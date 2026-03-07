@@ -1,0 +1,184 @@
+/* font faces */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Core Colors */
+  --bg-darker: #0d1117;
+  --bg-dark: #161b22;
+  --bg-panel: #21262d;
+  --bg-hover: #30363d;
+  
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --text-accent: #58a6ff;
+  
+  --border-color: #30363d;
+  --border-radius: 8px;
+  
+  /* Git Graph Colors */
+  --commit-red: #f85149;
+  --commit-green: #3fb950;
+  --commit-purple: #a371f7;
+  --commit-orange: #d29922;
+
+  /* UI Accents */
+  --accent-primary: #1f6feb;
+  --accent-hover: #388bfd;
+  --danger: #da3633;
+  
+  /* Metrics */
+  --sidebar-width: 260px;
+  --activity-bar-width: 48px;
+  
+  /* Shadows & Effects */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.5);
+  --glass-bg: rgba(22, 27, 34, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none; /* Desktop app feel */
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: var(--bg-darker);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Layout System */
+.app-container {
+  display: flex;
+  height: 100%;
+}
+
+.activity-bar {
+  width: var(--activity-bar-width);
+  background-color: var(--bg-darker);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 16px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--border-radius);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover, .icon-btn.active {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--bg-dark);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.main-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-darker);
+  position: relative;
+}
+
+/* Glassmorphism Topbar */
+.topbar {
+  height: 60px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  z-index: 10;
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.pane {
+  flex: 1;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane:last-child {
+  border-right: none;
+}
+
+.pane-header {
+  padding: 12px 16px;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.pane-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-hover); 
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 148, 158, 0.5);
+}
