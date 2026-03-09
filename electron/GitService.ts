@@ -70,7 +70,14 @@ export class GitService {
     // Use ASCII separators that are very unlikely to appear in commit messages.
     // RS (\x1e) separates commits and US (\x1f) separates fields.
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%D%x1e';
-    return this.runCommand(['log', `-${limit}`, `--pretty=format:${format}`, '--date=iso']);
+    return this.runCommand([
+      'log',
+      '--all',
+      '--topo-order',
+      `-${limit}`,
+      `--pretty=format:${format}`,
+      '--date=iso'
+    ]);
   }
 
   /**

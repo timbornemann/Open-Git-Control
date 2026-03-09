@@ -223,7 +223,7 @@ code, pre {
 .commit-row {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   cursor: pointer;
   border-bottom: 1px solid rgba(48, 54, 61, 0.4);
   transition: background-color 0.12s ease;
@@ -239,13 +239,44 @@ code, pre {
   border-bottom-color: rgba(31, 111, 235, 0.3);
 }
 
+.commit-row.secondary-history {
+  background-color: rgba(139, 148, 158, 0.03);
+}
+
+.commit-row.secondary-history .commit-hash,
+.commit-row.secondary-history .commit-subject,
+.commit-row.secondary-history .commit-author,
+.commit-row.secondary-history .commit-date {
+  color: var(--text-secondary);
+}
+
+.commit-row.secondary-history .branch-label {
+  opacity: 0.72;
+}
+
 .commit-info {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding-left: 4px;
+  padding: 6px 0 6px 4px;
+}
+
+.commit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.commit-subject-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .commit-hash {
@@ -292,14 +323,15 @@ code, pre {
 .commit-refs {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .branch-label {
   font-size: 0.7rem;
   font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 999px;
   background-color: rgba(88, 166, 255, 0.15);
   color: #58a6ff;
   border: 1px solid rgba(88, 166, 255, 0.3);
@@ -312,10 +344,38 @@ code, pre {
   border-color: rgba(63, 185, 80, 0.3);
 }
 
+.branch-label.local {
+  background-color: rgba(31, 111, 235, 0.14);
+  color: #7cb8ff;
+  border-color: rgba(31, 111, 235, 0.24);
+}
+
+.branch-label.remote {
+  background-color: rgba(139, 148, 158, 0.12);
+  color: #aeb6bf;
+  border-color: rgba(139, 148, 158, 0.22);
+}
+
 .branch-label.tag {
   background-color: rgba(210, 169, 34, 0.15);
   color: #d2a922;
   border-color: rgba(210, 169, 34, 0.3);
+}
+
+.branch-label.head-pointer {
+  background-color: rgba(163, 113, 247, 0.14);
+  color: #c297ff;
+  border-color: rgba(163, 113, 247, 0.24);
+}
+
+.branch-label.working-tree {
+  background-color: rgba(210, 153, 34, 0.14);
+  color: #e3b341;
+  border-color: rgba(210, 153, 34, 0.26);
+}
+
+.working-tree-row .commit-hash {
+  color: #d29922;
 }
 
 /* ═══ Context Menu ═══ */

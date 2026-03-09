@@ -1,19 +1,21 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { parseGitLog } from '../utils/gitParsing';
+import { GitStatusDetailed, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 
 interface CommitGraphProps {
   repoPath: string | null;
-  onSelectCommit?: (hash: string) => void;
+  onSelectCommit?: (hash: string | null) => void;
   selectedHash?: string | null;
   refreshTrigger?: number;
 }
 
-const ROW_HEIGHT = 36;
-const LANE_WIDTH = 22;
-const GRAPH_PADDING = 14;
-const NODE_RADIUS = 5;
-const MERGE_NODE_RADIUS = 7;
+const LOG_LIMIT = 200;
+const ROW_HEIGHT = 44;
+const LANE_WIDTH = 24;
+const GRAPH_PADDING = 16;
+const NODE_RADIUS = 4;
+const MERGE_NODE_RADIUS = 6;
+const SECONDARY_GRAPH_COLOR = 'rgba(139, 148, 158, 0.78)';
 
 interface ContextMenuState {
   x: number;
@@ -29,8 +31,33 @@ interface MenuAction {
   action: () => void;
 }
 
+type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
+
+const getRefKind = (ref: string): RefKind => {
+  if (ref.startsWith('tag:')) return 'tag';
+  if (ref.startsWith('HEAD ->')) return 'head';
+  if (ref === 'HEAD') return 'head-pointer';
+  if (ref.includes('/')) return 'remote';
+  return 'local';
+};
+
+const getRefPriority = (ref: string) => {
+  const kind = getRefKind(ref);
+  if (kind === 'head') return 0;
+  if (kind === 'local') return 1;
+  if (kind === 'remote') return 2;
+  if (kind === 'tag') return 3;
+  return 4;
+};
+
+const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
+  const prioDiff = getRefPriority(a) - getRefPriority(b);
+  return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
+});
+
 export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
+  const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
   const [loading, setLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [actionResult, setActionResult] = useState<{ message: string; isError: boolean } | null>(null);
@@ -40,7 +67,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     if (!repoPath || !window.electronAPI) return;
     setLoading(true);
     try {
-      const { success, data, error } = await window.electronAPI.runGitCommand('log', '100');
+      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_LIMIT));
       if (success && data) {
         setLayout(computeGraphLayout(parseGitLog(data)));
       } else {
@@ -53,13 +80,37 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     }
   }, [repoPath]);
 
+  const refreshWorkingTreeStatus = useCallback(async () => {
+    if (!repoPath || !window.electronAPI) return;
+    try {
+      const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
+      if (success) {
+        setWorkingTreeStatus(parseGitStatusDetailed(data || ''));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [repoPath]);
+
   useEffect(() => {
     if (!repoPath) {
       setLayout(null);
+      setWorkingTreeStatus(null);
       return;
     }
     refreshCommits();
-  }, [repoPath, refreshCommits, refreshTrigger]);
+    refreshWorkingTreeStatus();
+  }, [repoPath, refreshCommits, refreshWorkingTreeStatus, refreshTrigger]);
+
+  useEffect(() => {
+    if (!repoPath) return;
+    const intervalId = window.setInterval(refreshWorkingTreeStatus, 3000);
+    window.addEventListener('focus', refreshWorkingTreeStatus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshWorkingTreeStatus);
+    };
+  }, [repoPath, refreshWorkingTreeStatus]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -247,31 +298,64 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Keine Commits gefunden.</div>;
   }
 
+  const hasWorkingTreeChanges = Boolean(
+    workingTreeStatus &&
+    (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0)
+  );
+  const workingTreeRowOffset = hasWorkingTreeChanges ? 1 : 0;
   const graphWidth = Math.max((layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2, 60);
-  const totalHeight = layout.nodes.length * ROW_HEIGHT;
+  const totalHeight = (layout.nodes.length + workingTreeRowOffset) * ROW_HEIGHT;
   const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
+  const nodeByHash = new Map(layout.nodes.map(node => [node.commit.hash, node]));
+  const headNode = layout.nodes.find(node => (
+    node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
+  )) ?? layout.nodes[0];
+  const reachableFromHead = new Set<string>();
+  const workingTreeLabel = !workingTreeStatus ? ''
+    : workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0
+      ? 'Uncommitted Changes'
+      : 'Staged Changes';
+  const workingTreeCount = !workingTreeStatus ? 0
+    : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
+  const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
+
+  if (headNode) {
+    const stack = [headNode.commit.hash];
+    while (stack.length > 0) {
+      const hash = stack.pop();
+      if (!hash || reachableFromHead.has(hash)) continue;
+      reachableFromHead.add(hash);
+      const currentNode = nodeByHash.get(hash);
+      if (!currentNode) continue;
+      currentNode.commit.parentHashes.forEach(parentHash => {
+        if (nodeByHash.has(parentHash) && !reachableFromHead.has(parentHash)) {
+          stack.push(parentHash);
+        }
+      });
+    }
+  }
 
   const buildEdgePath = (edge: GraphEdge): string => {
     const x1 = laneX(edge.fromLane);
-    const y1 = edge.fromRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+    const y1 = (edge.fromRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
     const x2 = laneX(edge.toLane);
-    const y2 = Math.min(edge.toRow * ROW_HEIGHT + ROW_HEIGHT / 2, totalHeight);
+    const y2 = Math.min((edge.toRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2, totalHeight);
 
     if (x1 === x2) {
       return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
     const span = y2 - y1;
-    const curveSpan = Math.min(span, ROW_HEIGHT * 2.5);
+    const verticalInset = Math.min(ROW_HEIGHT * 0.9, Math.max(10, span * 0.28));
+    const bendStartY = y1 + verticalInset;
+    const bendEndY = y2 - verticalInset;
+    const midY = (bendStartY + bendEndY) / 2;
 
-    if (curveSpan >= span) {
-      const midY = (y1 + y2) / 2;
+    if (bendStartY >= bendEndY) {
       return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
     }
 
-    const midCurveY = y1 + curveSpan / 2;
-    const curveEndY = y1 + curveSpan;
-    return `M ${x1} ${y1} C ${x1} ${midCurveY}, ${x2} ${midCurveY}, ${x2} ${curveEndY} L ${x2} ${y2}`;
+    return `M ${x1} ${y1} L ${x1} ${bendStartY} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${bendEndY} L ${x2} ${y2}`;
   };
 
   return (
@@ -282,86 +366,195 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
           height={totalHeight}
           className="commit-graph-svg"
         >
+          {Array.from({ length: layout.maxLane + 1 }).map((_, lane) => {
+            const x = laneX(lane);
+            return (
+              <line
+                key={`lane-${lane}`}
+                x1={x}
+                y1={0}
+                x2={x}
+                y2={totalHeight}
+                stroke="rgba(201, 209, 217, 0.06)"
+                strokeWidth={1}
+              />
+            );
+          })}
+          {hasWorkingTreeChanges && headNode && (
+            <>
+              <path
+                d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
+                stroke={headNode.color}
+                strokeWidth={5}
+                strokeOpacity={0.1}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
+                stroke={headNode.color}
+                strokeWidth={2.2}
+                strokeOpacity={0.92}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <circle
+                cx={laneX(headNode.lane)}
+                cy={ROW_HEIGHT / 2}
+                r={NODE_RADIUS + 2}
+                fill="var(--bg-darker)"
+                stroke="#d29922"
+                strokeWidth={2.2}
+              />
+            </>
+          )}
           {layout.edges.map((edge, i) => (
             <path
               key={`eg${i}`}
               d={buildEdgePath(edge)}
-              stroke={edge.color}
-              strokeWidth={6}
+              stroke={reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? edge.color : SECONDARY_GRAPH_COLOR}
+              strokeWidth={edge.kind === 'merge' ? 4.5 : 5}
               strokeOpacity={0.1}
               fill="none"
               strokeLinecap="round"
+              strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
             />
           ))}
           {layout.edges.map((edge, i) => (
             <path
               key={`em${i}`}
               d={buildEdgePath(edge)}
-              stroke={edge.color}
-              strokeWidth={2}
-              strokeOpacity={0.85}
+              stroke={reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? edge.color : SECONDARY_GRAPH_COLOR}
+              strokeWidth={edge.kind === 'merge' ? 1.5 : 2.2}
+              strokeOpacity={edge.kind === 'merge' ? 0.72 : 0.92}
               fill="none"
               strokeLinecap="round"
+              strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
             />
           ))}
           {layout.nodes.map((node) => {
             const cx = laneX(node.lane);
-            const cy = node.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
             const isSelected = selectedHash === node.commit.hash;
+            const isSecondary = !reachableFromHead.has(node.commit.hash);
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
+            const fillColor = isSecondary ? SECONDARY_GRAPH_COLOR : node.color;
 
             return (
               <g key={node.commit.hash}>
                 {isSelected && (
                   <circle
                     cx={cx} cy={cy} r={r + 6}
-                    fill={node.color} opacity={0.15}
+                    fill={fillColor} opacity={0.15}
                   />
                 )}
                 {isSelected && (
                   <circle
                     cx={cx} cy={cy} r={r + 3}
-                    fill="none" stroke={node.color} strokeWidth={1.5} opacity={0.6}
+                    fill="none" stroke={fillColor} strokeWidth={1.5} opacity={0.6}
                   />
                 )}
-                <circle
-                  cx={cx} cy={cy} r={r}
-                  fill={node.color} stroke="var(--bg-darker)" strokeWidth={2.5}
-                />
                 {node.isMerge && (
-                  <circle cx={cx} cy={cy} r={r * 0.4} fill="var(--bg-darker)" />
+                  <>
+                    <rect
+                      x={cx - r}
+                      y={cy - r}
+                      width={r * 2}
+                      height={r * 2}
+                      transform={`rotate(45 ${cx} ${cy})`}
+                      fill={fillColor}
+                      stroke="var(--bg-darker)"
+                      strokeWidth={2.5}
+                      rx={1.5}
+                    />
+                    <circle cx={cx} cy={cy} r={r * 0.34} fill="var(--bg-darker)" />
+                  </>
+                )}
+                {!node.isMerge && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={r}
+                    fill={fillColor}
+                    stroke="var(--bg-darker)"
+                    strokeWidth={2.5}
+                  />
                 )}
               </g>
             );
           })}
         </svg>
 
+        {hasWorkingTreeChanges && (
+          <div
+            className={`commit-row working-tree-row ${isWorkingTreeSelected ? 'selected' : ''}`}
+            onClick={() => onSelectCommit && onSelectCommit(null)}
+            style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
+          >
+            <div className="commit-info">
+              <span className="commit-hash">WORKDIR</span>
+              <div className="commit-main">
+                <div className="commit-refs">
+                  {workingTreeStatus!.staged.length > 0 && (
+                    <span className="branch-label tag">
+                      {workingTreeStatus!.staged.length} staged
+                    </span>
+                  )}
+                  {workingTreeStatus!.unstaged.length > 0 && (
+                    <span className="branch-label working-tree">
+                      {workingTreeStatus!.unstaged.length} unstaged
+                    </span>
+                  )}
+                  {workingTreeStatus!.untracked.length > 0 && (
+                    <span className="branch-label remote">
+                      {workingTreeStatus!.untracked.length} untracked
+                    </span>
+                  )}
+                </div>
+                <div className="commit-subject-row">
+                  <span className="commit-subject">{workingTreeLabel}</span>
+                  <span className="commit-meta">
+                    <span className="commit-author">Klicken zum Stage / Commit</span>
+                    <span className="commit-date">{workingTreeCount}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {layout.nodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
+          const isSecondary = !reachableFromHead.has(node.commit.hash);
+          const sortedRefs = sortRefs(node.commit.refs);
           return (
             <div
               key={node.commit.hash}
-              className={`commit-row ${isSelected ? 'selected' : ''}`}
+              className={`commit-row ${isSelected ? 'selected' : ''} ${isSecondary ? 'secondary-history' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
               style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
             >
               <div className="commit-info">
-                {node.commit.refs.length > 0 && (
-                  <div className="commit-refs">
-                    {node.commit.refs.map((ref, ri) => (
-                      <span key={ri} className={`branch-label ${ref.startsWith('HEAD') ? 'head' : ''} ${ref.startsWith('tag:') ? 'tag' : ''}`}>
-                        {ref}
-                      </span>
-                    ))}
-                  </div>
-                )}
                 <span className="commit-hash">{node.commit.abbrevHash}</span>
-                <span className="commit-subject">{node.commit.subject}</span>
-                <span className="commit-meta">
-                  <span className="commit-author">{node.commit.author}</span>
-                  <span className="commit-date">{formatDate(node.commit.date)}</span>
-                </span>
+                <div className="commit-main">
+                  {sortedRefs.length > 0 && (
+                    <div className="commit-refs">
+                      {sortedRefs.map((ref, ri) => (
+                        <span key={ri} className={`branch-label ${getRefKind(ref)}`}>
+                          {ref}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="commit-subject-row">
+                    <span className="commit-subject">{node.commit.subject}</span>
+                    <span className="commit-meta">
+                      <span className="commit-author">{node.commit.author}</span>
+                      <span className="commit-date">{formatDate(node.commit.date)}</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           );
