@@ -1,28 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GitBranch, Settings, FolderGit2, ArrowDownCircle, ArrowUpCircle, Plus, Github, DownloadCloud, Key, ExternalLink, LogOut, RefreshCw, X, Tag, Globe, GitPullRequest } from 'lucide-react';
+import { GitBranch, Settings, FolderGit2, Plus, Github, DownloadCloud, Key, ExternalLink, LogOut, RefreshCw, GitPullRequest } from 'lucide-react';
 import { CommitGraph } from './components/CommitGraph';
 import { StagingArea } from './components/StagingArea';
 import { CommitDetails } from './components/CommitDetails';
+import { RepoList } from './components/sidebar/RepoList';
+import { BranchPanel } from './components/sidebar/BranchPanel';
+import { TagPanel } from './components/sidebar/TagPanel';
+import { RemotePanel } from './components/sidebar/RemotePanel';
+import { TopbarActions } from './components/topbar/TopbarActions';
+import { useToastQueue } from './hooks/useToastQueue';
+import { BranchInfo, RemoteSyncState } from './types/git';
+import { GitHubRepositoryDto, PullRequestDto } from './global';
 import './index.css';
 
 const REMOTE_SYNC_INTERVAL_MS = 60_000;
 
 const App: React.FC = () => {
-  type BranchInfo = {
-    name: string;
-    isHead: boolean;
-    scope: 'local' | 'remote';
-  };
-
-  type RemoteSyncState = {
-    isFetching: boolean;
-    lastFetchedAt: number | null;
-    lastFetchError: string | null;
-    ahead: number;
-    behind: number;
-    hasUpstream: boolean;
-  };
-
   const [activeTab, setActiveTab] = useState<'repos' | 'github'>('repos');
 
   // Multi-repo
@@ -40,7 +33,7 @@ const App: React.FC = () => {
   // GitHub Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubUser, setGithubUser] = useState<string | null>(null);
-  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [githubRepos, setGithubRepos] = useState<GitHubRepositoryDto[]>([]);
   const [tokenInput, setTokenInput] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -61,7 +54,7 @@ const App: React.FC = () => {
   const [cloneError, setCloneError] = useState<string | null>(null);
 
   // Pull Requests
-  const [pullRequests, setPullRequests] = useState<any[]>([]);
+  const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [prOwnerRepo, setPrOwnerRepo] = useState<{ owner: string; repo: string } | null>(null);
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -94,7 +87,7 @@ const App: React.FC = () => {
   // UI state
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
-  const [gitActionToast, setGitActionToast] = useState<{msg: string, isError: boolean} | null>(null);
+  const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
   const isRemoteFetchRunningRef = useRef(false);
@@ -107,9 +100,6 @@ const App: React.FC = () => {
     branchName.replace(/^remotes\/[^/]+\//, '')
   ), []);
 
-  const getRemoteBranchLabel = useCallback((branchName: string) => (
-    branchName.replace(/^remotes\//, '')
-  ), []);
 
   const formatLastFetchedAt = useCallback((timestamp: number | null) => {
     if (!timestamp) return 'Noch nicht aktualisiert';
@@ -412,13 +402,6 @@ const App: React.FC = () => {
 
     loginWithSavedToken();
   }, []);
-
-  // Hide action toast
-  useEffect(() => {
-    if (!gitActionToast) return;
-    const t = setTimeout(() => setGitActionToast(null), 3000);
-    return () => clearTimeout(t);
-  }, [gitActionToast]);
 
   const refreshRemoteState = useCallback(async (showToast = false) => {
     if (!window.electronAPI || !activeRepo) return false;
@@ -949,422 +932,47 @@ const App: React.FC = () => {
           {/* Repos Tab */}
           {activeTab === 'repos' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {/* Repo list */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {openRepos.map(repoPath => {
-                  const name = repoPath.split(/[\\/]/).pop() || repoPath;
-                  const isActive = repoPath === activeRepo;
-                  return (
-                    <div
-                      key={repoPath}
-                      className="repo-list-item"
-                      onClick={() => handleSwitchRepo(repoPath)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 8px',
-                        backgroundColor: isActive ? 'var(--bg-hover)' : 'transparent',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        border: isActive ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                      }}
-                    >
-                      <FolderGit2
-                        size={14}
-                        style={{
-                          opacity: isActive ? 1 : 0.6,
-                          flexShrink: 0,
-                          color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)',
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: '0.85rem',
-                          fontWeight: isActive ? 600 : 400,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                          color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        }}
-                      >
-                        {name}
-                      </span>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleCloseRepo(repoPath);
-                        }}
-                        className="icon-btn repo-close-btn"
-                        style={{ padding: '2px', opacity: 0 }}
-                        title="Entfernen"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-                {openRepos.length === 0 && (
-                  <div
-                    style={{
-                      padding: '20px 8px',
-                      textAlign: 'center',
-                      color: 'var(--text-secondary)',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
-                    Kein Repository geöffnet.
-                    <button
-                      onClick={handleOpenFolder}
-                      style={{
-                        marginTop: '12px',
-                        display: 'block',
-                        width: '100%',
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--accent-primary)',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Repository öffnen
-                    </button>
-                  </div>
-                )}
-              </div>
+              <RepoList
+                openRepos={openRepos}
+                activeRepo={activeRepo}
+                onSwitchRepo={handleSwitchRepo}
+                onCloseRepo={handleCloseRepo}
+                onOpenFolder={handleOpenFolder}
+              />
 
-              {/* Branches */}
               {activeRepo && (
-                <>
-                  <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '4px 8px 6px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Branches
-                    </span>
-                    <button
-                      className="icon-btn"
-                      style={{ padding: '2px' }}
-                      onClick={() => {
-                        setIsCreatingBranch(true);
-                        setNewBranchName('');
-                      }}
-                      title="Neuen Branch erstellen"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                  {isCreatingBranch && (
-                    <div style={{ padding: '2px 8px 6px' }}>
-                      <input
-                        ref={newBranchInputRef}
-                        type="text"
-                        placeholder="branch-name"
-                        value={newBranchName}
-                        onChange={e => setNewBranchName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleCreateBranch();
-                          if (e.key === 'Escape') {
-                            setIsCreatingBranch(false);
-                            setNewBranchName('');
-                          }
-                        }}
-                        onBlur={() => {
-                          if (!newBranchName.trim()) setIsCreatingBranch(false);
-                        }}
-                        style={{
-                          width: '100%',
-                          boxSizing: 'border-box',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--accent-primary)',
-                          backgroundColor: 'var(--bg-dark)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.82rem',
-                          fontFamily: 'monospace',
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {branches.map(b => (
-                      <div
-                        key={b.name}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '6px 8px',
-                          color: b.isHead
-                            ? 'var(--accent-primary)'
-                            : b.scope === 'remote'
-                              ? 'var(--text-secondary)'
-                              : 'var(--text-primary)',
-                          backgroundColor: b.isHead ? 'var(--bg-hover)' : 'transparent',
-                          borderRadius: '4px',
-                          cursor: !b.isHead && b.scope === 'local' ? 'pointer' : 'default',
-                          opacity: b.scope === 'remote' ? 0.72 : 1,
-                        }}
-                        onClick={() => !b.isHead && b.scope === 'local' && runGitCommand(['checkout', b.name], `Ausgecheckt: ${b.name}`)}
-                        onContextMenu={e => {
-                          e.preventDefault();
-                          setBranchContextMenu({ x: e.clientX, y: e.clientY, branch: b.name, isHead: b.isHead });
-                        }}
-                      >
-                        <GitBranch size={14} style={{ opacity: b.isHead ? 1 : (b.scope === 'remote' ? 0.45 : 0.6) }} />
-                        <span
-                          style={{
-                            fontSize: '0.85rem',
-                            fontWeight: b.isHead ? 600 : 400,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {b.scope === 'remote' ? getRemoteBranchLabel(b.name) : b.name}
-                          {b.scope === 'remote' && (
-                            <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                              {localBranchNames.has(getRemoteBranchShortName(b.name)) ? '(remote)' : '(nur remote)'}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <BranchPanel
+                  branches={branches}
+                  isCreatingBranch={isCreatingBranch}
+                  newBranchName={newBranchName}
+                  newBranchInputRef={newBranchInputRef}
+                  onSetCreatingBranch={setIsCreatingBranch}
+                  onSetNewBranchName={setNewBranchName}
+                  onCreateBranch={handleCreateBranch}
+                  onCheckoutBranch={(name) => runGitCommand(['checkout', name], `Ausgecheckt: ${name}`)}
+                  onSetBranchContextMenu={setBranchContextMenu}
+                />
               )}
 
-              {/* Tags */}
               {activeRepo && (
-                <>
-                  <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '4px 8px 6px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Tags
-                    </span>
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      <button
-                        className="icon-btn"
-                        style={{ padding: '2px' }}
-                        onClick={handleCreateTag}
-                        title="Tag erstellen"
-                      >
-                        <Plus size={13} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        style={{ padding: '2px' }}
-                        onClick={handlePushTags}
-                        title="Tags pushen"
-                      >
-                        <ArrowUpCircle size={13} />
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {tags.map(t => (
-                      <div
-                        key={t}
-                        className="repo-list-item"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '5px 8px',
-                          borderRadius: '4px',
-                          cursor: 'default',
-                        }}
-                      >
-                        <Tag size={13} style={{ color: '#d2a922', opacity: 0.7, flexShrink: 0 }} />
-                        <span
-                          style={{
-                            fontSize: '0.82rem',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flex: 1,
-                          }}
-                        >
-                          {t}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteTag(t)}
-                          className="icon-btn repo-close-btn"
-                          style={{ padding: '2px', opacity: 0 }}
-                          title="Tag löschen"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ))}
-                    {tags.length === 0 && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '2px 8px' }}>
-                        Keine Tags vorhanden.
-                      </div>
-                    )}
-                  </div>
-                </>
+                <TagPanel
+                  tags={tags}
+                  onCreateTag={handleCreateTag}
+                  onPushTags={handlePushTags}
+                  onDeleteTag={handleDeleteTag}
+                />
               )}
 
-              {/* Remotes */}
               {activeRepo && (
-                <>
-                  <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '4px 8px 6px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      Remotes
-                    </span>
-                    <button
-                      className="icon-btn"
-                      style={{ padding: '2px' }}
-                      onClick={handleAddRemote}
-                      title="Remote hinzufügen"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div
-                      style={{
-                        margin: '0 8px 8px',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        backgroundColor: 'var(--bg-panel)',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: remoteStatus.color }}>
-                          {remoteStatus.title}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>alle 60s</span>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {remoteStatus.detail}
-                      </span>
-                      {remoteSync.lastFetchedAt && !remoteSync.isFetching && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {formatLastFetchedAt(remoteSync.lastFetchedAt)}
-                        </span>
-                      )}
-                      {remoteSync.behind > 0 && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          Remote voraus: {remoteSync.behind} Commit{remoteSync.behind === 1 ? '' : 's'}.
-                        </span>
-                      )}
-                      {remoteSync.ahead > 0 && remoteSync.hasUpstream && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          Lokal voraus: {remoteSync.ahead} Commit{remoteSync.ahead === 1 ? '' : 's'} noch nicht gepusht.
-                        </span>
-                      )}
-                      {remoteOnlyBranches.length > 0 && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {remoteOnlyBranches.length} Branch{remoteOnlyBranches.length === 1 ? '' : 'es'} existieren nur auf dem Remote.
-                        </span>
-                      )}
-                      {remoteSync.lastFetchError && (
-                        <span style={{ fontSize: '0.75rem', color: '#f85149' }}>
-                          {remoteSync.lastFetchError}
-                        </span>
-                      )}
-                    </div>
-                    {remotes.map(r => (
-                      <div
-                        key={r.name}
-                        className="repo-list-item"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '5px 8px',
-                          borderRadius: '4px',
-                          cursor: 'default',
-                        }}
-                      >
-                        <Globe size={13} style={{ color: 'var(--text-accent)', opacity: 0.7, flexShrink: 0 }} />
-                        <span style={{ fontSize: '0.82rem', fontWeight: 500, flexShrink: 0 }}>{r.name}</span>
-                        <span
-                          style={{
-                            fontSize: '0.72rem',
-                            color: 'var(--text-secondary)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flex: 1,
-                          }}
-                          title={r.url}
-                        >
-                          {r.url}
-                        </span>
-                        <button
-                          onClick={() => handleRemoveRemote(r.name)}
-                          className="icon-btn repo-close-btn"
-                          style={{ padding: '2px', opacity: 0 }}
-                          title="Remote entfernen"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    ))}
-                    {remotes.length === 0 && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '2px 8px' }}>
-                        Keine Remotes konfiguriert.
-                      </div>
-                    )}
-                  </div>
-                </>
+                <RemotePanel
+                  remotes={remotes}
+                  remoteSync={remoteSync}
+                  remoteStatus={remoteStatus}
+                  remoteOnlyBranchesCount={remoteOnlyBranches.length}
+                  onAddRemote={handleAddRemote}
+                  onRemoveRemote={handleRemoveRemote}
+                  onRefreshRemote={() => refreshRemoteState(true)}
+                />
               )}
 
               {/* GitHub connect for active repo */}
@@ -1872,39 +1480,16 @@ const App: React.FC = () => {
           
           <div style={{ flex: 1 }}></div>
           
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="icon-btn"
-              onClick={() => refreshRemoteState(true)}
-              disabled={!activeRepo || isGitActionRunning || remoteSync.isFetching}
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <RefreshCw size={16} className={remoteSync.isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
-              {remoteSync.isFetching ? 'Fetch läuft...' : 'Fetch'}
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => runGitCommand(['pull'], 'Erfolgreich gepullt.', 'Pull wird ausgefuehrt...')}
-              disabled={!activeRepo || isGitActionRunning}
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <ArrowDownCircle size={16} className={isGitActionRunning && activeGitActionLabel === 'Pull wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
-              {isGitActionRunning && activeGitActionLabel === 'Pull wird ausgefuehrt...' ? 'Pull läuft...' : 'Pull'}
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => runGitCommand(['push'], 'Erfolgreich gepusht.', 'Push wird ausgefuehrt...')}
-              disabled={!activeRepo || isGitActionRunning}
-              style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <ArrowUpCircle size={16} className={isGitActionRunning && activeGitActionLabel === 'Push wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
-              {isGitActionRunning && activeGitActionLabel === 'Push wird ausgefuehrt...' ? 'Push läuft...' : 'Push'}
-            </button>
-            <button
-              className="icon-btn"
-              onClick={() => setSelectedCommit(null)}
-              style={{ backgroundColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.85rem', padding: '6px 12px' }} 
-              disabled={!activeRepo}>
-              Stage / Commit
-            </button>
-          </div>
+          <TopbarActions
+            activeRepo={activeRepo}
+            isGitActionRunning={isGitActionRunning}
+            isFetching={remoteSync.isFetching}
+            activeActionLabel={activeGitActionLabel}
+            onFetch={() => refreshRemoteState(true)}
+            onPull={() => runGitCommand(['pull'], 'Erfolgreich gepullt.', 'Pull wird ausgefuehrt...')}
+            onPush={() => runGitCommand(['push'], 'Erfolgreich gepusht.', 'Push wird ausgefuehrt...')}
+            onStageCommit={() => setSelectedCommit(null)}
+          />
         </div>
 
         <div className="content-area">
