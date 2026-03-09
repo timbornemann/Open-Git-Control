@@ -805,7 +805,105 @@ const App: React.FC = () => {
     branch.scope === 'remote' && !localBranchNames.has(getRemoteBranchShortName(branch.name))
   ));
 
-  const hasRemoteChanges = remoteSync.behind > 0 || remoteOnlyBranches.length > 0;
+  const remoteStatus = (() => {
+    if (remoteSync.isFetching) {
+      return {
+        title: 'Remote wird aktualisiert...',
+        detail: 'Fetch laeuft gerade.',
+        color: '#7cb8ff',
+        backgroundColor: 'rgba(31, 111, 235, 0.14)',
+        borderColor: 'rgba(31, 111, 235, 0.28)',
+      };
+    }
+
+    if (remoteSync.lastFetchError) {
+      return {
+        title: 'Remote-Check fehlgeschlagen',
+        detail: remoteSync.lastFetchError,
+        color: '#f85149',
+        backgroundColor: 'rgba(248, 81, 73, 0.14)',
+        borderColor: 'rgba(248, 81, 73, 0.28)',
+      };
+    }
+
+    if (hasRemoteOrigin === false) {
+      return {
+        title: 'Kein Remote konfiguriert',
+        detail: 'Dieses Repository hat noch kein Remote.',
+        color: 'var(--text-secondary)',
+        backgroundColor: 'var(--bg-panel)',
+        borderColor: 'var(--border-color)',
+      };
+    }
+
+    if (remoteSync.lastFetchedAt === null) {
+      return {
+        title: 'Remote noch nicht geprueft',
+        detail: 'Noch kein erfolgreicher Fetch fuer dieses Repository.',
+        color: 'var(--text-secondary)',
+        backgroundColor: 'var(--bg-panel)',
+        borderColor: 'var(--border-color)',
+      };
+    }
+
+    if (!remoteSync.hasUpstream) {
+      return {
+        title: 'Kein Tracking-Branch',
+        detail: 'Der aktuelle lokale Branch tracked keinen Remote-Branch.',
+        color: '#d2a922',
+        backgroundColor: 'rgba(210, 169, 34, 0.14)',
+        borderColor: 'rgba(210, 169, 34, 0.28)',
+      };
+    }
+
+    if (remoteSync.ahead > 0 && remoteSync.behind > 0) {
+      return {
+        title: 'Lokal und Remote sind unterschiedlich',
+        detail: `Lokal ${remoteSync.ahead} voraus, Remote ${remoteSync.behind} voraus.`,
+        color: '#d2a922',
+        backgroundColor: 'rgba(210, 169, 34, 0.14)',
+        borderColor: 'rgba(210, 169, 34, 0.28)',
+      };
+    }
+
+    if (remoteSync.behind > 0) {
+      return {
+        title: `Remote ist ${remoteSync.behind} Commit${remoteSync.behind === 1 ? '' : 's'} voraus`,
+        detail: 'Der Remote hat neuere Commits als dein lokaler Branch.',
+        color: '#d2a922',
+        backgroundColor: 'rgba(210, 169, 34, 0.14)',
+        borderColor: 'rgba(210, 169, 34, 0.28)',
+      };
+    }
+
+    if (remoteSync.ahead > 0) {
+      return {
+        title: `Lokal ist ${remoteSync.ahead} Commit${remoteSync.ahead === 1 ? '' : 's'} voraus`,
+        detail: 'Deine lokalen Commits wurden noch nicht gepusht.',
+        color: '#7cb8ff',
+        backgroundColor: 'rgba(31, 111, 235, 0.14)',
+        borderColor: 'rgba(31, 111, 235, 0.28)',
+      };
+    }
+
+    if (remoteOnlyBranches.length > 0) {
+      return {
+        title: `${remoteOnlyBranches.length} zusaetzl. Remote-Branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`,
+        detail: 'Auf dem Remote gibt es weitere Branches.',
+        color: '#d2a922',
+        backgroundColor: 'rgba(210, 169, 34, 0.14)',
+        borderColor: 'rgba(210, 169, 34, 0.28)',
+      };
+    }
+
+    return {
+      title: 'Remote ist aktuell',
+      detail: formatLastFetchedAt(remoteSync.lastFetchedAt),
+      color: '#3fb950',
+      backgroundColor: 'rgba(63, 185, 80, 0.14)',
+      borderColor: 'rgba(63, 185, 80, 0.28)',
+    };
+  })();
 
   return (
     <div className="app-container">
@@ -1188,22 +1286,27 @@ const App: React.FC = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: hasRemoteChanges ? '#d2a922' : 'var(--text-secondary)' }}>
-                          {remoteSync.isFetching ? 'Remote wird aktualisiert...' : (hasRemoteChanges ? 'Remote-Änderungen gefunden' : 'Remote-Status aktuell')}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: remoteStatus.color }}>
+                          {remoteStatus.title}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>alle 60s</span>
                       </div>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {formatLastFetchedAt(remoteSync.lastFetchedAt)}
+                        {remoteStatus.detail}
                       </span>
+                      {remoteSync.lastFetchedAt && !remoteSync.isFetching && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {formatLastFetchedAt(remoteSync.lastFetchedAt)}
+                        </span>
+                      )}
                       {remoteSync.behind > 0 && (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {remoteSync.behind} neue Commit{remoteSync.behind === 1 ? '' : 's'} auf dem Remote-Tracking-Branch.
+                          Remote voraus: {remoteSync.behind} Commit{remoteSync.behind === 1 ? '' : 's'}.
                         </span>
                       )}
                       {remoteSync.ahead > 0 && remoteSync.hasUpstream && (
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {remoteSync.ahead} lokale Commit{remoteSync.ahead === 1 ? '' : 's'} noch nicht gepusht.
+                          Lokal voraus: {remoteSync.ahead} Commit{remoteSync.ahead === 1 ? '' : 's'} noch nicht gepusht.
                         </span>
                       )}
                       {remoteOnlyBranches.length > 0 && (
@@ -1738,21 +1841,15 @@ const App: React.FC = () => {
                 fontSize: '0.78rem',
                 padding: '4px 8px',
                 borderRadius: '12px',
-                backgroundColor: hasRemoteChanges ? 'rgba(210, 169, 34, 0.14)' : 'var(--bg-panel)',
-                color: hasRemoteChanges ? '#d2a922' : 'var(--text-secondary)',
-                border: `1px solid ${hasRemoteChanges ? 'rgba(210, 169, 34, 0.28)' : 'var(--border-color)'}`,
+                backgroundColor: remoteStatus.backgroundColor,
+                color: remoteStatus.color,
+                border: `1px solid ${remoteStatus.borderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
               }}>
                 <RefreshCw size={12} style={{ opacity: remoteSync.isFetching ? 1 : 0.7 }} />
-                {remoteSync.isFetching
-                  ? 'Remote wird aktualisiert...'
-                  : remoteSync.behind > 0
-                    ? `${remoteSync.behind} Remote-Commit${remoteSync.behind === 1 ? '' : 's'} neuer`
-                    : remoteOnlyBranches.length > 0
-                      ? `${remoteOnlyBranches.length} zusätzl. Remote-Branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`
-                      : 'Remote aktuell'}
+                {remoteStatus.title}
               </span>
             )}
             {(isGitActionRunning || remoteSync.isFetching) && activeGitActionLabel && (
