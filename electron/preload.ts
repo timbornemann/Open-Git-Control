@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
   githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
+  githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),
+  githubLoginWithSavedToken: () => ipcRenderer.invoke('github:loginWithSavedToken'),
   githubCheckAuthStatus: () => ipcRenderer.invoke('github:checkAuthStatus'),
   githubLogout: () => ipcRenderer.invoke('github:logout'),
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) =>

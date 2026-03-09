@@ -288,24 +288,39 @@ const App: React.FC = () => {
     };
   }, [branchContextMenu]);
 
-  // Auto-login GitHub
+  // Auto-login GitHub via token stored in main process secure storage
   useEffect(() => {
-    const savedToken = localStorage.getItem('github_token');
-    if (savedToken && window.electronAPI) {
+    const loginWithSavedToken = async () => {
+      if (!window.electronAPI) return;
+
       setIsAuthenticating(true);
-      window.electronAPI.githubAuth(savedToken).then(async (success) => {
-        if (success) {
-          setIsAuthenticated(true);
-          const status = await window.electronAPI.githubCheckAuthStatus();
+      try {
+        const status = await window.electronAPI.githubGetSavedAuthStatus();
+        if (!status.hasSavedToken) {
+          setIsAuthenticated(status.authenticated);
           setGithubUser(status.username);
-          const result = await window.electronAPI.githubGetRepos();
-          if (result.success) setGithubRepos(result.data || []);
-        } else {
-          localStorage.removeItem('github_token');
+          return;
         }
+
+        const loginResult = await window.electronAPI.githubLoginWithSavedToken();
+        if (loginResult.success && loginResult.authenticated) {
+          setIsAuthenticated(true);
+          setGithubUser(loginResult.username);
+          const reposResult = await window.electronAPI.githubGetRepos();
+          if (reposResult.success) setGithubRepos(reposResult.data || []);
+        } else {
+          setIsAuthenticated(false);
+          setGithubUser(null);
+        }
+      } catch {
+        setIsAuthenticated(false);
+        setGithubUser(null);
+      } finally {
         setIsAuthenticating(false);
-      }).catch(() => setIsAuthenticating(false));
-    }
+      }
+    };
+
+    loginWithSavedToken();
   }, []);
 
   // Hide action toast
@@ -439,7 +454,6 @@ const App: React.FC = () => {
     try {
       const success = await window.electronAPI.githubAuth(token);
       if (success) {
-        localStorage.setItem('github_token', token);
         setIsAuthenticated(true);
         setTokenInput('');
         const status = await window.electronAPI.githubCheckAuthStatus();
@@ -464,7 +478,6 @@ const App: React.FC = () => {
     } catch (e) {
       console.error('GitHub logout failed:', e);
     } finally {
-      localStorage.removeItem('github_token');
       setIsAuthenticated(false);
       setGithubUser(null);
       setGithubRepos([]);

@@ -15,6 +15,8 @@ export interface ElectronAPI {
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;
   githubAuth: (token: string) => Promise<boolean>;
   githubGetRepos: () => Promise<{ success: boolean; data?: any[]; error?: any }>;
+  githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null }>;
+  githubLoginWithSavedToken: () => Promise<{ success: boolean; authenticated: boolean; username: string | null }>;
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
   githubLogout: () => Promise<{ success: boolean; error?: any }>;
   githubCreateRepo: (
