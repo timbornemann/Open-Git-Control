@@ -3,9 +3,9 @@ import { GitStatusDetailed, FileEntry, parseGitStatusDetailed } from '../utils/g
 
 interface StagingAreaProps {
   repoPath: string | null;
+  onRepoChanged?: () => void; // Called after commit/stash/discard to refresh graph
 }
 
-// Status label badges
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   'A': { label: 'Added', color: '#3fb950' },
   'M': { label: 'Modified', color: '#d29922' },
@@ -18,11 +18,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 const getStatusInfo = (code: string) => STATUS_LABELS[code] || { label: code, color: '#8b949e' };
 const basename = (p: string) => p.split(/[\\/]/).pop() || p;
 
-export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
+export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged }) => {
   const [status, setStatus] = useState<GitStatusDetailed | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; err: boolean } | null>(null);
+  const [diffContent, setDiffContent] = useState<{ path: string; diff: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -39,20 +40,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
     return () => clearInterval(iv);
   }, [repoPath, refresh]);
 
-  // Auto-hide toast
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const git = async (args: string[], msg: string) => {
+  const git = async (args: string[], msg: string, notify = false) => {
     if (!window.electronAPI) return;
     try {
       const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (r.success) {
         setToast({ msg, err: false });
-        refresh();
+        await refresh();
+        if (notify && onRepoChanged) onRepoChanged();
       } else {
         setToast({ msg: r.error || 'Fehler', err: true });
       }
@@ -61,34 +62,49 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
     }
   };
 
-  // Actions
-  const stageFile = (f: string) => git(['add', f], `${basename(f)} gestaged`);
+  // Single-file actions (sequential, no race condition)
+  const stageFile = (f: string) => git(['add', '--', f], `${basename(f)} gestaged`);
+  const unstageFile = (f: string) => git(['reset', 'HEAD', '--', f], `${basename(f)} unstaged`);
+  
+  // Bulk actions — use single git command to avoid lock file issues
   const stageAll = () => git(['add', '.'], 'Alle Dateien gestaged');
-  const unstageFile = (f: string) => git(['reset', 'HEAD', f], `${basename(f)} unstaged`);
   const unstageAll = () => git(['reset', 'HEAD'], 'Alle Dateien unstaged');
+  
   const discardFile = (f: string) => {
-    if (confirm(`Änderungen in "${basename(f)}" verwerfen? Das kann nicht rückgängig gemacht werden!`)) {
-      git(['checkout', '--', f], `${basename(f)} verworfen`);
+    if (confirm(`Änderungen in "${basename(f)}" verwerfen?`)) {
+      git(['checkout', '--', f], `${basename(f)} verworfen`, true);
     }
   };
   const discardAll = () => {
-    if (confirm('⚠️ Alle unstaged Änderungen verwerfen? Das kann nicht rückgängig gemacht werden!')) {
-      git(['checkout', '--', '.'], 'Alle Änderungen verworfen');
+    if (confirm('⚠️ Alle unstaged Änderungen verwerfen?')) {
+      git(['checkout', '--', '.'], 'Alle Änderungen verworfen', true);
     }
   };
   const deleteUntracked = (f: string) => {
     if (confirm(`"${basename(f)}" löschen?`)) {
-      git(['clean', '-f', f], `${basename(f)} gelöscht`);
+      git(['clean', '-f', '--', f], `${basename(f)} gelöscht`, true);
     }
   };
+  
   const stashChanges = () => {
     const msg = prompt('Stash-Nachricht (optional):');
     if (msg !== null) {
       const args = msg.trim() ? ['stash', 'push', '-m', msg.trim()] : ['stash'];
-      git(args, 'Änderungen gestasht');
+      git(args, 'Änderungen gestasht', true);
     }
   };
-  const stashPop = () => git(['stash', 'pop'], 'Stash angewendet');
+  const stashPop = () => git(['stash', 'pop'], 'Stash angewendet', true);
+
+  const showDiff = async (filePath: string, staged: boolean) => {
+    if (!window.electronAPI) return;
+    try {
+      const args = staged ? ['diff', '--cached', '--', filePath] : ['diff', '--', filePath];
+      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      if (r.success) {
+        setDiffContent({ path: filePath, diff: r.data || '(Keine Unterschiede)' });
+      }
+    } catch (e) { console.error(e); }
+  };
 
   const handleCommit = async () => {
     if (!commitMsg.trim() || !window.electronAPI) return;
@@ -102,7 +118,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
       if (r.success) {
         setCommitMsg('');
         setToast({ msg: 'Commit erfolgreich!', err: false });
-        refresh();
+        await refresh();
+        if (onRepoChanged) onRepoChanged();
       } else {
         setToast({ msg: r.error || 'Commit fehlgeschlagen', err: true });
       }
@@ -118,12 +135,32 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
 
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length;
 
+  // Diff viewer overlay
+  if (diffContent) {
+    return (
+      <div className="staging-container">
+        <div className="staging-toolbar">
+          <button className="staging-tool-btn" onClick={() => setDiffContent(null)}>← Zurück</button>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{diffContent.path}</span>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: '8px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.75rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {diffContent.diff.split('\n').map((line, i) => {
+            let color = 'var(--text-secondary)';
+            if (line.startsWith('+') && !line.startsWith('+++')) color = '#3fb950';
+            else if (line.startsWith('-') && !line.startsWith('---')) color = '#f85149';
+            else if (line.startsWith('@@')) color = '#a371f7';
+            return <div key={i} style={{ color }}>{line || ' '}</div>;
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const FileRow = ({ entry, section }: { entry: FileEntry; section: 'staged' | 'unstaged' | 'untracked' }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
-
     return (
-      <div className="staging-file-row">
+      <div className="staging-file-row" onClick={() => section !== 'untracked' && showDiff(entry.path, section === 'staged')}>
         <span className="staging-status" style={{ color: info.color }}>{statusCode}</span>
         <span className="staging-path" title={entry.path}>{entry.path}</span>
         <div className="staging-actions">
@@ -158,14 +195,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
 
   return (
     <div className="staging-container">
-      {/* Toolbar */}
       <div className="staging-toolbar">
-        <button className="staging-tool-btn" onClick={stashChanges} title="Stash">
-          📦 Stash
-        </button>
-        <button className="staging-tool-btn" onClick={stashPop} title="Stash Pop">
-          📤 Pop
-        </button>
+        <button className="staging-tool-btn" onClick={stashChanges} title="Stash">📦 Stash</button>
+        <button className="staging-tool-btn" onClick={stashPop} title="Stash Pop">📤 Pop</button>
         <div style={{ flex: 1 }} />
         {totalChanges > 0 && (
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
@@ -174,7 +206,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
         )}
       </div>
 
-      {/* File lists */}
       <div className="staging-files">
         {totalChanges === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
@@ -182,31 +213,21 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
           </div>
         )}
 
-        {/* Staged Changes */}
         {status.staged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader
-              title="Staged Changes"
-              count={status.staged.length}
-              color="#3fb950"
-              actions={
-                <button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">− Alle</button>
-              }
+            <SectionHeader title="Staged Changes" count={status.staged.length} color="#3fb950"
+              actions={<button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">− Alle</button>}
             />
             {status.staged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
           </div>
         )}
 
-        {/* Unstaged Changes */}
         {status.unstaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader
-              title="Changes"
-              count={status.unstaged.length}
-              color="#d29922"
+            <SectionHeader title="Changes" count={status.unstaged.length} color="#d29922"
               actions={
                 <>
-                  <button className="staging-btn-sm" onClick={() => { const paths = status.unstaged.map(f => f.path); paths.forEach(p => stageFile(p)); }} title="Alle stagen">+ Alle</button>
+                  <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
                   <button className="staging-btn-sm danger" onClick={discardAll} title="Alle verwerfen">✕ Alle</button>
                 </>
               }
@@ -215,23 +236,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
           </div>
         )}
 
-        {/* Untracked */}
         {status.untracked.length > 0 && (
           <div className="staging-section">
-            <SectionHeader
-              title="Untracked"
-              count={status.untracked.length}
-              color="#8b949e"
-              actions={
-                <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
-              }
+            <SectionHeader title="Untracked" count={status.untracked.length} color="#8b949e"
+              actions={<button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>}
             />
             {status.untracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
           </div>
         )}
       </div>
 
-      {/* Commit area */}
       <div className="staging-commit-area">
         <textarea
           className="staging-commit-input"
@@ -241,9 +255,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
         />
         <div className="staging-commit-bar">
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-            Ctrl+Enter zum Committen
-          </span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Ctrl+Enter</span>
           <button
             className="staging-commit-btn"
             onClick={handleCommit}
@@ -254,7 +266,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
         </div>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div className={`action-toast ${toast.err ? 'error' : 'success'}`}>
           {toast.err ? '✗' : '✓'} {toast.msg}

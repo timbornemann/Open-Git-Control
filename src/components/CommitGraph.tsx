@@ -6,6 +6,7 @@ interface CommitGraphProps {
   repoPath: string | null;
   onSelectCommit?: (hash: string) => void;
   selectedHash?: string | null;
+  refreshTrigger?: number;
 }
 
 const ROW_HEIGHT = 36;
@@ -29,7 +30,7 @@ interface MenuAction {
   action: () => void;
 }
 
-export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash }) => {
+export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [loading, setLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -59,7 +60,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       return;
     }
     refreshCommits();
-  }, [repoPath, refreshCommits]);
+  }, [repoPath, refreshCommits, refreshTrigger]);
 
   // Close context menu on click anywhere or Escape
   useEffect(() => {
