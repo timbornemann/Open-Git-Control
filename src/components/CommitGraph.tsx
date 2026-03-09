@@ -110,9 +110,27 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
     const actions: MenuAction[] = [
       {
-        label: `Checkout ${shortHash}`,
+        label: `Checkout (Branch von ${shortHash})`,
         icon: '↩',
-        action: () => runGitAction(['checkout', hash], `Checkout zu ${shortHash} erfolgreich.`),
+        action: async () => {
+          const suggested = `checkout-${shortHash}`;
+          const name = prompt('Branch-Name für Checkout:', suggested);
+          if (name && name.trim()) {
+            runGitAction(['checkout', '-b', name.trim(), hash], `Branch "${name.trim()}" aus ${shortHash} ausgecheckt.`);
+          }
+        },
+      },
+      {
+        label: 'Nur Commit (detached HEAD) auschecken…',
+        icon: '⚠',
+        action: async () => {
+          const ok = confirm(
+            'Achtung: Detached HEAD!\n\nWenn du direkt auf diesen Commit wechselst, arbeitest du auf keinem Branch.\nNeue Commits sind dann leicht „unsichtbar“, bis du einen Branch erstellst.\n\nTrotzdem fortfahren?'
+          );
+          if (ok) {
+            runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
+          }
+        },
       },
       {
         label: 'Neuen Branch erstellen...',
