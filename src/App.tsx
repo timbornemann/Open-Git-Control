@@ -5,11 +5,22 @@ import { StagingArea } from './components/StagingArea';
 import { CommitDetails } from './components/CommitDetails';
 import './index.css';
 
+const REMOTE_SYNC_INTERVAL_MS = 60_000;
+
 const App: React.FC = () => {
   type BranchInfo = {
     name: string;
     isHead: boolean;
     scope: 'local' | 'remote';
+  };
+
+  type RemoteSyncState = {
+    isFetching: boolean;
+    lastFetchedAt: number | null;
+    lastFetchError: string | null;
+    ahead: number;
+    behind: number;
+    hasUpstream: boolean;
   };
 
   const [activeTab, setActiveTab] = useState<'repos' | 'github'>('repos');
@@ -71,14 +82,41 @@ const App: React.FC = () => {
 
   // Remotes
   const [remotes, setRemotes] = useState<{ name: string; url: string }[]>([]);
+  const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({
+    isFetching: false,
+    lastFetchedAt: null,
+    lastFetchError: null,
+    ahead: 0,
+    behind: 0,
+    hasUpstream: false,
+  });
 
   // UI state
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [gitActionToast, setGitActionToast] = useState<{msg: string, isError: boolean} | null>(null);
+  const isGitActionRunningRef = useRef(false);
+  const isRemoteFetchRunningRef = useRef(false);
 
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  const getRemoteBranchShortName = useCallback((branchName: string) => (
+    branchName.replace(/^remotes\/[^/]+\//, '')
+  ), []);
+
+  const getRemoteBranchLabel = useCallback((branchName: string) => (
+    branchName.replace(/^remotes\//, '')
+  ), []);
+
+  const formatLastFetchedAt = useCallback((timestamp: number | null) => {
+    if (!timestamp) return 'Noch nicht aktualisiert';
+    return `Zuletzt aktualisiert: ${new Date(timestamp).toLocaleTimeString('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })}`;
   }, []);
 
   // Load stored repos on startup
@@ -110,6 +148,10 @@ const App: React.FC = () => {
       activeRepo,
     });
   }, [openRepos, activeRepo, reposLoaded]);
+
+  useEffect(() => {
+    isGitActionRunningRef.current = isGitActionRunning;
+  }, [isGitActionRunning]);
 
   // Fetch branches
   useEffect(() => {
@@ -150,6 +192,53 @@ const App: React.FC = () => {
       }
     };
     fetchBranches();
+  }, [activeRepo, refreshTrigger]);
+
+  useEffect(() => {
+    const fetchRemoteTracking = async () => {
+      if (!activeRepo || !window.electronAPI) {
+        setRemoteSync(prev => ({
+          ...prev,
+          ahead: 0,
+          behind: 0,
+          hasUpstream: false,
+        }));
+        return;
+      }
+
+      try {
+        const { success, data } = await window.electronAPI.runGitCommand('status', '-sb');
+        if (!success || !data) {
+          setRemoteSync(prev => ({
+            ...prev,
+            ahead: 0,
+            behind: 0,
+            hasUpstream: false,
+          }));
+          return;
+        }
+
+        const header = String(data).split('\n')[0]?.trim() ?? '';
+        const aheadMatch = header.match(/ahead (\d+)/);
+        const behindMatch = header.match(/behind (\d+)/);
+
+        setRemoteSync(prev => ({
+          ...prev,
+          ahead: aheadMatch ? Number(aheadMatch[1]) : 0,
+          behind: behindMatch ? Number(behindMatch[1]) : 0,
+          hasUpstream: header.includes('...'),
+        }));
+      } catch {
+        setRemoteSync(prev => ({
+          ...prev,
+          ahead: 0,
+          behind: 0,
+          hasUpstream: false,
+        }));
+      }
+    };
+
+    fetchRemoteTracking();
   }, [activeRepo, refreshTrigger]);
 
   // Check remote origin / remotes
@@ -329,6 +418,80 @@ const App: React.FC = () => {
     const t = setTimeout(() => setGitActionToast(null), 3000);
     return () => clearTimeout(t);
   }, [gitActionToast]);
+
+  const refreshRemoteState = useCallback(async (showToast = false) => {
+    if (!window.electronAPI || !activeRepo) return false;
+    if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
+
+    isRemoteFetchRunningRef.current = true;
+    setRemoteSync(prev => ({
+      ...prev,
+      isFetching: true,
+      lastFetchError: null,
+    }));
+
+    try {
+      const result = await window.electronAPI.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
+      if (result.success) {
+        setRemoteSync(prev => ({
+          ...prev,
+          isFetching: false,
+          lastFetchedAt: Date.now(),
+          lastFetchError: null,
+        }));
+        triggerRefresh();
+        if (showToast) {
+          setGitActionToast({ msg: 'Remote aktualisiert.', isError: false });
+        }
+        return true;
+      }
+
+      const errorMessage = String(result.error || 'Remote konnte nicht aktualisiert werden.');
+      setRemoteSync(prev => ({
+        ...prev,
+        isFetching: false,
+        lastFetchError: errorMessage,
+      }));
+      if (showToast) {
+        setGitActionToast({ msg: errorMessage, isError: true });
+      }
+      return false;
+    } catch (e: any) {
+      const errorMessage = e?.message || 'Remote konnte nicht aktualisiert werden.';
+      setRemoteSync(prev => ({
+        ...prev,
+        isFetching: false,
+        lastFetchError: errorMessage,
+      }));
+      if (showToast) {
+        setGitActionToast({ msg: errorMessage, isError: true });
+      }
+      return false;
+    } finally {
+      isRemoteFetchRunningRef.current = false;
+    }
+  }, [activeRepo, triggerRefresh]);
+
+  useEffect(() => {
+    if (!activeRepo) {
+      setRemoteSync({
+        isFetching: false,
+        lastFetchedAt: null,
+        lastFetchError: null,
+        ahead: 0,
+        behind: 0,
+        hasUpstream: false,
+      });
+      return;
+    }
+
+    refreshRemoteState();
+    const intervalId = window.setInterval(() => {
+      refreshRemoteState();
+    }, REMOTE_SYNC_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeRepo, refreshRemoteState]);
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!window.electronAPI || repoPath === activeRepo) return;
@@ -627,6 +790,18 @@ const App: React.FC = () => {
     await runGitCommand(['remote', 'remove', remoteName], `Remote "${remoteName}" entfernt.`);
   };
 
+  const localBranchNames = new Set(
+    branches
+      .filter(branch => branch.scope === 'local')
+      .map(branch => branch.name)
+  );
+
+  const remoteOnlyBranches = branches.filter(branch => (
+    branch.scope === 'remote' && !localBranchNames.has(getRemoteBranchShortName(branch.name))
+  ));
+
+  const hasRemoteChanges = remoteSync.behind > 0 || remoteOnlyBranches.length > 0;
+
   return (
     <div className="app-container">
       {/* Activity Bar */}
@@ -653,7 +828,13 @@ const App: React.FC = () => {
                 <Plus size={16} />
               </button>
               {activeRepo && (
-                <button className="icon-btn" style={{ padding: '4px' }} onClick={triggerRefresh} title="Aktualisieren">
+                <button
+                  className="icon-btn"
+                  style={{ padding: '4px' }}
+                  onClick={() => refreshRemoteState(true)}
+                  title="Remote aktualisieren"
+                  disabled={remoteSync.isFetching || isGitActionRunning}
+                >
                   <RefreshCw size={14} />
                 </button>
               )}
@@ -830,18 +1011,23 @@ const App: React.FC = () => {
                           alignItems: 'center',
                           gap: '8px',
                           padding: '6px 8px',
-                          color: b.isHead ? 'var(--accent-primary)' : 'var(--text-primary)',
+                          color: b.isHead
+                            ? 'var(--accent-primary)'
+                            : b.scope === 'remote'
+                              ? 'var(--text-secondary)'
+                              : 'var(--text-primary)',
                           backgroundColor: b.isHead ? 'var(--bg-hover)' : 'transparent',
                           borderRadius: '4px',
-                          cursor: 'pointer',
+                          cursor: !b.isHead && b.scope === 'local' ? 'pointer' : 'default',
+                          opacity: b.scope === 'remote' ? 0.72 : 1,
                         }}
-                        onClick={() => !b.isHead && runGitCommand(['checkout', b.name], `Ausgecheckt: ${b.name}`)}
+                        onClick={() => !b.isHead && b.scope === 'local' && runGitCommand(['checkout', b.name], `Ausgecheckt: ${b.name}`)}
                         onContextMenu={e => {
                           e.preventDefault();
                           setBranchContextMenu({ x: e.clientX, y: e.clientY, branch: b.name, isHead: b.isHead });
                         }}
                       >
-                        <GitBranch size={14} style={{ opacity: b.isHead ? 1 : 0.6 }} />
+                        <GitBranch size={14} style={{ opacity: b.isHead ? 1 : (b.scope === 'remote' ? 0.45 : 0.6) }} />
                         <span
                           style={{
                             fontSize: '0.85rem',
@@ -851,10 +1037,10 @@ const App: React.FC = () => {
                             whiteSpace: 'nowrap',
                           }}
                         >
-                          {b.name}
+                          {b.scope === 'remote' ? getRemoteBranchLabel(b.name) : b.name}
                           {b.scope === 'remote' && (
                             <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                              (remote)
+                              {localBranchNames.has(getRemoteBranchShortName(b.name)) ? '(remote)' : '(nur remote)'}
                             </span>
                           )}
                         </span>
@@ -984,6 +1170,48 @@ const App: React.FC = () => {
                     </button>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div
+                      style={{
+                        margin: '0 8px 8px',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--bg-panel)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: hasRemoteChanges ? '#d2a922' : 'var(--text-secondary)' }}>
+                          {remoteSync.isFetching ? 'Remote wird aktualisiert...' : (hasRemoteChanges ? 'Remote-Änderungen gefunden' : 'Remote-Status aktuell')}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>alle 60s</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {formatLastFetchedAt(remoteSync.lastFetchedAt)}
+                      </span>
+                      {remoteSync.behind > 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {remoteSync.behind} neue Commit{remoteSync.behind === 1 ? '' : 's'} auf dem Remote-Tracking-Branch.
+                        </span>
+                      )}
+                      {remoteSync.ahead > 0 && remoteSync.hasUpstream && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {remoteSync.ahead} lokale Commit{remoteSync.ahead === 1 ? '' : 's'} noch nicht gepusht.
+                        </span>
+                      )}
+                      {remoteOnlyBranches.length > 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          {remoteOnlyBranches.length} Branch{remoteOnlyBranches.length === 1 ? '' : 'es'} existieren nur auf dem Remote.
+                        </span>
+                      )}
+                      {remoteSync.lastFetchError && (
+                        <span style={{ fontSize: '0.75rem', color: '#f85149' }}>
+                          {remoteSync.lastFetchError}
+                        </span>
+                      )}
+                    </div>
                     {remotes.map(r => (
                       <div
                         key={r.name}
@@ -1500,6 +1728,28 @@ const App: React.FC = () => {
                 <GitBranch size={12} /> {currentBranch}
               </span>
             )}
+            {activeRepo && (
+              <span style={{
+                fontSize: '0.78rem',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                backgroundColor: hasRemoteChanges ? 'rgba(210, 169, 34, 0.14)' : 'var(--bg-panel)',
+                color: hasRemoteChanges ? '#d2a922' : 'var(--text-secondary)',
+                border: `1px solid ${hasRemoteChanges ? 'rgba(210, 169, 34, 0.28)' : 'var(--border-color)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <RefreshCw size={12} style={{ opacity: remoteSync.isFetching ? 1 : 0.7 }} />
+                {remoteSync.isFetching
+                  ? 'Remote wird aktualisiert...'
+                  : remoteSync.behind > 0
+                    ? `${remoteSync.behind} Remote-Commit${remoteSync.behind === 1 ? '' : 's'} neuer`
+                    : remoteOnlyBranches.length > 0
+                      ? `${remoteOnlyBranches.length} zusätzl. Remote-Branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`
+                      : 'Remote aktuell'}
+              </span>
+            )}
           </div>
           
           <div style={{ flex: 1 }}></div>
@@ -1507,8 +1757,8 @@ const App: React.FC = () => {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               className="icon-btn"
-              onClick={() => runGitCommand(['fetch', '--all'], 'Fetch erfolgreich.')}
-              disabled={!activeRepo || isGitActionRunning}
+              onClick={() => refreshRemoteState(true)}
+              disabled={!activeRepo || isGitActionRunning || remoteSync.isFetching}
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
               <RefreshCw size={16} style={{ marginRight: '6px' }} /> Fetch
             </button>
