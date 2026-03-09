@@ -64,6 +64,7 @@ export class GitHubService {
       fullName: repo.full_name,
       private: repo.private,
       cloneUrl: repo.clone_url,
+      htmlUrl: repo.html_url,
       description: repo.description,
       updatedAt: repo.updated_at
     }));
@@ -85,7 +86,6 @@ export class GitHubService {
       fullName: data.full_name,
       private: data.private,
       cloneUrl: data.clone_url,
-      sshUrl: data.ssh_url,
       htmlUrl: data.html_url,
     };
   }

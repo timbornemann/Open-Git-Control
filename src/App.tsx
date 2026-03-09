@@ -580,7 +580,7 @@ const App: React.FC = () => {
 
     try {
       const result = await window.electronAPI.githubCreateRepo(name, description, newRepoPrivate);
-      if (!result.success || !result.data) {
+      if (!result.success) {
         throw new Error(result.error || 'Fehler beim Erstellen des GitHub-Repositories.');
       }
 
@@ -716,7 +716,7 @@ const App: React.FC = () => {
         head: newPRHead || currentBranch,
         base: newPRBase || 'main',
       });
-      if (result.success && result.data) {
+      if (result.success) {
         setGitActionToast({ msg: `PR #${result.data.number} erstellt.`, isError: false });
         setShowCreatePR(false);
         setNewPRTitle('');
