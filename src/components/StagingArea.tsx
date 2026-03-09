@@ -28,7 +28,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
     try {
-      const { success, data } = await window.electronAPI.runGitCommand('status');
+      const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
       if (success && data) setStatus(parseGitStatusDetailed(data));
     } catch (e) { console.error(e); }
   }, [repoPath]);
