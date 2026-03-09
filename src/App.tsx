@@ -95,6 +95,7 @@ const App: React.FC = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [gitActionToast, setGitActionToast] = useState<{msg: string, isError: boolean} | null>(null);
+  const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
   const isRemoteFetchRunningRef = useRef(false);
 
@@ -424,6 +425,7 @@ const App: React.FC = () => {
     if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
 
     isRemoteFetchRunningRef.current = true;
+    setActiveGitActionLabel('Fetch wird ausgefuehrt...');
     setRemoteSync(prev => ({
       ...prev,
       isFetching: true,
@@ -469,6 +471,7 @@ const App: React.FC = () => {
       return false;
     } finally {
       isRemoteFetchRunningRef.current = false;
+      setActiveGitActionLabel(current => (current === 'Fetch wird ausgefuehrt...' ? null : current));
     }
   }, [activeRepo, triggerRefresh]);
 
@@ -686,9 +689,10 @@ const App: React.FC = () => {
     }
   };
 
-  const runGitCommand = async (args: string[], successMsg: string) => {
+  const runGitCommand = async (args: string[], successMsg: string, actionLabel?: string) => {
     if (!window.electronAPI || !activeRepo) return;
     setIsGitActionRunning(true);
+    setActiveGitActionLabel(actionLabel || `Git ${args[0]} wird ausgefuehrt...`);
     try {
       const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (r.success) {
@@ -701,6 +705,7 @@ const App: React.FC = () => {
       setGitActionToast({ msg: e.message, isError: true });
     } finally {
       setIsGitActionRunning(false);
+      setActiveGitActionLabel(null);
     }
   };
 
@@ -1750,6 +1755,22 @@ const App: React.FC = () => {
                       : 'Remote aktuell'}
               </span>
             )}
+            {(isGitActionRunning || remoteSync.isFetching) && activeGitActionLabel && (
+              <span style={{
+                fontSize: '0.78rem',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(31, 111, 235, 0.14)',
+                color: '#7cb8ff',
+                border: '1px solid rgba(31, 111, 235, 0.28)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <RefreshCw size={12} className="spin" />
+                {activeGitActionLabel}
+              </span>
+            )}
           </div>
           
           <div style={{ flex: 1 }}></div>
@@ -1760,21 +1781,24 @@ const App: React.FC = () => {
               onClick={() => refreshRemoteState(true)}
               disabled={!activeRepo || isGitActionRunning || remoteSync.isFetching}
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <RefreshCw size={16} style={{ marginRight: '6px' }} /> Fetch
+              <RefreshCw size={16} className={remoteSync.isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
+              {remoteSync.isFetching ? 'Fetch läuft...' : 'Fetch'}
             </button>
             <button
               className="icon-btn"
-              onClick={() => runGitCommand(['pull'], 'Erfolgreich gepullt.')}
+              onClick={() => runGitCommand(['pull'], 'Erfolgreich gepullt.', 'Pull wird ausgefuehrt...')}
               disabled={!activeRepo || isGitActionRunning}
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <ArrowDownCircle size={16} style={{ marginRight: '6px' }} /> Pull
+              <ArrowDownCircle size={16} className={isGitActionRunning && activeGitActionLabel === 'Pull wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
+              {isGitActionRunning && activeGitActionLabel === 'Pull wird ausgefuehrt...' ? 'Pull läuft...' : 'Pull'}
             </button>
             <button
               className="icon-btn"
-              onClick={() => runGitCommand(['push'], 'Erfolgreich gepusht.')}
+              onClick={() => runGitCommand(['push'], 'Erfolgreich gepusht.', 'Push wird ausgefuehrt...')}
               disabled={!activeRepo || isGitActionRunning}
               style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-              <ArrowUpCircle size={16} style={{ marginRight: '6px' }} /> Push
+              <ArrowUpCircle size={16} className={isGitActionRunning && activeGitActionLabel === 'Push wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
+              {isGitActionRunning && activeGitActionLabel === 'Push wird ausgefuehrt...' ? 'Push läuft...' : 'Push'}
             </button>
             <button
               className="icon-btn"
