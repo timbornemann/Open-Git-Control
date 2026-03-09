@@ -2,10 +2,33 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 import * as path from 'path';
+import * as fs from 'fs';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
 
 const isDev = process.env.NODE_ENV === 'development';
+
+interface StoredData {
+  repos: { path: string; lastOpened: number }[];
+  activeRepo: string | null;
+}
+
+function getStorePath(): string {
+  return path.join(app.getPath('userData'), 'repos.json');
+}
+
+function readStoreData(): StoredData {
+  try {
+    const raw = fs.readFileSync(getStorePath(), 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return { repos: [], activeRepo: null };
+  }
+}
+
+function writeStoreData(data: StoredData): void {
+  fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2));
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -40,7 +63,21 @@ function setupIPC() {
       return { path: selectedPath, isRepo };
     }
   });
-  
+
+  ipcMain.handle('dialog:selectDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Zielordner für Clone auswählen'
+    });
+    if (canceled) return null;
+    return filePaths[0];
+  });
+
+  ipcMain.handle('git:setRepo', async (_event: any, repoPath: string) => {
+    gitService.setRepoPath(repoPath);
+    return true;
+  });
+
   ipcMain.handle('git:command', async (_event: any, commandName: string, ...args: any[]) => {
     try {
       if (commandName === 'status') {
@@ -62,6 +99,42 @@ function setupIPC() {
     } catch (error: any) {
       return { success: false, error: error.message };
     }
+  });
+
+  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
+    const webContents = event.sender;
+
+    const result = await gitService.cloneRepo(cloneUrl, targetDir, (line: string) => {
+      webContents.send('clone:progress', line);
+    });
+
+    return result;
+  });
+
+  ipcMain.handle('git:init', async (_event: any, repoPath: string) => {
+    try {
+      gitService.setRepoPath(repoPath);
+      const out = await gitService.runCommand(['init']);
+      return { success: true, data: out };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Repo persistence
+  ipcMain.handle('repos:getStored', async () => {
+    const data = readStoreData();
+    data.repos = data.repos.filter(r => fs.existsSync(r.path));
+    if (data.activeRepo && !data.repos.some(r => r.path === data.activeRepo)) {
+      data.activeRepo = data.repos.length > 0 ? data.repos[0].path : null;
+    }
+    writeStoreData(data);
+    return data;
+  });
+
+  ipcMain.handle('repos:setStored', async (_event: any, data: StoredData) => {
+    writeStoreData(data);
+    return true;
   });
 
   ipcMain.handle('github:auth', async (_event: any, token: string) => {
@@ -86,23 +159,24 @@ function setupIPC() {
     };
   });
 
-  ipcMain.handle('dialog:selectDirectory', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      properties: ['openDirectory'],
-      title: 'Zielordner für Clone auswählen'
-    });
-    if (canceled) return null;
-    return filePaths[0];
+  ipcMain.handle('github:getPRs', async (_event, owner: string, repo: string, state: string) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    try {
+      const prs = await githubService.getPullRequests(owner, repo, state as any);
+      return { success: true, data: prs };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
   });
 
-  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
-    const webContents = event.sender;
-
-    const result = await gitService.cloneRepo(cloneUrl, targetDir, (line: string) => {
-      webContents.send('clone:progress', line);
-    });
-
-    return result;
+  ipcMain.handle('github:createPR', async (_event, params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    try {
+      const pr = await githubService.createPullRequest(params.owner, params.repo, params.title, params.body, params.head, params.base);
+      return { success: true, data: pr };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
   });
 }
 

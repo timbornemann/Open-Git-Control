@@ -61,6 +61,60 @@ export class GitHubService {
       updatedAt: repo.updated_at
     }));
   }
+
+  async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const { data } = await this.octokit.rest.pulls.list({
+      owner,
+      repo,
+      state,
+      per_page: 30,
+      sort: 'updated',
+      direction: 'desc'
+    });
+
+    return data.map((pr: any) => ({
+      number: pr.number,
+      title: pr.title,
+      state: pr.state,
+      user: pr.user?.login || '',
+      createdAt: pr.created_at,
+      updatedAt: pr.updated_at,
+      head: pr.head?.ref || '',
+      base: pr.base?.ref || '',
+      merged: pr.merged_at !== null,
+      htmlUrl: pr.html_url,
+      draft: pr.draft || false,
+    }));
+  }
+
+  async createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string
+  ) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const { data } = await this.octokit.rest.pulls.create({
+      owner,
+      repo,
+      title,
+      body,
+      head,
+      base,
+    });
+
+    return {
+      number: data.number,
+      title: data.title,
+      htmlUrl: data.html_url,
+      state: data.state,
+    };
+  }
 }
 
 export const githubService = new GitHubService();
