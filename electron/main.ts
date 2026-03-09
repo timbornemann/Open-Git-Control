@@ -237,7 +237,9 @@ function setupIPC() {
   });
 
   ipcMain.handle('github:createRepo', async (_event, params: { name: string; description: string; isPrivate: boolean }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    if (!githubService.isAuthenticated()) {
+      return { success: false, error: 'Not authenticated' };
+    }
 
     const name = (params?.name || '').trim();
     if (!name) {
@@ -247,8 +249,9 @@ function setupIPC() {
     try {
       const repo = await githubService.createRepository(name, params?.description || '', Boolean(params?.isPrivate));
       return { success: true, data: repo };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to create repository';
+      return { success: false, error: message };
     }
   });
 
