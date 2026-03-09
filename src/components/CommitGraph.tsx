@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { GitStatusDetailed, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 
@@ -62,10 +62,19 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [actionResult, setActionResult] = useState<{ message: string; isError: boolean } | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef<GraphLayout | null>(null);
+  const pendingScrollTopRef = useRef<number | null>(null);
 
   const refreshCommits = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
-    setLoading(true);
+    const shouldShowLoadingState = !layoutRef.current;
+    const scrollContainer = logContainerRef.current?.parentElement ?? null;
+    pendingScrollTopRef.current = scrollContainer ? scrollContainer.scrollTop : null;
+
+    if (shouldShowLoadingState) {
+      setLoading(true);
+    }
+
     try {
       const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_LIMIT));
       if (success && data) {
@@ -76,7 +85,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (shouldShowLoadingState) {
+        setLoading(false);
+      }
     }
   }, [repoPath]);
 
@@ -96,11 +107,29 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     if (!repoPath) {
       setLayout(null);
       setWorkingTreeStatus(null);
+      layoutRef.current = null;
+      pendingScrollTopRef.current = null;
       return;
     }
     refreshCommits();
     refreshWorkingTreeStatus();
   }, [repoPath, refreshCommits, refreshWorkingTreeStatus, refreshTrigger]);
+
+  useEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
+
+  useLayoutEffect(() => {
+    if (pendingScrollTopRef.current === null) return;
+    const scrollContainer = logContainerRef.current?.parentElement;
+    if (!scrollContainer) {
+      pendingScrollTopRef.current = null;
+      return;
+    }
+
+    scrollContainer.scrollTop = pendingScrollTopRef.current;
+    pendingScrollTopRef.current = null;
+  }, [layout, workingTreeStatus]);
 
   useEffect(() => {
     if (!repoPath) return;
