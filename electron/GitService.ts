@@ -25,10 +25,15 @@ export class GitService {
 
     try {
       const { stdout } = await execFileAsync('git', args, { cwd: this.repoPath });
-      return stdout.trim();
+      return stdout.trimEnd();
     } catch (error: any) {
-      console.error(`Git Error executing "git ${args.join(' ')}":`, error.message);
-      throw error;
+      // execFile errors include stdout and stderr properties
+      const gitOut = (error.stderr || '').trim() || (error.stdout || '').trim();
+      const detailedMessage = gitOut ? `${error.message}\nGit Output: ${gitOut}` : error.message;
+      console.error(`Git Error executing "git ${args.join(' ')}":`, detailedMessage);
+      
+      // We throw an Error so it normalizes for IPC handling in main.ts
+      throw new Error(detailedMessage);
     }
   }
 
