@@ -29,7 +29,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     if (!repoPath || !window.electronAPI) return;
     try {
       const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
-      if (success && data) setStatus(parseGitStatusDetailed(data));
+      if (success) setStatus(parseGitStatusDetailed(data || ''));
     } catch (e) { console.error(e); }
   }, [repoPath]);
 
@@ -37,7 +37,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     if (!repoPath) { setStatus(null); return; }
     refresh();
     const iv = setInterval(refresh, 3000);
-    return () => clearInterval(iv);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener('focus', refresh);
+    };
   }, [repoPath, refresh]);
 
   useEffect(() => {
