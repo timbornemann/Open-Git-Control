@@ -90,16 +90,18 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     for (let pi = 0; pi < parents.length; pi++) {
       const parentHash = parents[pi];
 
-      // Find if this parent is already expected in a lane
       let parentLane = activeLanes.indexOf(parentHash);
 
-      if (parentLane === -1) {
-        // Parent not yet tracked — assign a lane
+      if (parentLane !== -1) {
+        if (pi === 0 && parentLane !== myLane) {
+          activeLanes[parentLane] = null;
+          activeLanes[myLane] = parentHash;
+          parentLane = myLane;
+        }
+      } else {
         if (pi === 0) {
-          // First parent (main line): reuse current lane
           parentLane = myLane;
         } else {
-          // Secondary parent (merge source): find a free lane
           parentLane = activeLanes.indexOf(null);
           if (parentLane === -1) {
             parentLane = activeLanes.length;
@@ -109,12 +111,8 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
         activeLanes[parentLane] = parentHash;
       }
 
-      // Draw an edge from this commit to where the parent will appear
-      // The actual parent row is not known yet if it's below, so we store edges
-      // We'll need the parent's row later — for now store parentHash
       const parentRow = hashToRow.get(parentHash);
       if (parentRow !== undefined) {
-        // Parent already placed (shouldn't happen in top-down but handle it)
         const parentNode = nodes.find(n => n.commit.hash === parentHash);
         edges.push({
           fromRow: row,

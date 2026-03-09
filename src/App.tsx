@@ -1493,7 +1493,7 @@ const App: React.FC = () => {
         <div className="content-area">
           <div className="pane" style={{ flex: 2 }}>
             <div className="pane-header">Commit Graph</div>
-            <div className="pane-content">
+            <div className="pane-content" style={{ padding: 0 }}>
               <CommitGraph 
                 repoPath={activeRepo} 
                 selectedHash={selectedCommit} 

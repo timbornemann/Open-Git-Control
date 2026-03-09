@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { parseGitLog } from '../utils/gitParsing';
-import { computeGraphLayout, GraphLayout, GraphNode } from '../utils/graphLayout';
+import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -10,12 +10,11 @@ interface CommitGraphProps {
 }
 
 const ROW_HEIGHT = 36;
-const LANE_WIDTH = 16;
-const GRAPH_PADDING = 12;
+const LANE_WIDTH = 22;
+const GRAPH_PADDING = 14;
 const NODE_RADIUS = 5;
-const MERGE_NODE_RADIUS = 6;
+const MERGE_NODE_RADIUS = 7;
 
-// ── Context Menu ──
 interface ContextMenuState {
   x: number;
   y: number;
@@ -62,7 +61,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     refreshCommits();
   }, [repoPath, refreshCommits, refreshTrigger]);
 
-  // Close context menu on click anywhere or Escape
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
@@ -74,14 +72,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     };
   }, []);
 
-  // Auto-hide action result toast
   useEffect(() => {
     if (!actionResult) return;
     const t = setTimeout(() => setActionResult(null), 4000);
     return () => clearTimeout(t);
   }, [actionResult]);
 
-  // ── Git Actions ──
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
     try {
@@ -125,7 +121,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         icon: '⚠',
         action: async () => {
           const ok = confirm(
-            'Achtung: Detached HEAD!\n\nWenn du direkt auf diesen Commit wechselst, arbeitest du auf keinem Branch.\nNeue Commits sind dann leicht „unsichtbar“, bis du einen Branch erstellst.\n\nTrotzdem fortfahren?'
+            'Achtung: Detached HEAD!\n\nWenn du direkt auf diesen Commit wechselst, arbeitest du auf keinem Branch.\nNeue Commits sind dann leicht „unsichtbar", bis du einen Branch erstellst.\n\nTrotzdem fortfahren?'
           );
           if (ok) {
             runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
@@ -214,7 +210,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       },
     ];
 
-    // Add merge-specific option
     if (isMerge) {
       actions.splice(5, 0, {
         label: `Revert Merge ${shortHash}`,
@@ -230,7 +225,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     return actions;
   };
 
-  // ── Render helpers ──
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
@@ -253,12 +247,95 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Keine Commits gefunden.</div>;
   }
 
-  const graphWidth = (layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2;
+  const graphWidth = Math.max((layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2, 60);
+  const totalHeight = layout.nodes.length * ROW_HEIGHT;
   const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
+
+  const buildEdgePath = (edge: GraphEdge): string => {
+    const x1 = laneX(edge.fromLane);
+    const y1 = edge.fromRow * ROW_HEIGHT + ROW_HEIGHT / 2;
+    const x2 = laneX(edge.toLane);
+    const y2 = Math.min(edge.toRow * ROW_HEIGHT + ROW_HEIGHT / 2, totalHeight);
+
+    if (x1 === x2) {
+      return `M ${x1} ${y1} L ${x2} ${y2}`;
+    }
+
+    const span = y2 - y1;
+    const curveSpan = Math.min(span, ROW_HEIGHT * 2.5);
+
+    if (curveSpan >= span) {
+      const midY = (y1 + y2) / 2;
+      return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    }
+
+    const midCurveY = y1 + curveSpan / 2;
+    const curveEndY = y1 + curveSpan;
+    return `M ${x1} ${y1} C ${x1} ${midCurveY}, ${x2} ${midCurveY}, ${x2} ${curveEndY} L ${x2} ${y2}`;
+  };
 
   return (
     <>
       <div ref={logContainerRef} className="commit-graph-container">
+        <svg
+          width={graphWidth}
+          height={totalHeight}
+          className="commit-graph-svg"
+        >
+          {layout.edges.map((edge, i) => (
+            <path
+              key={`eg${i}`}
+              d={buildEdgePath(edge)}
+              stroke={edge.color}
+              strokeWidth={6}
+              strokeOpacity={0.1}
+              fill="none"
+              strokeLinecap="round"
+            />
+          ))}
+          {layout.edges.map((edge, i) => (
+            <path
+              key={`em${i}`}
+              d={buildEdgePath(edge)}
+              stroke={edge.color}
+              strokeWidth={2}
+              strokeOpacity={0.85}
+              fill="none"
+              strokeLinecap="round"
+            />
+          ))}
+          {layout.nodes.map((node) => {
+            const cx = laneX(node.lane);
+            const cy = node.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const isSelected = selectedHash === node.commit.hash;
+            const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
+
+            return (
+              <g key={node.commit.hash}>
+                {isSelected && (
+                  <circle
+                    cx={cx} cy={cy} r={r + 6}
+                    fill={node.color} opacity={0.15}
+                  />
+                )}
+                {isSelected && (
+                  <circle
+                    cx={cx} cy={cy} r={r + 3}
+                    fill="none" stroke={node.color} strokeWidth={1.5} opacity={0.6}
+                  />
+                )}
+                <circle
+                  cx={cx} cy={cy} r={r}
+                  fill={node.color} stroke="var(--bg-darker)" strokeWidth={2.5}
+                />
+                {node.isMerge && (
+                  <circle cx={cx} cy={cy} r={r * 0.4} fill="var(--bg-darker)" />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
         {layout.nodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
           return (
@@ -267,57 +344,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               className={`commit-row ${isSelected ? 'selected' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
-              style={{ height: ROW_HEIGHT }}
+              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
             >
-              {/* Graph SVG column */}
-              <div className="commit-graph-col" style={{ width: graphWidth, minWidth: graphWidth }}>
-                <svg width={graphWidth} height={ROW_HEIGHT} style={{ display: 'block' }}>
-                  {layout.edges
-                    .filter(e => e.fromRow <= node.row && e.toRow >= node.row)
-                    .map((edge, i) => {
-                      const x1 = laneX(edge.fromLane);
-                      const x2 = laneX(edge.toLane);
-
-                      if (edge.fromRow === node.row && edge.toRow === node.row + 1 && edge.fromLane === edge.toLane) {
-                        return <line key={i} x1={x1} y1={0} x2={x2} y2={ROW_HEIGHT} stroke={edge.color} strokeWidth={2} strokeOpacity={0.6} />;
-                      }
-                      if (edge.fromRow === node.row) {
-                        if (edge.fromLane === edge.toLane) {
-                          return <line key={i} x1={x1} y1={ROW_HEIGHT / 2} x2={x1} y2={ROW_HEIGHT} stroke={edge.color} strokeWidth={2} strokeOpacity={0.6} />;
-                        }
-                        const cx1 = laneX(edge.fromLane);
-                        const cx2 = laneX(edge.toLane);
-                        const d = `M ${cx1} ${ROW_HEIGHT / 2} C ${cx1} ${ROW_HEIGHT}, ${cx2} ${ROW_HEIGHT}, ${cx2} ${ROW_HEIGHT}`;
-                        return <path key={i} d={d} stroke={edge.color} strokeWidth={2} strokeOpacity={0.6} fill="none" />;
-                      }
-                      if (edge.toRow === node.row) {
-                        if (edge.fromLane === edge.toLane) {
-                          return <line key={i} x1={x1} y1={0} x2={x2} y2={ROW_HEIGHT / 2} stroke={edge.color} strokeWidth={2} strokeOpacity={0.6} />;
-                        }
-                        const cx1 = laneX(edge.fromLane);
-                        const cx2 = laneX(edge.toLane);
-                        const d = `M ${cx1} 0 C ${cx1} 0, ${cx2} 0, ${cx2} ${ROW_HEIGHT / 2}`;
-                        return <path key={i} d={d} stroke={edge.color} strokeWidth={2} strokeOpacity={0.6} fill="none" />;
-                      }
-                      const x = laneX(edge.fromLane);
-                      return <line key={i} x1={x} y1={0} x2={x} y2={ROW_HEIGHT} stroke={edge.color} strokeWidth={2} strokeOpacity={0.4} />;
-                    })}
-                  <circle
-                    cx={laneX(node.lane)} cy={ROW_HEIGHT / 2}
-                    r={node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS}
-                    fill={node.color} stroke="var(--bg-darker)" strokeWidth={2}
-                  />
-                  {isSelected && (
-                    <circle
-                      cx={laneX(node.lane)} cy={ROW_HEIGHT / 2}
-                      r={(node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS) + 3}
-                      fill="none" stroke={node.color} strokeWidth={1.5} opacity={0.6}
-                    />
-                  )}
-                </svg>
-              </div>
-
-              {/* Commit info */}
               <div className="commit-info">
                 {node.commit.refs.length > 0 && (
                   <div className="commit-refs">
@@ -340,7 +368,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         })}
       </div>
 
-      {/* Context Menu */}
       {contextMenu && (
         <div
           className="ctx-menu-backdrop"
@@ -373,7 +400,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         </div>
       )}
 
-      {/* Action Result Toast */}
       {actionResult && (
         <div className={`action-toast ${actionResult.isError ? 'error' : 'success'}`}>
           {actionResult.isError ? '✗' : '✓'} {actionResult.message}

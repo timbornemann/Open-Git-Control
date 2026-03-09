@@ -208,12 +208,20 @@ code, pre {
 
 /* ═══ Commit Graph ═══ */
 .commit-graph-container {
-  display: flex;
-  flex-direction: column;
+  position: relative;
   padding: 0;
 }
 
+.commit-graph-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .commit-row {
+  position: relative;
   display: flex;
   align-items: center;
   cursor: pointer;
@@ -229,11 +237,6 @@ code, pre {
 .commit-row.selected {
   background-color: rgba(31, 111, 235, 0.12);
   border-bottom-color: rgba(31, 111, 235, 0.3);
-}
-
-.commit-graph-col {
-  flex-shrink: 0;
-  overflow: hidden;
 }
 
 .commit-info {
