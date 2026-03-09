@@ -182,3 +182,441 @@ code, pre {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 148, 158, 0.5);
 }
+
+/* Clone Progress Spinner */
+.clone-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: clone-spin 0.8s linear infinite;
+}
+
+@keyframes clone-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ═══ Commit Graph ═══ */
+.commit-graph-container {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.commit-row {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+  transition: background-color 0.12s ease;
+  padding-right: 12px;
+}
+
+.commit-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.commit-row.selected {
+  background-color: rgba(31, 111, 235, 0.12);
+  border-bottom-color: rgba(31, 111, 235, 0.3);
+}
+
+.commit-graph-col {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.commit-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.commit-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--text-accent);
+  flex-shrink: 0;
+  width: 62px;
+}
+
+.commit-subject {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.commit-author {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-date {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  width: 55px;
+  text-align: right;
+}
+
+.commit-refs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.branch-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background-color: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  white-space: nowrap;
+}
+
+.branch-label.head {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border-color: rgba(63, 185, 80, 0.3);
+}
+
+.branch-label.tag {
+  background-color: rgba(210, 169, 34, 0.15);
+  color: #d2a922;
+  border-color: rgba(210, 169, 34, 0.3);
+}
+
+/* ═══ Context Menu ═══ */
+.ctx-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 2001;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  min-width: 220px;
+  padding: 4px 0;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  animation: ctx-fade-in 0.1s ease;
+}
+
+@keyframes ctx-fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ctx-menu-header {
+  padding: 6px 12px 4px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.ctx-menu-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.ctx-menu-item.danger {
+  color: #f85149;
+}
+
+.ctx-menu-item.danger:hover {
+  background-color: rgba(248, 81, 73, 0.12);
+}
+
+.ctx-menu-icon {
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.ctx-menu-sep {
+  height: 1px;
+  background: var(--border-color);
+  margin: 3px 8px;
+}
+
+/* ═══ Action Toast ═══ */
+.action-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  z-index: 3000;
+  animation: toast-in 0.25s ease;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+
+.action-toast.success {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.action-toast.error {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ Staging Area ═══ */
+.staging-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.staging-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.staging-tool-btn {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.15s;
+}
+.staging-tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.staging-files {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.staging-section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.staging-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--bg-dark);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.staging-count {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  min-width: 18px;
+  text-align: center;
+}
+
+.staging-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 14px;
+  font-size: 0.82rem;
+  cursor: default;
+  transition: background-color 0.1s;
+}
+.staging-file-row:hover {
+  background: var(--bg-hover);
+}
+.staging-file-row:hover .staging-actions {
+  opacity: 1;
+}
+
+.staging-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.staging-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+}
+
+.staging-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+}
+
+.staging-btn {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s;
+  padding: 0;
+}
+.staging-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+.staging-btn.danger:hover {
+  background: #f85149;
+  border-color: #f85149;
+}
+
+.staging-btn-sm {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: all 0.12s;
+}
+.staging-btn-sm:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.staging-btn-sm.danger:hover {
+  color: #f85149;
+}
+
+.staging-commit-area {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staging-commit-input {
+  width: 100%;
+  min-height: 52px;
+  max-height: 120px;
+  padding: 8px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+.staging-commit-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.staging-commit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.staging-commit-btn {
+  padding: 5px 14px;
+  background: var(--accent-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.staging-commit-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.staging-commit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+

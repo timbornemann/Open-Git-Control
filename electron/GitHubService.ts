@@ -1,19 +1,36 @@
 export class GitHubService {
   private octokit: any | null = null;
   private token: string | null = null;
+  private username: string | null = null;
 
   async authenticate(token: string): Promise<boolean> {
     try {
-      const { Octokit } = await import('octokit');
+      // Using new Function to prevent TypeScript from compiling dynamic import into require()
+      const _importDynamic = new Function('modulePath', 'return import(modulePath)');
+      const { Octokit } = await _importDynamic('octokit');
       this.octokit = new Octokit({ auth: token });
-      const { data } = await this.octokit.rest.users.getAuthenticated();
+      
+      // Validate the token by calling the rate limit endpoint (works with any valid token)
+      await this.octokit.rest.rateLimit.get();
+      
       this.token = token;
-      console.log('GitHub Authenticated as:', data.login);
+      
+      // Try fetching the username for display
+      try {
+         const { data } = await this.octokit.rest.users.getAuthenticated();
+         this.username = data?.login || null;
+         console.log('GitHub Authenticated as:', this.username);
+      } catch {
+         this.username = null;
+         console.log('GitHub Authenticated (Token valid, but user scope not available).');
+      }
+
       return true;
     } catch (e) {
-      console.error('GitHub Auth Error:', e);
+      console.error('GitHub Auth Error:', (e as Error).message);
       this.octokit = null;
       this.token = null;
+      this.username = null;
       return false;
     }
   }
@@ -22,10 +39,13 @@ export class GitHubService {
     return this.octokit !== null;
   }
 
+  getUsername(): string | null {
+    return this.username;
+  }
+
   async getMyRepositories() {
     if (!this.octokit) throw new Error('Not authenticated');
     
-    // Fetch user's own repositories
     const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
       sort: 'updated',
       per_page: 50

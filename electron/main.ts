@@ -1,4 +1,6 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+console.log('--- MAIN PROCESS START ---');
+console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 import * as path from 'path';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
@@ -34,7 +36,6 @@ function setupIPC() {
     } else {
       const selectedPath = filePaths[0];
       gitService.setRepoPath(selectedPath);
-      // Check if it's a valid repo
       const isRepo = await gitService.checkIsRepo();
       return { path: selectedPath, isRepo };
     }
@@ -51,6 +52,9 @@ function setupIPC() {
       } else if (commandName === 'branches') {
         const branches = await gitService.getBranches();
         return { success: true, data: branches };
+      } else if (commandName === 'commitDetails') {
+        const details = await gitService.getCommitDetails(args[0]);
+        return { success: true, data: details };
       } else {
         const custom = await gitService.runCommand([commandName, ...args]);
         return { success: true, data: custom };
@@ -73,6 +77,32 @@ function setupIPC() {
     } catch (e: any) {
       return { success: false, error: e.message };
     }
+  });
+
+  ipcMain.handle('github:checkAuthStatus', async () => {
+    return {
+      authenticated: githubService.isAuthenticated(),
+      username: githubService.getUsername()
+    };
+  });
+
+  ipcMain.handle('dialog:selectDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Zielordner für Clone auswählen'
+    });
+    if (canceled) return null;
+    return filePaths[0];
+  });
+
+  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
+    const webContents = event.sender;
+
+    const result = await gitService.cloneRepo(cloneUrl, targetDir, (line: string) => {
+      webContents.send('clone:progress', line);
+    });
+
+    return result;
   });
 }
 

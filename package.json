@@ -5,11 +5,11 @@
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"npm run electron:dev\"",
-    "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development electron .",
+    "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/start-electron.js",
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsc --project tsconfig.node.json",
     "preview": "vite preview",
-    "electron:start": "cross-env NODE_ENV=development electron ."
+    "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js"
   },
   "dependencies": {
     "lucide-react": "^0.300.0",

@@ -1,111 +1,263 @@
-import React, { useEffect, useState } from 'react';
-import { GitStatus, parseGitStatus } from '../utils/gitParsing';
+import React, { useEffect, useState, useCallback } from 'react';
+import { GitStatusDetailed, FileEntry, parseGitStatusDetailed } from '../utils/gitParsing';
 
 interface StagingAreaProps {
   repoPath: string | null;
 }
 
+// Status label badges
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  'A': { label: 'Added', color: '#3fb950' },
+  'M': { label: 'Modified', color: '#d29922' },
+  'D': { label: 'Deleted', color: '#f85149' },
+  'R': { label: 'Renamed', color: '#a371f7' },
+  'C': { label: 'Copied', color: '#58a6ff' },
+  '?': { label: 'Untracked', color: '#8b949e' },
+};
+
+const getStatusInfo = (code: string) => STATUS_LABELS[code] || { label: code, color: '#8b949e' };
+const basename = (p: string) => p.split(/[\\/]/).pop() || p;
+
 export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath }) => {
-  const [status, setStatus] = useState<GitStatus | null>(null);
+  const [status, setStatus] = useState<GitStatusDetailed | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; err: boolean } | null>(null);
 
-  useEffect(() => {
-    if (!repoPath) {
-      setStatus(null);
-      return;
-    }
-
-    const fetchStatus = async () => {
-      if (!window.electronAPI) return;
-      try {
-        const { success, data } = await window.electronAPI.runGitCommand('status');
-        if (success && data) {
-          setStatus(parseGitStatus(data));
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    
-    // Initial fetch
-    fetchStatus();
-    
-    const interval = setInterval(fetchStatus, 3000);
-    return () => clearInterval(interval);
+  const refresh = useCallback(async () => {
+    if (!repoPath || !window.electronAPI) return;
+    try {
+      const { success, data } = await window.electronAPI.runGitCommand('status');
+      if (success && data) setStatus(parseGitStatusDetailed(data));
+    } catch (e) { console.error(e); }
   }, [repoPath]);
 
-  const handleCommit = async () => {
-    if (!commitMsg.trim() || !hasChanges) return;
+  useEffect(() => {
+    if (!repoPath) { setStatus(null); return; }
+    refresh();
+    const iv = setInterval(refresh, 3000);
+    return () => clearInterval(iv);
+  }, [repoPath, refresh]);
+
+  // Auto-hide toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const git = async (args: string[], msg: string) => {
     if (!window.electronAPI) return;
+    try {
+      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      if (r.success) {
+        setToast({ msg, err: false });
+        refresh();
+      } else {
+        setToast({ msg: r.error || 'Fehler', err: true });
+      }
+    } catch (e: any) {
+      setToast({ msg: e.message, err: true });
+    }
+  };
+
+  // Actions
+  const stageFile = (f: string) => git(['add', f], `${basename(f)} gestaged`);
+  const stageAll = () => git(['add', '.'], 'Alle Dateien gestaged');
+  const unstageFile = (f: string) => git(['reset', 'HEAD', f], `${basename(f)} unstaged`);
+  const unstageAll = () => git(['reset', 'HEAD'], 'Alle Dateien unstaged');
+  const discardFile = (f: string) => {
+    if (confirm(`Änderungen in "${basename(f)}" verwerfen? Das kann nicht rückgängig gemacht werden!`)) {
+      git(['checkout', '--', f], `${basename(f)} verworfen`);
+    }
+  };
+  const discardAll = () => {
+    if (confirm('⚠️ Alle unstaged Änderungen verwerfen? Das kann nicht rückgängig gemacht werden!')) {
+      git(['checkout', '--', '.'], 'Alle Änderungen verworfen');
+    }
+  };
+  const deleteUntracked = (f: string) => {
+    if (confirm(`"${basename(f)}" löschen?`)) {
+      git(['clean', '-f', f], `${basename(f)} gelöscht`);
+    }
+  };
+  const stashChanges = () => {
+    const msg = prompt('Stash-Nachricht (optional):');
+    if (msg !== null) {
+      const args = msg.trim() ? ['stash', 'push', '-m', msg.trim()] : ['stash'];
+      git(args, 'Änderungen gestasht');
+    }
+  };
+  const stashPop = () => git(['stash', 'pop'], 'Stash angewendet');
+
+  const handleCommit = async () => {
+    if (!commitMsg.trim() || !window.electronAPI) return;
+    if (!status || status.staged.length === 0) {
+      setToast({ msg: 'Bitte zuerst Dateien stagen.', err: true });
+      return;
+    }
     setIsCommitting(true);
     try {
-      // First stage all for simplicity
-      await window.electronAPI.runGitCommand('add', '.');
-      // Then commit
-      await window.electronAPI.runGitCommand('commit', '-m', `"${commitMsg}"`);
-      setCommitMsg('');
-    } catch (e) {
-      console.error(e);
-      alert('Commit fehlgeschlagen');
+      const r = await window.electronAPI.runGitCommand('commit', '-m', commitMsg.trim());
+      if (r.success) {
+        setCommitMsg('');
+        setToast({ msg: 'Commit erfolgreich!', err: false });
+        refresh();
+      } else {
+        setToast({ msg: r.error || 'Commit fehlgeschlagen', err: true });
+      }
+    } catch (e: any) {
+      setToast({ msg: e.message, err: true });
     } finally {
       setIsCommitting(false);
     }
   };
 
   if (!repoPath) return null;
-  if (!status) return <div>Lade Status...</div>;
+  if (!status) return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>Lade Status...</div>;
 
-  const hasChanges = 
-    status.staged.length > 0 || 
-    status.modified.length > 0 || 
-    status.untracked.length > 0 || 
-    status.deleted.length > 0;
+  const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length;
 
-  if (!hasChanges) {
-    return <div style={{ color: 'var(--text-secondary)' }}>Keine Änderungen (Working Tree clean).</div>;
-  }
+  const FileRow = ({ entry, section }: { entry: FileEntry; section: 'staged' | 'unstaged' | 'untracked' }) => {
+    const statusCode = section === 'staged' ? entry.x : entry.y;
+    const info = getStatusInfo(statusCode);
 
-  const FileList = ({ title, files, color }: { title: string, files: string[], color: string }) => {
-    if (files.length === 0) return null;
     return (
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-          {title} ({files.length})
+      <div className="staging-file-row">
+        <span className="staging-status" style={{ color: info.color }}>{statusCode}</span>
+        <span className="staging-path" title={entry.path}>{entry.path}</span>
+        <div className="staging-actions">
+          {section === 'staged' && (
+            <button className="staging-btn" onClick={(e) => { e.stopPropagation(); unstageFile(entry.path); }} title="Unstage">−</button>
+          )}
+          {section === 'unstaged' && (
+            <>
+              <button className="staging-btn" onClick={(e) => { e.stopPropagation(); stageFile(entry.path); }} title="Stage">+</button>
+              <button className="staging-btn danger" onClick={(e) => { e.stopPropagation(); discardFile(entry.path); }} title="Verwerfen">✕</button>
+            </>
+          )}
+          {section === 'untracked' && (
+            <>
+              <button className="staging-btn" onClick={(e) => { e.stopPropagation(); stageFile(entry.path); }} title="Stage">+</button>
+              <button className="staging-btn danger" onClick={(e) => { e.stopPropagation(); deleteUntracked(entry.path); }} title="Löschen">✕</button>
+            </>
+          )}
         </div>
-        {files.map(f => (
-          <div key={f} style={{ color, fontSize: '0.9rem', padding: '4px 8px', backgroundColor: 'var(--bg-dark)', borderRadius: '4px', marginBottom: '4px', fontFamily: 'monospace' }}>
-            {f}
-          </div>
-        ))}
       </div>
     );
   };
 
+  const SectionHeader = ({ title, count, color, actions }: { title: string; count: number; color: string; actions?: React.ReactNode }) => (
+    <div className="staging-section-header">
+      <span style={{ color }}>{title}</span>
+      <span className="staging-count">{count}</span>
+      <div style={{ flex: 1 }} />
+      {actions}
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        <FileList title="Staged Changes" files={status.staged} color="var(--commit-green)" />
-        <FileList title="Modified (Unstaged)" files={status.modified} color="var(--commit-orange)" />
-        <FileList title="Untracked" files={status.untracked} color="var(--text-primary)" />
-        <FileList title="Deleted" files={status.deleted} color="var(--danger)" />
+    <div className="staging-container">
+      {/* Toolbar */}
+      <div className="staging-toolbar">
+        <button className="staging-tool-btn" onClick={stashChanges} title="Stash">
+          📦 Stash
+        </button>
+        <button className="staging-tool-btn" onClick={stashPop} title="Stash Pop">
+          📤 Pop
+        </button>
+        <div style={{ flex: 1 }} />
+        {totalChanges > 0 && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            {totalChanges} Änderung{totalChanges !== 1 ? 'en' : ''}
+          </span>
+        )}
       </div>
 
-      {hasChanges && (
-        <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <textarea 
-            placeholder="Commit message..." 
-            value={commitMsg}
-            onChange={e => setCommitMsg(e.target.value)}
-            style={{ width: '100%', minHeight: '60px', padding: '8px', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', resize: 'vertical', fontFamily: 'inherit' }}
-          />
-          <button 
+      {/* File lists */}
+      <div className="staging-files">
+        {totalChanges === 0 && (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            ✓ Working Tree ist sauber.
+          </div>
+        )}
+
+        {/* Staged Changes */}
+        {status.staged.length > 0 && (
+          <div className="staging-section">
+            <SectionHeader
+              title="Staged Changes"
+              count={status.staged.length}
+              color="#3fb950"
+              actions={
+                <button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">− Alle</button>
+              }
+            />
+            {status.staged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
+          </div>
+        )}
+
+        {/* Unstaged Changes */}
+        {status.unstaged.length > 0 && (
+          <div className="staging-section">
+            <SectionHeader
+              title="Changes"
+              count={status.unstaged.length}
+              color="#d29922"
+              actions={
+                <>
+                  <button className="staging-btn-sm" onClick={() => { const paths = status.unstaged.map(f => f.path); paths.forEach(p => stageFile(p)); }} title="Alle stagen">+ Alle</button>
+                  <button className="staging-btn-sm danger" onClick={discardAll} title="Alle verwerfen">✕ Alle</button>
+                </>
+              }
+            />
+            {status.unstaged.map(f => <FileRow key={`u-${f.path}`} entry={f} section="unstaged" />)}
+          </div>
+        )}
+
+        {/* Untracked */}
+        {status.untracked.length > 0 && (
+          <div className="staging-section">
+            <SectionHeader
+              title="Untracked"
+              count={status.untracked.length}
+              color="#8b949e"
+              actions={
+                <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
+              }
+            />
+            {status.untracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
+          </div>
+        )}
+      </div>
+
+      {/* Commit area */}
+      <div className="staging-commit-area">
+        <textarea
+          className="staging-commit-input"
+          placeholder="Commit-Nachricht..."
+          value={commitMsg}
+          onChange={e => setCommitMsg(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
+        />
+        <div className="staging-commit-bar">
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            Ctrl+Enter zum Committen
+          </span>
+          <button
+            className="staging-commit-btn"
             onClick={handleCommit}
-            disabled={!commitMsg.trim() || isCommitting}
-            style={{ padding: '8px 16px', backgroundColor: 'var(--commit-green)', color: '#fff', border: 'none', borderRadius: '4px', cursor: (!commitMsg.trim() || isCommitting) ? 'not-allowed' : 'pointer', opacity: (!commitMsg.trim() || isCommitting) ? 0.5 : 1, fontWeight: 500 }}
+            disabled={!commitMsg.trim() || isCommitting || !status || status.staged.length === 0}
           >
-            {isCommitting ? 'Committing...' : 'Commit Changes'}
+            {isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0})`}
           </button>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className={`action-toast ${toast.err ? 'error' : 'success'}`}>
+          {toast.err ? '✗' : '✓'} {toast.msg}
         </div>
       )}
     </div>
