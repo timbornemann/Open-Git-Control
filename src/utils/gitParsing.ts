@@ -17,10 +17,17 @@ export interface GitStatus {
 
 export function parseGitLog(logOutput: string): GitCommit[] {
   if (!logOutput.trim()) return [];
-  
-  return logOutput.split('\n').map(line => {
-    // Format: %H|%h|%an|%ad|%s|%P|%D
-    const parts = line.split('|');
+
+  const commitSeparator = '\x1e';
+  const fieldSeparator = '\x1f';
+
+  return logOutput
+    .split(commitSeparator)
+    .map(chunk => chunk.trim())
+    .filter(Boolean)
+    .map(line => {
+    // Format: %H\x1f%h\x1f%an\x1f%ad\x1f%s\x1f%P\x1f%D
+    const parts = line.split(fieldSeparator);
     const hash = parts[0];
     const abbrevHash = parts[1];
     const author = parts[2];
@@ -45,13 +52,6 @@ export interface GitStatusDetailed {
   staged: FileEntry[];    // files with changes in the index (x !== ' ' && x !== '?')
   unstaged: FileEntry[];  // files with changes in the working tree (y !== ' ' && y !== '?')
   untracked: FileEntry[]; // files that are '??'
-}
-
-export interface GitStatus {
-  staged: string[];
-  modified: string[];
-  untracked: string[];
-  deleted: string[];
 }
 
 export function parseGitStatusDetailed(statusOutput: string): GitStatusDetailed {
