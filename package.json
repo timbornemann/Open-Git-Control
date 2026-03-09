@@ -9,7 +9,8 @@
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsc --project tsconfig.node.json",
     "preview": "vite preview",
-    "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js"
+    "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "lucide-react": "^0.300.0",
@@ -30,6 +31,7 @@
     "electron-builder": "^24.9.1",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
+    "vitest": "^4.0.18",
     "wait-on": "^9.0.4"
   }
 }

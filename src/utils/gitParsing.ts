@@ -15,31 +15,48 @@ export interface GitStatus {
   deleted: string[];
 }
 
-export function parseGitLog(logOutput: string): GitCommit[] {
-  if (!logOutput.trim()) return [];
+const LOG_RECORD_SEPARATOR = '\x00';
+const LOG_FIELD_SEPARATOR = '\x1f';
+const LOG_REF_SEPARATOR = '\x1d';
 
-  const commitSeparator = '\x1e';
-  const fieldSeparator = '\x1f';
+function splitGitLogRecord(record: string): string[] {
+  const fields: string[] = [];
+  let start = 0;
+
+  for (let i = 0; i < record.length; i += 1) {
+    if (record[i] === LOG_FIELD_SEPARATOR) {
+      fields.push(record.slice(start, i));
+      start = i + 1;
+      if (fields.length === 6) {
+        break;
+      }
+    }
+  }
+
+  fields.push(record.slice(start));
+  while (fields.length < 7) {
+    fields.push('');
+  }
+
+  return fields;
+}
+
+export function parseGitLog(logOutput: string): GitCommit[] {
+  if (!logOutput) return [];
 
   return logOutput
-    .split(commitSeparator)
-    .map(chunk => chunk.trim())
+    .split(LOG_RECORD_SEPARATOR)
+    .map(record => record.trim())
     .filter(Boolean)
-    .map(line => {
-    // Format: %H\x1f%h\x1f%an\x1f%ad\x1f%s\x1f%P\x1f%D
-    const parts = line.split(fieldSeparator);
-    const hash = parts[0];
-    const abbrevHash = parts[1];
-    const author = parts[2];
-    const date = parts[3];
-    const subject = parts[4] || '';
-    const parentsRaw = parts[5] || '';
-    const parentHashes = parentsRaw.trim() ? parentsRaw.trim().split(' ') : [];
-    const refsRaw = parts[6] || '';
-    const refs = refsRaw.trim() ? refsRaw.trim().split(', ').map(r => r.trim()).filter(Boolean) : [];
+    .map(record => {
+      const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(record);
+      const parentHashes = parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [];
+      const refs = refsRaw
+        ? refsRaw.split(LOG_REF_SEPARATOR).map(ref => ref.trim()).filter(Boolean)
+        : [];
 
-    return { hash, abbrevHash, author, date, subject, parentHashes, refs };
-  });
+      return { hash, abbrevHash, author, date, subject, parentHashes, refs };
+    });
 }
 
 export interface FileEntry {
