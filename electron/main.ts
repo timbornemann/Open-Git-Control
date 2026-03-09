@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron';
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 import * as path from 'path';
@@ -28,6 +28,58 @@ function readStoreData(): StoredData {
 
 function writeStoreData(data: StoredData): void {
   fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2));
+}
+
+const GITHUB_TOKEN_STORE_FILE = 'github-token.bin';
+
+function getGithubTokenStorePath(): string {
+  return path.join(app.getPath('userData'), GITHUB_TOKEN_STORE_FILE);
+}
+
+function saveGithubTokenSecurely(token: string): boolean {
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('OS-backed encryption is not available. GitHub token will not be persisted.');
+    return false;
+  }
+
+  const encrypted = safeStorage.encryptString(token);
+  fs.writeFileSync(getGithubTokenStorePath(), encrypted, { mode: 0o600 });
+  return true;
+}
+
+function readSavedGithubToken(): string | null {
+  const tokenPath = getGithubTokenStorePath();
+  if (!fs.existsSync(tokenPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) return null;
+
+  try {
+    const encrypted = fs.readFileSync(tokenPath);
+    return safeStorage.decryptString(encrypted);
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedGithubTokenSecurely(): void {
+  const tokenPath = getGithubTokenStorePath();
+  if (!fs.existsSync(tokenPath)) return;
+
+  try {
+    const stat = fs.statSync(tokenPath);
+    const randomOverwrite = Buffer.alloc(stat.size);
+    for (let i = 0; i < randomOverwrite.length; i += 1) {
+      randomOverwrite[i] = Math.floor(Math.random() * 256);
+    }
+    fs.writeFileSync(tokenPath, randomOverwrite);
+  } catch {
+    // ignore and try to remove file below
+  }
+
+  try {
+    fs.rmSync(tokenPath, { force: true });
+  } catch {
+    // ignore
+  }
 }
 
 function createWindow() {
@@ -139,7 +191,39 @@ function setupIPC() {
 
   ipcMain.handle('github:auth', async (_event: any, token: string) => {
     const success = await githubService.authenticate(token);
+    if (success) {
+      saveGithubTokenSecurely(token);
+    }
     return success;
+  });
+
+  ipcMain.handle('github:getSavedAuthStatus', async () => {
+    const savedToken = readSavedGithubToken();
+    return {
+      hasSavedToken: Boolean(savedToken),
+      authenticated: githubService.isAuthenticated(),
+      username: githubService.getUsername(),
+    };
+  });
+
+  ipcMain.handle('github:loginWithSavedToken', async () => {
+    const savedToken = readSavedGithubToken();
+    if (!savedToken) {
+      githubService.logout();
+      return { success: false, authenticated: false, username: null };
+    }
+
+    const success = await githubService.authenticate(savedToken);
+    if (!success) {
+      clearSavedGithubTokenSecurely();
+      return { success: false, authenticated: false, username: null };
+    }
+
+    return {
+      success: true,
+      authenticated: true,
+      username: githubService.getUsername(),
+    };
   });
 
   ipcMain.handle('github:getRepos', async () => {
@@ -170,6 +254,7 @@ function setupIPC() {
 
   ipcMain.handle('github:logout', async () => {
     githubService.logout();
+    clearSavedGithubTokenSecurely();
     return { success: true };
   });
 
