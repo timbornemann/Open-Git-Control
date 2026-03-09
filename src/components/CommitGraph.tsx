@@ -125,6 +125,21 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         },
       },
       {
+        label: 'Tag erstellen...',
+        icon: '🏷',
+        action: async () => {
+          const name = prompt('Tag-Name:');
+          if (name && name.trim()) {
+            const msg = prompt('Tag-Nachricht (leer = lightweight):');
+            if (msg && msg.trim()) {
+              runGitAction(['tag', '-a', name.trim(), '-m', msg.trim(), hash], `Tag "${name.trim()}" erstellt.`);
+            } else {
+              runGitAction(['tag', name.trim(), hash], `Tag "${name.trim()}" erstellt.`);
+            }
+          }
+        },
+      },
+      {
         label: '', icon: '', separator: true, action: () => {},
       },
       {

@@ -183,6 +183,15 @@ code, pre {
   background: rgba(139, 148, 158, 0.5);
 }
 
+/* ═══ Repo List ═══ */
+.repo-list-item:hover .repo-close-btn {
+  opacity: 0.6 !important;
+}
+.repo-close-btn:hover {
+  opacity: 1 !important;
+  color: var(--text-primary) !important;
+}
+
 /* Clone Progress Spinner */
 .clone-spinner {
   width: 16px;
