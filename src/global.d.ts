@@ -16,6 +16,7 @@ export interface ElectronAPI {
   githubAuth: (token: string) => Promise<boolean>;
   githubGetRepos: () => Promise<{ success: boolean; data?: any[]; error?: any }>;
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
+  githubLogout: () => Promise<{ success: boolean; error?: any }>;
   githubCreateRepo: (
     name: string,
     description: string,

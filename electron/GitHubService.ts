@@ -39,6 +39,13 @@ export class GitHubService {
     return this.octokit !== null;
   }
 
+
+  logout(): void {
+    this.octokit = null;
+    this.token = null;
+    this.username = null;
+  }
+
   getUsername(): string | null {
     return this.username;
   }
@@ -60,6 +67,27 @@ export class GitHubService {
       description: repo.description,
       updatedAt: repo.updated_at
     }));
+  }
+
+  async createRepository(name: string, description: string, isPrivate: boolean) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const { data } = await this.octokit.rest.repos.createForAuthenticatedUser({
+      name,
+      description,
+      private: isPrivate,
+      auto_init: false,
+    });
+
+    return {
+      id: data.id,
+      name: data.name,
+      fullName: data.full_name,
+      private: data.private,
+      cloneUrl: data.clone_url,
+      sshUrl: data.ssh_url,
+      htmlUrl: data.html_url,
+    };
   }
 
   async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {

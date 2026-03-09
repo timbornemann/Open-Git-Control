@@ -152,6 +152,27 @@ function setupIPC() {
     }
   });
 
+  ipcMain.handle('github:createRepo', async (_event, params: { name: string; description: string; isPrivate: boolean }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+
+    const name = (params?.name || '').trim();
+    if (!name) {
+      return { success: false, error: 'Repository name is required' };
+    }
+
+    try {
+      const repo = await githubService.createRepository(name, params?.description || '', Boolean(params?.isPrivate));
+      return { success: true, data: repo };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('github:logout', async () => {
+    githubService.logout();
+    return { success: true };
+  });
+
   ipcMain.handle('github:checkAuthStatus', async () => {
     return {
       authenticated: githubService.isAuthenticated(),

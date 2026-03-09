@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
   githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
   githubCheckAuthStatus: () => ipcRenderer.invoke('github:checkAuthStatus'),
+  githubLogout: () => ipcRenderer.invoke('github:logout'),
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) =>
     ipcRenderer.invoke('github:createRepo', { name, description, isPrivate }),
   githubGetPRs: (owner: string, repo: string, state: string) =>

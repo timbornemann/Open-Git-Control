@@ -6,6 +6,12 @@ import { CommitDetails } from './components/CommitDetails';
 import './index.css';
 
 const App: React.FC = () => {
+  type BranchInfo = {
+    name: string;
+    isHead: boolean;
+    scope: 'local' | 'remote';
+  };
+
   const [activeTab, setActiveTab] = useState<'repos' | 'github'>('repos');
 
   // Multi-repo
@@ -14,7 +20,7 @@ const App: React.FC = () => {
   const [reposLoaded, setReposLoaded] = useState(false);
   
   // Branch state
-  const [branches, setBranches] = useState<{name: string, isHead: boolean}[]>([]);
+  const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [currentBranch, setCurrentBranch] = useState<string>('');
   
   // Refresh trigger
@@ -119,15 +125,29 @@ const App: React.FC = () => {
         const { success, data } = await window.electronAPI.runGitCommand('branch', '-a');
         if (success && data) {
           const lines = data.split('\n').filter((l: string) => l.trim().length > 0);
-          const parsedBranches = lines.map((line: string) => {
-            const isHead = line.startsWith('*');
-            const name = line.replace('*', '').trim();
-            if (isHead) setCurrentBranch(name);
-            return { name, isHead };
-          });
+          const parsedBranches = lines
+            .map((line: string): BranchInfo | null => {
+              const isHead = line.startsWith('*');
+              const name = line.replace('*', '').trim();
+              if (name.includes(' -> ')) return null;
+
+              const scope: BranchInfo['scope'] = name.startsWith('remotes/') ? 'remote' : 'local';
+              return { name, isHead, scope };
+            })
+            .filter((branch: BranchInfo | null): branch is BranchInfo => branch !== null);
+
+          const head = parsedBranches.find((b: BranchInfo) => b.isHead)?.name ?? '';
+          setCurrentBranch(head);
           setBranches(parsedBranches);
+        } else {
+          setCurrentBranch('');
+          setBranches([]);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        setCurrentBranch('');
+        setBranches([]);
+      }
     };
     fetchBranches();
   }, [activeRepo, refreshTrigger]);
@@ -436,12 +456,20 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('github_token');
-    setIsAuthenticated(false);
-    setGithubUser(null);
-    setGithubRepos([]);
-    setTokenInput('');
+  const handleLogout = async () => {
+    try {
+      if (window.electronAPI) {
+        await window.electronAPI.githubLogout();
+      }
+    } catch (e) {
+      console.error('GitHub logout failed:', e);
+    } finally {
+      localStorage.removeItem('github_token');
+      setIsAuthenticated(false);
+      setGithubUser(null);
+      setGithubRepos([]);
+      setTokenInput('');
+    }
   };
 
   const handleClone = async (cloneUrl: string, repoName: string) => {
@@ -811,6 +839,11 @@ const App: React.FC = () => {
                           }}
                         >
                           {b.name}
+                          {b.scope === 'remote' && (
+                            <span style={{ marginLeft: '6px', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                              (remote)
+                            </span>
+                          )}
                         </span>
                       </div>
                     ))}
@@ -1554,7 +1587,7 @@ const App: React.FC = () => {
                 <span className="ctx-menu-icon">↩</span> Checkout
               </button>
             )}
-            {!branchContextMenu.isHead && (
+            {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
               <button
                 className="ctx-menu-item"
                 onClick={() => {
@@ -1566,6 +1599,7 @@ const App: React.FC = () => {
                 <span className="ctx-menu-icon">⤓</span> In aktuellen Branch mergen
               </button>
             )}
+            {!branchContextMenu.branch.startsWith('remotes/') && (
             <button
               className="ctx-menu-item"
               onClick={() => {
@@ -1576,8 +1610,9 @@ const App: React.FC = () => {
             >
               <span className="ctx-menu-icon">✎</span> Umbenennen
             </button>
+            )}
             <div className="ctx-menu-sep" />
-            {!branchContextMenu.isHead && (
+            {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
               <button
                 className="ctx-menu-item danger"
                 onClick={() => {

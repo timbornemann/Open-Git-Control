@@ -67,8 +67,9 @@ export class GitService {
    * Holt das Git Log in einem einfach parsebaren Format
    */
   async getLog(limit: number = 50): Promise<string> {
-    // Format: Hash|AbbrevHash|Author|Date|Subject|Parents|Refs
-    const format = '%H|%h|%an|%ad|%s|%P|%D';
+    // Use ASCII separators that are very unlikely to appear in commit messages.
+    // RS (\x1e) separates commits and US (\x1f) separates fields.
+    const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%D%x1e';
     return this.runCommand(['log', `-${limit}`, `--pretty=format:${format}`, '--date=iso']);
   }
 
