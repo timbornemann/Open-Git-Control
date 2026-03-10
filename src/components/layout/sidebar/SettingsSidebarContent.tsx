@@ -17,6 +17,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
 
   const selectedModel = settings.aiProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel;
 
@@ -207,16 +208,46 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         )}
 
         {settings.aiProvider === 'gemini' && (
-          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            Gemini API Key
-            <input
-              type="password"
-              value={settings.geminiApiKey}
-              onChange={(e) => onUpdateSettings({ geminiApiKey: e.target.value })}
-              placeholder="AIza..."
-              style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
-            />
-          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              Gemini API Key
+              <input
+                type="password"
+                value={geminiApiKeyInput}
+                onChange={(e) => setGeminiApiKeyInput(e.target.value)}
+                placeholder={settings.hasGeminiApiKey ? 'Bereits gespeichert (neu eingeben zum Ersetzen)' : 'AIza...'}
+                style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                className="staging-tool-btn"
+                onClick={async () => {
+                  if (!window.electronAPI) return;
+                  await window.electronAPI.setGeminiApiKey(geminiApiKeyInput);
+                  setGeminiApiKeyInput('');
+                  await onUpdateSettings({});
+                }}
+              >
+                API Key speichern
+              </button>
+              <button
+                className="staging-tool-btn"
+                onClick={async () => {
+                  if (!window.electronAPI) return;
+                  await window.electronAPI.clearGeminiApiKey();
+                  setGeminiApiKeyInput('');
+                  await onUpdateSettings({});
+                }}
+                disabled={!settings.hasGeminiApiKey}
+              >
+                API Key entfernen
+              </button>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Status: {settings.hasGeminiApiKey ? 'gespeichert' : 'nicht gespeichert'}
+            </div>
+          </div>
         )}
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>

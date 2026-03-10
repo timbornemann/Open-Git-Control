@@ -220,9 +220,10 @@ async function runProviderChat(
   settings: AppSettings,
   messages: ConversationMessage[],
   tools: ToolDefinition[],
+  getGeminiApiKey: () => string,
 ): Promise<{ content: string; toolCalls: AssistantToolCall[]; rawGeminiParts?: Array<Record<string, unknown>> }> {
   if (settings.aiProvider === 'gemini') {
-    return runGeminiChat(settings, messages, tools);
+    return runGeminiChat(settings, messages, tools, getGeminiApiKey);
   }
   return runOllamaChat(settings, messages, tools);
 }
@@ -305,8 +306,9 @@ async function runGeminiChat(
   settings: AppSettings,
   messages: ConversationMessage[],
   tools: ToolDefinition[],
+  getGeminiApiKey: () => string,
 ): Promise<{ content: string; toolCalls: AssistantToolCall[]; rawGeminiParts?: Array<Record<string, unknown>> }> {
-  const apiKey = settings.geminiApiKey.trim();
+  const apiKey = getGeminiApiKey().trim();
   if (!apiKey) {
     throw new Error('Gemini API key is missing.');
   }
@@ -417,9 +419,9 @@ async function runGeminiChat(
 export class AiService {
   constructor(private readonly gitService: GitService) {}
 
-  async testConnection(settings: AppSettings): Promise<{ ok: true; provider: AiProvider; model: string; detail: string }> {
+  async testConnection(settings: AppSettings, getGeminiApiKey: () => string): Promise<{ ok: true; provider: AiProvider; model: string; detail: string }> {
     if (settings.aiProvider === 'gemini') {
-      const apiKey = settings.geminiApiKey.trim();
+      const apiKey = getGeminiApiKey().trim();
       if (!apiKey) {
         throw new Error('Gemini API key fehlt.');
       }
@@ -448,9 +450,9 @@ export class AiService {
     return { ok: true, provider: 'ollama', model: settings.ollamaModel, detail: `Ollama ${safeString(json.version, 'unknown')}` };
   }
 
-  async listModels(settings: AppSettings): Promise<string[]> {
+  async listModels(settings: AppSettings, getGeminiApiKey: () => string): Promise<string[]> {
     if (settings.aiProvider === 'gemini') {
-      const apiKey = settings.geminiApiKey.trim();
+      const apiKey = getGeminiApiKey().trim();
       if (!apiKey) {
         throw new Error('Gemini API key fehlt.');
       }
@@ -489,7 +491,7 @@ export class AiService {
     );
   }
 
-  async runAutoCommit(settings: AppSettings): Promise<AiAutoCommitResult> {
+  async runAutoCommit(settings: AppSettings, getGeminiApiKey: () => string): Promise<AiAutoCommitResult> {
     const repoPath = this.gitService.getRepoPath();
     if (!repoPath) {
       throw new Error('No repository selected.');
@@ -504,8 +506,11 @@ export class AiService {
       throw new Error('Kein KI-Modell konfiguriert.');
     }
 
-    if (settings.aiProvider === 'gemini' && !settings.geminiApiKey.trim()) {
-      throw new Error('Gemini API key fehlt.');
+    if (settings.aiProvider === 'gemini') {
+      const apiKey = getGeminiApiKey().trim();
+      if (!apiKey) {
+        throw new Error('Gemini API key fehlt.');
+      }
     }
 
     const initialStatus = await this.gitService.getStatusPorcelain();
@@ -549,7 +554,7 @@ export class AiService {
     let summary = 'AI Auto-Commit finished.';
 
     for (let turn = 1; turn <= MAX_TURNS; turn += 1) {
-      const assistantReply = await runProviderChat(settings, messages, tools);
+      const assistantReply = await runProviderChat(settings, messages, tools, getGeminiApiKey);
 
       messages.push({
         role: 'assistant',

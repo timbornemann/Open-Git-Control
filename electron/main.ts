@@ -247,14 +247,23 @@ function getSettingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json');
 }
 
-function readSettings(): AppSettings {
+type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };
+
+function readRawSettings(): RawSettingsWithLegacyKey | null {
   try {
     const raw = fs.readFileSync(getSettingsPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return normalizeSettings(parsed);
+    return JSON.parse(raw) as RawSettingsWithLegacyKey;
   } catch {
+    return null;
+  }
+}
+
+function readSettings(): AppSettings {
+  const raw = readRawSettings();
+  if (!raw) {
     return { ...DEFAULT_SETTINGS };
   }
+  return normalizeSettings(raw);
 }
 
 function writeSettings(settings: AppSettings): void {
@@ -263,6 +272,15 @@ function writeSettings(settings: AppSettings): void {
 }
 
 const GITHUB_TOKEN_STORE_FILE = 'github-token.bin';
+const GEMINI_API_KEY_STORE_FILE = 'gemini-api-key.bin';
+const MAX_GEMINI_KEY_LENGTH = 500;
+
+function normalizeGeminiApiKey(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, MAX_GEMINI_KEY_LENGTH);
+}
 
 function getGithubTokenStorePath(): string {
   return path.join(app.getPath('userData'), GITHUB_TOKEN_STORE_FILE);
@@ -312,6 +330,105 @@ function clearSavedGithubTokenSecurely(): void {
   } catch {
     // ignore
   }
+}
+
+function getGeminiApiKeyStorePath(): string {
+  return path.join(app.getPath('userData'), GEMINI_API_KEY_STORE_FILE);
+}
+
+function saveGeminiApiKeySecurely(apiKey: string): boolean {
+  const normalized = normalizeGeminiApiKey(apiKey);
+  if (!normalized) {
+    clearSavedGeminiApiKeySecurely();
+    return true;
+  }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('OS-backed encryption is not available. Gemini API key will not be persisted.');
+    return false;
+  }
+
+  const encrypted = safeStorage.encryptString(normalized);
+  fs.writeFileSync(getGeminiApiKeyStorePath(), encrypted, { mode: 0o600 });
+  return true;
+}
+
+function readSavedGeminiApiKey(): string | null {
+  const keyPath = getGeminiApiKeyStorePath();
+  if (!fs.existsSync(keyPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) return null;
+
+  try {
+    const encrypted = fs.readFileSync(keyPath);
+    return normalizeGeminiApiKey(safeStorage.decryptString(encrypted)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedGeminiApiKeySecurely(): void {
+  const keyPath = getGeminiApiKeyStorePath();
+  if (!fs.existsSync(keyPath)) return;
+
+  try {
+    const stat = fs.statSync(keyPath);
+    const randomOverwrite = Buffer.alloc(stat.size);
+    for (let i = 0; i < randomOverwrite.length; i += 1) {
+      randomOverwrite[i] = Math.floor(Math.random() * 256);
+    }
+    fs.writeFileSync(keyPath, randomOverwrite);
+  } catch {
+    // ignore and try to remove file below
+  }
+
+  try {
+    fs.rmSync(keyPath, { force: true });
+  } catch {
+    // ignore
+  }
+}
+
+function readSettingsWithMigration(): AppSettings {
+  const rawSettings = readRawSettings();
+  const settings = normalizeSettings(rawSettings);
+  const legacyGeminiApiKey = normalizeGeminiApiKey(rawSettings?.geminiApiKey);
+
+  if (legacyGeminiApiKey) {
+    const savedSecurely = saveGeminiApiKeySecurely(legacyGeminiApiKey);
+    const nextSettings = normalizeSettings({
+      ...(rawSettings || {}),
+      hasGeminiApiKey: savedSecurely,
+    });
+    writeSettings(nextSettings);
+    return nextSettings;
+  }
+
+  if (rawSettings && Object.prototype.hasOwnProperty.call(rawSettings, 'geminiApiKey')) {
+    const nextSettings = normalizeSettings({
+      ...rawSettings,
+      hasGeminiApiKey: settings.hasGeminiApiKey,
+    });
+    writeSettings(nextSettings);
+    return nextSettings;
+  }
+
+  const hasSavedKey = Boolean(readSavedGeminiApiKey());
+  if (settings.hasGeminiApiKey !== hasSavedKey) {
+    const nextSettings = normalizeSettings({ ...settings, hasGeminiApiKey: hasSavedKey });
+    writeSettings(nextSettings);
+    return nextSettings;
+  }
+
+  return settings;
+}
+
+function getGeminiApiKeyFromSecureStore(): string {
+
+  const key = readSavedGeminiApiKey();
+  if (!key) {
+    throw new Error('Gemini API key fehlt. Bitte in den Einstellungen speichern.');
+  }
+  return key;
 }
 
 function parseFileHistory(logOutput: string): FileHistoryEntry[] {
@@ -625,23 +742,49 @@ function setupIPC() {
     return true;
   });
   ipcMain.handle('settings:get', async () => {
-    return readSettings();
+    return readSettingsWithMigration();
   });
 
   ipcMain.handle('settings:set', async (_event: any, partial: Partial<AppSettings>) => {
-    const current = readSettings();
-    const next: AppSettings = {
+    const current = readSettingsWithMigration();
+    const partialWithoutSecrets = { ...partial } as Partial<AppSettings> & { geminiApiKey?: unknown; hasGeminiApiKey?: unknown };
+    delete partialWithoutSecrets.geminiApiKey;
+    delete partialWithoutSecrets.hasGeminiApiKey;
+
+    const next = normalizeSettings({
       ...current,
-      ...partial,
-    };
+      ...partialWithoutSecrets,
+      hasGeminiApiKey: current.hasGeminiApiKey,
+    });
+
+    writeSettings(next);
+    return next;
+  });
+
+  ipcMain.handle('settings:setGeminiApiKey', async (_event: any, apiKey: unknown) => {
+    const normalized = normalizeGeminiApiKey(apiKey);
+    const current = readSettingsWithMigration();
+    const saved = saveGeminiApiKeySecurely(normalized);
+    const next = normalizeSettings({
+      ...current,
+      hasGeminiApiKey: normalized ? saved : false,
+    });
+    writeSettings(next);
+    return next;
+  });
+
+  ipcMain.handle('settings:clearGeminiApiKey', async () => {
+    const current = readSettingsWithMigration();
+    clearSavedGeminiApiKeySecurely();
+    const next = normalizeSettings({ ...current, hasGeminiApiKey: false });
     writeSettings(next);
     return next;
   });
 
   ipcMain.handle('ai:testConnection', async () => {
     try {
-      const settings = readSettings();
-      const result = await aiService.testConnection(settings);
+      const settings = readSettingsWithMigration();
+      const result = await aiService.testConnection(settings, getGeminiApiKeyFromSecureStore);
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI-Verbindung fehlgeschlagen.';
@@ -651,8 +794,8 @@ function setupIPC() {
 
   ipcMain.handle('ai:listModels', async () => {
     try {
-      const settings = readSettings();
-      const models = await aiService.listModels(settings);
+      const settings = readSettingsWithMigration();
+      const models = await aiService.listModels(settings, getGeminiApiKeyFromSecureStore);
       return { success: true, data: models };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI-Modelle konnten nicht geladen werden.';
@@ -662,8 +805,8 @@ function setupIPC() {
 
   ipcMain.handle('git:aiAutoCommit', async () => {
     try {
-      const settings = readSettings();
-      const result = await aiService.runAutoCommit(settings);
+      const settings = readSettingsWithMigration();
+      const result = await aiService.runAutoCommit(settings, getGeminiApiKeyFromSecureStore);
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';

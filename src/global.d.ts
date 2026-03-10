@@ -58,8 +58,8 @@ export interface AppSettingsDto {
   aiProvider: AiProviderDto;
   ollamaBaseUrl: string;
   ollamaModel: string;
-  geminiApiKey: string;
   geminiModel: string;
+  hasGeminiApiKey: boolean;
 }
 
 export interface PullRequestDto {
@@ -126,6 +126,8 @@ export interface ElectronAPI {
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;
   getSettings: () => Promise<AppSettingsDto>;
   setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
+  setGeminiApiKey: (apiKey: string) => Promise<AppSettingsDto>;
+  clearGeminiApiKey: () => Promise<AppSettingsDto>;
   aiTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
   aiListModels: () => Promise<IpcResult<string[]>>;
   ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
