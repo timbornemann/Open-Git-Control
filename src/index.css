@@ -706,3 +706,17 @@ code, pre {
   cursor: not-allowed;
 }
 
+
+body[data-theme='light'] {
+  --bg-darker: #f6f8fa;
+  --bg-dark: #ffffff;
+  --bg-panel: #eef2f6;
+  --bg-hover: #e1e8f0;
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-accent: #0969da;
+  --border-color: #d0d7de;
+  --accent-primary: #0969da;
+  --accent-hover: #1f6feb;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+}

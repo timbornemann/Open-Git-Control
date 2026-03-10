@@ -43,6 +43,10 @@ export interface AppSettingsDto {
   language: 'de' | 'en';
   autoFetchIntervalMs: number;
   defaultBranch: string;
+  confirmDangerousOps: boolean;
+  commitTemplate: string;
+  showSecondaryHistory: boolean;
+  commitSignoffByDefault: boolean;
 }
 export interface PullRequestDto {
   number: number;
@@ -108,3 +112,4 @@ declare global {
 }
 
 export {};
+

@@ -19,14 +19,14 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     className="sidebar-header"
     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
   >
-    <span>{activeTab === 'repos' ? 'Repositories' : 'GitHub'}</span>
+    <span>{activeTab === 'repos' ? 'Repositories' : activeTab === 'github' ? 'GitHub' : 'Settings'}</span>
     {activeTab === 'repos' && (
       <div style={{ display: 'flex', gap: '2px' }}>
         <button
           className="icon-btn"
           style={{ padding: '4px' }}
           onClick={onOpenFolder}
-          title="Repository hinzufügen"
+          title="Repository hinzufuegen"
         >
           <Plus size={16} />
         </button>
@@ -45,4 +45,3 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     )}
   </div>
 );
-

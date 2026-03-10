@@ -8,7 +8,7 @@ type Params = {
   triggerRefresh: () => void;
   setGitActionToast: (toast: { msg: string; isError: boolean }) => void;
   onRepoCloned: (repoPath: string) => Promise<void>;
-  setActiveTab: (tab: 'repos' | 'github') => void;
+  setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
 };
 
 export const useGithubDomain = ({
@@ -267,3 +267,4 @@ export const useGithubDomain = ({
     handleCreatePR,
   };
 };
+

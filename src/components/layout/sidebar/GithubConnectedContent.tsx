@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github, LogOut, DownloadCloud, FolderOpen, CheckCircle2, Plus, GitPullRequest } from 'lucide-react';
+import { Github, LogOut, DownloadCloud, FolderOpen, CheckCircle2, Plus, GitPullRequest, Copy, ExternalLink, GitBranch } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 
 type GithubConnectedContentProps = Pick<
@@ -17,6 +17,9 @@ type GithubConnectedContentProps = Pick<
   | 'setPrFilter'
   | 'prLoading'
   | 'pullRequests'
+  | 'onOpenPR'
+  | 'onCopyPRUrl'
+  | 'onCheckoutPR'
   | 'showCreatePR'
   | 'setShowCreatePR'
   | 'currentBranch'
@@ -46,6 +49,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   setPrFilter,
   prLoading,
   pullRequests,
+  onOpenPR,
+  onCopyPRUrl,
+  onCheckoutPR,
   showCreatePR,
   setShowCreatePR,
   currentBranch,
@@ -137,7 +143,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                 onClick={() => localRepoPath && onSwitchRepo(localRepoPath)}
                 className="icon-btn"
                 style={{ padding: '4px', opacity: isActiveLocalRepo ? 0.55 : 1 }}
-                title={isActiveLocalRepo ? 'Bereits aktiv' : 'Lokales Repository öffnen'}
+                title={isActiveLocalRepo ? 'Bereits aktiv' : 'Lokales Repository oeffnen'}
                 disabled={!localRepoPath || isActiveLocalRepo}
               >
                 <FolderOpen size={14} />
@@ -344,44 +350,56 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
               key={pr.number}
               style={{
                 display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
+                flexDirection: 'column',
+                gap: '6px',
                 padding: '8px',
                 backgroundColor: 'var(--bg-panel)',
                 borderRadius: '4px',
                 border: '1px solid var(--border-color)',
-                cursor: 'pointer',
               }}
-              onClick={() => window.open(pr.htmlUrl, '_blank')}
             >
-              <GitPullRequest
-                size={14}
-                style={{
-                  color: pr.merged ? '#a371f7' : pr.state === 'open' ? '#3fb950' : '#f85149',
-                  marginTop: '2px',
-                  flexShrink: 0,
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <GitPullRequest
+                  size={14}
                   style={{
-                    fontSize: '0.82rem',
-                    fontWeight: 500,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    color: pr.merged ? '#a371f7' : pr.state === 'open' ? '#3fb950' : '#f85149',
+                    marginTop: '2px',
+                    flexShrink: 0,
                   }}
-                >
-                  {pr.title}
-                  {pr.draft && (
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>
-                      Draft
-                    </span>
-                  )}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 500,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {pr.title}
+                    {pr.draft && (
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>
+                        Draft
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    #{pr.number} | {pr.head} {'->'} {pr.base} | {pr.user}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  #{pr.number} | {pr.head} {'->'} {pr.base} | {pr.user}
-                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title="Im Browser oeffnen">
+                  <ExternalLink size={12} />
+                </button>
+                <button className="staging-btn-sm" onClick={() => onCopyPRUrl(pr.htmlUrl)} title="URL kopieren">
+                  <Copy size={12} />
+                </button>
+                <button className="staging-btn-sm" onClick={() => onCheckoutPR(pr.number, pr.head)} title="PR Branch auschecken">
+                  <GitBranch size={12} />
+                </button>
               </div>
             </div>
           ))}

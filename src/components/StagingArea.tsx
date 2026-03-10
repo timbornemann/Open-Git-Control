@@ -83,6 +83,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
   const { toast, setToast } = useToastQueue(3000);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts'>('all');
+  const [amendCommit, setAmendCommit] = useState(false);
+  const [signoffCommit, setSignoffCommit] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -120,6 +124,23 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     };
   }, [repoPath, refresh]);
 
+
+  useEffect(() => {
+    const loadCommitPreferences = async () => {
+      if (!window.electronAPI) return;
+      try {
+        const settings = await window.electronAPI.getSettings();
+        setSignoffCommit(Boolean(settings.commitSignoffByDefault));
+        if (settings.commitTemplate && !commitMsg.trim()) {
+          setCommitMsg(settings.commitTemplate);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    loadCommitPreferences();
+  }, []);
   const git = async (args: string[], msg: string, notify = false) => {
     if (!window.electronAPI) return;
     try {
@@ -313,7 +334,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
     setIsCommitting(true);
     try {
-      const r = await window.electronAPI.runGitCommand('commit', '-m', commitMsg.trim());
+      const commitArgs: string[] = ['commit'];
+      if (amendCommit) commitArgs.push('--amend');
+      if (signoffCommit) commitArgs.push('--signoff');
+      commitArgs.push('-m', commitMsg.trim());
+      const r = await window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
       if (r.success) {
         setCommitMsg('');
         setToast({ msg: 'Commit erfolgreich!', isError: false });
@@ -334,6 +359,17 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const bySearch = <T extends { path: string }>(entries: T[]) => entries
+    .filter(entry => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery))
+    .sort((a, b) => a.path.localeCompare(b.path));
+
+  const visibleStaged = activeFilter === 'all' || activeFilter === 'staged' ? bySearch(status.staged) : [];
+  const visibleUnstaged = activeFilter === 'all' || activeFilter === 'unstaged' ? bySearch(status.unstaged) : [];
+  const visibleUntracked = activeFilter === 'all' || activeFilter === 'untracked' ? bySearch(status.untracked) : [];
+  const visibleConflicts = activeFilter === 'all' || activeFilter === 'conflicts' ? bySearch(status.conflicts) : [];
+  const visibleTotal = visibleStaged.length + visibleUnstaged.length + visibleUntracked.length + visibleConflicts.length;
 
   if (diffContent) {
     return (
@@ -411,13 +447,33 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
   return (
     <div className="staging-container">
-      <div className="staging-toolbar">
+      <div className="staging-toolbar" style={{ flexWrap: 'wrap' }}>
         <button className="staging-tool-btn" onClick={stashChanges} title="Stash">Stash</button>
         <button className="staging-tool-btn" onClick={stashPop} title="Stash Pop">Pop</button>
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Datei suchen..."
+          style={{ flex: 1, minWidth: '170px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.76rem' }}
+        />
+        {(['all', 'staged', 'unstaged', 'untracked', 'conflicts'] as const).map((filter) => (
+          <button
+            key={filter}
+            className="staging-tool-btn"
+            style={{
+              backgroundColor: activeFilter === filter ? 'rgba(31, 111, 235, 0.2)' : undefined,
+              borderColor: activeFilter === filter ? 'rgba(31, 111, 235, 0.5)' : undefined,
+              color: activeFilter === filter ? '#7cb8ff' : undefined,
+            }}
+            onClick={() => setActiveFilter(filter)}
+          >
+            {filter}
+          </button>
+        ))}
         <div style={{ flex: 1 }} />
-        {totalChanges > 0 && (
+        {visibleTotal > 0 && (
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-            {totalChanges} Aenderung{totalChanges !== 1 ? 'en' : ''}
+            {visibleTotal} sichtbar
           </span>
         )}
       </div>
@@ -429,16 +485,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </div>
         )}
 
-        {status.conflicts.length > 0 && (
+        {visibleConflicts.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Konflikte" count={status.conflicts.length} color="#f85149" />
+            <SectionHeader title="Konflikte" count={visibleConflicts.length} color="#f85149" />
             <div style={{ padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
               <button className="staging-btn-sm" onClick={mergeContinue}>Merge fortsetzen</button>
               <button className="staging-btn-sm danger" onClick={mergeAbort}>Abbrechen</button>
               <button className="staging-btn-sm" onClick={rebaseContinue}>Rebase continue</button>
               <button className="staging-btn-sm danger" onClick={rebaseAbort}>Rebase abort</button>
             </div>
-            {status.conflicts.map((f) => (
+            {visibleConflicts.map((f) => (
               <div key={`c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
                 <span className="staging-status" style={{ color: '#f85149', width: 22 }}>{f.code}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -456,18 +512,18 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </div>
         )}
 
-        {status.staged.length > 0 && (
+        {visibleStaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Staged Changes" count={status.staged.length} color="#3fb950"
+            <SectionHeader title="Staged Changes" count={visibleStaged.length} color="#3fb950"
               actions={<button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">- Alle</button>}
             />
-            {status.staged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
+            {visibleStaged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
           </div>
         )}
 
-        {status.unstaged.length > 0 && (
+        {visibleUnstaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Changes" count={status.unstaged.length} color="#d29922"
+            <SectionHeader title="Changes" count={visibleUnstaged.length} color="#d29922"
               actions={
                 <>
                   <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
@@ -475,16 +531,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
                 </>
               }
             />
-            {status.unstaged.map(f => <FileRow key={`u-${f.path}`} entry={f} section="unstaged" />)}
+            {visibleUnstaged.map(f => <FileRow key={`u-${f.path}`} entry={f} section="unstaged" />)}
           </div>
         )}
 
-        {status.untracked.length > 0 && (
+        {visibleUntracked.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Untracked" count={status.untracked.length} color="#8b949e"
+            <SectionHeader title="Untracked" count={visibleUntracked.length} color="#8b949e"
               actions={<button className="staging-btn-sm" onClick={stageAllUntracked} title="Alle untracked stagen">+ Alle</button>}
             />
-            {status.untracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
+            {visibleUntracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
           </div>
         )}
       </div>
@@ -498,10 +554,19 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
           disabled={hasOpenConflicts}
         />
-        <div className="staging-commit-bar">
+        <div className="staging-commit-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? '#f85149' : 'var(--text-secondary)' }}>
             {hasOpenConflicts ? 'Offene Konflikte blockieren Commit' : 'Ctrl+Enter'}
           </span>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            <input type="checkbox" checked={amendCommit} onChange={(e) => setAmendCommit(e.target.checked)} />
+            Amend
+          </label>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            <input type="checkbox" checked={signoffCommit} onChange={(e) => setSignoffCommit(e.target.checked)} />
+            Signoff
+          </label>
+          <div style={{ flex: 1 }} />
           <button
             className="staging-commit-btn"
             onClick={handleCommit}
@@ -566,3 +631,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
+
+
+
+
+
+
+

@@ -24,9 +24,12 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
       <Github size={22} />
     </button>
     <div style={{ flex: 1 }} />
-    <button className="icon-btn" title="Settings">
+    <button
+      className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`}
+      onClick={() => setActiveTab('settings')}
+      title="Settings"
+    >
       <Settings size={22} />
     </button>
   </div>
 );
-

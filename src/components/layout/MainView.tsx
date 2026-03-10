@@ -25,6 +25,7 @@ type Props = {
   setSelectedCommit: (hash: string | null) => void;
   refreshTrigger: number;
   triggerRefresh: () => void;
+  showSecondaryHistory: boolean;
   onFetch: () => void;
   onPull: () => void;
   onPush: () => void;
@@ -41,6 +42,7 @@ export const MainView: React.FC<Props> = ({
   setSelectedCommit,
   refreshTrigger,
   triggerRefresh,
+  showSecondaryHistory,
   onFetch,
   onPull,
   onPush,
@@ -129,6 +131,7 @@ export const MainView: React.FC<Props> = ({
             selectedHash={selectedCommit}
             onSelectCommit={setSelectedCommit}
             refreshTrigger={refreshTrigger}
+            showSecondaryHistory={showSecondaryHistory}
           />
         </div>
       </div>
@@ -152,3 +155,4 @@ export const MainView: React.FC<Props> = ({
     </div>
   </div>
 );
+

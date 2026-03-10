@@ -5,6 +5,7 @@ import { SidebarHeader } from './sidebar/SidebarHeader';
 import { ReposSidebarContent } from './sidebar/ReposSidebarContent';
 import { GithubAuthContent } from './sidebar/GithubAuthContent';
 import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
+import { SettingsSidebarContent } from './sidebar/SettingsSidebarContent';
 
 export const AppSidebar: React.FC<AppSidebarProps> = (props) => (
   <>
@@ -24,8 +25,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => (
         {props.activeTab === 'repos' && <ReposSidebarContent {...props} />}
         {props.activeTab === 'github' && !props.isAuthenticated && <GithubAuthContent {...props} />}
         {props.activeTab === 'github' && props.isAuthenticated && <GithubConnectedContent {...props} />}
+        {props.activeTab === 'settings' && (
+          <SettingsSidebarContent
+            settings={props.settings}
+            onUpdateSettings={props.onUpdateSettings}
+            jobs={props.jobs}
+            onClearJobs={props.onClearJobs}
+          />
+        )}
       </div>
     </div>
   </>
 );
-

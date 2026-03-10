@@ -1,9 +1,27 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
+
+const DEFAULT_SETTINGS: AppSettingsDto = {
+  theme: 'dark',
+  language: 'de',
+  autoFetchIntervalMs: 60_000,
+  defaultBranch: 'main',
+  confirmDangerousOps: true,
+  commitTemplate: '',
+  showSecondaryHistory: true,
+  commitSignoffByDefault: false,
+};
+
+type RunGitCommandOptions = {
+  skipDirtyGuard?: boolean;
+};
+
+const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
@@ -17,6 +35,9 @@ export const useAppState = () => {
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [newRepoPrivate, setNewRepoPrivate] = useState(true);
+
+  const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
+  const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
 
   const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
 
@@ -50,27 +71,103 @@ export const useAppState = () => {
     onNoActiveRepo: resetRepoScopedUi,
   });
 
-  const runGitCommand = useCallback(async (args: string[], successMsg: string, actionLabel?: string) => {
-    if (!window.electronAPI || !workspace.activeRepo) return;
-
-    setIsGitActionRunning(true);
-    setActiveGitActionLabel(actionLabel || `Git ${args[0]} wird ausgefuehrt...`);
+  const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
+    if (!window.electronAPI) return;
 
     try {
-      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const next = await window.electronAPI.setSettings(partial);
+      setSettings(next);
+    } catch (e: any) {
+      setGitActionToast({ msg: e?.message || 'Settings konnten nicht gespeichert werden.', isError: true });
+    }
+  }, [setGitActionToast]);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!window.electronAPI) return;
+      try {
+        const loaded = await window.electronAPI.getSettings();
+        setSettings(loaded);
+      } catch {
+        setSettings(DEFAULT_SETTINGS);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', settings.theme);
+  }, [settings.theme]);
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const unsubscribe = window.electronAPI.onJobEvent((event) => {
+      setJobs(prev => [event, ...prev].slice(0, 200));
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const runGitCommand = useCallback(async (
+    args: string[],
+    successMsg: string,
+    actionLabel?: string,
+    options?: RunGitCommandOptions,
+  ): Promise<boolean> => {
+    if (!window.electronAPI || !workspace.activeRepo || args.length === 0) return false;
+
+    const command = args[0];
+    const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
+
+    if (shouldGuard) {
+      try {
+        const status = await window.electronAPI.runGitCommand('statusPorcelain');
+        const hasLocalChanges = Boolean(status.success && String(status.data || '').trim().length > 0);
+        if (hasLocalChanges) {
+          setConfirmDialog({
+            variant: 'danger',
+            title: 'Ungesicherte Aenderungen erkannt',
+            message: `Vor "git ${args.join(' ')}" wurden lokale Aenderungen gefunden.`,
+            contextItems: [
+              { label: 'Befehl', value: `git ${args.join(' ')}` },
+              { label: 'Hinweis', value: 'Working Tree ist nicht sauber' },
+            ],
+            irreversible: false,
+            consequences: 'Je nach Operation koennen unstaged oder staged Aenderungen betroffen sein.',
+            confirmLabel: 'Trotzdem ausfuehren',
+            onConfirm: async () => {
+              await runGitCommand(args, successMsg, actionLabel, { skipDirtyGuard: true });
+            },
+          });
+          return false;
+        }
+      } catch {
+        // continue without blocking if status check fails
+      }
+    }
+
+    setIsGitActionRunning(true);
+    setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
+
+    try {
+      const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
       if (r.success) {
         setGitActionToast({ msg: successMsg, isError: false });
         triggerRefresh();
-      } else {
-        setGitActionToast({ msg: r.error || 'Fehler beim Ausführen von git.', isError: true });
+        return true;
       }
+      setGitActionToast({ msg: r.error || 'Fehler beim Ausfuehren von git.', isError: true });
+      return false;
     } catch (e: any) {
       setGitActionToast({ msg: e.message, isError: true });
+      return false;
     } finally {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [setGitActionToast, triggerRefresh, workspace.activeRepo]);
+  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, triggerRefresh, workspace.activeRepo]);
 
   isGitActionRunningRef.current = isGitActionRunning;
 
@@ -84,6 +181,7 @@ export const useAppState = () => {
     runGitCommand,
     setConfirmDialog,
     setInputDialog,
+    autoFetchIntervalMs: settings.autoFetchIntervalMs,
   });
 
   const github = useGithubDomain({
@@ -142,6 +240,33 @@ export const useAppState = () => {
       setIsConnectingGithubRepo(false);
     }
   };
+
+  const handleOpenPR = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  const handleCopyPRUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setGitActionToast({ msg: 'PR-URL kopiert.', isError: false });
+    } catch {
+      setGitActionToast({ msg: 'PR-URL konnte nicht kopiert werden.', isError: true });
+    }
+  };
+
+  const handleCheckoutPR = async (prNumber: number, headRef: string) => {
+    const targetBranch = `pr-${prNumber}-${headRef.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+    const fetched = await runGitCommand(
+      ['fetch', 'origin', `pull/${prNumber}/head:${targetBranch}`],
+      `PR #${prNumber} Branch geladen.`,
+      `PR #${prNumber} wird geladen...`,
+      { skipDirtyGuard: true },
+    );
+    if (!fetched) return;
+    await runGitCommand(['checkout', targetBranch], `PR-Branch ${targetBranch} ausgecheckt.`);
+  };
+
+  const clearJobs = () => setJobs([]);
 
   return {
     activeTab: workspace.activeTab,
@@ -225,6 +350,14 @@ export const useAppState = () => {
     newPRBase: github.newPRBase,
     setNewPRBase: github.setNewPRBase,
     handleCreatePR: github.handleCreatePR,
+    handleOpenPR,
+    handleCopyPRUrl,
+    handleCheckoutPR,
+
+    settings,
+    handleUpdateSettings,
+    jobs,
+    clearJobs,
 
     isConnectingGithubRepo,
     connectError,

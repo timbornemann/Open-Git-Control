@@ -11,6 +11,7 @@ interface CommitGraphProps {
   onSelectCommit?: (hash: string | null) => void;
   selectedHash?: string | null;
   refreshTrigger?: number;
+  showSecondaryHistory?: boolean;
 }
 
 const LOG_LIMIT = 200;
@@ -90,7 +91,7 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
   return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
 });
 
-export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger }) => {
+export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
   const [loading, setLoading] = useState(false);
@@ -700,7 +701,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             <path
               key={`eg${i}`}
               d={buildEdgePath(edge)}
-              stroke={reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? edge.color : SECONDARY_GRAPH_COLOR}
+              stroke={showSecondaryHistory && !reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? SECONDARY_GRAPH_COLOR : edge.color}
               strokeWidth={edge.kind === 'merge' ? 4.5 : 5}
               strokeOpacity={0.1}
               fill="none"
@@ -712,7 +713,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             <path
               key={`em${i}`}
               d={buildEdgePath(edge)}
-              stroke={reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? edge.color : SECONDARY_GRAPH_COLOR}
+              stroke={showSecondaryHistory && !reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? SECONDARY_GRAPH_COLOR : edge.color}
               strokeWidth={edge.kind === 'merge' ? 1.5 : 2.2}
               strokeOpacity={edge.kind === 'merge' ? 0.72 : 0.92}
               fill="none"
@@ -724,7 +725,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             const cx = laneX(node.lane);
             const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
             const isSelected = selectedHash === node.commit.hash;
-            const isSecondary = !reachableFromHead.has(node.commit.hash);
+            const isSecondary = showSecondaryHistory && !reachableFromHead.has(node.commit.hash);
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
             const fillColor = isSecondary ? SECONDARY_GRAPH_COLOR : node.color;
 
@@ -813,7 +814,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
         {layout.nodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
-          const isSecondary = !reachableFromHead.has(node.commit.hash);
+          const isSecondary = showSecondaryHistory && !reachableFromHead.has(node.commit.hash);
           const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
           const sortedRefs = sortRefs(node.commit.refs);
           return (
@@ -934,4 +935,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     </>
   );
 };
+
+
 

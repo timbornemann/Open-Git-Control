@@ -3,7 +3,7 @@ import { CommitFileDetail, parseCommitDetails } from '../utils/gitParsing';
 import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
 import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
 
-type DetailsTab = 'history' | 'blame';
+type DetailsTab = 'history' | 'blame' | 'patch';
 
 interface CommitDetailsProps {
   hash: string;
@@ -24,6 +24,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [blameError, setBlameError] = useState<string | null>(null);
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
 
+  const [patchLoading, setPatchLoading] = useState(false);
+  const [patchError, setPatchError] = useState<string | null>(null);
+  const [patchContent, setPatchContent] = useState('');
+
   useEffect(() => {
     if (!hash || !window.electronAPI) return;
 
@@ -33,8 +37,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setActiveTab('history');
       setHistoryEntries([]);
       setBlameLines([]);
+      setPatchContent('');
       setHistoryError(null);
       setBlameError(null);
+      setPatchError(null);
 
       try {
         const { success, data } = await window.electronAPI.runGitCommand('commitDetails', hash);
@@ -113,6 +119,33 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchBlame();
+  }, [activeTab, hash, selectedFile]);
+
+  useEffect(() => {
+    if (!selectedFile || !window.electronAPI) return;
+
+    const fetchPatch = async () => {
+      if (activeTab !== 'patch') return;
+      setPatchLoading(true);
+      setPatchError(null);
+      try {
+        const result = await window.electronAPI.runGitCommand('show', '--format=', hash, '--', selectedFile.path);
+        if (result.success) {
+          setPatchContent(String(result.data || ''));
+        } else {
+          setPatchContent('');
+          setPatchError(result.error || 'Patch konnte nicht geladen werden.');
+        }
+      } catch (error) {
+        console.error(error);
+        setPatchContent('');
+        setPatchError('Patch konnte nicht geladen werden.');
+      } finally {
+        setPatchLoading(false);
+      }
+    };
+
+    fetchPatch();
   }, [activeTab, hash, selectedFile]);
 
   const getIconForStatus = (status: string) => {
@@ -205,34 +238,23 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           </div>
 
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              onClick={() => setActiveTab('history')}
-              style={{
-                fontSize: '0.78rem',
-                padding: '5px 8px',
-                borderRadius: '5px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: activeTab === 'history' ? 'var(--accent-primary)' : 'var(--bg-panel)',
-                color: activeTab === 'history' ? '#ffffff' : 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              History
-            </button>
-            <button
-              onClick={() => setActiveTab('blame')}
-              style={{
-                fontSize: '0.78rem',
-                padding: '5px 8px',
-                borderRadius: '5px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: activeTab === 'blame' ? 'var(--accent-primary)' : 'var(--bg-panel)',
-                color: activeTab === 'blame' ? '#ffffff' : 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              Blame
-            </button>
+            {(['history', 'blame', 'patch'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '5px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)',
+                  color: activeTab === tab ? '#ffffff' : 'var(--text-primary)',
+                  cursor: 'pointer',
+                }}
+              >
+                {tab === 'history' ? 'History' : tab === 'blame' ? 'Blame' : 'Patch'}
+              </button>
+            ))}
           </div>
 
           {activeTab === 'history' && (
@@ -312,6 +334,33 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
                       <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{line.content}</span>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'patch' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {patchLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Lade Patch...</span>}
+              {patchError && <span style={{ color: '#f87171', fontSize: '0.82rem' }}>{patchError}</span>}
+              {!patchLoading && !patchError && !patchContent.trim() && (
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Kein Patch verfuegbar.</span>
+              )}
+              {!patchLoading && !patchError && patchContent.trim() && (
+                <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ maxHeight: '380px', overflow: 'auto', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.74rem', lineHeight: '1.45', backgroundColor: 'var(--bg-panel)', padding: '8px' }}>
+                    {patchContent.split('\n').map((line, index) => {
+                      let color = 'var(--text-secondary)';
+                      if (line.startsWith('+') && !line.startsWith('+++')) color = '#3fb950';
+                      else if (line.startsWith('-') && !line.startsWith('---')) color = '#f85149';
+                      else if (line.startsWith('@@')) color = '#a371f7';
+                      return (
+                        <div key={`${index}-${line.slice(0, 10)}`} style={{ color, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                          {line || ' '}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

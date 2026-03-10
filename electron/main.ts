@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
+import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
 
 const isDev = process.env.NODE_ENV === 'development';
 type GitCommandName =
@@ -170,20 +171,6 @@ interface StoredData {
   activeRepo: string | null;
 }
 
-interface AppSettings {
-  theme: 'dark' | 'light';
-  language: 'de' | 'en';
-  autoFetchIntervalMs: number;
-  defaultBranch: string;
-}
-
-const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'dark',
-  language: 'de',
-  autoFetchIntervalMs: 60_000,
-  defaultBranch: 'main',
-};
-
 interface FileHistoryEntry {
   hash: string;
   abbrevHash: string;
@@ -227,27 +214,14 @@ function readSettings(): AppSettings {
   try {
     const raw = fs.readFileSync(getSettingsPath(), 'utf-8');
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return {
-      ...DEFAULT_SETTINGS,
-      ...parsed,
-      autoFetchIntervalMs: Number.isFinite(parsed.autoFetchIntervalMs)
-        ? Math.max(10_000, Math.min(parsed.autoFetchIntervalMs as number, 300_000))
-        : DEFAULT_SETTINGS.autoFetchIntervalMs,
-      defaultBranch: (parsed.defaultBranch || DEFAULT_SETTINGS.defaultBranch).trim() || DEFAULT_SETTINGS.defaultBranch,
-    };
+    return normalizeSettings(parsed);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
 }
 
 function writeSettings(settings: AppSettings): void {
-  const normalized: AppSettings = {
-    ...DEFAULT_SETTINGS,
-    ...settings,
-    autoFetchIntervalMs: Math.max(10_000, Math.min(settings.autoFetchIntervalMs, 300_000)),
-    defaultBranch: settings.defaultBranch.trim() || DEFAULT_SETTINGS.defaultBranch,
-  };
-
+  const normalized = normalizeSettings(settings);
   fs.writeFileSync(getSettingsPath(), JSON.stringify(normalized, null, 2));
 }
 
@@ -418,6 +392,7 @@ function setupIPC() {
   });
 
   ipcMain.handle('git:command', async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
+    let longRunningJobId: string | null = null;
     try {
       assertAllowedGitCommand(commandName);
       const normalizedArgs = normalizeArgs(rawArgs);
@@ -702,3 +677,7 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
+
+

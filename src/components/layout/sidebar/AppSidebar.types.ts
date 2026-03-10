@@ -1,6 +1,6 @@
 import React from 'react';
 import { BranchInfo, RemoteSyncState } from '../../../types/git';
-import { GitHubRepositoryDto, PullRequestDto } from '../../../global';
+import { AppSettingsDto, GitHubRepositoryDto, GitJobEventDto, PullRequestDto } from '../../../global';
 
 export type RemoteStatus = {
   title: string;
@@ -13,8 +13,8 @@ export type RemoteStatus = {
 export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
 export type AppSidebarProps = {
-  activeTab: 'repos' | 'github';
-  setActiveTab: (tab: 'repos' | 'github') => void;
+  activeTab: 'repos' | 'github' | 'settings';
+  setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
 
   activeRepo: string | null;
   openRepos: string[];
@@ -78,6 +78,9 @@ export type AppSidebarProps = {
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
   pullRequests: PullRequestDto[];
+  onOpenPR: (url: string) => void;
+  onCopyPRUrl: (url: string) => void;
+  onCheckoutPR: (prNumber: number, headRef: string) => Promise<void>;
 
   showCreatePR: boolean;
   setShowCreatePR: (value: boolean) => void;
@@ -92,4 +95,9 @@ export type AppSidebarProps = {
   newPRBase: string;
   setNewPRBase: (value: string) => void;
   onCreatePR: () => void;
+
+  settings: AppSettingsDto;
+  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  jobs: GitJobEventDto[];
+  onClearJobs: () => void;
 };

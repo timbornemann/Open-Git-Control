@@ -71,6 +71,9 @@ const App: React.FC = () => {
         setPrFilter={state.setPrFilter}
         prLoading={state.prLoading}
         pullRequests={state.pullRequests}
+        onOpenPR={state.handleOpenPR}
+        onCopyPRUrl={state.handleCopyPRUrl}
+        onCheckoutPR={state.handleCheckoutPR}
         showCreatePR={state.showCreatePR}
         setShowCreatePR={state.setShowCreatePR}
         currentBranch={state.currentBranch}
@@ -84,6 +87,10 @@ const App: React.FC = () => {
         newPRBase={state.newPRBase}
         setNewPRBase={state.setNewPRBase}
         onCreatePR={state.handleCreatePR}
+        settings={state.settings}
+        onUpdateSettings={state.handleUpdateSettings}
+        jobs={state.jobs}
+        onClearJobs={state.clearJobs}
       />
 
       <MainView
@@ -97,6 +104,7 @@ const App: React.FC = () => {
         setSelectedCommit={state.setSelectedCommit}
         refreshTrigger={state.refreshTrigger}
         triggerRefresh={state.triggerRefresh}
+        showSecondaryHistory={state.settings.showSecondaryHistory}
         onFetch={() => state.refreshRemoteState(true)}
         onPull={() => state.runGitCommand(['pull'], 'Erfolgreich gepullt.', 'Pull wird ausgefuehrt...')}
         onPush={() => state.runGitCommand(['push'], 'Erfolgreich gepusht.', 'Push wird ausgefuehrt...')}
@@ -104,7 +112,7 @@ const App: React.FC = () => {
 
       {state.gitActionToast && (
         <div className={`action-toast ${state.gitActionToast.isError ? 'error' : 'success'}`}>
-          {state.gitActionToast.isError ? '?' : '?'} {state.gitActionToast.msg}
+          {state.gitActionToast.isError ? 'x' : 'ok'} {state.gitActionToast.msg}
         </div>
       )}
 

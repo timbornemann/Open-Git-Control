@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRe
 import { BranchInfo, RemoteSyncState } from '../../../types/git';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 
-const REMOTE_SYNC_INTERVAL_MS = 60_000;
 
 type Params = {
   activeRepo: string | null;
@@ -11,9 +10,10 @@ type Params = {
   setGitActionToast: (toast: { msg: string; isError: boolean }) => void;
   setActiveGitActionLabel: Dispatch<SetStateAction<string | null>>;
   isGitActionRunningRef: MutableRefObject<boolean>;
-  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<void>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
+  autoFetchIntervalMs: number;
 };
 
 export const useRepositoryDomain = ({
@@ -26,6 +26,7 @@ export const useRepositoryDomain = ({
   runGitCommand,
   setConfirmDialog,
   setInputDialog,
+  autoFetchIntervalMs,
 }: Params) => {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [currentBranch, setCurrentBranch] = useState('');
@@ -270,10 +271,10 @@ export const useRepositoryDomain = ({
     refreshRemoteState();
     const intervalId = window.setInterval(() => {
       refreshRemoteState();
-    }, REMOTE_SYNC_INTERVAL_MS);
+    }, autoFetchIntervalMs);
 
     return () => window.clearInterval(intervalId);
-  }, [activeRepo, refreshRemoteState]);
+  }, [activeRepo, autoFetchIntervalMs, refreshRemoteState]);
 
   const handleCreateBranch = async () => {
     const name = newBranchName.trim();
@@ -568,4 +569,7 @@ export const useRepositoryDomain = ({
     handleRemoveRemote,
   };
 };
+
+
+
 

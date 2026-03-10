@@ -16,7 +16,7 @@ export const useWorkspaceDomain = ({
   onRepoActivated,
   onNoActiveRepo,
 }: Params) => {
-  const [activeTab, setActiveTab] = useState<'repos' | 'github'>('repos');
+  const [activeTab, setActiveTab] = useState<'repos' | 'github' | 'settings'>('repos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [reposLoaded, setReposLoaded] = useState(false);
@@ -146,3 +146,4 @@ export const useWorkspaceDomain = ({
     addOpenRepo,
   };
 };
+
