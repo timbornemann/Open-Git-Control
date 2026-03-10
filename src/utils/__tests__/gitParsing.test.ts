@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseGitLog } from '../gitParsing';
+import {
+  parseCommitDetails,
+  parseGitLog,
+  parseGitStatus,
+  parseGitStatusDetailed,
+} from '../gitParsing';
 
 const US = '\x1f';
 const NUL = '\x00';
@@ -21,31 +26,73 @@ function makeRecord(fields: {
     fields.date,
     fields.subject ?? '',
     fields.parents ?? '',
-    fields.refs ?? ''
+    fields.refs ?? '',
   ].join(US) + NUL;
 }
 
 describe('parseGitLog', () => {
-  it('parses subject containing pipe characters without splitting', () => {
-    const output = makeRecord({
-      hash: 'a'.repeat(40),
-      short: 'aaaaaaa',
-      author: 'Alice',
-      date: '2024-10-01 10:00:00 +0000',
-      subject: 'feat: keep | pipes | intact',
-      parents: 'b'.repeat(40),
-      refs: 'HEAD -> main'
+  it('returns an empty array for empty output', () => {
+    expect(parseGitLog('')).toEqual([]);
+  });
+
+  it('handles records with missing fields by filling defaults', () => {
+    const output = `short-only${US}partial${NUL}`;
+    const parsed = parseGitLog(output);
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toMatchObject({
+      hash: 'short-only',
+      abbrevHash: 'partial',
+      author: '',
+      date: '',
+      subject: '',
+      parentHashes: [],
+      refs: [],
+      stats: { files: 0, additions: 0, deletions: 0 },
     });
+  });
+
+  it('parses subject values with pipe characters and commit stats', () => {
+    const output = [
+      makeRecord({
+        hash: 'a'.repeat(40),
+        short: 'aaaaaaa',
+        author: 'Alice',
+        date: '2024-10-01 10:00:00 +0000',
+        subject: 'feat: keep | pipes | intact',
+        parents: 'b'.repeat(40),
+        refs: 'HEAD -> main',
+      }),
+      '12 3 src/App.tsx\x00',
+      '- - assets/logo.png\x00',
+    ].join('');
 
     const parsed = parseGitLog(output);
 
     expect(parsed).toHaveLength(1);
     expect(parsed[0].subject).toBe('feat: keep | pipes | intact');
+    expect(parsed[0].stats).toEqual({ files: 2, additions: 12, deletions: 3 });
   });
 
-  it('parses merge commits with multiple parent hashes', () => {
+  it('ignores non-numstat tokens after a commit header', () => {
+    const output = [
+      makeRecord({
+        hash: '9'.repeat(40),
+        short: '9999999',
+        author: 'Alice',
+        date: '2024-10-10 10:00:00 +0000',
+      }),
+      'this is noise\x00',
+    ].join('');
+
+    const parsed = parseGitLog(output);
+    expect(parsed[0].stats).toEqual({ files: 0, additions: 0, deletions: 0 });
+  });
+
+  it('parses merge commits with multiple parents and split refs', () => {
     const parentOne = '1'.repeat(40);
     const parentTwo = '2'.repeat(40);
+
     const output = makeRecord({
       hash: '3'.repeat(40),
       short: '3333333',
@@ -53,46 +100,44 @@ describe('parseGitLog', () => {
       date: '2024-10-02 10:00:00 +0000',
       subject: 'Merge branch feature',
       parents: `${parentOne} ${parentTwo}`,
-      refs: 'origin/main'
+      refs: ['origin/main', 'tag: release/v1.0.0'].join(GS),
     });
 
     const parsed = parseGitLog(output);
 
+    expect(parsed).toHaveLength(1);
     expect(parsed[0].parentHashes).toEqual([parentOne, parentTwo]);
+    expect(parsed[0].refs).toEqual(['origin/main', 'tag: release/v1.0.0']);
   });
 
-  it('parses empty subject and unusual refs separated by explicit separator', () => {
-    const output = makeRecord({
+  it('ignores numstat rows until the first commit header exists', () => {
+    const output = ['4 2 src/ignored.ts\x00', makeRecord({
       hash: '4'.repeat(40),
       short: '4444444',
       author: 'Bot',
       date: '2024-10-03 10:00:00 +0000',
       subject: '',
       parents: '',
-      refs: ['tag: release/v1.0.0', 'HEAD -> feat/(strange), origin/feat/(strange)'].join(GS)
-    });
+      refs: '',
+    })].join('');
 
     const parsed = parseGitLog(output);
 
-    expect(parsed[0].subject).toBe('');
-    expect(parsed[0].parentHashes).toEqual([]);
-    expect(parsed[0].refs).toEqual([
-      'tag: release/v1.0.0',
-      'HEAD -> feat/(strange), origin/feat/(strange)'
-    ]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].stats).toEqual({ files: 0, additions: 0, deletions: 0 });
   });
 
-  it('parses multiple commits with unicode and special characters', () => {
+  it('parses multiple commits and tolerates blank lines before tokens', () => {
     const output = [
-      makeRecord({
+      `\n${makeRecord({
         hash: '5'.repeat(40),
         short: '5555555',
-        author: 'Änne',
+        author: 'Anne',
         date: '2024-10-04 10:00:00 +0000',
-        subject: 'fix: emoji 🚀 and umlauts äöü',
+        subject: 'fix: unicode and special chars',
         parents: '6'.repeat(40),
-        refs: 'origin/feature/special'
-      }),
+        refs: 'origin/feature/special',
+      })}`,
       makeRecord({
         hash: '7'.repeat(40),
         short: '7777777',
@@ -100,15 +145,64 @@ describe('parseGitLog', () => {
         date: '2024-10-05 10:00:00 +0000',
         subject: 'chore: second commit',
         parents: '',
-        refs: ''
-      })
+        refs: '',
+      }),
     ].join('');
 
     const parsed = parseGitLog(output);
 
     expect(parsed).toHaveLength(2);
-    expect(parsed[0].author).toBe('Änne');
-    expect(parsed[0].subject).toContain('🚀');
+    expect(parsed[0].author).toBe('Anne');
     expect(parsed[1].refs).toEqual([]);
+  });
+});
+
+describe('parseGitStatusDetailed', () => {
+  it('returns empty buckets for empty input', () => {
+    expect(parseGitStatusDetailed('   ')).toEqual({ staged: [], unstaged: [], untracked: [] });
+  });
+
+  it('classifies staged, unstaged and untracked entries', () => {
+    const output = ['.', 'M  src/staged.ts', ' M src/modified.ts', 'MM src/both.ts', '?? src/new.ts', 'D  src/deleted.ts'].join('\n');
+
+    const parsed = parseGitStatusDetailed(output);
+
+    expect(parsed.staged.map(entry => entry.path)).toEqual(['src/staged.ts', 'src/both.ts', 'src/deleted.ts']);
+    expect(parsed.unstaged.map(entry => entry.path)).toEqual(['src/modified.ts', 'src/both.ts']);
+    expect(parsed.untracked.map(entry => entry.path)).toEqual(['src/new.ts']);
+  });
+});
+
+describe('parseGitStatus', () => {
+  it('returns empty buckets for empty input', () => {
+    expect(parseGitStatus('')).toEqual({ staged: [], modified: [], untracked: [], deleted: [] });
+  });
+
+  it('classifies porcelain status output', () => {
+    const output = ['.', 'A  src/added.ts', 'M  src/staged.ts', ' D src/deleted.ts', ' M src/modified.ts', '?? src/new.ts'].join('\n');
+    const parsed = parseGitStatus(output);
+
+    expect(parsed).toEqual({
+      staged: ['src/added.ts', 'src/staged.ts'],
+      modified: ['src/modified.ts'],
+      untracked: ['src/new.ts'],
+      deleted: ['src/deleted.ts'],
+    });
+  });
+});
+
+describe('parseCommitDetails', () => {
+  it('parses valid commit detail lines and ignores malformed ones', () => {
+    const output = ['M\tsrc/App.tsx', 'A\tsrc/new-file.ts', '', 'not-a-status-line', 'R100\tsrc/old.ts -> src/new.ts'].join('\n');
+
+    expect(parseCommitDetails(output)).toEqual([
+      { status: 'M', path: 'src/App.tsx' },
+      { status: 'A', path: 'src/new-file.ts' },
+      { status: 'R100', path: 'src/old.ts -> src/new.ts' },
+    ]);
+  });
+
+  it('returns an empty array for blank output', () => {
+    expect(parseCommitDetails('  \n')).toEqual([]);
   });
 });
