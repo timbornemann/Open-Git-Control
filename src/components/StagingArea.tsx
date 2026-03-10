@@ -135,6 +135,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
+  const [isAiCommitting, setIsAiCommitting] = useState(false);
+  const [aiConfig, setAiConfig] = useState<{ enabled: boolean; provider: 'ollama' | 'gemini'; model: string }>({ enabled: false, provider: 'ollama', model: '' });
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -193,6 +195,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       try {
         const settings = await window.electronAPI.getSettings();
         setSignoffCommit(Boolean(settings.commitSignoffByDefault));
+        setAiConfig({ enabled: Boolean(settings.aiAutoCommitEnabled), provider: settings.aiProvider, model: settings.aiProvider === 'gemini' ? (settings.geminiModel || '') : (settings.ollamaModel || '') });
         if (settings.commitTemplate && !commitMsg.trim()) {
           setCommitMsg(settings.commitTemplate);
         }
@@ -431,6 +434,53 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     });
   };
 
+  const handleAiAutoCommit = async () => {
+    if (!window.electronAPI || !status) return;
+
+    if (!aiConfig.enabled) {
+      setToast({ msg: 'KI Auto-Commit ist in den Einstellungen deaktiviert.', isError: true });
+      return;
+    }
+
+    if (!aiConfig.model.trim()) {
+      setToast({ msg: 'Bitte in den Einstellungen zuerst ein KI-Modell auswaehlen.', isError: true });
+      return;
+    }
+
+    if (status.conflicts.length > 0) {
+      setToast({ msg: 'Bitte zuerst alle Konflikte aufloesen.', isError: true });
+      return;
+    }
+
+    if (status.staged.length + status.unstaged.length + status.untracked.length === 0) {
+      setToast({ msg: 'Keine Aenderungen fuer KI Auto-Commit vorhanden.', isError: true });
+      return;
+    }
+
+    setIsAiCommitting(true);
+    try {
+      const result = await window.electronAPI.runAiAutoCommit();
+      if (!result.success) {
+        setToast({ msg: result.error || 'KI Auto-Commit fehlgeschlagen.', isError: true });
+        return;
+      }
+
+      const commits = result.data.commits || [];
+      if (commits.length === 0) {
+        setToast({ msg: result.data.summary || 'KI hat keine Commits erstellt.', isError: false });
+      } else {
+        const list = commits.map((commit) => `${commit.hash} ${commit.subject}`).join(' | ');
+        setToast({ msg: `KI Commit(s): ${list}`, isError: false });
+      }
+
+      await refresh();
+      if (onRepoChanged) onRepoChanged();
+    } catch (error: unknown) {
+      setToast({ msg: error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.', isError: true });
+    } finally {
+      setIsAiCommitting(false);
+    }
+  };
   const handleCommit = async () => {
     if (!commitMsg.trim() || !window.electronAPI || !status) return;
 
@@ -703,9 +753,18 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </label>
           <div style={{ flex: 1 }} />
           <button
+            className="staging-tool-btn"
+            onClick={handleAiAutoCommit}
+            disabled={hasOpenConflicts || isCommitting || isAiCommitting || !status}
+            title={aiConfig.enabled ? 'KI entscheidet Staging + Commit-Nachrichten automatisch.' : 'In Settings zuerst KI Auto-Commit aktivieren.'}
+            style={{ opacity: aiConfig.enabled ? 1 : 0.7 }}
+          >
+            {isAiCommitting ? 'KI arbeitet...' : 'KI Auto-Commit'}
+          </button>
+          <button
             className="staging-commit-btn"
             onClick={handleCommit}
-            disabled={hasOpenConflicts || !commitMsg.trim() || isCommitting || !status || status.staged.length === 0}
+            disabled={hasOpenConflicts || !commitMsg.trim() || isCommitting || isAiCommitting || !status || status.staged.length === 0}
           >
             {hasOpenConflicts
               ? `Konflikte (${status.conflicts.length})`
@@ -819,6 +878,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
+
+
+
+
+
+
+
 
 
 
