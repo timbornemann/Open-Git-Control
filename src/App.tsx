@@ -1693,7 +1693,7 @@ const App: React.FC = () => {
             </div>
             <div className="pane-content" style={{ overflow: 'hidden' }}>
               {selectedCommit ? (
-                <CommitDetails hash={selectedCommit} />
+                <CommitDetails hash={selectedCommit} onSelectCommit={setSelectedCommit} />
               ) : (
                 <StagingArea repoPath={activeRepo} onRepoChanged={triggerRefresh} />
               )}

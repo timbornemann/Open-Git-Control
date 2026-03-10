@@ -16,7 +16,7 @@ export class GitService {
   }
 
   /**
-   * Führt einen Git Befehl im ausgewählten Repository aus
+   * Fuehrt einen Git Befehl im ausgewaehlten Repository aus
    */
   async runCommand(args: string[]): Promise<string> {
     if (!this.repoPath) {
@@ -31,14 +31,14 @@ export class GitService {
       const gitOut = (error.stderr || '').trim() || (error.stdout || '').trim();
       const detailedMessage = gitOut ? `${error.message}\nGit Output: ${gitOut}` : error.message;
       console.error(`Git Error executing "git ${args.join(' ')}":`, detailedMessage);
-      
+
       // We throw an Error so it normalizes for IPC handling in main.ts
       throw new Error(detailedMessage);
     }
   }
 
   /**
-   * Überprüft, ob das aktuelle Verzeichnis ein Git Repo ist
+   * Ueberprueft, ob das aktuelle Verzeichnis ein Git Repo ist
    */
   async checkIsRepo(): Promise<boolean> {
     try {
@@ -50,7 +50,7 @@ export class GitService {
   }
 
   /**
-   * Gibt den aktuellen Status zurück (Short Format)
+   * Gibt den aktuellen Status zurueck (Short Format)
    */
   async getStatus(): Promise<string> {
     return this.runCommand(['status', '--short']);
@@ -62,7 +62,7 @@ export class GitService {
   async getBranches(): Promise<string> {
     return this.runCommand(['branch', '-a']);
   }
-  
+
   /**
    * Holt das Git Log in einem einfach parsebaren Format
    */
@@ -77,24 +77,60 @@ export class GitService {
       '-z',
       `-${limit}`,
       `--pretty=format:${format}`,
-      '--date=iso'
+      '--date=iso',
     ]);
   }
 
   /**
-   * Holt die Details eines einzelnen Commits (veränderte Dateien)
+   * Holt die Details eines einzelnen Commits (veraenderte Dateien)
    */
   async getCommitDetails(hash: string): Promise<string> {
     // Liefert Status (A, M, D) und Dateipfad (-M, --name-status)
     return this.runCommand(['show', '--name-status', '--format=', hash]);
   }
+
+  /**
+   * Liefert die Historie einer einzelnen Datei.
+   */
+  async getFileHistory(filePath: string, limit: number = 100, commitHash?: string): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 100;
+    const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x00';
+    const args = [
+      'log',
+      '--follow',
+      '-z',
+      `-${safeLimit}`,
+      `--pretty=format:${format}`,
+      '--date=iso',
+    ];
+
+    if (commitHash) {
+      args.push(commitHash);
+    }
+
+    args.push('--', filePath);
+    return this.runCommand(args);
+  }
+
+  /**
+   * Liefert Blame-Informationen einer Datei.
+   */
+  async getFileBlame(filePath: string, commitHash?: string): Promise<string> {
+    const args = ['blame', '--line-porcelain'];
+    if (commitHash) {
+      args.push(commitHash);
+    }
+    args.push('--', filePath);
+    return this.runCommand(args);
+  }
+
   /**
    * Klont ein Repository mit Fortschrittsanzeige
    */
   cloneRepo(
-    cloneUrl: string, 
-    targetDir: string, 
-    onProgress: (line: string) => void
+    cloneUrl: string,
+    targetDir: string,
+    onProgress: (line: string) => void,
   ): Promise<{ success: boolean; repoPath: string; error?: string }> {
     return new Promise((resolve) => {
       // Extract repo name from URL for the target folder
@@ -102,7 +138,7 @@ export class GitService {
       const repoPath = path.join(targetDir, repoName);
 
       const proc = spawn('git', ['clone', '--progress', cloneUrl, repoPath], {
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       // Git clone sends progress to stderr

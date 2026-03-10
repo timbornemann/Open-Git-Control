@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runGitCommand: (commandName: string, ...args: any[]) => ipcRenderer.invoke('git:command', commandName, ...args),
   gitClone: (cloneUrl: string, targetDir: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
+  getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
+    ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),
+  getFileBlame: (filePath: string, commitHash?: string) =>
+    ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
   onCloneProgress: (callback: (line: string) => void) => {
     const handler = (_event: any, line: string) => callback(line);
     ipcRenderer.on('clone:progress', handler);

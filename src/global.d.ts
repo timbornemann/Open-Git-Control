@@ -1,3 +1,5 @@
+import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from './types/git';
+
 export interface StoredRepoData {
   repos: { path: string; lastOpened: number }[];
   activeRepo: string | null;
@@ -45,6 +47,8 @@ export interface ElectronAPI {
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>; 
   gitClone: (cloneUrl: string, targetDir: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>; 
+  getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
+  getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
   getStoredRepos: () => Promise<StoredRepoData>;
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;

@@ -27,3 +27,21 @@ export type ToastMessage = {
   msg: string;
   isError: boolean;
 };
+
+export type GitFileHistoryEntryDto = {
+  hash: string;
+  abbrevHash: string;
+  author: string;
+  date: string;
+  subject: string;
+};
+
+export type GitFileBlameLineDto = {
+  lineNumber: number;
+  commitHash: string;
+  abbrevHash: string;
+  author: string;
+  authorTime: string;
+  summary: string;
+  content: string;
+};

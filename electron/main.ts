@@ -13,6 +13,24 @@ interface StoredData {
   activeRepo: string | null;
 }
 
+interface FileHistoryEntry {
+  hash: string;
+  abbrevHash: string;
+  author: string;
+  date: string;
+  subject: string;
+}
+
+interface FileBlameLine {
+  lineNumber: number;
+  commitHash: string;
+  abbrevHash: string;
+  author: string;
+  authorTime: string;
+  summary: string;
+  content: string;
+}
+
 function getStorePath(): string {
   return path.join(app.getPath('userData'), 'repos.json');
 }
@@ -82,6 +100,72 @@ function clearSavedGithubTokenSecurely(): void {
   }
 }
 
+function parseFileHistory(logOutput: string): FileHistoryEntry[] {
+  if (!logOutput) return [];
+
+  return logOutput
+    .split('\x00')
+    .map(record => record.trim())
+    .filter(Boolean)
+    .map(record => {
+      const [hash = '', abbrevHash = '', author = '', date = '', subject = ''] = record.split('\x1f');
+      return { hash, abbrevHash, author, date, subject };
+    });
+}
+
+function parseFileBlame(blameOutput: string): FileBlameLine[] {
+  if (!blameOutput.trim()) return [];
+
+  const lines = blameOutput.split('\n');
+  const parsed: FileBlameLine[] = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const header = lines[i]?.trim() || '';
+    const headerMatch = header.match(/^([0-9a-f]{40})\s+\d+\s+(\d+)\s+\d+$/i);
+
+    if (!headerMatch) {
+      continue;
+    }
+
+    const commitHash = headerMatch[1];
+    const lineNumber = Number(headerMatch[2]);
+    let author = 'Unknown';
+    let authorTime = '';
+    let summary = '';
+    let content = '';
+
+    for (i += 1; i < lines.length; i += 1) {
+      const metaLine = lines[i];
+      if (metaLine.startsWith('\t')) {
+        content = metaLine.slice(1);
+        break;
+      }
+      if (metaLine.startsWith('author ')) {
+        author = metaLine.slice('author '.length).trim() || 'Unknown';
+      } else if (metaLine.startsWith('author-time ')) {
+        const unixSeconds = Number(metaLine.slice('author-time '.length).trim());
+        if (Number.isFinite(unixSeconds)) {
+          authorTime = new Date(unixSeconds * 1000).toISOString();
+        }
+      } else if (metaLine.startsWith('summary ')) {
+        summary = metaLine.slice('summary '.length).trim();
+      }
+    }
+
+    parsed.push({
+      lineNumber,
+      commitHash,
+      abbrevHash: commitHash.slice(0, 8),
+      author,
+      authorTime,
+      summary,
+      content,
+    });
+  }
+
+  return parsed;
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -148,6 +232,34 @@ function setupIPC() {
         const custom = await gitService.runCommand([commandName, ...args]);
         return { success: true, data: custom };
       }
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:fileHistory', async (_event: any, filePath: string, commitHash?: string, limit: number = 100) => {
+    try {
+      const normalizedPath = (filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const raw = await gitService.getFileHistory(normalizedPath, limit, commitHash);
+      return { success: true, data: parseFileHistory(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:fileBlame', async (_event: any, filePath: string, commitHash?: string) => {
+    try {
+      const normalizedPath = (filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const raw = await gitService.getFileBlame(normalizedPath, commitHash);
+      return { success: true, data: parseFileBlame(raw) };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
