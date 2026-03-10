@@ -32,6 +32,11 @@ type InputDialogState = {
   onSubmit: (values: Record<string, string>) => Promise<void> | void;
 };
 
+type ConflictEntry = FileEntry & { code: string };
+type GitStatusWithConflicts = GitStatusDetailed & { conflicts: ConflictEntry[] };
+
+const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   A: { label: 'Added', color: '#3fb950' },
   M: { label: 'Modified', color: '#d29922' },
@@ -41,11 +46,37 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   '?': { label: 'Untracked', color: '#8b949e' },
 };
 
+const CONFLICT_LABELS: Record<string, string> = {
+  UU: 'Both modified',
+  AA: 'Both added',
+  DD: 'Both deleted',
+  AU: 'Added by us',
+  UA: 'Added by them',
+  DU: 'Deleted by us',
+  UD: 'Deleted by them',
+};
+
 const getStatusInfo = (code: string) => STATUS_LABELS[code] || { label: code, color: '#8b949e' };
 const basename = (p: string) => p.split(/[\\/]/).pop() || p;
 
+const parseConflictEntries = (statusOutput: string): ConflictEntry[] => {
+  if (!statusOutput.trim()) return [];
+
+  const conflicts: ConflictEntry[] = [];
+  for (const line of statusOutput.split('\n')) {
+    if (line.length < 3) continue;
+    const x = line[0];
+    const y = line[1];
+    const code = `${x}${y}`;
+    if (!CONFLICT_CODES.has(code)) continue;
+    conflicts.push({ path: line.substring(3).trim(), x, y, code });
+  }
+
+  return conflicts;
+};
+
 export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged }) => {
-  const [status, setStatus] = useState<GitStatusDetailed | null>(null);
+  const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [diffContent, setDiffContent] = useState<{ path: string; diff: string } | null>(null);
@@ -56,8 +87,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
     try {
-      const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
-      if (success) setStatus(parseGitStatusDetailed(data || ''));
+      const { success, data } = await window.electronAPI.runGitCommand('statusPorcelain');
+      if (!success) return;
+
+      const rawStatus = data || '';
+      const parsed = parseGitStatusDetailed(rawStatus);
+      const conflicts = parseConflictEntries(rawStatus);
+      const conflictPathSet = new Set(conflicts.map(c => c.path));
+
+      setStatus({
+        ...parsed,
+        conflicts,
+        staged: parsed.staged.filter(f => !conflictPathSet.has(f.path)),
+        unstaged: parsed.unstaged.filter(f => !conflictPathSet.has(f.path)),
+      });
     } catch (e) {
       console.error(e);
     }
@@ -202,12 +245,54 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     }
   };
 
+  const takeConflictVersion = (filePath: string, side: 'ours' | 'theirs') => {
+    const command = side === 'ours' ? 'conflictTakeOurs' : 'conflictTakeTheirs';
+    return git([command, filePath], `${basename(filePath)}: ${side} uebernommen`);
+  };
+
+  const markConflictResolved = (filePath: string) => git(['conflictMarkResolved', filePath], `${basename(filePath)} als geloest markiert`);
+
+  const mergeContinue = () => git(['mergeContinue'], 'Merge fortgesetzt', true);
+  const mergeAbort = () => {
+    setConfirmDialog({
+      variant: 'danger',
+      title: 'Merge abbrechen?',
+      message: 'Der laufende Merge wird verworfen und auf den Zustand vor dem Merge zurueckgesetzt.',
+      contextItems: [{ label: 'Aktion', value: 'git merge --abort' }],
+      irreversible: true,
+      consequences: 'Alle noch nicht gesicherten Merge-Konfliktaufloesungen gehen verloren.',
+      confirmLabel: 'Merge abbrechen',
+      onConfirm: () => git(['mergeAbort'], 'Merge abgebrochen', true),
+    });
+  };
+
+  const rebaseContinue = () => git(['rebaseContinue'], 'Rebase fortgesetzt', true);
+  const rebaseAbort = () => {
+    setConfirmDialog({
+      variant: 'danger',
+      title: 'Rebase abbrechen?',
+      message: 'Der laufende Rebase wird verworfen und der vorherige Branch-Zustand wiederhergestellt.',
+      contextItems: [{ label: 'Aktion', value: 'git rebase --abort' }],
+      irreversible: true,
+      consequences: 'Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.',
+      confirmLabel: 'Rebase abbrechen',
+      onConfirm: () => git(['rebaseAbort'], 'Rebase abgebrochen', true),
+    });
+  };
+
   const handleCommit = async () => {
-    if (!commitMsg.trim() || !window.electronAPI) return;
-    if (!status || status.staged.length === 0) {
+    if (!commitMsg.trim() || !window.electronAPI || !status) return;
+
+    if (status.conflicts.length > 0) {
+      setToast({ msg: 'Bitte zuerst alle Konflikte aufloesen.', isError: true });
+      return;
+    }
+
+    if (status.staged.length === 0) {
       setToast({ msg: 'Bitte zuerst Dateien stagen.', isError: true });
       return;
     }
+
     setIsCommitting(true);
     try {
       const r = await window.electronAPI.runGitCommand('commit', '-m', commitMsg.trim());
@@ -229,7 +314,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   if (!repoPath) return null;
   if (!status) return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>Lade Status...</div>;
 
-  const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length;
+  const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
+  const hasOpenConflicts = status.conflicts.length > 0;
 
   if (diffContent) {
     return (
@@ -325,6 +411,33 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </div>
         )}
 
+        {status.conflicts.length > 0 && (
+          <div className="staging-section">
+            <SectionHeader title="Konflikte" count={status.conflicts.length} color="#f85149" />
+            <div style={{ padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
+              <button className="staging-btn-sm" onClick={mergeContinue}>Merge fortsetzen</button>
+              <button className="staging-btn-sm danger" onClick={mergeAbort}>Abbrechen</button>
+              <button className="staging-btn-sm" onClick={rebaseContinue}>Rebase continue</button>
+              <button className="staging-btn-sm danger" onClick={rebaseAbort}>Rebase abort</button>
+            </div>
+            {status.conflicts.map((f) => (
+              <div key={`c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
+                <span className="staging-status" style={{ color: '#f85149', width: 22 }}>{f.code}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="staging-path" title={f.path}>{f.path}</span>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</div>
+                </div>
+                <div className="staging-actions" style={{ opacity: 1, flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' }}>
+                  <button className="staging-btn-sm" onClick={() => takeConflictVersion(f.path, 'ours')}>Take ours</button>
+                  <button className="staging-btn-sm" onClick={() => takeConflictVersion(f.path, 'theirs')}>Take theirs</button>
+                  <button className="staging-btn-sm" onClick={() => showDiff(f.path, false)}>Diff anzeigen</button>
+                  <button className="staging-btn-sm" onClick={() => markConflictResolved(f.path)}>Als geloest markieren</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {status.staged.length > 0 && (
           <div className="staging-section">
             <SectionHeader title="Staged Changes" count={status.staged.length} color="#3fb950"
@@ -361,19 +474,25 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       <div className="staging-commit-area">
         <textarea
           className="staging-commit-input"
-          placeholder="Commit-Nachricht..."
+          placeholder={hasOpenConflicts ? 'Konflikte aufloesen, danach committen...' : 'Commit-Nachricht...'}
           value={commitMsg}
           onChange={e => setCommitMsg(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
+          disabled={hasOpenConflicts}
         />
         <div className="staging-commit-bar">
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Ctrl+Enter</span>
+          <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? '#f85149' : 'var(--text-secondary)' }}>
+            {hasOpenConflicts ? 'Offene Konflikte blockieren Commit' : 'Ctrl+Enter'}
+          </span>
           <button
             className="staging-commit-btn"
             onClick={handleCommit}
-            disabled={!commitMsg.trim() || isCommitting || !status || status.staged.length === 0}
+            disabled={hasOpenConflicts || !commitMsg.trim() || isCommitting || !status || status.staged.length === 0}
           >
-            {isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0})`}
+            {hasOpenConflicts
+              ? `Konflikte (${status.conflicts.length})`
+              : (isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0})`)
+            }
           </button>
         </div>
       </div>

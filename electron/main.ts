@@ -219,6 +219,9 @@ function setupIPC() {
       if (commandName === 'status') {
         const status = await gitService.getStatus();
         return { success: true, data: status };
+      } else if (commandName === 'statusPorcelain') {
+        const status = await gitService.getStatusPorcelain();
+        return { success: true, data: status };
       } else if (commandName === 'log') {
         const log = await gitService.getLog(args[0] || 50);
         return { success: true, data: log };
@@ -228,6 +231,27 @@ function setupIPC() {
       } else if (commandName === 'commitDetails') {
         const details = await gitService.getCommitDetails(args[0]);
         return { success: true, data: details };
+      } else if (commandName === 'conflictTakeOurs') {
+        const output = await gitService.checkoutConflictVersion(args[0], 'ours');
+        return { success: true, data: output };
+      } else if (commandName === 'conflictTakeTheirs') {
+        const output = await gitService.checkoutConflictVersion(args[0], 'theirs');
+        return { success: true, data: output };
+      } else if (commandName === 'conflictMarkResolved') {
+        const output = await gitService.addFile(args[0]);
+        return { success: true, data: output };
+      } else if (commandName === 'mergeContinue') {
+        const output = await gitService.continueMerge();
+        return { success: true, data: output };
+      } else if (commandName === 'mergeAbort') {
+        const output = await gitService.abortMerge();
+        return { success: true, data: output };
+      } else if (commandName === 'rebaseContinue') {
+        const output = await gitService.continueRebase();
+        return { success: true, data: output };
+      } else if (commandName === 'rebaseAbort') {
+        const output = await gitService.abortRebase();
+        return { success: true, data: output };
       } else {
         const custom = await gitService.runCommand([commandName, ...args]);
         return { success: true, data: custom };

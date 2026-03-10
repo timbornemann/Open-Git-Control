@@ -57,6 +57,56 @@ export class GitService {
   }
 
   /**
+   * Gibt den aktuellen Status im Porcelain-v1-Format zurueck.
+   * Dieses Format ist stabil und fuer UI-Parsing geeignet.
+   */
+  async getStatusPorcelain(): Promise<string> {
+    return this.runCommand(['status', '--porcelain=v1']);
+  }
+
+  /**
+   * Nimmt bei einer Konfliktdatei die lokale (ours) oder entfernte (theirs) Variante.
+   */
+  async checkoutConflictVersion(filePath: string, side: 'ours' | 'theirs'): Promise<string> {
+    return this.runCommand(['checkout', '--' + side, '--', filePath]);
+  }
+
+  /**
+   * Markiert eine Datei nach Konfliktaufloesung als geloest (staged).
+   */
+  async addFile(filePath: string): Promise<string> {
+    return this.runCommand(['add', '--', filePath]);
+  }
+
+  /**
+   * Setzt einen laufenden Merge nach Konfliktaufloesung fort.
+   */
+  async continueMerge(): Promise<string> {
+    return this.runCommand(['merge', '--continue']);
+  }
+
+  /**
+   * Bricht einen laufenden Merge ab.
+   */
+  async abortMerge(): Promise<string> {
+    return this.runCommand(['merge', '--abort']);
+  }
+
+  /**
+   * Setzt einen laufenden Rebase nach Konfliktaufloesung fort.
+   */
+  async continueRebase(): Promise<string> {
+    return this.runCommand(['rebase', '--continue']);
+  }
+
+  /**
+   * Bricht einen laufenden Rebase ab.
+   */
+  async abortRebase(): Promise<string> {
+    return this.runCommand(['rebase', '--abort']);
+  }
+
+  /**
    * Holt die Branch-Liste
    */
   async getBranches(): Promise<string> {
