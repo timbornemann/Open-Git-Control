@@ -10,7 +10,10 @@
     "build:electron": "tsc --project tsconfig.node.json",
     "preview": "vite preview",
     "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
-    "test": "node scripts/run-tests.js"
+    "test": "npm run test:unit",
+    "test:unit": "node scripts/run-tests.js",
+    "test:coverage": "node scripts/run-tests.js --coverage",
+    "test:ci": "npm run build:electron && npm run test:coverage && npm run build"
   },
   "dependencies": {
     "lucide-react": "^0.300.0",
@@ -25,6 +28,7 @@
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "electron": "^28.0.0",
