@@ -66,18 +66,18 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ ollamaBaseUrl: 123 as never }).ollamaBaseUrl).toBe(DEFAULT_SETTINGS.ollamaBaseUrl);
   });
 
-  it('normalizes model values and gemini API key', () => {
+  it('normalizes model values and gemini key presence flag', () => {
     const veryLong = 'm'.repeat(500);
 
     const normalized = normalizeSettings({
       ollamaModel: `  ${veryLong}  `,
       geminiModel: '   ',
-      geminiApiKey: `  ${'k'.repeat(600)}  `,
+      hasGeminiApiKey: true,
     });
 
     expect(normalized.ollamaModel.length).toBe(200);
     expect(normalized.geminiModel).toBe(DEFAULT_SETTINGS.geminiModel);
-    expect(normalized.geminiApiKey.length).toBe(500);
-    expect(normalizeSettings({ geminiApiKey: 123 as never }).geminiApiKey).toBe('');
+    expect(normalized.hasGeminiApiKey).toBe(true);
+    expect(normalizeSettings({ hasGeminiApiKey: 'yes' as never }).hasGeminiApiKey).toBe(false);
   });
 });

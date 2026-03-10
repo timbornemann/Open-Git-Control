@@ -19,8 +19,8 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
   aiProvider: 'ollama',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
-  geminiApiKey: '',
   geminiModel: 'gemini-3-flash-preview',
+  hasGeminiApiKey: false,
 };
 
 type RunGitCommandOptions = {

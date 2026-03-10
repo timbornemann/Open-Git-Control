@@ -13,8 +13,8 @@ export interface AppSettings {
   aiProvider: AiProvider;
   ollamaBaseUrl: string;
   ollamaModel: string;
-  geminiApiKey: string;
   geminiModel: string;
+  hasGeminiApiKey: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -30,8 +30,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiProvider: 'ollama',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
-  geminiApiKey: '',
   geminiModel: 'gemini-3-flash-preview',
+  hasGeminiApiKey: false,
 };
 
 const MIN_FETCH_INTERVAL_MS = 10_000;
@@ -39,7 +39,6 @@ const MAX_FETCH_INTERVAL_MS = 300_000;
 const MAX_COMMIT_TEMPLATE_LENGTH = 8_000;
 const MAX_OLLAMA_BASE_URL_LENGTH = 500;
 const MAX_MODEL_LENGTH = 200;
-const MAX_GEMINI_KEY_LENGTH = 500;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
   return value === 'light' ? 'light' : 'dark';
@@ -114,13 +113,6 @@ function normalizeModel(value: unknown, fallback = ''): string {
   return trimmed || fallback;
 }
 
-function normalizeGeminiApiKey(value: unknown): string {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  return value.trim().slice(0, MAX_GEMINI_KEY_LENGTH);
-}
-
 export function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   const value = input || {};
   return {
@@ -136,7 +128,7 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     aiProvider: normalizeAiProvider(value.aiProvider),
     ollamaBaseUrl: normalizeOllamaBaseUrl(value.ollamaBaseUrl),
     ollamaModel: normalizeModel(value.ollamaModel),
-    geminiApiKey: normalizeGeminiApiKey(value.geminiApiKey),
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),
+    hasGeminiApiKey: normalizeBoolean(value.hasGeminiApiKey, false),
   };
 }

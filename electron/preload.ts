@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
+  setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),
+  clearGeminiApiKey: () => ipcRenderer.invoke('settings:clearGeminiApiKey'),
   aiTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
   aiListModels: () => ipcRenderer.invoke('ai:listModels'),
   ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
