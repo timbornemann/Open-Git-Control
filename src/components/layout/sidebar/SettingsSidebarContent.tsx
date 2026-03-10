@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppSidebarProps } from './AppSidebar.types';
 
 type SettingsSidebarContentProps = Pick<
@@ -13,6 +13,69 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   onClearJobs,
 }) => {
   const sortedJobs = [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
+  const [isTestingAi, setIsTestingAi] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+
+  const selectedModel = settings.aiProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel;
+
+  const mergedModelOptions = useMemo(() => {
+    const values = [...modelOptions, selectedModel].filter(Boolean);
+    return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+  }, [modelOptions, selectedModel]);
+
+  const setSelectedModel = async (model: string) => {
+    if (settings.aiProvider === 'gemini') {
+      await onUpdateSettings({ geminiModel: model });
+      return;
+    }
+    await onUpdateSettings({ ollamaModel: model });
+  };
+
+  const testConnection = async () => {
+    if (!window.electronAPI) return;
+    setIsTestingAi(true);
+    setAiStatus(null);
+
+    try {
+      const result = await window.electronAPI.aiTestConnection();
+      if (!result.success) {
+        setAiStatus(`Verbindung fehlgeschlagen: ${result.error}`);
+        return;
+      }
+
+      setAiStatus(`Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`);
+    } catch (error: unknown) {
+      setAiStatus(error instanceof Error ? error.message : 'Verbindung fehlgeschlagen.');
+    } finally {
+      setIsTestingAi(false);
+    }
+  };
+
+  const loadModels = async () => {
+    if (!window.electronAPI) return;
+    setIsLoadingModels(true);
+    setAiStatus(null);
+
+    try {
+      const result = await window.electronAPI.aiListModels();
+      if (!result.success) {
+        setAiStatus(`Modelle konnten nicht geladen werden: ${result.error}`);
+        return;
+      }
+
+      setModelOptions(result.data);
+      if (!selectedModel && result.data.length > 0) {
+        await setSelectedModel(result.data[0]);
+      }
+      setAiStatus(`${result.data.length} Modell(e) geladen.`);
+    } catch (error: unknown) {
+      setAiStatus(error instanceof Error ? error.message : 'Modelle konnten nicht geladen werden.');
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -106,6 +169,89 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
       </div>
 
+      <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>KI Auto-Commit</div>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
+            checked={settings.aiAutoCommitEnabled}
+            onChange={(e) => onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
+          />
+          Feature aktivieren
+        </label>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          Provider
+          <select
+            value={settings.aiProvider}
+            onChange={(e) => onUpdateSettings({ aiProvider: e.target.value as 'ollama' | 'gemini' })}
+            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          >
+            <option value="ollama">Ollama</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </label>
+
+        {settings.aiProvider === 'ollama' && (
+          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            Ollama URL
+            <input
+              type="text"
+              value={settings.ollamaBaseUrl}
+              onChange={(e) => onUpdateSettings({ ollamaBaseUrl: e.target.value })}
+              placeholder="http://127.0.0.1:11434"
+              style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+            />
+          </label>
+        )}
+
+        {settings.aiProvider === 'gemini' && (
+          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            Gemini API Key
+            <input
+              type="password"
+              value={settings.geminiApiKey}
+              onChange={(e) => onUpdateSettings({ geminiApiKey: e.target.value })}
+              placeholder="AIza..."
+              style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+            />
+          </label>
+        )}
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          Modell
+          <input
+            list="ai-model-list"
+            type="text"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            placeholder={settings.aiProvider === 'gemini' ? 'z.B. gemini-3-flash-preview' : 'z.B. llama3.1:8b'}
+            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          />
+          <datalist id="ai-model-list">
+            {mergedModelOptions.map((model) => (
+              <option key={model} value={model} />
+            ))}
+          </datalist>
+        </label>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
+            {isTestingAi ? 'Teste...' : 'Verbindung testen'}
+          </button>
+          <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
+            {isLoadingModels ? 'Lade Modelle...' : 'Modelle laden'}
+          </button>
+        </div>
+
+        {aiStatus && (
+          <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+            {aiStatus}
+          </div>
+        )}
+      </div>
+
       <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Job Center</div>
@@ -136,4 +282,3 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     </div>
   );
 };
-
