@@ -155,6 +155,24 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const stageFile = (f: string) => git(['add', '--', f], `${basename(f)} gestaged`);
   const unstageFile = (f: string) => git(['reset', 'HEAD', '--', f], `${basename(f)} unstaged`);
   const stageAll = () => git(['add', '.'], 'Alle Dateien gestaged');
+  const stageAllUntracked = async () => {
+    if (!window.electronAPI || !status || status.untracked.length === 0) return;
+
+    try {
+      for (const entry of status.untracked) {
+        const r = await window.electronAPI.runGitCommand('add', '--', entry.path);
+        if (!r.success) {
+          throw new Error(r.error || `Fehler beim Stagen von ${entry.path}`);
+        }
+      }
+
+      const count = status.untracked.length;
+      setToast({ msg: `${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, isError: false });
+      await refresh();
+    } catch (e: any) {
+      setToast({ msg: e.message, isError: true });
+    }
+  };
   const unstageAll = () => git(['reset', 'HEAD'], 'Alle Dateien unstaged');
 
   const discardFile = (f: string) => {
@@ -464,7 +482,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
         {status.untracked.length > 0 && (
           <div className="staging-section">
             <SectionHeader title="Untracked" count={status.untracked.length} color="#8b949e"
-              actions={<button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>}
+              actions={<button className="staging-btn-sm" onClick={stageAllUntracked} title="Alle untracked stagen">+ Alle</button>}
             />
             {status.untracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
           </div>

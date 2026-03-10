@@ -61,7 +61,8 @@ export class GitService {
    * Dieses Format ist stabil und fuer UI-Parsing geeignet.
    */
   async getStatusPorcelain(): Promise<string> {
-    return this.runCommand(['status', '--porcelain=v1']);
+    // -uall lists each untracked file individually instead of collapsing directories.
+    return this.runCommand(['status', '--porcelain=v1', '--untracked-files=all']);
   }
 
   /**
@@ -227,3 +228,4 @@ export class GitService {
 
 // Singleton Instanz
 export const gitService = new GitService();
+
