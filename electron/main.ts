@@ -124,7 +124,7 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
   const maxArgsByCommand: Partial<Record<GitCommandName, number>> = {
     status: 2,
     statusPorcelain: 0,
-    log: 1,
+    log: 2,
     branches: 0,
     commitDetails: 1,
     conflictTakeOurs: 1,
@@ -158,10 +158,17 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     throw new Error('Too many args for git ' + commandName + '.');
   }
 
-  if (commandName === 'log' && args.length === 1) {
+  if (commandName === 'log' && args.length >= 1) {
     const parsedLimit = Number(args[0]);
     if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 5000) {
       throw new Error('Invalid log limit.');
+    }
+  }
+
+  if (commandName === 'log' && args.length >= 2) {
+    const scope = args[1];
+    if (scope !== 'all' && scope !== 'head') {
+      throw new Error('Invalid log scope.');
     }
   }
 }
@@ -445,7 +452,7 @@ function setupIPC() {
       } else if (commandName === 'statusPorcelain') {
         data = await gitService.getStatusPorcelain();
       } else if (commandName === 'log') {
-        data = await gitService.getLog(Number(normalizedArgs[0]) || 50);
+        data = await gitService.getLog(Number(normalizedArgs[0]) || 50, normalizedArgs[1] !== 'head');
       } else if (commandName === 'branches') {
         data = await gitService.getBranches();
       } else if (commandName === 'commitDetails') {
@@ -759,7 +766,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-
-
-
 

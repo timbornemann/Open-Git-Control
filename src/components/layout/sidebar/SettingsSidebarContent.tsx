@@ -83,7 +83,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
-          Sekundaere Historie im Graph hervorheben
+          Sekundaere Historie anzeigen (alle Branches)
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -136,3 +136,4 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     </div>
   );
 };
+

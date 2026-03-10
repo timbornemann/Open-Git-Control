@@ -14,13 +14,13 @@ interface CommitGraphProps {
   showSecondaryHistory?: boolean;
 }
 
-const LOG_LIMIT = 200;
+const LOG_LIMIT = 500;
 const ROW_HEIGHT = 44;
-const LANE_WIDTH = 24;
+const LANE_WIDTH = 28;
 const GRAPH_PADDING = 16;
 const NODE_RADIUS = 4;
 const MERGE_NODE_RADIUS = 6;
-const SECONDARY_GRAPH_COLOR = 'rgba(139, 148, 158, 0.78)';
+const SECONDARY_GRAPH_ACCENT = 'rgba(139, 148, 158, 0.34)';
 
 interface ContextMenuState {
   x: number;
@@ -117,7 +117,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     }
 
     try {
-      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_LIMIT));
+      const scope = showSecondaryHistory ? 'all' : 'head';
+      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_LIMIT), scope);
       if (success && data) {
         setLayout(computeGraphLayout(parseGitLog(data)));
       } else {
@@ -130,7 +131,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         setLoading(false);
       }
     }
-  }, [repoPath]);
+  }, [repoPath, showSecondaryHistory]);
 
   const refreshWorkingTreeStatus = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -597,17 +598,23 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
 
-    const span = y2 - y1;
-    const verticalInset = Math.min(ROW_HEIGHT * 0.9, Math.max(10, span * 0.28));
-    const bendStartY = y1 + verticalInset;
-    const bendEndY = y2 - verticalInset;
-    const midY = (bendStartY + bendEndY) / 2;
+    const verticalSpan = Math.max(8, y2 - y1);
+    const turnY = y1 + Math.min(ROW_HEIGHT * 0.8, Math.max(10, verticalSpan * 0.42));
+    const direction = x2 > x1 ? 1 : -1;
+    const controlInset = Math.min(14, Math.abs(x2 - x1) * 0.45);
 
-    if (bendStartY >= bendEndY) {
-      return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    return `M ${x1} ${y1} L ${x1} ${turnY} C ${x1 + direction * controlInset} ${turnY}, ${x2 - direction * controlInset} ${turnY}, ${x2} ${turnY} L ${x2} ${y2}`;
+  };
+
+  const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
+
+  const getEdgeStroke = (edge: GraphEdge) => {
+    const fromNode = layout.nodes[edge.fromRow];
+    if (!fromNode) return edge.color;
+    if (!showSecondaryHistory || !isSecondaryCommit(fromNode.commit.hash)) {
+      return edge.color;
     }
-
-    return `M ${x1} ${y1} L ${x1} ${bendStartY} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${bendEndY} L ${x2} ${y2}`;
+    return edge.kind === 'merge' ? SECONDARY_GRAPH_ACCENT : edge.color;
   };
 
   return (
@@ -664,7 +671,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 y1={0}
                 x2={x}
                 y2={totalHeight}
-                stroke="rgba(201, 209, 217, 0.06)"
+                stroke="rgba(201, 209, 217, 0.11)"
                 strokeWidth={1}
               />
             );
@@ -701,8 +708,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             <path
               key={`eg${i}`}
               d={buildEdgePath(edge)}
-              stroke={showSecondaryHistory && !reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? SECONDARY_GRAPH_COLOR : edge.color}
-              strokeWidth={edge.kind === 'merge' ? 4.5 : 5}
+              stroke={getEdgeStroke(edge)}
+              strokeWidth={edge.kind === 'merge' ? 2.8 : 3.2}
               strokeOpacity={0.1}
               fill="none"
               strokeLinecap="round"
@@ -713,9 +720,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             <path
               key={`em${i}`}
               d={buildEdgePath(edge)}
-              stroke={showSecondaryHistory && !reachableFromHead.has(layout.nodes[edge.fromRow]?.commit.hash) ? SECONDARY_GRAPH_COLOR : edge.color}
-              strokeWidth={edge.kind === 'merge' ? 1.5 : 2.2}
-              strokeOpacity={edge.kind === 'merge' ? 0.72 : 0.92}
+              stroke={getEdgeStroke(edge)}
+              strokeWidth={edge.kind === 'merge' ? 1.35 : 1.9}
+              strokeOpacity={edge.kind === 'merge' ? 0.86 : 0.97}
               fill="none"
               strokeLinecap="round"
               strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
@@ -725,9 +732,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             const cx = laneX(node.lane);
             const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
             const isSelected = selectedHash === node.commit.hash;
-            const isSecondary = showSecondaryHistory && !reachableFromHead.has(node.commit.hash);
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
-            const fillColor = isSecondary ? SECONDARY_GRAPH_COLOR : node.color;
+            const fillColor = node.color;
 
             return (
               <g key={node.commit.hash}>
@@ -814,13 +820,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
         {layout.nodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
-          const isSecondary = showSecondaryHistory && !reachableFromHead.has(node.commit.hash);
+          const isSecondary = isSecondaryCommit(node.commit.hash);
           const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
           const sortedRefs = sortRefs(node.commit.refs);
           return (
             <div
               key={node.commit.hash}
-              className={`commit-row ${isSelected ? 'selected' : ''} ${isSecondary ? 'secondary-history' : ''}`}
+              className={`commit-row ${isSelected ? 'selected' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
               style={{ height: ROW_HEIGHT, paddingLeft: graphWidth, ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px rgba(31, 111, 235, 0.45)' } : {}) }}
@@ -935,6 +941,5 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     </>
   );
 };
-
 
 

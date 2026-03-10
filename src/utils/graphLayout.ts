@@ -3,7 +3,7 @@ import { GitCommit } from './gitParsing';
 // Colors for branch lanes (GitKraken-inspired palette)
 export const LANE_COLORS = [
   '#00b4d8', // cyan
-  '#e040fb', // magenta  
+  '#e040fb', // magenta
   '#3fb950', // green
   '#d29922', // orange
   '#f78166', // coral
@@ -37,34 +37,29 @@ export interface GraphLayout {
   maxLane: number;
 }
 
+const LANE_REUSE_COOLDOWN_ROWS = 2;
+
 /**
  * Assigns lanes (columns) to commits and computes edges.
- * 
- * Algorithm: walk commits top-down (newest first).
- * Maintain a set of "active lanes" — each lane tracks
- * which commit hash it is currently waiting to encounter.
- * 
- * - If a commit's hash is expected in an existing lane, place it there.
- * - If not expected anywhere, assign the first free lane.
- * - For each parent of the current commit:
- *   - If the parent is already expected in a lane, draw an edge to that lane.
- *   - Otherwise, reserve a lane for that parent.
- * - After placing a commit, release lanes that are no longer needed.
+ *
+ * Goals for readability in complex merge graphs:
+ * - Keep the active first-parent chain on lane 0.
+ * - Keep first-parent continuity for side branches.
+ * - Avoid immediate lane recycling so unrelated branches do not visually "stack".
  */
 export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
-
-  // activeLanes[i] = hash that lane i is waiting for, or null if free
   const activeLanes: (string | null)[] = [];
-  // Build set of all hashes in the visible window for quick membership checks
+  const laneFreedAtRow: number[] = [];
   const visibleHashes = new Set(commits.map(c => c.hash));
   const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+
   const headCommit = commits.find(commit => (
     commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
   )) ?? commits[0];
-  const trunkHashes = new Set<string>();
 
+  const trunkHashes = new Set<string>();
   for (let current = headCommit; current; ) {
     trunkHashes.add(current.hash);
     const firstParent = current.parentHashes[0];
@@ -77,94 +72,104 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const ensureLaneExists = (lane: number) => {
     while (activeLanes.length <= lane) {
       activeLanes.push(null);
+      laneFreedAtRow.push(-9999);
     }
   };
 
-  const clearDuplicateReservations = (hash: string, keepLane: number) => {
+  const freeLane = (lane: number, row: number) => {
+    ensureLaneExists(lane);
+    activeLanes[lane] = null;
+    laneFreedAtRow[lane] = row;
+  };
+
+  const clearDuplicateReservations = (hash: string, keepLane: number, row: number) => {
     for (let lane = 0; lane < activeLanes.length; lane++) {
       if (lane !== keepLane && activeLanes[lane] === hash) {
-        activeLanes[lane] = null;
+        freeLane(lane, row);
       }
     }
   };
 
-  const findFreeSideLane = () => {
-    for (let lane = 1; lane < activeLanes.length; lane++) {
+  const findFreeLane = (startLane: number, row: number) => {
+    for (let lane = startLane; lane < activeLanes.length; lane++) {
+      if (activeLanes[lane] !== null) continue;
+      const recentlyFreed = row - (laneFreedAtRow[lane] ?? -9999) <= LANE_REUSE_COOLDOWN_ROWS;
+      if (!recentlyFreed) {
+        return lane;
+      }
+    }
+
+    for (let lane = startLane; lane < activeLanes.length; lane++) {
       if (activeLanes[lane] === null) return lane;
     }
+
     activeLanes.push(null);
+    laneFreedAtRow.push(-9999);
     return activeLanes.length - 1;
+  };
+
+  const reserveHashInLane = (hash: string, preferredLane: number, startLane: number, row: number) => {
+    const existingLane = activeLanes.indexOf(hash);
+    if (existingLane !== -1) {
+      if (preferredLane >= 0 && existingLane !== preferredLane) {
+        ensureLaneExists(preferredLane);
+        if (activeLanes[preferredLane] === null || activeLanes[preferredLane] === hash) {
+          freeLane(existingLane, row);
+          activeLanes[preferredLane] = hash;
+          clearDuplicateReservations(hash, preferredLane, row);
+          return preferredLane;
+        }
+      }
+      return existingLane;
+    }
+
+    let lane = preferredLane;
+    ensureLaneExists(Math.max(lane, startLane));
+    if (lane < startLane || activeLanes[lane] !== null) {
+      lane = findFreeLane(startLane, row);
+    }
+
+    activeLanes[lane] = hash;
+    clearDuplicateReservations(hash, lane, row);
+    return lane;
   };
 
   for (let row = 0; row < commits.length; row++) {
     const commit = commits[row];
     const commitOnTrunk = trunkHashes.has(commit.hash);
 
-    // 1. Find which lane this commit belongs to
-    let myLane = commitOnTrunk ? 0 : -1;
-
-    if (!commitOnTrunk) {
-      for (let lane = 1; lane < activeLanes.length; lane++) {
-        if (activeLanes[lane] === commit.hash) {
-          myLane = lane;
-          break;
-        }
-      }
-    }
-
+    let myLane = commitOnTrunk ? 0 : activeLanes.indexOf(commit.hash);
     if (myLane === -1) {
-      // Not expected in any lane — find a free side lane
-      myLane = commitOnTrunk ? 0 : findFreeSideLane();
+      myLane = findFreeLane(1, row);
     }
 
     ensureLaneExists(myLane);
-    clearDuplicateReservations(commit.hash, myLane);
+    clearDuplicateReservations(commit.hash, myLane, row);
+    freeLane(myLane, row);
 
-    // Place this commit
-    activeLanes[myLane] = null; // free the lane (we'll re-assign below if needed)
     const color = LANE_COLORS[myLane % LANE_COLORS.length];
     const isMerge = commit.parentHashes.length > 1;
-
     nodes.push({ commit, row, lane: myLane, color, isMerge });
 
-    // 2. Process parents
     const parents = commit.parentHashes.filter(h => h.length > 0);
-
-    for (let pi = 0; pi < parents.length; pi++) {
-      const parentHash = parents[pi];
-      const parentOnTrunk = trunkHashes.has(parentHash);
-
-      let parentLane = activeLanes.indexOf(parentHash);
-
-      if (parentOnTrunk) {
-        parentLane = 0;
-        ensureLaneExists(parentLane);
-        clearDuplicateReservations(parentHash, parentLane);
-        activeLanes[parentLane] = parentHash;
-      } else if (parentLane !== -1) {
-        if (pi === 0 && parentLane !== myLane) {
-          activeLanes[parentLane] = null;
-          activeLanes[myLane] = parentHash;
-          parentLane = myLane;
-        }
-      } else {
-        if (pi === 0 && !commitOnTrunk) {
-          parentLane = myLane;
-        } else {
-          parentLane = findFreeSideLane();
-        }
-        activeLanes[parentLane] = parentHash;
-      }
-
+    if (parents.length > 0) {
+      const primaryLane = commitOnTrunk ? 0 : myLane;
+      reserveHashInLane(parents[0], primaryLane, primaryLane, row);
     }
 
-    // Clean up: trim trailing null lanes
-    while (activeLanes.length > 0 && activeLanes[activeLanes.length - 1] === null) {
+    for (let pi = 1; pi < parents.length; pi++) {
+      const parentHash = parents[pi];
+      const preferred = trunkHashes.has(parentHash) ? 0 : -1;
+      const startLane = preferred === 0 ? 0 : 1;
+      reserveHashInLane(parentHash, preferred, startLane, row);
+    }
+
+    while (activeLanes.length > 1 && activeLanes[activeLanes.length - 1] === null) {
       activeLanes.pop();
+      laneFreedAtRow.pop();
     }
   }
 
-  // Second pass: now that all nodes are placed, build edges from each commit to its parents
   const nodeByHash = new Map(nodes.map(node => [node.commit.hash, node]));
   for (const node of nodes) {
     const parents = node.commit.parentHashes.filter(h => h.length > 0);
@@ -180,10 +185,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
           color: pi === 0 ? node.color : parentNode.color,
           kind: pi === 0 ? 'primary' : 'merge',
         });
-      } else if (visibleHashes.has(parentHash)) {
-        // Parent is visible but hasn't been found (should not happen)
-      } else {
-        // Parent is outside the visible window — draw edge going down to last row
+      } else if (!visibleHashes.has(parentHash)) {
         edges.push({
           fromRow: node.row,
           fromLane: node.lane,
@@ -196,6 +198,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     }
   }
 
-  const maxLane = nodes.reduce((max, n) => Math.max(max, n.lane), 0);
+  const maxLane = nodes.reduce((max, node) => Math.max(max, node.lane), 0);
   return { nodes, edges, maxLane };
 }
+

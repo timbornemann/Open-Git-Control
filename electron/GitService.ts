@@ -117,19 +117,17 @@ export class GitService {
   /**
    * Holt das Git Log in einem einfach parsebaren Format
    */
-  async getLog(limit: number = 50): Promise<string> {
+  async getLog(limit: number = 50, includeAll: boolean = true): Promise<string> {
     // NUL separates commits (with -z) and US (\x1f) separates fixed fields.
     // Refs use GS (\x1d) as an explicit separator to avoid ambiguities.
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
-    return this.runCommand([
-      'log',
-      '--all',
-      '--topo-order',
-      '-z',
-      `-${limit}`,
-      `--pretty=format:${format}`,
-      '--date=iso',
-    ]);
+    const args = ['log', '--topo-order', '-z', '-' + limit, '--pretty=format:' + format, '--date=iso'];
+
+    if (includeAll) {
+      args.splice(1, 0, '--all');
+    }
+
+    return this.runCommand(args);
   }
 
   /**

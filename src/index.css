@@ -254,20 +254,12 @@ code, pre {
 }
 
 .commit-row.secondary-history {
-  background-color: rgba(139, 148, 158, 0.03);
+  background: linear-gradient(90deg, rgba(31, 111, 235, 0.08), rgba(31, 111, 235, 0.02) 48%, transparent 100%);
 }
 
-.commit-row.secondary-history .commit-hash,
-.commit-row.secondary-history .commit-subject,
-.commit-row.secondary-history .commit-author,
-.commit-row.secondary-history .commit-date {
-  color: var(--text-secondary);
+.commit-row.secondary-history .commit-hash {
+  text-shadow: 0 0 8px rgba(88, 166, 255, 0.22);
 }
-
-.commit-row.secondary-history .branch-label {
-  opacity: 0.72;
-}
-
 .commit-info {
   flex: 1;
   display: flex;
@@ -720,3 +712,4 @@ body[data-theme='light'] {
   --accent-hover: #1f6feb;
   --glass-bg: rgba(255, 255, 255, 0.85);
 }
+
