@@ -14,7 +14,7 @@ interface CommitGraphProps {
   showSecondaryHistory?: boolean;
 }
 
-const LOG_LIMIT = 500;
+const LOG_PAGE_SIZE = 200;
 const ROW_HEIGHT = 44;
 const LANE_WIDTH = 28;
 const GRAPH_PADDING = 16;
@@ -93,8 +93,11 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
 
 export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
+  const [commitCount, setCommitCount] = useState(0);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreCommits, setHasMoreCommits] = useState(true);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const { toast, setToast } = useToastQueue(4000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -105,33 +108,61 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const logContainerRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<GraphLayout | null>(null);
   const pendingScrollTopRef = useRef<number | null>(null);
+  const pendingScrollHeightRef = useRef<number | null>(null);
 
-  const refreshCommits = useCallback(async () => {
+  const refreshCommits = useCallback(async (mode: 'reset' | 'append' = 'reset') => {
     if (!repoPath || !window.electronAPI) return;
+
+    const isAppend = mode === 'append';
     const shouldShowLoadingState = !layoutRef.current;
     const scrollContainer = logContainerRef.current?.parentElement ?? null;
-    pendingScrollTopRef.current = scrollContainer ? scrollContainer.scrollTop : null;
 
-    if (shouldShowLoadingState) {
-      setLoading(true);
+    if (isAppend && scrollContainer) {
+      pendingScrollTopRef.current = scrollContainer.scrollTop;
+      pendingScrollHeightRef.current = scrollContainer.scrollHeight;
+      setLoadingMore(true);
+    } else {
+      pendingScrollTopRef.current = scrollContainer ? scrollContainer.scrollTop : null;
+      pendingScrollHeightRef.current = null;
+      if (shouldShowLoadingState) {
+        setLoading(true);
+      }
     }
 
     try {
       const scope = showSecondaryHistory ? 'all' : 'head';
-      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_LIMIT), scope);
-      if (success && data) {
-        setLayout(computeGraphLayout(parseGitLog(data)));
+      const offset = isAppend ? commitCount : 0;
+      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_PAGE_SIZE), scope, String(offset));
+      if (success) {
+        const parsedChunk = parseGitLog(data || '');
+        const nextCount = isAppend ? commitCount + parsedChunk.length : parsedChunk.length;
+        setCommitCount(nextCount);
+        setHasMoreCommits(parsedChunk.length === LOG_PAGE_SIZE);
+
+        if (isAppend && layoutRef.current) {
+          const merged = [...layoutRef.current.nodes.map(node => node.commit), ...parsedChunk];
+          setLayout(computeGraphLayout(merged));
+        } else {
+          setLayout(computeGraphLayout(parsedChunk));
+        }
       } else {
         console.error('Failed to fetch commits:', error);
       }
     } catch (e) {
       console.error(e);
     } finally {
-      if (shouldShowLoadingState) {
+      if (isAppend) {
+        setLoadingMore(false);
+      } else if (shouldShowLoadingState) {
         setLoading(false);
       }
     }
-  }, [repoPath, showSecondaryHistory]);
+  }, [repoPath, showSecondaryHistory, commitCount]);
+
+  const loadMoreCommits = useCallback(async () => {
+    if (loading || loadingMore || !hasMoreCommits) return;
+    await refreshCommits('append');
+  }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
 
   const refreshWorkingTreeStatus = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -148,9 +179,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   useEffect(() => {
     if (!repoPath) {
       setLayout(null);
+      setCommitCount(0);
+      setHasMoreCommits(true);
       setWorkingTreeStatus(null);
       layoutRef.current = null;
       pendingScrollTopRef.current = null;
+      pendingScrollHeightRef.current = null;
       return;
     }
     refreshCommits();
@@ -166,11 +200,22 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     const scrollContainer = logContainerRef.current?.parentElement;
     if (!scrollContainer) {
       pendingScrollTopRef.current = null;
+      pendingScrollHeightRef.current = null;
       return;
     }
 
-    scrollContainer.scrollTop = pendingScrollTopRef.current;
+    const previousTop = pendingScrollTopRef.current;
+    const previousHeight = pendingScrollHeightRef.current;
+
+    if (typeof previousHeight === 'number') {
+      const deltaHeight = scrollContainer.scrollHeight - previousHeight;
+      scrollContainer.scrollTop = Math.max(0, previousTop + deltaHeight);
+    } else {
+      scrollContainer.scrollTop = previousTop;
+    }
+
     pendingScrollTopRef.current = null;
+    pendingScrollHeightRef.current = null;
   }, [layout, workingTreeStatus]);
 
   useEffect(() => {
@@ -182,6 +227,21 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       window.removeEventListener('focus', refreshWorkingTreeStatus);
     };
   }, [repoPath, refreshWorkingTreeStatus]);
+
+  useEffect(() => {
+    const scrollContainer = logContainerRef.current?.parentElement;
+    if (!scrollContainer) return;
+
+    const onScroll = () => {
+      if (loading || loadingMore || !hasMoreCommits) return;
+      if (scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 220) {
+        loadMoreCommits();
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', onScroll);
+    return () => scrollContainer.removeEventListener('scroll', onScroll);
+  }, [hasMoreCommits, loadMoreCommits, loading, loadingMore, commitCount]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -866,9 +926,31 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             </div>
           );
         })}
+        {(loadingMore || hasMoreCommits) && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 18px', paddingLeft: graphWidth }}>
+            <button
+              type="button"
+              onClick={() => loadMoreCommits()}
+              disabled={loadingMore}
+              style={{
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-panel)',
+                color: 'var(--text-primary)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                cursor: loadingMore ? 'default' : 'pointer',
+                opacity: loadingMore ? 0.7 : 1,
+              }}
+            >
+              {loadingMore ? 'Lade weitere Commits…' : 'Mehr laden'}
+            </button>
+          </div>
+        )}
       </div>
 
       {contextMenu && (
+
         <div
           className="ctx-menu-backdrop"
           onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}
