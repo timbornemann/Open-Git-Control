@@ -43,6 +43,8 @@ export interface GitJobEventDto {
   timestamp: number;
 }
 
+export type AiProviderDto = 'ollama' | 'gemini';
+
 export interface AppSettingsDto {
   theme: 'dark' | 'light';
   language: 'de' | 'en';
@@ -52,6 +54,12 @@ export interface AppSettingsDto {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  aiAutoCommitEnabled: boolean;
+  aiProvider: AiProviderDto;
+  ollamaBaseUrl: string;
+  ollamaModel: string;
+  geminiApiKey: string;
+  geminiModel: string;
 }
 
 export interface PullRequestDto {
@@ -66,6 +74,24 @@ export interface PullRequestDto {
   merged: boolean;
   htmlUrl: string;
   draft: boolean;
+}
+
+export interface AiAutoCommitCommitDto {
+  hash: string;
+  subject: string;
+}
+
+export interface AiAutoCommitResultDto {
+  commits: AiAutoCommitCommitDto[];
+  summary: string;
+  turns: number;
+}
+
+export interface AiConnectionResultDto {
+  ok: true;
+  provider: AiProviderDto;
+  model: string;
+  detail: string;
 }
 
 export interface DeviceFlowStartDto {
@@ -100,6 +126,11 @@ export interface ElectronAPI {
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;
   getSettings: () => Promise<AppSettingsDto>;
   setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
+  aiTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
+  aiListModels: () => Promise<IpcResult<string[]>>;
+  ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
+  ollamaListModels: () => Promise<IpcResult<string[]>>;
+  runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
   githubAuth: (token: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;
@@ -134,4 +165,3 @@ declare global {
 }
 
 export {};
-

@@ -1,3 +1,5 @@
+export type AiProvider = 'ollama' | 'gemini';
+
 export interface AppSettings {
   theme: 'dark' | 'light';
   language: 'de' | 'en';
@@ -7,6 +9,12 @@ export interface AppSettings {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  aiAutoCommitEnabled: boolean;
+  aiProvider: AiProvider;
+  ollamaBaseUrl: string;
+  ollamaModel: string;
+  geminiApiKey: string;
+  geminiModel: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -18,11 +26,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  aiAutoCommitEnabled: false,
+  aiProvider: 'ollama',
+  ollamaBaseUrl: 'http://127.0.0.1:11434',
+  ollamaModel: '',
+  geminiApiKey: '',
+  geminiModel: 'gemini-3-flash-preview',
 };
 
 const MIN_FETCH_INTERVAL_MS = 10_000;
 const MAX_FETCH_INTERVAL_MS = 300_000;
 const MAX_COMMIT_TEMPLATE_LENGTH = 8_000;
+const MAX_OLLAMA_BASE_URL_LENGTH = 500;
+const MAX_MODEL_LENGTH = 200;
+const MAX_GEMINI_KEY_LENGTH = 500;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
   return value === 'light' ? 'light' : 'dark';
@@ -62,6 +79,48 @@ function normalizeCommitTemplate(value: unknown): string {
   return value.slice(0, MAX_COMMIT_TEMPLATE_LENGTH);
 }
 
+function normalizeAiProvider(value: unknown): AiProvider {
+  return value === 'gemini' ? 'gemini' : 'ollama';
+}
+
+function normalizeOllamaBaseUrl(value: unknown): string {
+  if (typeof value !== 'string') {
+    return DEFAULT_SETTINGS.ollamaBaseUrl;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return DEFAULT_SETTINGS.ollamaBaseUrl;
+  }
+
+  const capped = trimmed.slice(0, MAX_OLLAMA_BASE_URL_LENGTH).replace(/\/+$/, '');
+  try {
+    const parsed = new URL(capped);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return DEFAULT_SETTINGS.ollamaBaseUrl;
+    }
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return DEFAULT_SETTINGS.ollamaBaseUrl;
+  }
+}
+
+function normalizeModel(value: unknown, fallback = ''): string {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim().slice(0, MAX_MODEL_LENGTH);
+  return trimmed || fallback;
+}
+
+function normalizeGeminiApiKey(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, MAX_GEMINI_KEY_LENGTH);
+}
+
 export function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   const value = input || {};
   return {
@@ -73,5 +132,11 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     commitTemplate: normalizeCommitTemplate(value.commitTemplate),
     showSecondaryHistory: normalizeBoolean(value.showSecondaryHistory, DEFAULT_SETTINGS.showSecondaryHistory),
     commitSignoffByDefault: normalizeBoolean(value.commitSignoffByDefault, DEFAULT_SETTINGS.commitSignoffByDefault),
+    aiAutoCommitEnabled: normalizeBoolean(value.aiAutoCommitEnabled, DEFAULT_SETTINGS.aiAutoCommitEnabled),
+    aiProvider: normalizeAiProvider(value.aiProvider),
+    ollamaBaseUrl: normalizeOllamaBaseUrl(value.ollamaBaseUrl),
+    ollamaModel: normalizeModel(value.ollamaModel),
+    geminiApiKey: normalizeGeminiApiKey(value.geminiApiKey),
+    geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),
   };
 }

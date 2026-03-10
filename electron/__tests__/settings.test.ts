@@ -34,4 +34,30 @@ describe('normalizeSettings', () => {
     expect(result.commitSignoffByDefault).toBe(true);
     expect(result.commitTemplate.length).toBe(8000);
   });
+
+  it('normalizes ollama settings', () => {
+    const result = normalizeSettings({
+      aiAutoCommitEnabled: true,
+      aiProvider: 'ollama',
+      ollamaBaseUrl: '  http://localhost:11434/  ',
+      ollamaModel: '  llama3.1:8b  ',
+    });
+
+    expect(result.aiAutoCommitEnabled).toBe(true);
+    expect(result.aiProvider).toBe('ollama');
+    expect(result.ollamaBaseUrl).toBe('http://localhost:11434');
+    expect(result.ollamaModel).toBe('llama3.1:8b');
+  });
+
+  it('normalizes gemini settings', () => {
+    const result = normalizeSettings({
+      aiProvider: 'gemini',
+      geminiApiKey: '  api-key  ',
+      geminiModel: '  gemini-3-flash-preview  ',
+    });
+
+    expect(result.aiProvider).toBe('gemini');
+    expect(result.geminiApiKey).toBe('api-key');
+    expect(result.geminiModel).toBe('gemini-3-flash-preview');
+  });
 });

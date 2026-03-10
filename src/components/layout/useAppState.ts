@@ -15,6 +15,12 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  aiAutoCommitEnabled: false,
+  aiProvider: 'ollama',
+  ollamaBaseUrl: 'http://127.0.0.1:11434',
+  ollamaModel: '',
+  geminiApiKey: '',
+  geminiModel: 'gemini-3-flash-preview',
 };
 
 type RunGitCommandOptions = {
@@ -385,4 +391,9 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
+
+
+
+
+
 
