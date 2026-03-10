@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   runGitCommand: (commandName: string, ...args: any[]) => ipcRenderer.invoke('git:command', commandName, ...args),
+  gitFetch: () => ipcRenderer.invoke('git:command', 'fetch', '--all', '--prune', '--tags', '--quiet'),
+  gitPull: () => ipcRenderer.invoke('git:command', 'pull'),
+  gitPush: () => ipcRenderer.invoke('git:command', 'push'),
   gitClone: (cloneUrl: string, targetDir: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
@@ -16,8 +19,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('clone:progress', handler);
     return () => ipcRenderer.removeListener('clone:progress', handler);
   },
+  onJobEvent: (callback: (event: any) => void) => {
+    const handler = (_event: any, payload: any) => callback(payload);
+    ipcRenderer.on('job:event', handler);
+    return () => ipcRenderer.removeListener('job:event', handler);
+  },
   getStoredRepos: () => ipcRenderer.invoke('repos:getStored'),
   setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
   githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
   githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),

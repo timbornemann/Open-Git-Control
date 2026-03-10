@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { GitStatusDetailed, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
@@ -58,6 +58,15 @@ type InputDialogState = {
 };
 
 type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
+type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
+
+const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
+  all: 'Alles',
+  subject: 'Nachricht',
+  author: 'Autor',
+  hash: 'Hash',
+  refs: 'Refs',
+};
 
 const getRefKind = (ref: string): RefKind => {
   if (ref.startsWith('tag:')) return 'tag';
@@ -89,6 +98,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const { toast, setToast } = useToastQueue(4000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
+  const [matchCursor, setMatchCursor] = useState(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<GraphLayout | null>(null);
   const pendingScrollTopRef = useRef<number | null>(null);
@@ -180,6 +192,56 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     };
   }, []);
 
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+
+  const matchedNodes = useMemo(() => {
+    if (!layout || !normalizedSearch) return [];
+
+    return layout.nodes.filter(node => {
+      const { abbrevHash, hash, author, subject, refs } = node.commit;
+      const inHash = abbrevHash.toLowerCase().includes(normalizedSearch) || hash.toLowerCase().includes(normalizedSearch);
+      const inAuthor = author.toLowerCase().includes(normalizedSearch);
+      const inSubject = subject.toLowerCase().includes(normalizedSearch);
+      const inRefs = refs.some(ref => ref.toLowerCase().includes(normalizedSearch));
+
+      if (searchScope === 'hash') return inHash;
+      if (searchScope === 'author') return inAuthor;
+      if (searchScope === 'subject') return inSubject;
+      if (searchScope === 'refs') return inRefs;
+
+      return inHash || inAuthor || inSubject || inRefs;
+    });
+  }, [layout, normalizedSearch, searchScope]);
+
+  const matchedHashSet = useMemo(() => new Set(matchedNodes.map(node => node.commit.hash)), [matchedNodes]);
+
+  useEffect(() => {
+    setMatchCursor(0);
+  }, [normalizedSearch, searchScope]);
+
+  useEffect(() => {
+    if (!selectedHash || matchedNodes.length === 0) return;
+    const idx = matchedNodes.findIndex(node => node.commit.hash === selectedHash);
+    if (idx >= 0) {
+      setMatchCursor(idx);
+    }
+  }, [selectedHash, matchedNodes]);
+
+  const jumpToMatch = useCallback((step: 1 | -1) => {
+    if (matchedNodes.length === 0) return;
+
+    const nextIndex = (matchCursor + step + matchedNodes.length) % matchedNodes.length;
+    setMatchCursor(nextIndex);
+
+    const hash = matchedNodes[nextIndex].commit.hash;
+    onSelectCommit?.(hash);
+
+    requestAnimationFrame(() => {
+      const row = document.querySelector('[data-commit-hash="' + hash + '"]') as HTMLElement | null;
+      row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+  }, [matchCursor, matchedNodes, onSelectCommit]);
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
     try {
@@ -549,6 +611,43 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
   return (
     <>
+      <div className="commit-search-toolbar" style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(180deg, rgba(18,22,29,0.98), rgba(18,22,29,0.9))', borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <input
+          className="commit-search-input" style={{ flex: 1, minWidth: '240px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.82rem' }}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Commits durchsuchen (Hash, Autor, Nachricht, Ref)"
+        />
+        <div className="commit-search-filters" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {(Object.keys(SEARCH_SCOPE_LABELS) as SearchScope[]).map(scope => (
+            <button
+              key={scope}
+              className={`commit-search-chip ${searchScope === scope ? 'active' : ''}`}
+              style={{
+                border: '1px solid var(--border-color)',
+                backgroundColor: searchScope === scope ? 'rgba(31, 111, 235, 0.2)' : 'var(--bg-panel)',
+                color: searchScope === scope ? '#7cb8ff' : 'var(--text-secondary)',
+                borderRadius: '999px',
+                padding: '4px 9px',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+              }}
+              onClick={() => setSearchScope(scope)}
+            >
+              {SEARCH_SCOPE_LABELS[scope]}
+            </button>
+          ))}
+        </div>
+        {normalizedSearch && (
+          <div className="commit-search-meta" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+            <span>{matchedNodes.length} Treffer</span>
+            <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(-1)} disabled={matchedNodes.length === 0}>Prev</button>
+            <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(1)} disabled={matchedNodes.length === 0}>Next</button>
+          </div>
+        )}
+      </div>
+
       <div ref={logContainerRef} className="commit-graph-container">
         <svg
           width={graphWidth}
@@ -715,6 +814,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         {layout.nodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
           const isSecondary = !reachableFromHead.has(node.commit.hash);
+          const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
           const sortedRefs = sortRefs(node.commit.refs);
           return (
             <div
@@ -722,7 +822,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               className={`commit-row ${isSelected ? 'selected' : ''} ${isSecondary ? 'secondary-history' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
-              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
+              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth, ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px rgba(31, 111, 235, 0.45)' } : {}) }}
+              data-commit-hash={node.commit.hash}
             >
               <div className="commit-info">
                 <span className="commit-hash">{node.commit.abbrevHash}</span>

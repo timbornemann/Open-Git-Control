@@ -10,7 +10,7 @@
     "build:electron": "tsc --project tsconfig.node.json",
     "preview": "vite preview",
     "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
-    "test": "vitest run"
+    "test": "node scripts/run-tests.js"
   },
   "dependencies": {
     "lucide-react": "^0.300.0",

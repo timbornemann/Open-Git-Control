@@ -26,6 +26,24 @@ export interface GitHubRepositoryDto {
   htmlUrl: string;
 }
 
+
+type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
+
+export interface GitJobEventDto {
+  id: string;
+  operation: string;
+  status: GitJobStatus;
+  message?: string;
+  progress?: number;
+  timestamp: number;
+}
+
+export interface AppSettingsDto {
+  theme: 'dark' | 'light';
+  language: 'de' | 'en';
+  autoFetchIntervalMs: number;
+  defaultBranch: string;
+}
 export interface PullRequestDto {
   number: number;
   title: string;
@@ -45,13 +63,19 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>; 
+  gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitClone: (cloneUrl: string, targetDir: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>; 
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
+  onJobEvent: (callback: (event: GitJobEventDto) => void) => () => void;
   getStoredRepos: () => Promise<StoredRepoData>;
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;
+  getSettings: () => Promise<AppSettingsDto>;
+  setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
   githubAuth: (token: string) => Promise<boolean>;
   githubGetRepos: () => Promise<IpcResult<GitHubRepositoryDto[]>>;
   githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null }>;
