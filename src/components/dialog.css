@@ -1,0 +1,177 @@
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.dialog-modal {
+  width: min(560px, 100%);
+  max-height: 85vh;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialog-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dialog-header h3 {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.dialog-content {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dialog-message {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.dialog-context-list {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
+  gap: 6px 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-dark);
+}
+
+.dialog-context-list dt {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.dialog-context-list dd {
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: 'JetBrains Mono', monospace;
+  overflow-wrap: anywhere;
+}
+
+.dialog-impact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+}
+
+.dialog-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dialog-field span {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.dialog-field input,
+.dialog-field textarea {
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.dialog-field textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.dialog-field input:focus,
+.dialog-field textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.dialog-field small {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.dialog-validation {
+  font-size: 0.78rem;
+  color: #f85149;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.dialog-btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.dialog-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dialog-btn-secondary {
+  border-color: var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+}
+
+.dialog-btn-secondary:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.dialog-btn-primary {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.dialog-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.dialog-btn-danger {
+  background: #da3633;
+  color: #fff;
+}
+
+.dialog-btn-danger:hover:not(:disabled) {
+  background: #f85149;
+}

@@ -1,6 +1,10 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { GitStatusDetailed, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
+import { useToastQueue } from '../hooks/useToastQueue';
+import { Confirm, DialogContextItem } from './Confirm';
+import { DangerConfirm } from './DangerConfirm';
+import { Input, InputDialogField } from './Input';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -31,6 +35,28 @@ interface MenuAction {
   action: () => void;
 }
 
+type ConfirmDialogState = {
+  variant: 'confirm' | 'danger';
+  title: string;
+  message: string;
+  contextItems: DialogContextItem[];
+  irreversible: boolean;
+  consequences: string;
+  confirmLabel?: string;
+  onConfirm: () => Promise<void> | void;
+};
+
+type InputDialogState = {
+  title: string;
+  message: string;
+  fields: InputDialogField[];
+  contextItems: DialogContextItem[];
+  irreversible: boolean;
+  consequences: string;
+  confirmLabel?: string;
+  onSubmit: (values: Record<string, string>) => Promise<void> | void;
+};
+
 type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
 
 const getRefKind = (ref: string): RefKind => {
@@ -60,7 +86,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
   const [loading, setLoading] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [actionResult, setActionResult] = useState<{ message: string; isError: boolean } | null>(null);
+  const { toast, setToast } = useToastQueue(4000);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<GraphLayout | null>(null);
   const pendingScrollTopRef = useRef<number | null>(null);
@@ -152,26 +180,39 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     };
   }, []);
 
-  useEffect(() => {
-    if (!actionResult) return;
-    const t = setTimeout(() => setActionResult(null), 4000);
-    return () => clearTimeout(t);
-  }, [actionResult]);
-
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
     try {
       const result = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (result.success) {
-        setActionResult({ message: successMsg, isError: false });
+        setToast({ msg: successMsg, isError: false });
         refreshCommits();
+        refreshWorkingTreeStatus();
       } else {
-        setActionResult({ message: result.error || 'Unbekannter Fehler', isError: true });
+        setToast({ msg: result.error || 'Unbekannter Fehler', isError: true });
       }
     } catch (e: any) {
-      setActionResult({ message: e.message, isError: true });
+      setToast({ msg: e.message, isError: true });
     }
   };
+
+  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
+
+  const executeConfirmDialog = useCallback(async () => {
+    if (!confirmDialog) return;
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
+  }, [confirmDialog]);
+
+  const closeInputDialog = useCallback(() => setInputDialog(null), []);
+
+  const executeInputDialog = useCallback(async (values: Record<string, string>) => {
+    if (!inputDialog) return;
+    const action = inputDialog.onSubmit;
+    setInputDialog(null);
+    await action(values);
+  }, [inputDialog]);
 
   const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
     e.preventDefault();
@@ -187,50 +228,121 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     const actions: MenuAction[] = [
       {
         label: `Checkout (Branch von ${shortHash})`,
-        icon: '↩',
-        action: async () => {
+        icon: '->',
+        action: () => {
           const suggested = `checkout-${shortHash}`;
-          const name = prompt('Branch-Name für Checkout:', suggested);
-          if (name && name.trim()) {
-            runGitAction(['checkout', '-b', name.trim(), hash], `Branch "${name.trim()}" aus ${shortHash} ausgecheckt.`);
-          }
+          setInputDialog({
+            title: 'Branch aus Commit auschecken',
+            message: 'Es wird ein neuer Branch auf Basis dieses Commits erstellt und ausgecheckt.',
+            fields: [
+              {
+                id: 'name',
+                label: 'Neuer Branch-Name',
+                defaultValue: suggested,
+                required: true,
+              },
+            ],
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+              { label: 'Aktion', value: 'checkout -b <name> <commit>' },
+            ],
+            irreversible: false,
+            consequences: 'Du wechselst auf den neuen Branch. Der aktuelle Branch bleibt unveraendert.',
+            confirmLabel: 'Branch erstellen',
+            onSubmit: async (values) => {
+              const name = (values.name || '').trim();
+              if (!name) return;
+              await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" aus ${shortHash} ausgecheckt.`);
+            },
+          });
         },
       },
       {
-        label: 'Nur Commit (detached HEAD) auschecken…',
-        icon: '⚠',
-        action: async () => {
-          const ok = confirm(
-            'Achtung: Detached HEAD!\n\nWenn du direkt auf diesen Commit wechselst, arbeitest du auf keinem Branch.\nNeue Commits sind dann leicht „unsichtbar", bis du einen Branch erstellst.\n\nTrotzdem fortfahren?'
-          );
-          if (ok) {
-            runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
-          }
+        label: 'Nur Commit (detached HEAD) auschecken...',
+        icon: '!',
+        action: () => {
+          setConfirmDialog({
+            variant: 'confirm',
+            title: 'Detached HEAD aktivieren?',
+            message: 'Du checkst direkt auf den Commit aus und arbeitest temporaer ohne Branch.',
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+              { label: 'Modus', value: 'Detached HEAD' },
+            ],
+            irreversible: false,
+            consequences: 'Neue Commits sind spaeter schwerer auffindbar, bis du einen Branch erstellst.',
+            confirmLabel: 'Trotzdem auschecken',
+            onConfirm: async () => {
+              await runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
+            },
+          });
         },
       },
       {
         label: 'Neuen Branch erstellen...',
-        icon: '⑂',
-        action: async () => {
-          const name = prompt('Branch-Name:');
-          if (name && name.trim()) {
-            runGitAction(['checkout', '-b', name.trim(), hash], `Branch "${name.trim()}" erstellt.`);
-          }
+        icon: 'B',
+        action: () => {
+          setInputDialog({
+            title: 'Neuen Branch erstellen',
+            message: 'Der neue Branch zeigt auf den ausgewaehlten Commit.',
+            fields: [
+              {
+                id: 'name',
+                label: 'Branch-Name',
+                required: true,
+              },
+            ],
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+            ],
+            irreversible: false,
+            consequences: 'Der Branch wird erstellt und direkt ausgecheckt.',
+            confirmLabel: 'Branch erstellen',
+            onSubmit: async (values) => {
+              const name = (values.name || '').trim();
+              if (!name) return;
+              await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" erstellt.`);
+            },
+          });
         },
       },
       {
         label: 'Tag erstellen...',
-        icon: '🏷',
-        action: async () => {
-          const name = prompt('Tag-Name:');
-          if (name && name.trim()) {
-            const msg = prompt('Tag-Nachricht (leer = lightweight):');
-            if (msg && msg.trim()) {
-              runGitAction(['tag', '-a', name.trim(), '-m', msg.trim(), hash], `Tag "${name.trim()}" erstellt.`);
-            } else {
-              runGitAction(['tag', name.trim(), hash], `Tag "${name.trim()}" erstellt.`);
-            }
-          }
+        icon: 'T',
+        action: () => {
+          setInputDialog({
+            title: 'Tag auf Commit erstellen',
+            message: 'Lege einen lightweight oder annotierten Tag an.',
+            fields: [
+              {
+                id: 'name',
+                label: 'Tag-Name',
+                required: true,
+                placeholder: 'v1.2.3',
+              },
+              {
+                id: 'message',
+                label: 'Tag-Nachricht (optional)',
+                placeholder: 'Leer lassen fuer lightweight Tag',
+              },
+            ],
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+            ],
+            irreversible: false,
+            consequences: 'Der Tag markiert diesen Commit lokal. Push auf Remote erfolgt separat.',
+            confirmLabel: 'Tag erstellen',
+            onSubmit: async (values) => {
+              const name = (values.name || '').trim();
+              if (!name) return;
+              const msg = (values.message || '').trim();
+              if (msg) {
+                await runGitAction(['tag', '-a', name, '-m', msg, hash], `Tag "${name}" erstellt.`);
+              } else {
+                await runGitAction(['tag', name, hash], `Tag "${name}" erstellt.`);
+              }
+            },
+          });
         },
       },
       {
@@ -238,12 +350,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       },
       {
         label: `Cherry-Pick ${shortHash}`,
-        icon: '🍒',
+        icon: 'CP',
         action: () => runGitAction(['cherry-pick', hash], `Cherry-Pick von ${shortHash} erfolgreich.`),
       },
       {
         label: `Revert ${shortHash}`,
-        icon: '↶',
+        icon: 'RV',
         action: () => runGitAction(['revert', '--no-edit', hash], `Revert von ${shortHash} erfolgreich.`),
       },
       {
@@ -251,30 +363,66 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       },
       {
         label: `Reset --soft auf ${shortHash}`,
-        icon: '⟲',
+        icon: 'RS',
         action: () => {
-          if (confirm(`Soft-Reset auf ${shortHash}? Änderungen bleiben staged.`)) {
-            runGitAction(['reset', '--soft', hash], `Soft-Reset auf ${shortHash} erfolgreich.`);
-          }
+          setConfirmDialog({
+            variant: 'confirm',
+            title: 'Soft Reset ausfuehren?',
+            message: 'HEAD wird auf den Commit gesetzt, Aenderungen bleiben staged.',
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+              { label: 'Reset-Modus', value: '--soft' },
+            ],
+            irreversible: false,
+            consequences: 'Die Commit-Historie wird lokal verschoben.',
+            confirmLabel: 'Soft Reset',
+            onConfirm: async () => {
+              await runGitAction(['reset', '--soft', hash], `Soft-Reset auf ${shortHash} erfolgreich.`);
+            },
+          });
         },
       },
       {
         label: `Reset --mixed auf ${shortHash}`,
-        icon: '⟲',
+        icon: 'RM',
         action: () => {
-          if (confirm(`Mixed-Reset auf ${shortHash}? Änderungen bleiben unstaged.`)) {
-            runGitAction(['reset', '--mixed', hash], `Mixed-Reset auf ${shortHash} erfolgreich.`);
-          }
+          setConfirmDialog({
+            variant: 'confirm',
+            title: 'Mixed Reset ausfuehren?',
+            message: 'HEAD wird verschoben, Aenderungen bleiben unstaged im Working Tree.',
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+              { label: 'Reset-Modus', value: '--mixed' },
+            ],
+            irreversible: false,
+            consequences: 'Index wird zurueckgesetzt. Commit-Historie aendert sich lokal.',
+            confirmLabel: 'Mixed Reset',
+            onConfirm: async () => {
+              await runGitAction(['reset', '--mixed', hash], `Mixed-Reset auf ${shortHash} erfolgreich.`);
+            },
+          });
         },
       },
       {
         label: `Reset --hard auf ${shortHash}`,
-        icon: '⟲',
+        icon: 'RH',
         danger: true,
         action: () => {
-          if (confirm(`⚠️ ACHTUNG: Hard-Reset auf ${shortHash}? Alle Änderungen gehen verloren!`)) {
-            runGitAction(['reset', '--hard', hash], `Hard-Reset auf ${shortHash} erfolgreich.`);
-          }
+          setConfirmDialog({
+            variant: 'danger',
+            title: 'Hard Reset ausfuehren?',
+            message: 'HEAD, Index und Working Tree werden auf den Commit zurueckgesetzt.',
+            contextItems: [
+              { label: 'Commit', value: shortHash },
+              { label: 'Reset-Modus', value: '--hard' },
+            ],
+            irreversible: true,
+            consequences: 'Lokale nicht-gesicherte Aenderungen gehen verloren.',
+            confirmLabel: 'Hard Reset',
+            onConfirm: async () => {
+              await runGitAction(['reset', '--hard', hash], `Hard-Reset auf ${shortHash} erfolgreich.`);
+            },
+          });
         },
       },
       {
@@ -282,10 +430,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       },
       {
         label: 'Commit-Hash kopieren',
-        icon: '📋',
+        icon: 'ID',
         action: () => {
           navigator.clipboard.writeText(hash);
-          setActionResult({ message: 'Hash kopiert!', isError: false });
+          setToast({ msg: 'Hash kopiert!', isError: false });
         },
       },
     ];
@@ -293,11 +441,23 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     if (isMerge) {
       actions.splice(5, 0, {
         label: `Revert Merge ${shortHash}`,
-        icon: '↶',
+        icon: 'MR',
         action: () => {
-          if (confirm(`Merge-Revert von ${shortHash}? (Parent 1 wird beibehalten)`)) {
-            runGitAction(['revert', '-m', '1', '--no-edit', hash], `Merge-Revert von ${shortHash} erfolgreich.`);
-          }
+          setConfirmDialog({
+            variant: 'confirm',
+            title: 'Merge-Revert ausfuehren?',
+            message: 'Der Merge-Commit wird mit Parent 1 als Hauptlinie reverted.',
+            contextItems: [
+              { label: 'Merge-Commit', value: shortHash },
+              { label: 'Parent', value: '1' },
+            ],
+            irreversible: false,
+            consequences: 'Es entsteht ein neuer Revert-Commit und moegliche Konflikte muessen geloest werden.',
+            confirmLabel: 'Merge-Revert',
+            onConfirm: async () => {
+              await runGitAction(['revert', '-m', '1', '--no-edit', hash], `Merge-Revert von ${shortHash} erfolgreich.`);
+            },
+          });
         },
       });
     }
@@ -622,11 +782,55 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         </div>
       )}
 
-      {actionResult && (
-        <div className={`action-toast ${actionResult.isError ? 'error' : 'success'}`}>
-          {actionResult.isError ? '✗' : '✓'} {actionResult.message}
+      {toast && (
+        <div className={`action-toast ${toast.isError ? 'error' : 'success'}`}>
+          {toast.isError ? 'x' : 'ok'} {toast.msg}
         </div>
+      )}
+
+      {confirmDialog && confirmDialog.variant === 'confirm' && (
+        <Confirm
+          open={true}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          contextItems={confirmDialog.contextItems}
+          irreversible={confirmDialog.irreversible}
+          consequences={confirmDialog.consequences}
+          confirmLabel={confirmDialog.confirmLabel}
+          onConfirm={executeConfirmDialog}
+          onCancel={closeConfirmDialog}
+        />
+      )}
+
+      {confirmDialog && confirmDialog.variant === 'danger' && (
+        <DangerConfirm
+          open={true}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          contextItems={confirmDialog.contextItems}
+          irreversible={confirmDialog.irreversible}
+          consequences={confirmDialog.consequences}
+          confirmLabel={confirmDialog.confirmLabel}
+          onConfirm={executeConfirmDialog}
+          onCancel={closeConfirmDialog}
+        />
+      )}
+
+      {inputDialog && (
+        <Input
+          open={true}
+          title={inputDialog.title}
+          message={inputDialog.message}
+          fields={inputDialog.fields}
+          contextItems={inputDialog.contextItems}
+          irreversible={inputDialog.irreversible}
+          consequences={inputDialog.consequences}
+          confirmLabel={inputDialog.confirmLabel}
+          onSubmit={executeInputDialog}
+          onCancel={closeInputDialog}
+        />
       )}
     </>
   );
 };
+
