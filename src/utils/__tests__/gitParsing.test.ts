@@ -127,6 +127,36 @@ describe('parseGitLog', () => {
     expect(parsed[0].stats).toEqual({ files: 0, additions: 0, deletions: 0 });
   });
 
+
+  it('supports appending paged log chunks without losing earlier commits', () => {
+    const firstPage = makeRecord({
+      hash: 'a'.repeat(40),
+      short: 'aaaaaaa',
+      author: 'Page1',
+      date: '2024-10-06 10:00:00 +0000',
+      subject: 'first page commit',
+      parents: 'b'.repeat(40),
+      refs: 'HEAD -> main',
+    });
+
+    const secondPage = makeRecord({
+      hash: 'c'.repeat(40),
+      short: 'ccccccc',
+      author: 'Page2',
+      date: '2024-10-05 10:00:00 +0000',
+      subject: 'second page commit',
+      parents: 'd'.repeat(40),
+      refs: '',
+    });
+
+    const combined = parseGitLog(firstPage + secondPage);
+
+    expect(combined.map(commit => commit.subject)).toEqual([
+      'first page commit',
+      'second page commit',
+    ]);
+  });
+
   it('parses multiple commits and tolerates blank lines before tokens', () => {
     const output = [
       `\n${makeRecord({

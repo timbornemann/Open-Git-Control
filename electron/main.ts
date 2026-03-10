@@ -125,7 +125,7 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
   const maxArgsByCommand: Partial<Record<GitCommandName, number>> = {
     status: 2,
     statusPorcelain: 0,
-    log: 2,
+    log: 3,
     branches: 0,
     commitDetails: 1,
     conflictTakeOurs: 1,
@@ -170,6 +170,13 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     const scope = args[1];
     if (scope !== 'all' && scope !== 'head') {
       throw new Error('Invalid log scope.');
+    }
+  }
+
+  if (commandName === 'log' && args.length >= 3) {
+    const parsedOffset = Number(args[2]);
+    if (!Number.isFinite(parsedOffset) || parsedOffset < 0 || parsedOffset > 50000) {
+      throw new Error('Invalid log offset.');
     }
   }
 }
@@ -570,7 +577,11 @@ function setupIPC() {
       } else if (commandName === 'statusPorcelain') {
         data = await gitService.getStatusPorcelain();
       } else if (commandName === 'log') {
-        data = await gitService.getLog(Number(normalizedArgs[0]) || 50, normalizedArgs[1] !== 'head');
+        data = await gitService.getLog(
+          Number(normalizedArgs[0]) || 50,
+          normalizedArgs[1] !== 'head',
+          Number(normalizedArgs[2]) || 0,
+        );
       } else if (commandName === 'branches') {
         data = await gitService.getBranches();
       } else if (commandName === 'commitDetails') {
