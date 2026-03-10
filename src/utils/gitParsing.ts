@@ -6,6 +6,11 @@ export interface GitCommit {
   subject: string;
   parentHashes: string[];
   refs: string[]; // e.g. ['HEAD -> main', 'origin/main']
+  stats: {
+    files: number;
+    additions: number;
+    deletions: number;
+  };
 }
 
 export interface GitStatus {
@@ -44,19 +49,64 @@ function splitGitLogRecord(record: string): string[] {
 export function parseGitLog(logOutput: string): GitCommit[] {
   if (!logOutput) return [];
 
-  return logOutput
-    .split(LOG_RECORD_SEPARATOR)
-    .map(record => record.trim())
-    .filter(Boolean)
-    .map(record => {
-      const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(record);
+  const tokens = logOutput.split(LOG_RECORD_SEPARATOR);
+  const commits: GitCommit[] = [];
+  let current: GitCommit | null = null;
+
+  const ensureCurrent = () => {
+    if (!current) return;
+    commits.push(current);
+    current = null;
+  };
+
+  for (const rawToken of tokens) {
+    const token = rawToken.replace(/^\r?\n/, '');
+    if (!token) {
+      ensureCurrent();
+      continue;
+    }
+
+    if (token.includes(LOG_FIELD_SEPARATOR)) {
+      ensureCurrent();
+      const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(token);
       const parentHashes = parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [];
       const refs = refsRaw
         ? refsRaw.split(LOG_REF_SEPARATOR).map(ref => ref.trim()).filter(Boolean)
         : [];
 
-      return { hash, abbrevHash, author, date, subject, parentHashes, refs };
-    });
+      current = {
+        hash,
+        abbrevHash,
+        author,
+        date,
+        subject,
+        parentHashes,
+        refs,
+        stats: { files: 0, additions: 0, deletions: 0 },
+      };
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    const numstatMatch = token.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+    if (!numstatMatch) continue;
+
+    const additionsRaw = numstatMatch[1];
+    const deletionsRaw = numstatMatch[2];
+    current.stats.files += 1;
+    if (additionsRaw !== '-') {
+      current.stats.additions += Number(additionsRaw);
+    }
+    if (deletionsRaw !== '-') {
+      current.stats.deletions += Number(deletionsRaw);
+    }
+  }
+
+  ensureCurrent();
+  return commits;
 }
 
 export interface FileEntry {
@@ -120,10 +170,10 @@ export interface CommitFileDetail {
 
 export function parseCommitDetails(showOutput: string): CommitFileDetail[] {
   if (!showOutput.trim()) return [];
-  
+
   const files: CommitFileDetail[] = [];
   const lines = showOutput.split('\n');
-  
+
   for (const line of lines) {
     if (!line.trim()) continue;
     // Format is usually: M       src/App.tsx

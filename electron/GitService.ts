@@ -4,6 +4,8 @@ import * as path from 'path';
 
 const execFileAsync = util.promisify(execFile);
 
+export type CommitStats = { files: number; additions: number; deletions: number };
+
 export class GitService {
   private repoPath: string | null = null;
 
@@ -121,7 +123,7 @@ export class GitService {
     // NUL separates commits (with -z) and US (\x1f) separates fixed fields.
     // Refs use GS (\x1d) as an explicit separator to avoid ambiguities.
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
-    const args = ['log', '--topo-order', '-z', '-' + limit, '--pretty=format:' + format, '--date=iso'];
+    const args = ['log', '--topo-order', '-z', '-' + limit, '--pretty=format:' + format, '--date=iso', '--numstat'];
 
     if (includeAll) {
       args.splice(1, 0, '--all');
@@ -226,4 +228,6 @@ export class GitService {
 
 // Singleton Instanz
 export const gitService = new GitService();
+
+
 

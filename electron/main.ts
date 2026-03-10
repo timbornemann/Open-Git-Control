@@ -526,6 +526,46 @@ function setupIPC() {
     }
   });
 
+  ipcMain.handle('git:addIgnoreRule', async (_event: any, pattern: string) => {
+    try {
+      const normalizedPattern = String(pattern || '').trim().replace(/\\/g, '/');
+      if (!normalizedPattern) {
+        return { success: false, error: 'Pattern is required' };
+      }
+      if (normalizedPattern.length > 400) {
+        return { success: false, error: 'Pattern is too long' };
+      }
+      if (/\r|\n/.test(normalizedPattern)) {
+        return { success: false, error: 'Pattern must be a single line' };
+      }
+
+      const selectedRepo = gitService.getRepoPath();
+      if (!selectedRepo) {
+        return { success: false, error: 'No repository selected' };
+      }
+
+      const repoRoot = await gitService.runCommand(['rev-parse', '--show-toplevel']);
+      const gitignorePath = path.join(repoRoot, '.gitignore');
+      const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
+      const existingRules = new Set(
+        existing
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(Boolean),
+      );
+
+      if (existingRules.has(normalizedPattern)) {
+        return { success: true, added: false, pattern: normalizedPattern };
+      }
+
+      const needsLeadingNewline = existing.length > 0 && !existing.endsWith('\n') && !existing.endsWith('\r\n');
+      const nextContent = `${needsLeadingNewline ? '\n' : ''}${normalizedPattern}\n`;
+      fs.appendFileSync(gitignorePath, nextContent, 'utf-8');
+      return { success: true, added: true, pattern: normalizedPattern };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
   ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
     const webContents = event.sender;
     const jobId = createJobId('git-clone');
@@ -766,4 +806,6 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
 

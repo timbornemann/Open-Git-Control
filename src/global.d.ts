@@ -86,6 +86,7 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  addIgnoreRule: (pattern: string) => Promise<{ success: boolean; added?: boolean; pattern?: string; error?: string }>;
   gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -133,3 +134,4 @@ declare global {
 }
 
 export {};
+

@@ -34,6 +34,14 @@ type InputDialogState = {
 
 type ConflictEntry = FileEntry & { code: string };
 type GitStatusWithConflicts = GitStatusDetailed & { conflicts: ConflictEntry[] };
+type DiffStats = { files: number; additions: number; deletions: number };
+type FileSection = 'staged' | 'unstaged' | 'untracked';
+type StagingContextMenuState = {
+  x: number;
+  y: number;
+  entry: FileEntry;
+  section: FileSection;
+};
 
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
@@ -75,6 +83,42 @@ const parseConflictEntries = (statusOutput: string): ConflictEntry[] => {
   return conflicts;
 };
 
+const EMPTY_DIFF_STATS: DiffStats = { files: 0, additions: 0, deletions: 0 };
+
+const parseNumstatStats = (numstatOutput: string): DiffStats => {
+  const stats: DiffStats = { ...EMPTY_DIFF_STATS };
+  if (!numstatOutput.trim()) return stats;
+
+  for (const line of numstatOutput.split('\n')) {
+    const match = line.trim().match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+    if (!match) continue;
+
+    stats.files += 1;
+    if (match[1] !== '-') {
+      stats.additions += Number(match[1]);
+    }
+    if (match[2] !== '-') {
+      stats.deletions += Number(match[2]);
+    }
+  }
+
+  return stats;
+};
+
+const formatDiffStats = (stats: DiffStats): string => `${stats.files}f +${stats.additions} -${stats.deletions}`;
+const toGitPath = (p: string) => p.replace(/\\/g, '/');
+const dirname = (p: string) => {
+  const normalized = toGitPath(p);
+  const idx = normalized.lastIndexOf('/');
+  return idx >= 0 ? normalized.slice(0, idx) : '';
+};
+const extensionPattern = (p: string) => {
+  const name = basename(p);
+  const idx = name.lastIndexOf('.');
+  if (idx <= 0 || idx === name.length - 1) return null;
+  return `*${name.slice(idx)}`;
+};
+
 export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged }) => {
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
@@ -87,24 +131,40 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const [activeFilter, setActiveFilter] = useState<'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts'>('all');
   const [amendCommit, setAmendCommit] = useState(false);
   const [signoffCommit, setSignoffCommit] = useState(false);
+  const [commitDescription, setCommitDescription] = useState('');
+  const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
+  const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
+  const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
     try {
-      const { success, data } = await window.electronAPI.runGitCommand('statusPorcelain');
-      if (!success) return;
+      const statusRequest = window.electronAPI.runGitCommand('statusPorcelain');
+      const stagedDiffRequest = window.electronAPI.runGitCommand('diff', '--numstat', '--cached');
+      const unstagedDiffRequest = window.electronAPI.runGitCommand('diff', '--numstat');
 
-      const rawStatus = data || '';
-      const parsed = parseGitStatusDetailed(rawStatus);
-      const conflicts = parseConflictEntries(rawStatus);
-      const conflictPathSet = new Set(conflicts.map(c => c.path));
+      const [statusResult, stagedResult, unstagedResult] = await Promise.all([
+        statusRequest,
+        stagedDiffRequest,
+        unstagedDiffRequest,
+      ]);
 
-      setStatus({
-        ...parsed,
-        conflicts,
-        staged: parsed.staged.filter(f => !conflictPathSet.has(f.path)),
-        unstaged: parsed.unstaged.filter(f => !conflictPathSet.has(f.path)),
-      });
+      if (statusResult.success) {
+        const rawStatus = statusResult.data || '';
+        const parsed = parseGitStatusDetailed(rawStatus);
+        const conflicts = parseConflictEntries(rawStatus);
+        const conflictPathSet = new Set(conflicts.map(c => c.path));
+
+        setStatus({
+          ...parsed,
+          conflicts,
+          staged: parsed.staged.filter(f => !conflictPathSet.has(f.path)),
+          unstaged: parsed.unstaged.filter(f => !conflictPathSet.has(f.path)),
+        });
+      }
+
+      setStagedStats(stagedResult.success ? parseNumstatStats(stagedResult.data || '') : EMPTY_DIFF_STATS);
+      setUnstagedStats(unstagedResult.success ? parseNumstatStats(unstagedResult.data || '') : EMPTY_DIFF_STATS);
     } catch (e) {
       console.error(e);
     }
@@ -113,6 +173,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   useEffect(() => {
     if (!repoPath) {
       setStatus(null);
+      setStagedStats(EMPTY_DIFF_STATS);
+      setUnstagedStats(EMPTY_DIFF_STATS);
       return;
     }
     refresh();
@@ -173,6 +235,56 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     await action(values);
   }, [inputDialog]);
 
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const close = () => setContextMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextMenu]);
+
+  const openFileContextMenu = (event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
+  };
+
+  const addIgnoreRule = async (entry: FileEntry, section: FileSection, pattern: string) => {
+    if (!window.electronAPI) return;
+
+    const normalizedPattern = pattern.trim();
+    if (!normalizedPattern) return;
+
+    try {
+      const result = await window.electronAPI.addIgnoreRule(normalizedPattern);
+      if (!result.success) {
+        setToast({ msg: result.error || 'Konnte .gitignore nicht aktualisieren.', isError: true });
+        return;
+      }
+
+      if (section === 'staged' && entry.x === 'A') {
+        await window.electronAPI.runGitCommand('reset', 'HEAD', '--', entry.path);
+      }
+
+      setToast({ msg: result.added ? `Ignore-Regel hinzugefuegt: ${normalizedPattern}` : `Regel existiert bereits: ${normalizedPattern}`, isError: false });
+      await refresh();
+      if (onRepoChanged) onRepoChanged();
+    } catch (e: any) {
+      setToast({ msg: e.message || 'Konnte .gitignore nicht aktualisieren.', isError: true });
+    }
+  };
   const stageFile = (f: string) => git(['add', '--', f], `${basename(f)} gestaged`);
   const unstageFile = (f: string) => git(['reset', 'HEAD', '--', f], `${basename(f)} unstaged`);
   const stageAll = () => git(['add', '.'], 'Alle Dateien gestaged');
@@ -338,9 +450,13 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       if (amendCommit) commitArgs.push('--amend');
       if (signoffCommit) commitArgs.push('--signoff');
       commitArgs.push('-m', commitMsg.trim());
+      if (commitDescription.trim()) {
+        commitArgs.push('-m', commitDescription.trim());
+      }
       const r = await window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
       if (r.success) {
         setCommitMsg('');
+        setCommitDescription('');
         setToast({ msg: 'Commit erfolgreich!', isError: false });
         await refresh();
         if (onRepoChanged) onRepoChanged();
@@ -370,6 +486,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const visibleUntracked = activeFilter === 'all' || activeFilter === 'untracked' ? bySearch(status.untracked) : [];
   const visibleConflicts = activeFilter === 'all' || activeFilter === 'conflicts' ? bySearch(status.conflicts) : [];
   const visibleTotal = visibleStaged.length + visibleUnstaged.length + visibleUntracked.length + visibleConflicts.length;
+  const contextEntry = contextMenu?.entry || null;
+  const contextDir = contextEntry ? dirname(contextEntry.path) : '';
+  const contextTopDir = contextDir.includes('/') ? contextDir.split('/')[0] : '';
+  const contextExtPattern = contextEntry ? extensionPattern(contextEntry.path) : null;
 
   if (diffContent) {
     return (
@@ -408,11 +528,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     );
   }
 
-  const FileRow = ({ entry, section }: { entry: FileEntry; section: 'staged' | 'unstaged' | 'untracked' }) => {
+  const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
     return (
-      <div className="staging-file-row" onClick={() => section !== 'untracked' && showDiff(entry.path, section === 'staged')}>
+      <div className="staging-file-row" onClick={() => section !== 'untracked' && showDiff(entry.path, section === 'staged')} onContextMenu={(e) => openFileContextMenu(e, entry, section)}>
         <span className="staging-status" style={{ color: info.color }}>{statusCode}</span>
         <span className="staging-path" title={entry.path}>{entry.path}</span>
         <div className="staging-actions">
@@ -436,10 +556,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     );
   };
 
-  const SectionHeader = ({ title, count, color, actions }: { title: string; count: number; color: string; actions?: React.ReactNode }) => (
+  const SectionHeader = ({ title, count, color, actions, statsText }: { title: string; count: number; color: string; actions?: React.ReactNode; statsText?: string }) => (
     <div className="staging-section-header">
       <span style={{ color }}>{title}</span>
       <span className="staging-count">{count}</span>
+      {statsText && <span className="staging-stats-inline">{statsText}</span>}
       <div style={{ flex: 1 }} />
       {actions}
     </div>
@@ -470,6 +591,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
             {filter}
           </button>
         ))}
+        <span className="staging-stat-chip" title="Staged Diff-Statistik">
+          Staged {formatDiffStats(stagedStats)}
+        </span>
+        <span className="staging-stat-chip" title="Unstaged Diff-Statistik">
+          Unstaged {formatDiffStats(unstagedStats)}
+        </span>
         <div style={{ flex: 1 }} />
         {visibleTotal > 0 && (
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
@@ -514,7 +641,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleStaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Staged Changes" count={visibleStaged.length} color="#3fb950"
+            <SectionHeader title="Staged Changes" count={visibleStaged.length} color="#3fb950" statsText={formatDiffStats(stagedStats)}
               actions={<button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">- Alle</button>}
             />
             {visibleStaged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
@@ -523,7 +650,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleUnstaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Changes" count={visibleUnstaged.length} color="#d29922"
+            <SectionHeader title="Changes" count={visibleUnstaged.length} color="#d29922" statsText={formatDiffStats(unstagedStats)}
               actions={
                 <>
                   <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
@@ -548,9 +675,17 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       <div className="staging-commit-area">
         <textarea
           className="staging-commit-input"
-          placeholder={hasOpenConflicts ? 'Konflikte aufloesen, danach committen...' : 'Commit-Nachricht...'}
+          placeholder={hasOpenConflicts ? 'Konflikte aufloesen, danach committen...' : 'Commit-Titel...'}
           value={commitMsg}
           onChange={e => setCommitMsg(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
+          disabled={hasOpenConflicts}
+        />
+        <textarea
+          className="staging-commit-input staging-commit-description"
+          placeholder="Commit-Beschreibung (optional)..."
+          value={commitDescription}
+          onChange={e => setCommitDescription(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCommit(); }}
           disabled={hasOpenConflicts}
         />
@@ -574,12 +709,65 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           >
             {hasOpenConflicts
               ? `Konflikte (${status.conflicts.length})`
-              : (isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0})`)
+              : (isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0} | ${formatDiffStats(stagedStats)})`)
             }
           </button>
         </div>
       </div>
 
+      {contextMenu && contextEntry && (
+        <div className="ctx-menu-backdrop" onClick={() => setContextMenu(null)}>
+          <div className="ctx-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(e) => e.stopPropagation()}>
+            <div className="ctx-menu-header">{contextEntry.path}</div>
+            <button
+              className="ctx-menu-item"
+              onClick={() => {
+                setContextMenu(null);
+                addIgnoreRule(contextEntry, contextMenu.section, toGitPath(contextEntry.path));
+              }}
+            >
+              <span className="ctx-menu-icon">IG</span>
+              Datei zu .gitignore hinzufuegen
+            </button>
+            {contextDir && (
+              <button
+                className="ctx-menu-item"
+                onClick={() => {
+                  setContextMenu(null);
+                  addIgnoreRule(contextEntry, contextMenu.section, `${contextDir}/`);
+                }}
+              >
+                <span className="ctx-menu-icon">DIR</span>
+                Ordner ignorieren ({contextDir}/)
+              </button>
+            )}
+            {contextTopDir && contextTopDir !== contextDir && (
+              <button
+                className="ctx-menu-item"
+                onClick={() => {
+                  setContextMenu(null);
+                  addIgnoreRule(contextEntry, contextMenu.section, `${contextTopDir}/`);
+                }}
+              >
+                <span className="ctx-menu-icon">TOP</span>
+                Oberordner ignorieren ({contextTopDir}/)
+              </button>
+            )}
+            {contextExtPattern && (
+              <button
+                className="ctx-menu-item"
+                onClick={() => {
+                  setContextMenu(null);
+                  addIgnoreRule(contextEntry, contextMenu.section, contextExtPattern);
+                }}
+              >
+                <span className="ctx-menu-icon">EXT</span>
+                Dateityp ignorieren ({contextExtPattern})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       {toast && (
         <div className={`action-toast ${toast.isError ? 'error' : 'success'}`}>
           {toast.isError ? 'x' : 'ok'} {toast.msg}
@@ -631,6 +819,29 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

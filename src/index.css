@@ -318,12 +318,14 @@ code, pre {
   white-space: nowrap;
 }
 
-.commit-date {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  opacity: 0.7;
-  width: 55px;
-  text-align: right;
+.commit-stats {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: #9fb3c8;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.24);
+  border-radius: 999px;
+  padding: 1px 7px;
 }
 
 .commit-refs {
@@ -524,6 +526,16 @@ code, pre {
   color: var(--text-primary);
 }
 
+.staging-stat-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: #9fb3c8;
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid rgba(88, 166, 255, 0.24);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .staging-files {
   flex: 1;
   overflow-y: auto;
@@ -557,6 +569,12 @@ code, pre {
   font-size: 0.7rem;
   min-width: 18px;
   text-align: center;
+}
+
+.staging-stats-inline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: #9fb3c8;
 }
 
 .staging-file-row {
@@ -673,6 +691,12 @@ code, pre {
   border-color: var(--accent-primary);
 }
 
+.staging-commit-description {
+  min-height: 40px;
+  max-height: 90px;
+  font-size: 0.8rem;
+}
+
 .staging-commit-bar {
   display: flex;
   align-items: center;
@@ -712,4 +736,6 @@ body[data-theme='light'] {
   --accent-hover: #1f6feb;
   --glass-bg: rgba(255, 255, 255, 0.85);
 }
+
+
 

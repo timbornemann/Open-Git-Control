@@ -541,6 +541,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     } catch { return ''; }
   };
 
+  const formatCommitStats = (files: number, additions: number, deletions: number) => {
+    if (files === 0 && additions === 0 && deletions === 0) {
+      return '0f +0 -0';
+    }
+    return `${files}f +${additions} -${deletions}`;
+  };
+
   if (!repoPath) {
     return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>Bitte wähle ein Repository aus, um den Graphen zu sehen.</div>;
   }
@@ -848,6 +855,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                     <span className="commit-subject">{node.commit.subject}</span>
                     <span className="commit-meta">
                       <span className="commit-author">{node.commit.author}</span>
+                      <span className="commit-stats" title={`${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`}>
+                        {formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)}
+                      </span>
                       <span className="commit-date">{formatDate(node.commit.date)}</span>
                     </span>
                   </div>
@@ -941,5 +951,14 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     </>
   );
 };
+
+
+
+
+
+
+
+
+
 
 

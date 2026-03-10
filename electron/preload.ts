@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   runGitCommand: (commandName: string, ...args: any[]) => ipcRenderer.invoke('git:command', commandName, ...args),
+  addIgnoreRule: (pattern: string) => ipcRenderer.invoke('git:addIgnoreRule', pattern),
   gitFetch: () => ipcRenderer.invoke('git:command', 'fetch', '--all', '--prune', '--tags', '--quiet'),
   gitPull: () => ipcRenderer.invoke('git:command', 'pull'),
   gitPush: () => ipcRenderer.invoke('git:command', 'push'),
@@ -43,3 +44,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
     ipcRenderer.invoke('github:createPR', params)
 });
+
