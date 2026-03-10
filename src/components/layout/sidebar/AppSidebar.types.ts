@@ -1,6 +1,6 @@
 import React from 'react';
 import { BranchInfo, RemoteSyncState } from '../../../types/git';
-import { AppSettingsDto, GitHubRepositoryDto, GitJobEventDto, PullRequestDto } from '../../../global';
+import { AppSettingsDto, DeviceFlowStartDto, GitHubRepositoryDto, GitJobEventDto, PullRequestDto } from '../../../global';
 
 export type RemoteStatus = {
   title: string;
@@ -12,12 +12,16 @@ export type RemoteStatus = {
 
 export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
+export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean }>;
+
 export type AppSidebarProps = {
   activeTab: 'repos' | 'github' | 'settings';
   setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
 
   activeRepo: string | null;
   openRepos: string[];
+  repoMeta: RepoMetaMap;
+  onToggleRepoPin: (repoPath: string) => void;
   onOpenFolder: () => void;
   onSwitchRepo: (repoPath: string) => void;
   onCloseRepo: (repoPath: string) => void;
@@ -66,6 +70,12 @@ export type AppSidebarProps = {
   authError: string | null;
   setAuthError: (value: string | null) => void;
   onTokenLogin: () => void;
+  oauthConfigured: boolean;
+  deviceFlow: DeviceFlowStartDto | null;
+  isDeviceFlowRunning: boolean;
+  deviceFlowError: string | null;
+  onStartDeviceFlowLogin: () => void;
+  onCancelDeviceFlow: () => void;
 
   githubUser: string | null;
   githubRepos: GitHubRepositoryDto[];

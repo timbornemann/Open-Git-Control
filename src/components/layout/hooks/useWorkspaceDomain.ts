@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialogState } from '../layoutTypes';
 
 type Params = {
@@ -7,6 +7,11 @@ type Params = {
   setGitActionToast: (toast: { msg: string; isError: boolean }) => void;
   onRepoActivated: () => void;
   onNoActiveRepo: () => void;
+};
+
+type RepoMetaEntry = {
+  lastOpened: number;
+  pinned: boolean;
 };
 
 export const useWorkspaceDomain = ({
@@ -19,7 +24,39 @@ export const useWorkspaceDomain = ({
   const [activeTab, setActiveTab] = useState<'repos' | 'github' | 'settings'>('repos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
+  const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
   const [reposLoaded, setReposLoaded] = useState(false);
+
+  const sortedOpenRepos = useMemo(() => {
+    const withMeta = openRepos.map((path) => ({
+      path,
+      pinned: repoMeta[path]?.pinned || false,
+      lastOpened: repoMeta[path]?.lastOpened || 0,
+      name: (path.split(/[\\/]/).pop() || path).toLowerCase(),
+    }));
+
+    withMeta.sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
+      }
+      if (a.lastOpened !== b.lastOpened) {
+        return b.lastOpened - a.lastOpened;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    return withMeta.map((entry) => entry.path);
+  }, [openRepos, repoMeta]);
+
+  const touchRepo = (repoPath: string) => {
+    setRepoMeta((prev) => ({
+      ...prev,
+      [repoPath]: {
+        pinned: prev[repoPath]?.pinned || false,
+        lastOpened: Date.now(),
+      },
+    }));
+  };
 
   useEffect(() => {
     const loadStored = async () => {
@@ -27,8 +64,18 @@ export const useWorkspaceDomain = ({
       try {
         const data = await window.electronAPI.getStoredRepos();
         if (data.repos.length > 0) {
-          const paths = data.repos.map(r => r.path);
+          const paths = data.repos.map((r) => r.path);
+          const meta: Record<string, RepoMetaEntry> = {};
+          for (const repo of data.repos) {
+            meta[repo.path] = {
+              lastOpened: Number.isFinite(repo.lastOpened) ? repo.lastOpened : Date.now(),
+              pinned: Boolean(repo.pinned),
+            };
+          }
+
+          setRepoMeta(meta);
           setOpenRepos(paths);
+
           const active = data.activeRepo && paths.includes(data.activeRepo) ? data.activeRepo : paths[0];
           await window.electronAPI.setRepoPath(active);
           setActiveRepo(active);
@@ -43,30 +90,51 @@ export const useWorkspaceDomain = ({
 
   useEffect(() => {
     if (!reposLoaded || !window.electronAPI) return;
+
+    const repos = sortedOpenRepos.map((path) => ({
+      path,
+      lastOpened: repoMeta[path]?.lastOpened || Date.now(),
+      pinned: repoMeta[path]?.pinned || false,
+    }));
+
     window.electronAPI.setStoredRepos({
-      repos: openRepos.map(p => ({ path: p, lastOpened: Date.now() })),
+      repos,
       activeRepo,
     });
-  }, [openRepos, activeRepo, reposLoaded]);
+  }, [sortedOpenRepos, repoMeta, activeRepo, reposLoaded]);
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!window.electronAPI || repoPath === activeRepo) return;
     await window.electronAPI.setRepoPath(repoPath);
     setActiveRepo(repoPath);
+    touchRepo(repoPath);
     onRepoActivated();
     triggerRefresh();
   };
 
   const handleCloseRepo = async (repoPath: string) => {
-    const next = openRepos.filter(r => r !== repoPath);
+    const next = openRepos.filter((r) => r !== repoPath);
     setOpenRepos(next);
+    setRepoMeta((prev) => {
+      const clone = { ...prev };
+      delete clone[repoPath];
+      return clone;
+    });
+
     if (activeRepo === repoPath) {
       if (next.length > 0) {
-        const newActive = next[0];
+        const sortedNext = [...next].sort((a, b) => {
+          const aPinned = repoMeta[a]?.pinned || false;
+          const bPinned = repoMeta[b]?.pinned || false;
+          if (aPinned !== bPinned) return aPinned ? -1 : 1;
+          return (repoMeta[b]?.lastOpened || 0) - (repoMeta[a]?.lastOpened || 0);
+        });
+        const newActive = sortedNext[0];
         if (window.electronAPI) {
           await window.electronAPI.setRepoPath(newActive);
         }
         setActiveRepo(newActive);
+        touchRepo(newActive);
         onRepoActivated();
         triggerRefresh();
       } else {
@@ -76,14 +144,23 @@ export const useWorkspaceDomain = ({
     }
   };
 
+  const ensureRepoPresent = (repoPath: string) => {
+    setOpenRepos((prev) => (prev.includes(repoPath) ? prev : [...prev, repoPath]));
+    setRepoMeta((prev) => ({
+      ...prev,
+      [repoPath]: {
+        pinned: prev[repoPath]?.pinned || false,
+        lastOpened: Date.now(),
+      },
+    }));
+  };
+
   const handleOpenFolder = async () => {
     if (!window.electronAPI) return;
     try {
       const result = await window.electronAPI.openDirectory();
       if (result && result.isRepo) {
-        if (!openRepos.includes(result.path)) {
-          setOpenRepos(prev => [...prev, result.path]);
-        }
+        ensureRepoPresent(result.path);
         await window.electronAPI.setRepoPath(result.path);
         setActiveRepo(result.path);
         onRepoActivated();
@@ -103,9 +180,7 @@ export const useWorkspaceDomain = ({
           onConfirm: async () => {
             const initResult = await window.electronAPI.gitInit(result.path);
             if (initResult.success) {
-              if (!openRepos.includes(result.path)) {
-                setOpenRepos(prev => [...prev, result.path]);
-              }
+              ensureRepoPresent(result.path);
               await window.electronAPI.setRepoPath(result.path);
               setActiveRepo(result.path);
               onRepoActivated();
@@ -124,19 +199,28 @@ export const useWorkspaceDomain = ({
 
   const addOpenRepo = async (repoPath: string) => {
     if (!window.electronAPI) return;
-    if (!openRepos.includes(repoPath)) {
-      setOpenRepos(prev => [...prev, repoPath]);
-    }
+    ensureRepoPresent(repoPath);
     await window.electronAPI.setRepoPath(repoPath);
     setActiveRepo(repoPath);
     onRepoActivated();
     triggerRefresh();
   };
 
+  const toggleRepoPin = (repoPath: string) => {
+    setRepoMeta((prev) => ({
+      ...prev,
+      [repoPath]: {
+        pinned: !prev[repoPath]?.pinned,
+        lastOpened: prev[repoPath]?.lastOpened || Date.now(),
+      },
+    }));
+  };
+
   return {
     activeTab,
     setActiveTab,
-    openRepos,
+    openRepos: sortedOpenRepos,
+    repoMeta,
     setOpenRepos,
     activeRepo,
     setActiveRepo,
@@ -144,6 +228,6 @@ export const useWorkspaceDomain = ({
     handleCloseRepo,
     handleOpenFolder,
     addOpenRepo,
+    toggleRepoPin,
   };
 };
-

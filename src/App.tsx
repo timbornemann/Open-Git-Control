@@ -19,6 +19,8 @@ const App: React.FC = () => {
         setActiveTab={state.setActiveTab}
         activeRepo={state.activeRepo}
         openRepos={state.openRepos}
+        repoMeta={state.repoMeta}
+        onToggleRepoPin={state.handleToggleRepoPin}
         onOpenFolder={state.handleOpenFolder}
         onSwitchRepo={state.handleSwitchRepo}
         onCloseRepo={state.handleCloseRepo}
@@ -61,6 +63,12 @@ const App: React.FC = () => {
         authError={state.authError}
         setAuthError={state.setAuthError}
         onTokenLogin={state.handleTokenLogin}
+        oauthConfigured={state.oauthConfigured}
+        deviceFlow={state.deviceFlow}
+        isDeviceFlowRunning={state.isDeviceFlowRunning}
+        deviceFlowError={state.deviceFlowError}
+        onStartDeviceFlowLogin={state.handleStartDeviceFlowLogin}
+        onCancelDeviceFlow={state.handleCancelDeviceFlow}
         githubUser={state.githubUser}
         githubRepos={state.githubRepos}
         onLogout={state.handleLogout}

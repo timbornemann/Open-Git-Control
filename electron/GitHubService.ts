@@ -1,7 +1,28 @@
+const DEVICE_CODE_ENDPOINT = 'https://github.com/login/device/code';
+const ACCESS_TOKEN_ENDPOINT = 'https://github.com/login/oauth/access_token';
+
+type DeviceFlowStartResult = {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+};
+
+type DeviceFlowPollResult =
+  | { status: 'success'; accessToken: string; tokenType: string; scope: string }
+  | { status: 'pending'; interval?: number }
+  | { status: 'error'; error: string; errorDescription?: string };
+
 export class GitHubService {
   private octokit: any | null = null;
   private token: string | null = null;
   private username: string | null = null;
+
+  private getDeviceFlowClientId(): string | null {
+    const envClientId = (process.env.GITHUB_OAUTH_CLIENT_ID || '').trim();
+    return envClientId || null;
+  }
 
   async authenticate(token: string): Promise<boolean> {
     try {
@@ -9,20 +30,20 @@ export class GitHubService {
       const _importDynamic = new Function('modulePath', 'return import(modulePath)');
       const { Octokit } = await _importDynamic('octokit');
       this.octokit = new Octokit({ auth: token });
-      
+
       // Validate the token by calling the rate limit endpoint (works with any valid token)
       await this.octokit.rest.rateLimit.get();
-      
+
       this.token = token;
-      
+
       // Try fetching the username for display
       try {
-         const { data } = await this.octokit.rest.users.getAuthenticated();
-         this.username = data?.login || null;
-         console.log('GitHub Authenticated as:', this.username);
+        const { data } = await this.octokit.rest.users.getAuthenticated();
+        this.username = data?.login || null;
+        console.log('GitHub Authenticated as:', this.username);
       } catch {
-         this.username = null;
-         console.log('GitHub Authenticated (Token valid, but user scope not available).');
+        this.username = null;
+        console.log('GitHub Authenticated (Token valid, but user scope not available).');
       }
 
       return true;
@@ -35,10 +56,126 @@ export class GitHubService {
     }
   }
 
+  async startDeviceFlow(): Promise<DeviceFlowStartResult> {
+    const clientId = this.getDeviceFlowClientId();
+    if (!clientId) {
+      throw new Error('Device Flow nicht konfiguriert. Bitte GITHUB_OAUTH_CLIENT_ID setzen.');
+    }
+
+    const params = new URLSearchParams();
+    params.set('client_id', clientId);
+    params.set('scope', 'repo read:user');
+
+    const response = await fetch(DEVICE_CODE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Device Flow konnte nicht gestartet werden (${response.status}).`);
+    }
+
+    const payload = await response.json() as {
+      device_code?: string;
+      user_code?: string;
+      verification_uri?: string;
+      expires_in?: number;
+      interval?: number;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (payload.error) {
+      throw new Error(payload.error_description || payload.error);
+    }
+
+    if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
+      throw new Error('Unvollstaendige Device-Flow Antwort erhalten.');
+    }
+
+    return {
+      deviceCode: payload.device_code,
+      userCode: payload.user_code,
+      verificationUri: payload.verification_uri,
+      expiresIn: Number(payload.expires_in || 900),
+      interval: Number(payload.interval || 5),
+    };
+  }
+
+  async pollDeviceFlow(deviceCode: string): Promise<DeviceFlowPollResult> {
+    const clientId = this.getDeviceFlowClientId();
+    if (!clientId) {
+      return { status: 'error', error: 'oauth_not_configured', errorDescription: 'GITHUB_OAUTH_CLIENT_ID fehlt.' };
+    }
+
+    const params = new URLSearchParams();
+    params.set('client_id', clientId);
+    params.set('device_code', deviceCode);
+    params.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code');
+
+    const response = await fetch(ACCESS_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        error: 'request_failed',
+        errorDescription: `Token-Abfrage fehlgeschlagen (${response.status}).`,
+      };
+    }
+
+    const payload = await response.json() as {
+      access_token?: string;
+      token_type?: string;
+      scope?: string;
+      error?: string;
+      error_description?: string;
+      interval?: number;
+    };
+
+    if (payload.error) {
+      if (payload.error === 'authorization_pending') {
+        return { status: 'pending' };
+      }
+      if (payload.error === 'slow_down') {
+        return { status: 'pending', interval: Number(payload.interval || 10) };
+      }
+      return {
+        status: 'error',
+        error: payload.error,
+        errorDescription: payload.error_description,
+      };
+    }
+
+    if (!payload.access_token) {
+      return {
+        status: 'error',
+        error: 'missing_access_token',
+        errorDescription: 'Kein Access Token in der Antwort enthalten.',
+      };
+    }
+
+    return {
+      status: 'success',
+      accessToken: payload.access_token,
+      tokenType: payload.token_type || 'bearer',
+      scope: payload.scope || '',
+    };
+  }
+
   isAuthenticated(): boolean {
     return this.octokit !== null;
   }
-
 
   logout(): void {
     this.octokit = null;
@@ -52,12 +189,12 @@ export class GitHubService {
 
   async getMyRepositories() {
     if (!this.octokit) throw new Error('Not authenticated');
-    
+
     const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
       sort: 'updated',
       per_page: 50
     });
-    
+
     return data.map((repo: any) => ({
       id: repo.id,
       name: repo.name,

@@ -9,10 +9,12 @@ import { AppSidebarProps } from './AppSidebar.types';
 type ReposSidebarContentProps = Pick<
   AppSidebarProps,
   | 'openRepos'
+  | 'repoMeta'
   | 'activeRepo'
   | 'onOpenFolder'
   | 'onSwitchRepo'
   | 'onCloseRepo'
+  | 'onToggleRepoPin'
   | 'branches'
   | 'isCreatingBranch'
   | 'newBranchName'
@@ -48,10 +50,12 @@ type ReposSidebarContentProps = Pick<
 
 export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   openRepos,
+  repoMeta,
   activeRepo,
   onOpenFolder,
   onSwitchRepo,
   onCloseRepo,
+  onToggleRepoPin,
   branches,
   isCreatingBranch,
   newBranchName,
@@ -87,10 +91,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
     <RepoList
       openRepos={openRepos}
+      repoMeta={repoMeta}
       activeRepo={activeRepo}
       onSwitchRepo={onSwitchRepo}
       onCloseRepo={onCloseRepo}
       onOpenFolder={onOpenFolder}
+      onTogglePin={onToggleRepoPin}
     />
 
     {activeRepo && (
@@ -224,7 +230,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           </button>
           {!isAuthenticated && (
             <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              Hinweis: Bitte zuerst im GitHub-Tab einen Token hinterlegen.
+              Hinweis: Bitte zuerst im GitHub-Tab anmelden.
             </div>
           )}
         </div>
@@ -232,4 +238,3 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
     )}
   </div>
 );
-

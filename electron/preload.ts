@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
+  githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
+  githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
   githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
   githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),
   githubLoginWithSavedToken: () => ipcRenderer.invoke('github:loginWithSavedToken'),

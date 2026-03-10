@@ -35,7 +35,7 @@ export const useRepoManager = ({ onRepoChanged, onRepoCleared, onToastSuccess, o
   useEffect(() => {
     if (!reposLoaded || !window.electronAPI) return;
     window.electronAPI.setStoredRepos({
-      repos: openRepos.map(path => ({ path, lastOpened: Date.now() })),
+      repos: openRepos.map(path => ({ path, lastOpened: Date.now(), pinned: false })),
       activeRepo,
     });
   }, [openRepos, activeRepo, reposLoaded]);
@@ -114,3 +114,4 @@ export const useRepoManager = ({ onRepoChanged, onRepoCleared, onToastSuccess, o
     handleCloseRepo,
   };
 };
+

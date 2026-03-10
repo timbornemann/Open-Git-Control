@@ -272,10 +272,12 @@ export const useAppState = () => {
     activeTab: workspace.activeTab,
     setActiveTab: workspace.setActiveTab,
     openRepos: workspace.openRepos,
+    repoMeta: workspace.repoMeta,
     activeRepo: workspace.activeRepo,
     handleOpenFolder: workspace.handleOpenFolder,
     handleSwitchRepo: workspace.handleSwitchRepo,
     handleCloseRepo: workspace.handleCloseRepo,
+    handleToggleRepoPin: workspace.toggleRepoPin,
 
     refreshTrigger,
     triggerRefresh,
@@ -324,6 +326,12 @@ export const useAppState = () => {
     authError: github.authError,
     setAuthError: github.setAuthError,
     handleTokenLogin: github.handleTokenLogin,
+    oauthConfigured: github.oauthConfigured,
+    deviceFlow: github.deviceFlow,
+    isDeviceFlowRunning: github.isDeviceFlowRunning,
+    deviceFlowError: github.deviceFlowError,
+    handleStartDeviceFlowLogin: github.handleStartDeviceFlowLogin,
+    handleCancelDeviceFlow: github.handleCancelDeviceFlow,
     handleLogout: github.handleLogout,
 
     isCloning: github.isCloning,
@@ -377,3 +385,4 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
+

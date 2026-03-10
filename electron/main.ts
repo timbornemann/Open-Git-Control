@@ -166,8 +166,14 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
   }
 }
 
+interface StoredRepoEntry {
+  path: string;
+  lastOpened: number;
+  pinned: boolean;
+}
+
 interface StoredData {
-  repos: { path: string; lastOpened: number }[];
+  repos: StoredRepoEntry[];
   activeRepo: string | null;
 }
 
@@ -193,17 +199,40 @@ function getStorePath(): string {
   return path.join(app.getPath('userData'), 'repos.json');
 }
 
+function normalizeStoredData(input: Partial<StoredData> | null | undefined): StoredData {
+  const reposInput = Array.isArray(input?.repos) ? input.repos : [];
+  const seen = new Set<string>();
+
+  const repos: StoredRepoEntry[] = reposInput
+    .map((repo: any) => {
+      const pathValue = typeof repo?.path === 'string' ? repo.path.trim() : '';
+      if (!pathValue || seen.has(pathValue)) return null;
+      seen.add(pathValue);
+      const lastOpened = Number.isFinite(repo?.lastOpened) ? Number(repo.lastOpened) : Date.now();
+      const pinned = typeof repo?.pinned === 'boolean' ? repo.pinned : false;
+      return { path: pathValue, lastOpened, pinned };
+    })
+    .filter((repo: StoredRepoEntry | null): repo is StoredRepoEntry => repo !== null);
+
+  const activeRepo = typeof input?.activeRepo === 'string' && input.activeRepo.trim().length > 0
+    ? input.activeRepo
+    : null;
+
+  return { repos, activeRepo };
+}
+
 function readStoreData(): StoredData {
   try {
     const raw = fs.readFileSync(getStorePath(), 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Partial<StoredData>;
+    return normalizeStoredData(parsed);
   } catch {
     return { repos: [], activeRepo: null };
   }
 }
 
 function writeStoreData(data: StoredData): void {
-  fs.writeFileSync(getStorePath(), JSON.stringify(data, null, 2));
+  fs.writeFileSync(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
 }
 
 function getSettingsPath(): string {
@@ -575,6 +604,7 @@ function setupIPC() {
       hasSavedToken: Boolean(savedToken),
       authenticated: githubService.isAuthenticated(),
       username: githubService.getUsername(),
+      oauthConfigured: Boolean((process.env.GITHUB_OAUTH_CLIENT_ID || '').trim()),
     };
   });
 
@@ -596,6 +626,58 @@ function setupIPC() {
       authenticated: true,
       username: githubService.getUsername(),
     };
+  });
+
+  ipcMain.handle('github:deviceStart', async () => {
+    try {
+      const flow = await githubService.startDeviceFlow();
+      return { success: true, data: flow };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Device Flow konnte nicht gestartet werden.';
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('github:devicePoll', async (_event: any, deviceCode: string) => {
+    try {
+      const normalizedDeviceCode = (deviceCode || '').trim();
+      if (!normalizedDeviceCode) {
+        return { success: false, error: 'device_code fehlt' };
+      }
+
+      const result = await githubService.pollDeviceFlow(normalizedDeviceCode);
+      if (result.status === 'pending') {
+        return { success: true, data: { status: 'pending', interval: result.interval || null } };
+      }
+
+      if (result.status === 'error') {
+        return {
+          success: true,
+          data: {
+            status: 'error',
+            error: result.error,
+            errorDescription: result.errorDescription || null,
+          },
+        };
+      }
+
+      const authenticated = await githubService.authenticate(result.accessToken);
+      if (!authenticated) {
+        return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
+      }
+
+      saveGithubTokenSecurely(result.accessToken);
+      return {
+        success: true,
+        data: {
+          status: 'success',
+          username: githubService.getUsername(),
+        },
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Device Flow Polling fehlgeschlagen.';
+      return { success: false, error: message };
+    }
   });
 
   ipcMain.handle('github:getRepos', async () => {
