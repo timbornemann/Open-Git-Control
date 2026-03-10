@@ -29,6 +29,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
+  aiTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
+  aiListModels: () => ipcRenderer.invoke('ai:listModels'),
+  ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
+  ollamaListModels: () => ipcRenderer.invoke('ai:listModels'),
+  runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
@@ -44,4 +49,3 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
     ipcRenderer.invoke('github:createPR', params)
 });
-

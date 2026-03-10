@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
+import { aiService } from './AiService';
 import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -637,6 +638,39 @@ function setupIPC() {
     return next;
   });
 
+  ipcMain.handle('ai:testConnection', async () => {
+    try {
+      const settings = readSettings();
+      const result = await aiService.testConnection(settings);
+      return { success: true, data: result };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'KI-Verbindung fehlgeschlagen.';
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('ai:listModels', async () => {
+    try {
+      const settings = readSettings();
+      const models = await aiService.listModels(settings);
+      return { success: true, data: models };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'KI-Modelle konnten nicht geladen werden.';
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('git:aiAutoCommit', async () => {
+    try {
+      const settings = readSettings();
+      const result = await aiService.runAutoCommit(settings);
+      return { success: true, data: result };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
+      return { success: false, error: message };
+    }
+  });
+
   ipcMain.handle('github:auth', async (_event: any, token: string) => {
     const success = await githubService.authenticate(token);
     if (success) {
@@ -806,6 +840,11 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
+
+
+
 
 
 
