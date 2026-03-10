@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github, LogOut, DownloadCloud, Plus, GitPullRequest } from 'lucide-react';
+import { Github, LogOut, DownloadCloud, FolderOpen, CheckCircle2, Plus, GitPullRequest } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 
 type GithubConnectedContentProps = Pick<
@@ -9,6 +9,9 @@ type GithubConnectedContentProps = Pick<
   | 'onLogout'
   | 'onClone'
   | 'isCloning'
+  | 'openRepos'
+  | 'activeRepo'
+  | 'onSwitchRepo'
   | 'prOwnerRepo'
   | 'prFilter'
   | 'setPrFilter'
@@ -35,6 +38,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   onLogout,
   onClone,
   isCloning,
+  openRepos,
+  activeRepo,
+  onSwitchRepo,
   prOwnerRepo,
   prFilter,
   setPrFilter,
@@ -75,40 +81,82 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
       </button>
     </div>
 
-    {githubRepos.map(repo => (
-      <div
-        key={repo.id}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px',
-          backgroundColor: 'var(--bg-panel)',
-          borderRadius: '4px',
-          border: '1px solid var(--border-color)',
-        }}
-      >
-        <span
+    {githubRepos.map(repo => {
+      const localRepoPath = openRepos.find(p => (p.split(/[\\/]/).pop() || '').toLowerCase() === repo.name.toLowerCase());
+      const isLocallyAvailable = Boolean(localRepoPath);
+      const isActiveLocalRepo = Boolean(localRepoPath && localRepoPath === activeRepo);
+
+      return (
+        <div
+          key={repo.id}
           style={{
-            fontSize: '0.85rem',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '8px',
+            backgroundColor: 'var(--bg-panel)',
+            borderRadius: '4px',
+            border: '1px solid var(--border-color)',
+            gap: '8px',
           }}
         >
-          {repo.name}
-        </span>
-        <button
-          onClick={() => onClone(repo.cloneUrl, repo.name)}
-          disabled={isCloning}
-          className="icon-btn"
-          style={{ padding: '4px' }}
-          title="Clone Repo"
-        >
-          <DownloadCloud size={14} />
-        </button>
-      </div>
-    ))}
+          <span
+            style={{
+              fontSize: '0.85rem',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+              minWidth: 0,
+            }}
+            title={repo.name}
+          >
+            {repo.name}
+          </span>
+
+          {isLocallyAvailable ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#3fb950',
+                  backgroundColor: 'rgba(63, 185, 80, 0.14)',
+                  border: '1px solid rgba(63, 185, 80, 0.35)',
+                  borderRadius: '999px',
+                  padding: '2px 8px',
+                }}
+                title="Bereits lokal vorhanden"
+              >
+                <CheckCircle2 size={12} /> Lokal
+              </span>
+              <button
+                onClick={() => localRepoPath && onSwitchRepo(localRepoPath)}
+                className="icon-btn"
+                style={{ padding: '4px', opacity: isActiveLocalRepo ? 0.55 : 1 }}
+                title={isActiveLocalRepo ? 'Bereits aktiv' : 'Lokales Repository öffnen'}
+                disabled={!localRepoPath || isActiveLocalRepo}
+              >
+                <FolderOpen size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onClone(repo.cloneUrl, repo.name)}
+              disabled={isCloning}
+              className="icon-btn"
+              style={{ padding: '4px' }}
+              title="Clone Repo"
+            >
+              <DownloadCloud size={14} />
+            </button>
+          )}
+        </div>
+      );
+    })}
 
     {prOwnerRepo && (
       <>
@@ -354,4 +402,3 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
     )}
   </div>
 );
-
