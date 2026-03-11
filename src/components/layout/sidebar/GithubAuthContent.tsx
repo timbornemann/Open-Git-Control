@@ -1,6 +1,6 @@
 import React from 'react';
-import { Key, ExternalLink, Github, ShieldCheck, Copy } from 'lucide-react';
-import { AppSidebarProps } from './AppSidebar.types';
+import { Key, ExternalLink, Github, ShieldCheck, Copy, Info } from 'lucide-react';
+import { AppSidebarProps, GithubAuthHelpMethod } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
 type GithubAuthContentProps = Pick<
@@ -20,7 +20,43 @@ type GithubAuthContentProps = Pick<
   | 'isWebFlowRunning'
   | 'webFlowError'
   | 'onStartWebFlowLogin'
+  | 'selectedGithubAuthHelpMethod'
+  | 'onSelectGithubAuthHelpMethod'
 >;
+
+const HelpMethodButton: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  title: string;
+}> = ({ active, onClick, title }) => (
+  <button
+    className="icon-btn"
+    onClick={onClick}
+    title={title}
+    style={{
+      padding: '2px',
+      marginLeft: 'auto',
+      color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
+      border: active ? '1px solid var(--accent-primary-border)' : '1px solid transparent',
+      borderRadius: '999px',
+      width: '20px',
+      height: '20px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+  >
+    <Info size={12} />
+  </button>
+);
+
+const toggleMethod = (
+  current: GithubAuthHelpMethod,
+  next: Exclude<GithubAuthHelpMethod, null>,
+  onSelect: (method: GithubAuthHelpMethod) => void,
+) => {
+  onSelect(current === next ? null : next);
+};
 
 export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   tokenInput,
@@ -38,6 +74,8 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   isWebFlowRunning,
   webFlowError,
   onStartWebFlowLogin,
+  selectedGithubAuthHelpMethod,
+  onSelectGithubAuthHelpMethod,
 }) => {
   const { tr } = useI18n();
 
@@ -56,7 +94,14 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
       <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem' }}>GitHub Connect</h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 1: Personal Access Token (PAT)', 'Method 1: Personal Access Token (PAT)')}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 1: Personal Access Token (PAT)', 'Method 1: Personal Access Token (PAT)')}</div>
+          <HelpMethodButton
+            active={selectedGithubAuthHelpMethod === 'pat'}
+            onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'pat', onSelectGithubAuthHelpMethod)}
+            title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 1 anzeigen', 'Show step-by-step guide for method 1')}
+          />
+        </div>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
           {tr('Klassische Anmeldung mit eigenem Token.', 'Classic sign-in with your own token.')}
         </p>
@@ -64,6 +109,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
           href="#"
           onClick={(e) => {
             e.preventDefault();
+            onSelectGithubAuthHelpMethod('pat');
             window.open('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control');
           }}
           style={{
@@ -135,7 +181,14 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 2: OAuth Device Flow (Alternative)', 'Method 2: OAuth Device Flow (Alternative)')}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 2: OAuth Device Flow (Alternative)', 'Method 2: OAuth Device Flow (Alternative)')}</div>
+          <HelpMethodButton
+            active={selectedGithubAuthHelpMethod === 'device'}
+            onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'device', onSelectGithubAuthHelpMethod)}
+            title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 2 anzeigen', 'Show step-by-step guide for method 2')}
+          />
+        </div>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
           {tr('Browser-Oeffnung mit Einmal-Code. PAT bleibt weiterhin moeglich.', 'Browser-based sign-in with one-time code. PAT remains available.')}
         </p>
@@ -209,7 +262,14 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 3: 1-Klick GitHub Login', 'Method 3: One-click GitHub login')}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 3: 1-Klick GitHub Login', 'Method 3: One-click GitHub login')}</div>
+          <HelpMethodButton
+            active={selectedGithubAuthHelpMethod === 'web'}
+            onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'web', onSelectGithubAuthHelpMethod)}
+            title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 3 anzeigen', 'Show step-by-step guide for method 3')}
+          />
+        </div>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
           {tr('Ohne OAuth App oder Keys: Klick auf Button, im Browser anmelden, fertig.', 'No OAuth app or keys: click button, sign in in browser, done.')}
         </p>
