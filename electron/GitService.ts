@@ -1,6 +1,8 @@
 import { execFile, spawn } from 'child_process';
 import * as util from 'util';
 import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 const execFileAsync = util.promisify(execFile);
 
@@ -17,25 +19,48 @@ export class GitService {
     return this.repoPath;
   }
 
+  private ensureRepoPath(): string {
+    if (!this.repoPath) {
+      throw new Error('No repository path set.');
+    }
+    return this.repoPath;
+  }
+
+  private normalizeGitError(error: any, args: string[]): Error {
+    const gitOut = (error?.stderr || '').trim() || (error?.stdout || '').trim();
+    const detailedMessage = gitOut ? `${error.message}\nGit Output: ${gitOut}` : String(error?.message || 'Unknown git error');
+    console.error(`Git Error executing "git ${args.join(' ')}":`, detailedMessage);
+    return new Error(detailedMessage);
+  }
+
   /**
    * Fuehrt einen Git Befehl im ausgewaehlten Repository aus
    */
   async runCommand(args: string[]): Promise<string> {
-    if (!this.repoPath) {
-      throw new Error('No repository path set.');
+    const repoPath = this.ensureRepoPath();
+
+    try {
+      const { stdout } = await execFileAsync('git', args, { cwd: repoPath, maxBuffer: 20 * 1024 * 1024 });
+      return stdout.trimEnd();
+    } catch (error: any) {
+      throw this.normalizeGitError(error, args);
+    }
+  }
+
+  /**
+   * Fuehrt einen Git-Befehl in einem expliziten Repository-Pfad aus.
+   */
+  async runCommandAtPath(repoPath: string, args: string[]): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
     }
 
     try {
-      const { stdout } = await execFileAsync('git', args, { cwd: this.repoPath });
+      const { stdout } = await execFileAsync('git', args, { cwd: normalizedPath, maxBuffer: 20 * 1024 * 1024 });
       return stdout.trimEnd();
     } catch (error: any) {
-      // execFile errors include stdout and stderr properties
-      const gitOut = (error.stderr || '').trim() || (error.stdout || '').trim();
-      const detailedMessage = gitOut ? `${error.message}\nGit Output: ${gitOut}` : error.message;
-      console.error(`Git Error executing "git ${args.join(' ')}":`, detailedMessage);
-
-      // We throw an Error so it normalizes for IPC handling in main.ts
-      throw new Error(detailedMessage);
+      throw this.normalizeGitError(error, args);
     }
   }
 
@@ -107,6 +132,141 @@ export class GitService {
    */
   async abortRebase(): Promise<string> {
     return this.runCommand(['rebase', '--abort']);
+  }
+
+  /**
+   * Startet einen interaktiven Rebase mit einer vorgegebenen Todo-Liste.
+   */
+  async startInteractiveRebase(baseHash: string, todoLines: string[]): Promise<string> {
+    const repoPath = this.ensureRepoPath();
+    const normalizedBase = (baseHash || '').trim();
+    if (!normalizedBase) {
+      throw new Error('Base commit hash is required for interactive rebase.');
+    }
+
+    const normalizedLines = Array.isArray(todoLines)
+      ? todoLines
+        .map((line) => String(line || '').trim())
+        .filter(Boolean)
+      : [];
+
+    if (normalizedLines.length === 0) {
+      throw new Error('At least one rebase todo line is required.');
+    }
+
+    const todoText = normalizedLines.join('\n') + '\n';
+    const helperPath = path.join(os.tmpdir(), `ogc-rebase-editor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.js`);
+    const helperScript = [
+      "const fs = require('fs');",
+      "const target = process.argv[2];",
+      "if (!target) process.exit(1);",
+      "const raw = process.env.OGC_REBASE_TODO_B64 || '';",
+      "const content = Buffer.from(raw, 'base64').toString('utf8');",
+      "fs.writeFileSync(target, content, 'utf8');",
+    ].join('\n');
+
+    fs.writeFileSync(helperPath, helperScript, 'utf8');
+
+    const quotedNode = `\"${process.execPath.replace(/\"/g, '\\\"')}\"`;
+    const quotedHelper = `\"${helperPath.replace(/\"/g, '\\\"')}\"`;
+
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['rebase', '-i', normalizedBase],
+        {
+          cwd: repoPath,
+          maxBuffer: 20 * 1024 * 1024,
+          env: {
+            ...process.env,
+            GIT_SEQUENCE_EDITOR: `${quotedNode} ${quotedHelper}`,
+            OGC_REBASE_TODO_B64: Buffer.from(todoText, 'utf8').toString('base64'),
+          },
+        },
+      );
+
+      return stdout.trimEnd();
+    } catch (error: any) {
+      throw this.normalizeGitError(error, ['rebase', '-i', normalizedBase]);
+    } finally {
+      try {
+        fs.rmSync(helperPath, { force: true });
+      } catch {
+        // ignore temp cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Wendet ein Patch auf Working Tree oder Index an.
+   */
+  async applyPatch(patchText: string, options?: { cached?: boolean; reverse?: boolean }): Promise<string> {
+    const repoPath = this.ensureRepoPath();
+    const patch = String(patchText || '');
+    if (!patch.trim()) {
+      throw new Error('Patch content is empty.');
+    }
+
+    const args = ['apply', '--recount', '--whitespace=nowarn'];
+    if (options?.cached) {
+      args.push('--cached');
+    }
+    if (options?.reverse) {
+      args.push('-R');
+    }
+
+    return await new Promise<string>((resolve, reject) => {
+      const proc = spawn('git', args, { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+
+      proc.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+      });
+
+      proc.on('error', (error) => {
+        reject(error);
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout.trimEnd());
+          return;
+        }
+
+        const message = (stderr || stdout || `git apply exited with code ${code}`).trim();
+        reject(new Error(message));
+      });
+
+      proc.stdin.write(patch);
+      proc.stdin.end();
+    });
+  }
+
+  async getRepoOriginUrl(repoPath: string): Promise<string | null> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) return null;
+
+    try {
+      const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], {
+        cwd: normalizedPath,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+      const trimmed = String(stdout || '').trim();
+      return trimmed || null;
+    } catch {
+      // Missing origin is a normal state for local-only repos. Do not spam console errors.
+      return null;
+    }
+  }
+
+  async getStashes(limit: number = 200): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
+    return this.runCommand(['stash', 'list', `--max-count=${safeLimit}`]);
   }
 
   /**
@@ -229,5 +389,3 @@ export class GitService {
 
 // Singleton Instanz
 export const gitService = new GitService();
-
-
