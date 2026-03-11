@@ -1,26 +1,5 @@
-
 import { GitService, gitService } from './GitService';
 import { AppSettings, AiProvider } from './settings';
-
-type ToolDefinition = {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-};
-
-type AssistantToolCall = {
-  name: string;
-  arguments: Record<string, unknown>;
-  rawFunctionCall?: Record<string, unknown>;
-};
-
-type ConversationMessage = {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  toolCalls?: AssistantToolCall[];
-  toolName?: string;
-  rawGeminiParts?: Array<Record<string, unknown>>;
-};
 
 type StatusEntry = {
   path: string;
@@ -29,48 +8,68 @@ type StatusEntry = {
   code: string;
 };
 
+type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked' | 'other';
+
+type SnapshotFile = {
+  path: string;
+  changeType: FileChangeType;
+  additions: number;
+  deletions: number;
+  isBinary: boolean;
+  preview: string;
+  groupKey: string;
+};
+
+type CommitMessage = {
+  title: string;
+  description: string;
+};
+
 type AiCommit = {
   hash: string;
   subject: string;
+};
+
+type ProgressPhase = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
+type ProgressMode = 'normal' | 'retry' | 'fallback';
+
+export type AiProgressUpdate = {
+  phase: ProgressPhase;
+  message: string;
+  progress?: number;
+  details?: Record<string, unknown>;
 };
 
 export type AiAutoCommitResult = {
   commits: AiCommit[];
   summary: string;
   turns: number;
+  modeTransitions: string[];
+  processedFiles: number;
+  remainingFiles: number;
+  commitPlanStats: {
+    groupCount: number;
+    retries: number;
+    fallbackCommits: number;
+    totalCommits: number;
+    totalFilesProcessed: number;
+  };
+  warnings: string[];
+  diagnostics: string[];
 };
 
-const MAX_TURNS = 24;
-const MAX_DIFF_CHARS = 12000;
+const CHAT_TIMEOUT_MS = 90_000;
+const RUN_TIMEOUT_MS = 10 * 60 * 1000;
+const MAX_PREVIEW_CHARS = 220;
+const MAX_COMMIT_FILES_NORMAL = 5;
+const MAX_COMMIT_FILES_RETRY = 3;
+const MAX_COMMIT_FILES_FALLBACK = 2;
+const MAX_NET_LINES_PER_COMMIT = 450;
+const MAX_RETRIES_PER_GROUP = 2;
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
 function safeString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
-}
-
-function parseJsonObject(value: unknown): Record<string, unknown> {
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
-      return {};
-    } catch {
-      return {};
-    }
-  }
-
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 }
 
 function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
@@ -95,115 +94,6 @@ function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
-function trimDiff(diff: string): string {
-  if (diff.length <= MAX_DIFF_CHARS) return diff;
-  return `${diff.slice(0, MAX_DIFF_CHARS)}\n\n[diff truncated]`;
-}
-
-function buildTools(): ToolDefinition[] {
-  return [
-    {
-      name: 'get_status',
-      description: 'Returns current git status split by staged/unstaged/untracked/conflicts.',
-      parameters: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false,
-      },
-    },
-    {
-      name: 'get_diff',
-      description: 'Returns textual git diff for one file path. Use staged=true for index diff.',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          staged: { type: 'boolean' },
-        },
-        required: ['path'],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: 'stage_files',
-      description: 'Stages the provided file paths.',
-      parameters: {
-        type: 'object',
-        properties: {
-          paths: {
-            type: 'array',
-            items: { type: 'string' },
-          },
-        },
-        required: ['paths'],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: 'unstage_files',
-      description: 'Unstages the provided file paths.',
-      parameters: {
-        type: 'object',
-        properties: {
-          paths: {
-            type: 'array',
-            items: { type: 'string' },
-          },
-        },
-        required: ['paths'],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: 'commit',
-      description: 'Creates one commit from currently staged files.',
-      parameters: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
-          signoff: { type: 'boolean' },
-        },
-        required: ['title'],
-        additionalProperties: false,
-      },
-    },
-    {
-      name: 'finish',
-      description: 'Signal that all desired commits are done and return a short summary.',
-      parameters: {
-        type: 'object',
-        properties: {
-          summary: { type: 'string' },
-        },
-        additionalProperties: false,
-      },
-    },
-  ];
-}
-
-
-function sanitizeGeminiSchema(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sanitizeGeminiSchema);
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  const input = value as Record<string, unknown>;
-  const output: Record<string, unknown> = {};
-
-  for (const [key, child] of Object.entries(input)) {
-    if (key === 'additionalProperties' || key === '') {
-      continue;
-    }
-    output[key] = sanitizeGeminiSchema(child);
-  }
-
-  return output;
-}
 function normalizeGeminiModel(model: string): string {
   const trimmed = model.trim();
   if (!trimmed) return '';
@@ -216,204 +106,313 @@ function getSelectedModel(settings: AppSettings): string {
     : settings.ollamaModel.trim();
 }
 
-async function runProviderChat(
-  settings: AppSettings,
-  messages: ConversationMessage[],
-  tools: ToolDefinition[],
-  getGeminiApiKey: () => string,
-): Promise<{ content: string; toolCalls: AssistantToolCall[]; rawGeminiParts?: Array<Record<string, unknown>> }> {
-  if (settings.aiProvider === 'gemini') {
-    return runGeminiChat(settings, messages, tools, getGeminiApiKey);
-  }
-  return runOllamaChat(settings, messages, tools);
+function detectChangeType(entry: StatusEntry): FileChangeType {
+  if (entry.code === '??' || entry.x === '?' || entry.y === '?') return 'untracked';
+  const code = `${entry.x}${entry.y}`;
+  if (code.includes('R')) return 'renamed';
+  if (code.includes('A')) return 'added';
+  if (code.includes('D')) return 'deleted';
+  if (code.includes('M')) return 'modified';
+  return 'other';
 }
 
-async function runOllamaChat(
-  settings: AppSettings,
-  messages: ConversationMessage[],
-  tools: ToolDefinition[],
-): Promise<{ content: string; toolCalls: AssistantToolCall[]; rawGeminiParts?: Array<Record<string, unknown>> }> {
-  const response = await fetch(`${settings.ollamaBaseUrl}/api/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: settings.ollamaModel,
-      stream: false,
-      messages: messages.map(message => {
-        if (message.role === 'tool') {
-          return { role: 'tool', content: message.content };
-        }
+function getExtension(pathValue: string): string {
+  const idx = pathValue.lastIndexOf('.');
+  if (idx < 0 || idx === pathValue.length - 1) return 'none';
+  return pathValue.slice(idx + 1).toLowerCase();
+}
 
-        return {
-          role: message.role,
-          content: message.content,
-          ...(message.toolCalls && message.toolCalls.length > 0
-            ? {
-                tool_calls: message.toolCalls.map(call => ({
-                  function: {
-                    name: call.name,
-                    arguments: call.arguments,
-                  },
-                })),
-              }
-            : {}),
-        };
-      }),
-      tools: tools.map(tool => ({
-        type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
-      })),
-      options: {
-        temperature: 0.1,
-      },
-    }),
-  });
+function getTopDirectory(pathValue: string): string {
+  const normalized = pathValue.replace(/\\/g, '/');
+  const first = normalized.split('/')[0];
+  return first || 'root';
+}
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Ollama chat failed (${response.status}): ${text || response.statusText}`);
+function buildGroupKey(pathValue: string, changeType: FileChangeType): string {
+  const normalized = pathValue.replace(/\\/g, '/').toLowerCase();
+  const ext = getExtension(normalized);
+  const topDir = getTopDirectory(normalized);
+
+  if (/package-lock\.json$|yarn\.lock$|pnpm-lock\.ya?ml$|bun\.lockb$/.test(normalized)) {
+    return 'special:lockfiles';
   }
 
-  const data = (await response.json()) as {
-    message?: {
-      content?: unknown;
-      tool_calls?: Array<{ function?: { name?: unknown; arguments?: unknown } }>;
-    };
-  };
+  if (/(^|\/)(migrations?|db\/migrate|prisma\/migrations)(\/|$)/.test(normalized)) {
+    return 'special:migrations';
+  }
 
-  const toolCalls = Array.isArray(data.message?.tool_calls)
-    ? data.message!.tool_calls
-        .map(call => ({
-          name: safeString(call.function?.name).trim(),
-          arguments: parseJsonObject(call.function?.arguments),
-        }))
-        .filter(call => call.name.length > 0)
-    : [];
+  if (/(^|\/)(dist|build|coverage|out|target|generated|.next)(\/|$)/.test(normalized) || /\.min\./.test(normalized)) {
+    return 'special:generated';
+  }
 
+  if (['md', 'mdx', 'txt', 'rst', 'adoc'].includes(ext)) {
+    return 'special:docs';
+  }
+
+  return `${topDir}:${ext}:${changeType}`;
+}
+
+function parseNumstatLine(raw: string): { additions: number; deletions: number; isBinary: boolean } {
+  const trimmed = (raw || '').trim();
+  const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+  if (!match) {
+    return { additions: 0, deletions: 0, isBinary: false };
+  }
+
+  const isBinary = match[1] === '-' || match[2] === '-';
   return {
-    content: safeString(data.message?.content),
-    toolCalls,
+    additions: match[1] === '-' ? 0 : Number(match[1]),
+    deletions: match[2] === '-' ? 0 : Number(match[2]),
+    isBinary,
   };
 }
 
-async function runGeminiChat(
+function toPreview(diffText: string): string {
+  return (diffText || '').replace(/\s+/g, ' ').trim().slice(0, MAX_PREVIEW_CHARS) || '(no preview available)';
+}
+
+function clipCommitTitle(title: string): string {
+  const normalized = title.replace(/\s+/g, ' ').trim();
+  if (!normalized) return 'chore: update files';
+  if (normalized.length <= 72) return normalized;
+  return normalized.slice(0, 72).trimEnd();
+}
+
+function parseJsonFromText(rawText: string): Record<string, unknown> | null {
+  const text = (rawText || '').trim();
+  if (!text) return null;
+
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through
+  }
+
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first >= 0 && last > first) {
+    try {
+      const parsed = JSON.parse(text.slice(first, last + 1));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error: unknown) {
+    if ((error as any)?.name === 'AbortError') {
+      throw new Error(`KI Anfrage Zeitlimit ueberschritten (${Math.round(timeoutMs / 1000)}s).`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function runProviderText(
   settings: AppSettings,
-  messages: ConversationMessage[],
-  tools: ToolDefinition[],
+  systemPrompt: string,
+  userPrompt: string,
   getGeminiApiKey: () => string,
-): Promise<{ content: string; toolCalls: AssistantToolCall[]; rawGeminiParts?: Array<Record<string, unknown>> }> {
-  const apiKey = getGeminiApiKey().trim();
-  if (!apiKey) {
-    throw new Error('Gemini API key is missing.');
-  }
-
-  const model = normalizeGeminiModel(settings.geminiModel);
-  if (!model) {
-    throw new Error('Gemini model is missing.');
-  }
-
-  const systemInstruction = messages.find(message => message.role === 'system')?.content || '';
-  const rest = messages.filter(message => message.role !== 'system');
-  const contents: Array<{ role: 'user' | 'model'; parts: Array<Record<string, unknown>> }> = [];
-
-  for (const message of rest) {
-    if (message.role === 'user') {
-      contents.push({ role: 'user', parts: [{ text: message.content }] });
-      continue;
+): Promise<string> {
+  if (settings.aiProvider === 'gemini') {
+    const apiKey = getGeminiApiKey().trim();
+    if (!apiKey) {
+      throw new Error('Gemini API key fehlt.');
     }
 
-    if (message.role === 'assistant') {
-      if (Array.isArray(message.rawGeminiParts) && message.rawGeminiParts.length > 0) {
-        contents.push({ role: 'model', parts: message.rawGeminiParts });
-        continue;
-      }
-
-      const parts: Array<Record<string, unknown>> = [];
-      if (message.content.trim()) {
-        parts.push({ text: message.content });
-      }
-      for (const call of message.toolCalls || []) {
-        const functionCallPayload: Record<string, unknown> = call.rawFunctionCall
-          ? { ...call.rawFunctionCall }
-          : {};
-        functionCallPayload.name = call.name;
-        functionCallPayload.args = call.arguments;
-        parts.push({ functionCall: functionCallPayload });
-      }
-      if (parts.length > 0) {
-        contents.push({ role: 'model', parts });
-      }
-      continue;
+    const model = normalizeGeminiModel(settings.geminiModel);
+    if (!model) {
+      throw new Error('Gemini Modell fehlt.');
     }
 
-    if (message.role === 'tool') {
-      contents.push({
-        role: 'user',
-        parts: [{ functionResponse: { name: message.toolName || 'tool', response: parseJsonObject(message.content) } }],
-      });
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: { temperature: 0.1 },
+        }),
+      },
+      CHAT_TIMEOUT_MS,
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Gemini Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
     }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
+    };
+
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const content = parts
+      .map((part) => safeString((part as any).text))
+      .join('')
+      .trim();
+
+    return content;
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const response = await fetchWithTimeout(
+    `${settings.ollamaBaseUrl}/api/chat`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: settings.ollamaModel,
+        stream: false,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        options: { temperature: 0.1 },
+      }),
     },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      tools: [{ functionDeclarations: tools.map(tool => ({ name: tool.name, description: tool.description, parameters: sanitizeGeminiSchema(tool.parameters) })) }],
-      generationConfig: { temperature: 0.1 },
-    }),
-  });
+    CHAT_TIMEOUT_MS,
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Gemini chat failed (${response.status}): ${text || response.statusText}`);
+    throw new Error(`Ollama Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
   }
 
-  const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{
-          text?: unknown;
-          functionCall?: Record<string, unknown>;
-        }>;
-      };
-    }>;
-  };
+  const data = (await response.json()) as { message?: { content?: unknown } };
+  return safeString(data.message?.content).trim();
+}
 
-  const rawParts = Array.isArray(data.candidates?.[0]?.content?.parts)
-    ? (data.candidates?.[0]?.content?.parts as Array<Record<string, unknown>>)
-    : [];
+function groupFilesDeterministically(files: SnapshotFile[]): SnapshotFile[][] {
+  const groups = new Map<string, SnapshotFile[]>();
 
-  let content = '';
-  const toolCalls: AssistantToolCall[] = [];
-
-  for (const part of rawParts) {
-    if (typeof part.text === 'string') {
-      content += part.text;
-    }
-    if (part.functionCall) {
-      const functionCall = part.functionCall as Record<string, unknown>;
-      const name = safeString(functionCall.name).trim();
-      if (name) {
-        toolCalls.push({
-          name,
-          arguments: parseJsonObject(functionCall.args),
-          rawFunctionCall: functionCall,
-        });
-      }
-    }
+  for (const file of files) {
+    const arr = groups.get(file.groupKey) || [];
+    arr.push(file);
+    groups.set(file.groupKey, arr);
   }
 
-  return { content, toolCalls, rawGeminiParts: rawParts };
+  return [...groups.values()]
+    .map(group => group.sort((a, b) => a.path.localeCompare(b.path)))
+    .sort((a, b) => {
+      const aSpecial = a[0]?.groupKey.startsWith('special:') ? 0 : 1;
+      const bSpecial = b[0]?.groupKey.startsWith('special:') ? 0 : 1;
+      if (aSpecial !== bSpecial) return aSpecial - bSpecial;
+      return a[0].groupKey.localeCompare(b[0].groupKey);
+    });
+}
+
+function pickWindow(group: SnapshotFile[], mode: ProgressMode): SnapshotFile[] {
+  const maxFiles = mode === 'fallback'
+    ? MAX_COMMIT_FILES_FALLBACK
+    : mode === 'retry'
+      ? MAX_COMMIT_FILES_RETRY
+      : MAX_COMMIT_FILES_NORMAL;
+
+  const selected: SnapshotFile[] = [];
+  let netLines = 0;
+
+  for (const file of group) {
+    if (selected.length >= maxFiles) break;
+    const weight = file.additions + file.deletions;
+    if (selected.length > 0 && netLines + weight > MAX_NET_LINES_PER_COMMIT) {
+      break;
+    }
+    selected.push(file);
+    netLines += weight;
+  }
+
+  if (selected.length === 0 && group.length > 0) {
+    return [group[0]];
+  }
+
+  return selected;
+}
+
+async function chooseFilesWithAi(
+  settings: AppSettings,
+  candidateWindow: SnapshotFile[],
+  getGeminiApiKey: () => string,
+): Promise<string[]> {
+  if (candidateWindow.length <= 1) {
+    return candidateWindow.map(file => file.path);
+  }
+
+  const systemPrompt = [
+    'You decide which files should be committed together in one small coherent commit.',
+    'Return strict JSON only: {"selectedPaths": string[]} with at least 1 and at most 5 items.',
+    'Only choose paths from the provided list.',
+    'Prefer fine-grained commits.',
+  ].join(' ');
+
+  const userPrompt = [
+    'Candidates:',
+    ...candidateWindow.map((file, index) => `${index + 1}. ${file.path} | ${file.changeType} | +${file.additions}/-${file.deletions} | ${file.preview}`),
+    'Return JSON only.',
+  ].join('\n');
+
+  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+  const parsed = parseJsonFromText(raw) || {};
+  const selectedRaw = Array.isArray(parsed.selectedPaths) ? parsed.selectedPaths : [];
+  const candidateSet = new Set(candidateWindow.map(file => file.path));
+
+  const selected = selectedRaw
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(item => item.trim())
+    .filter(item => candidateSet.has(item));
+
+  const unique = uniqueSorted(selected);
+  return unique.length > 0 ? unique.slice(0, MAX_COMMIT_FILES_NORMAL) : [candidateWindow[0].path];
+}
+
+async function generateCommitMessageWithAi(
+  settings: AppSettings,
+  batch: SnapshotFile[],
+  getGeminiApiKey: () => string,
+): Promise<CommitMessage> {
+  const systemPrompt = [
+    'You write concise git commit messages.',
+    'Return strict JSON only: {"title": string, "description": string}.',
+    'Title must be imperative, <=72 chars, no trailing period.',
+    'Description should be short and optional-friendly.',
+  ].join(' ');
+
+  const userPrompt = [
+    'Files in this commit:',
+    ...batch.map((file) => `- ${file.path} (${file.changeType}, +${file.additions}/-${file.deletions}) ${file.preview}`),
+    'Return JSON only.',
+  ].join('\n');
+
+  try {
+    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+    const parsed = parseJsonFromText(raw) || {};
+    const title = clipCommitTitle(safeString(parsed.title, '').trim());
+    const description = safeString(parsed.description, '').trim();
+    return { title, description };
+  } catch {
+    const first = batch[0];
+    const scope = getTopDirectory(first.path);
+    return {
+      title: clipCommitTitle(`chore(${scope}): update ${batch.length} file${batch.length === 1 ? '' : 's'}`),
+      description: '',
+    };
+  }
 }
 
 export class AiService {
@@ -491,7 +490,13 @@ export class AiService {
     );
   }
 
-  async runAutoCommit(settings: AppSettings, getGeminiApiKey: () => string): Promise<AiAutoCommitResult> {
+  async runAutoCommit(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    onProgress?: (update: AiProgressUpdate) => void,
+  ): Promise<AiAutoCommitResult> {
+    const runStartedAt = Date.now();
+
     const repoPath = this.gitService.getRepoPath();
     if (!repoPath) {
       throw new Error('No repository selected.');
@@ -513,221 +518,311 @@ export class AiService {
       }
     }
 
-    const initialStatus = await this.gitService.getStatusPorcelain();
-    const initialEntries = parseStatusPorcelain(initialStatus);
+    onProgress?.({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: { mode: 'normal' } });
 
-    if (initialEntries.some(entry => CONFLICT_CODES.has(entry.code))) {
+    const initialStatus = await this.gitService.getStatusPorcelain();
+    const statusEntries = parseStatusPorcelain(initialStatus);
+
+    if (statusEntries.some(entry => CONFLICT_CODES.has(entry.code))) {
       throw new Error('Repository hat Konflikte. Bitte zuerst aufloesen.');
     }
 
-    if (initialEntries.length === 0) {
+    if (statusEntries.length === 0) {
       throw new Error('Working Tree ist sauber. Keine Commits noetig.');
     }
 
-    const commits: AiCommit[] = [];
-    const tools = buildTools();
-    const messages: ConversationMessage[] = [
-      {
-        role: 'system',
-        content: [
-          'You are an autonomous git commit assistant.',
-          'Goal: create a clean and logical sequence of commits from local changes.',
-          'Always inspect status and diffs before committing.',
-          'Only use provided tools and existing file paths.',
-          'Create concise imperative commit titles.',
-          'When done, call finish with a short summary.',
-        ].join(' '),
-      },
-      {
-        role: 'user',
-        content: [
-          `Repository path: ${repoPath}`,
-          `Provider: ${settings.aiProvider}`,
-          `Model: ${model}`,
-          `Current status entries: ${initialEntries.length}`,
-          'Split unrelated changes into separate commits where useful.',
-          'Do not push and do not rewrite history.',
-        ].join('\n'),
-      },
-    ];
+    const snapshotFiles: SnapshotFile[] = [];
+    for (const entry of statusEntries) {
+      const pathValue = entry.path;
+      const changeType = detectChangeType(entry);
 
-    let summary = 'AI Auto-Commit finished.';
-
-    for (let turn = 1; turn <= MAX_TURNS; turn += 1) {
-      const assistantReply = await runProviderChat(settings, messages, tools, getGeminiApiKey);
-
-      messages.push({
-        role: 'assistant',
-        content: assistantReply.content,
-        toolCalls: assistantReply.toolCalls,
-        rawGeminiParts: assistantReply.rawGeminiParts,
-      });
-
-      if (assistantReply.toolCalls.length === 0) {
-        if (assistantReply.content.trim()) {
-          summary = assistantReply.content.trim();
-        }
-        break;
+      let numstatRaw = '';
+      try {
+        numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--', pathValue]);
+      } catch {
+        numstatRaw = '';
       }
 
-      let shouldFinish = false;
-      for (const toolCall of assistantReply.toolCalls) {
-        const toolResult = await this.executeTool(toolCall.name, toolCall.arguments, settings, commits);
-        messages.push({ role: 'tool', content: JSON.stringify(toolResult), toolName: toolCall.name });
+      if (!numstatRaw.trim()) {
+        try {
+          numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--cached', '--', pathValue]);
+        } catch {
+          numstatRaw = '';
+        }
+      }
 
-        if (toolCall.name === 'finish') {
-          shouldFinish = true;
-          if (typeof toolResult.summary === 'string' && toolResult.summary.trim()) {
-            summary = toolResult.summary;
+      const numstat = parseNumstatLine(numstatRaw.split('\n').find(Boolean) || '');
+
+      let previewRaw = '';
+      try {
+        previewRaw = await this.gitService.runCommand(['diff', '--', pathValue]);
+      } catch {
+        previewRaw = '';
+      }
+
+      if (!previewRaw.trim()) {
+        try {
+          previewRaw = await this.gitService.runCommand(['diff', '--cached', '--', pathValue]);
+        } catch {
+          previewRaw = '';
+        }
+      }
+
+      snapshotFiles.push({
+        path: pathValue,
+        changeType,
+        additions: numstat.additions,
+        deletions: numstat.deletions,
+        isBinary: numstat.isBinary,
+        preview: toPreview(previewRaw),
+        groupKey: buildGroupKey(pathValue, changeType),
+      });
+    }
+
+    onProgress?.({
+      phase: 'grouping',
+      message: `Dateien werden gruppiert (${snapshotFiles.length})...`,
+      progress: 15,
+      details: { mode: 'normal', remainingFiles: snapshotFiles.length },
+    });
+
+    const groups = groupFilesDeterministically(snapshotFiles);
+    const groupQueues = groups.map(group => [...group]);
+
+    const commits: AiCommit[] = [];
+    const warnings: string[] = [];
+    const diagnostics: string[] = [];
+    const modeTransitions: string[] = ['normal'];
+    let mode: ProgressMode = 'normal';
+    let modelTurns = 0;
+    let retries = 0;
+    let fallbackCommits = 0;
+    let processedFiles = 0;
+
+
+    for (let groupIndex = 0; groupIndex < groupQueues.length; groupIndex += 1) {
+      const queue = groupQueues[groupIndex];
+      if (queue.length === 0) continue;
+
+      let groupRetries = 0;
+
+      while (queue.length > 0) {
+        if (Date.now() - runStartedAt > RUN_TIMEOUT_MS) {
+          warnings.push('Zeitbudget erreicht; verbleibende Dateien werden im Ergebnis ausgewiesen.');
+          break;
+        }
+
+        const phase: ProgressPhase = mode === 'fallback' ? 'fallback' : mode === 'retry' ? 'retry' : 'committing';
+        const windowFiles = pickWindow(queue, mode);
+
+        onProgress?.({
+          phase,
+          message: `Gruppe ${groupIndex + 1}/${groupQueues.length}: ${windowFiles.length} Datei(en) werden vorbereitet`,
+          progress: Math.min(95, 20 + Math.floor((processedFiles / Math.max(1, snapshotFiles.length)) * 70)),
+          details: {
+            mode,
+            groupId: groupIndex + 1,
+            groupSize: queue.length,
+            remainingFiles: snapshotFiles.length - processedFiles,
+          },
+        });
+
+        let selectedPaths: string[] = [];
+
+        if (mode === 'fallback') {
+          selectedPaths = windowFiles.map(file => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
+        } else {
+          try {
+            modelTurns += 1;
+            selectedPaths = await chooseFilesWithAi(settings, windowFiles, getGeminiApiKey);
+          } catch (error: unknown) {
+            diagnostics.push(error instanceof Error ? error.message : 'KI-Auswahl fehlgeschlagen.');
+            selectedPaths = [];
           }
         }
+
+        if (selectedPaths.length === 0) {
+          if (groupRetries < MAX_RETRIES_PER_GROUP) {
+            groupRetries += 1;
+            retries += 1;
+            if (mode !== 'retry') {
+              mode = 'retry';
+              modeTransitions.push('retry');
+            }
+            onProgress?.({
+              phase: 'retry',
+              message: `Keine Auswahl erhalten, Retry ${groupRetries}/${MAX_RETRIES_PER_GROUP}`,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+                retryCount: groupRetries,
+              },
+            });
+            continue;
+          }
+
+          if (mode !== 'fallback') {
+            mode = 'fallback';
+            modeTransitions.push('fallback');
+          }
+          onProgress?.({
+            phase: 'fallback',
+            message: 'Auto-Fallback aktiv: Mikro-Batches werden verwendet.',
+            details: {
+              mode,
+              groupId: groupIndex + 1,
+              groupSize: queue.length,
+              remainingFiles: snapshotFiles.length - processedFiles,
+            },
+          });
+          continue;
+        }
+
+        const selectedSet = new Set(selectedPaths);
+        const batchFiles = queue.filter(file => selectedSet.has(file.path));
+
+        if (batchFiles.length === 0) {
+          warnings.push(`Gruppe ${groupIndex + 1}: KI-Auswahl enthielt keine gueltigen Pfade.`);
+          if (groupRetries < MAX_RETRIES_PER_GROUP) {
+            groupRetries += 1;
+            retries += 1;
+            if (mode !== 'retry') {
+              mode = 'retry';
+              modeTransitions.push('retry');
+            }
+            continue;
+          }
+          if (mode !== 'fallback') {
+            mode = 'fallback';
+            modeTransitions.push('fallback');
+          }
+          continue;
+        }
+
+        try {
+          for (const file of batchFiles) {
+            await this.gitService.runCommand(['add', '--', file.path]);
+          }
+
+          let message: CommitMessage;
+          try {
+            modelTurns += 1;
+            message = await generateCommitMessageWithAi(settings, batchFiles, getGeminiApiKey);
+          } catch (error: unknown) {
+            diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
+            message = {
+              title: clipCommitTitle(`chore: update ${batchFiles.length} file${batchFiles.length === 1 ? '' : 's'}`),
+              description: '',
+            };
+          }
+
+          const commitArgs = ['commit', '-m', message.title];
+          if (message.description.trim()) {
+            commitArgs.push('-m', message.description.trim());
+          }
+
+          await this.gitService.runCommand(commitArgs);
+
+          const hash = (await this.gitService.runCommand(['rev-parse', '--short', 'HEAD'])).trim();
+          const subject = (await this.gitService.runCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
+          commits.push({ hash, subject });
+
+          const committedPaths = new Set(batchFiles.map(file => file.path));
+          for (let i = queue.length - 1; i >= 0; i -= 1) {
+            if (committedPaths.has(queue[i].path)) {
+              queue.splice(i, 1);
+            }
+          }
+
+          processedFiles += batchFiles.length;
+          if (mode === 'fallback') {
+            fallbackCommits += 1;
+          }
+
+          groupRetries = 0;
+          if (mode !== 'normal') {
+            mode = 'normal';
+            modeTransitions.push('normal');
+          }
+
+          onProgress?.({
+            phase: 'committing',
+            message: `Commit erstellt: ${subject}`,
+            details: {
+              mode,
+              groupId: groupIndex + 1,
+              groupSize: queue.length,
+              remainingFiles: snapshotFiles.length - processedFiles,
+              lastCommit: `${hash} ${subject}`,
+            },
+          });
+        } catch (error: unknown) {
+          diagnostics.push(error instanceof Error ? error.message : 'Commit fehlgeschlagen.');
+
+          if (groupRetries < MAX_RETRIES_PER_GROUP) {
+            groupRetries += 1;
+            retries += 1;
+            if (mode !== 'retry') {
+              mode = 'retry';
+              modeTransitions.push('retry');
+            }
+            continue;
+          }
+
+          if (mode !== 'fallback') {
+            mode = 'fallback';
+            modeTransitions.push('fallback');
+          }
+          warnings.push(`Gruppe ${groupIndex + 1}: Wechsel auf Fallback nach Commit-Fehler.`);
+        }
       }
 
-      if (shouldFinish) {
+      if (Date.now() - runStartedAt > RUN_TIMEOUT_MS) {
         break;
       }
     }
 
-    return { commits, summary, turns: messages.length };
-  }
+    const finalStatus = await this.gitService.getStatusPorcelain();
+    const remainingEntries = parseStatusPorcelain(finalStatus);
+    const remainingFiles = remainingEntries.length;
 
-  private async executeTool(
-    toolName: string,
-    args: Record<string, unknown>,
-    settings: AppSettings,
-    commits: AiCommit[],
-  ): Promise<Record<string, unknown>> {
-    try {
-      if (toolName === 'get_status') {
-        const rawStatus = await this.gitService.getStatusPorcelain();
-        const entries = parseStatusPorcelain(rawStatus);
+    const summary = commits.length === 0
+      ? 'Keine Commits erstellt.'
+      : `KI Auto-Commit abgeschlossen: ${commits.length} Commit(s) erstellt.`;
 
-        const staged = uniqueSorted(entries.filter(entry => entry.x !== ' ' && entry.x !== '?').map(entry => entry.path));
-        const unstaged = uniqueSorted(entries.filter(entry => entry.y !== ' ' && entry.y !== '?').map(entry => entry.path));
-        const untracked = uniqueSorted(entries.filter(entry => entry.x === '?' || entry.y === '?').map(entry => entry.path));
-        const conflicts = uniqueSorted(entries.filter(entry => CONFLICT_CODES.has(entry.code)).map(entry => entry.path));
+    onProgress?.({
+      phase: 'done',
+      message: summary,
+      progress: 100,
+      details: {
+        mode,
+        remainingFiles,
+        processedFiles,
+        lastCommit: commits.length > 0 ? `${commits[commits.length - 1].hash} ${commits[commits.length - 1].subject}` : null,
+      },
+    });
 
-        return { ok: true, staged, unstaged, untracked, conflicts, total: entries.length };
-      }
-
-      if (toolName === 'get_diff') {
-        const path = safeString(args.path).trim();
-        const staged = Boolean(args.staged);
-        if (!path) {
-          return { ok: false, error: 'path is required' };
-        }
-
-        const rawStatus = await this.gitService.getStatusPorcelain();
-        const knownPaths = new Set(parseStatusPorcelain(rawStatus).map(entry => entry.path));
-        if (!knownPaths.has(path)) {
-          return { ok: false, error: `Unknown path: ${path}` };
-        }
-
-        const diff = staged
-          ? await this.gitService.runCommand(['diff', '--cached', '--', path])
-          : await this.gitService.runCommand(['diff', '--', path]);
-
-        return { ok: true, path, staged, diff: trimDiff(diff || '(empty diff)') };
-      }
-
-      if (toolName === 'stage_files') {
-        const paths = uniqueSorted(asStringArray(args.paths).map(path => path.trim()).filter(Boolean));
-        if (paths.length === 0) {
-          return { ok: false, error: 'No paths provided.' };
-        }
-
-        const rawStatus = await this.gitService.getStatusPorcelain();
-        const knownPaths = new Set(parseStatusPorcelain(rawStatus).map(entry => entry.path));
-        const invalid = paths.filter(path => !knownPaths.has(path));
-        if (invalid.length > 0) {
-          return { ok: false, error: `Unknown paths: ${invalid.join(', ')}` };
-        }
-
-        for (const path of paths) {
-          await this.gitService.runCommand(['add', '--', path]);
-        }
-
-        return { ok: true, staged: paths };
-      }
-
-      if (toolName === 'unstage_files') {
-        const paths = uniqueSorted(asStringArray(args.paths).map(path => path.trim()).filter(Boolean));
-        if (paths.length === 0) {
-          return { ok: false, error: 'No paths provided.' };
-        }
-
-        for (const path of paths) {
-          await this.gitService.runCommand(['reset', 'HEAD', '--', path]);
-        }
-
-        return { ok: true, unstaged: paths };
-      }
-
-      if (toolName === 'commit') {
-        const title = safeString(args.title).trim();
-        const description = safeString(args.description).trim();
-        const signoff = typeof args.signoff === 'boolean' ? args.signoff : settings.commitSignoffByDefault;
-
-        if (!title) {
-          return { ok: false, error: 'Commit title is required.' };
-        }
-
-        const rawStatus = await this.gitService.getStatusPorcelain();
-        const entries = parseStatusPorcelain(rawStatus);
-        const stagedCount = entries.filter(entry => entry.x !== ' ' && entry.x !== '?').length;
-
-        if (stagedCount === 0) {
-          return { ok: false, error: 'No staged files to commit.' };
-        }
-
-        const commitArgs = ['commit'];
-        if (signoff) {
-          commitArgs.push('--signoff');
-        }
-        commitArgs.push('-m', title);
-        if (description) {
-          commitArgs.push('-m', description);
-        }
-
-        await this.gitService.runCommand(commitArgs);
-
-        const hash = (await this.gitService.runCommand(['rev-parse', '--short', 'HEAD'])).trim();
-        const subject = (await this.gitService.runCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
-        commits.push({ hash, subject });
-
-        return { ok: true, hash, subject };
-      }
-
-      if (toolName === 'finish') {
-        return {
-          ok: true,
-          summary: safeString(args.summary, 'AI Auto-Commit finished.'),
-          commitsCreated: commits.length,
-        };
-      }
-
-      return { ok: false, error: `Unknown tool: ${toolName}` };
-    } catch (error: unknown) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown tool execution error',
-      };
-    }
+    return {
+      commits,
+      summary,
+      turns: modelTurns,
+      modeTransitions,
+      processedFiles,
+      remainingFiles,
+      commitPlanStats: {
+        groupCount: groups.length,
+        retries,
+        fallbackCommits,
+        totalCommits: commits.length,
+        totalFilesProcessed: processedFiles,
+      },
+      warnings,
+      diagnostics,
+    };
   }
 }
 
 export const aiService = new AiService(gitService);
-
-
-
-
-
-
-
-
-
-
-
-
-
 
