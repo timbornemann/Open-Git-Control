@@ -39,6 +39,8 @@ export type AppSidebarProps = {
   onCreateBranch: () => void;
   onCheckoutBranch: (name: string) => void;
   onSetBranchContextMenu: (value: BranchContextMenuState) => void;
+  isBranchPanelCollapsed: boolean;
+  onToggleBranchPanelCollapsed: () => void;
 
   tags: string[];
   onCreateTag: () => void;
@@ -54,6 +56,8 @@ export type AppSidebarProps = {
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;
+  isRemotePanelCollapsed: boolean;
+  onToggleRemotePanelCollapsed: () => void;
 
   hasRemoteOrigin: boolean | null;
   isConnectingGithubRepo: boolean;
@@ -114,5 +118,4 @@ export type AppSidebarProps = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
 };
-
 

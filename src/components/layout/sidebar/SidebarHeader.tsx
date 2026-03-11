@@ -1,6 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
+import { useI18n } from '../../../i18n';
 
 type SidebarHeaderProps = Pick<
   AppSidebarProps,
@@ -14,34 +15,38 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   onRefreshRemoteQuick,
   remoteSync,
   isGitActionRunning,
-}) => (
-  <div
-    className="sidebar-header"
-    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-  >
-    <span>{activeTab === 'repos' ? 'Repositories' : activeTab === 'github' ? 'GitHub' : 'Settings'}</span>
-    {activeTab === 'repos' && (
-      <div style={{ display: 'flex', gap: '2px' }}>
-        <button
-          className="icon-btn"
-          style={{ padding: '4px' }}
-          onClick={onOpenFolder}
-          title="Repository hinzufuegen"
-        >
-          <Plus size={16} />
-        </button>
-        {activeRepo && (
+}) => {
+  const { tr } = useI18n();
+
+  return (
+    <div
+      className="sidebar-header"
+      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+    >
+      <span>{activeTab === 'repos' ? tr('Repositories', 'Repositories') : activeTab === 'github' ? 'GitHub' : tr('Einstellungen', 'Settings')}</span>
+      {activeTab === 'repos' && (
+        <div style={{ display: 'flex', gap: '2px' }}>
           <button
             className="icon-btn"
             style={{ padding: '4px' }}
-            onClick={onRefreshRemoteQuick}
-            title="Remote aktualisieren"
-            disabled={remoteSync.isFetching || isGitActionRunning}
+            onClick={onOpenFolder}
+            title={tr('Repository hinzufügen', 'Add repository')}
           >
-            <RefreshCw size={14} />
+            <Plus size={16} />
           </button>
-        )}
-      </div>
-    )}
-  </div>
-);
+          {activeRepo && (
+            <button
+              className="icon-btn"
+              style={{ padding: '4px' }}
+              onClick={onRefreshRemoteQuick}
+              title={tr('Remote aktualisieren', 'Refresh remote')}
+              disabled={remoteSync.isFetching || isGitActionRunning}
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};

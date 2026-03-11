@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { ElectronAPI, PullRequestDto } from '../global';
+import { trByLanguage, type AppLanguage } from '../i18n';
 import { RepoOwnerRef } from '../types/git';
 
 type CreatePRInput = {
@@ -14,11 +15,12 @@ type Params = {
   activeRepo: string | null;
   isAuthenticated: boolean;
   refreshTrigger: number;
+  language: AppLanguage;
   onCreated?: (number: number) => void;
   onError?: (message: string) => void;
 };
 
-export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, onCreated, onError }: Params) => {
+export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
@@ -52,7 +54,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, o
       head,
       base,
       currentBranch,
-    });
+    }, language);
 
     if (result.success) {
       onCreated?.(result.number);
@@ -61,7 +63,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, o
 
     onError?.(result.error);
     return false;
-  }, [onCreated, onError, prOwnerRepo]);
+  }, [language, onCreated, onError, prOwnerRepo]);
 
   return {
     pullRequests,
@@ -124,9 +126,12 @@ export const submitPullRequest = async (
   electronAPI: ElectronAPI | undefined,
   prOwnerRepo: RepoOwnerRef | null,
   input: CreatePRInput,
+  language: AppLanguage,
 ): Promise<{ success: true; number: number } | { success: false; error: string }> => {
+  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+
   if (!electronAPI || !prOwnerRepo || !input.title.trim()) {
-    return { success: false, error: 'Fehler beim Erstellen des PR.' };
+    return { success: false, error: tr('Fehler beim Erstellen des PR.', 'Error creating PR.') };
   }
 
   try {
@@ -140,14 +145,14 @@ export const submitPullRequest = async (
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || 'Fehler beim Erstellen des PR.' };
+      return { success: false, error: result.error || tr('Fehler beim Erstellen des PR.', 'Error creating PR.') };
     }
 
     return { success: true, number: result.data.number };
   } catch (error: unknown) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Fehler beim Erstellen des PR.',
+      error: error instanceof Error ? error.message : tr('Fehler beim Erstellen des PR.', 'Error creating PR.'),
     };
   }
 };

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { GitBranch, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
@@ -7,6 +7,7 @@ import { StagingArea } from '../StagingArea';
 import { DiffViewer } from '../DiffViewer';
 import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
+import { useI18n } from '../../i18n';
 
 type RemoteStatus = {
   title: string;
@@ -57,6 +58,7 @@ export const MainView: React.FC<Props> = ({
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
+  const { tr } = useI18n();
 
   useEffect(() => {
     setActiveDiffRequest(null);
@@ -191,14 +193,14 @@ export const MainView: React.FC<Props> = ({
       <div className="content-area">
         <div className="pane" style={{ flex: 2.35 }}>
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{activeDiffRequest ? 'Diff Viewer' : 'Commit Graph'}</span>
+            <span>{activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph')}</span>
             {activeDiffRequest && (
               <button
                 className="icon-btn"
                 onClick={() => setActiveDiffRequest(null)}
                 style={{ fontSize: '0.75rem', padding: '2px 6px' }}
               >
-                Zurueck zum Graph
+                {tr('Zurück zum Graph', 'Back to graph')}
               </button>
             )}
           </div>
@@ -219,16 +221,16 @@ export const MainView: React.FC<Props> = ({
 
         <div className="pane">
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{selectedCommit ? 'Commit Inspector' : 'Working Directory'}</span>
+            <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : tr('Working Directory', 'Working Directory')}</span>
             {selectedCommit && (
               <div style={{ display: 'flex', gap: '6px' }}>
                 {commitHistoryStack.length > 0 && (
                   <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                    Zurueck
+                    {tr('Zurück', 'Back')}
                   </button>
                 )}
                 <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                  Schliessen
+                  {tr('Schließen', 'Close')}
                 </button>
               </div>
             )}

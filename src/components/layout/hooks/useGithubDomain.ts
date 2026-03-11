@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '../../../global';
+import { trByLanguage, type AppLanguage } from '../../../i18n';
 
 type Params = {
   onRepoCloned: (repoPath: string) => Promise<void>;
   setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
+  language: AppLanguage;
 };
 
 export const useGithubDomain = ({
   onRepoCloned,
   setActiveTab,
+  language,
 }: Params) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubUser, setGithubUser] = useState<string | null>(null);
@@ -31,7 +34,7 @@ export const useGithubDomain = ({
   const [cloneFinished, setCloneFinished] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
 
-
+  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {
@@ -106,10 +109,10 @@ export const useGithubDomain = ({
         const result = await window.electronAPI.githubGetRepos();
         if (result.success) setGithubRepos(result.data || []);
       } else {
-        setAuthError('Token ungueltig. Bitte pruefe die Berechtigungen.');
+        setAuthError(tr('Token ungültig. Bitte prüfe die Berechtigungen.', 'Invalid token. Please check permissions.'));
       }
     } catch {
-      setAuthError('Fehler bei der Authentifizierung.');
+      setAuthError(tr('Fehler bei der Authentifizierung.', 'Authentication error.'));
     } finally {
       setIsAuthenticating(false);
     }
@@ -124,7 +127,7 @@ export const useGithubDomain = ({
         const pollResult = await window.electronAPI.githubDevicePoll(deviceCode);
         if (!pollResult.success) {
           setIsDeviceFlowRunning(false);
-          setDeviceFlowError(pollResult.error || 'Device Flow Polling fehlgeschlagen.');
+          setDeviceFlowError(pollResult.error || tr('Device Flow Polling fehlgeschlagen.', 'Device flow polling failed.'));
           return;
         }
 
@@ -136,7 +139,7 @@ export const useGithubDomain = ({
 
         if (data.status === 'error') {
           setIsDeviceFlowRunning(false);
-          setDeviceFlowError(data.errorDescription || data.error || 'Device Flow fehlgeschlagen.');
+          setDeviceFlowError(data.errorDescription || data.error || tr('Device Flow fehlgeschlagen.', 'Device flow failed.'));
           return;
         }
 
@@ -152,7 +155,7 @@ export const useGithubDomain = ({
         }
       } catch (error: any) {
         setIsDeviceFlowRunning(false);
-        setDeviceFlowError(error?.message || 'Device Flow Polling fehlgeschlagen.');
+        setDeviceFlowError(error?.message || tr('Device Flow Polling fehlgeschlagen.', 'Device flow polling failed.'));
       }
     }, Math.max(2, intervalSeconds) * 1000);
   };
@@ -166,7 +169,7 @@ export const useGithubDomain = ({
 
     const startResult = await window.electronAPI.githubDeviceStart();
     if (!startResult.success) {
-      setDeviceFlowError(startResult.error || 'Device Flow konnte nicht gestartet werden.');
+      setDeviceFlowError(startResult.error || tr('Device Flow konnte nicht gestartet werden.', 'Could not start device flow.'));
       return;
     }
 
@@ -223,21 +226,20 @@ export const useGithubDomain = ({
       cleanup();
       if (result.success) {
         setCloneFinished(true);
-        setCloneLog(prev => [...prev, `Repository erfolgreich geklont nach: ${result.repoPath}`]);
+        setCloneLog(prev => [...prev, `SUCCESS: ${tr('Repository erfolgreich geklont nach', 'Repository cloned successfully to')}: ${result.repoPath}`]);
         await onRepoCloned(result.repoPath);
         setActiveTab('repos');
       } else {
-        setCloneError(result.error || 'Unbekannter Fehler');
-        setCloneLog(prev => [...prev, `Fehler: ${result.error}`]);
+        const errorMessage = result.error || tr('Unbekannter Fehler', 'Unknown error');
+        setCloneError(errorMessage);
+        setCloneLog(prev => [...prev, `ERROR: ${errorMessage}`]);
       }
     } catch (e: any) {
       cleanup();
       setCloneError(e.message);
-      setCloneLog(prev => [...prev, `Fehler: ${e.message}`]);
+      setCloneLog(prev => [...prev, `ERROR: ${e.message}`]);
     }
   };
-
-
 
   return {
     isAuthenticated,
@@ -267,6 +269,5 @@ export const useGithubDomain = ({
     cloneFinished,
     cloneError,
     handleClone,
-
   };
 };

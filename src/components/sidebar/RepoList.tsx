@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 type Props = {
   openRepos: string[];
@@ -21,6 +22,7 @@ export const RepoList: React.FC<Props> = ({
   onTogglePin,
 }) => {
   const [query, setQuery] = useState('');
+  const { tr, locale } = useI18n();
 
   const filteredRepos = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -39,7 +41,7 @@ export const RepoList: React.FC<Props> = ({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Repository suchen..."
+            placeholder={tr('Repository suchen...', 'Search repository...')}
             style={{ width: '100%', boxSizing: 'border-box', padding: '7px 8px 7px 28px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
           />
         </div>
@@ -74,9 +76,9 @@ export const RepoList: React.FC<Props> = ({
                   {name}
                 </span>
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-                  {new Date(lastOpened).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                  {new Date(lastOpened).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}
                   {' '}
-                  {new Date(lastOpened).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(lastOpened).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
 
@@ -87,12 +89,12 @@ export const RepoList: React.FC<Props> = ({
                 }}
                 className="icon-btn"
                 style={{ padding: '2px', opacity: isPinned ? 1 : 0.7, color: isPinned ? '#d2a922' : 'var(--text-secondary)' }}
-                title={isPinned ? 'Favorit entfernen' : 'Als Favorit markieren'}
+                title={isPinned ? tr('Favorit entfernen', 'Remove favorite') : tr('Als Favorit markieren', 'Mark as favorite')}
               >
                 {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
               </button>
 
-              <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title="Entfernen">
+              <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Entfernen', 'Remove')}>
                 <X size={12} />
               </button>
             </div>
@@ -101,16 +103,16 @@ export const RepoList: React.FC<Props> = ({
 
         {openRepos.length > 0 && filteredRepos.length === 0 && (
           <div style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-            Keine Treffer fuer "{query}".
+            {tr(`Keine Treffer für "${query}".`, `No matches for "${query}".`)}
           </div>
         )}
 
         {openRepos.length === 0 && (
           <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
-            Kein Repository geoeffnet.
+            {tr('Kein Repository geöffnet.', 'No repository opened.')}
             <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-              Repository oeffnen
+              {tr('Repository öffnen', 'Open repository')}
             </button>
           </div>
         )}

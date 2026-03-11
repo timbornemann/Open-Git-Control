@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { CommitFileDetail, parseCommitDetails } from '../utils/gitParsing';
 import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
 import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
+import { useI18n } from '../i18n';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -34,6 +35,8 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [blameError, setBlameError] = useState<string | null>(null);
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
 
+  const { tr, locale } = useI18n();
+
   useEffect(() => {
     if (!normalizedHash || !window.electronAPI) return;
 
@@ -60,7 +63,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
         const detailResult = await window.electronAPI.runGitCommand('commitDetails', normalizedHash);
         if (!detailResult.success) {
           setFiles([]);
-          setFilesError(detailResult.error || 'Commit-Details konnten nicht geladen werden.');
+          setFilesError(detailResult.error || tr('Commit-Details konnten nicht geladen werden.', 'Could not load commit details.'));
           return;
         }
 
@@ -76,7 +79,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
             const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
             if (mergedBranchFiles.length > 0) {
               setFiles(mergedBranchFiles);
-              setFilesSourceHint('Dateien zeigen die effektiven Aenderungen aus dem gemergten Branch (gegen Parent 1).');
+              setFilesSourceHint(tr('Dateien zeigen die effektiven Änderungen aus dem gemergten Branch (gegen Parent 1).', 'Files show the effective changes from the merged branch (against parent 1).'));
               return;
             }
           }
@@ -86,14 +89,14 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       } catch (fetchError) {
         console.error(fetchError);
         setFiles([]);
-        setFilesError('Commit-Details konnten nicht geladen werden.');
+        setFilesError(tr('Commit-Details konnten nicht geladen werden.', 'Could not load commit details.'));
       } finally {
         setLoadingFiles(false);
       }
     };
 
     fetchDetails();
-  }, [normalizedHash]);
+  }, [normalizedHash, tr]);
 
   const selectedFile = useMemo(
     () => files.find(file => file.path === selectedFilePath) ?? null,
@@ -115,19 +118,19 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           setHistoryEntries(result.data || []);
         } else {
           setHistoryEntries([]);
-          setHistoryError(result.error || 'Datei-Historie konnte nicht geladen werden.');
+          setHistoryError(result.error || tr('Datei-Historie konnte nicht geladen werden.', 'Could not load file history.'));
         }
       } catch (fetchError) {
         console.error(fetchError);
         setHistoryEntries([]);
-        setHistoryError('Datei-Historie konnte nicht geladen werden.');
+        setHistoryError(tr('Datei-Historie konnte nicht geladen werden.', 'Could not load file history.'));
       } finally {
         setHistoryLoading(false);
       }
     };
 
     fetchHistory();
-  }, [activeTab, normalizedHash, selectedFile]);
+  }, [activeTab, normalizedHash, selectedFile, tr]);
 
   useEffect(() => {
     if (!selectedFile || !window.electronAPI) return;
@@ -137,7 +140,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
 
       if (isDeletedFile) {
         setBlameLines([]);
-        setBlameError('Blame ist fuer geloeschte Dateien in diesem Commit nicht verfuegbar.');
+        setBlameError(tr('Blame ist für gelöschte Dateien in diesem Commit nicht verfügbar.', 'Blame is not available for deleted files in this commit.'));
         return;
       }
 
@@ -149,19 +152,19 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           setBlameLines(result.data || []);
         } else {
           setBlameLines([]);
-          setBlameError(result.error || 'Blame-Daten konnten nicht geladen werden.');
+          setBlameError(result.error || tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
         }
       } catch (fetchError) {
         console.error(fetchError);
         setBlameLines([]);
-        setBlameError('Blame-Daten konnten nicht geladen werden.');
+        setBlameError(tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
       } finally {
         setBlameLoading(false);
       }
     };
 
     fetchBlame();
-  }, [activeTab, normalizedHash, isDeletedFile, selectedFile]);
+  }, [activeTab, normalizedHash, isDeletedFile, selectedFile, tr]);
 
   useEffect(() => {
     if (!selectedFile || activeTab !== 'patch' || !normalizedHash) return;
@@ -170,9 +173,9 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       source: 'commit',
       path: selectedFile.path,
       commitHash: normalizedHash,
-      title: `Commit Diff ${normalizedHash.slice(0, 8)}`,
+      title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`),
     });
-  }, [activeTab, normalizedHash, onOpenDiff, selectedFile]);
+  }, [activeTab, normalizedHash, onOpenDiff, selectedFile, tr]);
 
   const getIconForStatus = (status: string) => {
     switch (status[0]) {
@@ -191,7 +194,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     if (!dateString) return '-';
     const parsed = new Date(dateString);
     if (Number.isNaN(parsed.getTime())) return dateString;
-    return parsed.toLocaleString('de-DE', {
+    return parsed.toLocaleString(locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -212,18 +215,18 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     const hour = 60 * minute;
     const day = 24 * hour;
 
-    if (absMs < minute) return 'gerade eben';
-    if (absMs < hour) return 'vor ' + Math.max(1, Math.round(absMs / minute)) + ' Min';
-    if (absMs < day) return 'vor ' + Math.max(1, Math.round(absMs / hour)) + ' Std';
+    if (absMs < minute) return tr('gerade eben', 'just now');
+    if (absMs < hour) return tr('vor ' + Math.max(1, Math.round(absMs / minute)) + ' Min', Math.max(1, Math.round(absMs / minute)) + ' min ago');
+    if (absMs < day) return tr('vor ' + Math.max(1, Math.round(absMs / hour)) + ' Std', Math.max(1, Math.round(absMs / hour)) + ' h ago');
     const days = Math.max(1, Math.round(absMs / day));
-    return 'vor ' + days + ' Tag' + (days === 1 ? '' : 'en');
+    return tr('vor ' + days + ' Tag' + (days === 1 ? '' : 'en'), days + ' day' + (days === 1 ? '' : 's') + ' ago');
   };
 
   const formatBlameDate = (dateString: string) => {
     if (!dateString) return '-';
     const parsed = new Date(dateString);
     if (Number.isNaN(parsed.getTime())) return dateString;
-    return parsed.toLocaleDateString('de-DE', {
+    return parsed.toLocaleDateString(locale, {
       year: '2-digit',
       month: '2-digit',
       day: '2-digit',
@@ -234,21 +237,21 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     <div className="commit-details-panel" style={{ padding: '12px', height: '100%', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
         <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>
-          Commit Details: {normalizedHash ? normalizedHash.substring(0, 8) : 'ungueltig'}
+          {tr('Commit Details', 'Commit details')}: {normalizedHash ? normalizedHash.substring(0, 8) : tr('ungültig', 'invalid')}
         </h4>
         {selectedFile && (
           <button className="icon-btn" onClick={() => setSelectedFilePath(null)} style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
-            Dateien
+            {tr('Dateien', 'Files')}
           </button>
         )}
       </div>
 
       {!normalizedHash ? (
         <div style={{ color: '#f87171', fontSize: '0.84rem', border: '1px solid rgba(248,81,73,0.35)', borderRadius: 6, padding: '8px 10px' }}>
-          Ungueltige Commit-ID.
+          {tr('Ungültige Commit-ID.', 'Invalid commit ID.')}
         </div>
       ) : loadingFiles ? (
-        <p style={{ color: 'var(--text-secondary)' }}>Lade Details...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>{tr('Lade Details...', 'Loading details...')}</p>
       ) : filesError ? (
         <div style={{ color: '#f87171', fontSize: '0.84rem', border: '1px solid rgba(248,81,73,0.35)', borderRadius: 6, padding: '8px 10px' }}>
           {filesError}
@@ -273,13 +276,13 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           ))}
           {files.length === 0 && (
             <span style={{ color: 'var(--text-secondary)' }}>
-              {isMergeCommit ? 'Keine effektiven Dateiaenderungen gegen Parent 1 gefunden.' : 'Keine Dateien geaendert.'}
+              {isMergeCommit ? tr('Keine effektiven Dateiänderungen gegen Parent 1 gefunden.', 'No effective file changes against parent 1 found.') : tr('Keine Dateien geändert.', 'No files changed.')}
             </span>
           )}
         </ul>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Datei</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{tr('Datei', 'File')}</div>
           <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
             {selectedFile.path}
           </div>
@@ -291,7 +294,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
                 onClick={() => setActiveTab(tab)}
                 style={{ fontSize: '0.78rem', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-color)', backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)', color: activeTab === tab ? '#ffffff' : 'var(--text-primary)', cursor: 'pointer' }}
               >
-                {tab === 'history' ? 'History' : tab === 'blame' ? 'Blame' : 'Patch'}
+                {tab === 'history' ? tr('Historie', 'History') : tab === 'blame' ? 'Blame' : 'Patch'}
               </button>
             ))}
           </div>
@@ -299,12 +302,12 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {activeTab === 'history' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                Verlauf dieser Datei. Klick auf einen Eintrag oeffnet den kompletten Commit rechts.
+                {tr('Verlauf dieser Datei. Klick auf einen Eintrag öffnet den kompletten Commit rechts.', 'History of this file. Click an entry to open the full commit on the right.')}
               </span>
-              {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Lade History...</span>}
+              {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Lade Historie...', 'Loading history...')}</span>}
               {historyError && <span style={{ color: '#f87171', fontSize: '0.82rem' }}>{historyError}</span>}
               {!historyLoading && !historyError && historyEntries.length === 0 && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Keine Historie gefunden.</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Keine Historie gefunden.', 'No history found.')}</span>
               )}
               {!historyLoading && !historyError && historyEntries.map(entry => {
                 const normalizedEntryHash = (entry.hash.match(/[0-9a-f]{7,40}/i) || [''])[0];
@@ -318,16 +321,16 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        {entry.abbrevHash || (normalizedEntryHash ? normalizedEntryHash.slice(0, 8) : 'ungueltig')}
+                        {entry.abbrevHash || (normalizedEntryHash ? normalizedEntryHash.slice(0, 8) : tr('ungültig', 'invalid'))}
                       </span>
                       {isCurrentCommit && (
                         <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 999, backgroundColor: 'rgba(31,111,235,0.25)', color: '#7cb8ff' }}>
-                          Aktuell
+                          {tr('Aktuell', 'Current')}
                         </span>
                       )}
                     </div>
                     <span style={{ fontSize: '0.84rem', color: entry.subject ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                      {entry.subject || '(ohne Nachricht)'}
+                      {entry.subject || tr('(ohne Nachricht)', '(no message)')}
                     </span>
                     <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
                       {entry.author || '-'} | {formatDate(entry.date)} | {formatRelativeDate(entry.date)}
@@ -341,17 +344,17 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {activeTab === 'blame' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                Blame zeigt pro Zeile, aus welchem Commit sie zuletzt stammt.
+                {tr('Blame zeigt pro Zeile, aus welchem Commit sie zuletzt stammt.', 'Blame shows for each line which commit last touched it.')}
               </span>
-              {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Lade Blame...</span>}
+              {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Lade Blame...', 'Loading blame...')}</span>}
               {blameError && <span style={{ color: '#f87171', fontSize: '0.82rem' }}>{blameError}</span>}
               {!blameLoading && !blameError && blameLines.length === 0 && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Keine Blame-Daten gefunden.</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Keine Blame-Daten gefunden.', 'No blame data found.')}</span>
               )}
               {!blameLoading && !blameError && (
                 <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '56px 80px 120px 60px 1fr', gap: '8px', padding: '6px 8px', borderBottom: '1px solid var(--border-color)', backgroundColor: 'rgba(255, 255, 255, 0.03)', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    <span>Zeile</span><span>Commit</span><span>Autor</span><span>Datum</span><span>Inhalt</span>
+                    <span>{tr('Zeile', 'Line')}</span><span>{tr('Commit', 'Commit')}</span><span>{tr('Autor', 'Author')}</span><span>{tr('Datum', 'Date')}</span><span>{tr('Inhalt', 'Content')}</span>
                   </div>
                   <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
                     {blameLines.map((line, index) => (
@@ -383,13 +386,13 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {activeTab === 'patch' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                Diff im Hauptfenster geoeffnet. Nutze dort Unified/Side-by-Side und Hunk-Navigation.
+                {tr('Diff im Hauptfenster geöffnet. Nutze dort Unified/Side-by-Side und Hunk-Navigation.', 'Diff opened in the main window. Use Unified/Side-by-Side and hunk navigation there.')}
               </span>
               <button
                 className="staging-tool-btn"
-                onClick={() => onOpenDiff?.({ source: 'commit', path: selectedFile.path, commitHash: normalizedHash, title: `Commit Diff ${normalizedHash.slice(0, 8)}` })}
+                onClick={() => onOpenDiff?.({ source: 'commit', path: selectedFile.path, commitHash: normalizedHash, title: tr(`Commit Diff ${normalizedHash.slice(0, 8)}`, `Commit diff ${normalizedHash.slice(0, 8)}`) })}
               >
-                Diff erneut im Hauptfenster anzeigen
+                {tr('Diff erneut im Hauptfenster anzeigen', 'Show diff again in main window')}
               </button>
             </div>
           )}

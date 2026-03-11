@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { Confirm, DialogContextItem } from './Confirm';
+import { useI18n } from '../i18n';
 
 interface DangerConfirmProps {
   open: boolean;
@@ -25,18 +26,22 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
   cancelLabel,
   onConfirm,
   onCancel,
-}) => (
-  <Confirm
-    open={open}
-    title={title}
-    message={message}
-    contextItems={contextItems}
-    irreversible={irreversible}
-    consequences={consequences}
-    confirmLabel={confirmLabel ?? 'Trotzdem ausfuehren'}
-    cancelLabel={cancelLabel}
-    onConfirm={onConfirm}
-    onCancel={onCancel}
-    confirmVariant="danger"
-  />
-);
+}) => {
+  const { tr } = useI18n();
+
+  return (
+    <Confirm
+      open={open}
+      title={title}
+      message={message}
+      contextItems={contextItems}
+      irreversible={irreversible}
+      consequences={consequences}
+      confirmLabel={confirmLabel ?? tr('Trotzdem ausführen', 'Run anyway')}
+      cancelLabel={cancelLabel}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      confirmVariant="danger"
+    />
+  );
+};

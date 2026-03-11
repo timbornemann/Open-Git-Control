@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { AppSidebarProps } from './AppSidebar.types';
+import { useI18n } from '../../../i18n';
 
 type SettingsSidebarContentProps = Pick<
   AppSidebarProps,
@@ -18,6 +19,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
+  const { tr, locale } = useI18n();
 
   const selectedModel = settings.aiProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel;
 
@@ -42,13 +44,13 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     try {
       const result = await window.electronAPI.aiTestConnection();
       if (!result.success) {
-        setAiStatus(`Verbindung fehlgeschlagen: ${result.error}`);
+        setAiStatus(tr(`Verbindung fehlgeschlagen: ${result.error}`, `Connection failed: ${result.error}`));
         return;
       }
 
-      setAiStatus(`Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`);
+      setAiStatus(tr(`Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`, `Connected: ${result.data.provider} / ${result.data.model} (${result.data.detail})`));
     } catch (error: unknown) {
-      setAiStatus(error instanceof Error ? error.message : 'Verbindung fehlgeschlagen.');
+      setAiStatus(error instanceof Error ? error.message : tr('Verbindung fehlgeschlagen.', 'Connection failed.'));
     } finally {
       setIsTestingAi(false);
     }
@@ -62,7 +64,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     try {
       const result = await window.electronAPI.aiListModels();
       if (!result.success) {
-        setAiStatus(`Modelle konnten nicht geladen werden: ${result.error}`);
+        setAiStatus(tr(`Modelle konnten nicht geladen werden: ${result.error}`, `Could not load models: ${result.error}`));
         return;
       }
 
@@ -70,9 +72,9 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       if (!selectedModel && result.data.length > 0) {
         await setSelectedModel(result.data[0]);
       }
-      setAiStatus(`${result.data.length} Modell(e) geladen.`);
+      setAiStatus(tr(`${result.data.length} Modell(e) geladen.`, `${result.data.length} model(s) loaded.`));
     } catch (error: unknown) {
-      setAiStatus(error instanceof Error ? error.message : 'Modelle konnten nicht geladen werden.');
+      setAiStatus(error instanceof Error ? error.message : tr('Modelle konnten nicht geladen werden.', 'Could not load models.'));
     } finally {
       setIsLoadingModels(false);
     }
@@ -81,10 +83,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Allgemein</div>
+        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{tr('Allgemein', 'General')}</div>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Theme
+          {tr('Theme', 'Theme')}
           <select
             value={settings.theme}
             onChange={(e) => onUpdateSettings({ theme: e.target.value as 'dark' | 'light' })}
@@ -96,7 +98,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Sprache
+          {tr('Sprache', 'Language')}
           <select
             value={settings.language}
             onChange={(e) => onUpdateSettings({ language: e.target.value as 'de' | 'en' })}
@@ -108,7 +110,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Auto-Fetch Intervall (Sekunden)
+          {tr('Auto-Fetch Intervall (Sekunden)', 'Auto-fetch interval (seconds)')}
           <input
             type="number"
             min={10}
@@ -123,7 +125,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Default Branch
+          {tr('Default Branch', 'Default branch')}
           <input
             type="text"
             value={settings.defaultBranch}
@@ -138,7 +140,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.confirmDangerousOps}
             onChange={(e) => onUpdateSettings({ confirmDangerousOps: e.target.checked })}
           />
-          Gefaehrliche Git-Operationen bestaetigen
+          {tr('Gefährliche Git-Operationen bestätigen', 'Confirm dangerous Git operations')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -147,7 +149,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
-          Sekundaere Historie anzeigen (alle Branches)
+          {tr('Sekundäre Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -156,11 +158,11 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.commitSignoffByDefault}
             onChange={(e) => onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
           />
-          Commit Signoff standardmaessig aktiv
+          {tr('Commit Signoff standardmäßig aktiv', 'Enable commit signoff by default')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Commit Template
+          {tr('Commit Template', 'Commit template')}
           <textarea
             rows={4}
             value={settings.commitTemplate}
@@ -171,7 +173,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       </div>
 
       <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>KI Auto-Commit</div>
+        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{tr('KI Auto-Commit', 'AI Auto-Commit')}</div>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
@@ -179,11 +181,11 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.aiAutoCommitEnabled}
             onChange={(e) => onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
           />
-          Feature aktivieren
+          {tr('Feature aktivieren', 'Enable feature')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Provider
+          {tr('Provider', 'Provider')}
           <select
             value={settings.aiProvider}
             onChange={(e) => onUpdateSettings({ aiProvider: e.target.value as 'ollama' | 'gemini' })}
@@ -215,7 +217,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
                 type="password"
                 value={geminiApiKeyInput}
                 onChange={(e) => setGeminiApiKeyInput(e.target.value)}
-                placeholder={settings.hasGeminiApiKey ? 'Bereits gespeichert (neu eingeben zum Ersetzen)' : 'AIza...'}
+                placeholder={settings.hasGeminiApiKey ? tr('Bereits gespeichert (neu eingeben zum Ersetzen)', 'Already saved (enter again to replace)') : 'AIza...'}
                 style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
               />
             </label>
@@ -229,7 +231,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
                   await onUpdateSettings({});
                 }}
               >
-                API Key speichern
+                {tr('API Key speichern', 'Save API key')}
               </button>
               <button
                 className="staging-tool-btn"
@@ -241,23 +243,23 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
                 }}
                 disabled={!settings.hasGeminiApiKey}
               >
-                API Key entfernen
+                {tr('API Key entfernen', 'Remove API key')}
               </button>
             </div>
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-              Status: {settings.hasGeminiApiKey ? 'gespeichert' : 'nicht gespeichert'}
+              {tr('Status', 'Status')}: {settings.hasGeminiApiKey ? tr('gespeichert', 'saved') : tr('nicht gespeichert', 'not saved')}
             </div>
           </div>
         )}
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          Modell
+          {tr('Modell', 'Model')}
           <input
             list="ai-model-list"
             type="text"
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            placeholder={settings.aiProvider === 'gemini' ? 'z.B. gemini-3-flash-preview' : 'z.B. llama3.1:8b'}
+            placeholder={settings.aiProvider === 'gemini' ? tr('z.B. gemini-3-flash-preview', 'e.g. gemini-3-flash-preview') : tr('z.B. llama3.1:8b', 'e.g. llama3.1:8b')}
             style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
           />
           <datalist id="ai-model-list">
@@ -269,10 +271,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
-            {isTestingAi ? 'Teste...' : 'Verbindung testen'}
+            {isTestingAi ? tr('Teste...', 'Testing...') : tr('Verbindung testen', 'Test connection')}
           </button>
           <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
-            {isLoadingModels ? 'Lade Modelle...' : 'Modelle laden'}
+            {isLoadingModels ? tr('Lade Modelle...', 'Loading models...') : tr('Modelle laden', 'Load models')}
           </button>
         </div>
 
@@ -285,12 +287,12 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
       <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Job Center</div>
-          <button className="staging-tool-btn" onClick={onClearJobs}>Leeren</button>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{tr('Job Center', 'Job center')}</div>
+          <button className="staging-tool-btn" onClick={onClearJobs}>{tr('Leeren', 'Clear')}</button>
         </div>
 
         {sortedJobs.length === 0 && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Keine Jobs vorhanden.</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{tr('Keine Jobs vorhanden.', 'No jobs available.')}</div>
         )}
 
         {sortedJobs.map((job) => (
@@ -305,7 +307,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
               </div>
             )}
             <div style={{ marginTop: '4px', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-              {new Date(job.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {new Date(job.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
           </div>
         ))}

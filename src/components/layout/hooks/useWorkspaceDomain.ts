@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState } from '../layoutTypes';
 
 type Params = {
@@ -7,6 +8,7 @@ type Params = {
   setGitActionToast: (toast: { msg: string; isError: boolean }) => void;
   onRepoActivated: () => void;
   onNoActiveRepo: () => void;
+  language: AppLanguage;
 };
 
 type RepoMetaEntry = {
@@ -20,12 +22,15 @@ export const useWorkspaceDomain = ({
   setGitActionToast,
   onRepoActivated,
   onNoActiveRepo,
+  language,
 }: Params) => {
   const [activeTab, setActiveTab] = useState<'repos' | 'github' | 'settings'>('repos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
   const [reposLoaded, setReposLoaded] = useState(false);
+
+  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
   const sortedOpenRepos = useMemo(() => {
     const withMeta = openRepos.map((path) => ({
@@ -168,15 +173,15 @@ export const useWorkspaceDomain = ({
       } else if (result && !result.isRepo) {
         setConfirmDialog({
           variant: 'confirm',
-          title: 'Git-Repository initialisieren?',
-          message: 'Das ausgewaehlte Verzeichnis ist noch kein Git-Repository.',
+          title: tr('Git-Repository initialisieren?', 'Initialize Git repository?'),
+          message: tr('Das ausgewählte Verzeichnis ist noch kein Git-Repository.', 'The selected directory is not a Git repository yet.'),
           contextItems: [
-            { label: 'Pfad', value: result.path },
-            { label: 'Aktion', value: 'git init' },
+            { label: tr('Pfad', 'Path'), value: result.path },
+            { label: tr('Aktion', 'Action'), value: 'git init' },
           ],
           irreversible: false,
-          consequences: 'Es wird ein .git-Verzeichnis angelegt und das Verzeichnis als Repository vorbereitet.',
-          confirmLabel: 'Repository initialisieren',
+          consequences: tr('Es wird ein .git-Verzeichnis angelegt und das Verzeichnis als Repository vorbereitet.', 'A .git directory will be created and the folder prepared as repository.'),
+          confirmLabel: tr('Repository initialisieren', 'Initialize repository'),
           onConfirm: async () => {
             const initResult = await window.electronAPI.gitInit(result.path);
             if (initResult.success) {
@@ -184,10 +189,10 @@ export const useWorkspaceDomain = ({
               await window.electronAPI.setRepoPath(result.path);
               setActiveRepo(result.path);
               onRepoActivated();
-              setGitActionToast({ msg: 'Neues Git-Repository initialisiert.', isError: false });
+              setGitActionToast({ msg: tr('Neues Git-Repository initialisiert.', 'Initialized new Git repository.'), isError: false });
               triggerRefresh();
             } else {
-              setGitActionToast({ msg: initResult.error || 'Fehler bei git init.', isError: true });
+              setGitActionToast({ msg: initResult.error || tr('Fehler bei git init.', 'Error during git init.'), isError: true });
             }
           },
         });

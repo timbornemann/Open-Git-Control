@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Columns, FileWarning, LayoutList, X } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
+import { useI18n } from '../i18n';
 
 type DiffViewMode = 'unified' | 'side-by-side';
 type ParsedLineType = 'context' | 'add' | 'del';
@@ -176,12 +177,6 @@ const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
   return output;
 };
 
-const readableSourceLabel = (request: DiffRequest): string => {
-  if (request.source === 'staged') return 'Staging Area';
-  if (request.source === 'unstaged') return 'Working Tree';
-  return `Commit ${toShortHash(request.commitHash)}`;
-};
-
 export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +184,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const { tr } = useI18n();
+
+  const readableSourceLabel = (currentRequest: DiffRequest): string => {
+    if (currentRequest.source === 'staged') return tr('Staging Area', 'Staging Area');
+    if (currentRequest.source === 'unstaged') return tr('Working Tree', 'Working Tree');
+    return tr(`Commit ${toShortHash(currentRequest.commitHash)}`, `Commit ${toShortHash(currentRequest.commitHash)}`);
+  };
 
   useEffect(() => {
     const fetchDiff = async () => {
@@ -210,21 +212,21 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         }
 
         if (!result.success) {
-          setError(result.error || 'Diff konnte nicht geladen werden.');
+          setError(result.error || tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
           return;
         }
 
         setDiffText(String(result.data || ''));
       } catch (fetchError: unknown) {
         console.error(fetchError);
-        setError('Diff konnte nicht geladen werden.');
+        setError(tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDiff();
-  }, [repoPath, request]);
+  }, [repoPath, request, tr]);
 
   const extension = useMemo(() => getExtension(request.path), [request.path]);
   const looksBinaryByExt = useMemo(() => BINARY_EXTENSIONS.has(extension), [extension]);
@@ -336,18 +338,18 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
             <button
               className={`diff-toggle-btn ${viewMode === 'unified' ? 'active' : ''}`}
               onClick={() => setViewMode('unified')}
-              title="Unified Diff"
+              title={tr('Unified Diff', 'Unified diff')}
               disabled={!canRenderText}
             >
-              <LayoutList size={14} /> Unified
+              <LayoutList size={14} /> {tr('Unified', 'Unified')}
             </button>
             <button
               className={`diff-toggle-btn ${viewMode === 'side-by-side' ? 'active' : ''}`}
               onClick={() => setViewMode('side-by-side')}
-              title="Side-by-Side Diff"
+              title={tr('Side-by-Side Diff', 'Side-by-side diff')}
               disabled={!canRenderText}
             >
-              <Columns size={14} /> Side-by-Side
+              <Columns size={14} /> {tr('Side-by-Side', 'Side-by-side')}
             </button>
           </div>
 
@@ -355,29 +357,29 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
             <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
               <ChevronLeft size={14} />
             </button>
-            <span className="diff-nav-label">Hunk {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}</span>
+            <span className="diff-nav-label">{tr('Hunk', 'Hunk')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}</span>
             <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex + 1)} disabled={hunkCount === 0}>
               <ChevronRight size={14} />
             </button>
           </div>
 
-          <button className="diff-close-btn" onClick={onClose} title="Diff schliessen">
+          <button className="diff-close-btn" onClick={onClose} title={tr('Diff schließen', 'Close diff')}>
             <X size={14} />
           </button>
         </div>
       </div>
 
-      {isLoading && <div className="diff-empty-state">Diff wird geladen...</div>}
+      {isLoading && <div className="diff-empty-state">{tr('Diff wird geladen...', 'Loading diff...')}</div>}
       {error && !isLoading && <div className="diff-empty-state error">{error}</div>}
-      {!isLoading && !error && !diffText.trim() && <div className="diff-empty-state">Keine Unterschiede vorhanden.</div>}
+      {!isLoading && !error && !diffText.trim() && <div className="diff-empty-state">{tr('Keine Unterschiede vorhanden.', 'No differences found.')}</div>}
 
       {!isLoading && !error && diffText.trim() && !canRenderText && (
         <div className="diff-empty-state warning">
           <FileWarning size={18} />
           <span>
             {isBinaryDiff || looksBinaryByExt
-              ? 'Binardatei erkannt. Text-Diff wird nicht dargestellt.'
-              : 'Diese Datei kann nicht als Text-Diff dargestellt werden.'}
+              ? tr('Binärdatei erkannt. Text-Diff wird nicht dargestellt.', 'Binary file detected. Text diff is not shown.')
+              : tr('Diese Datei kann nicht als Text-Diff dargestellt werden.', 'This file cannot be shown as text diff.')}
           </span>
         </div>
       )}
@@ -386,7 +388,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         <div className="diff-content-scroll">
           {isTooLarge && (
             <div className="diff-large-warning">
-              Grosser Diff erkannt. Anzeige wurde aus Performance-Gruenden gekuerzt.
+              {tr('Großer Diff erkannt. Anzeige wurde aus Performance-Gründen gekürzt.', 'Large diff detected. Output was truncated for performance.')}
             </div>
           )}
 
@@ -399,7 +401,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
           )}
 
           {parsed.hunks.length === 0 && (
-            <div className="diff-empty-state">Keine Hunk-Daten verfuegbar.</div>
+            <div className="diff-empty-state">{tr('Keine Hunk-Daten verfügbar.', 'No hunk data available.')}</div>
           )}
 
           {parsed.hunks.map((hunk, hunkIndex) => {
@@ -436,4 +438,3 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     </div>
   );
 };
-

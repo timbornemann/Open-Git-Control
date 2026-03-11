@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo } from 'react';
 import { ChevronDown, ChevronRight, GitBranch, Plus } from 'lucide-react';
 import { BranchInfo } from '../../types/git';
+import { useI18n } from '../../i18n';
 
 type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
@@ -14,6 +15,8 @@ type Props = {
   onCreateBranch: () => void;
   onCheckoutBranch: (name: string) => void;
   onSetBranchContextMenu: (value: ContextMenuState) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 };
 
 export const BranchPanel: React.FC<Props> = ({
@@ -26,8 +29,10 @@ export const BranchPanel: React.FC<Props> = ({
   onCreateBranch,
   onCheckoutBranch,
   onSetBranchContextMenu,
+  collapsed,
+  onToggleCollapsed,
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const { tr } = useI18n();
 
   const { localBranches, remoteBranches } = useMemo(() => {
     const locals = branches
@@ -74,16 +79,16 @@ export const BranchPanel: React.FC<Props> = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 6px' }}>
         <button
           className="icon-btn"
-          onClick={() => setCollapsed(previous => !previous)}
+          onClick={onToggleCollapsed}
           style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? 'Branches anzeigen' : 'Branches einklappen'}
+          title={collapsed ? tr('Branches anzeigen', 'Show branches') : tr('Branches einklappen', 'Collapse branches')}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
           <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
-            Branches
+            {tr('Branches', 'Branches')}
           </span>
         </button>
-        <button className="icon-btn" style={{ padding: '2px' }} onClick={() => { onSetCreatingBranch(true); onSetNewBranchName(''); }} title="Neuen Branch erstellen"><Plus size={13} /></button>
+        <button className="icon-btn" style={{ padding: '2px' }} onClick={() => { onSetCreatingBranch(true); onSetNewBranchName(''); }} title={tr('Neuen Branch erstellen', 'Create new branch')}><Plus size={13} /></button>
       </div>
 
       {!collapsed && (
@@ -114,24 +119,24 @@ export const BranchPanel: React.FC<Props> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div style={{ padding: '0 8px' }}>
               <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                Lokal ({localBranches.length})
+                {tr('Lokal', 'Local')} ({localBranches.length})
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {localBranches.map(renderBranchRow)}
                 {localBranches.length === 0 && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '3px 8px' }}>Keine lokalen Branches.</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '3px 8px' }}>{tr('Keine lokalen Branches.', 'No local branches.')}</span>
                 )}
               </div>
             </div>
 
             <div style={{ padding: '0 8px' }}>
               <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                Remote ({remoteBranches.length})
+                {tr('Remote', 'Remote')} ({remoteBranches.length})
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {remoteBranches.map(renderBranchRow)}
                 {remoteBranches.length === 0 && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '3px 8px' }}>Keine Remote-Branches.</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '3px 8px' }}>{tr('Keine Remote-Branches.', 'No remote branches.')}</span>
                 )}
               </div>
             </div>

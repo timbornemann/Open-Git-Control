@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { Plus, Tag, ArrowUpCircle, X } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 type Props = {
   tags: string[];
@@ -8,22 +9,26 @@ type Props = {
   onDeleteTag: (name: string) => void;
 };
 
-export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDeleteTag }) => (
-  <>
-    <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 6px' }}>
-      <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>Tags</span>
-      <div style={{ display: 'flex', gap: '2px' }}>
-        <button className="icon-btn" style={{ padding: '2px' }} onClick={onCreateTag} title="Tag erstellen"><Plus size={13} /></button>
-        <button className="icon-btn" style={{ padding: '2px' }} onClick={onPushTags} title="Tags pushen"><ArrowUpCircle size={13} /></button>
+export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDeleteTag }) => {
+  const { tr } = useI18n();
+
+  return (
+    <>
+      <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 6px' }}>
+        <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>{tr('Tags', 'Tags')}</span>
+        <div style={{ display: 'flex', gap: '2px' }}>
+          <button className="icon-btn" style={{ padding: '2px' }} onClick={onCreateTag} title={tr('Tag erstellen', 'Create tag')}><Plus size={13} /></button>
+          <button className="icon-btn" style={{ padding: '2px' }} onClick={onPushTags} title={tr('Tags pushen', 'Push tags')}><ArrowUpCircle size={13} /></button>
+        </div>
       </div>
-    </div>
-    {tags.map(tag => (
-      <div key={tag} className="repo-list-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px' }}>
-        <Tag size={13} style={{ opacity: 0.7 }} />
-        <span style={{ fontSize: '0.82rem', flex: 1 }}>{tag}</span>
-        <button onClick={() => onDeleteTag(tag)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title="Tag löschen"><X size={11} /></button>
-      </div>
-    ))}
-  </>
-);
+      {tags.map(tag => (
+        <div key={tag} className="repo-list-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px' }}>
+          <Tag size={13} style={{ opacity: 0.7 }} />
+          <span style={{ fontSize: '0.82rem', flex: 1 }}>{tag}</span>
+          <button onClick={() => onDeleteTag(tag)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Tag löschen', 'Delete tag')}><X size={11} /></button>
+        </div>
+      ))}
+    </>
+  );
+};

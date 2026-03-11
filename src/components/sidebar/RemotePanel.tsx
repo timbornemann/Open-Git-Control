@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Globe, Plus, RefreshCw, X } from 'lucide-react';
 import { RemoteInfo, RemoteSyncState } from '../../types/git';
 import { DialogFrame } from '../DialogFrame';
+import { useI18n } from '../../i18n';
 
 type RemoteStatus = {
   title: string;
@@ -22,6 +23,8 @@ type Props = {
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 };
 
 const toShortRemoteBranch = (name: string) => name.replace(/^remotes\//, '');
@@ -37,11 +40,13 @@ export const RemotePanel: React.FC<Props> = ({
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
   onCheckoutRemoteBranch,
+  collapsed,
+  onToggleCollapsed,
 }) => {
   const [isRemoteBranchesDialogOpen, setIsRemoteBranchesDialogOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   const remoteOnlyPreview = remoteOnlyBranches.slice(0, 3);
-  const isHealthy = remoteStatus.title === 'Remote ist aktuell' && remoteOnlyBranchesCount === 0 && !remoteSync.lastFetchError && remoteSync.hasUpstream;
+  const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && remoteOnlyBranchesCount === 0 && !remoteSync.lastFetchError && remoteSync.hasUpstream;
+  const { tr } = useI18n();
 
   return (
     <>
@@ -49,16 +54,16 @@ export const RemotePanel: React.FC<Props> = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 6px' }}>
         <button
           className="icon-btn"
-          onClick={() => setCollapsed(previous => !previous)}
+          onClick={onToggleCollapsed}
           style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? 'Remotes anzeigen' : 'Remotes einklappen'}
+          title={collapsed ? tr('Remotes anzeigen', 'Show remotes') : tr('Remotes einklappen', 'Collapse remotes')}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>Remotes</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>{tr('Remotes', 'Remotes')}</span>
         </button>
         <div style={{ display: 'flex', gap: '2px' }}>
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onAddRemote} title="Remote hinzufuegen"><Plus size={13} /></button>
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onRefreshRemote} title="Remote aktualisieren" disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
+          <button className="icon-btn" style={{ padding: '2px' }} onClick={onAddRemote} title={tr('Remote hinzufügen', 'Add remote')}><Plus size={13} /></button>
+          <button className="icon-btn" style={{ padding: '2px' }} onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
         </div>
       </div>
 
@@ -79,16 +84,16 @@ export const RemotePanel: React.FC<Props> = ({
                   className="staging-tool-btn"
                   onClick={onSetUpstreamForCurrentBranch}
                   style={{ alignSelf: 'flex-start' }}
-                  title="Setzt den aktuellen Branch auf origin/<branch> als Tracking-Branch"
+                  title={tr('Setzt den aktuellen Branch auf origin/<branch> als Tracking-Branch', 'Set current branch tracking to origin/<branch>')}
                 >
-                  Upstream setzen
+                  {tr('Upstream setzen', 'Set upstream')}
                 </button>
               )}
 
               {remoteOnlyBranchesCount > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                    {remoteOnlyBranchesCount} Branches nur auf Remote. Schnell auschecken:
+                    {tr(`${remoteOnlyBranchesCount} Branches nur auf Remote. Schnell auschecken:`, `${remoteOnlyBranchesCount} branches only on remote. Quick checkout:`)}
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {remoteOnlyPreview.map(branch => (
@@ -97,7 +102,7 @@ export const RemotePanel: React.FC<Props> = ({
                         className="staging-tool-btn"
                         style={{ fontSize: '0.72rem', padding: '2px 6px' }}
                         onClick={() => onCheckoutRemoteBranch(branch)}
-                        title={`Checkout von ${toShortRemoteBranch(branch)}`}
+                        title={tr(`Checkout von ${toShortRemoteBranch(branch)}`, `Checkout ${toShortRemoteBranch(branch)}`)}
                       >
                         {toShortRemoteBranch(branch)}
                       </button>
@@ -107,9 +112,9 @@ export const RemotePanel: React.FC<Props> = ({
                         className="staging-tool-btn"
                         style={{ fontSize: '0.72rem', padding: '2px 6px' }}
                         onClick={() => setIsRemoteBranchesDialogOpen(true)}
-                        title="Alle Remote-Branches anzeigen"
+                        title={tr('Alle Remote-Branches anzeigen', 'Show all remote branches')}
                       >
-                        Alle anzeigen ({remoteOnlyBranchesCount})
+                        {tr(`Alle anzeigen (${remoteOnlyBranchesCount})`, `Show all (${remoteOnlyBranchesCount})`)}
                       </button>
                     )}
                   </div>
@@ -125,7 +130,7 @@ export const RemotePanel: React.FC<Props> = ({
               <Globe size={13} style={{ color: 'var(--text-accent)', opacity: 0.7, flexShrink: 0 }} />
               <span style={{ fontSize: '0.82rem', fontWeight: 500, flexShrink: 0 }}>{r.name}</span>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={r.url}>{r.url}</span>
-              <button onClick={() => onRemoveRemote(r.name)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title="Remote entfernen"><X size={11} /></button>
+              <button onClick={() => onRemoveRemote(r.name)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Remote entfernen', 'Remove remote')}><X size={11} /></button>
             </div>
           ))}
         </>
@@ -133,12 +138,12 @@ export const RemotePanel: React.FC<Props> = ({
 
       <DialogFrame
         open={isRemoteBranchesDialogOpen}
-        title="Remote-Branches ohne lokales Gegenstueck"
+        title={tr('Remote-Branches ohne lokales Gegenstück', 'Remote branches without local counterpart')}
         onClose={() => setIsRemoteBranchesDialogOpen(false)}
-        cancelLabel="Schliessen"
+        cancelLabel={tr('Schließen', 'Close')}
       >
         <p className="dialog-message">
-          Diese Branches existieren auf dem Remote, aber nicht lokal. Du kannst sie direkt auschecken.
+          {tr('Diese Branches existieren auf dem Remote, aber nicht lokal. Du kannst sie direkt auschecken.', 'These branches exist on the remote, but not locally. You can check them out directly.')}
         </p>
         <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden', maxHeight: '320px' }}>
           {remoteOnlyBranches.map((branch) => (
@@ -157,7 +162,7 @@ export const RemotePanel: React.FC<Props> = ({
                 }}
                 style={{ fontSize: '0.72rem', padding: '3px 8px' }}
               >
-                Auschecken
+                {tr('Auschecken', 'Checkout')}
               </button>
             </div>
           ))}

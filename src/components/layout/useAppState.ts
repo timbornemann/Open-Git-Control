@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
+import { trByLanguage } from '../../i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
@@ -29,6 +30,19 @@ type RunGitCommandOptions = {
 };
 
 const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
+const SIDEBAR_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-collapse-by-repo:v1';
+
+type SidebarCollapseState = {
+  branchPanelCollapsed: boolean;
+  remotePanelCollapsed: boolean;
+};
+
+type SidebarCollapseByRepo = Record<string, SidebarCollapseState>;
+
+const DEFAULT_SIDEBAR_COLLAPSE_STATE: SidebarCollapseState = {
+  branchPanelCollapsed: false,
+  remotePanelCollapsed: false,
+};
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
@@ -45,6 +59,7 @@ export const useAppState = () => {
 
   const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
   const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
+  const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
 
   const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
 
@@ -58,6 +73,10 @@ export const useAppState = () => {
     closeInputDialog,
     executeInputDialog,
   } = useDialogControllers();
+
+  const tr = useCallback((deText: string, enText: string) => {
+    return trByLanguage(settings.language, deText, enText);
+  }, [settings.language]);
 
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
@@ -76,7 +95,61 @@ export const useAppState = () => {
     setGitActionToast,
     onRepoActivated: resetRepoScopedUi,
     onNoActiveRepo: resetRepoScopedUi,
+    language: settings.language,
   });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SidebarCollapseByRepo;
+      if (parsed && typeof parsed === 'object') {
+        setSidebarCollapseByRepo(parsed);
+      }
+    } catch {
+      // ignore malformed local storage values
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_STORAGE_KEY, JSON.stringify(sidebarCollapseByRepo));
+    } catch {
+      // ignore write errors (e.g. private mode / quota)
+    }
+  }, [sidebarCollapseByRepo]);
+
+  const activeSidebarCollapseState = workspace.activeRepo
+    ? (sidebarCollapseByRepo[workspace.activeRepo] || DEFAULT_SIDEBAR_COLLAPSE_STATE)
+    : DEFAULT_SIDEBAR_COLLAPSE_STATE;
+
+  const updateActiveRepoSidebarCollapse = useCallback((partial: Partial<SidebarCollapseState>) => {
+    const repoPath = workspace.activeRepo;
+    if (!repoPath) return;
+
+    setSidebarCollapseByRepo(prev => {
+      const current = prev[repoPath] || DEFAULT_SIDEBAR_COLLAPSE_STATE;
+      return {
+        ...prev,
+        [repoPath]: {
+          ...current,
+          ...partial,
+        },
+      };
+    });
+  }, [workspace.activeRepo]);
+
+  const toggleBranchPanelCollapsed = useCallback(() => {
+    updateActiveRepoSidebarCollapse({
+      branchPanelCollapsed: !activeSidebarCollapseState.branchPanelCollapsed,
+    });
+  }, [activeSidebarCollapseState.branchPanelCollapsed, updateActiveRepoSidebarCollapse]);
+
+  const toggleRemotePanelCollapsed = useCallback(() => {
+    updateActiveRepoSidebarCollapse({
+      remotePanelCollapsed: !activeSidebarCollapseState.remotePanelCollapsed,
+    });
+  }, [activeSidebarCollapseState.remotePanelCollapsed, updateActiveRepoSidebarCollapse]);
 
   const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
     if (!window.electronAPI) return;
@@ -85,9 +158,9 @@ export const useAppState = () => {
       const next = await window.electronAPI.setSettings(partial);
       setSettings(next);
     } catch (e: any) {
-      setGitActionToast({ msg: e?.message || 'Settings konnten nicht gespeichert werden.', isError: true });
+      setGitActionToast({ msg: e?.message || tr('Einstellungen konnten nicht gespeichert werden.', 'Could not save settings.'), isError: true });
     }
-  }, [setGitActionToast]);
+  }, [setGitActionToast, tr]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -135,15 +208,15 @@ export const useAppState = () => {
         if (hasLocalChanges) {
           setConfirmDialog({
             variant: 'danger',
-            title: 'Ungesicherte Aenderungen erkannt',
-            message: `Vor "git ${args.join(' ')}" wurden lokale Aenderungen gefunden.`,
+            title: tr('Ungesicherte Änderungen erkannt', 'Uncommitted changes detected'),
+            message: tr(`Vor "git ${args.join(' ')}" wurden lokale Änderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
             contextItems: [
-              { label: 'Befehl', value: `git ${args.join(' ')}` },
-              { label: 'Hinweis', value: 'Working Tree ist nicht sauber' },
+              { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+              { label: tr('Hinweis', 'Hint'), value: tr('Working Tree ist nicht sauber', 'Working tree is dirty') },
             ],
             irreversible: false,
-            consequences: 'Je nach Operation koennen unstaged oder staged Aenderungen betroffen sein.',
-            confirmLabel: 'Trotzdem ausfuehren',
+            consequences: tr('Je nach Operation können unstaged oder staged Änderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
+            confirmLabel: tr('Trotzdem ausführen', 'Run anyway'),
             onConfirm: async () => {
               await runGitCommand(args, successMsg, actionLabel, { skipDirtyGuard: true });
             },
@@ -156,7 +229,7 @@ export const useAppState = () => {
     }
 
     setIsGitActionRunning(true);
-    setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
+    setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
     try {
       const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
@@ -165,7 +238,7 @@ export const useAppState = () => {
         triggerRefresh();
         return true;
       }
-      setGitActionToast({ msg: r.error || 'Fehler beim Ausfuehren von git.', isError: true });
+      setGitActionToast({ msg: r.error || tr('Fehler beim Ausführen von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
       setGitActionToast({ msg: e.message, isError: true });
@@ -174,7 +247,7 @@ export const useAppState = () => {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, triggerRefresh, workspace.activeRepo]);
+  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, triggerRefresh, workspace.activeRepo, tr]);
 
   isGitActionRunningRef.current = isGitActionRunning;
 
@@ -189,11 +262,13 @@ export const useAppState = () => {
     setConfirmDialog,
     setInputDialog,
     autoFetchIntervalMs: settings.autoFetchIntervalMs,
+    language: settings.language,
   });
 
   const github = useGithubDomain({
     onRepoCloned: workspace.addOpenRepo,
     setActiveTab: workspace.setActiveTab,
+    language: settings.language,
   });
 
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -206,8 +281,9 @@ export const useAppState = () => {
     activeRepo: workspace.activeRepo,
     isAuthenticated: github.isAuthenticated,
     refreshTrigger,
+    language: settings.language,
     onCreated: (number) => {
-      setGitActionToast({ msg: `PR #${number} erstellt.`, isError: false });
+      setGitActionToast({ msg: tr(`PR #${number} erstellt.`, `Created PR #${number}.`), isError: false });
       setShowCreatePR(false);
       setNewPRTitle('');
       setNewPRBody('');
@@ -221,7 +297,7 @@ export const useAppState = () => {
   const handleCreateGithubRepoForCurrent = async () => {
     if (!window.electronAPI || !workspace.activeRepo) return;
     if (!github.isAuthenticated) {
-      setConnectError('Bitte zuerst GitHub verbinden (GitHub-Tab).');
+      setConnectError(tr('Bitte zuerst GitHub verbinden (GitHub-Tab).', 'Please connect GitHub first (GitHub tab).'));
       return;
     }
 
@@ -230,7 +306,7 @@ export const useAppState = () => {
     const description = newRepoDescription.trim();
 
     if (!name) {
-      setConnectError('Repository-Name darf nicht leer sein.');
+      setConnectError(tr('Repository-Name darf nicht leer sein.', 'Repository name must not be empty.'));
       return;
     }
 
@@ -240,31 +316,30 @@ export const useAppState = () => {
     try {
       const result = await window.electronAPI.githubCreateRepo(name, description, newRepoPrivate);
       if (!result.success) {
-        throw new Error(result.error || 'Fehler beim Erstellen des GitHub-Repositories.');
+        throw new Error(result.error || tr('Fehler beim Erstellen des GitHub-Repositories.', 'Error while creating the GitHub repository.'));
       }
 
       const remoteUrl = result.data.cloneUrl;
 
       let r = await window.electronAPI.runGitCommand('remote', 'add', 'origin', remoteUrl);
       if (!r.success) {
-        throw new Error(r.error || 'Fehler beim Setzen des Git-Remotes.');
+        throw new Error(r.error || tr('Fehler beim Setzen des Git-Remotes.', 'Error while setting Git remote.'));
       }
 
       r = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
       if (!r.success) {
-        throw new Error(r.error || 'Fehler beim Pushen nach GitHub.');
+        throw new Error(r.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
       }
 
       repository.setHasRemoteOrigin(true);
-      setGitActionToast({ msg: 'Neues GitHub-Repository erstellt und verbunden.', isError: false });
+      setGitActionToast({ msg: tr('Neues GitHub-Repository erstellt und verbunden.', 'Created and connected new GitHub repository.'), isError: false });
       triggerRefresh();
     } catch (e: any) {
-      setConnectError(e?.message || 'Fehler beim Erstellen und Verbinden mit GitHub.');
+      setConnectError(e?.message || tr('Fehler beim Erstellen und Verbinden mit GitHub.', 'Error while creating and connecting GitHub repository.'));
     } finally {
       setIsConnectingGithubRepo(false);
     }
   };
-
 
   const handleCreatePR = async () => {
     await pullRequestDomain.createPR({
@@ -275,6 +350,7 @@ export const useAppState = () => {
       currentBranch: repository.currentBranch,
     });
   };
+
   const handleOpenPR = (url: string) => {
     window.open(url, '_blank');
   };
@@ -282,9 +358,9 @@ export const useAppState = () => {
   const handleCopyPRUrl = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      setGitActionToast({ msg: 'PR-URL kopiert.', isError: false });
+      setGitActionToast({ msg: tr('PR-URL kopiert.', 'Copied PR URL.'), isError: false });
     } catch {
-      setGitActionToast({ msg: 'PR-URL konnte nicht kopiert werden.', isError: true });
+      setGitActionToast({ msg: tr('PR-URL konnte nicht kopiert werden.', 'Could not copy PR URL.'), isError: true });
     }
   };
 
@@ -292,28 +368,29 @@ export const useAppState = () => {
     const targetBranch = `pr-${prNumber}-${headRef.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
     const fetched = await runGitCommand(
       ['fetch', 'origin', `pull/${prNumber}/head:${targetBranch}`],
-      `PR #${prNumber} Branch geladen.`,
-      `PR #${prNumber} wird geladen...`,
+      tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
+      tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
       { skipDirtyGuard: true },
     );
     if (!fetched) return;
-    await runGitCommand(['checkout', targetBranch], `PR-Branch ${targetBranch} ausgecheckt.`);
+    await runGitCommand(['checkout', targetBranch], tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`));
   };
+
   const handleSetUpstreamForCurrentBranch = useCallback(async () => {
     if (!workspace.activeRepo || !repository.currentBranch) return;
 
     const setTracking = await runGitCommand(
       ['branch', '--set-upstream-to', `origin/${repository.currentBranch}`, repository.currentBranch],
-      `Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
+      tr(`Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`, `Tracking set: ${repository.currentBranch} -> origin/${repository.currentBranch}`),
     );
 
     if (!setTracking) {
       await runGitCommand(
         ['push', '-u', 'origin', repository.currentBranch],
-        `Branch ${repository.currentBranch} mit Upstream gepusht.`,
+        tr(`Branch ${repository.currentBranch} mit Upstream gepusht.`, `Pushed branch ${repository.currentBranch} with upstream.`),
       );
     }
-  }, [repository.currentBranch, runGitCommand, workspace.activeRepo]);
+  }, [repository.currentBranch, runGitCommand, workspace.activeRepo, tr]);
 
   const handleCheckoutRemoteBranch = useCallback(async (remoteBranchName: string) => {
     const normalized = (remoteBranchName || '').trim();
@@ -322,9 +399,10 @@ export const useAppState = () => {
     const shortName = normalized.replace(/^remotes\//, '').replace(/^origin\//, '').replace(/^[^/]+\//, '');
     await runGitCommand(
       ['checkout', '-b', shortName, '--track', normalized],
-      `Branch ${shortName} aus ${normalized} ausgecheckt.`,
+      tr(`Branch ${shortName} aus ${normalized} ausgecheckt.`, `Checked out branch ${shortName} from ${normalized}.`),
     );
-  }, [runGitCommand]);
+  }, [runGitCommand, tr]);
+
   const clearJobs = () => setJobs([]);
 
   return {
@@ -357,6 +435,8 @@ export const useAppState = () => {
     newBranchInputRef: repository.newBranchInputRef,
     branchContextMenu: repository.branchContextMenu,
     setBranchContextMenu: repository.setBranchContextMenu,
+    isBranchPanelCollapsed: activeSidebarCollapseState.branchPanelCollapsed,
+    toggleBranchPanelCollapsed,
 
     tags: repository.tags,
     remotes: repository.remotes,
@@ -365,6 +445,8 @@ export const useAppState = () => {
     remoteOnlyBranches: repository.remoteOnlyBranches,
     remoteStatus: repository.remoteStatus,
     refreshRemoteState: repository.refreshRemoteState,
+    isRemotePanelCollapsed: activeSidebarCollapseState.remotePanelCollapsed,
+    toggleRemotePanelCollapsed,
 
     handleCreateBranch: repository.handleCreateBranch,
     handleDeleteBranch: repository.handleDeleteBranch,
@@ -446,11 +528,3 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
-
-
-
-
-
-
-

@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DialogContextItem } from './Confirm';
 import { DialogFrame } from './DialogFrame';
+import { useI18n } from '../i18n';
 
 export interface InputDialogField {
   id: string;
@@ -35,14 +36,15 @@ export const Input: React.FC<InputProps> = ({
   contextItems = [],
   irreversible = false,
   consequences,
-  confirmLabel = 'Speichern',
-  cancelLabel = 'Abbrechen',
+  confirmLabel,
+  cancelLabel,
   onSubmit,
   onCancel,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
   const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const { tr } = useI18n();
 
   const initialValues = useMemo(() => {
     const nextValues: Record<string, string> = {};
@@ -62,7 +64,7 @@ export const Input: React.FC<InputProps> = ({
     for (const field of fields) {
       const value = values[field.id] ?? '';
       if (field.required && !value.trim()) {
-        setValidationError(`Bitte "${field.label}" ausfuellen.`);
+        setValidationError(tr(`Bitte "${field.label}" ausfüllen.`, `Please fill "${field.label}".`));
         return;
       }
     }
@@ -78,8 +80,8 @@ export const Input: React.FC<InputProps> = ({
       onClose={onCancel}
       onConfirm={handleSubmit}
       onEnter={handleSubmit}
-      confirmLabel={confirmLabel}
-      cancelLabel={cancelLabel}
+      confirmLabel={confirmLabel ?? tr('Speichern', 'Save')}
+      cancelLabel={cancelLabel ?? tr('Abbrechen', 'Cancel')}
       initialFocusRef={firstInputRef as React.RefObject<HTMLElement | null>}
     >
       {message && <p className="dialog-message">{message}</p>}
@@ -121,7 +123,7 @@ export const Input: React.FC<InputProps> = ({
       {validationError && <div className="dialog-validation">{validationError}</div>}
       <div className="dialog-impact">
         <span>
-          Irreversibel: <strong>{irreversible ? 'Ja' : 'Nein'}</strong>
+          {tr('Irreversibel', 'Irreversible')}: <strong>{irreversible ? tr('Ja', 'Yes') : tr('Nein', 'No')}</strong>
         </span>
         {consequences && <span>{consequences}</span>}
       </div>

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
+import { useI18n } from '../i18n';
 import './dialog.css';
 
 interface DialogFrameProps {
@@ -31,8 +32,8 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   onClose,
   onConfirm,
   onEnter,
-  confirmLabel = 'Bestaetigen',
-  cancelLabel = 'Abbrechen',
+  confirmLabel,
+  cancelLabel,
   confirmDisabled = false,
   confirmVariant = 'default',
   closeOnBackdrop = true,
@@ -41,6 +42,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const { tr } = useI18n();
 
   useEffect(() => {
     if (!open) return;
@@ -130,7 +132,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         <div className="dialog-content">{children}</div>
         <div className="dialog-footer">
           <button className="dialog-btn dialog-btn-secondary" onClick={onClose}>
-            {cancelLabel}
+            {cancelLabel ?? tr('Abbrechen', 'Cancel')}
           </button>
           {onConfirm && (
             <button
@@ -138,7 +140,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
               onClick={onConfirm}
               disabled={confirmDisabled}
             >
-              {confirmLabel}
+              {confirmLabel ?? tr('Bestätigen', 'Confirm')}
             </button>
           )}
         </div>

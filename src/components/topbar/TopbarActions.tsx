@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 type Props = {
   activeRepo: string | null;
@@ -12,20 +13,27 @@ type Props = {
   onStageCommit: () => void;
 };
 
-export const TopbarActions: React.FC<Props> = ({ activeRepo, isGitActionRunning, isFetching, activeActionLabel, onFetch, onPull, onPush, onStageCommit }) => (
-  <div style={{ display: 'flex', gap: '8px' }}>
-    <button className="icon-btn" onClick={onFetch} disabled={!activeRepo || isGitActionRunning || isFetching} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-      <RefreshCw size={16} className={isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
-      {isFetching ? 'Fetch läuft...' : 'Fetch'}
-    </button>
-    <button className="icon-btn" onClick={onPull} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-      <ArrowDownCircle size={16} className={isGitActionRunning && activeActionLabel === 'Pull wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
-      {isGitActionRunning && activeActionLabel === 'Pull wird ausgefuehrt...' ? 'Pull läuft...' : 'Pull'}
-    </button>
-    <button className="icon-btn" onClick={onPush} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
-      <ArrowUpCircle size={16} className={isGitActionRunning && activeActionLabel === 'Push wird ausgefuehrt...' ? 'spin' : ''} style={{ marginRight: '6px' }} />
-      {isGitActionRunning && activeActionLabel === 'Push wird ausgefuehrt...' ? 'Push läuft...' : 'Push'}
-    </button>
-    <button className="icon-btn" onClick={onStageCommit} style={{ backgroundColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>Stage / Commit</button>
-  </div>
-);
+export const TopbarActions: React.FC<Props> = ({ activeRepo, isGitActionRunning, isFetching, activeActionLabel, onFetch, onPull, onPush, onStageCommit }) => {
+  const { tr } = useI18n();
+  const normalizedAction = (activeActionLabel || '').toLowerCase();
+  const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
+  const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
+
+  return (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <button className="icon-btn" onClick={onFetch} disabled={!activeRepo || isGitActionRunning || isFetching} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+        <RefreshCw size={16} className={isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
+        {isFetching ? tr('Fetch läuft...', 'Fetch running...') : 'Fetch'}
+      </button>
+      <button className="icon-btn" onClick={onPull} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+        <ArrowDownCircle size={16} className={isPullRunning ? 'spin' : ''} style={{ marginRight: '6px' }} />
+        {isPullRunning ? tr('Pull läuft...', 'Pull running...') : 'Pull'}
+      </button>
+      <button className="icon-btn" onClick={onPush} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+        <ArrowUpCircle size={16} className={isPushRunning ? 'spin' : ''} style={{ marginRight: '6px' }} />
+        {isPushRunning ? tr('Push läuft...', 'Push running...') : 'Push'}
+      </button>
+      <button className="icon-btn" onClick={onStageCommit} style={{ backgroundColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>{tr('Stagen / Commit', 'Stage / Commit')}</button>
+    </div>
+  );
+};

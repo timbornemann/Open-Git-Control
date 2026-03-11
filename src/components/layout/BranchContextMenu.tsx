@@ -1,4 +1,5 @@
-import React from 'react';
+﻿import React from 'react';
+import { useI18n } from '../../i18n';
 
 type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
@@ -19,6 +20,8 @@ export const BranchContextMenu: React.FC<Props> = ({
   onRename,
   onDelete,
 }) => {
+  const { tr } = useI18n();
+
   if (!branchContextMenu) return null;
 
   return (
@@ -44,7 +47,7 @@ export const BranchContextMenu: React.FC<Props> = ({
               onCheckout(b);
             }}
           >
-            <span className="ctx-menu-icon">?</span> Checkout
+            <span className="ctx-menu-icon">?</span> {tr('Checkout', 'Checkout')}
           </button>
         )}
         {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
@@ -56,7 +59,7 @@ export const BranchContextMenu: React.FC<Props> = ({
               onMerge(b);
             }}
           >
-            <span className="ctx-menu-icon">?</span> In aktuellen Branch mergen
+            <span className="ctx-menu-icon">?</span> {tr('In aktuellen Branch mergen', 'Merge into current branch')}
           </button>
         )}
         {!branchContextMenu.branch.startsWith('remotes/') && (
@@ -68,7 +71,7 @@ export const BranchContextMenu: React.FC<Props> = ({
               onRename(b);
             }}
           >
-            <span className="ctx-menu-icon">?</span> Umbenennen
+            <span className="ctx-menu-icon">?</span> {tr('Umbenennen', 'Rename')}
           </button>
         )}
         <div className="ctx-menu-sep" />
@@ -81,7 +84,7 @@ export const BranchContextMenu: React.FC<Props> = ({
               onDelete(b);
             }}
           >
-            <span className="ctx-menu-icon">?</span> Branch l�schen
+            <span className="ctx-menu-icon">?</span> {tr('Branch löschen', 'Delete branch')}
           </button>
         )}
       </div>
