@@ -99,4 +99,17 @@ describe('normalizeSettings', () => {
 
     expect(normalizeSettings({ githubOauthClientId: 123 as never }).githubOauthClientId).toBe('');
   });
+  it('normalizes github host with safe fallback rules', () => {
+    expect(normalizeSettings({ githubHost: '  HTTPS://GitHub.Example.com:8443///  ' }).githubHost).toBe('github.example.com:8443');
+    expect(normalizeSettings({ githubHost: '   ' }).githubHost).toBe(DEFAULT_SETTINGS.githubHost);
+    expect(normalizeSettings({ githubHost: 'github.com/path' }).githubHost).toBe(DEFAULT_SETTINGS.githubHost);
+    expect(normalizeSettings({ githubHost: 123 as never }).githubHost).toBe(DEFAULT_SETTINGS.githubHost);
+
+    const longHost = 'https://' + 'a'.repeat(220) + '.example.com';
+    const normalizedLongHost = normalizeSettings({ githubHost: longHost }).githubHost;
+    expect(normalizedLongHost.length).toBeLessThanOrEqual(200);
+    expect(normalizedLongHost).not.toContain('http://');
+    expect(normalizedLongHost).not.toContain('https://');
+  });
 });
+
