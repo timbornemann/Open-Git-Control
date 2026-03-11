@@ -14,6 +14,7 @@ interface CommitDetailsProps {
 
 export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectCommit, onOpenDiff }) => {
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
   const [files, setFiles] = useState<CommitFileDetail[]>([]);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
@@ -31,6 +32,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
 
     const fetchDetails = async () => {
       setLoadingFiles(true);
+      setFilesError(null);
       setSelectedFilePath(null);
       setActiveTab('history');
       setHistoryEntries([]);
@@ -39,15 +41,17 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setBlameError(null);
 
       try {
-        const { success, data } = await window.electronAPI.runGitCommand('commitDetails', hash);
+        const { success, data, error } = await window.electronAPI.runGitCommand('commitDetails', hash);
         if (success && data) {
           setFiles(parseCommitDetails(data));
         } else {
           setFiles([]);
+          setFilesError(error || 'Commit-Details konnten nicht geladen werden.');
         }
-      } catch (error) {
-        console.error(error);
+      } catch (fetchError) {
+        console.error(fetchError);
         setFiles([]);
+        setFilesError('Commit-Details konnten nicht geladen werden.');
       } finally {
         setLoadingFiles(false);
       }
@@ -78,8 +82,8 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           setHistoryEntries([]);
           setHistoryError(result.error || 'Datei-Historie konnte nicht geladen werden.');
         }
-      } catch (error) {
-        console.error(error);
+      } catch (fetchError) {
+        console.error(fetchError);
         setHistoryEntries([]);
         setHistoryError('Datei-Historie konnte nicht geladen werden.');
       } finally {
@@ -88,7 +92,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchHistory();
-  }, [activeTab, hash, isDeletedFile, selectedFile]);
+  }, [activeTab, hash, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !window.electronAPI) return;
@@ -112,8 +116,8 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           setBlameLines([]);
           setBlameError(result.error || 'Blame-Daten konnten nicht geladen werden.');
         }
-      } catch (error) {
-        console.error(error);
+      } catch (fetchError) {
+        console.error(fetchError);
         setBlameLines([]);
         setBlameError('Blame-Daten konnten nicht geladen werden.');
       } finally {
@@ -149,7 +153,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return '';
+    if (!dateString) return '-';
     const parsed = new Date(dateString);
     if (Number.isNaN(parsed.getTime())) return dateString;
     return parsed.toLocaleString('de-DE', {
@@ -161,6 +165,35 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     });
   };
 
+  const formatBlameDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return dateString;
+    return parsed.toLocaleDateString('de-DE', {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
+  const formatRelativeDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return '-';
+
+    const now = Date.now();
+    const diffMs = now - parsed.getTime();
+    const absMs = Math.abs(diffMs);
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (absMs < minute) return 'gerade eben';
+    if (absMs < hour) return 'vor ' + Math.max(1, Math.round(absMs / minute)) + ' Min';
+    if (absMs < day) return 'vor ' + Math.max(1, Math.round(absMs / hour)) + ' Std';
+    const days = Math.max(1, Math.round(absMs / day));
+    return 'vor ' + days + ' Tag' + (days === 1 ? '' : 'en');
+  };
   return (
     <div className="commit-details-panel" style={{ padding: '12px', height: '100%', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
@@ -178,6 +211,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
 
       {loadingFiles ? (
         <p style={{ color: 'var(--text-secondary)' }}>Lade Details...</p>
+      ) : filesError ? (
+        <div style={{ color: '#f87171', fontSize: '0.84rem', border: '1px solid rgba(248,81,73,0.35)', borderRadius: 6, padding: '8px 10px' }}>
+          {filesError}
+        </div>
       ) : !selectedFile ? (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {files.map((file, index) => (
@@ -246,39 +283,61 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
 
           {activeTab === 'history' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                Verlauf dieser Datei. Klick auf einen Eintrag oeffnet den kompletten Commit rechts.
+              </span>
               {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Lade History...</span>}
               {historyError && <span style={{ color: '#f87171', fontSize: '0.82rem' }}>{historyError}</span>}
               {!historyLoading && !historyError && historyEntries.length === 0 && (
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Keine Historie gefunden.</span>
               )}
-              {!historyLoading && !historyError && historyEntries.map(entry => (
-                <button
-                  key={`${entry.hash}-${entry.subject}`}
-                  onClick={() => onSelectCommit?.(entry.hash)}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    backgroundColor: 'var(--bg-panel)',
-                    padding: '7px 8px',
-                    cursor: onSelectCommit ? 'pointer' : 'default',
-                    color: 'var(--text-primary)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '3px',
-                  }}
-                >
-                  <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.abbrevHash}</span>
-                  <span style={{ fontSize: '0.84rem' }}>{entry.subject || '(ohne Nachricht)'}</span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{entry.author} - {formatDate(entry.date)}</span>
-                </button>
-              ))}
+              {!historyLoading && !historyError && historyEntries.map(entry => {
+                const isCurrentCommit = entry.hash === hash;
+                return (
+                  <button
+                    key={`${entry.hash}-${entry.subject}`}
+                    onClick={() => onSelectCommit?.(entry.hash)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      border: isCurrentCommit ? '1px solid rgba(31, 111, 235, 0.5)' : '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      backgroundColor: isCurrentCommit ? 'rgba(31, 111, 235, 0.12)' : 'var(--bg-panel)',
+                      padding: '8px 9px',
+                      cursor: onSelectCommit ? 'pointer' : 'default',
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        {entry.abbrevHash || entry.hash.slice(0, 8)}
+                      </span>
+                      {isCurrentCommit && (
+                        <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 999, backgroundColor: 'rgba(31,111,235,0.25)', color: '#7cb8ff' }}>
+                          Aktuell
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.84rem', color: entry.subject ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                      {entry.subject || '(ohne Nachricht)'}
+                    </span>
+                    <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                      {entry.author || '-'} | {formatDate(entry.date)} | {formatRelativeDate(entry.date)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
           {activeTab === 'blame' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                Blame zeigt pro Zeile, aus welchem Commit sie zuletzt stammt.
+              </span>
               {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Lade Blame...</span>}
               {blameError && <span style={{ color: '#f87171', fontSize: '0.82rem' }}>{blameError}</span>}
               {!blameLoading && !blameError && blameLines.length === 0 && (
@@ -286,41 +345,68 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
               )}
               {!blameLoading && !blameError && (
                 <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                  {blameLines.map(line => (
-                    <div
-                      key={`${line.lineNumber}-${line.commitHash}`}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '52px 76px 1fr',
-                        gap: '8px',
-                        alignItems: 'start',
-                        padding: '5px 8px',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                        fontFamily: 'monospace',
-                        fontSize: '0.76rem',
-                        color: 'var(--text-primary)',
-                      }}
-                    >
-                      <span style={{ color: 'var(--text-secondary)' }}>{line.lineNumber}</span>
-                      <button
-                        onClick={() => onSelectCommit?.(line.commitHash)}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '56px 80px 120px 60px 1fr',
+                      gap: '8px',
+                      padding: '6px 8px',
+                      borderBottom: '1px solid var(--border-color)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                      fontSize: '0.72rem',
+                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                    }}
+                  >
+                    <span>Zeile</span>
+                    <span>Commit</span>
+                    <span>Autor</span>
+                    <span>Datum</span>
+                    <span>Inhalt</span>
+                  </div>
+                  <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {blameLines.map((line, index) => (
+                      <div
+                        key={`${line.lineNumber}-${line.commitHash}`}
                         style={{
-                          padding: 0,
-                          border: 'none',
-                          background: 'transparent',
-                          color: 'var(--accent-primary)',
-                          textAlign: 'left',
-                          cursor: onSelectCommit ? 'pointer' : 'default',
+                          display: 'grid',
+                          gridTemplateColumns: '56px 80px 120px 60px 1fr',
+                          gap: '8px',
+                          alignItems: 'start',
+                          padding: '5px 8px',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                           fontFamily: 'monospace',
                           fontSize: '0.76rem',
+                          color: 'var(--text-primary)',
+                          backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.015)',
                         }}
                         title={`${line.author} - ${line.summary}`}
                       >
-                        {line.abbrevHash}
-                      </button>
-                      <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{line.content}</span>
-                    </div>
-                  ))}
+                        <span style={{ color: 'var(--text-secondary)' }}>{line.lineNumber}</span>
+                        <button
+                          onClick={() => onSelectCommit?.(line.commitHash)}
+                          style={{
+                            padding: 0,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--accent-primary)',
+                            textAlign: 'left',
+                            cursor: onSelectCommit ? 'pointer' : 'default',
+                            fontFamily: 'monospace',
+                            fontSize: '0.76rem',
+                          }}
+                        >
+                          {line.abbrevHash}
+                        </button>
+                        <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {line.author || '-'}
+                        </span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{formatBlameDate(line.authorTime)}</span>
+                        <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{line.content}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -344,4 +430,5 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     </div>
   );
 };
+
 
