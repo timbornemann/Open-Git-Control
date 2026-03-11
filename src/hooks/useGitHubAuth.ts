@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 type Params = {
   onAuthChanged?: (authenticated: boolean) => void;
 };
@@ -40,7 +40,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
           setGithubUser(loginResult.username);
           onAuthChanged?.(true);
           const reposResult = await window.electronAPI.githubGetRepos();
-          if (reposResult.success) setGithubRepos(reposResult.data || []);
+          if (reposResult.success) setGithubRepos(reposResult.data.repos || []);
         } else {
           setIsAuthenticated(false);
           setGithubUser(null);
@@ -69,7 +69,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     try {
       const success = await window.electronAPI.githubAuth(token);
       if (!success) {
-        setAuthError('Token ungültig. Bitte prüfe die Berechtigungen.');
+        setAuthError('Token ungÃ¼ltig. Bitte prÃ¼fe die Berechtigungen.');
         return;
       }
 
@@ -79,7 +79,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
       const status = await window.electronAPI.githubCheckAuthStatus();
       setGithubUser(status.username);
       const result = await window.electronAPI.githubGetRepos();
-      if (result.success) setGithubRepos(result.data || []);
+      if (result.success) setGithubRepos(result.data.repos || []);
     } catch {
       setAuthError('Fehler bei der Authentifizierung.');
     } finally {
@@ -115,3 +115,4 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     handleLogout,
   };
 };
+

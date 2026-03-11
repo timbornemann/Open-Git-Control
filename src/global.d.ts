@@ -30,9 +30,21 @@ export interface GitHubRepositoryDto {
   private: boolean;
   cloneUrl: string;
   htmlUrl: string;
+  description?: string | null;
+  updatedAt?: string;
+}
+
+export interface GitHubRepositoryPageDto {
+  repos: GitHubRepositoryDto[];
+  nextPage: number | null;
+  hasMore: boolean;
+  totalCount: number | null;
 }
 
 type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
+type GitJobPhaseDto = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
+
+export type AiAutoCommitModeDto = 'normal' | 'retry' | 'fallback';
 
 export interface GitJobEventDto {
   id: string;
@@ -40,6 +52,18 @@ export interface GitJobEventDto {
   status: GitJobStatus;
   message?: string;
   progress?: number;
+  details?: {
+    phase?: GitJobPhaseDto;
+    mode?: AiAutoCommitModeDto | string;
+    groupId?: number;
+    groupSize?: number;
+    remainingFiles?: number;
+    processedFiles?: number;
+    totalCommits?: number;
+    lastCommit?: string | null;
+    retryCount?: number;
+    [key: string]: unknown;
+  };
   timestamp: number;
 }
 
@@ -86,6 +110,7 @@ export interface AppSettingsDto {
   geminiModel: string;
   hasGeminiApiKey: boolean;
   githubOauthClientId: string;
+  githubHost: string;
 }
 
 export interface PullRequestDto {
@@ -102,6 +127,8 @@ export interface PullRequestDto {
   draft: boolean;
 }
 
+export type PullRequestMergeMethodDto = 'merge' | 'squash' | 'rebase';
+
 export interface AiAutoCommitCommitDto {
   hash: string;
   subject: string;
@@ -111,6 +138,18 @@ export interface AiAutoCommitResultDto {
   commits: AiAutoCommitCommitDto[];
   summary: string;
   turns: number;
+  modeTransitions: string[];
+  processedFiles: number;
+  remainingFiles: number;
+  commitPlanStats: {
+    groupCount: number;
+    retries: number;
+    fallbackCommits: number;
+    totalCommits: number;
+    totalFilesProcessed: number;
+  };
+  warnings: string[];
+  diagnostics: string[];
 }
 
 export interface AiConnectionResultDto {
@@ -133,11 +172,31 @@ export type DeviceFlowPollDto =
   | { status: 'error'; error: string; errorDescription: string | null }
   | { status: 'success'; username: string | null };
 
+export interface GitStashEntryDto {
+  index: number;
+  name: string;
+  hash: string;
+  branch: string;
+  subject: string;
+}
+
+export interface DiagnosticsReportDto {
+  generatedAt: string;
+  appVersion: string;
+  platform: string;
+  activeRepo: string | null;
+  report: string;
+}
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<{ success: boolean; data?: any; error?: string }>;
+  getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
+  getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;
   addIgnoreRule: (pattern: string) => Promise<{ success: boolean; added?: boolean; pattern?: string; error?: string }>;
   gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -165,11 +224,11 @@ export interface ElectronAPI {
   ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
   ollamaListModels: () => Promise<IpcResult<string[]>>;
   runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
-  githubAuth: (token: string) => Promise<boolean>;
+  githubAuth: (token: string, host?: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;
   githubWebLogin: () => Promise<IpcResult<{ username: string | null }>>;
-  githubGetRepos: () => Promise<IpcResult<GitHubRepositoryDto[]>>;
+  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => Promise<IpcResult<GitHubRepositoryPageDto>>;
   githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null; oauthConfigured: boolean }>;
   githubLoginWithSavedToken: () => Promise<{ success: boolean; authenticated: boolean; username: string | null }>;
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
@@ -191,6 +250,15 @@ export interface ElectronAPI {
       state: string;
     }>
   >;
+  githubMergePR: (params: {
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    mergeMethod: PullRequestMergeMethodDto;
+    commitTitle?: string;
+    commitMessage?: string;
+  }) => Promise<IpcResult<{ sha: string; merged: boolean; message: string }>>;
+  getDiagnosticsReport: () => Promise<IpcResult<DiagnosticsReportDto>>;
 }
 
 declare global {
@@ -200,3 +268,4 @@ declare global {
 }
 
 export {};
+

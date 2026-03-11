@@ -16,11 +16,12 @@ type Params = {
   isAuthenticated: boolean;
   refreshTrigger: number;
   language: AppLanguage;
+  githubHost?: string;
   onCreated?: (number: number) => void;
   onError?: (message: string) => void;
 };
 
-export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, onCreated, onError }: Params) => {
+export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, githubHost = 'github.com', onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
@@ -28,12 +29,12 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
 
   useEffect(() => {
     const parseOwnerRepo = async () => {
-      const ownerRepo = await resolvePrOwnerRepo(window.electronAPI, activeRepo, isAuthenticated);
+      const ownerRepo = await resolvePrOwnerRepo(window.electronAPI, activeRepo, isAuthenticated, githubHost);
       setPrOwnerRepo(ownerRepo);
       if (!ownerRepo) setPullRequests([]);
     };
     parseOwnerRepo();
-  }, [activeRepo, isAuthenticated, refreshTrigger]);
+  }, [activeRepo, isAuthenticated, refreshTrigger, githubHost]);
 
   useEffect(() => {
     const fetchPRs = async () => {
@@ -75,10 +76,18 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   };
 };
 
-export const parsePrOwnerRepoFromRemote = (remoteUrl: string): RepoOwnerRef | null => {
+function normalizeGithubHost(value: string): string {
+  const trimmed = (value || '').trim().toLowerCase();
+  if (!trimmed) return 'github.com';
+  return trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+}
+
+export const parsePrOwnerRepoFromRemote = (remoteUrl: string, githubHost: string = 'github.com'): RepoOwnerRef | null => {
   const trimmedRemote = remoteUrl.trim();
-  const httpsMatch = trimmedRemote.match(/github\.com\/([^/]+)\/([^/.]+)/);
-  const sshMatch = trimmedRemote.match(/github\.com:([^/]+)\/([^/.]+)/);
+  const host = normalizeGithubHost(githubHost).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const httpsMatch = trimmedRemote.match(new RegExp(`${host}\/([^/]+)\/([^/.]+)`));
+  const sshMatch = trimmedRemote.match(new RegExp(`${host}:([^/]+)\/([^/.]+)`));
   const match = httpsMatch || sshMatch;
 
   if (!match) return null;
@@ -93,13 +102,14 @@ export const resolvePrOwnerRepo = async (
   electronAPI: ElectronAPI | undefined,
   activeRepo: string | null,
   isAuthenticated: boolean,
+  githubHost: string = 'github.com',
 ): Promise<RepoOwnerRef | null> => {
   if (!activeRepo || !electronAPI || !isAuthenticated) return null;
 
   try {
     const response = await electronAPI.runGitCommand('remote', 'get-url', 'origin');
     if (!response.success || !response.data) return null;
-    return parsePrOwnerRepoFromRemote(String(response.data));
+    return parsePrOwnerRepoFromRemote(String(response.data), githubHost);
   } catch {
     return null;
   }
