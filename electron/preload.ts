@@ -1,4 +1,4 @@
-﻿const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
   ollamaListModels: () => ipcRenderer.invoke('ai:listModels'),
   runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
+  cancelAiAutoCommit: () => ipcRenderer.invoke('git:cancelAiAutoCommit'),
   githubAuth: (token: string, host?: string) => ipcRenderer.invoke('github:auth', token, host),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
@@ -69,3 +70,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:mergePR', params),
   getDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:report'),
 });
+

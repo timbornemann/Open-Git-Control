@@ -433,6 +433,8 @@ function createJobId(operation: string): string {
   return operation + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 }
 
+let currentAiAutoCommitJob: { id: string; cancelRequested: boolean } | null = null;
+
 function emitJobEvent(webContents: Electron.WebContents, event: JobEventPayload): void {
   webContents.send('job:event', event);
 }
@@ -1388,6 +1390,7 @@ function setupIPC() {
   ipcMain.handle('git:aiAutoCommit', async (event: any) => {
     const webContents = event.sender;
     const jobId = createJobId('git-aiAutoCommit');
+    currentAiAutoCommitJob = { id: jobId, cancelRequested: false };
 
     emitJobEvent(webContents, {
       id: jobId,
@@ -1400,17 +1403,22 @@ function setupIPC() {
 
     try {
       const settings = readSettingsWithMigration();
-      const result = await aiService.runAutoCommit(settings, getGeminiApiKeyFromSecureStore, (update) => {
-        emitJobEvent(webContents, {
-          id: jobId,
-          operation: 'git:aiAutoCommit',
-          status: 'progress',
-          message: update.message,
-          ...(typeof update.progress === 'number' ? { progress: update.progress } : {}),
-          details: update.details ? { ...update.details, phase: update.phase } : { phase: update.phase },
-          timestamp: Date.now(),
-        });
-      });
+      const result = await aiService.runAutoCommit(
+        settings,
+        getGeminiApiKeyFromSecureStore,
+        (update) => {
+          emitJobEvent(webContents, {
+            id: jobId,
+            operation: 'git:aiAutoCommit',
+            status: 'progress',
+            message: update.message,
+            ...(typeof update.progress === 'number' ? { progress: update.progress } : {}),
+            details: update.details ? { ...update.details, phase: update.phase } : { phase: update.phase },
+            timestamp: Date.now(),
+          });
+        },
+        () => currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested,
+      );
 
       emitJobEvent(webContents, {
         id: jobId,
@@ -1430,16 +1438,31 @@ function setupIPC() {
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
+      const wasCancelled = /abgebrochen/i.test(message);
+
       emitJobEvent(webContents, {
         id: jobId,
         operation: 'git:aiAutoCommit',
-        status: 'failed',
+        status: wasCancelled ? 'cancelled' : 'failed',
         message,
-        details: { phase: 'failed' },
+        details: { phase: wasCancelled ? 'cancelled' : 'failed', mode: 'normal' },
         timestamp: Date.now(),
       });
+
       return { success: false, error: message };
+    } finally {
+      if (currentAiAutoCommitJob?.id === jobId) {
+        currentAiAutoCommitJob = null;
+      }
     }
+  });
+
+  ipcMain.handle('git:cancelAiAutoCommit', async () => {
+    if (!currentAiAutoCommitJob) {
+      return { success: true, canceled: false };
+    }
+    currentAiAutoCommitJob.cancelRequested = true;
+    return { success: true, canceled: true };
   });
   ipcMain.handle('github:auth', async (_event: any, token: string, host?: string) => {
     const settings = readSettingsWithMigration();
@@ -1688,6 +1711,7 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
 
 
 

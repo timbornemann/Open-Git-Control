@@ -494,6 +494,7 @@ export class AiService {
     settings: AppSettings,
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
+    shouldCancel?: () => boolean,
   ): Promise<AiAutoCommitResult> {
     const runStartedAt = Date.now();
 
@@ -519,6 +520,12 @@ export class AiService {
     }
 
     onProgress?.({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: { mode: 'normal' } });
+    const ensureNotCancelled = () => {
+      if (shouldCancel?.()) {
+        throw new Error('KI Auto-Commit wurde abgebrochen.');
+      }
+    };
+    ensureNotCancelled();
 
     const initialStatus = await this.gitService.getStatusPorcelain();
     const statusEntries = parseStatusPorcelain(initialStatus);
@@ -532,7 +539,9 @@ export class AiService {
     }
 
     const snapshotFiles: SnapshotFile[] = [];
-    for (const entry of statusEntries) {
+    for (let index = 0; index < statusEntries.length; index += 1) {
+      ensureNotCancelled();
+      const entry = statusEntries[index];
       const pathValue = entry.path;
       const changeType = detectChangeType(entry);
 
@@ -551,7 +560,7 @@ export class AiService {
         }
       }
 
-      const numstat = parseNumstatLine(numstatRaw.split('\n').find(Boolean) || '');
+      const numstat = parseNumstatLine(numstatRaw.split('\\n').find(Boolean) || '');
 
       let previewRaw = '';
       try {
@@ -577,8 +586,20 @@ export class AiService {
         preview: toPreview(previewRaw),
         groupKey: buildGroupKey(pathValue, changeType),
       });
-    }
 
+      if (index % 5 === 0 || index === statusEntries.length - 1) {
+        onProgress?.({
+          phase: 'snapshot',
+          message: `Snapshot: ${index + 1}/${statusEntries.length} Dateien analysiert`,
+          progress: Math.min(18, 5 + Math.floor(((index + 1) / Math.max(1, statusEntries.length)) * 12)),
+          details: {
+            mode: 'normal',
+            processedFiles: index + 1,
+            remainingFiles: Math.max(0, statusEntries.length - (index + 1)),
+          },
+        });
+      }
+    }
     onProgress?.({
       phase: 'grouping',
       message: `Dateien werden gruppiert (${snapshotFiles.length})...`,
@@ -607,6 +628,7 @@ export class AiService {
       let groupRetries = 0;
 
       while (queue.length > 0) {
+        ensureNotCancelled();
         if (Date.now() - runStartedAt > RUN_TIMEOUT_MS) {
           warnings.push('Zeitbudget erreicht; verbleibende Dateien werden im Ergebnis ausgewiesen.');
           break;
@@ -724,6 +746,7 @@ export class AiService {
           }
 
           await this.gitService.runCommand(commitArgs);
+          ensureNotCancelled();
 
           const hash = (await this.gitService.runCommand(['rev-parse', '--short', 'HEAD'])).trim();
           const subject = (await this.gitService.runCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
