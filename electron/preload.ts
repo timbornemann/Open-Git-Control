@@ -1,10 +1,14 @@
-const { contextBridge, ipcRenderer } = require('electron');
+﻿const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   runGitCommand: (commandName: string, ...args: any[]) => ipcRenderer.invoke('git:command', commandName, ...args),
+  startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke('git:interactiveRebase', baseHash, todoLines),
+  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke('git:applyPatch', patch, options || {}),
+  getStashes: () => ipcRenderer.invoke('git:stashes'),
+  getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke('git:repoOriginUrl', repoPath),
   addIgnoreRule: (pattern: string) => ipcRenderer.invoke('git:addIgnoreRule', pattern),
   gitFetch: () => ipcRenderer.invoke('git:command', 'fetch', '--all', '--prune', '--tags', '--quiet'),
   gitPull: () => ipcRenderer.invoke('git:command', 'pull'),
@@ -46,11 +50,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
   ollamaListModels: () => ipcRenderer.invoke('ai:listModels'),
   runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
-  githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
+  githubAuth: (token: string, host?: string) => ipcRenderer.invoke('github:auth', token, host),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
   githubWebLogin: () => ipcRenderer.invoke('github:webLogin'),
-  githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
+  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => ipcRenderer.invoke('github:getRepos', params || {}),
   githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),
   githubLoginWithSavedToken: () => ipcRenderer.invoke('github:loginWithSavedToken'),
   githubCheckAuthStatus: () => ipcRenderer.invoke('github:checkAuthStatus'),
@@ -61,4 +65,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:getPRs', owner, repo, state),
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
     ipcRenderer.invoke('github:createPR', params),
+  githubMergePR: (params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) =>
+    ipcRenderer.invoke('github:mergePR', params),
+  getDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:report'),
 });

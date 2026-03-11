@@ -1,4 +1,4 @@
-export type AiProvider = 'ollama' | 'gemini';
+﻿export type AiProvider = 'ollama' | 'gemini';
 export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
 
 export interface AppSettings {
@@ -17,6 +17,7 @@ export interface AppSettings {
   geminiModel: string;
   hasGeminiApiKey: boolean;
   githubOauthClientId: string;
+  githubHost: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -35,6 +36,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
   githubOauthClientId: '',
+  githubHost: 'github.com',
 };
 
 const MIN_FETCH_INTERVAL_MS = 10_000;
@@ -43,6 +45,7 @@ const MAX_COMMIT_TEMPLATE_LENGTH = 8_000;
 const MAX_OLLAMA_BASE_URL_LENGTH = 500;
 const MAX_MODEL_LENGTH = 200;
 const MAX_GITHUB_OAUTH_CLIENT_ID_LENGTH = 200;
+const MAX_GITHUB_HOST_LENGTH = 200;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
   switch (value) {
@@ -137,6 +140,24 @@ function normalizeGithubOauthClientId(value: unknown): string {
   return value.trim().slice(0, MAX_GITHUB_OAUTH_CLIENT_ID_LENGTH);
 }
 
+function normalizeGithubHost(value: unknown): string {
+  if (typeof value !== 'string') {
+    return DEFAULT_SETTINGS.githubHost;
+  }
+
+  const trimmed = value.trim().toLowerCase().slice(0, MAX_GITHUB_HOST_LENGTH);
+  if (!trimmed) {
+    return DEFAULT_SETTINGS.githubHost;
+  }
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!withoutProtocol || /[^a-z0-9.\-:]/.test(withoutProtocol)) {
+    return DEFAULT_SETTINGS.githubHost;
+  }
+
+  return withoutProtocol;
+}
+
 export function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   const value = input || {};
   return {
@@ -155,5 +176,6 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),
     hasGeminiApiKey: normalizeBoolean(value.hasGeminiApiKey, false),
     githubOauthClientId: normalizeGithubOauthClientId(value.githubOauthClientId),
+    githubHost: normalizeGithubHost(value.githubHost),
   };
 }

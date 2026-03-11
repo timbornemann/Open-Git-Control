@@ -393,6 +393,7 @@ type JobEventPayload = {
   status: JobEventStatus;
   message?: string;
   progress?: number;
+  details?: Record<string, unknown>;
   timestamp: number;
 };
 
@@ -553,6 +554,14 @@ interface FileBlameLine {
   authorTime: string;
   summary: string;
   content: string;
+}
+
+interface StashEntry {
+  index: number;
+  name: string;
+  hash: string;
+  branch: string;
+  subject: string;
 }
 
 function getStorePath(): string {
@@ -867,6 +876,108 @@ function parseFileBlame(blameOutput: string): FileBlameLine[] {
   return parsed;
 }
 
+function parseStashList(stashOutput: string): StashEntry[] {
+  if (!stashOutput.trim()) return [];
+
+  return stashOutput
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const match = line.match(/^stash@\{(\d+)\}:\s*(?:On|WIP on)\s+([^:]+):\s*(.+)$/i);
+      if (!match) {
+        return null;
+      }
+
+      const index = Number(match[1]);
+      const branch = (match[2] || '').trim();
+      const subject = (match[3] || '').trim();
+      const hashMatch = subject.match(/^([0-9a-f]{7,40})\s+/i);
+      const hash = hashMatch ? hashMatch[1] : '';
+
+      return {
+        index,
+        name: `stash@{${index}}`,
+        hash,
+        branch,
+        subject,
+      };
+    })
+    .filter((entry): entry is StashEntry => Boolean(entry));
+}
+
+function sanitizeRemoteUrl(value: string): string {
+  if (!value) return value;
+  return value.replace(/:\/\/[^@\s]+@/g, '://***@');
+}
+
+async function buildDiagnosticsReport(): Promise<{ generatedAt: string; appVersion: string; platform: string; activeRepo: string | null; report: string }> {
+  const generatedAt = new Date().toISOString();
+  const settings = readSettingsWithMigration();
+  const activeRepo = gitService.getRepoPath();
+
+  const lines: string[] = [];
+  lines.push('Open-Git-Control Diagnostics');
+  lines.push(`Generated: ${generatedAt}`);
+  lines.push(`Version: ${app.getVersion()}`);
+  lines.push(`Platform: ${process.platform} ${process.arch}`);
+  lines.push(`Node: ${process.version}`);
+  lines.push(`Electron: ${process.versions.electron || ''}`);
+  lines.push(`Active repo: ${activeRepo || '(none)'}`);
+  lines.push('');
+  lines.push('[Settings]');
+  lines.push(`language=${settings.language}`);
+  lines.push(`theme=${settings.theme}`);
+  lines.push(`autoFetchIntervalMs=${settings.autoFetchIntervalMs}`);
+  lines.push(`confirmDangerousOps=${settings.confirmDangerousOps}`);
+  lines.push(`showSecondaryHistory=${settings.showSecondaryHistory}`);
+  lines.push(`aiProvider=${settings.aiProvider}`);
+  lines.push(`githubHost=${settings.githubHost}`);
+  lines.push(`oauthConfigured=${githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost)}`);
+  lines.push(`hasGeminiApiKey=${settings.hasGeminiApiKey}`);
+
+  lines.push('');
+  lines.push('[Updater]');
+  lines.push(`state=${updaterStatus.state}`);
+  lines.push(`availableVersion=${updaterStatus.availableVersion || ''}`);
+  lines.push(`downloaded=${updaterStatus.downloaded}`);
+  lines.push(`lastError=${updaterStatus.error || ''}`);
+
+  if (activeRepo) {
+    lines.push('');
+    lines.push('[Git]');
+    try {
+      const status = await gitService.runCommand(['status', '-sb']);
+      lines.push('status -sb:');
+      lines.push(status || '(empty)');
+    } catch (error: any) {
+      lines.push(`status -sb failed: ${error?.message || String(error)}`);
+    }
+
+    try {
+      const remotes = await gitService.runCommand(['remote', '-v']);
+      lines.push('');
+      lines.push('remote -v:');
+      lines.push(
+        remotes
+          .split('\n')
+          .map(line => sanitizeRemoteUrl(line))
+          .join('\n') || '(empty)',
+      );
+    } catch (error: any) {
+      lines.push(`remote -v failed: ${error?.message || String(error)}`);
+    }
+  }
+
+  return {
+    generatedAt,
+    appVersion: app.getVersion(),
+    platform: `${process.platform}-${process.arch}`,
+    activeRepo,
+    report: lines.join('\n'),
+  };
+}
+
 function createWindow() {
   const windowIconPath = getWindowIconPath();
 
@@ -991,6 +1102,76 @@ function setupIPC() {
           timestamp: Date.now(),
         });
       }
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:interactiveRebase', async (_event: any, baseHash: unknown, todoLines: unknown) => {
+    try {
+      const normalizedBase = String(baseHash || '').trim();
+      if (!/^[0-9a-f]{7,40}$/i.test(normalizedBase)) {
+        return { success: false, error: 'Invalid base commit hash.' };
+      }
+
+      if (!Array.isArray(todoLines) || todoLines.length === 0) {
+        return { success: false, error: 'Rebase todo list is empty.' };
+      }
+
+      const normalizedTodo = todoLines
+        .map(line => String(line || '').trim())
+        .filter(Boolean)
+        .slice(0, 500);
+
+      if (normalizedTodo.length === 0) {
+        return { success: false, error: 'Rebase todo list is empty.' };
+      }
+
+      const data = await gitService.startInteractiveRebase(normalizedBase, normalizedTodo);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:applyPatch', async (_event: any, patch: unknown, options: { cached?: unknown; reverse?: unknown } = {}) => {
+    try {
+      const normalizedPatch = String(patch || '');
+      if (!normalizedPatch.trim()) {
+        return { success: false, error: 'Patch is empty.' };
+      }
+      if (normalizedPatch.length > 2_000_000) {
+        return { success: false, error: 'Patch is too large.' };
+      }
+
+      const data = await gitService.applyPatch(normalizedPatch, {
+        cached: Boolean(options.cached),
+        reverse: Boolean(options.reverse),
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:stashes', async () => {
+    try {
+      const raw = await gitService.getStashes(200);
+      return { success: true, data: parseStashList(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:repoOriginUrl', async (_event: any, repoPath: string) => {
+    try {
+      const normalizedPath = String(repoPath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+
+      const url = await gitService.getRepoOriginUrl(normalizedPath);
+      return { success: true, data: url };
+    } catch (error: any) {
       return { success: false, error: error.message };
     }
   });
@@ -1204,19 +1385,66 @@ function setupIPC() {
     }
   });
 
-  ipcMain.handle('git:aiAutoCommit', async () => {
+  ipcMain.handle('git:aiAutoCommit', async (event: any) => {
+    const webContents = event.sender;
+    const jobId = createJobId('git-aiAutoCommit');
+
+    emitJobEvent(webContents, {
+      id: jobId,
+      operation: 'git:aiAutoCommit',
+      status: 'start',
+      message: 'KI Auto-Commit gestartet.',
+      details: { phase: 'snapshot', mode: 'normal' },
+      timestamp: Date.now(),
+    });
+
     try {
       const settings = readSettingsWithMigration();
-      const result = await aiService.runAutoCommit(settings, getGeminiApiKeyFromSecureStore);
+      const result = await aiService.runAutoCommit(settings, getGeminiApiKeyFromSecureStore, (update) => {
+        emitJobEvent(webContents, {
+          id: jobId,
+          operation: 'git:aiAutoCommit',
+          status: 'progress',
+          message: update.message,
+          ...(typeof update.progress === 'number' ? { progress: update.progress } : {}),
+          details: update.details ? { ...update.details, phase: update.phase } : { phase: update.phase },
+          timestamp: Date.now(),
+        });
+      });
+
+      emitJobEvent(webContents, {
+        id: jobId,
+        operation: 'git:aiAutoCommit',
+        status: 'done',
+        message: result.summary || 'KI Auto-Commit abgeschlossen.',
+        details: {
+          phase: 'done',
+          mode: result.modeTransitions[result.modeTransitions.length - 1] || 'normal',
+          processedFiles: result.processedFiles,
+          remainingFiles: result.remainingFiles,
+          totalCommits: result.commitPlanStats.totalCommits,
+        },
+        timestamp: Date.now(),
+      });
+
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
+      emitJobEvent(webContents, {
+        id: jobId,
+        operation: 'git:aiAutoCommit',
+        status: 'failed',
+        message,
+        details: { phase: 'failed' },
+        timestamp: Date.now(),
+      });
       return { success: false, error: message };
     }
   });
-
-  ipcMain.handle('github:auth', async (_event: any, token: string) => {
-    const success = await githubService.authenticate(token);
+  ipcMain.handle('github:auth', async (_event: any, token: string, host?: string) => {
+    const settings = readSettingsWithMigration();
+    const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
+    const success = await githubService.authenticate(token, normalizedHost);
     if (success) {
       saveGithubTokenSecurely(token);
     }
@@ -1230,7 +1458,7 @@ function setupIPC() {
       hasSavedToken: Boolean(savedToken),
       authenticated: githubService.isAuthenticated(),
       username: githubService.getUsername(),
-      oauthConfigured: githubService.isDeviceFlowConfigured(settings.githubOauthClientId),
+      oauthConfigured: githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost),
     };
   });
 
@@ -1241,7 +1469,8 @@ function setupIPC() {
       return { success: false, authenticated: false, username: null };
     }
 
-    const success = await githubService.authenticate(savedToken);
+    const settings = readSettingsWithMigration();
+    const success = await githubService.authenticate(savedToken, settings.githubHost);
     if (!success) {
       clearSavedGithubTokenSecurely();
       return { success: false, authenticated: false, username: null };
@@ -1257,7 +1486,7 @@ function setupIPC() {
   ipcMain.handle('github:deviceStart', async () => {
     try {
       const settings = readSettingsWithMigration();
-      const flow = await githubService.startDeviceFlow(settings.githubOauthClientId);
+      const flow = await githubService.startDeviceFlow(settings.githubOauthClientId, settings.githubHost);
       return { success: true, data: flow };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Device Flow konnte nicht gestartet werden.';
@@ -1273,7 +1502,7 @@ function setupIPC() {
       }
 
       const settings = readSettingsWithMigration();
-      const result = await githubService.pollDeviceFlow(normalizedDeviceCode, settings.githubOauthClientId);
+      const result = await githubService.pollDeviceFlow(normalizedDeviceCode, settings.githubOauthClientId, settings.githubHost);
       if (result.status === 'pending') {
         return { success: true, data: { status: 'pending', interval: result.interval || null } };
       }
@@ -1289,7 +1518,7 @@ function setupIPC() {
         };
       }
 
-      const authenticated = await githubService.authenticate(result.accessToken);
+      const authenticated = await githubService.authenticate(result.accessToken, settings.githubHost);
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
       }
@@ -1310,9 +1539,14 @@ function setupIPC() {
 
   ipcMain.handle('github:webLogin', async () => {
     try {
+      const settings = readSettingsWithMigration();
+      if (githubService.normalizeHost(settings.githubHost) !== 'github.com') {
+        return { success: false, error: '1-Klick Login wird aktuell nur fuer github.com unterstuetzt. Bitte PAT verwenden.' };
+      }
+
       const tokenResult = await runGithubCliOneClickLogin();
 
-      const authenticated = await githubService.authenticate(tokenResult.accessToken);
+      const authenticated = await githubService.authenticate(tokenResult.accessToken, settings.githubHost);
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
       }
@@ -1330,10 +1564,10 @@ function setupIPC() {
     }
   });
 
-  ipcMain.handle('github:getRepos', async () => {
+  ipcMain.handle('github:getRepos', async (_event: any, params: { page?: number; perPage?: number; search?: string } = {}) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
-      const repos = await githubService.getMyRepositories();
+      const repos = await githubService.getMyRepositories(params.page, params.perPage, params.search || '');
       return { success: true, data: repos };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -1368,7 +1602,7 @@ function setupIPC() {
   ipcMain.handle('github:checkAuthStatus', async () => {
     return {
       authenticated: githubService.isAuthenticated(),
-      username: githubService.getUsername()
+      username: githubService.getUsername(),
     };
   });
 
@@ -1389,6 +1623,38 @@ function setupIPC() {
       return { success: true, data: pr };
     } catch (e: any) {
       return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('github:mergePR', async (_event, params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    try {
+      const pullNumber = Number(params?.pullNumber);
+      if (!Number.isFinite(pullNumber) || pullNumber <= 0) {
+        return { success: false, error: 'Invalid pull request number.' };
+      }
+
+      const result = await githubService.mergePullRequest(
+        params.owner,
+        params.repo,
+        pullNumber,
+        params.mergeMethod,
+        params.commitTitle,
+        params.commitMessage,
+      );
+
+      return { success: true, data: result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('diagnostics:report', async () => {
+    try {
+      const data = await buildDiagnosticsReport();
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Diagnostics konnten nicht erstellt werden.' };
     }
   });
 }
@@ -1422,5 +1688,12 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
+
+
+
+
+
 
 
