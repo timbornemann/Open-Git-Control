@@ -299,7 +299,32 @@ export const useAppState = () => {
     if (!fetched) return;
     await runGitCommand(['checkout', targetBranch], `PR-Branch ${targetBranch} ausgecheckt.`);
   };
+  const handleSetUpstreamForCurrentBranch = useCallback(async () => {
+    if (!workspace.activeRepo || !repository.currentBranch) return;
 
+    const setTracking = await runGitCommand(
+      ['branch', '--set-upstream-to', `origin/${repository.currentBranch}`, repository.currentBranch],
+      `Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
+    );
+
+    if (!setTracking) {
+      await runGitCommand(
+        ['push', '-u', 'origin', repository.currentBranch],
+        `Branch ${repository.currentBranch} mit Upstream gepusht.`,
+      );
+    }
+  }, [repository.currentBranch, runGitCommand, workspace.activeRepo]);
+
+  const handleCheckoutRemoteBranch = useCallback(async (remoteBranchName: string) => {
+    const normalized = (remoteBranchName || '').trim();
+    if (!normalized) return;
+
+    const shortName = normalized.replace(/^remotes\//, '').replace(/^origin\//, '').replace(/^[^/]+\//, '');
+    await runGitCommand(
+      ['checkout', '-b', shortName, '--track', normalized],
+      `Branch ${shortName} aus ${normalized} ausgecheckt.`,
+    );
+  }, [runGitCommand]);
   const clearJobs = () => setJobs([]);
 
   return {
@@ -350,6 +375,8 @@ export const useAppState = () => {
     handlePushTags: repository.handlePushTags,
     handleAddRemote: repository.handleAddRemote,
     handleRemoveRemote: repository.handleRemoveRemote,
+    handleSetUpstreamForCurrentBranch,
+    handleCheckoutRemoteBranch,
 
     isAuthenticated: github.isAuthenticated,
     githubUser: github.githubUser,
@@ -419,6 +446,8 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
+
+
 
 
 

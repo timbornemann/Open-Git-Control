@@ -32,9 +32,12 @@ type ReposSidebarContentProps = Pick<
   | 'remoteSync'
   | 'remoteStatus'
   | 'remoteOnlyBranchesCount'
+  | 'remoteOnlyBranches'
   | 'onAddRemote'
   | 'onRemoveRemote'
   | 'onRefreshRemote'
+  | 'onSetUpstreamForCurrentBranch'
+  | 'onCheckoutRemoteBranch'
   | 'hasRemoteOrigin'
   | 'isConnectingGithubRepo'
   | 'connectError'
@@ -73,9 +76,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   remoteSync,
   remoteStatus,
   remoteOnlyBranchesCount,
+  remoteOnlyBranches,
   onAddRemote,
   onRemoveRemote,
   onRefreshRemote,
+  onSetUpstreamForCurrentBranch,
+  onCheckoutRemoteBranch,
   hasRemoteOrigin,
   isConnectingGithubRepo,
   connectError,
@@ -128,9 +134,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
         remoteSync={remoteSync}
         remoteStatus={remoteStatus}
         remoteOnlyBranchesCount={remoteOnlyBranchesCount}
+        remoteOnlyBranches={remoteOnlyBranches}
         onAddRemote={onAddRemote}
         onRemoveRemote={onRemoveRemote}
         onRefreshRemote={onRefreshRemote}
+        onSetUpstreamForCurrentBranch={onSetUpstreamForCurrentBranch}
+        onCheckoutRemoteBranch={onCheckoutRemoteBranch}
       />
     )}
 
@@ -238,3 +247,4 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
     )}
   </div>
 );
+

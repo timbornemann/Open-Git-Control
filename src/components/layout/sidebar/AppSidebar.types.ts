@@ -48,9 +48,12 @@ export type AppSidebarProps = {
   remotes: { name: string; url: string }[];
   remoteStatus: RemoteStatus;
   remoteOnlyBranchesCount: number;
+  remoteOnlyBranches: string[];
   onAddRemote: () => void;
   onRemoveRemote: (name: string) => void;
   onRefreshRemote: () => void;
+  onSetUpstreamForCurrentBranch: () => void;
+  onCheckoutRemoteBranch: (remoteBranchName: string) => void;
 
   hasRemoteOrigin: boolean | null;
   isConnectingGithubRepo: boolean;
@@ -111,3 +114,5 @@ export type AppSidebarProps = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
 };
+
+

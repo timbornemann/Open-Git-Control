@@ -43,9 +43,12 @@ const App: React.FC = () => {
         remotes={state.remotes}
         remoteStatus={state.remoteStatus}
         remoteOnlyBranchesCount={state.remoteOnlyBranches.length}
+        remoteOnlyBranches={state.remoteOnlyBranches.map(branch => branch.name)}
         onAddRemote={state.handleAddRemote}
         onRemoveRemote={state.handleRemoveRemote}
         onRefreshRemote={() => state.refreshRemoteState(true)}
+        onSetUpstreamForCurrentBranch={state.handleSetUpstreamForCurrentBranch}
+        onCheckoutRemoteBranch={state.handleCheckoutRemoteBranch}
         hasRemoteOrigin={state.hasRemoteOrigin}
         isConnectingGithubRepo={state.isConnectingGithubRepo}
         connectError={state.connectError}
@@ -192,3 +195,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
