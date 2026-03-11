@@ -1,17 +1,17 @@
 import { GitCommit } from './gitParsing';
 
-// Colors for branch lanes (GitKraken-inspired palette)
+// Brand-aligned lane colors for branch graph readability
 export const LANE_COLORS = [
-  '#00b4d8', // cyan
-  '#e040fb', // magenta
-  '#3fb950', // green
-  '#d29922', // orange
-  '#f78166', // coral
-  '#a371f7', // purple
-  '#58a6ff', // blue
-  '#f85149', // red
-  '#7ee787', // light green
-  '#d2a8ff', // light purple
+  'var(--graph-lane-1)',
+  'var(--graph-lane-2)',
+  'var(--graph-lane-3)',
+  'var(--graph-lane-4)',
+  'var(--graph-lane-5)',
+  'var(--graph-lane-6)',
+  'var(--graph-lane-7)',
+  'var(--graph-lane-8)',
+  'var(--graph-lane-9)',
+  'var(--graph-lane-10)',
 ];
 
 export interface GraphEdge {

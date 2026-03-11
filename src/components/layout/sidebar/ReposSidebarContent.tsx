@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Github } from 'lucide-react';
 import { RepoList } from '../../sidebar/RepoList';
 import { BranchPanel } from '../../sidebar/BranchPanel';
@@ -228,7 +228,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
               </label>
             </div>
             {connectError && (
-              <div style={{ fontSize: '0.8rem', color: '#f85149' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
                 {connectError}
               </div>
             )}
@@ -238,7 +238,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
               style={{
                 padding: '6px 10px',
                 backgroundColor: !isConnectingGithubRepo ? 'var(--accent-primary)' : 'var(--bg-dark)',
-                color: !isConnectingGithubRepo ? '#fff' : 'var(--text-secondary)',
+                color: !isConnectingGithubRepo ? 'var(--on-accent)' : 'var(--text-secondary)',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: !isConnectingGithubRepo ? 'pointer' : 'not-allowed',

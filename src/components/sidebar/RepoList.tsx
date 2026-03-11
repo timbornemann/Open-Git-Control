@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
@@ -88,7 +88,7 @@ export const RepoList: React.FC<Props> = ({
                   onTogglePin(repoPath);
                 }}
                 className="icon-btn"
-                style={{ padding: '2px', opacity: isPinned ? 1 : 0.7, color: isPinned ? '#d2a922' : 'var(--text-secondary)' }}
+                style={{ padding: '2px', opacity: isPinned ? 1 : 0.7, color: isPinned ? 'var(--status-warning)' : 'var(--text-secondary)' }}
                 title={isPinned ? tr('Favorit entfernen', 'Remove favorite') : tr('Als Favorit markieren', 'Mark as favorite')}
               >
                 {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
@@ -111,7 +111,7 @@ export const RepoList: React.FC<Props> = ({
           <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
             {tr('Kein Repository geöffnet.', 'No repository opened.')}
-            <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+            <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
               {tr('Repository öffnen', 'Open repository')}
             </button>
           </div>

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GitBranch, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
@@ -8,6 +8,7 @@ import { DiffViewer } from '../DiffViewer';
 import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
 import { useI18n } from '../../i18n';
+import appLogo from '../../../logo.png';
 
 type RemoteStatus = {
   title: string;
@@ -118,8 +119,13 @@ export const MainView: React.FC<Props> = ({
     <div className="main-view">
       <div className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img
+            src={appLogo}
+            alt="Open-Git-Control"
+            style={{ width: '22px', height: '22px', objectFit: 'contain', borderRadius: '4px' }}
+          />
           <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>
-            {activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Git-Organizer'}
+            {activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
           </span>
           {currentBranch && (
             <span
@@ -127,9 +133,9 @@ export const MainView: React.FC<Props> = ({
                 fontSize: '0.8rem',
                 padding: '4px 8px',
                 borderRadius: '12px',
-                backgroundColor: 'rgba(57, 163, 71, 0.15)',
-                color: '#3fb950',
-                border: '1px solid rgba(57, 163, 71, 0.3)',
+                backgroundColor: 'var(--status-success-soft)',
+                color: 'var(--status-success)',
+                border: '1px solid var(--status-success-border)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -162,9 +168,9 @@ export const MainView: React.FC<Props> = ({
                 fontSize: '0.78rem',
                 padding: '4px 8px',
                 borderRadius: '12px',
-                backgroundColor: 'rgba(31, 111, 235, 0.14)',
-                color: '#7cb8ff',
-                border: '1px solid rgba(31, 111, 235, 0.28)',
+                backgroundColor: 'var(--accent-primary-soft)',
+                color: 'var(--text-accent)',
+                border: '1px solid var(--accent-primary-border)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -200,7 +206,7 @@ export const MainView: React.FC<Props> = ({
                 onClick={() => setActiveDiffRequest(null)}
                 style={{ fontSize: '0.75rem', padding: '2px 6px' }}
               >
-                {tr('Zurück zum Graph', 'Back to graph')}
+                {tr('Zurueck zum Graph', 'Back to graph')}
               </button>
             )}
           </div>
@@ -226,11 +232,11 @@ export const MainView: React.FC<Props> = ({
               <div style={{ display: 'flex', gap: '6px' }}>
                 {commitHistoryStack.length > 0 && (
                   <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                    {tr('Zurück', 'Back')}
+                    {tr('Zurueck', 'Back')}
                   </button>
                 )}
                 <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                  {tr('Schließen', 'Close')}
+                  {tr('Schliessen', 'Close')}
                 </button>
               </div>
             )}

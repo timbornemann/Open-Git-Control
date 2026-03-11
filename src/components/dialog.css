@@ -122,7 +122,7 @@
 
 .dialog-validation {
   font-size: 0.78rem;
-  color: #f85149;
+  color: var(--status-danger);
 }
 
 .dialog-footer {
@@ -160,7 +160,7 @@
 
 .dialog-btn-primary {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .dialog-btn-primary:hover:not(:disabled) {
@@ -168,10 +168,10 @@
 }
 
 .dialog-btn-danger {
-  background: #da3633;
-  color: #fff;
+  background: var(--status-danger);
+  color: var(--on-accent);
 }
 
 .dialog-btn-danger:hover:not(:disabled) {
-  background: #f85149;
+  background: var(--status-danger);
 }

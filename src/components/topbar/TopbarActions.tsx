@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ArrowDownCircle, ArrowUpCircle, RefreshCw } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
@@ -33,7 +33,7 @@ export const TopbarActions: React.FC<Props> = ({ activeRepo, isGitActionRunning,
         <ArrowUpCircle size={16} className={isPushRunning ? 'spin' : ''} style={{ marginRight: '6px' }} />
         {isPushRunning ? tr('Push läuft...', 'Push running...') : 'Push'}
       </button>
-      <button className="icon-btn" onClick={onStageCommit} style={{ backgroundColor: 'var(--accent-primary)', color: '#fff', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>{tr('Stagen / Commit', 'Stage / Commit')}</button>
+      <button className="icon-btn" onClick={onStageCommit} style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>{tr('Stagen / Commit', 'Stage / Commit')}</button>
     </div>
   );
 };

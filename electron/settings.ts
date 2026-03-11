@@ -1,7 +1,8 @@
 export type AiProvider = 'ollama' | 'gemini';
+export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
 
 export interface AppSettings {
-  theme: 'dark' | 'light';
+  theme: AppTheme;
   language: 'de' | 'en';
   autoFetchIntervalMs: number;
   defaultBranch: string;
@@ -18,7 +19,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'dark',
+  theme: 'copper-night',
   language: 'de',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
@@ -41,7 +42,20 @@ const MAX_OLLAMA_BASE_URL_LENGTH = 500;
 const MAX_MODEL_LENGTH = 200;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
-  return value === 'light' ? 'light' : 'dark';
+  switch (value) {
+    case 'copper-night':
+    case 'midnight-teal':
+    case 'graphite-blue':
+    case 'forest-copper':
+    case 'porcelain-light':
+      return value;
+    case 'dark':
+      return 'copper-night';
+    case 'light':
+      return 'porcelain-light';
+    default:
+      return DEFAULT_SETTINGS.theme;
+  }
 }
 
 function normalizeLanguage(value: unknown): AppSettings['language'] {

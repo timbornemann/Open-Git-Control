@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { BranchInfo, RemoteSyncState } from '../../../types/git';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
@@ -447,9 +447,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr('Remote wird aktualisiert...', 'Updating remote...'),
         detail: tr('Fetch läuft gerade.', 'Fetch is running.'),
-        color: '#7cb8ff',
-        backgroundColor: 'rgba(31, 111, 235, 0.14)',
-        borderColor: 'rgba(31, 111, 235, 0.28)',
+        color: 'var(--text-accent)',
+        backgroundColor: 'var(--accent-primary-soft)',
+        borderColor: 'var(--accent-primary-border)',
       };
     }
 
@@ -457,9 +457,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr('Remote-Check fehlgeschlagen', 'Remote check failed'),
         detail: remoteSync.lastFetchError,
-        color: '#f85149',
-        backgroundColor: 'rgba(248, 81, 73, 0.14)',
-        borderColor: 'rgba(248, 81, 73, 0.28)',
+        color: 'var(--status-danger)',
+        backgroundColor: 'var(--status-danger-soft)',
+        borderColor: 'var(--status-danger-border)',
       };
     }
 
@@ -487,9 +487,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr('Kein Tracking-Branch', 'No tracking branch'),
         detail: tr('Der aktuelle lokale Branch tracked keinen Remote-Branch.', 'Current local branch does not track a remote branch.'),
-        color: '#d2a922',
-        backgroundColor: 'rgba(210, 169, 34, 0.14)',
-        borderColor: 'rgba(210, 169, 34, 0.28)',
+        color: 'var(--status-warning)',
+        backgroundColor: 'var(--status-warning-soft)',
+        borderColor: 'var(--status-warning-border)',
       };
     }
 
@@ -497,9 +497,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr('Lokal und Remote sind unterschiedlich', 'Local and remote diverged'),
         detail: tr(`Lokal ${remoteSync.ahead} voraus, Remote ${remoteSync.behind} voraus.`, `Local ahead by ${remoteSync.ahead}, remote ahead by ${remoteSync.behind}.`),
-        color: '#d2a922',
-        backgroundColor: 'rgba(210, 169, 34, 0.14)',
-        borderColor: 'rgba(210, 169, 34, 0.28)',
+        color: 'var(--status-warning)',
+        backgroundColor: 'var(--status-warning-soft)',
+        borderColor: 'var(--status-warning-border)',
       };
     }
 
@@ -507,9 +507,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr(`Remote ist ${remoteSync.behind} Commit${remoteSync.behind === 1 ? '' : 's'} voraus`, `Remote is ahead by ${remoteSync.behind} commit${remoteSync.behind === 1 ? '' : 's'}`),
         detail: tr('Der Remote hat neuere Commits als dein lokaler Branch.', 'Remote has newer commits than your local branch.'),
-        color: '#d2a922',
-        backgroundColor: 'rgba(210, 169, 34, 0.14)',
-        borderColor: 'rgba(210, 169, 34, 0.28)',
+        color: 'var(--status-warning)',
+        backgroundColor: 'var(--status-warning-soft)',
+        borderColor: 'var(--status-warning-border)',
       };
     }
 
@@ -517,9 +517,9 @@ export const useRepositoryDomain = ({
       return {
         title: tr(`Lokal ist ${remoteSync.ahead} Commit${remoteSync.ahead === 1 ? '' : 's'} voraus`, `Local is ahead by ${remoteSync.ahead} commit${remoteSync.ahead === 1 ? '' : 's'}`),
         detail: tr('Deine lokalen Commits wurden noch nicht gepusht.', 'Your local commits have not been pushed yet.'),
-        color: '#7cb8ff',
-        backgroundColor: 'rgba(31, 111, 235, 0.14)',
-        borderColor: 'rgba(31, 111, 235, 0.28)',
+        color: 'var(--text-accent)',
+        backgroundColor: 'var(--accent-primary-soft)',
+        borderColor: 'var(--accent-primary-border)',
       };
     }
 
@@ -527,18 +527,18 @@ export const useRepositoryDomain = ({
       return {
         title: tr(`${remoteOnlyBranches.length} zusätzl. Remote-Branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`, `${remoteOnlyBranches.length} additional remote branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`),
         detail: tr('Auf dem Remote gibt es weitere Branches.', 'There are more branches on the remote.'),
-        color: '#d2a922',
-        backgroundColor: 'rgba(210, 169, 34, 0.14)',
-        borderColor: 'rgba(210, 169, 34, 0.28)',
+        color: 'var(--status-warning)',
+        backgroundColor: 'var(--status-warning-soft)',
+        borderColor: 'var(--status-warning-border)',
       };
     }
 
     return {
       title: tr('Remote ist aktuell', 'Remote is up to date'),
       detail: formatLastFetchedAt(remoteSync.lastFetchedAt),
-      color: '#3fb950',
-      backgroundColor: 'rgba(63, 185, 80, 0.14)',
-      borderColor: 'rgba(63, 185, 80, 0.28)',
+      color: 'var(--status-success)',
+      backgroundColor: 'var(--status-success-soft)',
+      borderColor: 'var(--status-success-border)',
     };
   })();
 

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Github, LogOut, DownloadCloud, FolderOpen, CheckCircle2, Plus, GitPullRequest, Copy, ExternalLink, GitBranch } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
@@ -133,9 +133,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                     gap: '4px',
                     fontSize: '0.72rem',
                     fontWeight: 600,
-                    color: '#3fb950',
-                    backgroundColor: 'rgba(63, 185, 80, 0.14)',
-                    border: '1px solid rgba(63, 185, 80, 0.35)',
+                    color: 'var(--status-success)',
+                    backgroundColor: 'var(--status-success-soft)',
+                    border: '1px solid var(--status-success-border)',
                     borderRadius: '999px',
                     padding: '2px 8px',
                   }}
@@ -214,7 +214,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   fontSize: '0.72rem',
                   fontWeight: 600,
                   backgroundColor: prFilter === filter ? 'var(--accent-primary)' : 'var(--bg-dark)',
-                  color: prFilter === filter ? '#fff' : 'var(--text-secondary)',
+                  color: prFilter === filter ? 'var(--on-accent)' : 'var(--text-secondary)',
                   border: `1px solid ${prFilter === filter ? 'var(--accent-primary)' : 'var(--border-color)'}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
@@ -328,7 +328,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   style={{
                     padding: '5px 10px',
                     backgroundColor: newPRTitle.trim() ? 'var(--accent-primary)' : 'var(--bg-dark)',
-                    color: newPRTitle.trim() ? '#fff' : 'var(--text-secondary)',
+                    color: newPRTitle.trim() ? 'var(--on-accent)' : 'var(--text-secondary)',
                     border: 'none',
                     borderRadius: '4px',
                     cursor: newPRTitle.trim() ? 'pointer' : 'not-allowed',
@@ -366,7 +366,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   <GitPullRequest
                     size={14}
                     style={{
-                      color: pr.merged ? '#a371f7' : pr.state === 'open' ? '#3fb950' : '#f85149',
+                      color: pr.merged ? 'var(--status-merged)' : pr.state === 'open' ? 'var(--status-success)' : 'var(--status-danger)',
                       marginTop: '2px',
                       flexShrink: 0,
                     }}

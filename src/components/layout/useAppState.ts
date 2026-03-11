@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
@@ -9,7 +9,7 @@ import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
 
 const DEFAULT_SETTINGS: AppSettingsDto = {
-  theme: 'dark',
+  theme: 'copper-night',
   language: 'de',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
@@ -30,7 +30,8 @@ type RunGitCommandOptions = {
 };
 
 const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
-const SIDEBAR_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-collapse-by-repo:v1';
+const SIDEBAR_COLLAPSE_STORAGE_KEY = 'open-git-control:sidebar-collapse-by-repo:v1';
+const LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-collapse-by-repo:v1';
 
 type SidebarCollapseState = {
   branchPanelCollapsed: boolean;
@@ -100,7 +101,7 @@ export const useAppState = () => {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY);
+      const raw = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as SidebarCollapseByRepo;
       if (parsed && typeof parsed === 'object') {

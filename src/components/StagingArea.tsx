@@ -48,12 +48,12 @@ type StagingContextMenuState = {
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  A: { label: 'Added', color: '#3fb950' },
-  M: { label: 'Modified', color: '#d29922' },
-  D: { label: 'Deleted', color: '#f85149' },
-  R: { label: 'Renamed', color: '#a371f7' },
-  C: { label: 'Copied', color: '#58a6ff' },
-  '?': { label: 'Untracked', color: '#8b949e' },
+  A: { label: 'Added', color: 'var(--status-success)' },
+  M: { label: 'Modified', color: 'var(--status-warning)' },
+  D: { label: 'Deleted', color: 'var(--status-danger)' },
+  R: { label: 'Renamed', color: 'var(--status-merged)' },
+  C: { label: 'Copied', color: 'var(--status-info)' },
+  '?': { label: 'Untracked', color: 'var(--status-untracked)' },
 };
 
 const CONFLICT_LABELS: Record<string, string> = {
@@ -66,7 +66,7 @@ const CONFLICT_LABELS: Record<string, string> = {
   UD: 'Deleted by them',
 };
 
-const getStatusInfo = (code: string) => STATUS_LABELS[code] || { label: code, color: '#8b949e' };
+const getStatusInfo = (code: string) => STATUS_LABELS[code] || { label: code, color: 'var(--status-untracked)' };
 const basename = (p: string) => p.split(/[\\/]/).pop() || p;
 
 const parseConflictEntries = (statusOutput: string): ConflictEntry[] => {
@@ -592,9 +592,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
             key={filter}
             className="staging-tool-btn"
             style={{
-              backgroundColor: activeFilter === filter ? 'rgba(31, 111, 235, 0.2)' : undefined,
-              borderColor: activeFilter === filter ? 'rgba(31, 111, 235, 0.5)' : undefined,
-              color: activeFilter === filter ? '#7cb8ff' : undefined,
+              backgroundColor: activeFilter === filter ? 'var(--accent-primary-soft)' : undefined,
+              borderColor: activeFilter === filter ? 'var(--accent-primary-border)' : undefined,
+              color: activeFilter === filter ? 'var(--text-accent)' : undefined,
             }}
             onClick={() => setActiveFilter(filter)}
           >
@@ -624,7 +624,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleConflicts.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Konflikte" count={visibleConflicts.length} color="#f85149" />
+            <SectionHeader title="Konflikte" count={visibleConflicts.length} color="var(--status-danger)" />
             <div style={{ padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
               <button className="staging-btn-sm" onClick={mergeContinue}>Merge fortsetzen</button>
               <button className="staging-btn-sm danger" onClick={mergeAbort}>Abbrechen</button>
@@ -633,7 +633,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
             </div>
             {visibleConflicts.map((f) => (
               <div key={`c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
-                <span className="staging-status" style={{ color: '#f85149', width: 22 }}>{f.code}</span>
+                <span className="staging-status" style={{ color: 'var(--status-danger)', width: 22 }}>{f.code}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <span className="staging-path" title={f.path}>{f.path}</span>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</div>
@@ -651,7 +651,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleStaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Staged Changes" count={visibleStaged.length} color="#3fb950" statsText={formatDiffStats(stagedStats)}
+            <SectionHeader title="Staged Changes" count={visibleStaged.length} color="var(--status-success)" statsText={formatDiffStats(stagedStats)}
               actions={<button className="staging-btn-sm" onClick={unstageAll} title="Alle unstagen">- Alle</button>}
             />
             {visibleStaged.map(f => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
@@ -660,7 +660,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleUnstaged.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Changes" count={visibleUnstaged.length} color="#d29922" statsText={formatDiffStats(unstagedStats)}
+            <SectionHeader title="Changes" count={visibleUnstaged.length} color="var(--status-warning)" statsText={formatDiffStats(unstagedStats)}
               actions={
                 <>
                   <button className="staging-btn-sm" onClick={stageAll} title="Alle stagen">+ Alle</button>
@@ -674,7 +674,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
         {visibleUntracked.length > 0 && (
           <div className="staging-section">
-            <SectionHeader title="Untracked" count={visibleUntracked.length} color="#8b949e"
+            <SectionHeader title="Untracked" count={visibleUntracked.length} color="var(--status-untracked)"
               actions={<button className="staging-btn-sm" onClick={stageAllUntracked} title="Alle untracked stagen">+ Alle</button>}
             />
             {visibleUntracked.map(f => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
@@ -700,7 +700,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           disabled={hasOpenConflicts}
         />
         <div className="staging-commit-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? '#f85149' : 'var(--text-secondary)' }}>
+          <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
             {hasOpenConflicts ? 'Offene Konflikte blockieren Commit' : 'Ctrl+Enter'}
           </span>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>

@@ -9,6 +9,31 @@ import { aiService } from './AiService';
 import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
 
 const isDev = process.env.NODE_ENV === 'development';
+const APP_DISPLAY_NAME = 'Open-Git-Control';
+const WINDOWS_APP_ID = 'com.opengitcontrol.app';
+
+function resolveExistingFile(candidates: string[]): string | undefined {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function getWindowIconPath(): string | undefined {
+  const iconFileName = process.platform === 'win32' ? 'logo.ico' : 'logo.png';
+  const appPath = app.getAppPath();
+  const rootPath = path.resolve(__dirname, '../../');
+
+  return resolveExistingFile([
+    path.join(appPath, iconFileName),
+    path.join(rootPath, iconFileName),
+    path.join(process.cwd(), iconFileName),
+    path.join(process.resourcesPath, iconFileName),
+  ]);
+}
 type GitCommandName =
   | 'status'
   | 'statusPorcelain'
@@ -523,9 +548,13 @@ function parseFileBlame(blameOutput: string): FileBlameLine[] {
 }
 
 function createWindow() {
+  const windowIconPath = getWindowIconPath();
+
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: APP_DISPLAY_NAME,
+    ...(windowIconPath ? { icon: windowIconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -997,6 +1026,11 @@ function setupIPC() {
 }
 
 app.whenReady().then(() => {
+  app.setName(APP_DISPLAY_NAME);
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(WINDOWS_APP_ID);
+  }
+
   setupIPC();
   createWindow();
 
@@ -1012,7 +1046,6 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-
 
 
 

@@ -44,9 +44,10 @@ export interface GitJobEventDto {
 }
 
 export type AiProviderDto = 'ollama' | 'gemini';
+export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
 
 export interface AppSettingsDto {
-  theme: 'dark' | 'light';
+  theme: AppThemeDto;
   language: 'de' | 'en';
   autoFetchIntervalMs: number;
   defaultBranch: string;

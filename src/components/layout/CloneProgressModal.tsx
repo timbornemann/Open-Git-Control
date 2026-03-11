@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { DownloadCloud } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
@@ -53,8 +53,8 @@ export const CloneProgressModal: React.FC<Props> = ({
           <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{tr('Klone', 'Cloning')}: {cloneRepoName || tr('Repository', 'Repository')}</span>
           <div style={{ flex: 1 }} />
           {!cloneFinished && !cloneError && <div className="clone-spinner" />}
-          {cloneFinished && <span style={{ color: '#3fb950', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fertig', 'Done')}</span>}
-          {cloneError && <span style={{ color: '#f85149', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fehler', 'Error')}</span>}
+          {cloneFinished && <span style={{ color: 'var(--status-success)', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fertig', 'Done')}</span>}
+          {cloneError && <span style={{ color: 'var(--status-danger)', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fehler', 'Error')}</span>}
         </div>
 
         <div
@@ -71,7 +71,7 @@ export const CloneProgressModal: React.FC<Props> = ({
         >
           {cloneLog.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>{tr('Starte Clone-Prozess...', 'Starting clone process...')}</span>}
           {cloneLog.map((line, i) => (
-            <div key={i} style={{ color: line.startsWith('ERROR:') ? '#f85149' : line.startsWith('SUCCESS:') ? '#3fb950' : 'var(--text-secondary)' }}>
+            <div key={i} style={{ color: line.startsWith('ERROR:') ? 'var(--status-danger)' : line.startsWith('SUCCESS:') ? 'var(--status-success)' : 'var(--text-secondary)' }}>
               {line}
             </div>
           ))}
@@ -84,7 +84,7 @@ export const CloneProgressModal: React.FC<Props> = ({
               style={{
                 padding: '6px 16px',
                 backgroundColor: 'var(--accent-primary)',
-                color: '#fff',
+                color: 'var(--on-accent)',
                 border: 'none',
                 borderRadius: '4px',
                 cursor: 'pointer',
@@ -92,7 +92,7 @@ export const CloneProgressModal: React.FC<Props> = ({
                 fontSize: '0.85rem',
               }}
             >
-              {tr('Schließen', 'Close')}
+              {tr('Schliessen', 'Close')}
             </button>
           </div>
         )}

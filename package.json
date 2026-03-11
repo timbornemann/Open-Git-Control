@@ -1,5 +1,6 @@
 {
-  "name": "git-organizer",
+  "name": "open-git-control",
+  "productName": "Open-Git-Control",
   "private": true,
   "version": "1.0.0",
   "main": "dist-electron/electron/main.js",

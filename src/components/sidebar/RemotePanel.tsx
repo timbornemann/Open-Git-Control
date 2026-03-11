@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Globe, Plus, RefreshCw, X } from 'lucide-react';
 import { RemoteInfo, RemoteSyncState } from '../../types/git';
 import { DialogFrame } from '../DialogFrame';
@@ -70,8 +70,8 @@ export const RemotePanel: React.FC<Props> = ({
       {!collapsed && (
         <>
           {isHealthy ? (
-            <div style={{ padding: '6px 8px', borderRadius: '6px', marginBottom: '6px', backgroundColor: 'rgba(63, 185, 80, 0.1)', border: '1px solid rgba(63, 185, 80, 0.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span style={{ fontSize: '0.76rem', color: '#9fe7aa' }}>{remoteStatus.title}</span>
+            <div style={{ padding: '6px 8px', borderRadius: '6px', marginBottom: '6px', backgroundColor: 'var(--status-success-soft)', border: '1px solid var(--status-success-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{ fontSize: '0.76rem', color: 'var(--status-success)' }}>{remoteStatus.title}</span>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{remoteStatus.detail}</span>
             </div>
           ) : (
@@ -121,7 +121,7 @@ export const RemotePanel: React.FC<Props> = ({
                 </div>
               )}
 
-              {remoteSync.lastFetchError && <span style={{ fontSize: '0.75rem', color: '#f85149' }}>{remoteSync.lastFetchError}</span>}
+              {remoteSync.lastFetchError && <span style={{ fontSize: '0.75rem', color: 'var(--status-danger)' }}>{remoteSync.lastFetchError}</span>}
             </div>
           )}
 
@@ -149,7 +149,7 @@ export const RemotePanel: React.FC<Props> = ({
           {remoteOnlyBranches.map((branch) => (
             <div
               key={branch}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 9px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 9px', borderBottom: '1px solid var(--line-subtle)' }}
             >
               <span style={{ fontFamily: 'monospace', fontSize: '0.77rem', color: 'var(--text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {toShortRemoteBranch(branch)}

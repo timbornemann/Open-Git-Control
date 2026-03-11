@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
@@ -6,6 +6,17 @@ type SettingsSidebarContentProps = Pick<
   AppSidebarProps,
   'settings' | 'onUpdateSettings' | 'jobs' | 'onClearJobs'
 >;
+
+const THEME_OPTIONS: Array<{
+  value: SettingsSidebarContentProps['settings']['theme'];
+  label: string;
+}> = [
+  { value: 'copper-night', label: 'Copper Night' },
+  { value: 'midnight-teal', label: 'Midnight Teal' },
+  { value: 'graphite-blue', label: 'Graphite Blue' },
+  { value: 'forest-copper', label: 'Forest Copper' },
+  { value: 'porcelain-light', label: 'Porcelain Light' },
+];
 
 export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   settings,
@@ -89,11 +100,12 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           {tr('Theme', 'Theme')}
           <select
             value={settings.theme}
-            onChange={(e) => onUpdateSettings({ theme: e.target.value as 'dark' | 'light' })}
+            onChange={(e) => onUpdateSettings({ theme: e.target.value as SettingsSidebarContentProps['settings']['theme'] })}
             style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
           >
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
+            {THEME_OPTIONS.map((themeOption) => (
+              <option key={themeOption.value} value={themeOption.value}>{themeOption.label}</option>
+            ))}
           </select>
         </label>
 
@@ -299,7 +311,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           <div key={`${job.id}-${job.timestamp}-${job.status}`} style={{ border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 8px', backgroundColor: 'var(--bg-dark)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
               <span style={{ fontSize: '0.76rem', color: 'var(--text-primary)' }}>{job.operation}</span>
-              <span style={{ fontSize: '0.72rem', color: job.status === 'failed' ? '#f85149' : 'var(--text-secondary)' }}>{job.status}</span>
+              <span style={{ fontSize: '0.72rem', color: job.status === 'failed' ? 'var(--status-danger)' : 'var(--text-secondary)' }}>{job.status}</span>
             </div>
             {job.message && (
               <div style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>

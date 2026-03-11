@@ -20,7 +20,7 @@ const LANE_WIDTH = 28;
 const GRAPH_PADDING = 16;
 const NODE_RADIUS = 4;
 const MERGE_NODE_RADIUS = 6;
-const SECONDARY_GRAPH_ACCENT = 'rgba(139, 148, 158, 0.34)';
+const SECONDARY_GRAPH_ACCENT = 'var(--status-untracked-border)';
 
 interface ContextMenuState {
   x: number;
@@ -609,7 +609,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   };
 
   if (!repoPath) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>Bitte wähle ein Repository aus, um den Graphen zu sehen.</div>;
+    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>Bitte waehle ein Repository aus, um den Graphen zu sehen.</div>;
   }
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Lade Commit-Historie...</div>;
@@ -686,7 +686,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
   return (
     <>
-      <div className="commit-search-toolbar" style={{ position: 'sticky', top: 0, zIndex: 3, background: 'linear-gradient(180deg, rgba(18,22,29,0.98), rgba(18,22,29,0.9))', borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <div className="commit-search-toolbar" style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg-darker)', borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
         <input
           className="commit-search-input" style={{ flex: 1, minWidth: '240px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.82rem' }}
           type="text"
@@ -701,8 +701,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               className={`commit-search-chip ${searchScope === scope ? 'active' : ''}`}
               style={{
                 border: '1px solid var(--border-color)',
-                backgroundColor: searchScope === scope ? 'rgba(31, 111, 235, 0.2)' : 'var(--bg-panel)',
-                color: searchScope === scope ? '#7cb8ff' : 'var(--text-secondary)',
+                backgroundColor: searchScope === scope ? 'var(--accent-primary-soft)' : 'var(--bg-panel)',
+                color: searchScope === scope ? 'var(--text-accent)' : 'var(--text-secondary)',
                 borderRadius: '999px',
                 padding: '4px 9px',
                 fontSize: '0.72rem',
@@ -738,7 +738,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 y1={0}
                 x2={x}
                 y2={totalHeight}
-                stroke="rgba(201, 209, 217, 0.11)"
+                stroke="var(--line-subtle)"
                 strokeWidth={1}
               />
             );
@@ -766,7 +766,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 cy={ROW_HEIGHT / 2}
                 r={NODE_RADIUS + 2}
                 fill="var(--bg-darker)"
-                stroke="#d29922"
+                stroke="var(--status-warning)"
                 strokeWidth={2.2}
               />
             </>
@@ -896,7 +896,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               className={`commit-row ${isSelected ? 'selected' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
-              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth, ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px rgba(31, 111, 235, 0.45)' } : {}) }}
+              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth, ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px var(--accent-primary-strong)' } : {}) }}
               data-commit-hash={node.commit.hash}
             >
               <div className="commit-info">
@@ -943,7 +943,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 opacity: loadingMore ? 0.7 : 1,
               }}
             >
-              {loadingMore ? 'Lade weitere Commits…' : 'Mehr laden'}
+              {loadingMore ? 'Lade weitere Commits...' : 'Mehr laden'}
             </button>
           </div>
         )}
@@ -961,7 +961,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             onClick={(e) => e.stopPropagation()}
           >
             <div className="ctx-menu-header">
-              {contextMenu.node.commit.abbrevHash} — {contextMenu.node.commit.subject.slice(0, 30)}{contextMenu.node.commit.subject.length > 30 ? '...' : ''}
+              {contextMenu.node.commit.abbrevHash} - {contextMenu.node.commit.subject.slice(0, 30)}{contextMenu.node.commit.subject.length > 30 ? '...' : ''}
             </div>
             {getMenuActions(contextMenu.node).map((item, idx) => {
               if (item.separator) {
