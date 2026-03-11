@@ -17,6 +17,9 @@ type GithubAuthContentProps = Pick<
   | 'deviceFlowError'
   | 'onStartDeviceFlowLogin'
   | 'onCancelDeviceFlow'
+  | 'isWebFlowRunning'
+  | 'webFlowError'
+  | 'onStartWebFlowLogin'
 >;
 
 export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
@@ -32,6 +35,9 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   deviceFlowError,
   onStartDeviceFlowLogin,
   onCancelDeviceFlow,
+  isWebFlowRunning,
+  webFlowError,
+  onStartWebFlowLogin,
 }) => {
   const { tr } = useI18n();
 
@@ -136,7 +142,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
 
         {!oauthConfigured && (
           <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)', textAlign: 'left' }}>
-            {tr('Device Flow ist nicht konfiguriert (GITHUB_OAUTH_CLIENT_ID fehlt).', 'Device Flow is not configured (missing GITHUB_OAUTH_CLIENT_ID).')}
+            {tr('Device Flow ist nicht konfiguriert (GitHub OAuth Client ID fehlt: Settings oder GITHUB_OAUTH_CLIENT_ID).', 'Device flow is not configured (missing GitHub OAuth Client ID in settings or GITHUB_OAUTH_CLIENT_ID).')}
           </div>
         )}
 
@@ -200,6 +206,34 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 3: 1-Klick GitHub Login', 'Method 3: One-click GitHub login')}</div>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
+          {tr('Ohne OAuth App oder Keys: Klick auf Button, im Browser anmelden, fertig.', 'No OAuth app or keys: click button, sign in in browser, done.')}
+        </p>
+        {webFlowError && (
+          <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)', textAlign: 'left' }}>
+            {webFlowError}
+          </div>
+        )}
+
+        <button
+          disabled={isWebFlowRunning || isDeviceFlowRunning}
+          onClick={onStartWebFlowLogin}
+          style={{
+            padding: '8px',
+            backgroundColor: !isWebFlowRunning && !isDeviceFlowRunning ? 'var(--accent-primary)' : 'var(--bg-dark)',
+            color: !isWebFlowRunning && !isDeviceFlowRunning ? 'var(--on-accent)' : 'var(--text-secondary)',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: !isWebFlowRunning && !isDeviceFlowRunning ? 'pointer' : 'not-allowed',
+            fontWeight: 600,
+          }}
+        >
+          {isWebFlowRunning ? tr('Browser-Login laeuft...', 'Browser login in progress...') : tr('Bei GitHub anmelden', 'Sign in with GitHub')}
+        </button>
       </div>
     </div>
   );

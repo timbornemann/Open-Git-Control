@@ -3,14 +3,259 @@ console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 import * as path from 'path';
 import * as fs from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
 import { aiService } from './AiService';
 import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
+import { autoUpdater } from 'electron-updater';
+import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 
 const isDev = process.env.NODE_ENV === 'development';
 const APP_DISPLAY_NAME = 'Open-Git-Control';
 const WINDOWS_APP_ID = 'com.opengitcontrol.app';
+const GITHUB_CLI_INSTALL_URL = 'https://cli.github.com/';
+const GITHUB_CLI_LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+const GITHUB_CLI_TOKEN_TIMEOUT_MS = 30 * 1000;
+const execFileAsync = promisify(execFile);
+
+type UpdaterState =
+  | 'idle'
+  | 'checking'
+  | 'update-available'
+  | 'no-update'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+type UpdaterStatusPayload = {
+  isSupported: boolean;
+  state: UpdaterState;
+  currentVersion: string;
+  availableVersion: string | null;
+  downloaded: boolean;
+  downloadPercent: number | null;
+  bytesPerSecond: number | null;
+  transferred: number | null;
+  total: number | null;
+  lastCheckedAt: number | null;
+  releaseNotes: string | null;
+  error: string | null;
+};
+
+const AUTO_UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+let autoUpdateInterval: NodeJS.Timeout | null = null;
+let updaterStatus: UpdaterStatusPayload = {
+  isSupported: !isDev,
+  state: 'idle',
+  currentVersion: app.getVersion(),
+  availableVersion: null,
+  downloaded: false,
+  downloadPercent: null,
+  bytesPerSecond: null,
+  transferred: null,
+  total: null,
+  lastCheckedAt: null,
+  releaseNotes: null,
+  error: null,
+};
+
+function emitUpdaterEvent(): void {
+  for (const browserWindow of BrowserWindow.getAllWindows()) {
+    browserWindow.webContents.send('updater:event', updaterStatus);
+  }
+}
+
+function setUpdaterStatus(patch: Partial<UpdaterStatusPayload>): void {
+  updaterStatus = {
+    ...updaterStatus,
+    ...patch,
+  };
+  emitUpdaterEvent();
+}
+
+function formatUpdaterError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error.trim();
+  }
+  return 'Unbekannter Update-Fehler.';
+}
+
+function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string | null {
+  if (!releaseNotes) return null;
+  if (typeof releaseNotes === 'string') {
+    const trimmed = releaseNotes.trim();
+    return trimmed || null;
+  }
+
+  const normalized = releaseNotes
+    .map((item) => {
+      if (item && typeof item.note === 'string') return item.note.trim();
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+
+  return normalized || null;
+}
+
+async function checkForAppUpdates(): Promise<{ success: boolean; error?: string }> {
+  if (!updaterStatus.isSupported) {
+    return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
+  }
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return { success: true };
+  } catch (error: unknown) {
+    const message = formatUpdaterError(error);
+    setUpdaterStatus({
+      state: 'error',
+      error: message,
+      lastCheckedAt: Date.now(),
+    });
+    return { success: false, error: message };
+  }
+}
+
+async function downloadAvailableUpdate(): Promise<{ success: boolean; error?: string }> {
+  if (!updaterStatus.isSupported) {
+    return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
+  }
+
+  if (updaterStatus.state !== 'update-available') {
+    return { success: false, error: 'Es ist kein herunterladbares Update verfuegbar.' };
+  }
+
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error: unknown) {
+    const message = formatUpdaterError(error);
+    setUpdaterStatus({
+      state: 'error',
+      error: message,
+    });
+    return { success: false, error: message };
+  }
+}
+
+function installDownloadedUpdate(): { success: boolean; error?: string } {
+  if (!updaterStatus.isSupported) {
+    return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
+  }
+
+  if (updaterStatus.state !== 'downloaded') {
+    return { success: false, error: 'Es wurde noch kein Update heruntergeladen.' };
+  }
+
+  setImmediate(() => {
+    autoUpdater.quitAndInstall(false, true);
+  });
+
+  return { success: true };
+}
+
+function configureAutoUpdates(): void {
+  if (isDev) {
+    setUpdaterStatus({
+      isSupported: false,
+      currentVersion: app.getVersion(),
+      state: 'idle',
+      error: null,
+    });
+    return;
+  }
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    setUpdaterStatus({
+      state: 'checking',
+      currentVersion: app.getVersion(),
+      lastCheckedAt: Date.now(),
+      error: null,
+      downloadPercent: null,
+      bytesPerSecond: null,
+      transferred: null,
+      total: null,
+      downloaded: false,
+    });
+  });
+
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
+    setUpdaterStatus({
+      state: 'update-available',
+      availableVersion: info.version || null,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+      error: null,
+      downloaded: false,
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    setUpdaterStatus({
+      state: 'no-update',
+      availableVersion: null,
+      releaseNotes: null,
+      downloaded: false,
+      downloadPercent: null,
+      bytesPerSecond: null,
+      transferred: null,
+      total: null,
+      error: null,
+      lastCheckedAt: Date.now(),
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress: ProgressInfo) => {
+    setUpdaterStatus({
+      state: 'downloading',
+      downloadPercent: Number.isFinite(progress.percent) ? progress.percent : 0,
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total,
+      error: null,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    setUpdaterStatus({
+      state: 'downloaded',
+      availableVersion: info.version || updaterStatus.availableVersion,
+      releaseNotes: normalizeReleaseNotes(info.releaseNotes) || updaterStatus.releaseNotes,
+      downloaded: true,
+      downloadPercent: 100,
+      error: null,
+    });
+  });
+
+  autoUpdater.on('error', (error: Error) => {
+    setUpdaterStatus({
+      state: 'error',
+      error: formatUpdaterError(error),
+      lastCheckedAt: Date.now(),
+    });
+  });
+
+  void checkForAppUpdates();
+
+  if (autoUpdateInterval) {
+    clearInterval(autoUpdateInterval);
+  }
+
+  autoUpdateInterval = setInterval(() => {
+    void checkForAppUpdates();
+  }, AUTO_UPDATE_CHECK_INTERVAL_MS);
+
+  autoUpdateInterval.unref();
+}
 
 function resolveExistingFile(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -34,6 +279,81 @@ function getWindowIconPath(): string | undefined {
     path.join(process.resourcesPath, iconFileName),
   ]);
 }
+
+type ExecErrorLike = Error & {
+  stderr?: string;
+  stdout?: string;
+  code?: string | number;
+};
+
+function formatExecError(error: unknown): string {
+  if (typeof error === 'string') {
+    return error.trim();
+  }
+
+  if (!(error instanceof Error)) {
+    return 'Unknown command error.';
+  }
+
+  const execError = error as ExecErrorLike;
+  const stderr = typeof execError.stderr === 'string' ? execError.stderr.trim() : '';
+  const stdout = typeof execError.stdout === 'string' ? execError.stdout.trim() : '';
+  return stderr || stdout || error.message;
+}
+
+async function runGhCommand(args: string[], timeoutMs: number): Promise<{ stdout: string; stderr: string }> {
+  const result = await execFileAsync('gh', args, {
+    windowsHide: true,
+    timeout: timeoutMs,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+
+  return {
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+  };
+}
+
+async function readGithubCliToken(): Promise<string | null> {
+  try {
+    const { stdout } = await runGhCommand(['auth', 'token', '--hostname', 'github.com'], GITHUB_CLI_TOKEN_TIMEOUT_MS);
+    const token = stdout.trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
+async function runGithubCliOneClickLogin(): Promise<{ accessToken: string }> {
+  try {
+    await runGhCommand(['--version'], GITHUB_CLI_TOKEN_TIMEOUT_MS);
+  } catch {
+    throw new Error(`GitHub CLI (gh) wurde nicht gefunden. Bitte installieren: ${GITHUB_CLI_INSTALL_URL}`);
+  }
+
+  const existingToken = await readGithubCliToken();
+  if (existingToken) {
+    return { accessToken: existingToken };
+  }
+
+  try {
+    await runGhCommand(
+      ['auth', 'login', '--hostname', 'github.com', '--web', '--git-protocol', 'https', '--scopes', 'repo,read:user'],
+      GITHUB_CLI_LOGIN_TIMEOUT_MS,
+    );
+  } catch (error: unknown) {
+    const detail = formatExecError(error);
+    throw new Error(`GitHub 1-Klick Login fehlgeschlagen. ${detail}`);
+  }
+
+  const token = await readGithubCliToken();
+  if (!token) {
+    throw new Error('GitHub Login wurde abgeschlossen, aber kein Token wurde von gh geliefert.');
+  }
+
+  return { accessToken: token };
+}
+
 type GitCommandName =
   | 'status'
   | 'statusPorcelain'
@@ -588,7 +908,7 @@ function setupIPC() {
   ipcMain.handle('dialog:selectDirectory', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory'],
-      title: 'Zielordner für Clone auswählen'
+      title: 'Zielordner fÃƒÆ’Ã‚Â¼r Clone auswÃƒÆ’Ã‚Â¤hlen'
     });
     if (canceled) return null;
     return filePaths[0];
@@ -839,6 +1159,29 @@ function setupIPC() {
     return next;
   });
 
+  ipcMain.handle('app:getVersion', async () => {
+    return app.getVersion();
+  });
+
+  ipcMain.handle('updater:getStatus', async () => {
+    return {
+      ...updaterStatus,
+      currentVersion: app.getVersion(),
+    };
+  });
+
+  ipcMain.handle('updater:check', async () => {
+    return checkForAppUpdates();
+  });
+
+  ipcMain.handle('updater:download', async () => {
+    return downloadAvailableUpdate();
+  });
+
+  ipcMain.handle('updater:install', async () => {
+    return installDownloadedUpdate();
+  });
+
   ipcMain.handle('ai:testConnection', async () => {
     try {
       const settings = readSettingsWithMigration();
@@ -882,11 +1225,12 @@ function setupIPC() {
 
   ipcMain.handle('github:getSavedAuthStatus', async () => {
     const savedToken = readSavedGithubToken();
+    const settings = readSettingsWithMigration();
     return {
       hasSavedToken: Boolean(savedToken),
       authenticated: githubService.isAuthenticated(),
       username: githubService.getUsername(),
-      oauthConfigured: Boolean((process.env.GITHUB_OAUTH_CLIENT_ID || '').trim()),
+      oauthConfigured: githubService.isDeviceFlowConfigured(settings.githubOauthClientId),
     };
   });
 
@@ -912,7 +1256,8 @@ function setupIPC() {
 
   ipcMain.handle('github:deviceStart', async () => {
     try {
-      const flow = await githubService.startDeviceFlow();
+      const settings = readSettingsWithMigration();
+      const flow = await githubService.startDeviceFlow(settings.githubOauthClientId);
       return { success: true, data: flow };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Device Flow konnte nicht gestartet werden.';
@@ -927,7 +1272,8 @@ function setupIPC() {
         return { success: false, error: 'device_code fehlt' };
       }
 
-      const result = await githubService.pollDeviceFlow(normalizedDeviceCode);
+      const settings = readSettingsWithMigration();
+      const result = await githubService.pollDeviceFlow(normalizedDeviceCode, settings.githubOauthClientId);
       if (result.status === 'pending') {
         return { success: true, data: { status: 'pending', interval: result.interval || null } };
       }
@@ -958,6 +1304,28 @@ function setupIPC() {
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Device Flow Polling fehlgeschlagen.';
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('github:webLogin', async () => {
+    try {
+      const tokenResult = await runGithubCliOneClickLogin();
+
+      const authenticated = await githubService.authenticate(tokenResult.accessToken);
+      if (!authenticated) {
+        return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
+      }
+
+      saveGithubTokenSecurely(tokenResult.accessToken);
+      return {
+        success: true,
+        data: {
+          username: githubService.getUsername(),
+        },
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'GitHub 1-Klick Login fehlgeschlagen.';
       return { success: false, error: message };
     }
   });
@@ -1033,6 +1401,7 @@ app.whenReady().then(() => {
 
   setupIPC();
   createWindow();
+  configureAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1041,19 +1410,17 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  if (autoUpdateInterval) {
+    clearInterval(autoUpdateInterval);
+    autoUpdateInterval = null;
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
-
-
-
-
-
-
-
-
-
 
 

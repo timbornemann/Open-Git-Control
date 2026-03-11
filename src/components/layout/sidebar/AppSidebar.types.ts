@@ -83,6 +83,9 @@ export type AppSidebarProps = {
   deviceFlowError: string | null;
   onStartDeviceFlowLogin: () => void;
   onCancelDeviceFlow: () => void;
+  isWebFlowRunning: boolean;
+  webFlowError: string | null;
+  onStartWebFlowLogin: () => void;
 
   githubUser: string | null;
   githubRepos: GitHubRepositoryDto[];
@@ -118,4 +121,3 @@ export type AppSidebarProps = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
 };
-

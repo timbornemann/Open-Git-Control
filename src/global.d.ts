@@ -43,6 +43,30 @@ export interface GitJobEventDto {
   timestamp: number;
 }
 
+export type UpdaterStateDto =
+  | 'idle'
+  | 'checking'
+  | 'update-available'
+  | 'no-update'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+export interface UpdaterStatusDto {
+  isSupported: boolean;
+  state: UpdaterStateDto;
+  currentVersion: string;
+  availableVersion: string | null;
+  downloaded: boolean;
+  downloadPercent: number | null;
+  bytesPerSecond: number | null;
+  transferred: number | null;
+  total: number | null;
+  lastCheckedAt: number | null;
+  releaseNotes: string | null;
+  error: string | null;
+}
+
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
 
@@ -61,6 +85,7 @@ export interface AppSettingsDto {
   ollamaModel: string;
   geminiModel: string;
   hasGeminiApiKey: boolean;
+  githubOauthClientId: string;
 }
 
 export interface PullRequestDto {
@@ -129,6 +154,12 @@ export interface ElectronAPI {
   setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
   setGeminiApiKey: (apiKey: string) => Promise<AppSettingsDto>;
   clearGeminiApiKey: () => Promise<AppSettingsDto>;
+  getAppVersion: () => Promise<string>;
+  getUpdaterStatus: () => Promise<UpdaterStatusDto>;
+  checkForAppUpdates: () => Promise<{ success: boolean; error?: string }>;
+  downloadAppUpdate: () => Promise<{ success: boolean; error?: string }>;
+  installAppUpdate: () => Promise<{ success: boolean; error?: string }>;
+  onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => () => void;
   aiTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
   aiListModels: () => Promise<IpcResult<string[]>>;
   ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
@@ -137,6 +168,7 @@ export interface ElectronAPI {
   githubAuth: (token: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;
+  githubWebLogin: () => Promise<IpcResult<{ username: string | null }>>;
   githubGetRepos: () => Promise<IpcResult<GitHubRepositoryDto[]>>;
   githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null; oauthConfigured: boolean }>;
   githubLoginWithSavedToken: () => Promise<{ success: boolean; authenticated: boolean; username: string | null }>;

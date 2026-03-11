@@ -17,6 +17,7 @@ const baseSettings: AppSettings = {
   ollamaModel: '',
   geminiModel: 'gemini-1.5-flash',
   hasGeminiApiKey: true,
+  githubOauthClientId: '',
 };
 
 const fakeGitService = {
@@ -55,3 +56,4 @@ describe('AiService gemini secret access', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('key=secure-key-123');
   });
 });
+

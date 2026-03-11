@@ -16,6 +16,7 @@ export interface AppSettings {
   ollamaModel: string;
   geminiModel: string;
   hasGeminiApiKey: boolean;
+  githubOauthClientId: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -33,6 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
+  githubOauthClientId: '',
 };
 
 const MIN_FETCH_INTERVAL_MS = 10_000;
@@ -40,6 +42,7 @@ const MAX_FETCH_INTERVAL_MS = 300_000;
 const MAX_COMMIT_TEMPLATE_LENGTH = 8_000;
 const MAX_OLLAMA_BASE_URL_LENGTH = 500;
 const MAX_MODEL_LENGTH = 200;
+const MAX_GITHUB_OAUTH_CLIENT_ID_LENGTH = 200;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
   switch (value) {
@@ -127,6 +130,13 @@ function normalizeModel(value: unknown, fallback = ''): string {
   return trimmed || fallback;
 }
 
+function normalizeGithubOauthClientId(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, MAX_GITHUB_OAUTH_CLIENT_ID_LENGTH);
+}
+
 export function normalizeSettings(input: Partial<AppSettings> | null | undefined): AppSettings {
   const value = input || {};
   return {
@@ -144,5 +154,6 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     ollamaModel: normalizeModel(value.ollamaModel),
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),
     hasGeminiApiKey: normalizeBoolean(value.hasGeminiApiKey, false),
+    githubOauthClientId: normalizeGithubOauthClientId(value.githubOauthClientId),
   };
 }

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppSidebarProps } from './AppSidebar.types';
+import type { UpdaterStatusDto } from '../../../global';
 import { useI18n } from '../../../i18n';
 
 type SettingsSidebarContentProps = Pick<
@@ -30,6 +31,12 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(null);
+  const [updaterMessage, setUpdaterMessage] = useState<string | null>(null);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const { tr, locale } = useI18n();
 
   const selectedModel = settings.aiProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel;
@@ -39,12 +46,53 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     return [...new Set(values)].sort((a, b) => a.localeCompare(b));
   }, [modelOptions, selectedModel]);
 
+  const updaterStatusLabel = useMemo(() => {
+    if (!updaterStatus) {
+      return tr('Lade Update-Status...', 'Loading updater status...');
+    }
+
+    switch (updaterStatus.state) {
+      case 'checking':
+        return tr('Suche nach Updates...', 'Checking for updates...');
+      case 'update-available':
+        return tr('Update verfuegbar', 'Update available');
+      case 'no-update':
+        return tr('App ist aktuell', 'App is up to date');
+      case 'downloading':
+        return tr('Update wird heruntergeladen...', 'Downloading update...');
+      case 'downloaded':
+        return tr('Update bereit zur Installation', 'Update ready to install');
+      case 'error':
+        return tr('Update-Fehler', 'Updater error');
+      case 'idle':
+      default:
+        return tr('Bereit', 'Ready');
+    }
+  }, [updaterStatus, tr]);
+
   const setSelectedModel = async (model: string) => {
     if (settings.aiProvider === 'gemini') {
       await onUpdateSettings({ geminiModel: model });
       return;
     }
     await onUpdateSettings({ ollamaModel: model });
+  };
+
+  const formatBytes = (bytes: number | null): string => {
+    if (!bytes || !Number.isFinite(bytes) || bytes <= 0) {
+      return '0 B';
+    }
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+
+    return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
   };
 
   const testConnection = async () => {
@@ -90,6 +138,105 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       setIsLoadingModels(false);
     }
   };
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    let active = true;
+
+    const bootstrapUpdater = async () => {
+      try {
+        const [version, status] = await Promise.all([
+          window.electronAPI.getAppVersion(),
+          window.electronAPI.getUpdaterStatus(),
+        ]);
+
+        if (!active) return;
+        setAppVersion(version);
+        setUpdaterStatus(status);
+      } catch {
+        if (!active) return;
+        setUpdaterMessage(tr('Update-Status konnte nicht geladen werden.', 'Could not load updater status.'));
+      }
+    };
+
+    void bootstrapUpdater();
+
+    const unsubscribe = window.electronAPI.onUpdaterEvent((status) => {
+      if (!active) return;
+      setUpdaterStatus(status);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [tr]);
+
+  const handleCheckForUpdates = async () => {
+    if (!window.electronAPI) return;
+
+    setIsCheckingUpdates(true);
+    setUpdaterMessage(null);
+
+    try {
+      const result = await window.electronAPI.checkForAppUpdates();
+      if (!result.success) {
+        setUpdaterMessage(result.error || tr('Update-Pruefung fehlgeschlagen.', 'Update check failed.'));
+        return;
+      }
+
+      setUpdaterMessage(tr('Update-Pruefung gestartet.', 'Update check started.'));
+    } catch (error: unknown) {
+      setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Pruefung fehlgeschlagen.', 'Update check failed.'));
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    if (!window.electronAPI) return;
+
+    setIsDownloadingUpdate(true);
+    setUpdaterMessage(null);
+
+    try {
+      const result = await window.electronAPI.downloadAppUpdate();
+      if (!result.success) {
+        setUpdaterMessage(result.error || tr('Update konnte nicht heruntergeladen werden.', 'Could not download update.'));
+        return;
+      }
+
+      setUpdaterMessage(tr('Download gestartet.', 'Download started.'));
+    } catch (error: unknown) {
+      setUpdaterMessage(error instanceof Error ? error.message : tr('Update konnte nicht heruntergeladen werden.', 'Could not download update.'));
+    } finally {
+      setIsDownloadingUpdate(false);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!window.electronAPI) return;
+
+    setIsInstallingUpdate(true);
+    setUpdaterMessage(null);
+
+    try {
+      const result = await window.electronAPI.installAppUpdate();
+      if (!result.success) {
+        setUpdaterMessage(result.error || tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+        return;
+      }
+
+      setUpdaterMessage(tr('App wird fuer das Update neu gestartet...', 'Restarting app to install update...'));
+    } catch (error: unknown) {
+      setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+    } finally {
+      setIsInstallingUpdate(false);
+    }
+  };
+
+  const updaterSupported = Boolean(updaterStatus?.isSupported);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -146,13 +293,28 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           />
         </label>
 
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {tr('GitHub OAuth Client ID (Device Flow)', 'GitHub OAuth Client ID (Device flow)')}
+          <input
+            type="text"
+            value={settings.githubOauthClientId}
+            onChange={(e) => onUpdateSettings({ githubOauthClientId: e.target.value })}
+            placeholder="Ov23li..."
+            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          />
+        </label>
+
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          {tr('Nur fuer Methode 2 (Device Flow): OAuth App Client ID erforderlich. Methode 3 (1-Klick) braucht keine eigene Client ID.', 'Only for Method 2 (Device flow): OAuth app client ID required. Method 3 (one-click) does not need your own client ID.')}
+        </div>
+
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="checkbox"
             checked={settings.confirmDangerousOps}
             onChange={(e) => onUpdateSettings({ confirmDangerousOps: e.target.checked })}
           />
-          {tr('Gefährliche Git-Operationen bestätigen', 'Confirm dangerous Git operations')}
+          {tr('GefÃƒÂ¤hrliche Git-Operationen bestÃƒÂ¤tigen', 'Confirm dangerous Git operations')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -161,7 +323,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
-          {tr('Sekundäre Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
+          {tr('SekundÃƒÂ¤re Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -170,7 +332,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.commitSignoffByDefault}
             onChange={(e) => onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
           />
-          {tr('Commit Signoff standardmäßig aktiv', 'Enable commit signoff by default')}
+          {tr('Commit Signoff standardmÃƒÂ¤ÃƒÅ¸ig aktiv', 'Enable commit signoff by default')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -295,6 +457,89 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             {aiStatus}
           </div>
         )}
+      </div>
+
+      <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{tr('App-Updates', 'App updates')}</div>
+
+        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+          {tr('Installierte Version', 'Installed version')}: {appVersion || '...'}
+        </div>
+
+        <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+          {tr('Status', 'Status')}: {updaterStatusLabel}
+        </div>
+
+        {updaterStatus?.availableVersion && (
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+            {tr('Verfuegbare Version', 'Available version')}: {updaterStatus.availableVersion}
+          </div>
+        )}
+
+        {updaterStatus?.lastCheckedAt && (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            {tr('Zuletzt geprueft', 'Last checked')}: {new Date(updaterStatus.lastCheckedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </div>
+        )}
+
+        {updaterStatus?.state === 'downloading' && (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            {tr('Download', 'Download')}: {(updaterStatus.downloadPercent || 0).toFixed(1)}% ({formatBytes(updaterStatus.transferred)} / {formatBytes(updaterStatus.total)})
+          </div>
+        )}
+
+        {updaterStatus?.releaseNotes && (
+          <details>
+            <summary style={{ cursor: 'pointer', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+              {tr('Release Notes anzeigen', 'Show release notes')}
+            </summary>
+            <div style={{ marginTop: '6px', fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+              {updaterStatus.releaseNotes}
+            </div>
+          </details>
+        )}
+
+        {updaterStatus?.error && (
+          <div style={{ fontSize: '0.74rem', color: 'var(--status-danger)', whiteSpace: 'pre-wrap' }}>
+            {updaterStatus.error}
+          </div>
+        )}
+
+        {updaterMessage && (
+          <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+            {updaterMessage}
+          </div>
+        )}
+
+        {!updaterSupported && (
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+            {tr('Auto-Updates sind nur in der installierten Produktions-App verfuegbar.', 'Auto updates are only available in installed production builds.')}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            className="staging-tool-btn"
+            onClick={handleCheckForUpdates}
+            disabled={!updaterSupported || isCheckingUpdates || isDownloadingUpdate || isInstallingUpdate}
+          >
+            {isCheckingUpdates ? tr('Pruefe...', 'Checking...') : tr('Nach Updates suchen', 'Check for updates')}
+          </button>
+          <button
+            className="staging-tool-btn"
+            onClick={handleDownloadUpdate}
+            disabled={!updaterSupported || updaterStatus?.state !== 'update-available' || isDownloadingUpdate || isInstallingUpdate}
+          >
+            {isDownloadingUpdate ? tr('Lade...', 'Downloading...') : tr('Update herunterladen', 'Download update')}
+          </button>
+          <button
+            className="staging-tool-btn"
+            onClick={handleInstallUpdate}
+            disabled={!updaterSupported || updaterStatus?.state !== 'downloaded' || isInstallingUpdate}
+          >
+            {isInstallingUpdate ? tr('Installiere...', 'Installing...') : tr('Update installieren', 'Install update')}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>

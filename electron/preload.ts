@@ -31,6 +31,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
   setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),
   clearGeminiApiKey: () => ipcRenderer.invoke('settings:clearGeminiApiKey'),
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  getUpdaterStatus: () => ipcRenderer.invoke('updater:getStatus'),
+  checkForAppUpdates: () => ipcRenderer.invoke('updater:check'),
+  downloadAppUpdate: () => ipcRenderer.invoke('updater:download'),
+  installAppUpdate: () => ipcRenderer.invoke('updater:install'),
+  onUpdaterEvent: (callback: (event: any) => void) => {
+    const handler = (_event: any, payload: any) => callback(payload);
+    ipcRenderer.on('updater:event', handler);
+    return () => ipcRenderer.removeListener('updater:event', handler);
+  },
   aiTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
   aiListModels: () => ipcRenderer.invoke('ai:listModels'),
   ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
@@ -39,6 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubAuth: (token: string) => ipcRenderer.invoke('github:auth', token),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
+  githubWebLogin: () => ipcRenderer.invoke('github:webLogin'),
   githubGetRepos: () => ipcRenderer.invoke('github:getRepos'),
   githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),
   githubLoginWithSavedToken: () => ipcRenderer.invoke('github:loginWithSavedToken'),
@@ -49,5 +60,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubGetPRs: (owner: string, repo: string, state: string) =>
     ipcRenderer.invoke('github:getPRs', owner, repo, state),
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
-    ipcRenderer.invoke('github:createPR', params)
+    ipcRenderer.invoke('github:createPR', params),
 });

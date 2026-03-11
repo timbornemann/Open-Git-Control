@@ -4,11 +4,22 @@
   "private": true,
   "version": "1.0.0",
   "main": "dist-electron/electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timbornemann/Git-Organizer.git"
+  },
   "scripts": {
     "dev": "concurrently -k \"vite\" \"npm run electron:dev\"",
     "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/start-electron.js",
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsc --project tsconfig.node.json",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --x64 --publish never",
+    "release:win": "npm run build && electron-builder --win nsis --x64 --publish always",
+    "release:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish always",
+    "release:mac": "npm run build && electron-builder --mac dmg zip --x64 --publish always",
     "preview": "vite preview",
     "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
     "test": "npm run test:unit",
@@ -17,6 +28,7 @@
     "test:ci": "npm run build:electron && npm run test:coverage && npm run build"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "lucide-react": "^0.300.0",
     "octokit": "^5.0.5",
     "react": "^18.2.0",
@@ -38,5 +50,77 @@
     "vite": "^5.0.8",
     "vitest": "^4.0.18",
     "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.opengitcontrol.app",
+    "productName": "Open-Git-Control",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "logo.ico",
+      "logo.png"
+    ],
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "logo.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "logo.png",
+      "category": "Development"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    }
   }
 }

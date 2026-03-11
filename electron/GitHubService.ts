@@ -14,14 +14,44 @@ type DeviceFlowPollResult =
   | { status: 'pending'; interval?: number }
   | { status: 'error'; error: string; errorDescription?: string };
 
+type WebFlowExchangeParams = {
+  code: string;
+  redirectUri: string;
+  codeVerifier: string;
+  configuredClientId?: string | null;
+};
+
+type WebFlowExchangeResult = {
+  accessToken: string;
+  tokenType: string;
+  scope: string;
+};
+
 export class GitHubService {
   private octokit: any | null = null;
   private token: string | null = null;
   private username: string | null = null;
 
-  private getDeviceFlowClientId(): string | null {
-    const envClientId = (process.env.GITHUB_OAUTH_CLIENT_ID || '').trim();
-    return envClientId || null;
+  private normalizeClientId(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const normalized = value.trim();
+    return normalized || null;
+  }
+
+  private getOauthClientId(configuredClientId?: string | null): string | null {
+    const settingsClientId = this.normalizeClientId(configuredClientId);
+    if (settingsClientId) {
+      return settingsClientId;
+    }
+
+    const envClientId = this.normalizeClientId(process.env.GITHUB_OAUTH_CLIENT_ID);
+    return envClientId;
+  }
+
+  isDeviceFlowConfigured(configuredClientId?: string | null): boolean {
+    return Boolean(this.getOauthClientId(configuredClientId));
   }
 
   async authenticate(token: string): Promise<boolean> {
@@ -56,10 +86,10 @@ export class GitHubService {
     }
   }
 
-  async startDeviceFlow(): Promise<DeviceFlowStartResult> {
-    const clientId = this.getDeviceFlowClientId();
+  async startDeviceFlow(configuredClientId?: string | null): Promise<DeviceFlowStartResult> {
+    const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
-      throw new Error('Device Flow nicht konfiguriert. Bitte GITHUB_OAUTH_CLIENT_ID setzen.');
+      throw new Error('Device Flow nicht konfiguriert. Bitte GitHub OAuth Client ID in den Einstellungen setzen oder GITHUB_OAUTH_CLIENT_ID bereitstellen.');
     }
 
     const params = new URLSearchParams();
@@ -106,10 +136,14 @@ export class GitHubService {
     };
   }
 
-  async pollDeviceFlow(deviceCode: string): Promise<DeviceFlowPollResult> {
-    const clientId = this.getDeviceFlowClientId();
+  async pollDeviceFlow(deviceCode: string, configuredClientId?: string | null): Promise<DeviceFlowPollResult> {
+    const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
-      return { status: 'error', error: 'oauth_not_configured', errorDescription: 'GITHUB_OAUTH_CLIENT_ID fehlt.' };
+      return {
+        status: 'error',
+        error: 'oauth_not_configured',
+        errorDescription: 'GitHub OAuth Client ID fehlt (Settings oder GITHUB_OAUTH_CLIENT_ID).',
+      };
     }
 
     const params = new URLSearchParams();
@@ -167,6 +201,59 @@ export class GitHubService {
 
     return {
       status: 'success',
+      accessToken: payload.access_token,
+      tokenType: payload.token_type || 'bearer',
+      scope: payload.scope || '',
+    };
+  }
+
+  async exchangeWebFlowCode(params: WebFlowExchangeParams): Promise<WebFlowExchangeResult> {
+    const clientId = this.getOauthClientId(params.configuredClientId);
+    if (!clientId) {
+      throw new Error('OAuth Browser Login ist nicht konfiguriert (GitHub OAuth Client ID fehlt).');
+    }
+
+    const body = new URLSearchParams();
+    body.set('client_id', clientId);
+    body.set('code', params.code);
+    body.set('redirect_uri', params.redirectUri);
+    body.set('code_verifier', params.codeVerifier);
+
+    const envClientSecret = this.normalizeClientId(process.env.GITHUB_OAUTH_CLIENT_SECRET);
+    if (envClientSecret) {
+      body.set('client_secret', envClientSecret);
+    }
+
+    const response = await fetch(ACCESS_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OAuth Token-Austausch fehlgeschlagen (${response.status}).`);
+    }
+
+    const payload = await response.json() as {
+      access_token?: string;
+      token_type?: string;
+      scope?: string;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (payload.error) {
+      throw new Error(payload.error_description || payload.error);
+    }
+
+    if (!payload.access_token) {
+      throw new Error('Kein Access Token in der OAuth-Antwort enthalten.');
+    }
+
+    return {
       accessToken: payload.access_token,
       tokenType: payload.token_type || 'bearer',
       scope: payload.scope || '',

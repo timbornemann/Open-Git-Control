@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { BranchContextMenu } from './components/layout/BranchContextMenu';
@@ -79,6 +79,9 @@ const App: React.FC = () => {
           deviceFlowError={state.deviceFlowError}
           onStartDeviceFlowLogin={state.handleStartDeviceFlowLogin}
           onCancelDeviceFlow={state.handleCancelDeviceFlow}
+          isWebFlowRunning={state.isWebFlowRunning}
+          webFlowError={state.webFlowError}
+          onStartWebFlowLogin={state.handleStartWebFlowLogin}
           githubUser={state.githubUser}
           githubRepos={state.githubRepos}
           onLogout={state.handleLogout}

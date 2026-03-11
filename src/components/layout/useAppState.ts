@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
+  githubOauthClientId: '',
 };
 
 type RunGitCommandOptions = {
@@ -270,6 +271,7 @@ export const useAppState = () => {
     onRepoCloned: workspace.addOpenRepo,
     setActiveTab: workspace.setActiveTab,
     language: settings.language,
+    githubOauthClientId: settings.githubOauthClientId,
   });
 
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -476,6 +478,9 @@ export const useAppState = () => {
     deviceFlowError: github.deviceFlowError,
     handleStartDeviceFlowLogin: github.handleStartDeviceFlowLogin,
     handleCancelDeviceFlow: github.handleCancelDeviceFlow,
+    isWebFlowRunning: github.isWebFlowRunning,
+    webFlowError: github.webFlowError,
+    handleStartWebFlowLogin: github.handleStartWebFlowLogin,
     handleLogout: github.handleLogout,
 
     isCloning: github.isCloning,
