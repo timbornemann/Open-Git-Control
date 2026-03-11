@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { GitBranch, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
@@ -54,7 +54,19 @@ export const MainView: React.FC<Props> = ({
   useEffect(() => {
     setActiveDiffRequest(null);
   }, [activeRepo]);
-
+  const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
+    setActiveDiffRequest((previous) => {
+      if (
+        previous &&
+        previous.source === diffRequest.source &&
+        previous.path === diffRequest.path &&
+        previous.commitHash === diffRequest.commitHash
+      ) {
+        return previous;
+      }
+      return diffRequest;
+    });
+  }, []);
   return (
     <div className="main-view">
       <div className="topbar">
@@ -174,13 +186,13 @@ export const MainView: React.FC<Props> = ({
               <CommitDetails
                 hash={selectedCommit}
                 onSelectCommit={setSelectedCommit}
-                onOpenDiff={(diffRequest) => setActiveDiffRequest(diffRequest)}
+                onOpenDiff={handleOpenDiff}
               />
             ) : (
               <StagingArea
                 repoPath={activeRepo}
                 onRepoChanged={triggerRefresh}
-                onOpenDiff={(diffRequest) => setActiveDiffRequest(diffRequest)}
+                onOpenDiff={handleOpenDiff}
               />
             )}
           </div>
@@ -189,3 +201,4 @@ export const MainView: React.FC<Props> = ({
     </div>
   );
 };
+
