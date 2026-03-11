@@ -443,14 +443,32 @@ function parseFileHistory(logOutput: string): FileHistoryEntry[] {
 
   return logOutput
     .split('\x00')
-    .map(record => record.trim())
+    .map(record => record.replace(/^\r?\n/, '').trim())
     .filter(Boolean)
     .map(record => {
-      const [hash = '', abbrevHash = '', author = '', date = '', subject = ''] = record.split('\\x1f');
-      return { hash, abbrevHash, author, date, subject };
-    });
-}
+      let parts = record.split('\x1f');
+      if (parts.length < 5 && record.includes('\\x1f')) {
+        parts = record.split('\\x1f');
+      }
+      if (parts.length < 5 && record.includes('|')) {
+        parts = record.split('|');
+      }
 
+      const [hashRaw = '', abbrevRaw = '', authorRaw = '', dateRaw = '', ...subjectRest] = parts;
+      const hash = hashRaw.trim();
+      if (!/^[0-9a-f]{7,40}$/i.test(hash)) {
+        return null;
+      }
+
+      const abbrevHash = (abbrevRaw || '').trim() || hash.slice(0, 8);
+      const author = (authorRaw || '').trim();
+      const date = (dateRaw || '').trim();
+      const subject = subjectRest.join('|').trim();
+
+      return { hash, abbrevHash, author, date, subject };
+    })
+    .filter((entry): entry is FileHistoryEntry => Boolean(entry));
+}
 function parseFileBlame(blameOutput: string): FileBlameLine[] {
   if (!blameOutput.trim()) return [];
 
@@ -994,6 +1012,10 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+
+
+
 
 
 
