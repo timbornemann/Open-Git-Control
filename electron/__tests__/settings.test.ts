@@ -9,12 +9,22 @@ describe('normalizeSettings', () => {
 
   it('normalizes theme and language with safe fallbacks', () => {
     expect(normalizeSettings({ theme: 'light', language: 'en' })).toMatchObject({
-      theme: 'light',
+      theme: 'porcelain-light',
+      language: 'en',
+    });
+
+    expect(normalizeSettings({ theme: 'midnight-teal', language: 'en' })).toMatchObject({
+      theme: 'midnight-teal',
+      language: 'en',
+    });
+
+    expect(normalizeSettings({ theme: 'dark' as never, language: 'en' })).toMatchObject({
+      theme: 'copper-night',
       language: 'en',
     });
 
     expect(normalizeSettings({ theme: 'invalid' as never, language: 'fr' as never })).toMatchObject({
-      theme: 'dark',
+      theme: 'copper-night',
       language: 'de',
     });
   });
@@ -79,5 +89,14 @@ describe('normalizeSettings', () => {
     expect(normalized.geminiModel).toBe(DEFAULT_SETTINGS.geminiModel);
     expect(normalized.hasGeminiApiKey).toBe(true);
     expect(normalizeSettings({ hasGeminiApiKey: 'yes' as never }).hasGeminiApiKey).toBe(false);
+  });
+
+  it('normalizes github oauth client id', () => {
+    expect(normalizeSettings({ githubOauthClientId: '  Ov23abc  ' }).githubOauthClientId).toBe('Ov23abc');
+
+    const longClientId = 'x'.repeat(250);
+    expect(normalizeSettings({ githubOauthClientId: longClientId }).githubOauthClientId.length).toBe(200);
+
+    expect(normalizeSettings({ githubOauthClientId: 123 as never }).githubOauthClientId).toBe('');
   });
 });
