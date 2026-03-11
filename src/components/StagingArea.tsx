@@ -275,6 +275,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       if (event.status === 'failed') {
         setIsAiJobRunning(false);
         setAiProgressMessage(event.message || 'KI Auto-Commit fehlgeschlagen.');
+        return;
+      }
+
+      if (event.status === 'cancelled') {
+        setIsAiJobRunning(false);
+        setAiProgressMessage(event.message || 'KI Auto-Commit abgebrochen.');
       }
     });
 
@@ -537,6 +543,21 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       setIsAiJobRunning(false);
     }
   };
+
+  const handleCancelAiAutoCommit = async () => {
+    if (!window.electronAPI) return;
+
+    try {
+      const result = await window.electronAPI.cancelAiAutoCommit();
+      if (result.success && result.canceled) {
+        setAiProgressMessage('Abbruch wird ausgefuehrt...');
+      } else {
+        setAiProgressMessage('Kein laufender KI Auto-Commit zum Abbrechen.');
+      }
+    } catch (error: unknown) {
+      setToast({ msg: error instanceof Error ? error.message : 'KI Auto-Commit konnte nicht abgebrochen werden.', isError: true });
+    }
+  };
   const handleCommit = async () => {
     if (!commitMsg.trim() || !window.electronAPI || !status) return;
 
@@ -786,6 +807,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
               )}
             </div>
           )}
+          {(isAiCommitting || isAiJobRunning) && (
+            <button
+              className="staging-tool-btn danger"
+              type="button"
+              onClick={handleCancelAiAutoCommit}
+              title="Laufenden KI Auto-Commit abbrechen"
+            >
+              Abbrechen
+            </button>
+          )}
           <button
             className="staging-tool-btn"
             type="button"
@@ -913,6 +944,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
 
 
 
