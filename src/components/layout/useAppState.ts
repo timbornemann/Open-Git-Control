@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
   githubOauthClientId: '',
+  githubHost: 'github.com',
 };
 
 type RunGitCommandOptions = {
@@ -210,15 +211,15 @@ export const useAppState = () => {
         if (hasLocalChanges) {
           setConfirmDialog({
             variant: 'danger',
-            title: tr('Ungesicherte Änderungen erkannt', 'Uncommitted changes detected'),
-            message: tr(`Vor "git ${args.join(' ')}" wurden lokale Änderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
+            title: tr('Ungesicherte Ã„nderungen erkannt', 'Uncommitted changes detected'),
+            message: tr(`Vor "git ${args.join(' ')}" wurden lokale Ã„nderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
             contextItems: [
               { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
               { label: tr('Hinweis', 'Hint'), value: tr('Working Tree ist nicht sauber', 'Working tree is dirty') },
             ],
             irreversible: false,
-            consequences: tr('Je nach Operation können unstaged oder staged Änderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
-            confirmLabel: tr('Trotzdem ausführen', 'Run anyway'),
+            consequences: tr('Je nach Operation kÃ¶nnen unstaged oder staged Ã„nderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
+            confirmLabel: tr('Trotzdem ausfÃ¼hren', 'Run anyway'),
             onConfirm: async () => {
               await runGitCommand(args, successMsg, actionLabel, { skipDirtyGuard: true });
             },
@@ -231,7 +232,7 @@ export const useAppState = () => {
     }
 
     setIsGitActionRunning(true);
-    setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
+    setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgefÃ¼hrt...`, `Running git ${command}...`));
 
     try {
       const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
@@ -240,7 +241,7 @@ export const useAppState = () => {
         triggerRefresh();
         return true;
       }
-      setGitActionToast({ msg: r.error || tr('Fehler beim Ausführen von git.', 'Error while running git.'), isError: true });
+      setGitActionToast({ msg: r.error || tr('Fehler beim AusfÃ¼hren von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
       setGitActionToast({ msg: e.message, isError: true });
@@ -272,6 +273,7 @@ export const useAppState = () => {
     setActiveTab: workspace.setActiveTab,
     language: settings.language,
     githubOauthClientId: settings.githubOauthClientId,
+    githubHost: settings.githubHost,
   });
 
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -285,6 +287,7 @@ export const useAppState = () => {
     isAuthenticated: github.isAuthenticated,
     refreshTrigger,
     language: settings.language,
+    githubHost: settings.githubHost,
     onCreated: (number) => {
       setGitActionToast({ msg: tr(`PR #${number} erstellt.`, `Created PR #${number}.`), isError: false });
       setShowCreatePR(false);
@@ -364,6 +367,32 @@ export const useAppState = () => {
       setGitActionToast({ msg: tr('PR-URL kopiert.', 'Copied PR URL.'), isError: false });
     } catch {
       setGitActionToast({ msg: tr('PR-URL konnte nicht kopiert werden.', 'Could not copy PR URL.'), isError: true });
+    }
+  };
+
+  const handleMergePR = async (
+    prNumber: number,
+    mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge',
+  ) => {
+    if (!window.electronAPI || !pullRequestDomain.prOwnerRepo) return;
+
+    try {
+      const result = await window.electronAPI.githubMergePR({
+        owner: pullRequestDomain.prOwnerRepo.owner,
+        repo: pullRequestDomain.prOwnerRepo.repo,
+        pullNumber: prNumber,
+        mergeMethod,
+      });
+
+      if (!result.success) {
+        setGitActionToast({ msg: result.error || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
+        return;
+      }
+
+      setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
+      triggerRefresh();
+    } catch (error: any) {
+      setGitActionToast({ msg: error?.message || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
     }
   };
 
@@ -466,6 +495,13 @@ export const useAppState = () => {
     isAuthenticated: github.isAuthenticated,
     githubUser: github.githubUser,
     githubRepos: github.githubRepos,
+    githubRepoSearch: github.githubRepoSearch,
+    setGithubRepoSearch: github.setGithubRepoSearch,
+    githubReposHasMore: github.githubReposHasMore,
+    isLoadingGithubRepos: github.isLoadingRepos,
+    isLoadingMoreGithubRepos: github.isLoadingMoreRepos,
+    loadMoreGithubRepos: () => { void github.loadMoreRepos(); },
+    refreshGithubRepos: () => { void github.refreshRepos(); },
     tokenInput: github.tokenInput,
     setTokenInput: github.setTokenInput,
     isAuthenticating: github.isAuthenticating,
@@ -510,6 +546,7 @@ export const useAppState = () => {
     handleOpenPR,
     handleCopyPRUrl,
     handleCheckoutPR,
+    handleMergePR,
 
     settings,
     handleUpdateSettings,
@@ -534,3 +571,9 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
+
+
+
+
+
+

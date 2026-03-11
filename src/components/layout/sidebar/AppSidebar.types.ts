@@ -13,6 +13,7 @@ export type RemoteStatus = {
 export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean }>;
+export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 
 export type AppSidebarProps = {
   activeTab: 'repos' | 'github' | 'settings';
@@ -86,9 +87,18 @@ export type AppSidebarProps = {
   isWebFlowRunning: boolean;
   webFlowError: string | null;
   onStartWebFlowLogin: () => void;
+  selectedGithubAuthHelpMethod: GithubAuthHelpMethod;
+  onSelectGithubAuthHelpMethod: (method: GithubAuthHelpMethod) => void;
 
   githubUser: string | null;
   githubRepos: GitHubRepositoryDto[];
+  githubRepoSearch: string;
+  setGithubRepoSearch: (value: string) => void;
+  githubReposHasMore: boolean;
+  isLoadingGithubRepos: boolean;
+  isLoadingMoreGithubRepos: boolean;
+  loadMoreGithubRepos: () => void;
+  refreshGithubRepos: () => void;
   onLogout: () => void;
   onClone: (cloneUrl: string, repoName: string) => void;
   isCloning: boolean;
@@ -101,6 +111,7 @@ export type AppSidebarProps = {
   onOpenPR: (url: string) => void;
   onCopyPRUrl: (url: string) => void;
   onCheckoutPR: (prNumber: number, headRef: string) => Promise<void>;
+  onMergePR: (prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => Promise<void>;
 
   showCreatePR: boolean;
   setShowCreatePR: (value: boolean) => void;
