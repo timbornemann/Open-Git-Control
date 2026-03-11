@@ -42,7 +42,7 @@ export interface GitHubRepositoryPageDto {
 }
 
 type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
-type GitJobPhaseDto = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
+type GitJobPhaseDto = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
 
 export type AiAutoCommitModeDto = 'normal' | 'retry' | 'fallback';
 
@@ -224,6 +224,7 @@ export interface ElectronAPI {
   ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
   ollamaListModels: () => Promise<IpcResult<string[]>>;
   runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
+  cancelAiAutoCommit: () => Promise<{ success: boolean; canceled: boolean }>;
   githubAuth: (token: string, host?: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;
@@ -268,4 +269,6 @@ declare global {
 }
 
 export {};
+
+
 
