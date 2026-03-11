@@ -1,5 +1,18 @@
-import React from 'react';
-import { Github, LogOut, DownloadCloud, FolderOpen, CheckCircle2, Plus, GitPullRequest, Copy, ExternalLink, GitBranch } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Github,
+  LogOut,
+  DownloadCloud,
+  FolderOpen,
+  CheckCircle2,
+  Plus,
+  GitPullRequest,
+  Copy,
+  ExternalLink,
+  GitBranch,
+  Search,
+  RefreshCw,
+} from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
@@ -7,6 +20,13 @@ type GithubConnectedContentProps = Pick<
   AppSidebarProps,
   | 'githubUser'
   | 'githubRepos'
+  | 'githubRepoSearch'
+  | 'setGithubRepoSearch'
+  | 'githubReposHasMore'
+  | 'isLoadingGithubRepos'
+  | 'isLoadingMoreGithubRepos'
+  | 'loadMoreGithubRepos'
+  | 'refreshGithubRepos'
   | 'onLogout'
   | 'onClone'
   | 'isCloning'
@@ -21,6 +41,7 @@ type GithubConnectedContentProps = Pick<
   | 'onOpenPR'
   | 'onCopyPRUrl'
   | 'onCheckoutPR'
+  | 'onMergePR'
   | 'showCreatePR'
   | 'setShowCreatePR'
   | 'currentBranch'
@@ -36,9 +57,33 @@ type GithubConnectedContentProps = Pick<
   | 'onCreatePR'
 >;
 
+const toRepoIdentity = (remoteUrl: string): string | null => {
+  const trimmed = (remoteUrl || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  if (!trimmed) return null;
+
+  const sshMatch = trimmed.match(/^git@([^:]+):(.+)$/i);
+  if (sshMatch) {
+    return `${sshMatch[1].toLowerCase()}/${sshMatch[2].replace(/^\/+/, '').toLowerCase()}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.host.toLowerCase()}/${parsed.pathname.replace(/^\/+/, '').toLowerCase()}`;
+  } catch {
+    return null;
+  }
+};
+
 export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   githubUser,
   githubRepos,
+  githubRepoSearch,
+  setGithubRepoSearch,
+  githubReposHasMore,
+  isLoadingGithubRepos,
+  isLoadingMoreGithubRepos,
+  loadMoreGithubRepos,
+  refreshGithubRepos,
   onLogout,
   onClone,
   isCloning,
@@ -53,6 +98,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   onOpenPR,
   onCopyPRUrl,
   onCheckoutPR,
+  onMergePR,
   showCreatePR,
   setShowCreatePR,
   currentBranch,
@@ -68,6 +114,51 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   onCreatePR,
 }) => {
   const { tr } = useI18n();
+  const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOrigins = async () => {
+      if (!window.electronAPI || openRepos.length === 0) {
+        if (active) setRepoOriginByPath({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        openRepos.map(async (repoPath) => {
+          try {
+            const result = await window.electronAPI.getRepoOriginUrl(repoPath);
+            if (!result.success) return [repoPath, null] as const;
+            return [repoPath, toRepoIdentity(result.data || '')] as const;
+          } catch {
+            return [repoPath, null] as const;
+          }
+        }),
+      );
+
+      if (!active) return;
+      const next: Record<string, string | null> = {};
+      for (const [repoPath, identity] of entries) {
+        next[repoPath] = identity;
+      }
+      setRepoOriginByPath(next);
+    };
+
+    void loadOrigins();
+    return () => {
+      active = false;
+    };
+  }, [openRepos]);
+
+  const localRepoByIdentity = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const repoPath of openRepos) {
+      const identity = repoOriginByPath[repoPath];
+      if (identity) map.set(identity, repoPath);
+    }
+    return map;
+  }, [openRepos, repoOriginByPath]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -91,8 +182,40 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
         </button>
       </div>
 
-      {githubRepos.map(repo => {
-        const localRepoPath = openRepos.find(p => (p.split(/[\\/]/).pop() || '').toLowerCase() === repo.name.toLowerCase());
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+          <input
+            type="text"
+            value={githubRepoSearch}
+            onChange={e => setGithubRepoSearch(e.target.value)}
+            placeholder={tr('GitHub-Repositories suchen...', 'Search GitHub repositories...')}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '6px 8px 6px 28px',
+              borderRadius: '4px',
+              border: '1px solid var(--border-color)',
+              backgroundColor: 'var(--bg-panel)',
+              color: 'var(--text-primary)',
+              fontSize: '0.8rem',
+            }}
+          />
+        </div>
+        <button className="icon-btn" style={{ padding: '6px' }} onClick={refreshGithubRepos} title={tr('Liste aktualisieren', 'Refresh list')}>
+          <RefreshCw size={14} className={isLoadingGithubRepos ? 'spin' : ''} />
+        </button>
+      </div>
+
+      {isLoadingGithubRepos && (
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          {tr('Lade Repositories...', 'Loading repositories...')}
+        </div>
+      )}
+
+      {!isLoadingGithubRepos && githubRepos.map(repo => {
+        const repoIdentity = toRepoIdentity(repo.cloneUrl);
+        const localRepoPath = repoIdentity ? localRepoByIdentity.get(repoIdentity) : undefined;
         const isLocallyAvailable = Boolean(localRepoPath);
         const isActiveLocalRepo = Boolean(localRepoPath && localRepoPath === activeRepo);
 
@@ -119,9 +242,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                 flex: 1,
                 minWidth: 0,
               }}
-              title={repo.name}
+              title={repo.fullName}
             >
-              {repo.name}
+              {repo.fullName}
             </span>
 
             {isLocallyAvailable ? (
@@ -147,7 +270,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   onClick={() => localRepoPath && onSwitchRepo(localRepoPath)}
                   className="icon-btn"
                   style={{ padding: '4px', opacity: isActiveLocalRepo ? 0.55 : 1 }}
-                  title={isActiveLocalRepo ? tr('Bereits aktiv', 'Already active') : tr('Lokales Repository öffnen', 'Open local repository')}
+                  title={isActiveLocalRepo ? tr('Bereits aktiv', 'Already active') : tr('Lokales Repository oeffnen', 'Open local repository')}
                   disabled={!localRepoPath || isActiveLocalRepo}
                 >
                   <FolderOpen size={14} />
@@ -167,6 +290,23 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           </div>
         );
       })}
+
+      {!isLoadingGithubRepos && githubRepos.length === 0 && (
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          {tr('Keine Repositories gefunden.', 'No repositories found.')}
+        </div>
+      )}
+
+      {githubReposHasMore && (
+        <button
+          className="staging-tool-btn"
+          onClick={loadMoreGithubRepos}
+          disabled={isLoadingMoreGithubRepos}
+          style={{ alignSelf: 'center' }}
+        >
+          {isLoadingMoreGithubRepos ? tr('Lade mehr...', 'Loading more...') : tr('Mehr laden', 'Load more')}
+        </button>
+      )}
 
       {prOwnerRepo && (
         <>
@@ -394,8 +534,15 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                  <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title={tr('Im Browser öffnen', 'Open in browser')}>
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  {pr.state === 'open' && (
+                    <>
+                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'merge')} title={tr('Merge', 'Merge')}>Merge</button>
+                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'squash')} title={tr('Squash', 'Squash')}>Squash</button>
+                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'rebase')} title={tr('Rebase', 'Rebase')}>Rebase</button>
+                    </>
+                  )}
+                  <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title={tr('Im Browser oeffnen', 'Open in browser')}>
                     <ExternalLink size={12} />
                   </button>
                   <button className="staging-btn-sm" onClick={() => onCopyPRUrl(pr.htmlUrl)} title={tr('URL kopieren', 'Copy URL')}>
