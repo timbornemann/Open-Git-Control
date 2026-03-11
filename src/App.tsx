@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { BranchContextMenu } from './components/layout/BranchContextMenu';
@@ -13,6 +13,7 @@ import './index.css';
 const App: React.FC = () => {
   const state = useAppState();
   const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
+  const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
 
   return (
     <I18nProvider language={state.settings.language}>
@@ -82,8 +83,17 @@ const App: React.FC = () => {
           isWebFlowRunning={state.isWebFlowRunning}
           webFlowError={state.webFlowError}
           onStartWebFlowLogin={state.handleStartWebFlowLogin}
+          selectedGithubAuthHelpMethod={selectedGithubAuthHelpMethod}
+          onSelectGithubAuthHelpMethod={setSelectedGithubAuthHelpMethod}
           githubUser={state.githubUser}
           githubRepos={state.githubRepos}
+          githubRepoSearch={state.githubRepoSearch}
+          setGithubRepoSearch={state.setGithubRepoSearch}
+          githubReposHasMore={state.githubReposHasMore}
+          isLoadingGithubRepos={state.isLoadingGithubRepos}
+          isLoadingMoreGithubRepos={state.isLoadingMoreGithubRepos}
+          loadMoreGithubRepos={state.loadMoreGithubRepos}
+          refreshGithubRepos={state.refreshGithubRepos}
           onLogout={state.handleLogout}
           onClone={state.handleClone}
           isCloning={state.isCloning}
@@ -95,6 +105,7 @@ const App: React.FC = () => {
           onOpenPR={state.handleOpenPR}
           onCopyPRUrl={state.handleCopyPRUrl}
           onCheckoutPR={state.handleCheckoutPR}
+          onMergePR={state.handleMergePR}
           showCreatePR={state.showCreatePR}
           setShowCreatePR={state.setShowCreatePR}
           currentBranch={state.currentBranch}
@@ -115,6 +126,10 @@ const App: React.FC = () => {
         />
 
         <MainView
+          activeTab={state.activeTab}
+          isAuthenticated={state.isAuthenticated}
+          selectedGithubAuthHelpMethod={selectedGithubAuthHelpMethod}
+          onClearGithubAuthHelpMethod={() => setSelectedGithubAuthHelpMethod(null)}
           activeRepo={state.activeRepo}
           currentBranch={state.currentBranch}
           remoteSync={state.remoteSync}
@@ -127,8 +142,9 @@ const App: React.FC = () => {
           triggerRefresh={state.triggerRefresh}
           showSecondaryHistory={state.settings.showSecondaryHistory}
           onFetch={() => state.refreshRemoteState(true)}
-          onPull={() => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.'), tr('Pull wird ausgeführt...', 'Running pull...'))}
-          onPush={() => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgeführt...', 'Running push...'))}
+          onPull={() => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.'), tr('Pull wird ausgefuehrt...', 'Running pull...'))}
+          onPush={() => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgefuehrt...', 'Running push...'))}
+          settings={state.settings}
         />
 
         {state.gitActionToast && (
@@ -206,3 +222,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
