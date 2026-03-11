@@ -33,6 +33,12 @@ type Props = {
   onPush: () => void;
 };
 
+const normalizeCommitHash = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const match = String(value).match(/[0-9a-f]{7,40}/i);
+  return match ? match[0] : null;
+};
+
 export const MainView: React.FC<Props> = ({
   activeRepo,
   currentBranch,
@@ -72,28 +78,30 @@ export const MainView: React.FC<Props> = ({
   }, []);
 
   const handleSelectCommitDirect = useCallback((hash: string | null) => {
+    const normalized = normalizeCommitHash(hash);
     setCommitHistoryStack([]);
-    setSelectedCommit(hash);
+    setSelectedCommit(normalized);
   }, [setSelectedCommit]);
 
   const handleSelectCommitFromHistory = useCallback((hash: string) => {
-    if (!hash) return;
+    const normalized = normalizeCommitHash(hash);
+    if (!normalized) return;
 
     if (!selectedCommit) {
-      setSelectedCommit(hash);
+      setSelectedCommit(normalized);
       return;
     }
 
-    if (selectedCommit === hash) return;
+    if (selectedCommit === normalized) return;
 
     setCommitHistoryStack(prev => [...prev, selectedCommit]);
-    setSelectedCommit(hash);
+    setSelectedCommit(normalized);
   }, [selectedCommit, setSelectedCommit]);
 
   const handleCommitBack = useCallback(() => {
     setCommitHistoryStack(prev => {
       if (prev.length === 0) return prev;
-      const nextHash = prev[prev.length - 1];
+      const nextHash = normalizeCommitHash(prev[prev.length - 1]);
       setSelectedCommit(nextHash);
       return prev.slice(0, -1);
     });

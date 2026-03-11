@@ -13,8 +13,15 @@ interface CommitDetailsProps {
 }
 
 export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectCommit, onOpenDiff }) => {
+  const normalizedHash = useMemo(() => {
+    const match = String(hash || '').match(/[0-9a-f]{7,40}/i);
+    return match ? match[0] : '';
+  }, [hash]);
+
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
+  const [filesSourceHint, setFilesSourceHint] = useState<string | null>(null);
+  const [isMergeCommit, setIsMergeCommit] = useState(false);
   const [files, setFiles] = useState<CommitFileDetail[]>([]);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
@@ -28,11 +35,13 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
 
   useEffect(() => {
-    if (!hash || !window.electronAPI) return;
+    if (!normalizedHash || !window.electronAPI) return;
 
     const fetchDetails = async () => {
       setLoadingFiles(true);
       setFilesError(null);
+      setFilesSourceHint(null);
+      setIsMergeCommit(false);
       setSelectedFilePath(null);
       setActiveTab('history');
       setHistoryEntries([]);
@@ -41,13 +50,39 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setBlameError(null);
 
       try {
-        const { success, data, error } = await window.electronAPI.runGitCommand('commitDetails', hash);
-        if (success && data) {
-          setFiles(parseCommitDetails(data));
-        } else {
+        const parentsResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%P', normalizedHash);
+        const parents = parentsResult.success
+          ? String(parentsResult.data || '').trim().split(/\s+/).filter(Boolean)
+          : [];
+        const mergeCommit = parents.length > 1;
+        setIsMergeCommit(mergeCommit);
+
+        const detailResult = await window.electronAPI.runGitCommand('commitDetails', normalizedHash);
+        if (!detailResult.success) {
           setFiles([]);
-          setFilesError(error || 'Commit-Details konnten nicht geladen werden.');
+          setFilesError(detailResult.error || 'Commit-Details konnten nicht geladen werden.');
+          return;
         }
+
+        const directFiles = parseCommitDetails(String(detailResult.data || ''));
+        if (directFiles.length > 0) {
+          setFiles(directFiles);
+          return;
+        }
+
+        if (mergeCommit) {
+          const mergeRangeResult = await window.electronAPI.runGitCommand('diff', '--name-status', `${normalizedHash}^1`, normalizedHash);
+          if (mergeRangeResult.success) {
+            const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
+            if (mergedBranchFiles.length > 0) {
+              setFiles(mergedBranchFiles);
+              setFilesSourceHint('Dateien zeigen die effektiven Aenderungen aus dem gemergten Branch (gegen Parent 1).');
+              return;
+            }
+          }
+        }
+
+        setFiles([]);
       } catch (fetchError) {
         console.error(fetchError);
         setFiles([]);
@@ -58,7 +93,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchDetails();
-  }, [hash]);
+  }, [normalizedHash]);
 
   const selectedFile = useMemo(
     () => files.find(file => file.path === selectedFilePath) ?? null,
@@ -75,7 +110,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await window.electronAPI.getFileHistory(selectedFile.path, hash, 80);
+        const result = await window.electronAPI.getFileHistory(selectedFile.path, normalizedHash, 80);
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -92,7 +127,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchHistory();
-  }, [activeTab, hash, selectedFile]);
+  }, [activeTab, normalizedHash, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !window.electronAPI) return;
@@ -109,7 +144,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await window.electronAPI.getFileBlame(selectedFile.path, hash);
+        const result = await window.electronAPI.getFileBlame(selectedFile.path, normalizedHash);
         if (result.success) {
           setBlameLines(result.data || []);
         } else {
@@ -126,18 +161,18 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchBlame();
-  }, [activeTab, hash, isDeletedFile, selectedFile]);
+  }, [activeTab, normalizedHash, isDeletedFile, selectedFile]);
 
   useEffect(() => {
-    if (!selectedFile || activeTab !== 'patch') return;
+    if (!selectedFile || activeTab !== 'patch' || !normalizedHash) return;
 
     onOpenDiff?.({
       source: 'commit',
       path: selectedFile.path,
-      commitHash: hash,
-      title: `Commit Diff ${hash.slice(0, 8)}`,
+      commitHash: normalizedHash,
+      title: `Commit Diff ${normalizedHash.slice(0, 8)}`,
     });
-  }, [activeTab, hash, onOpenDiff, selectedFile]);
+  }, [activeTab, normalizedHash, onOpenDiff, selectedFile]);
 
   const getIconForStatus = (status: string) => {
     switch (status[0]) {
@@ -165,17 +200,6 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     });
   };
 
-  const formatBlameDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const parsed = new Date(dateString);
-    if (Number.isNaN(parsed.getTime())) return dateString;
-    return parsed.toLocaleDateString('de-DE', {
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-    });
-  };
-
   const formatRelativeDate = (dateString: string) => {
     if (!dateString) return '-';
     const parsed = new Date(dateString);
@@ -194,22 +218,36 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     const days = Math.max(1, Math.round(absMs / day));
     return 'vor ' + days + ' Tag' + (days === 1 ? '' : 'en');
   };
+
+  const formatBlameDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) return dateString;
+    return parsed.toLocaleDateString('de-DE', {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
   return (
     <div className="commit-details-panel" style={{ padding: '12px', height: '100%', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
-        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Commit Details: {hash.substring(0, 8)}</h4>
+        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>
+          Commit Details: {normalizedHash ? normalizedHash.substring(0, 8) : 'ungueltig'}
+        </h4>
         {selectedFile && (
-          <button
-            className="icon-btn"
-            onClick={() => setSelectedFilePath(null)}
-            style={{ fontSize: '0.75rem', padding: '3px 8px' }}
-          >
+          <button className="icon-btn" onClick={() => setSelectedFilePath(null)} style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
             Dateien
           </button>
         )}
       </div>
 
-      {loadingFiles ? (
+      {!normalizedHash ? (
+        <div style={{ color: '#f87171', fontSize: '0.84rem', border: '1px solid rgba(248,81,73,0.35)', borderRadius: 6, padding: '8px 10px' }}>
+          Ungueltige Commit-ID.
+        </div>
+      ) : loadingFiles ? (
         <p style={{ color: 'var(--text-secondary)' }}>Lade Details...</p>
       ) : filesError ? (
         <div style={{ color: '#f87171', fontSize: '0.84rem', border: '1px solid rgba(248,81,73,0.35)', borderRadius: 6, padding: '8px 10px' }}>
@@ -217,47 +255,32 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
         </div>
       ) : !selectedFile ? (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {filesSourceHint && (
+            <li style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', backgroundColor: 'var(--bg-panel)' }}>
+              {filesSourceHint}
+            </li>
+          )}
           {files.map((file, index) => (
             <li key={`${file.path}-${index}`}>
               <button
                 onClick={() => setSelectedFilePath(file.path)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'var(--bg-panel)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  padding: '7px 8px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}
               >
                 {getIconForStatus(file.status)}
                 <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.path}</span>
               </button>
             </li>
           ))}
-          {files.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>Keine Dateien geaendert.</span>}
+          {files.length === 0 && (
+            <span style={{ color: 'var(--text-secondary)' }}>
+              {isMergeCommit ? 'Keine effektiven Dateiaenderungen gegen Parent 1 gefunden.' : 'Keine Dateien geaendert.'}
+            </span>
+          )}
         </ul>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Datei</div>
-          <div
-            style={{
-              fontFamily: 'monospace',
-              color: 'var(--text-primary)',
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '6px',
-              padding: '7px 8px',
-              overflowX: 'auto',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
             {selectedFile.path}
           </div>
 
@@ -266,15 +289,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                style={{
-                  fontSize: '0.78rem',
-                  padding: '5px 8px',
-                  borderRadius: '5px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)',
-                  color: activeTab === tab ? '#ffffff' : 'var(--text-primary)',
-                  cursor: 'pointer',
-                }}
+                style={{ fontSize: '0.78rem', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-color)', backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)', color: activeTab === tab ? '#ffffff' : 'var(--text-primary)', cursor: 'pointer' }}
               >
                 {tab === 'history' ? 'History' : tab === 'blame' ? 'Blame' : 'Patch'}
               </button>
@@ -292,28 +307,18 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Keine Historie gefunden.</span>
               )}
               {!historyLoading && !historyError && historyEntries.map(entry => {
-                const isCurrentCommit = entry.hash === hash;
+                const normalizedEntryHash = (entry.hash.match(/[0-9a-f]{7,40}/i) || [''])[0];
+                const isCurrentCommit = normalizedEntryHash === normalizedHash;
                 return (
                   <button
                     key={`${entry.hash}-${entry.subject}`}
-                    onClick={() => onSelectCommit?.(entry.hash)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      border: isCurrentCommit ? '1px solid rgba(31, 111, 235, 0.5)' : '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      backgroundColor: isCurrentCommit ? 'rgba(31, 111, 235, 0.12)' : 'var(--bg-panel)',
-                      padding: '8px 9px',
-                      cursor: onSelectCommit ? 'pointer' : 'default',
-                      color: 'var(--text-primary)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                    }}
+                    onClick={() => normalizedEntryHash && onSelectCommit?.(normalizedEntryHash)}
+                    style={{ width: '100%', textAlign: 'left', border: isCurrentCommit ? '1px solid rgba(31, 111, 235, 0.5)' : '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: isCurrentCommit ? 'rgba(31, 111, 235, 0.12)' : 'var(--bg-panel)', padding: '8px 9px', cursor: onSelectCommit ? 'pointer' : 'default', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}
+                    disabled={!normalizedEntryHash}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        {entry.abbrevHash || entry.hash.slice(0, 8)}
+                        {entry.abbrevHash || (normalizedEntryHash ? normalizedEntryHash.slice(0, 8) : 'ungueltig')}
                       </span>
                       {isCurrentCommit && (
                         <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 999, backgroundColor: 'rgba(31,111,235,0.25)', color: '#7cb8ff' }}>
@@ -345,57 +350,20 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
               )}
               {!blameLoading && !blameError && (
                 <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '56px 80px 120px 60px 1fr',
-                      gap: '8px',
-                      padding: '6px 8px',
-                      borderBottom: '1px solid var(--border-color)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
-                    }}
-                  >
-                    <span>Zeile</span>
-                    <span>Commit</span>
-                    <span>Autor</span>
-                    <span>Datum</span>
-                    <span>Inhalt</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '56px 80px 120px 60px 1fr', gap: '8px', padding: '6px 8px', borderBottom: '1px solid var(--border-color)', backgroundColor: 'rgba(255, 255, 255, 0.03)', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    <span>Zeile</span><span>Commit</span><span>Autor</span><span>Datum</span><span>Inhalt</span>
                   </div>
                   <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
                     {blameLines.map((line, index) => (
                       <div
                         key={`${line.lineNumber}-${line.commitHash}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '56px 80px 120px 60px 1fr',
-                          gap: '8px',
-                          alignItems: 'start',
-                          padding: '5px 8px',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                          fontFamily: 'monospace',
-                          fontSize: '0.76rem',
-                          color: 'var(--text-primary)',
-                          backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.015)',
-                        }}
+                        style={{ display: 'grid', gridTemplateColumns: '56px 80px 120px 60px 1fr', gap: '8px', alignItems: 'start', padding: '5px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', fontFamily: 'monospace', fontSize: '0.76rem', color: 'var(--text-primary)', backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.015)' }}
                         title={`${line.author} - ${line.summary}`}
                       >
                         <span style={{ color: 'var(--text-secondary)' }}>{line.lineNumber}</span>
                         <button
                           onClick={() => onSelectCommit?.(line.commitHash)}
-                          style={{
-                            padding: 0,
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--accent-primary)',
-                            textAlign: 'left',
-                            cursor: onSelectCommit ? 'pointer' : 'default',
-                            fontFamily: 'monospace',
-                            fontSize: '0.76rem',
-                          }}
+                          style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--accent-primary)', textAlign: 'left', cursor: onSelectCommit ? 'pointer' : 'default', fontFamily: 'monospace', fontSize: '0.76rem' }}
                         >
                           {line.abbrevHash}
                         </button>
@@ -419,7 +387,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
               </span>
               <button
                 className="staging-tool-btn"
-                onClick={() => onOpenDiff?.({ source: 'commit', path: selectedFile.path, commitHash: hash, title: `Commit Diff ${hash.slice(0, 8)}` })}
+                onClick={() => onOpenDiff?.({ source: 'commit', path: selectedFile.path, commitHash: normalizedHash, title: `Commit Diff ${normalizedHash.slice(0, 8)}` })}
               >
                 Diff erneut im Hauptfenster anzeigen
               </button>
@@ -430,5 +398,3 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     </div>
   );
 };
-
-
