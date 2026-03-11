@@ -1,4 +1,4 @@
-const DEVICE_CODE_ENDPOINT = 'https://github.com/login/device/code';
+﻿const DEVICE_CODE_ENDPOINT = 'https://github.com/login/device/code';
 const ACCESS_TOKEN_ENDPOINT = 'https://github.com/login/oauth/access_token';
 
 type DeviceFlowStartResult = {
@@ -19,6 +19,7 @@ type WebFlowExchangeParams = {
   redirectUri: string;
   codeVerifier: string;
   configuredClientId?: string | null;
+  configuredHost?: string | null;
 };
 
 type WebFlowExchangeResult = {
@@ -27,10 +28,15 @@ type WebFlowExchangeResult = {
   scope: string;
 };
 
+type MergeMethod = 'merge' | 'squash' | 'rebase';
+
+const DEFAULT_HOST = 'github.com';
+
 export class GitHubService {
   private octokit: any | null = null;
   private token: string | null = null;
   private username: string | null = null;
+  private host: string = DEFAULT_HOST;
 
   private normalizeClientId(value: unknown): string | null {
     if (typeof value !== 'string') {
@@ -38,6 +44,35 @@ export class GitHubService {
     }
     const normalized = value.trim();
     return normalized || null;
+  }
+
+  normalizeHost(value: unknown): string {
+    if (typeof value !== 'string') {
+      return DEFAULT_HOST;
+    }
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) {
+      return DEFAULT_HOST;
+    }
+
+    const withoutProtocol = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    if (!withoutProtocol || /[^a-z0-9.\-:]/.test(withoutProtocol)) {
+      return DEFAULT_HOST;
+    }
+
+    return withoutProtocol;
+  }
+
+  private getApiBaseUrl(configuredHost?: string | null): string {
+    const host = this.normalizeHost(configuredHost || this.host);
+    if (host === DEFAULT_HOST) {
+      return 'https://api.github.com';
+    }
+    return `https://${host}/api/v3`;
+  }
+
+  private getOauthHost(configuredHost?: string | null): string {
+    return this.normalizeHost(configuredHost || this.host);
   }
 
   private getOauthClientId(configuredClientId?: string | null): string | null {
@@ -50,30 +85,41 @@ export class GitHubService {
     return envClientId;
   }
 
-  isDeviceFlowConfigured(configuredClientId?: string | null): boolean {
+  isDeviceFlowConfigured(configuredClientId?: string | null, configuredHost?: string | null): boolean {
+    const host = this.getOauthHost(configuredHost);
+    if (host !== DEFAULT_HOST) {
+      return false;
+    }
     return Boolean(this.getOauthClientId(configuredClientId));
   }
 
-  async authenticate(token: string): Promise<boolean> {
+  getHost(): string {
+    return this.host;
+  }
+
+  async authenticate(token: string, configuredHost?: string | null): Promise<boolean> {
     try {
+      const host = this.normalizeHost(configuredHost);
+
       // Using new Function to prevent TypeScript from compiling dynamic import into require()
       const _importDynamic = new Function('modulePath', 'return import(modulePath)');
       const { Octokit } = await _importDynamic('octokit');
-      this.octokit = new Octokit({ auth: token });
+      this.octokit = new Octokit({ auth: token, baseUrl: this.getApiBaseUrl(host) });
 
       // Validate the token by calling the rate limit endpoint (works with any valid token)
       await this.octokit.rest.rateLimit.get();
 
       this.token = token;
+      this.host = host;
 
       // Try fetching the username for display
       try {
         const { data } = await this.octokit.rest.users.getAuthenticated();
         this.username = data?.login || null;
-        console.log('GitHub Authenticated as:', this.username);
+        console.log('GitHub Authenticated as:', this.username, 'on host:', host);
       } catch {
         this.username = null;
-        console.log('GitHub Authenticated (Token valid, but user scope not available).');
+        console.log('GitHub Authenticated (Token valid, but user scope not available). Host:', host);
       }
 
       return true;
@@ -86,7 +132,12 @@ export class GitHubService {
     }
   }
 
-  async startDeviceFlow(configuredClientId?: string | null): Promise<DeviceFlowStartResult> {
+  async startDeviceFlow(configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowStartResult> {
+    const host = this.getOauthHost(configuredHost);
+    if (host !== DEFAULT_HOST) {
+      throw new Error('Device Flow wird aktuell nur fuer github.com unterstuetzt. Bitte PAT-Login nutzen.');
+    }
+
     const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
       throw new Error('Device Flow nicht konfiguriert. Bitte GitHub OAuth Client ID in den Einstellungen setzen oder GITHUB_OAUTH_CLIENT_ID bereitstellen.');
@@ -136,7 +187,16 @@ export class GitHubService {
     };
   }
 
-  async pollDeviceFlow(deviceCode: string, configuredClientId?: string | null): Promise<DeviceFlowPollResult> {
+  async pollDeviceFlow(deviceCode: string, configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowPollResult> {
+    const host = this.getOauthHost(configuredHost);
+    if (host !== DEFAULT_HOST) {
+      return {
+        status: 'error',
+        error: 'oauth_host_not_supported',
+        errorDescription: 'Device Flow wird aktuell nur fuer github.com unterstuetzt.',
+      };
+    }
+
     const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
       return {
@@ -208,6 +268,11 @@ export class GitHubService {
   }
 
   async exchangeWebFlowCode(params: WebFlowExchangeParams): Promise<WebFlowExchangeResult> {
+    const host = this.getOauthHost(params.configuredHost);
+    if (host !== DEFAULT_HOST) {
+      throw new Error('OAuth Browser Login wird aktuell nur fuer github.com unterstuetzt.');
+    }
+
     const clientId = this.getOauthClientId(params.configuredClientId);
     if (!clientId) {
       throw new Error('OAuth Browser Login ist nicht konfiguriert (GitHub OAuth Client ID fehlt).');
@@ -274,15 +339,20 @@ export class GitHubService {
     return this.username;
   }
 
-  async getMyRepositories() {
+  async getMyRepositories(page: number = 1, perPage: number = 50, search: string = '') {
     if (!this.octokit) throw new Error('Not authenticated');
+
+    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+    const safePerPage = Number.isFinite(perPage) ? Math.max(10, Math.min(Math.floor(perPage), 100)) : 50;
+    const normalizedSearch = (search || '').trim().toLowerCase();
 
     const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
       sort: 'updated',
-      per_page: 50
+      per_page: safePerPage,
+      page: safePage,
     });
 
-    return data.map((repo: any) => ({
+    const mapped = data.map((repo: any) => ({
       id: repo.id,
       name: repo.name,
       fullName: repo.full_name,
@@ -290,8 +360,22 @@ export class GitHubService {
       cloneUrl: repo.clone_url,
       htmlUrl: repo.html_url,
       description: repo.description,
-      updatedAt: repo.updated_at
+      updatedAt: repo.updated_at,
     }));
+
+    const filtered = normalizedSearch
+      ? mapped.filter((repo: any) => {
+        const haystack = `${repo.name} ${repo.fullName} ${repo.description || ''}`.toLowerCase();
+        return haystack.includes(normalizedSearch);
+      })
+      : mapped;
+
+    return {
+      repos: filtered,
+      nextPage: data.length === safePerPage ? safePage + 1 : null,
+      hasMore: data.length === safePerPage,
+      totalCount: null,
+    };
   }
 
   async createRepository(name: string, description: string, isPrivate: boolean) {
@@ -311,6 +395,8 @@ export class GitHubService {
       private: data.private,
       cloneUrl: data.clone_url,
       htmlUrl: data.html_url,
+      description: data.description,
+      updatedAt: data.updated_at,
     };
   }
 
@@ -323,7 +409,7 @@ export class GitHubService {
       state,
       per_page: 30,
       sort: 'updated',
-      direction: 'desc'
+      direction: 'desc',
     });
 
     return data.map((pr: any) => ({
@@ -347,7 +433,7 @@ export class GitHubService {
     title: string,
     body: string,
     head: string,
-    base: string
+    base: string,
   ) {
     if (!this.octokit) throw new Error('Not authenticated');
 
@@ -365,6 +451,33 @@ export class GitHubService {
       title: data.title,
       htmlUrl: data.html_url,
       state: data.state,
+    };
+  }
+
+  async mergePullRequest(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    mergeMethod: MergeMethod,
+    commitTitle?: string,
+    commitMessage?: string,
+  ) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const method: MergeMethod = mergeMethod === 'rebase' || mergeMethod === 'squash' ? mergeMethod : 'merge';
+    const { data } = await this.octokit.rest.pulls.merge({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      merge_method: method,
+      ...(commitTitle ? { commit_title: commitTitle } : {}),
+      ...(commitMessage ? { commit_message: commitMessage } : {}),
+    });
+
+    return {
+      sha: data.sha,
+      merged: Boolean(data.merged),
+      message: data.message || 'Merged',
     };
   }
 }
