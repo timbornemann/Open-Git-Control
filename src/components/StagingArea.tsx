@@ -4,10 +4,12 @@ import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
+import { DiffRequest } from '../types/diff';
 
 interface StagingAreaProps {
   repoPath: string | null;
   onRepoChanged?: () => void;
+  onOpenDiff?: (request: DiffRequest) => void;
 }
 
 type ConfirmDialogState = {
@@ -119,11 +121,10 @@ const extensionPattern = (p: string) => {
   return `*${name.slice(idx)}`;
 };
 
-export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged }) => {
+export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff }) => {
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
-  const [diffContent, setDiffContent] = useState<{ path: string; diff: string } | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
   const { toast, setToast } = useToastQueue(3000);
@@ -386,17 +387,13 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
   const stashPop = () => git(['stash', 'pop'], 'Stash angewendet', true);
 
-  const showDiff = async (filePath: string, staged: boolean) => {
-    if (!window.electronAPI) return;
-    try {
-      const args = staged ? ['diff', '--cached', '--', filePath] : ['diff', '--', filePath];
-      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
-      if (r.success) {
-        setDiffContent({ path: filePath, diff: r.data || '(Keine Unterschiede)' });
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const showDiff = (filePath: string, staged: boolean) => {
+    const request: DiffRequest = {
+      source: staged ? 'staged' : 'unstaged',
+      path: filePath,
+      title: staged ? 'Staged Diff' : 'Unstaged Diff',
+    };
+    onOpenDiff?.(request);
   };
 
   const takeConflictVersion = (filePath: string, side: 'ours' | 'theirs') => {
@@ -540,43 +537,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const contextDir = contextEntry ? dirname(contextEntry.path) : '';
   const contextTopDir = contextDir.includes('/') ? contextDir.split('/')[0] : '';
   const contextExtPattern = contextEntry ? extensionPattern(contextEntry.path) : null;
-
-  if (diffContent) {
-    return (
-      <div className="staging-container">
-        <div className="staging-toolbar">
-          <button className="staging-tool-btn" onClick={() => setDiffContent(null)}>
-            Zurueck
-          </button>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{diffContent.path}</span>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '8px',
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.75rem',
-            lineHeight: '1.5',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
-          }}
-        >
-          {diffContent.diff.split('\n').map((line, i) => {
-            let color = 'var(--text-secondary)';
-            if (line.startsWith('+') && !line.startsWith('+++')) color = '#3fb950';
-            else if (line.startsWith('-') && !line.startsWith('---')) color = '#f85149';
-            else if (line.startsWith('@@')) color = '#a371f7';
-            return (
-              <div key={i} style={{ color }}>
-                {line || ' '}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
@@ -878,6 +838,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
 
 
 
