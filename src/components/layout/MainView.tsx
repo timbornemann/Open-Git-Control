@@ -50,10 +50,13 @@ export const MainView: React.FC<Props> = ({
   onPush,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
+  const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
 
   useEffect(() => {
     setActiveDiffRequest(null);
+    setCommitHistoryStack([]);
   }, [activeRepo]);
+
   const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
     setActiveDiffRequest((previous) => {
       if (
@@ -67,6 +70,40 @@ export const MainView: React.FC<Props> = ({
       return diffRequest;
     });
   }, []);
+
+  const handleSelectCommitDirect = useCallback((hash: string | null) => {
+    setCommitHistoryStack([]);
+    setSelectedCommit(hash);
+  }, [setSelectedCommit]);
+
+  const handleSelectCommitFromHistory = useCallback((hash: string) => {
+    if (!hash) return;
+
+    if (!selectedCommit) {
+      setSelectedCommit(hash);
+      return;
+    }
+
+    if (selectedCommit === hash) return;
+
+    setCommitHistoryStack(prev => [...prev, selectedCommit]);
+    setSelectedCommit(hash);
+  }, [selectedCommit, setSelectedCommit]);
+
+  const handleCommitBack = useCallback(() => {
+    setCommitHistoryStack(prev => {
+      if (prev.length === 0) return prev;
+      const nextHash = prev[prev.length - 1];
+      setSelectedCommit(nextHash);
+      return prev.slice(0, -1);
+    });
+  }, [setSelectedCommit]);
+
+  const closeInspector = useCallback(() => {
+    setCommitHistoryStack([]);
+    setSelectedCommit(null);
+  }, [setSelectedCommit]);
+
   return (
     <div className="main-view">
       <div className="topbar">
@@ -139,7 +176,7 @@ export const MainView: React.FC<Props> = ({
           onFetch={onFetch}
           onPull={onPull}
           onPush={onPush}
-          onStageCommit={() => setSelectedCommit(null)}
+          onStageCommit={() => handleSelectCommitDirect(null)}
         />
       </div>
 
@@ -164,7 +201,7 @@ export const MainView: React.FC<Props> = ({
               <CommitGraph
                 repoPath={activeRepo}
                 selectedHash={selectedCommit}
-                onSelectCommit={setSelectedCommit}
+                onSelectCommit={handleSelectCommitDirect}
                 refreshTrigger={refreshTrigger}
                 showSecondaryHistory={showSecondaryHistory}
               />
@@ -176,16 +213,23 @@ export const MainView: React.FC<Props> = ({
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{selectedCommit ? 'Commit Inspector' : 'Working Directory'}</span>
             {selectedCommit && (
-              <button className="icon-btn" onClick={() => setSelectedCommit(null)} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                Schliessen
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {commitHistoryStack.length > 0 && (
+                  <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                    Zurueck
+                  </button>
+                )}
+                <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                  Schliessen
+                </button>
+              </div>
             )}
           </div>
           <div className="pane-content" style={{ overflow: 'hidden' }}>
             {selectedCommit ? (
               <CommitDetails
                 hash={selectedCommit}
-                onSelectCommit={setSelectedCommit}
+                onSelectCommit={handleSelectCommitFromHistory}
                 onOpenDiff={handleOpenDiff}
               />
             ) : (
@@ -201,4 +245,3 @@ export const MainView: React.FC<Props> = ({
     </div>
   );
 };
-
