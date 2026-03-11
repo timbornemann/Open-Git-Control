@@ -5,6 +5,7 @@ import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
+import { usePullRequests } from '../../hooks/usePullRequests';
 
 const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'dark',
@@ -191,13 +192,30 @@ export const useAppState = () => {
   });
 
   const github = useGithubDomain({
-    activeRepo: workspace.activeRepo,
-    currentBranch: repository.currentBranch,
-    refreshTrigger,
-    triggerRefresh,
-    setGitActionToast,
     onRepoCloned: workspace.addOpenRepo,
     setActiveTab: workspace.setActiveTab,
+  });
+
+  const [showCreatePR, setShowCreatePR] = useState(false);
+  const [newPRTitle, setNewPRTitle] = useState('');
+  const [newPRBody, setNewPRBody] = useState('');
+  const [newPRHead, setNewPRHead] = useState('');
+  const [newPRBase, setNewPRBase] = useState('main');
+
+  const pullRequestDomain = usePullRequests({
+    activeRepo: workspace.activeRepo,
+    isAuthenticated: github.isAuthenticated,
+    refreshTrigger,
+    onCreated: (number) => {
+      setGitActionToast({ msg: `PR #${number} erstellt.`, isError: false });
+      setShowCreatePR(false);
+      setNewPRTitle('');
+      setNewPRBody('');
+      triggerRefresh();
+    },
+    onError: (message) => {
+      setGitActionToast({ msg: message, isError: true });
+    },
   });
 
   const handleCreateGithubRepoForCurrent = async () => {
@@ -247,6 +265,16 @@ export const useAppState = () => {
     }
   };
 
+
+  const handleCreatePR = async () => {
+    await pullRequestDomain.createPR({
+      title: newPRTitle,
+      body: newPRBody,
+      head: newPRHead,
+      base: newPRBase,
+      currentBranch: repository.currentBranch,
+    });
+  };
   const handleOpenPR = (url: string) => {
     window.open(url, '_blank');
   };
@@ -348,22 +376,22 @@ export const useAppState = () => {
     cloneError: github.cloneError,
     handleClone: github.handleClone,
 
-    prOwnerRepo: github.prOwnerRepo,
-    prFilter: github.prFilter,
-    setPrFilter: github.setPrFilter,
-    prLoading: github.prLoading,
-    pullRequests: github.pullRequests,
-    showCreatePR: github.showCreatePR,
-    setShowCreatePR: github.setShowCreatePR,
-    newPRTitle: github.newPRTitle,
-    setNewPRTitle: github.setNewPRTitle,
-    newPRBody: github.newPRBody,
-    setNewPRBody: github.setNewPRBody,
-    newPRHead: github.newPRHead,
-    setNewPRHead: github.setNewPRHead,
-    newPRBase: github.newPRBase,
-    setNewPRBase: github.setNewPRBase,
-    handleCreatePR: github.handleCreatePR,
+    prOwnerRepo: pullRequestDomain.prOwnerRepo,
+    prFilter: pullRequestDomain.prFilter,
+    setPrFilter: pullRequestDomain.setPrFilter,
+    prLoading: pullRequestDomain.prLoading,
+    pullRequests: pullRequestDomain.pullRequests,
+    showCreatePR,
+    setShowCreatePR,
+    newPRTitle,
+    setNewPRTitle,
+    newPRBody,
+    setNewPRBody,
+    newPRHead,
+    setNewPRHead,
+    newPRBase,
+    setNewPRBase,
+    handleCreatePR,
     handleOpenPR,
     handleCopyPRUrl,
     handleCheckoutPR,
