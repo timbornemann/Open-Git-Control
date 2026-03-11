@@ -3,6 +3,11 @@
   "productName": "Open-Git-Control",
   "private": true,
   "version": "1.0.0",
+  "description": "Desktop app for organizing and controlling Git repositories.",
+  "author": {
+    "name": "Tim Bornemann",
+    "email": "tim@timbornemann.de"
+  },
   "main": "dist-electron/electron/main.js",
   "repository": {
     "type": "git",
@@ -88,6 +93,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
+      "maintainer": "Tim Bornemann <tim@timbornemann.de>",
       "target": [
         {
           "target": "AppImage",
