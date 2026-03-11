@@ -5,11 +5,13 @@ import { Confirm, DialogContextItem } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
 import { DiffRequest } from '../types/diff';
+import { AppSettingsDto } from '../global';
 
 interface StagingAreaProps {
   repoPath: string | null;
   onRepoChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
+  settings: AppSettingsDto;
 }
 
 type ConfirmDialogState = {
@@ -121,7 +123,7 @@ const extensionPattern = (p: string) => {
   return `*${name.slice(idx)}`;
 };
 
-export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff }) => {
+export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff, settings }) => {
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
@@ -137,7 +139,17 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
   const [isAiCommitting, setIsAiCommitting] = useState(false);
-  const [aiConfig, setAiConfig] = useState<{ enabled: boolean; provider: 'ollama' | 'gemini'; model: string }>({ enabled: false, provider: 'ollama', model: '' });
+  const [isAiJobRunning, setIsAiJobRunning] = useState(false);
+  const [aiProgressMessage, setAiProgressMessage] = useState<string | null>(null);
+  const [aiPhase, setAiPhase] = useState<string>('idle');
+  const [aiMode, setAiMode] = useState<string>('normal');
+  const [aiLastCommit, setAiLastCommit] = useState<string | null>(null);
+  const [aiRemainingFiles, setAiRemainingFiles] = useState<number | null>(null);
+  const aiConfig = {
+    enabled: Boolean(settings.aiAutoCommitEnabled),
+    provider: settings.aiProvider,
+    model: settings.aiProvider === 'gemini' ? (settings.geminiModel || '') : (settings.ollamaModel || ''),
+  };
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -189,24 +201,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     };
   }, [repoPath, refresh]);
 
+  useEffect(() => {
+    setSignoffCommit(Boolean(settings.commitSignoffByDefault));
+  }, [settings.commitSignoffByDefault]);
 
   useEffect(() => {
-    const loadCommitPreferences = async () => {
-      if (!window.electronAPI) return;
-      try {
-        const settings = await window.electronAPI.getSettings();
-        setSignoffCommit(Boolean(settings.commitSignoffByDefault));
-        setAiConfig({ enabled: Boolean(settings.aiAutoCommitEnabled), provider: settings.aiProvider, model: settings.aiProvider === 'gemini' ? (settings.geminiModel || '') : (settings.ollamaModel || '') });
-        if (settings.commitTemplate && !commitMsg.trim()) {
-          setCommitMsg(settings.commitTemplate);
-        }
-      } catch {
-        // ignore
-      }
-    };
+    if (settings.commitTemplate && !commitMsg.trim()) {
+      setCommitMsg(settings.commitTemplate);
+    }
+  }, [settings.commitTemplate, commitMsg]);
 
-    loadCommitPreferences();
-  }, []);
   const git = async (args: string[], msg: string, notify = false) => {
     if (!window.electronAPI) return;
     try {
@@ -239,6 +243,43 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     await action(values);
   }, [inputDialog]);
 
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const unsubscribe = window.electronAPI.onJobEvent((event) => {
+      if (event.operation !== 'git:aiAutoCommit') return;
+
+      const details = event.details || {};
+      const phase = typeof details.phase === 'string' ? details.phase : null;
+      const mode = typeof details.mode === 'string' ? details.mode : null;
+      const lastCommit = typeof details.lastCommit === 'string' ? details.lastCommit : null;
+      const remaining = typeof details.remainingFiles === 'number' ? details.remainingFiles : null;
+
+      if (phase) setAiPhase(phase);
+      if (mode) setAiMode(mode);
+      if (lastCommit) setAiLastCommit(lastCommit);
+      if (remaining !== null) setAiRemainingFiles(remaining);
+
+      if (event.status === 'start' || event.status === 'progress') {
+        setIsAiJobRunning(true);
+        setAiProgressMessage(event.message || 'KI arbeitet...');
+        return;
+      }
+
+      if (event.status === 'done') {
+        setIsAiJobRunning(false);
+        setAiProgressMessage(event.message || 'KI Auto-Commit abgeschlossen.');
+        return;
+      }
+
+      if (event.status === 'failed') {
+        setIsAiJobRunning(false);
+        setAiProgressMessage(event.message || 'KI Auto-Commit fehlgeschlagen.');
+      }
+    });
+
+    return unsubscribe;
+  }, []);
   useEffect(() => {
     if (!contextMenu) return;
 
@@ -434,16 +475,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const handleAiAutoCommit = async () => {
     if (!window.electronAPI || !status) return;
 
-    if (!aiConfig.enabled) {
-      setToast({ msg: 'KI Auto-Commit ist in den Einstellungen deaktiviert.', isError: true });
-      return;
-    }
-
-    if (!aiConfig.model.trim()) {
-      setToast({ msg: 'Bitte in den Einstellungen zuerst ein KI-Modell auswaehlen.', isError: true });
-      return;
-    }
-
     if (status.conflicts.length > 0) {
       setToast({ msg: 'Bitte zuerst alle Konflikte aufloesen.', isError: true });
       return;
@@ -453,9 +484,29 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       setToast({ msg: 'Keine Aenderungen fuer KI Auto-Commit vorhanden.', isError: true });
       return;
     }
-
+    setAiPhase('snapshot');
+    setAiMode('normal');
+    setAiLastCommit(null);
+    setAiRemainingFiles(status.staged.length + status.unstaged.length + status.untracked.length);
+    setIsAiJobRunning(true);
+    setAiProgressMessage('KI startet...');
     setIsAiCommitting(true);
     try {
+      const latestSettings = await window.electronAPI.getSettings();
+      const latestModel = latestSettings.aiProvider === 'gemini'
+        ? (latestSettings.geminiModel || '')
+        : (latestSettings.ollamaModel || '');
+
+      if (!latestSettings.aiAutoCommitEnabled) {
+        setToast({ msg: 'KI Auto-Commit ist in den Einstellungen deaktiviert.', isError: true });
+        return;
+      }
+
+      if (!latestModel.trim()) {
+        setToast({ msg: 'Bitte in den Einstellungen zuerst ein KI-Modell auswaehlen.', isError: true });
+        return;
+      }
+
       const result = await window.electronAPI.runAiAutoCommit();
       if (!result.success) {
         setToast({ msg: result.error || 'KI Auto-Commit fehlgeschlagen.', isError: true });
@@ -463,19 +514,27 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       }
 
       const commits = result.data.commits || [];
+      const warnings = result.data.warnings || [];
+      const diagnostics = result.data.diagnostics || [];
+
       if (commits.length === 0) {
         setToast({ msg: result.data.summary || 'KI hat keine Commits erstellt.', isError: false });
       } else {
         const list = commits.map((commit) => `${commit.hash} ${commit.subject}`).join(' | ');
-        setToast({ msg: `KI Commit(s): ${list}`, isError: false });
+        const extra = warnings.length > 0 ? ` | Hinweise: ${warnings.length}` : '';
+        setToast({ msg: `KI Commit(s): ${list}${extra}`, isError: false });
       }
 
+      if (diagnostics.length > 0) {
+        console.info('AI Auto-Commit diagnostics:', diagnostics);
+      }
       await refresh();
       if (onRepoChanged) onRepoChanged();
     } catch (error: unknown) {
       setToast({ msg: error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.', isError: true });
     } finally {
       setIsAiCommitting(false);
+      setIsAiJobRunning(false);
     }
   };
   const handleCommit = async () => {
@@ -712,14 +771,30 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
             Signoff
           </label>
           <div style={{ flex: 1 }} />
+          {aiProgressMessage && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '220px', maxWidth: '420px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={aiProgressMessage}>
+                {aiProgressMessage}
+              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                {`Phase: ${aiPhase} | Modus: ${aiMode}${aiRemainingFiles !== null ? ` | Rest: ${aiRemainingFiles}` : ''}`}
+              </span>
+              {aiLastCommit && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={aiLastCommit}>
+                  {`Letzter Commit: ${aiLastCommit}`}
+                </span>
+              )}
+            </div>
+          )}
           <button
             className="staging-tool-btn"
+            type="button"
             onClick={handleAiAutoCommit}
-            disabled={hasOpenConflicts || isCommitting || isAiCommitting || !status}
+            disabled={isCommitting || isAiCommitting || isAiJobRunning || !status}
             title={aiConfig.enabled ? 'KI entscheidet Staging + Commit-Nachrichten automatisch.' : 'In Settings zuerst KI Auto-Commit aktivieren.'}
             style={{ opacity: aiConfig.enabled ? 1 : 0.7 }}
           >
-            {isAiCommitting ? 'KI arbeitet...' : 'KI Auto-Commit'}
+            {(isAiCommitting || isAiJobRunning) ? 'KI arbeitet...' : 'KI Auto-Commit'}
           </button>
           <button
             className="staging-commit-btn"
@@ -838,6 +913,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
+
+
+
+
+
+
+
 
 
 
