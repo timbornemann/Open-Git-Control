@@ -550,6 +550,85 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         },
       },
       {
+        label: `Interaktiver Rebase bis ${shortHash}`,
+        icon: 'IR',
+        action: () => {
+          const currentLayout = layout;
+          if (!currentLayout) return;
+
+          const selectedNode = currentLayout.nodes.find(candidate => candidate.commit.hash === hash);
+          if (!selectedNode) {
+            setToast({ msg: 'Ausgewaehlter Commit wurde nicht gefunden.', isError: true });
+            return;
+          }
+
+          if (selectedNode.commit.parentHashes.length === 0) {
+            setToast({ msg: 'Root-Commit kann nicht interaktiv gerebased werden.', isError: true });
+            return;
+          }
+
+          const headPath = currentLayout.nodes.filter(candidate => reachableFromHead.has(candidate.commit.hash));
+          const selectedIndex = headPath.findIndex(candidate => candidate.commit.hash === hash);
+          if (selectedIndex < 0) {
+            setToast({ msg: 'Commit liegt nicht auf dem aktuellen HEAD-Pfad.', isError: true });
+            return;
+          }
+
+          const rangeNewestFirst = headPath.slice(0, selectedIndex + 1);
+          if (rangeNewestFirst.some(candidate => candidate.isMerge)) {
+            setToast({ msg: 'Interaktiver Rebase mit Merge-Commits wird hier nicht unterstuetzt.', isError: true });
+            return;
+          }
+
+          const rangeOldestFirst = [...rangeNewestFirst].reverse();
+          const defaultTodo = rangeOldestFirst
+            .map(candidate => `pick ${candidate.commit.hash} ${candidate.commit.subject}`)
+            .join('\n');
+
+          const baseHash = selectedNode.commit.parentHashes[0];
+
+          setInputDialog({
+            title: 'Interaktiven Rebase starten',
+            message: 'Bearbeite die Rebase-Todo-Liste (pick/reword/edit/squash/fixup/drop).',
+            fields: [
+              {
+                id: 'todo',
+                label: 'Rebase Todo',
+                defaultValue: defaultTodo,
+                required: true,
+                multiline: true,
+                helperText: 'Eine Zeile pro Commit, z.B. "pick <hash> <message>"',
+              },
+            ],
+            contextItems: [
+              { label: 'Basis', value: baseHash.slice(0, 8) },
+              { label: 'Commit-Anzahl', value: String(rangeOldestFirst.length) },
+            ],
+            irreversible: false,
+            consequences: 'Commits werden lokal umgeschrieben. Bei Konflikten Rebase continue/abort im Working Directory nutzen.',
+            confirmLabel: 'Rebase starten',
+            onSubmit: async (values) => {
+              const lines = (values.todo || '')
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(Boolean);
+
+              if (lines.length === 0 || !window.electronAPI) return;
+
+              const result = await window.electronAPI.startInteractiveRebase(baseHash, lines);
+              if (!result.success) {
+                setToast({ msg: result.error || 'Interaktiver Rebase fehlgeschlagen.', isError: true });
+                return;
+              }
+
+              setToast({ msg: 'Interaktiver Rebase gestartet.', isError: false });
+              refreshCommits();
+              refreshWorkingTreeStatus();
+            },
+          });
+        },
+      },
+      {
         label: '', icon: '', separator: true, action: () => {},
       },
       {
@@ -1033,6 +1112,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     </>
   );
 };
+
+
+
+
 
 
 
