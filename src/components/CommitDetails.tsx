@@ -60,6 +60,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     () => files.find(file => file.path === selectedFilePath) ?? null,
     [files, selectedFilePath],
   );
+  const isDeletedFile = selectedFile?.status.startsWith('D') ?? false;
 
   useEffect(() => {
     if (!selectedFile || !window.electronAPI) return;
@@ -87,13 +88,19 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchHistory();
-  }, [activeTab, hash, selectedFile]);
+  }, [activeTab, hash, isDeletedFile, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !window.electronAPI) return;
 
     const fetchBlame = async () => {
       if (activeTab !== 'blame') return;
+
+      if (isDeletedFile) {
+        setBlameLines([]);
+        setBlameError('Blame ist fuer geloeschte Dateien in diesem Commit nicht verfuegbar.');
+        return;
+      }
 
       setBlameLoading(true);
       setBlameError(null);
@@ -115,7 +122,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     };
 
     fetchBlame();
-  }, [activeTab, hash, selectedFile]);
+  }, [activeTab, hash, isDeletedFile, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || activeTab !== 'patch') return;
@@ -337,3 +344,4 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     </div>
   );
 };
+
