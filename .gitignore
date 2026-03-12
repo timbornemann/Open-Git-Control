@@ -26,3 +26,4 @@ dist-electron
 
 # Codex local metadata
 .codex/
+release/
