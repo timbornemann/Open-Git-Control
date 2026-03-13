@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
@@ -34,17 +34,27 @@ type RunGitCommandOptions = {
 const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
 const SIDEBAR_COLLAPSE_STORAGE_KEY = 'open-git-control:sidebar-collapse-by-repo:v1';
 const LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-collapse-by-repo:v1';
+const SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY = 'open-git-control:sidebar-general-collapse:v1';
+const LEGACY_SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-general-collapse:v1';
 
 type SidebarCollapseState = {
   branchPanelCollapsed: boolean;
+  tagPanelCollapsed: boolean;
   remotePanelCollapsed: boolean;
 };
 
 type SidebarCollapseByRepo = Record<string, SidebarCollapseState>;
+type SidebarGeneralCollapseState = {
+  repoPanelCollapsed: boolean;
+};
 
 const DEFAULT_SIDEBAR_COLLAPSE_STATE: SidebarCollapseState = {
   branchPanelCollapsed: false,
+  tagPanelCollapsed: false,
   remotePanelCollapsed: false,
+};
+const DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE: SidebarGeneralCollapseState = {
+  repoPanelCollapsed: false,
 };
 
 export const useAppState = () => {
@@ -63,6 +73,7 @@ export const useAppState = () => {
   const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
   const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
   const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
+  const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE);
 
   const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
 
@@ -121,9 +132,30 @@ export const useAppState = () => {
       // ignore write errors (e.g. private mode / quota)
     }
   }, [sidebarCollapseByRepo]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<SidebarGeneralCollapseState>;
+      if (!parsed || typeof parsed !== 'object') return;
+      setSidebarGeneralCollapseState({
+        repoPanelCollapsed: Boolean(parsed.repoPanelCollapsed),
+      });
+    } catch {
+      // ignore malformed local storage values
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY, JSON.stringify(sidebarGeneralCollapseState));
+    } catch {
+      // ignore write errors (e.g. private mode / quota)
+    }
+  }, [sidebarGeneralCollapseState]);
 
   const activeSidebarCollapseState = workspace.activeRepo
-    ? (sidebarCollapseByRepo[workspace.activeRepo] || DEFAULT_SIDEBAR_COLLAPSE_STATE)
+    ? ({ ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(sidebarCollapseByRepo[workspace.activeRepo] || {}) })
     : DEFAULT_SIDEBAR_COLLAPSE_STATE;
 
   const updateActiveRepoSidebarCollapse = useCallback((partial: Partial<SidebarCollapseState>) => {
@@ -131,7 +163,7 @@ export const useAppState = () => {
     if (!repoPath) return;
 
     setSidebarCollapseByRepo(prev => {
-      const current = prev[repoPath] || DEFAULT_SIDEBAR_COLLAPSE_STATE;
+      const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[repoPath] || {}) };
       return {
         ...prev,
         [repoPath]: {
@@ -148,11 +180,24 @@ export const useAppState = () => {
     });
   }, [activeSidebarCollapseState.branchPanelCollapsed, updateActiveRepoSidebarCollapse]);
 
+  const toggleTagPanelCollapsed = useCallback(() => {
+    updateActiveRepoSidebarCollapse({
+      tagPanelCollapsed: !activeSidebarCollapseState.tagPanelCollapsed,
+    });
+  }, [activeSidebarCollapseState.tagPanelCollapsed, updateActiveRepoSidebarCollapse]);
+
   const toggleRemotePanelCollapsed = useCallback(() => {
     updateActiveRepoSidebarCollapse({
       remotePanelCollapsed: !activeSidebarCollapseState.remotePanelCollapsed,
     });
   }, [activeSidebarCollapseState.remotePanelCollapsed, updateActiveRepoSidebarCollapse]);
+
+  const toggleRepoPanelCollapsed = useCallback(() => {
+    setSidebarGeneralCollapseState(prev => ({
+      ...prev,
+      repoPanelCollapsed: !prev.repoPanelCollapsed,
+    }));
+  }, []);
 
   const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
     if (!window.electronAPI) return;
@@ -469,6 +514,10 @@ export const useAppState = () => {
     setBranchContextMenu: repository.setBranchContextMenu,
     isBranchPanelCollapsed: activeSidebarCollapseState.branchPanelCollapsed,
     toggleBranchPanelCollapsed,
+    isTagPanelCollapsed: activeSidebarCollapseState.tagPanelCollapsed,
+    toggleTagPanelCollapsed,
+    isRepoPanelCollapsed: sidebarGeneralCollapseState.repoPanelCollapsed,
+    toggleRepoPanelCollapsed,
 
     tags: repository.tags,
     remotes: repository.remotes,

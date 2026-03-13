@@ -26,6 +26,8 @@ export type AppSidebarProps = {
   onOpenFolder: () => void;
   onSwitchRepo: (repoPath: string) => void;
   onCloseRepo: (repoPath: string) => void;
+  isRepoPanelCollapsed: boolean;
+  onToggleRepoPanelCollapsed: () => void;
 
   remoteSync: RemoteSyncState;
   isGitActionRunning: boolean;
@@ -47,6 +49,8 @@ export type AppSidebarProps = {
   onCreateTag: () => void;
   onPushTags: () => void;
   onDeleteTag: (name: string) => void;
+  isTagPanelCollapsed: boolean;
+  onToggleTagPanelCollapsed: () => void;
 
   remotes: { name: string; url: string }[];
   remoteStatus: RemoteStatus;
