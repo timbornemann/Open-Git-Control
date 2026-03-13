@@ -243,22 +243,22 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
   const oneClickUpdateLabel = useMemo(() => {
     if (isRunningUpdate || updaterStatus?.state === 'checking') {
-      return tr('Pruefe...', 'Checking...');
+      return tr('1/2 Suche nach Update...', '1/2 Checking for update...');
     }
 
     if (updaterStatus?.state === 'downloading') {
-      return tr('Lade...', 'Downloading...');
+      return tr('1/2 Lade Update herunter...', '1/2 Downloading update...');
     }
 
     if (updaterStatus?.state === 'downloaded') {
-      return tr('Update heruntergeladen', 'Update downloaded');
+      return tr('1/2 Download abgeschlossen', '1/2 Download complete');
     }
 
     if (updaterStatus?.state === 'update-available') {
-      return tr('Update herunterladen', 'Download update');
+      return tr('1/2 Update jetzt herunterladen', '1/2 Download update now');
     }
 
-    return tr('Jetzt aktualisieren', 'Update now');
+    return tr('1/2 Nach Update suchen', '1/2 Check for update');
   }, [isRunningUpdate, updaterStatus?.state, tr]);
 
   const oneClickUpdateDisabled =
@@ -561,7 +561,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             onClick={handleInstallUpdate}
             disabled={!updaterSupported || updaterStatus?.state !== 'downloaded' || isInstallingUpdate}
           >
-            {isInstallingUpdate ? tr('Installiere...', 'Installing...') : tr('Update installieren', 'Install update')}
+            {isInstallingUpdate ? tr('2/2 Installiere heruntergeladenes Update...', '2/2 Installing downloaded update...') : tr('2/2 Heruntergeladenes Update installieren', '2/2 Install downloaded update')}
           </button>
         </div>
       </div>
