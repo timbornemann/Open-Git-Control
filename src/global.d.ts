@@ -91,6 +91,12 @@ export interface UpdaterStatusDto {
   error: string | null;
 }
 
+export interface UpdaterOneClickResultDto {
+  success: boolean;
+  action?: 'no-update' | 'downloaded';
+  error?: string;
+}
+
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
 
@@ -216,6 +222,7 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getUpdaterStatus: () => Promise<UpdaterStatusDto>;
   checkForAppUpdates: () => Promise<{ success: boolean; error?: string }>;
+  runOneClickAppUpdate: () => Promise<UpdaterOneClickResultDto>;
   downloadAppUpdate: () => Promise<{ success: boolean; error?: string }>;
   installAppUpdate: () => Promise<{ success: boolean; error?: string }>;
   onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => () => void;

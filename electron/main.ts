@@ -18,6 +18,10 @@ const WINDOWS_APP_ID = 'com.opengitcontrol.app';
 const GITHUB_CLI_INSTALL_URL = 'https://cli.github.com/';
 const GITHUB_CLI_LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 const GITHUB_CLI_TOKEN_TIMEOUT_MS = 30 * 1000;
+const UPDATER_CHECK_TIMEOUT_MS = 45 * 1000;
+const UPDATER_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+const UPDATER_STATE_WAIT_TIMEOUT_MS = 5 * 1000;
+const UPDATER_STATE_POLL_INTERVAL_MS = 150;
 const execFileAsync = promisify(execFile);
 
 type UpdaterState =
@@ -104,13 +108,85 @@ function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string
   return normalized || null;
 }
 
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    if (typeof timeout.unref === 'function') {
+      timeout.unref();
+    }
+
+    operation
+      .then((value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
+function waitForUpdaterState(targetStates: UpdaterState[], timeoutMs: number): Promise<UpdaterStatusPayload> {
+  if (targetStates.includes(updaterStatus.state)) {
+    return Promise.resolve(updaterStatus);
+  }
+
+  return new Promise((resolve, reject) => {
+    let interval: NodeJS.Timeout | null = null;
+
+    const timeout = setTimeout(() => {
+      if (interval) {
+        clearInterval(interval);
+      }
+      reject(new Error(`Updater status timeout while waiting for: ${targetStates.join(', ')}`));
+    }, timeoutMs);
+
+    interval = setInterval(() => {
+      if (targetStates.includes(updaterStatus.state)) {
+        clearTimeout(timeout);
+        if (interval) {
+          clearInterval(interval);
+        }
+        resolve(updaterStatus);
+      }
+    }, UPDATER_STATE_POLL_INTERVAL_MS);
+
+    if (typeof timeout.unref === 'function') {
+      timeout.unref();
+    }
+    if (interval && typeof interval.unref === 'function') {
+      interval.unref();
+    }
+  });
+}
+
 async function checkForAppUpdates(): Promise<{ success: boolean; error?: string }> {
   if (!updaterStatus.isSupported) {
     return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
   }
 
+  setUpdaterStatus({
+    state: 'checking',
+    currentVersion: app.getVersion(),
+    lastCheckedAt: Date.now(),
+    error: null,
+    downloadPercent: null,
+    bytesPerSecond: null,
+    transferred: null,
+    total: null,
+    downloaded: false,
+  });
+
   try {
-    await autoUpdater.checkForUpdates();
+    await withTimeout(
+      autoUpdater.checkForUpdates(),
+      UPDATER_CHECK_TIMEOUT_MS,
+      'Die Update-Pruefung hat das Zeitlimit ueberschritten.',
+    );
     return { success: true };
   } catch (error: unknown) {
     const message = formatUpdaterError(error);
@@ -132,8 +208,21 @@ async function downloadAvailableUpdate(): Promise<{ success: boolean; error?: st
     return { success: false, error: 'Es ist kein herunterladbares Update verfuegbar.' };
   }
 
+  setUpdaterStatus({
+    state: 'downloading',
+    downloadPercent: 0,
+    bytesPerSecond: null,
+    transferred: null,
+    total: null,
+    error: null,
+  });
+
   try {
-    await autoUpdater.downloadUpdate();
+    await withTimeout(
+      autoUpdater.downloadUpdate(),
+      UPDATER_DOWNLOAD_TIMEOUT_MS,
+      'Der Update-Download hat das Zeitlimit ueberschritten.',
+    );
     return { success: true };
   } catch (error: unknown) {
     const message = formatUpdaterError(error);
@@ -159,6 +248,77 @@ function installDownloadedUpdate(): { success: boolean; error?: string } {
   });
 
   return { success: true };
+}
+
+async function runOneClickUpdate(): Promise<{ success: boolean; action?: 'no-update' | 'downloaded'; error?: string }> {
+  if (!updaterStatus.isSupported) {
+    return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
+  }
+
+  if (updaterStatus.state === 'downloaded') {
+    return { success: true, action: 'downloaded' };
+  }
+
+  let stateAfterCheck: UpdaterStatusPayload;
+
+  if (updaterStatus.state === 'update-available') {
+    stateAfterCheck = updaterStatus;
+  } else {
+    const checkResult = await checkForAppUpdates();
+    if (!checkResult.success) {
+      return checkResult;
+    }
+
+    try {
+      stateAfterCheck = await waitForUpdaterState(
+        ['no-update', 'update-available', 'downloaded', 'error'],
+        UPDATER_STATE_WAIT_TIMEOUT_MS,
+      );
+    } catch (error: unknown) {
+      const message = formatUpdaterError(error);
+      setUpdaterStatus({
+        state: 'error',
+        error: message,
+        lastCheckedAt: Date.now(),
+      });
+      return { success: false, error: message };
+    }
+  }
+
+  if (stateAfterCheck.state === 'no-update') {
+    return { success: true, action: 'no-update' };
+  }
+
+  if (stateAfterCheck.state === 'downloaded') {
+    return { success: true, action: 'downloaded' };
+  }
+
+  if (stateAfterCheck.state === 'error') {
+    return { success: false, error: stateAfterCheck.error || 'Update-Pruefung fehlgeschlagen.' };
+  }
+
+  const downloadResult = await downloadAvailableUpdate();
+  if (!downloadResult.success) {
+    return downloadResult;
+  }
+
+  let stateAfterDownload: UpdaterStatusPayload;
+  try {
+    stateAfterDownload = await waitForUpdaterState(['downloaded', 'error'], UPDATER_DOWNLOAD_TIMEOUT_MS);
+  } catch (error: unknown) {
+    const message = formatUpdaterError(error);
+    setUpdaterStatus({
+      state: 'error',
+      error: message,
+    });
+    return { success: false, error: message };
+  }
+
+  if (stateAfterDownload.state === 'downloaded') {
+    return { success: true, action: 'downloaded' };
+  }
+
+  return { success: false, error: stateAfterDownload.error || 'Update konnte nicht heruntergeladen werden.' };
 }
 
 function configureAutoUpdates(): void {
@@ -1355,6 +1515,10 @@ function setupIPC() {
 
   ipcMain.handle('updater:check', async () => {
     return checkForAppUpdates();
+  });
+
+  ipcMain.handle('updater:runOneClick', async () => {
+    return runOneClickUpdate();
   });
 
   ipcMain.handle('updater:download', async () => {

@@ -2,7 +2,7 @@
   "name": "open-git-control",
   "productName": "Open-Git-Control",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.1",
   "description": "Desktop app for organizing and controlling Git repositories.",
   "author": {
     "name": "Tim Bornemann",
@@ -11,7 +11,7 @@
   "main": "dist-electron/electron/main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/timbornemann/Git-Organizer.git"
+    "url": "https://github.com/timbornemann/Open-Git-Control.git"
   },
   "scripts": {
     "dev": "concurrently -k \"vite\" \"npm run electron:dev\"",
@@ -73,6 +73,8 @@
     "publish": [
       {
         "provider": "github",
+        "owner": "timbornemann",
+        "repo": "Open-Git-Control",
         "releaseType": "release"
       }
     ],

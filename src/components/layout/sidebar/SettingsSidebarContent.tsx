@@ -34,8 +34,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   const [appVersion, setAppVersion] = useState('');
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(null);
   const [updaterMessage, setUpdaterMessage] = useState<string | null>(null);
-  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+  const [isRunningUpdate, setIsRunningUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
   const { tr, locale } = useI18n();
 
@@ -146,17 +145,26 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
     const bootstrapUpdater = async () => {
       try {
-        const [version, status] = await Promise.all([
-          window.electronAPI.getAppVersion(),
-          window.electronAPI.getUpdaterStatus(),
-        ]);
+        const version = await window.electronAPI.getAppVersion();
+        if (active) {
+          setAppVersion(version);
+        }
+      } catch {
+        if (active) {
+          setUpdaterMessage(tr('App-Version konnte nicht geladen werden.', 'Could not load app version.'));
+        }
+      }
 
+      try {
+        const status = await window.electronAPI.getUpdaterStatus();
         if (!active) return;
-        setAppVersion(version);
         setUpdaterStatus(status);
+        if (status.currentVersion) {
+          setAppVersion((current) => current || status.currentVersion);
+        }
       } catch {
         if (!active) return;
-        setUpdaterMessage(tr('Update-Status konnte nicht geladen werden.', 'Could not load updater status.'));
+        setUpdaterMessage((current) => current || tr('Update-Status konnte nicht geladen werden.', 'Could not load updater status.'));
       }
     };
 
@@ -165,6 +173,9 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     const unsubscribe = window.electronAPI.onUpdaterEvent((status) => {
       if (!active) return;
       setUpdaterStatus(status);
+      if (status.currentVersion) {
+        setAppVersion((current) => current || status.currentVersion);
+      }
     });
 
     return () => {
@@ -173,45 +184,34 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     };
   }, [tr]);
 
-  const handleCheckForUpdates = async () => {
+  const handleRunOneClickUpdate = async () => {
     if (!window.electronAPI) return;
 
-    setIsCheckingUpdates(true);
+    setIsRunningUpdate(true);
     setUpdaterMessage(null);
 
     try {
-      const result = await window.electronAPI.checkForAppUpdates();
+      const result = await window.electronAPI.runOneClickAppUpdate();
       if (!result.success) {
-        setUpdaterMessage(result.error || tr('Update-Pruefung fehlgeschlagen.', 'Update check failed.'));
+        setUpdaterMessage(result.error || tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
         return;
       }
 
-      setUpdaterMessage(tr('Update-Pruefung gestartet.', 'Update check started.'));
-    } catch (error: unknown) {
-      setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Pruefung fehlgeschlagen.', 'Update check failed.'));
-    } finally {
-      setIsCheckingUpdates(false);
-    }
-  };
-
-  const handleDownloadUpdate = async () => {
-    if (!window.electronAPI) return;
-
-    setIsDownloadingUpdate(true);
-    setUpdaterMessage(null);
-
-    try {
-      const result = await window.electronAPI.downloadAppUpdate();
-      if (!result.success) {
-        setUpdaterMessage(result.error || tr('Update konnte nicht heruntergeladen werden.', 'Could not download update.'));
+      if (result.action === 'downloaded') {
+        setUpdaterMessage(tr('Update heruntergeladen. Bitte installieren.', 'Update downloaded. Please install.'));
         return;
       }
 
-      setUpdaterMessage(tr('Download gestartet.', 'Download started.'));
+      if (result.action === 'no-update') {
+        setUpdaterMessage(tr('App ist bereits aktuell.', 'App is already up to date.'));
+        return;
+      }
+
+      setUpdaterMessage(tr('Update-Pruefung abgeschlossen.', 'Update check completed.'));
     } catch (error: unknown) {
-      setUpdaterMessage(error instanceof Error ? error.message : tr('Update konnte nicht heruntergeladen werden.', 'Could not download update.'));
+      setUpdaterMessage(error instanceof Error ? error.message : tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
     } finally {
-      setIsDownloadingUpdate(false);
+      setIsRunningUpdate(false);
     }
   };
 
@@ -237,6 +237,35 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   };
 
   const updaterSupported = Boolean(updaterStatus?.isSupported);
+  const installedVersion = appVersion || updaterStatus?.currentVersion || tr('unbekannt', 'unknown');
+
+  const oneClickUpdateLabel = useMemo(() => {
+    if (isRunningUpdate || updaterStatus?.state === 'checking') {
+      return tr('Pruefe...', 'Checking...');
+    }
+
+    if (updaterStatus?.state === 'downloading') {
+      return tr('Lade...', 'Downloading...');
+    }
+
+    if (updaterStatus?.state === 'downloaded') {
+      return tr('Update heruntergeladen', 'Update downloaded');
+    }
+
+    if (updaterStatus?.state === 'update-available') {
+      return tr('Update herunterladen', 'Download update');
+    }
+
+    return tr('Jetzt aktualisieren', 'Update now');
+  }, [isRunningUpdate, updaterStatus?.state, tr]);
+
+  const oneClickUpdateDisabled =
+    !updaterSupported
+    || isRunningUpdate
+    || isInstallingUpdate
+    || updaterStatus?.state === 'checking'
+    || updaterStatus?.state === 'downloading'
+    || updaterStatus?.state === 'downloaded';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -463,7 +492,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{tr('App-Updates', 'App updates')}</div>
 
         <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-          {tr('Installierte Version', 'Installed version')}: {appVersion || '...'}
+          {tr('Installierte Version', 'Installed version')}: {installedVersion}
         </div>
 
         <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
@@ -520,17 +549,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             className="staging-tool-btn"
-            onClick={handleCheckForUpdates}
-            disabled={!updaterSupported || isCheckingUpdates || isDownloadingUpdate || isInstallingUpdate}
+            onClick={handleRunOneClickUpdate}
+            disabled={oneClickUpdateDisabled}
           >
-            {isCheckingUpdates ? tr('Pruefe...', 'Checking...') : tr('Nach Updates suchen', 'Check for updates')}
-          </button>
-          <button
-            className="staging-tool-btn"
-            onClick={handleDownloadUpdate}
-            disabled={!updaterSupported || updaterStatus?.state !== 'update-available' || isDownloadingUpdate || isInstallingUpdate}
-          >
-            {isDownloadingUpdate ? tr('Lade...', 'Downloading...') : tr('Update herunterladen', 'Download update')}
+            {oneClickUpdateLabel}
           </button>
           <button
             className="staging-tool-btn"
