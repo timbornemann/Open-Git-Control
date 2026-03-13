@@ -106,6 +106,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [matchCursor, setMatchCursor] = useState(0);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const commitCountRef = useRef(0);
   const layoutRef = useRef<GraphLayout | null>(null);
   const pendingScrollTopRef = useRef<number | null>(null);
   const pendingScrollHeightRef = useRef<number | null>(null);
@@ -131,11 +132,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
     try {
       const scope = showSecondaryHistory ? 'all' : 'head';
-      const offset = isAppend ? commitCount : 0;
+      const offset = isAppend ? commitCountRef.current : 0;
       const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_PAGE_SIZE), scope, String(offset));
       if (success) {
         const parsedChunk = parseGitLog(data || '');
-        const nextCount = isAppend ? commitCount + parsedChunk.length : parsedChunk.length;
+        const nextCount = (isAppend ? commitCountRef.current : 0) + parsedChunk.length;
+        commitCountRef.current = nextCount;
         setCommitCount(nextCount);
         setHasMoreCommits(parsedChunk.length === LOG_PAGE_SIZE);
 
@@ -157,7 +159,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         setLoading(false);
       }
     }
-  }, [repoPath, showSecondaryHistory, commitCount]);
+  }, [repoPath, showSecondaryHistory]);
 
   const loadMoreCommits = useCallback(async () => {
     if (loading || loadingMore || !hasMoreCommits) return;
@@ -180,6 +182,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     if (!repoPath) {
       setLayout(null);
       setCommitCount(0);
+      commitCountRef.current = 0;
       setHasMoreCommits(true);
       setWorkingTreeStatus(null);
       layoutRef.current = null;
@@ -194,6 +197,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
+
+  useEffect(() => {
+    commitCountRef.current = commitCount;
+  }, [commitCount]);
 
   useLayoutEffect(() => {
     if (pendingScrollTopRef.current === null) return;
@@ -241,7 +248,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
     scrollContainer.addEventListener('scroll', onScroll);
     return () => scrollContainer.removeEventListener('scroll', onScroll);
-  }, [hasMoreCommits, loadMoreCommits, loading, loadingMore, commitCount]);
+  }, [hasMoreCommits, loadMoreCommits, loading, loadingMore]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -1112,18 +1119,3 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     </>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
