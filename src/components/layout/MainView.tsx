@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GitBranch, RefreshCw, ExternalLink, Check, Copy } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
@@ -46,6 +46,21 @@ const normalizeCommitHash = (value: string | null | undefined): string | null =>
   if (!value) return null;
   const match = String(value).match(/[0-9a-f]{7,40}/i);
   return match ? match[0] : null;
+};
+
+const PRIMARY_PANE_DEFAULT_RATIO = 0.7;
+const PRIMARY_PANE_MIN_WIDTH = 320;
+const INSPECTOR_PANE_MIN_WIDTH = 280;
+const CONTENT_RESIZER_WIDTH = 8;
+const MAIN_CONTENT_MIN_WIDTH = PRIMARY_PANE_MIN_WIDTH + INSPECTOR_PANE_MIN_WIDTH + CONTENT_RESIZER_WIDTH;
+
+const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number => {
+  const effectiveWidth = Math.max(containerWidth, MAIN_CONTENT_MIN_WIDTH);
+  const minRatio = PRIMARY_PANE_MIN_WIDTH / effectiveWidth;
+  const maxRatio = (effectiveWidth - INSPECTOR_PANE_MIN_WIDTH - CONTENT_RESIZER_WIDTH) / effectiveWidth;
+  const lower = Math.min(minRatio, maxRatio);
+  const upper = Math.max(minRatio, maxRatio);
+  return Math.min(upper, Math.max(lower, ratio));
 };
 
 const linkStyle: React.CSSProperties = {
@@ -247,7 +262,66 @@ export const MainView: React.FC<Props> = ({
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
+  const [primaryPaneRatio, setPrimaryPaneRatio] = useState(PRIMARY_PANE_DEFAULT_RATIO);
+  const [isContentResizing, setIsContentResizing] = useState(false);
+  const contentAreaRef = useRef<HTMLDivElement | null>(null);
+  const contentResizeActiveRef = useRef(false);
   const { tr } = useI18n();
+
+  const primaryPaneBasis = `${(primaryPaneRatio * 100).toFixed(2)}%`;
+
+  const handleContentResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    contentResizeActiveRef.current = true;
+    setIsContentResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!contentResizeActiveRef.current || !contentAreaRef.current) return;
+      const rect = contentAreaRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
+
+      const rawRatio = (event.clientX - rect.left) / rect.width;
+      setPrimaryPaneRatio(clampPrimaryPaneRatio(rawRatio, rect.width));
+    };
+
+    const stopResize = () => {
+      if (!contentResizeActiveRef.current) return;
+      contentResizeActiveRef.current = false;
+      setIsContentResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResize);
+    window.addEventListener('pointercancel', stopResize);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResize);
+      window.removeEventListener('pointercancel', stopResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, []);
+
+  useEffect(() => {
+    const clampToCurrentWidth = () => {
+      if (!contentAreaRef.current) return;
+      const rect = contentAreaRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
+
+      setPrimaryPaneRatio(previous => clampPrimaryPaneRatio(previous, rect.width));
+    };
+
+    clampToCurrentWidth();
+    window.addEventListener('resize', clampToCurrentWidth);
+    return () => window.removeEventListener('resize', clampToCurrentWidth);
+  }, []);
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
 
@@ -308,13 +382,13 @@ export const MainView: React.FC<Props> = ({
   return (
     <div className="main-view">
       <div className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
           <img
             src={appLogo}
             alt="Open-Git-Control"
             style={{ width: '22px', height: '22px', objectFit: 'contain', borderRadius: '4px' }}
           />
-          <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>
+          <span style={{ fontWeight: 600, fontSize: '1.1rem', minWidth: 0, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
           </span>
           {currentBranch && (
@@ -372,7 +446,7 @@ export const MainView: React.FC<Props> = ({
           )}
         </div>
 
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: '12px' }} />
 
         <TopbarActions
           activeRepo={activeRepo}
@@ -386,8 +460,8 @@ export const MainView: React.FC<Props> = ({
         />
       </div>
 
-      <div className="content-area">
-        <div className="pane" style={{ flex: 2.35 }}>
+      <div ref={contentAreaRef} className="content-area">
+        <div className="pane" style={{ flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }}>
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>
               {showGithubGuide
@@ -432,7 +506,15 @@ export const MainView: React.FC<Props> = ({
           </div>
         </div>
 
-        <div className="pane">
+        <div
+          className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={tr('Breite zwischen Verlauf und Inspector anpassen', 'Resize history and inspector')}
+          onPointerDown={handleContentResizeStart}
+        />
+
+        <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : tr('Working Directory', 'Working Directory')}</span>
             {selectedCommit && (

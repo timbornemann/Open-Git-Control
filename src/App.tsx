@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { BranchContextMenu } from './components/layout/BranchContextMenu';
@@ -10,14 +10,79 @@ import { useAppState } from './components/layout/useAppState';
 import { I18nProvider } from './i18n';
 import './index.css';
 
+const SIDEBAR_MIN_WIDTH = 180;
+const SIDEBAR_MAX_WIDTH = 560;
+const SIDEBAR_DEFAULT_WIDTH = 260;
+const APP_RESIZER_WIDTH = 8;
+const MIN_MAIN_VIEW_WIDTH = 608;
+
 const App: React.FC = () => {
   const state = useAppState();
   const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const getSidebarMaxWidth = useCallback(() => {
+    const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
+    return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
+  }, []);
+
+  const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    sidebarResizeStateRef.current = { startX: event.clientX, startWidth: sidebarWidth };
+    setIsSidebarResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = sidebarResizeStateRef.current;
+      if (!dragState) return;
+
+      const delta = event.clientX - dragState.startX;
+      const nextWidth = Math.round(dragState.startWidth + delta);
+      const clampedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), nextWidth));
+      setSidebarWidth(clampedWidth);
+    };
+
+    const stopResize = () => {
+      if (!sidebarResizeStateRef.current) return;
+      sidebarResizeStateRef.current = null;
+      setIsSidebarResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResize);
+    window.addEventListener('pointercancel', stopResize);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResize);
+      window.removeEventListener('pointercancel', stopResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [getSidebarMaxWidth]);
+
+  useEffect(() => {
+    const clampToViewport = () => {
+      const maxWidth = getSidebarMaxWidth();
+      setSidebarWidth((previous) => Math.max(SIDEBAR_MIN_WIDTH, Math.min(previous, maxWidth)));
+    };
+
+    clampToViewport();
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, [getSidebarMaxWidth]);
 
   return (
     <I18nProvider language={state.settings.language}>
-      <div className="app-container">
+      <div className="app-container" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
         <AppSidebar
           activeTab={state.activeTab}
           setActiveTab={state.setActiveTab}
@@ -125,6 +190,14 @@ const App: React.FC = () => {
           onClearJobs={state.clearJobs}
         />
 
+        <div
+          className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={tr('Sidebar-Breite anpassen', 'Resize sidebar width')}
+          onPointerDown={handleSidebarResizeStart}
+        />
+
         <MainView
           activeTab={state.activeTab}
           isAuthenticated={state.isAuthenticated}
@@ -222,4 +295,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
