@@ -5,6 +5,7 @@ import { CommitGraph } from '../CommitGraph';
 import { CommitDetails } from '../CommitDetails';
 import { StagingArea } from '../StagingArea';
 import { DiffViewer } from '../DiffViewer';
+import { RecoveryCenter } from '../RecoveryCenter';
 import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
 import { AppSettingsDto } from '../../global';
@@ -261,6 +262,7 @@ export const MainView: React.FC<Props> = ({
   settings,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
+  const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [primaryPaneRatio, setPrimaryPaneRatio] = useState(PRIMARY_PANE_DEFAULT_RATIO);
   const [isContentResizing, setIsContentResizing] = useState(false);
@@ -328,6 +330,7 @@ export const MainView: React.FC<Props> = ({
   useEffect(() => {
     setActiveDiffRequest(null);
     setCommitHistoryStack([]);
+    setShowRecoveryCenter(false);
   }, [activeRepo]);
 
   const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
@@ -466,7 +469,7 @@ export const MainView: React.FC<Props> = ({
             <span>
               {showGithubGuide
                 ? tr('GitHub Login Anleitung', 'GitHub login guide')
-                : (activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph'))}
+                : (showRecoveryCenter ? tr('Recovery Center', 'Recovery Center') : (activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph')))}
             </span>
             {showGithubGuide ? (
               <button
@@ -476,14 +479,27 @@ export const MainView: React.FC<Props> = ({
               >
                 {tr('Zurueck', 'Back')}
               </button>
-            ) : activeDiffRequest && (
-              <button
-                className="icon-btn"
-                onClick={() => setActiveDiffRequest(null)}
-                style={{ fontSize: '0.75rem', padding: '2px 6px' }}
-              >
-                {tr('Zurueck zum Graph', 'Back to graph')}
-              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {!activeDiffRequest && (
+                  <button
+                    className="icon-btn"
+                    onClick={() => setShowRecoveryCenter((prev) => !prev)}
+                    style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                  >
+                    {showRecoveryCenter ? tr('Zum Graph', 'To graph') : tr('Recovery Center', 'Recovery Center')}
+                  </button>
+                )}
+                {activeDiffRequest && (
+                  <button
+                    className="icon-btn"
+                    onClick={() => setActiveDiffRequest(null)}
+                    style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                  >
+                    {tr('Zurueck zum Graph', 'Back to graph')}
+                  </button>
+                )}
+              </div>
             )}
           </div>
           <div className="pane-content" style={{ padding: 0 }}>
@@ -493,6 +509,12 @@ export const MainView: React.FC<Props> = ({
               <GithubAuthGuide
                 method={selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>}
                 onClose={onClearGithubAuthHelpMethod}
+              />
+            ) : showRecoveryCenter ? (
+              <RecoveryCenter
+                refreshTrigger={refreshTrigger}
+                onRepoChanged={triggerRefresh}
+                settings={settings}
               />
             ) : (
               <CommitGraph

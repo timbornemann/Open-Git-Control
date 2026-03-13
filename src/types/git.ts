@@ -56,3 +56,12 @@ export type GitSubmoduleInfo = {
   isDirty: boolean;
   summary: string | null;
 };
+
+export type GitReflogEntryDto = {
+  hash: string;
+  abbrevHash: string;
+  selector: string;
+  subject: string;
+  date: string;
+};
+

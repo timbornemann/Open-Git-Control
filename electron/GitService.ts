@@ -306,6 +306,20 @@ export class GitService {
   }
 
   /**
+   * Liefert Reflog-Eintraege in einem stabil parsebaren Format.
+   */
+  async getReflog(limit: number = 300): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 300;
+    const format = '%H%x1f%h%x1f%gd%x1f%gs%x1f%cd%x00';
+    return this.runCommand([
+      'reflog',
+      '--date=iso',
+      `--max-count=${safeLimit}`,
+      '--pretty=format:' + format,
+    ]);
+  }
+
+  /**
    * Holt die Details eines einzelnen Commits (veraenderte Dateien)
    */
   async getCommitDetails(hash: string): Promise<string> {
