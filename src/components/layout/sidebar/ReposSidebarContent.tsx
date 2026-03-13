@@ -16,6 +16,8 @@ type ReposSidebarContentProps = Pick<
   | 'onSwitchRepo'
   | 'onCloseRepo'
   | 'onToggleRepoPin'
+  | 'isRepoPanelCollapsed'
+  | 'onToggleRepoPanelCollapsed'
   | 'branches'
   | 'isCreatingBranch'
   | 'newBranchName'
@@ -31,6 +33,8 @@ type ReposSidebarContentProps = Pick<
   | 'onCreateTag'
   | 'onPushTags'
   | 'onDeleteTag'
+  | 'isTagPanelCollapsed'
+  | 'onToggleTagPanelCollapsed'
   | 'remotes'
   | 'remoteSync'
   | 'remoteStatus'
@@ -64,6 +68,8 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onSwitchRepo,
   onCloseRepo,
   onToggleRepoPin,
+  isRepoPanelCollapsed,
+  onToggleRepoPanelCollapsed,
   branches,
   isCreatingBranch,
   newBranchName,
@@ -79,6 +85,8 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onCreateTag,
   onPushTags,
   onDeleteTag,
+  isTagPanelCollapsed,
+  onToggleTagPanelCollapsed,
   remotes,
   remoteSync,
   remoteStatus,
@@ -115,6 +123,8 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
         onCloseRepo={onCloseRepo}
         onOpenFolder={onOpenFolder}
         onTogglePin={onToggleRepoPin}
+        collapsed={isRepoPanelCollapsed}
+        onToggleCollapsed={onToggleRepoPanelCollapsed}
       />
 
       {activeRepo && (
@@ -139,6 +149,8 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           onCreateTag={onCreateTag}
           onPushTags={onPushTags}
           onDeleteTag={onDeleteTag}
+          collapsed={isTagPanelCollapsed}
+          onToggleCollapsed={onToggleTagPanelCollapsed}
         />
       )}
 

@@ -93,6 +93,8 @@ const App: React.FC = () => {
           onOpenFolder={state.handleOpenFolder}
           onSwitchRepo={state.handleSwitchRepo}
           onCloseRepo={state.handleCloseRepo}
+          isRepoPanelCollapsed={state.isRepoPanelCollapsed}
+          onToggleRepoPanelCollapsed={state.toggleRepoPanelCollapsed}
           remoteSync={state.remoteSync}
           isGitActionRunning={state.isGitActionRunning}
           onRefreshRemoteQuick={() => state.refreshRemoteState(true)}
@@ -111,6 +113,8 @@ const App: React.FC = () => {
           onCreateTag={state.handleCreateTag}
           onPushTags={state.handlePushTags}
           onDeleteTag={state.handleDeleteTag}
+          isTagPanelCollapsed={state.isTagPanelCollapsed}
+          onToggleTagPanelCollapsed={state.toggleTagPanelCollapsed}
           remotes={state.remotes}
           remoteStatus={state.remoteStatus}
           remoteOnlyBranchesCount={state.remoteOnlyBranches.length}
