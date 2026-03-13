@@ -31,3 +31,51 @@ describe('GitService.getLog pagination', () => {
     expect(args).toContain('--all');
   });
 });
+
+
+describe('GitService forensic history commands', () => {
+  it('builds -S search command with path separator', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue('ok');
+
+    await service.getForensicHistoryByString('needle', 'src/main.ts', 120);
+
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
+      'log',
+      '-S',
+      'needle',
+      '--',
+      'src/main.ts',
+      '-120',
+    ]));
+  });
+
+  it('builds -G regex search command with path separator', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue('ok');
+
+    await service.getForensicHistoryByRegex('foo.*bar', 'src/App.tsx', 80);
+
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
+      'log',
+      '-G',
+      'foo.*bar',
+      '--',
+      'src/App.tsx',
+      '-80',
+    ]));
+  });
+
+  it('builds -L line range search command', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue('ok');
+
+    await service.getForensicHistoryByLineRange('src/App.tsx', 10, 30, 60);
+
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
+      'log',
+      '-60',
+      '-L10,30:src/App.tsx',
+    ]));
+  });
+});

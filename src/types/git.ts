@@ -46,6 +46,17 @@ export type GitFileBlameLineDto = {
   content: string;
 };
 
+export type ForensicSearchTypeDto = 'string' | 'regex' | 'line';
+
+export type ForensicHistoryQueryDto = {
+  type: ForensicSearchTypeDto;
+  path: string;
+  value?: string;
+  startLine?: number;
+  endLine?: number;
+  limit?: number;
+};
+
 
 export type GitSubmoduleStateCode = 'clean' | 'uninitialized' | 'dirty' | 'conflicted' | 'unknown';
 
@@ -64,4 +75,3 @@ export type GitReflogEntryDto = {
   subject: string;
   date: string;
 };
-

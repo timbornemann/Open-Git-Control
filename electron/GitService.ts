@@ -291,10 +291,14 @@ export class GitService {
   /**
    * Holt das Git Log in einem einfach parsebaren Format
    */
+  private getStructuredLogFormat(): string {
+    return '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
+  }
+
   async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0): Promise<string> {
     // NUL separates commits (with -z) and US (\x1f) separates fixed fields.
     // Refs use GS (\x1d) as an explicit separator to avoid ambiguities.
-    const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
+    const format = this.getStructuredLogFormat();
     const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
     const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso', '--numstat'];
 
@@ -303,6 +307,51 @@ export class GitService {
     }
 
     return this.runCommand(args);
+  }
+
+  async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
+    const format = this.getStructuredLogFormat();
+    return this.runCommand([
+      'log',
+      '-z',
+      `-${safeLimit}`,
+      '--date=iso',
+      `--pretty=format:${format}`,
+      '--numstat',
+      '-S',
+      search,
+      '--',
+      filePath,
+    ]);
+  }
+
+  async getForensicHistoryByRegex(regex: string, filePath: string, limit: number = 200): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
+    const format = this.getStructuredLogFormat();
+    return this.runCommand([
+      'log',
+      '-z',
+      `-${safeLimit}`,
+      '--date=iso',
+      `--pretty=format:${format}`,
+      '--numstat',
+      '-G',
+      regex,
+      '--',
+      filePath,
+    ]);
+  }
+
+  async getForensicHistoryByLineRange(filePath: string, startLine: number, endLine: number, limit: number = 200): Promise<string> {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
+    return this.runCommand([
+      'log',
+      `-${safeLimit}`,
+      '--date=iso',
+      '--pretty=format:%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%x00',
+      `-L${startLine},${endLine}:${filePath}`,
+    ]);
   }
 
   /**

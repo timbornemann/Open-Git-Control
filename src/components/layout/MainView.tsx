@@ -523,6 +523,7 @@ export const MainView: React.FC<Props> = ({
                 onSelectCommit={handleSelectCommitDirect}
                 refreshTrigger={refreshTrigger}
                 showSecondaryHistory={showSecondaryHistory}
+                onOpenDiff={handleOpenDiff}
               />
             )}
           </div>
