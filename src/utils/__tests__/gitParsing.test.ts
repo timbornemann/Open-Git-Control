@@ -4,6 +4,7 @@ import {
   parseGitLog,
   parseGitStatus,
   parseGitStatusDetailed,
+  parseGitSubmoduleStatus,
 } from '../gitParsing';
 
 const US = '\x1f';
@@ -234,5 +235,27 @@ describe('parseCommitDetails', () => {
 
   it('returns an empty array for blank output', () => {
     expect(parseCommitDetails('  \n')).toEqual([]);
+  });
+});
+
+describe('parseGitSubmoduleStatus', () => {
+  it('parses clean, uninitialized, dirty and conflicted states', () => {
+    const output = [
+      ' 1234567890abcdef1234567890abcdef12345678 libs/clean (heads/main)',
+      '-abcdefabcdefabcdefabcdefabcdefabcdefabcd libs/new',
+      '+fedcbafedcbafedcbafedcbafedcbafedcbafedc libs/dirty (v1.2.0-3-gfedcba)',
+      'U00112233445566778899aabbccddeeff00112233 libs/conflict (merge conflict)',
+    ].join('\n');
+
+    expect(parseGitSubmoduleStatus(output)).toEqual([
+      { path: 'libs/clean', commit: '1234567890abcdef1234567890abcdef12345678', stateCode: 'clean', isDirty: false, summary: 'heads/main' },
+      { path: 'libs/new', commit: 'abcdefabcdefabcdefabcdefabcdefabcdefabcd', stateCode: 'uninitialized', isDirty: false, summary: null },
+      { path: 'libs/dirty', commit: 'fedcbafedcbafedcbafedcbafedcbafedcbafedc', stateCode: 'dirty', isDirty: true, summary: 'v1.2.0-3-gfedcba' },
+      { path: 'libs/conflict', commit: '00112233445566778899aabbccddeeff00112233', stateCode: 'conflicted', isDirty: true, summary: 'merge conflict' },
+    ]);
+  });
+
+  it('returns empty for non-matching input', () => {
+    expect(parseGitSubmoduleStatus('nonsense line')).toEqual([]);
   });
 });

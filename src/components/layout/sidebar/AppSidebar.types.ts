@@ -1,5 +1,5 @@
 import React from 'react';
-import { BranchInfo, RemoteSyncState } from '../../../types/git';
+import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { AppSettingsDto, DeviceFlowStartDto, GitHubRepositoryDto, GitJobEventDto, PullRequestDto } from '../../../global';
 
 export type RemoteStatus = {
@@ -63,6 +63,13 @@ export type AppSidebarProps = {
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;
   isRemotePanelCollapsed: boolean;
   onToggleRemotePanelCollapsed: () => void;
+
+  submodules: GitSubmoduleInfo[];
+  onSubmoduleInitUpdate: () => void;
+  onSubmoduleSync: () => void;
+  onOpenSubmodule: (submodulePath: string) => void;
+  isSubmodulePanelCollapsed: boolean;
+  onToggleSubmodulePanelCollapsed: () => void;
 
   hasRemoteOrigin: boolean | null;
   isConnectingGithubRepo: boolean;

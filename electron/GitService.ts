@@ -269,6 +269,18 @@ export class GitService {
     return this.runCommand(['stash', 'list', `--max-count=${safeLimit}`]);
   }
 
+  async getSubmoduleStatus(): Promise<string> {
+    return this.runCommand(['submodule', 'status', '--recursive']);
+  }
+
+  async updateSubmodulesInitRecursive(): Promise<string> {
+    return this.runCommand(['submodule', 'update', '--init', '--recursive']);
+  }
+
+  async syncSubmodulesRecursive(): Promise<string> {
+    return this.runCommand(['submodule', 'sync', '--recursive']);
+  }
+
   /**
    * Holt die Branch-Liste
    */

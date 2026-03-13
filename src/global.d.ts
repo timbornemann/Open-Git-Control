@@ -211,6 +211,7 @@ export interface ElectronAPI {
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
+  openSubmodule: (submodulePath: string) => Promise<{ success: boolean; error?: string }>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
   onJobEvent: (callback: (event: GitJobEventDto) => void) => () => void;
   getStoredRepos: () => Promise<StoredRepoData>;

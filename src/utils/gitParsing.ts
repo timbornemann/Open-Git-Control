@@ -189,3 +189,45 @@ export function parseCommitDetails(showOutput: string): CommitFileDetail[] {
 
   return files;
 }
+
+
+export interface GitSubmoduleStatusEntry {
+  path: string;
+  commit: string;
+  stateCode: 'clean' | 'uninitialized' | 'dirty' | 'conflicted' | 'unknown';
+  isDirty: boolean;
+  summary: string | null;
+}
+
+export function parseGitSubmoduleStatus(statusOutput: string): GitSubmoduleStatusEntry[] {
+  if (!statusOutput.trim()) return [];
+
+  return statusOutput
+    .split('\n')
+    .map((line) => line.replace(/\r$/, ''))
+    .filter((line) => line.trim().length > 0)
+    .map((line): GitSubmoduleStatusEntry | null => {
+      const match = line.match(/^([-+U ])([0-9a-f]+)\s+([^\s]+)(?:\s+\((.+)\))?$/i);
+      if (!match) return null;
+
+      const flag = match[1];
+      const stateCode = flag === ' '
+        ? 'clean'
+        : flag === '-'
+          ? 'uninitialized'
+          : flag === '+'
+            ? 'dirty'
+            : flag === 'U'
+              ? 'conflicted'
+              : 'unknown';
+
+      return {
+        path: match[3],
+        commit: match[2],
+        stateCode,
+        isDirty: flag === '+' || flag === 'U',
+        summary: match[4] || null,
+      };
+    })
+    .filter((entry): entry is GitSubmoduleStatusEntry => entry !== null);
+}

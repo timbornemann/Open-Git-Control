@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import { BranchInfo, RemoteSyncState } from '../../../types/git';
+import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
+import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
 
 type Params = {
   activeRepo: string | null;
@@ -40,6 +41,7 @@ export const useRepositoryDomain = ({
   const [tags, setTags] = useState<string[]>([]);
   const [remotes, setRemotes] = useState<{ name: string; url: string }[]>([]);
   const [hasRemoteOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
+  const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
 
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({
     isFetching: false,
@@ -280,6 +282,37 @@ export const useRepositoryDomain = ({
     return () => window.clearInterval(intervalId);
   }, [activeRepo, autoFetchIntervalMs, refreshRemoteState]);
 
+
+  useEffect(() => {
+    const fetchSubmodules = async () => {
+      if (!activeRepo || !window.electronAPI) {
+        setSubmodules([]);
+        return;
+      }
+
+      try {
+        const response = await window.electronAPI.runGitCommand('submoduleStatus');
+        if (!response.success) {
+          setSubmodules([]);
+          return;
+        }
+
+        const parsed = parseGitSubmoduleStatus(String(response.data || '')).map((item) => ({
+          path: item.path,
+          commit: item.commit,
+          stateCode: item.stateCode,
+          isDirty: item.isDirty,
+          summary: item.summary,
+        }));
+        setSubmodules(parsed);
+      } catch {
+        setSubmodules([]);
+      }
+    };
+
+    fetchSubmodules();
+  }, [activeRepo, refreshTrigger]);
+
   const handleCreateBranch = async () => {
     const name = newBranchName.trim();
     if (!name) return;
@@ -432,6 +465,23 @@ export const useRepositoryDomain = ({
     });
   };
 
+
+  const handleSubmoduleInitUpdate = async () => {
+    await runGitCommand(['submoduleUpdateInitRecursive'], tr('Submodule initialisiert/aktualisiert.', 'Submodules initialized/updated.'));
+  };
+
+  const handleSubmoduleSync = async () => {
+    await runGitCommand(['submoduleSyncRecursive'], tr('Submodule-URLs synchronisiert.', 'Submodule URLs synchronized.'));
+  };
+
+  const handleOpenSubmodule = async (submodulePath: string) => {
+    if (!window.electronAPI) return;
+    const result = await window.electronAPI.openSubmodule(submodulePath);
+    if (!result.success) {
+      setGitActionToast({ msg: result.error || tr('Submodule konnte nicht geöffnet werden.', 'Could not open submodule.'), isError: true });
+    }
+  };
+
   const localBranchNames = new Set(
     branches
       .filter(branch => branch.scope === 'local')
@@ -556,6 +606,7 @@ export const useRepositoryDomain = ({
     newBranchInputRef,
     tags,
     remotes,
+    submodules,
     hasRemoteOrigin,
     setHasRemoteOrigin,
     remoteSync,
@@ -571,5 +622,8 @@ export const useRepositoryDomain = ({
     handlePushTags,
     handleAddRemote,
     handleRemoveRemote,
+    handleSubmoduleInitUpdate,
+    handleSubmoduleSync,
+    handleOpenSubmodule,
   };
 };
