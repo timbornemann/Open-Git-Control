@@ -74,6 +74,8 @@
   /* Metrics */
   --sidebar-width: 260px;
   --activity-bar-width: 48px;
+  --pane-resizer-width: 8px;
+  --main-view-min-width: 608px;
 
   /* Shadows & Effects */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
@@ -110,10 +112,14 @@ code, pre {
 .app-container {
   display: flex;
   height: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .activity-bar {
   width: var(--activity-bar-width);
+  flex-shrink: 0;
   background-color: var(--bg-darker);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -157,6 +163,9 @@ code, pre {
 
 .sidebar {
   width: var(--sidebar-width);
+  min-width: 0;
+  max-width: 65vw;
+  flex-shrink: 0;
   background-color: var(--bg-dark);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -175,33 +184,40 @@ code, pre {
 
 .main-view {
   flex: 1;
+  min-width: var(--main-view-min-width);
   display: flex;
   flex-direction: column;
   background-color: var(--bg-darker);
   position: relative;
+  overflow: hidden;
 }
 
 /* Glassmorphism Topbar */
 .topbar {
-  height: 60px;
+  min-height: 60px;
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 24px;
+  gap: 12px;
   z-index: 10;
+  min-width: 0;
 }
 
 .content-area {
   flex: 1;
+  min-width: 0;
   display: flex;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .pane {
   flex: 1;
+  min-width: 0;
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -210,6 +226,34 @@ code, pre {
 
 .pane:last-child {
   border-right: none;
+}
+
+.pane-resizer {
+  position: relative;
+  width: var(--pane-resizer-width);
+  flex: 0 0 var(--pane-resizer-width);
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+}
+
+.pane-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-color);
+  transform: translateX(-50%);
+  opacity: 0.7;
+  transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+
+.pane-resizer:hover::before,
+.pane-resizer.dragging::before {
+  opacity: 1;
+  background: var(--accent-primary);
 }
 
 .pane-header {
@@ -222,7 +266,7 @@ code, pre {
 
 .pane-content {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 16px;
 }
 
@@ -1330,4 +1374,3 @@ body[data-theme='light'] {
 .diff-sbs-cell.empty {
   background: var(--status-untracked-soft);
 }
-
