@@ -546,7 +546,8 @@ type GitCommandName =
   | 'merge'
   | 'submoduleStatus'
   | 'submoduleUpdateInitRecursive'
-  | 'submoduleSyncRecursive';
+  | 'submoduleSyncRecursive'
+  | 'reflog';
 
 type JobEventStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 
@@ -593,6 +594,7 @@ const ALLOWED_GIT_COMMANDS: Set<GitCommandName> = new Set([
   'submoduleStatus',
   'submoduleUpdateInitRecursive',
   'submoduleSyncRecursive',
+  'reflog',
 ]);
 
 function createJobId(operation: string): string {
@@ -669,6 +671,7 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     submoduleStatus: 0,
     submoduleUpdateInitRecursive: 0,
     submoduleSyncRecursive: 0,
+    reflog: 1,
   };
 
   const max = maxArgsByCommand[commandName];
@@ -696,7 +699,15 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
       throw new Error('Invalid log offset.');
     }
   }
+
+  if (commandName === 'reflog' && args.length >= 1) {
+    const parsedLimit = Number(args[0]);
+    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
+      throw new Error('Invalid reflog limit.');
+    }
+  }
 }
+
 
 interface StoredRepoEntry {
   path: string;
@@ -1255,6 +1266,8 @@ function setupIPC() {
         data = await gitService.updateSubmodulesInitRecursive();
       } else if (commandName === 'submoduleSyncRecursive') {
         data = await gitService.syncSubmodulesRecursive();
+      } else if (commandName === 'reflog') {
+        data = await gitService.getReflog(Number(normalizedArgs[0]) || 300);
       } else {
         data = await gitService.runCommand([commandName, ...normalizedArgs]);
       }
