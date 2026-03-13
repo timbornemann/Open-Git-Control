@@ -1,5 +1,5 @@
 ﻿export type AiProvider = 'ollama' | 'gemini';
-export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
+export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 
 export interface AppSettings {
   theme: AppTheme;
@@ -54,6 +54,8 @@ function normalizeTheme(value: unknown): AppSettings['theme'] {
     case 'graphite-blue':
     case 'forest-copper':
     case 'porcelain-light':
+    case 'ember-slate':
+    case 'arctic-mint':
       return value;
     case 'dark':
       return 'copper-night';

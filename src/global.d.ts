@@ -98,7 +98,7 @@ export interface UpdaterOneClickResultDto {
 }
 
 export type AiProviderDto = 'ollama' | 'gemini';
-export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light';
+export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 
 export interface AppSettingsDto {
   theme: AppThemeDto;

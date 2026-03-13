@@ -17,6 +17,8 @@ const THEME_OPTIONS: Array<{
   { value: 'graphite-blue', label: 'Graphite Blue' },
   { value: 'forest-copper', label: 'Forest Copper' },
   { value: 'porcelain-light', label: 'Porcelain Light' },
+  { value: 'ember-slate', label: 'Ember Slate' },
+  { value: 'arctic-mint', label: 'Arctic Mint' },
 ];
 
 export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({

@@ -18,6 +18,16 @@ describe('normalizeSettings', () => {
       language: 'en',
     });
 
+    expect(normalizeSettings({ theme: 'ember-slate', language: 'de' })).toMatchObject({
+      theme: 'ember-slate',
+      language: 'de',
+    });
+
+    expect(normalizeSettings({ theme: 'arctic-mint', language: 'en' })).toMatchObject({
+      theme: 'arctic-mint',
+      language: 'en',
+    });
+
     expect(normalizeSettings({ theme: 'dark' as never, language: 'en' })).toMatchObject({
       theme: 'copper-night',
       language: 'en',
