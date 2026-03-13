@@ -20,7 +20,7 @@ export const TopbarActions: React.FC<Props> = ({ activeRepo, isGitActionRunning,
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
 
   return (
-    <div style={{ display: 'flex', gap: '8px' }}>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       <button className="icon-btn" onClick={onFetch} disabled={!activeRepo || isGitActionRunning || isFetching} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
         <RefreshCw size={16} className={isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
         {isFetching ? tr('Fetch läuft...', 'Fetch running...') : 'Fetch'}
