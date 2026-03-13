@@ -217,8 +217,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (r.success) {
         setToast({ msg, isError: false });
-        await refresh();
         if (notify && onRepoChanged) onRepoChanged();
+        await refresh();
       } else {
         setToast({ msg: r.error || 'Fehler', isError: true });
       }
@@ -330,8 +330,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       }
 
       setToast({ msg: result.added ? `Ignore-Regel hinzugefuegt: ${normalizedPattern}` : `Regel existiert bereits: ${normalizedPattern}`, isError: false });
-      await refresh();
       if (onRepoChanged) onRepoChanged();
+      await refresh();
     } catch (e: any) {
       setToast({ msg: e.message || 'Konnte .gitignore nicht aktualisieren.', isError: true });
     }
@@ -534,8 +534,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
       if (diagnostics.length > 0) {
         console.info('AI Auto-Commit diagnostics:', diagnostics);
       }
-      await refresh();
       if (onRepoChanged) onRepoChanged();
+      await refresh();
     } catch (error: unknown) {
       setToast({ msg: error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.', isError: true });
     } finally {
@@ -585,8 +585,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
         setCommitMsg('');
         setCommitDescription('');
         setToast({ msg: 'Commit erfolgreich!', isError: false });
-        await refresh();
         if (onRepoChanged) onRepoChanged();
+        await refresh();
       } else {
         setToast({ msg: r.error || 'Commit fehlgeschlagen', isError: true });
       }
@@ -944,52 +944,3 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
