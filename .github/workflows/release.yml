@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: release-${{ github.event.release.tag_name || github.ref }}
   cancel-in-progress: false
@@ -48,10 +51,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -75,7 +78,7 @@ jobs:
         run: npm ci
 
       - name: Prepare package version
-        run: node scripts/prepare-release-version.js "$RELEASE_VERSION"
+        run: node scripts/prepare-release-version.js "${{ env.RELEASE_VERSION }}"
 
       - name: Build release assets
         run: npm run ${{ matrix.script }}
@@ -84,7 +87,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Validate release artifacts
-        run: node scripts/validate-release-assets.js "$RELEASE_VERSION" "${{ matrix.platform }}"
+        run: node scripts/validate-release-assets.js "${{ env.RELEASE_VERSION }}" "${{ matrix.platform }}"
 
       - name: Attach assets to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -97,7 +100,7 @@ jobs:
 
       - name: Upload workflow artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-${{ matrix.label }}
           path: release/**
