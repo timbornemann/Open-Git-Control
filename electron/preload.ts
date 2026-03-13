@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),
   getFileBlame: (filePath: string, commitHash?: string) =>
     ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
+  openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),
   onCloneProgress: (callback: (line: string) => void) => {
     const handler = (_event: any, line: string) => callback(line);
     ipcRenderer.on('clone:progress', handler);

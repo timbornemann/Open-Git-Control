@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } from 'electron';
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 import * as path from 'path';
@@ -543,7 +543,10 @@ type GitCommandName =
   | 'add'
   | 'cherry-pick'
   | 'revert'
-  | 'merge';
+  | 'merge'
+  | 'submoduleStatus'
+  | 'submoduleUpdateInitRecursive'
+  | 'submoduleSyncRecursive';
 
 type JobEventStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 
@@ -587,6 +590,9 @@ const ALLOWED_GIT_COMMANDS: Set<GitCommandName> = new Set([
   'cherry-pick',
   'revert',
   'merge',
+  'submoduleStatus',
+  'submoduleUpdateInitRecursive',
+  'submoduleSyncRecursive',
 ]);
 
 function createJobId(operation: string): string {
@@ -660,6 +666,9 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     'cherry-pick': 3,
     revert: 5,
     merge: 4,
+    submoduleStatus: 0,
+    submoduleUpdateInitRecursive: 0,
+    submoduleSyncRecursive: 0,
   };
 
   const max = maxArgsByCommand[commandName];
@@ -1240,6 +1249,12 @@ function setupIPC() {
         data = await gitService.continueRebase();
       } else if (commandName === 'rebaseAbort') {
         data = await gitService.abortRebase();
+      } else if (commandName === 'submoduleStatus') {
+        data = await gitService.getSubmoduleStatus();
+      } else if (commandName === 'submoduleUpdateInitRecursive') {
+        data = await gitService.updateSubmodulesInitRecursive();
+      } else if (commandName === 'submoduleSyncRecursive') {
+        data = await gitService.syncSubmodulesRecursive();
       } else {
         data = await gitService.runCommand([commandName, ...normalizedArgs]);
       }
@@ -1360,6 +1375,36 @@ function setupIPC() {
 
       const raw = await gitService.getFileBlame(normalizedPath, commitHash);
       return { success: true, data: parseFileBlame(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+
+  ipcMain.handle('git:openSubmodule', async (_event: any, submodulePath: unknown) => {
+    try {
+      const relativePath = String(submodulePath || '').trim();
+      if (!relativePath) {
+        return { success: false, error: 'Submodule path is required.' };
+      }
+
+      const repoPath = gitService.getRepoPath();
+      if (!repoPath) {
+        return { success: false, error: 'No repository path set.' };
+      }
+
+      const resolvedPath = path.resolve(repoPath, relativePath);
+      const relativeFromRepo = path.relative(repoPath, resolvedPath);
+      if (relativeFromRepo.startsWith('..') || path.isAbsolute(relativeFromRepo)) {
+        return { success: false, error: 'Submodule path is outside the current repository.' };
+      }
+
+      const openError = await shell.openPath(resolvedPath);
+      if (openError) {
+        return { success: false, error: openError };
+      }
+
+      return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

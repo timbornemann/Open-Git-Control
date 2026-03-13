@@ -4,6 +4,7 @@ import { RepoList } from '../../sidebar/RepoList';
 import { BranchPanel } from '../../sidebar/BranchPanel';
 import { TagPanel } from '../../sidebar/TagPanel';
 import { RemotePanel } from '../../sidebar/RemotePanel';
+import { SubmodulePanel } from '../../sidebar/SubmodulePanel';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
@@ -47,6 +48,12 @@ type ReposSidebarContentProps = Pick<
   | 'onCheckoutRemoteBranch'
   | 'isRemotePanelCollapsed'
   | 'onToggleRemotePanelCollapsed'
+  | 'submodules'
+  | 'onSubmoduleInitUpdate'
+  | 'onSubmoduleSync'
+  | 'onOpenSubmodule'
+  | 'isSubmodulePanelCollapsed'
+  | 'onToggleSubmodulePanelCollapsed'
   | 'hasRemoteOrigin'
   | 'isConnectingGithubRepo'
   | 'connectError'
@@ -99,6 +106,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onCheckoutRemoteBranch,
   isRemotePanelCollapsed,
   onToggleRemotePanelCollapsed,
+  submodules,
+  onSubmoduleInitUpdate,
+  onSubmoduleSync,
+  onOpenSubmodule,
+  isSubmodulePanelCollapsed,
+  onToggleSubmodulePanelCollapsed,
   hasRemoteOrigin,
   isConnectingGithubRepo,
   connectError,
@@ -168,6 +181,18 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           onCheckoutRemoteBranch={onCheckoutRemoteBranch}
           collapsed={isRemotePanelCollapsed}
           onToggleCollapsed={onToggleRemotePanelCollapsed}
+        />
+      )}
+
+
+      {activeRepo && (
+        <SubmodulePanel
+          submodules={submodules}
+          onInitUpdate={onSubmoduleInitUpdate}
+          onSync={onSubmoduleSync}
+          onOpenSubmodule={onOpenSubmodule}
+          collapsed={isSubmodulePanelCollapsed}
+          onToggleCollapsed={onToggleSubmodulePanelCollapsed}
         />
       )}
 

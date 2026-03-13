@@ -45,3 +45,14 @@ export type GitFileBlameLineDto = {
   summary: string;
   content: string;
 };
+
+
+export type GitSubmoduleStateCode = 'clean' | 'uninitialized' | 'dirty' | 'conflicted' | 'unknown';
+
+export type GitSubmoduleInfo = {
+  path: string;
+  commit: string;
+  stateCode: GitSubmoduleStateCode;
+  isDirty: boolean;
+  summary: string | null;
+};

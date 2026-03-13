@@ -126,6 +126,12 @@ const App: React.FC = () => {
           onCheckoutRemoteBranch={state.handleCheckoutRemoteBranch}
           isRemotePanelCollapsed={state.isRemotePanelCollapsed}
           onToggleRemotePanelCollapsed={state.toggleRemotePanelCollapsed}
+          submodules={state.submodules}
+          onSubmoduleInitUpdate={state.handleSubmoduleInitUpdate}
+          onSubmoduleSync={state.handleSubmoduleSync}
+          onOpenSubmodule={state.handleOpenSubmodule}
+          isSubmodulePanelCollapsed={state.isSubmodulePanelCollapsed}
+          onToggleSubmodulePanelCollapsed={state.toggleSubmodulePanelCollapsed}
           hasRemoteOrigin={state.hasRemoteOrigin}
           isConnectingGithubRepo={state.isConnectingGithubRepo}
           connectError={state.connectError}

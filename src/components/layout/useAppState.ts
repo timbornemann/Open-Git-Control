@@ -41,6 +41,7 @@ type SidebarCollapseState = {
   branchPanelCollapsed: boolean;
   tagPanelCollapsed: boolean;
   remotePanelCollapsed: boolean;
+  submodulePanelCollapsed: boolean;
 };
 
 type SidebarCollapseByRepo = Record<string, SidebarCollapseState>;
@@ -52,6 +53,7 @@ const DEFAULT_SIDEBAR_COLLAPSE_STATE: SidebarCollapseState = {
   branchPanelCollapsed: false,
   tagPanelCollapsed: false,
   remotePanelCollapsed: false,
+  submodulePanelCollapsed: false,
 };
 const DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE: SidebarGeneralCollapseState = {
   repoPanelCollapsed: false,
@@ -191,6 +193,12 @@ export const useAppState = () => {
       remotePanelCollapsed: !activeSidebarCollapseState.remotePanelCollapsed,
     });
   }, [activeSidebarCollapseState.remotePanelCollapsed, updateActiveRepoSidebarCollapse]);
+
+  const toggleSubmodulePanelCollapsed = useCallback(() => {
+    updateActiveRepoSidebarCollapse({
+      submodulePanelCollapsed: !activeSidebarCollapseState.submodulePanelCollapsed,
+    });
+  }, [activeSidebarCollapseState.submodulePanelCollapsed, updateActiveRepoSidebarCollapse]);
 
   const toggleRepoPanelCollapsed = useCallback(() => {
     setSidebarGeneralCollapseState(prev => ({
@@ -521,6 +529,7 @@ export const useAppState = () => {
 
     tags: repository.tags,
     remotes: repository.remotes,
+    submodules: repository.submodules,
     hasRemoteOrigin: repository.hasRemoteOrigin,
     remoteSync: repository.remoteSync,
     remoteOnlyBranches: repository.remoteOnlyBranches,
@@ -528,6 +537,8 @@ export const useAppState = () => {
     refreshRemoteState: repository.refreshRemoteState,
     isRemotePanelCollapsed: activeSidebarCollapseState.remotePanelCollapsed,
     toggleRemotePanelCollapsed,
+    isSubmodulePanelCollapsed: activeSidebarCollapseState.submodulePanelCollapsed,
+    toggleSubmodulePanelCollapsed,
 
     handleCreateBranch: repository.handleCreateBranch,
     handleDeleteBranch: repository.handleDeleteBranch,
@@ -538,6 +549,9 @@ export const useAppState = () => {
     handlePushTags: repository.handlePushTags,
     handleAddRemote: repository.handleAddRemote,
     handleRemoveRemote: repository.handleRemoveRemote,
+    handleSubmoduleInitUpdate: repository.handleSubmoduleInitUpdate,
+    handleSubmoduleSync: repository.handleSubmoduleSync,
+    handleOpenSubmodule: repository.handleOpenSubmodule,
     handleSetUpstreamForCurrentBranch,
     handleCheckoutRemoteBranch,
 
