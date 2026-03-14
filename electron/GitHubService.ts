@@ -30,6 +30,21 @@ type WebFlowExchangeResult = {
 
 type MergeMethod = 'merge' | 'squash' | 'rebase';
 
+type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'requested' | 'waiting' | 'pending';
+type WorkflowRunConclusion =
+  | 'success'
+  | 'failure'
+  | 'cancelled'
+  | 'skipped'
+  | 'timed_out'
+  | 'action_required'
+  | 'neutral'
+  | 'stale'
+  | null;
+
+type CheckRunStatus = 'queued' | 'in_progress' | 'completed' | 'waiting' | 'requested' | 'pending';
+type CheckRunConclusion = WorkflowRunConclusion;
+
 const DEFAULT_HOST = 'github.com';
 
 export class GitHubService {
@@ -420,11 +435,89 @@ export class GitHubService {
       createdAt: pr.created_at,
       updatedAt: pr.updated_at,
       head: pr.head?.ref || '',
+      headSha: pr.head?.sha || '',
       base: pr.base?.ref || '',
       merged: pr.merged_at !== null,
       htmlUrl: pr.html_url,
       draft: pr.draft || false,
     }));
+  }
+
+  async getWorkflowRuns(owner: string, repo: string, params: { branch?: string; headSha?: string; perPage?: number } = {}) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const safePerPage = Number.isFinite(params.perPage)
+      ? Math.max(1, Math.min(Math.floor(params.perPage as number), 100))
+      : 20;
+
+    const { data } = await this.octokit.rest.actions.listWorkflowRunsForRepo({
+      owner,
+      repo,
+      ...(params.branch ? { branch: params.branch } : {}),
+      per_page: safePerPage,
+    });
+
+    const runs = (data.workflow_runs || []).filter((run: any) => {
+      if (!params.headSha) return true;
+      return run.head_sha === params.headSha;
+    });
+
+    return runs.map((run: any) => ({
+      id: run.id,
+      name: run.name || run.display_title || 'Workflow',
+      status: (run.status || 'pending') as WorkflowRunState,
+      conclusion: (run.conclusion ?? null) as WorkflowRunConclusion,
+      event: run.event || 'unknown',
+      htmlUrl: run.html_url,
+      workflowName: run.display_title || run.name || 'Workflow',
+      branch: run.head_branch || '',
+      headSha: run.head_sha || '',
+      createdAt: run.created_at,
+      startedAt: run.run_started_at || run.created_at,
+      updatedAt: run.updated_at,
+    }));
+  }
+
+  async getStatusChecks(owner: string, repo: string, ref: string) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const normalizedRef = (ref || '').trim();
+    if (!normalizedRef) {
+      throw new Error('Ref is required');
+    }
+
+    const [checksResponse, statusesResponse] = await Promise.all([
+      this.octokit.rest.checks.listForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
+      this.octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
+    ]);
+
+    const checkRuns = (checksResponse.data.check_runs || []).map((run: any) => ({
+      id: run.id,
+      name: run.name || run.app?.name || 'Check',
+      status: (run.status || 'pending') as CheckRunStatus,
+      conclusion: (run.conclusion ?? null) as CheckRunConclusion,
+      detailsUrl: run.details_url || run.html_url || null,
+      appName: run.app?.name || null,
+      startedAt: run.started_at || null,
+      completedAt: run.completed_at || null,
+    }));
+
+    const statusContexts = (statusesResponse.data.statuses || []).map((status: any) => ({
+      id: status.id,
+      context: status.context || 'status',
+      state: status.state || 'pending',
+      description: status.description || null,
+      targetUrl: status.target_url || null,
+      createdAt: status.created_at || null,
+      updatedAt: status.updated_at || null,
+    }));
+
+    return {
+      state: statusesResponse.data.state || 'pending',
+      sha: statusesResponse.data.sha || normalizedRef,
+      checkRuns,
+      statusContexts,
+    };
   }
 
   async createPullRequest(

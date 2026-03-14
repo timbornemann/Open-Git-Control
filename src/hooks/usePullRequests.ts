@@ -1,5 +1,12 @@
-﻿import { useCallback, useEffect, useState } from 'react';
-import { ElectronAPI, PullRequestDto } from '../global';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CiBadgeStateDto,
+  ElectronAPI,
+  GithubStatusChecksDto,
+  GithubWorkflowRunDto,
+  PullRequestCiDto,
+  PullRequestDto,
+} from '../global';
 import { trByLanguage, type AppLanguage } from '../i18n';
 import { RepoOwnerRef } from '../types/git';
 
@@ -21,19 +28,27 @@ type Params = {
   onError?: (message: string) => void;
 };
 
+const BASE_POLL_INTERVAL_MS = 60_000;
+const PENDING_POLL_INTERVAL_MS = 15_000;
+const MAX_BACKOFF_INTERVAL_MS = 5 * 60_000;
+
 export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, githubHost = 'github.com', onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
   const [prFilter, setPrFilter] = useState<'open' | 'closed' | 'all'>('open');
+  const [prCiByNumber, setPrCiByNumber] = useState<Record<number, PullRequestCiDto>>({});
 
   useEffect(() => {
     const parseOwnerRepo = async () => {
       const ownerRepo = await resolvePrOwnerRepo(window.electronAPI, activeRepo, isAuthenticated, githubHost);
       setPrOwnerRepo(ownerRepo);
-      if (!ownerRepo) setPullRequests([]);
+      if (!ownerRepo) {
+        setPullRequests([]);
+        setPrCiByNumber({});
+      }
     };
-    parseOwnerRepo();
+    void parseOwnerRepo();
   }, [activeRepo, isAuthenticated, refreshTrigger, githubHost]);
 
   useEffect(() => {
@@ -43,8 +58,59 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       setPullRequests(data);
       setPrLoading(false);
     };
-    fetchPRs();
+    void fetchPRs();
   }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
+
+  const openPrs = useMemo(() => pullRequests.filter(pr => pr.state === 'open'), [pullRequests]);
+
+  useEffect(() => {
+    if (!window.electronAPI || !prOwnerRepo || !isAuthenticated || openPrs.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let backoffMultiplier = 1;
+
+    const pollCi = async () => {
+      try {
+        const ciEntries = await Promise.all(
+          openPrs.map(async (pr) => {
+            const ci = await loadPullRequestCi(window.electronAPI, prOwnerRepo, pr);
+            return [pr.number, ci] as const;
+          }),
+        );
+
+        if (cancelled) return;
+
+        setPrCiByNumber((prev) => {
+          const next = { ...prev };
+          for (const [number, ci] of ciEntries) {
+            if (ci) {
+              next[number] = ci;
+            }
+          }
+          return next;
+        });
+
+        const hasPending = ciEntries.some(([, ci]) => ci?.badge === 'pending');
+        const nextDelay = hasPending ? PENDING_POLL_INTERVAL_MS : BASE_POLL_INTERVAL_MS;
+        backoffMultiplier = 1;
+        timeout = setTimeout(pollCi, nextDelay);
+      } catch {
+        if (cancelled) return;
+        backoffMultiplier = Math.min(backoffMultiplier * 2, MAX_BACKOFF_INTERVAL_MS / BASE_POLL_INTERVAL_MS);
+        timeout = setTimeout(pollCi, BASE_POLL_INTERVAL_MS * backoffMultiplier);
+      }
+    };
+
+    void pollCi();
+
+    return () => {
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [isAuthenticated, openPrs, prOwnerRepo]);
 
   const createPR = useCallback(async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
     if (!title.trim()) return false;
@@ -72,6 +138,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     prOwnerRepo,
     prFilter,
     setPrFilter,
+    prCiByNumber,
     createPR,
   };
 };
@@ -131,6 +198,67 @@ export const loadPullRequests = async (
     return [];
   }
 };
+
+export const loadPullRequestCi = async (
+  electronAPI: ElectronAPI | undefined,
+  prOwnerRepo: RepoOwnerRef | null,
+  pr: PullRequestDto,
+): Promise<PullRequestCiDto | null> => {
+  if (!electronAPI || !prOwnerRepo || !pr.headSha) return null;
+
+  try {
+    const [workflowResult, checksResult] = await Promise.all([
+      electronAPI.githubGetWorkflowRuns({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, headSha: pr.headSha, branch: pr.head, perPage: 10 }),
+      electronAPI.githubGetStatusChecks({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, ref: pr.headSha }),
+    ]);
+
+    const workflowRuns = workflowResult.success ? workflowResult.data : [];
+    const statusChecks = checksResult.success ? checksResult.data : null;
+    const badge = computeCiBadge(workflowRuns, statusChecks);
+
+    return {
+      badge,
+      summary: buildCiSummary(badge, workflowRuns, statusChecks),
+      workflowRuns,
+      statusChecks,
+      updatedAt: Date.now(),
+    };
+  } catch {
+    return null;
+  }
+};
+
+function computeCiBadge(workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): CiBadgeStateDto {
+  const conclusions = workflows.map(w => w.conclusion).filter(Boolean);
+  const hasFailure = conclusions.some(c => c === 'failure' || c === 'cancelled' || c === 'timed_out' || c === 'action_required');
+  const hasPendingWorkflow = workflows.some(w => w.status !== 'completed' || !w.conclusion);
+
+  if (hasFailure) return 'failure';
+
+  if (checks) {
+    if (checks.state === 'failure' || checks.state === 'error') return 'failure';
+    if (checks.state === 'pending') return 'pending';
+  }
+
+  if (hasPendingWorkflow) return 'pending';
+  if (conclusions.some(c => c === 'success')) return 'success';
+  if (checks?.state === 'success') return 'success';
+
+  return workflows.length === 0 && !checks ? 'unknown' : 'neutral';
+}
+
+function buildCiSummary(
+  badge: CiBadgeStateDto,
+  workflows: GithubWorkflowRunDto[],
+  checks: GithubStatusChecksDto | null,
+): string {
+  const checkCount = checks?.checkRuns.length || 0;
+  const statusCount = checks?.statusContexts.length || 0;
+  if (badge === 'success') return `CI passed (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
+  if (badge === 'failure') return `CI failed (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
+  if (badge === 'pending') return `CI pending (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
+  return `CI status (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
+}
 
 export const submitPullRequest = async (
   electronAPI: ElectronAPI | undefined,

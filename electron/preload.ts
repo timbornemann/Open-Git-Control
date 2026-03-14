@@ -68,6 +68,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:getPRs', owner, repo, state),
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
     ipcRenderer.invoke('github:createPR', params),
+  githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) =>
+    ipcRenderer.invoke('github:getWorkflowRuns', params),
+  githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) =>
+    ipcRenderer.invoke('github:getStatusChecks', params),
   githubMergePR: (params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) =>
     ipcRenderer.invoke('github:mergePR', params),
   getDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:report'),

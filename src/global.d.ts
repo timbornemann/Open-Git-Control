@@ -127,10 +127,65 @@ export interface PullRequestDto {
   createdAt: string;
   updatedAt: string;
   head: string;
+  headSha: string;
   base: string;
   merged: boolean;
   htmlUrl: string;
   draft: boolean;
+}
+
+
+export type CiBadgeStateDto = 'success' | 'failure' | 'pending' | 'neutral' | 'unknown';
+
+export interface GithubWorkflowRunDto {
+  id: number;
+  name: string;
+  workflowName: string;
+  status: string;
+  conclusion: string | null;
+  event: string;
+  htmlUrl: string;
+  branch: string;
+  headSha: string;
+  createdAt: string;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export interface GithubCheckRunDto {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  detailsUrl: string | null;
+  appName: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface GithubStatusContextDto {
+  id: number;
+  context: string;
+  state: string;
+  description: string | null;
+  targetUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface GithubStatusChecksDto {
+  state: string;
+  sha: string;
+  checkRuns: GithubCheckRunDto[];
+  statusContexts: GithubStatusContextDto[];
+}
+
+export interface PullRequestCiDto {
+  badge: CiBadgeStateDto;
+  summary: string;
+  workflowRuns: GithubWorkflowRunDto[];
+  statusChecks: GithubStatusChecksDto | null;
+  updatedAt: number;
 }
 
 export type PullRequestMergeMethodDto = 'merge' | 'squash' | 'rebase';
@@ -259,6 +314,9 @@ export interface ElectronAPI {
       state: string;
     }>
   >;
+
+  githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
+  githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => Promise<IpcResult<GithubStatusChecksDto>>;
   githubMergePR: (params: {
     owner: string;
     repo: string;

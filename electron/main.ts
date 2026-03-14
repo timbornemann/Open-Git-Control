@@ -1918,6 +1918,30 @@ function setupIPC() {
     }
   });
 
+
+  ipcMain.handle('github:getWorkflowRuns', async (_event, params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    try {
+      const runs = await githubService.getWorkflowRuns(params.owner, params.repo, {
+        branch: params.branch,
+        headSha: params.headSha,
+        perPage: params.perPage,
+      });
+      return { success: true, data: runs };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('github:getStatusChecks', async (_event, params: { owner: string; repo: string; ref: string }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+    try {
+      const checks = await githubService.getStatusChecks(params.owner, params.repo, params.ref);
+      return { success: true, data: checks };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  });
   ipcMain.handle('github:mergePR', async (_event, params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
