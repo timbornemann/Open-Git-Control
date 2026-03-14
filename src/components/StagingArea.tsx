@@ -11,6 +11,7 @@ interface StagingAreaProps {
   repoPath: string | null;
   onRepoChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
+  onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
   settings: AppSettingsDto;
 }
 
@@ -123,7 +124,7 @@ const extensionPattern = (p: string) => {
   return `*${name.slice(idx)}`;
 };
 
-export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff, settings }) => {
+export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff, onSelectFileInspect, settings }) => {
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
@@ -621,8 +622,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
+    const inspectSource = section === 'staged' ? 'staged' : section === 'unstaged' ? 'unstaged' : null;
     return (
-      <div className="staging-file-row" onClick={() => section !== 'untracked' && showDiff(entry.path, section === 'staged')} onContextMenu={(e) => openFileContextMenu(e, entry, section)}>
+      <div
+        className="staging-file-row"
+        onClick={() => {
+          if (inspectSource) {
+            onSelectFileInspect?.(entry.path, inspectSource);
+          }
+          if (section !== 'untracked') {
+            showDiff(entry.path, section === 'staged');
+          }
+        }}
+        onContextMenu={(e) => openFileContextMenu(e, entry, section)}
+      >
         <span className="staging-status" style={{ color: info.color }}>{statusCode}</span>
         <span className="staging-path" title={entry.path}>{entry.path}</span>
         <div className="staging-actions">
