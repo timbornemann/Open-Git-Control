@@ -5,6 +5,7 @@ import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
+import { DiffRequest } from '../types/diff';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -12,6 +13,7 @@ interface CommitGraphProps {
   selectedHash?: string | null;
   refreshTrigger?: number;
   showSecondaryHistory?: boolean;
+  onOpenDiff?: (request: DiffRequest) => void;
 }
 
 const LOG_PAGE_SIZE = 200;
@@ -60,6 +62,7 @@ type InputDialogState = {
 
 type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
 type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
+type ForensicSearchType = 'string' | 'regex' | 'line';
 
 const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
   all: 'Alles',
@@ -67,6 +70,12 @@ const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
   author: 'Autor',
   hash: 'Hash',
   refs: 'Refs',
+};
+
+const FORENSIC_SEARCH_TYPE_LABELS: Record<ForensicSearchType, string> = {
+  string: '-S String',
+  regex: '-G Regex',
+  line: '-L Zeilenbereich',
 };
 
 const getRefKind = (ref: string): RefKind => {
@@ -91,7 +100,7 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
   return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
 });
 
-export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true }) => {
+export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
@@ -105,6 +114,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [matchCursor, setMatchCursor] = useState(0);
+
+  const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
+  const [forensicPath, setForensicPath] = useState('');
+  const [forensicValue, setForensicValue] = useState('');
+  const [forensicStartLine, setForensicStartLine] = useState('1');
+  const [forensicEndLine, setForensicEndLine] = useState('1');
+  const [forensicLoading, setForensicLoading] = useState(false);
+  const [forensicError, setForensicError] = useState<string | null>(null);
+  const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const commitCountRef = useRef(0);
   const layoutRef = useRef<GraphLayout | null>(null);
@@ -188,6 +206,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       layoutRef.current = null;
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
+      setForensicResults([]);
+      setForensicError(null);
+      setForensicLoading(false);
       return;
     }
     refreshCommits();
@@ -208,6 +229,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     if (!scrollContainer) {
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
+      setForensicResults([]);
+      setForensicError(null);
+      setForensicLoading(false);
       return;
     }
 
@@ -311,6 +335,65 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
   }, [matchCursor, matchedNodes, onSelectCommit]);
+
+
+  const runForensicSearch = useCallback(async () => {
+    if (!repoPath || !window.electronAPI) return;
+
+    const normalizedPath = forensicPath.trim();
+    if (!normalizedPath) {
+      setForensicError('Bitte einen Pfad fuer die forensische Suche angeben.');
+      setForensicResults([]);
+      return;
+    }
+
+    const args: string[] = ['forensicHistory', forensicType, normalizedPath];
+
+    if (forensicType === 'line') {
+      const start = Number(forensicStartLine);
+      const end = Number(forensicEndLine);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
+        setForensicError('Ungueltiger Zeilenbereich. Bitte Start/Ende pruefen.');
+        setForensicResults([]);
+        return;
+      }
+      args.push('line-range', String(start), String(end), '200');
+    } else {
+      const searchTerm = forensicValue.trim();
+      if (!searchTerm) {
+        setForensicError(forensicType === 'regex' ? 'Bitte Regex angeben.' : 'Bitte Suchstring angeben.');
+        setForensicResults([]);
+        return;
+      }
+      args.push(searchTerm, '0', '0', '200');
+    }
+
+    setForensicLoading(true);
+    setForensicError(null);
+
+    try {
+      const { success, data, error } = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      if (!success) {
+        const message = String(error || 'Forensische Suche fehlgeschlagen.');
+        const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
+        setForensicError(invalidPattern ? 'Ungueltiges Regex-Muster. Bitte Ausdruck korrigieren.' : message);
+        setForensicResults([]);
+        return;
+      }
+
+      const commits = parseGitLog(String(data || ''));
+      const nodes = commits.map(commit => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
+      setForensicResults(nodes);
+      if (commits.length === 0) {
+        setForensicError('Keine Treffer gefunden.');
+      }
+    } catch (e: any) {
+      setForensicResults([]);
+      setForensicError(String(e?.message || 'Forensische Suche fehlgeschlagen.'));
+    } finally {
+      setForensicLoading(false);
+    }
+  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath]);
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
     try {
@@ -805,6 +888,60 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             <span>{matchedNodes.length} Treffer</span>
             <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(-1)} disabled={matchedNodes.length === 0}>Prev</button>
             <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(1)} disabled={matchedNodes.length === 0}>Next</button>
+          </div>
+        )}
+      </div>
+
+
+      <div style={{ borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-dark)' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Forensische Historie:</span>
+          {(Object.keys(FORENSIC_SEARCH_TYPE_LABELS) as ForensicSearchType[]).map(type => (
+            <button
+              key={type}
+              onClick={() => setForensicType(type)}
+              style={{ border: '1px solid var(--border-color)', backgroundColor: forensicType === type ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: forensicType === type ? 'var(--text-accent)' : 'var(--text-secondary)', borderRadius: '999px', padding: '4px 9px', fontSize: '0.72rem', cursor: 'pointer' }}
+            >
+              {FORENSIC_SEARCH_TYPE_LABELS[type]}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={forensicPath}
+            onChange={(e) => setForensicPath(e.target.value)}
+            placeholder="Pfad (z.B. src/components/CommitGraph.tsx)"
+            style={{ flex: 1, minWidth: 260, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
+          />
+          {forensicType === 'line' ? (
+            <>
+              <input type="number" min={1} value={forensicStartLine} onChange={(e) => setForensicStartLine(e.target.value)} placeholder="Start" style={{ width: 90, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
+              <input type="number" min={1} value={forensicEndLine} onChange={(e) => setForensicEndLine(e.target.value)} placeholder="Ende" style={{ width: 90, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
+            </>
+          ) : (
+            <input
+              type="text"
+              value={forensicValue}
+              onChange={(e) => setForensicValue(e.target.value)}
+              placeholder={forensicType === 'regex' ? 'Regex (git -G)' : 'String (git -S)'}
+              style={{ flex: 1, minWidth: 220, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
+            />
+          )}
+          <button onClick={() => void runForensicSearch()} disabled={forensicLoading} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>
+            {forensicLoading ? 'Suche...' : 'Forensisch suchen'}
+          </button>
+        </div>
+        {forensicError && <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>{forensicError}</div>}
+        {forensicResults.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 180, overflowY: 'auto' }}>
+            {forensicResults.map((node) => (
+              <div key={`forensic-${node.commit.hash}`} style={{ border: '1px solid var(--border-color)', borderRadius: 6, backgroundColor: 'var(--bg-panel)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button onClick={() => onSelectCommit?.(node.commit.hash)} style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'monospace' }}>{node.commit.abbrevHash}</button>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{node.commit.subject}</span>
+                <button onClick={() => onOpenDiff?.({ source: 'commit', path: forensicPath.trim(), commitHash: node.commit.hash, title: `${node.commit.abbrevHash} · ${forensicPath.trim()}` })} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', borderRadius: 4, padding: '3px 6px', fontSize: '0.72rem', cursor: 'pointer' }}>Diff</button>
+              </div>
+            ))}
           </div>
         )}
       </div>

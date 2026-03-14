@@ -547,7 +547,8 @@ type GitCommandName =
   | 'submoduleStatus'
   | 'submoduleUpdateInitRecursive'
   | 'submoduleSyncRecursive'
-  | 'reflog';
+  | 'reflog'
+  | 'forensicHistory';
 
 type JobEventStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 
@@ -595,6 +596,7 @@ const ALLOWED_GIT_COMMANDS: Set<GitCommandName> = new Set([
   'submoduleUpdateInitRecursive',
   'submoduleSyncRecursive',
   'reflog',
+  'forensicHistory',
 ]);
 
 function createJobId(operation: string): string {
@@ -672,6 +674,7 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     submoduleUpdateInitRecursive: 0,
     submoduleSyncRecursive: 0,
     reflog: 1,
+    forensicHistory: 6,
   };
 
   const max = maxArgsByCommand[commandName];
@@ -704,6 +707,35 @@ function validateCommandArgs(commandName: GitCommandName, args: string[]): void 
     const parsedLimit = Number(args[0]);
     if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
       throw new Error('Invalid reflog limit.');
+    }
+  }
+
+  if (commandName === 'forensicHistory') {
+    const searchType = args[0];
+    const targetPath = args[1];
+    if (!searchType || !['string', 'regex', 'line'].includes(searchType)) {
+      throw new Error('Invalid forensic search type.');
+    }
+    if (!targetPath) {
+      throw new Error('Forensic path is required.');
+    }
+
+    const parsedLimit = Number(args[5] || '200');
+    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 500) {
+      throw new Error('Invalid forensic limit.');
+    }
+
+    if (searchType === 'line') {
+      const parsedStart = Number(args[3]);
+      const parsedEnd = Number(args[4]);
+      if (!Number.isFinite(parsedStart) || parsedStart < 1) {
+        throw new Error('Invalid forensic start line.');
+      }
+      if (!Number.isFinite(parsedEnd) || parsedEnd < parsedStart) {
+        throw new Error('Invalid forensic end line.');
+      }
+    } else if (!args[2]) {
+      throw new Error('Forensic search term is required.');
     }
   }
 }
@@ -1268,6 +1300,21 @@ function setupIPC() {
         data = await gitService.syncSubmodulesRecursive();
       } else if (commandName === 'reflog') {
         data = await gitService.getReflog(Number(normalizedArgs[0]) || 300);
+      } else if (commandName === 'forensicHistory') {
+        const searchType = normalizedArgs[0];
+        const targetPath = normalizedArgs[1];
+        const searchTerm = normalizedArgs[2] || '';
+        const startLine = Number(normalizedArgs[3]);
+        const endLine = Number(normalizedArgs[4]);
+        const limit = Number(normalizedArgs[5]) || 200;
+
+        if (searchType === 'string') {
+          data = await gitService.getForensicHistoryByString(searchTerm, targetPath, limit);
+        } else if (searchType === 'regex') {
+          data = await gitService.getForensicHistoryByRegex(searchTerm, targetPath, limit);
+        } else {
+          data = await gitService.getForensicHistoryByLineRange(targetPath, startLine, endLine, limit);
+        }
       } else {
         data = await gitService.runCommand([commandName, ...normalizedArgs]);
       }
