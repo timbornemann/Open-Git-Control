@@ -4,6 +4,7 @@ import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
 import { CommitDetails } from '../CommitDetails';
 import { StagingArea } from '../StagingArea';
+import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { RemoteSyncState } from '../../types/git';
@@ -19,6 +20,11 @@ type RemoteStatus = {
   color: string;
   backgroundColor: string;
   borderColor: string;
+};
+
+type WorkingTreeSelection = {
+  path: string;
+  source: 'staged' | 'unstaged';
 };
 
 type Props = {
@@ -264,6 +270,7 @@ export const MainView: React.FC<Props> = ({
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
+  const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
   const [primaryPaneRatio, setPrimaryPaneRatio] = useState(PRIMARY_PANE_DEFAULT_RATIO);
   const [isContentResizing, setIsContentResizing] = useState(false);
   const contentAreaRef = useRef<HTMLDivElement | null>(null);
@@ -330,6 +337,7 @@ export const MainView: React.FC<Props> = ({
   useEffect(() => {
     setActiveDiffRequest(null);
     setCommitHistoryStack([]);
+    setWorkingTreeSelection(null);
     setShowRecoveryCenter(false);
   }, [activeRepo]);
 
@@ -349,6 +357,7 @@ export const MainView: React.FC<Props> = ({
 
   const handleSelectCommitDirect = useCallback((hash: string | null) => {
     const normalized = normalizeCommitHash(hash);
+    setWorkingTreeSelection(null);
     setCommitHistoryStack([]);
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
@@ -368,6 +377,19 @@ export const MainView: React.FC<Props> = ({
     setSelectedCommit(normalized);
   }, [selectedCommit, setSelectedCommit]);
 
+  const handleSelectWorkingTreeFile = useCallback((path: string, source: 'staged' | 'unstaged') => {
+    setCommitHistoryStack([]);
+    setSelectedCommit(null);
+    setWorkingTreeSelection({ path, source });
+  }, [setSelectedCommit]);
+
+  const handleSelectCommitFromWorkingTree = useCallback((hash: string) => {
+    const normalized = normalizeCommitHash(hash);
+    if (!normalized) return;
+    setWorkingTreeSelection(null);
+    setSelectedCommit(normalized);
+  }, [setSelectedCommit]);
+
   const handleCommitBack = useCallback(() => {
     setCommitHistoryStack(prev => {
       if (prev.length === 0) return prev;
@@ -379,6 +401,7 @@ export const MainView: React.FC<Props> = ({
 
   const closeInspector = useCallback(() => {
     setCommitHistoryStack([]);
+    setWorkingTreeSelection(null);
     setSelectedCommit(null);
   }, [setSelectedCommit]);
 
@@ -539,10 +562,10 @@ export const MainView: React.FC<Props> = ({
 
         <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : tr('Working Directory', 'Working Directory')}</span>
-            {selectedCommit && (
+            <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
+            {(selectedCommit || workingTreeSelection) && (
               <div style={{ display: 'flex', gap: '6px' }}>
-                {commitHistoryStack.length > 0 && (
+                {selectedCommit && commitHistoryStack.length > 0 && (
                   <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
                     {tr('Zurueck', 'Back')}
                   </button>
@@ -560,11 +583,19 @@ export const MainView: React.FC<Props> = ({
                 onSelectCommit={handleSelectCommitFromHistory}
                 onOpenDiff={handleOpenDiff}
               />
+            ) : workingTreeSelection ? (
+              <WorkingTreeFileDetails
+                path={workingTreeSelection.path}
+                source={workingTreeSelection.source}
+                onSelectCommit={handleSelectCommitFromWorkingTree}
+                onOpenDiff={handleOpenDiff}
+              />
             ) : (
               <StagingArea
                 repoPath={activeRepo}
                 onRepoChanged={triggerRefresh}
                 onOpenDiff={handleOpenDiff}
+                onSelectFileInspect={handleSelectWorkingTreeFile}
                 settings={settings}
               />
             )}
