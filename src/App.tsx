@@ -195,6 +195,12 @@ const App: React.FC = () => {
           newPRBase={state.newPRBase}
           setNewPRBase={state.setNewPRBase}
           onCreatePR={state.handleCreatePR}
+          releaseForm={state.releaseForm}
+          setReleaseForm={state.setReleaseForm}
+          releaseSubmitting={state.releaseSubmitting}
+          releaseError={state.releaseError}
+          releaseSuccess={state.releaseSuccess}
+          onCreateRelease={state.handleCreateRelease}
           settings={state.settings}
           onUpdateSettings={state.handleUpdateSettings}
           jobs={state.jobs}

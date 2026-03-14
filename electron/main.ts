@@ -1919,6 +1919,47 @@ function setupIPC() {
   });
 
 
+  ipcMain.handle('github:createRelease', async (_event, params: {
+    owner: string;
+    repo: string;
+    tagName: string;
+    targetCommitish?: string;
+    releaseName: string;
+    body?: string;
+    draft?: boolean;
+    prerelease?: boolean;
+  }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+
+    const tagName = (params?.tagName || '').trim();
+    const releaseName = (params?.releaseName || '').trim();
+
+    if (!tagName) {
+      return { success: false, error: 'Tag-Name ist erforderlich.' };
+    }
+
+    if (!releaseName) {
+      return { success: false, error: 'Release-Name ist erforderlich.' };
+    }
+
+    try {
+      const release = await githubService.createRelease({
+        owner: params.owner,
+        repo: params.repo,
+        tagName,
+        targetCommitish: params.targetCommitish,
+        releaseName,
+        body: params.body,
+        draft: Boolean(params.draft),
+        prerelease: Boolean(params.prerelease),
+      });
+      return { success: true, data: release };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Release konnte nicht erstellt werden.' };
+    }
+  });
+
+
   ipcMain.handle('github:getWorkflowRuns', async (_event, params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {

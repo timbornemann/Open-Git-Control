@@ -159,6 +159,21 @@ const LEGACY_TEXT_MAP_EN: Record<string, string> = {
   'Ordner ignorieren': 'Ignore folder',
   'Oberordner ignorieren': 'Ignore top-level folder',
   'Dateityp ignorieren': 'Ignore file type',
+  'Release erstellen': 'Create release',
+  'Tag-Name (Pflicht)': 'Tag name (required)',
+  'Release-Name (Pflicht)': 'Release name (required)',
+  'Ziel-Branch oder Commit (optional)': 'Target branch or commit (optional)',
+  'Release Notes (optional)': 'Release notes (optional)',
+  'Entwurf (Draft)': 'Draft',
+  'Pre-Release': 'Pre-release',
+  'Tag darf nicht leer sein.': 'Tag cannot be empty.',
+  'Tag enthält ungültige Zeichen/Leerzeichen.': 'Tag contains invalid chars/whitespace.',
+  'Release-Name darf nicht leer sein.': 'Release name must not be empty.',
+  'Release-Name muss mindestens 3 Zeichen haben.': 'Release name must be at least 3 characters.',
+  'Handlungsoption: Anderen Tag wählen.': 'Action: choose a different tag.',
+  'Release erfolgreich erstellt.': 'Release created successfully.',
+  'Release öffnen': 'Open release',
+  'Erstelle...': 'Creating...',
 };
 
 const LEGACY_REGEX_REPLACERS_EN: Array<[RegExp, string]> = [

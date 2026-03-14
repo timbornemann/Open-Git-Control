@@ -30,6 +30,27 @@ type WebFlowExchangeResult = {
 
 type MergeMethod = 'merge' | 'squash' | 'rebase';
 
+export type CreateReleaseParams = {
+  owner: string;
+  repo: string;
+  tagName: string;
+  targetCommitish?: string;
+  releaseName: string;
+  body?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+};
+
+export type GitHubReleaseDto = {
+  id: number;
+  tagName: string;
+  name: string;
+  htmlUrl: string;
+  draft: boolean;
+  prerelease: boolean;
+  publishedAt: string | null;
+};
+
 type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'requested' | 'waiting' | 'pending';
 type WorkflowRunConclusion =
   | 'success'
@@ -572,6 +593,71 @@ export class GitHubService {
       merged: Boolean(data.merged),
       message: data.message || 'Merged',
     };
+  }
+
+  async createRelease(params: CreateReleaseParams): Promise<GitHubReleaseDto> {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const owner = (params.owner || '').trim();
+    const repo = (params.repo || '').trim();
+    const tagName = (params.tagName || '').trim();
+    const releaseName = (params.releaseName || '').trim();
+    const targetCommitish = (params.targetCommitish || '').trim();
+
+    if (!owner || !repo) {
+      throw new Error('Owner und Repository sind erforderlich.');
+    }
+
+    if (!tagName) {
+      throw new Error('Tag-Name ist erforderlich.');
+    }
+
+    if (!releaseName) {
+      throw new Error('Release-Name ist erforderlich.');
+    }
+
+    try {
+      const { data } = await this.octokit.rest.repos.createRelease({
+        owner,
+        repo,
+        tag_name: tagName,
+        name: releaseName,
+        body: params.body || '',
+        draft: Boolean(params.draft),
+        prerelease: Boolean(params.prerelease),
+        ...(targetCommitish ? { target_commitish: targetCommitish } : {}),
+      });
+
+      return {
+        id: data.id,
+        tagName: data.tag_name,
+        name: data.name || releaseName,
+        htmlUrl: data.html_url,
+        draft: Boolean(data.draft),
+        prerelease: Boolean(data.prerelease),
+        publishedAt: data.published_at || null,
+      };
+    } catch (error: any) {
+      const status = Number(error?.status);
+      const apiMessage = typeof error?.response?.data?.message === 'string'
+        ? error.response.data.message
+        : '';
+      const normalizedMessage = `${error?.message || ''} ${apiMessage}`.toLowerCase();
+
+      if (status === 422 && normalizedMessage.includes('already_exists')) {
+        throw new Error('Tag existiert bereits. Bitte anderen Tag wählen oder bestehenden Tag verwenden.');
+      }
+
+      if (status === 422 && normalizedMessage.includes('target_commitish')) {
+        throw new Error('Ungültiger targetCommitish. Bitte Branch-Name oder Commit-SHA prüfen.');
+      }
+
+      if (status === 403 || status === 404) {
+        throw new Error('Keine Berechtigung für dieses Repository. Bitte Token-Rechte prüfen.');
+      }
+
+      throw new Error(apiMessage || error?.message || 'Release konnte nicht erstellt werden.');
+    }
   }
 }
 

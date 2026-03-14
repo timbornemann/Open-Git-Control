@@ -119,6 +119,29 @@ export interface AppSettingsDto {
   githubHost: string;
 }
 
+
+
+export interface GitHubCreateReleaseParamsDto {
+  owner: string;
+  repo: string;
+  tagName: string;
+  targetCommitish?: string;
+  releaseName: string;
+  body?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+}
+
+export interface GitHubReleaseDto {
+  id: number;
+  tagName: string;
+  name: string;
+  htmlUrl: string;
+  draft: boolean;
+  prerelease: boolean;
+  publishedAt: string | null;
+}
+
 export interface PullRequestDto {
   number: number;
   title: string;
@@ -314,6 +337,8 @@ export interface ElectronAPI {
       state: string;
     }>
   >;
+
+  githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
 
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
   githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => Promise<IpcResult<GithubStatusChecksDto>>;

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
+import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
 
 type GithubConnectedContentProps = Pick<
   AppSidebarProps,
@@ -58,6 +59,12 @@ type GithubConnectedContentProps = Pick<
   | 'newPRBase'
   | 'setNewPRBase'
   | 'onCreatePR'
+  | 'releaseForm'
+  | 'setReleaseForm'
+  | 'releaseSubmitting'
+  | 'releaseError'
+  | 'releaseSuccess'
+  | 'onCreateRelease'
 >;
 
 
@@ -141,10 +148,22 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   newPRBase,
   setNewPRBase,
   onCreatePR,
+  releaseForm,
+  setReleaseForm,
+  releaseSubmitting,
+  releaseError,
+  releaseSuccess,
+  onCreateRelease,
 }) => {
   const { tr } = useI18n();
   const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
+
+  const releaseValidation = validateGithubReleaseInput({
+    tagName: releaseForm.tagName || '',
+    releaseName: releaseForm.releaseName || '',
+  });
+  const releaseSubmitDisabled = !prOwnerRepo || releaseSubmitting || !releaseValidation.valid;
 
   useEffect(() => {
     let active = true;
@@ -511,6 +530,127 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
               </div>
             </div>
           )}
+
+          <div
+            style={{
+              padding: '8px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--bg-panel)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              marginBottom: '6px',
+              opacity: prOwnerRepo ? 1 : 0.6,
+            }}
+          >
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+              {tr('Release erstellen', 'Create release')}
+            </div>
+            <input
+              type="text"
+              placeholder={tr('Tag-Name (Pflicht)', 'Tag name (required)')}
+              value={releaseForm.tagName || ''}
+              onChange={e => setReleaseForm(prev => ({ ...prev, tagName: e.target.value }))}
+              disabled={!prOwnerRepo || releaseSubmitting}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+            />
+            <input
+              type="text"
+              placeholder={tr('Release-Name (Pflicht)', 'Release name (required)')}
+              value={releaseForm.releaseName || ''}
+              onChange={e => setReleaseForm(prev => ({ ...prev, releaseName: e.target.value }))}
+              disabled={!prOwnerRepo || releaseSubmitting}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+            />
+            <input
+              type="text"
+              placeholder={tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')}
+              value={releaseForm.targetCommitish || ''}
+              onChange={e => setReleaseForm(prev => ({ ...prev, targetCommitish: e.target.value }))}
+              disabled={!prOwnerRepo || releaseSubmitting}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+            />
+            <textarea
+              placeholder={tr('Release Notes (optional)', 'Release notes (optional)')}
+              value={releaseForm.body || ''}
+              onChange={e => setReleaseForm(prev => ({ ...prev, body: e.target.value }))}
+              rows={3}
+              disabled={!prOwnerRepo || releaseSubmitting}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(releaseForm.draft)}
+                  onChange={e => setReleaseForm(prev => ({ ...prev, draft: e.target.checked }))}
+                  disabled={!prOwnerRepo || releaseSubmitting}
+                />
+                {tr('Entwurf (Draft)', 'Draft')}
+              </label>
+              <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(releaseForm.prerelease)}
+                  onChange={e => setReleaseForm(prev => ({ ...prev, prerelease: e.target.checked }))}
+                  disabled={!prOwnerRepo || releaseSubmitting}
+                />
+                {tr('Pre-Release', 'Pre-release')}
+              </label>
+            </div>
+
+            {!releaseValidation.valid && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--status-warning)' }}>
+                {!releaseForm.tagName.trim()
+                  ? tr('Tag darf nicht leer sein.', 'Tag cannot be empty.')
+                  : releaseValidation.errors.tagName
+                    ? tr('Tag enthält ungültige Zeichen/Leerzeichen.', 'Tag contains invalid chars/whitespace.')
+                    : releaseValidation.errors.releaseName === 'release.validation.nameRequired'
+                      ? tr('Release-Name darf nicht leer sein.', 'Release name must not be empty.')
+                      : tr('Release-Name muss mindestens 3 Zeichen haben.', 'Release name must be at least 3 characters.')}
+              </div>
+            )}
+
+            {releaseError && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--status-danger)', lineHeight: 1.35 }}>
+                {releaseError}
+                {(releaseError.toLowerCase().includes('tag') || releaseError.toLowerCase().includes('already')) && (
+                  <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>
+                    {tr('Handlungsoption: Anderen Tag wählen.', 'Action: choose a different tag.')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {releaseSuccess && (
+              <div style={{ fontSize: '0.74rem', color: 'var(--status-success)', lineHeight: 1.35 }}>
+                {tr('Release erfolgreich erstellt.', 'Release created successfully.')} {' '}
+                <a href={releaseSuccess.htmlUrl} onClick={(e) => { e.preventDefault(); onOpenPR(releaseSuccess.htmlUrl); }} style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  {tr('Release öffnen', 'Open release')}
+                </a>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { void onCreateRelease(); }}
+                disabled={releaseSubmitDisabled}
+                style={{
+                  padding: '5px 10px',
+                  backgroundColor: releaseSubmitDisabled ? 'var(--bg-dark)' : 'var(--accent-primary)',
+                  color: releaseSubmitDisabled ? 'var(--text-secondary)' : 'var(--on-accent)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: releaseSubmitDisabled ? 'not-allowed' : 'pointer',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                }}
+              >
+                {releaseSubmitting ? tr('Erstelle...', 'Creating...') : tr('Release erstellen', 'Create release')}
+              </button>
+            </div>
+          </div>
 
           {prLoading && (
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '6px 0' }}>
