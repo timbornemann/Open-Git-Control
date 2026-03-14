@@ -12,6 +12,8 @@ import {
   GitBranch,
   Search,
   RefreshCw,
+  XCircle,
+  Clock3,
 } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
@@ -38,6 +40,7 @@ type GithubConnectedContentProps = Pick<
   | 'setPrFilter'
   | 'prLoading'
   | 'pullRequests'
+  | 'prCiByNumber'
   | 'onOpenPR'
   | 'onCopyPRUrl'
   | 'onCheckoutPR'
@@ -56,6 +59,31 @@ type GithubConnectedContentProps = Pick<
   | 'setNewPRBase'
   | 'onCreatePR'
 >;
+
+
+const getCiBadgeStyles = (badge: string) => {
+  if (badge === 'success') {
+    return { color: 'var(--status-success)', backgroundColor: 'var(--status-success-soft)', borderColor: 'var(--status-success-border)', label: 'CI: Success' };
+  }
+  if (badge === 'failure') {
+    return { color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-soft)', borderColor: 'var(--status-danger-border)', label: 'CI: Failed' };
+  }
+  if (badge === 'pending') {
+    return { color: 'var(--status-warning)', backgroundColor: 'var(--status-warning-soft)', borderColor: 'var(--status-warning-border)', label: 'CI: Pending' };
+  }
+  return { color: 'var(--text-secondary)', backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-color)', label: 'CI: Unknown' };
+};
+
+const formatDuration = (startedAt?: string | null, finishedAt?: string | null): string => {
+  if (!startedAt || !finishedAt) return '—';
+  const start = new Date(startedAt).getTime();
+  const end = new Date(finishedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '—';
+  const totalSec = Math.round((end - start) / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}m ${String(sec).padStart(2, '0')}s`;
+};
 
 const toRepoIdentity = (remoteUrl: string): string | null => {
   const trimmed = (remoteUrl || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
@@ -95,6 +123,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   setPrFilter,
   prLoading,
   pullRequests,
+  prCiByNumber,
   onOpenPR,
   onCopyPRUrl,
   onCheckoutPR,
@@ -115,6 +144,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
 }) => {
   const { tr } = useI18n();
   const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
+  const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -531,8 +561,78 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       #{pr.number} | {pr.head} {'->'} {pr.base} | {pr.user}
                     </div>
+                    {(() => {
+                      const ci = prCiByNumber[pr.number];
+                      const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown');
+                      return (
+                        <button
+                          onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)}
+                          style={{
+                            marginTop: '6px',
+                            borderRadius: '999px',
+                            border: `1px solid ${badgeStyles.borderColor}`,
+                            backgroundColor: badgeStyles.backgroundColor,
+                            color: badgeStyles.color,
+                            padding: '2px 8px',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                          title={ci?.summary || tr('CI-Status laden...', 'Loading CI status...')}
+                        >
+                          {ci?.badge === 'success' && <CheckCircle2 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
+                          {ci?.badge === 'failure' && <XCircle size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
+                          {ci?.badge === 'pending' && <RefreshCw size={11} className="spin" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
+                          {badgeStyles.label}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
+
+                {selectedPrNumber === pr.number && prCiByNumber[pr.number] && (
+                  <div
+                    style={{
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '8px',
+                      backgroundColor: 'var(--bg-dark)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                    }}
+                  >
+                    {(prCiByNumber[pr.number]?.workflowRuns || []).slice(0, 5).map(run => (
+                      <div
+                        key={run.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr auto',
+                          gap: '4px 10px',
+                          alignItems: 'center',
+                          fontSize: '0.72rem',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {run.workflowName || run.name}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)' }}>
+                            <Clock3 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />Trigger: {run.event} • Duration: {formatDuration(run.startedAt, run.updatedAt)}
+                          </div>
+                        </div>
+                        <button className="staging-btn-sm" onClick={() => onOpenPR(run.htmlUrl)} title={tr('Im Browser oeffnen', 'Open in browser')}>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    {prCiByNumber[pr.number]?.workflowRuns?.length === 0 && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        {tr('Keine Workflows fuer diesen PR-Head gefunden.', 'No workflows found for this PR head.')}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                   {pr.state === 'open' && (

@@ -11,7 +11,7 @@ describe('usePullRequests helpers', () => {
   it('laedt pull requests mit aktivem Filter', async () => {
     const githubGetPRs = vi.fn().mockResolvedValue({
       success: true,
-      data: [{ number: 1, title: 'PR', state: 'open', user: 'u', createdAt: '', updatedAt: '', head: 'a', base: 'b', merged: false, htmlUrl: '', draft: false }],
+      data: [{ number: 1, title: 'PR', state: 'open', user: 'u', createdAt: '', updatedAt: '', head: 'a', headSha: 'abc', base: 'b', merged: false, htmlUrl: '', draft: false }],
     });
 
     const prs = await loadPullRequests(
@@ -35,6 +35,7 @@ describe('usePullRequests helpers', () => {
       { githubCreatePR } as any,
       { owner: 'octo', repo: 'my-repo' },
       { title: ' Neuer PR ', body: ' Body ', head: '', base: '', currentBranch: 'feature/test' },
+      'de',
     );
 
     expect(githubCreatePR).toHaveBeenCalledWith({
@@ -53,6 +54,7 @@ describe('usePullRequests helpers', () => {
       { githubCreatePR: vi.fn().mockResolvedValue({ success: false, error: 'kaputt' }) } as any,
       { owner: 'octo', repo: 'my-repo' },
       { title: 'PR', body: '', head: 'h', base: 'b', currentBranch: 'x' },
+      'de',
     );
 
     expect(result).toEqual({ success: false, error: 'kaputt' });

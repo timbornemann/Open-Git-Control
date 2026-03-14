@@ -595,6 +595,7 @@ export const useAppState = () => {
     setPrFilter: pullRequestDomain.setPrFilter,
     prLoading: pullRequestDomain.prLoading,
     pullRequests: pullRequestDomain.pullRequests,
+    prCiByNumber: pullRequestDomain.prCiByNumber,
     showCreatePR,
     setShowCreatePR,
     newPRTitle,

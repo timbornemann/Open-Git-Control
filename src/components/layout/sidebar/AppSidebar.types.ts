@@ -1,6 +1,6 @@
 import React from 'react';
 import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { AppSettingsDto, DeviceFlowStartDto, GitHubRepositoryDto, GitJobEventDto, PullRequestDto } from '../../../global';
+import { AppSettingsDto, DeviceFlowStartDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto } from '../../../global';
 
 export type RemoteStatus = {
   title: string;
@@ -119,6 +119,7 @@ export type AppSidebarProps = {
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
   pullRequests: PullRequestDto[];
+  prCiByNumber: Record<number, PullRequestCiDto>;
   onOpenPR: (url: string) => void;
   onCopyPRUrl: (url: string) => void;
   onCheckoutPR: (prNumber: number, headRef: string) => Promise<void>;

@@ -177,6 +177,7 @@ const App: React.FC = () => {
           setPrFilter={state.setPrFilter}
           prLoading={state.prLoading}
           pullRequests={state.pullRequests}
+          prCiByNumber={state.prCiByNumber}
           onOpenPR={state.handleOpenPR}
           onCopyPRUrl={state.handleCopyPRUrl}
           onCheckoutPR={state.handleCheckoutPR}
