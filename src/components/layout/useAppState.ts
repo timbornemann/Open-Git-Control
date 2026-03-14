@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppSettingsDto, GitJobEventDto } from '../../global';
+import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
@@ -7,6 +7,7 @@ import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
+import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
 
 const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',
@@ -335,6 +336,20 @@ export const useAppState = () => {
   const [newPRHead, setNewPRHead] = useState('');
   const [newPRBase, setNewPRBase] = useState('main');
 
+  const [releaseForm, setReleaseFormState] = useState<GitHubCreateReleaseParamsDto>({
+    owner: '',
+    repo: '',
+    tagName: '',
+    targetCommitish: '',
+    releaseName: '',
+    body: '',
+    draft: false,
+    prerelease: false,
+  });
+  const [releaseSubmitting, setReleaseSubmitting] = useState(false);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [releaseSuccess, setReleaseSuccess] = useState<GitHubReleaseDto | null>(null);
+
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
     isAuthenticated: github.isAuthenticated,
@@ -409,6 +424,107 @@ export const useAppState = () => {
       currentBranch: repository.currentBranch,
     });
   };
+
+
+  const setReleaseForm = useCallback((updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => {
+    setReleaseFormState(prev => {
+      const next = updater(prev);
+      return {
+        ...next,
+        owner: pullRequestDomain.prOwnerRepo?.owner || '',
+        repo: pullRequestDomain.prOwnerRepo?.repo || '',
+      };
+    });
+  }, [pullRequestDomain.prOwnerRepo]);
+
+  useEffect(() => {
+    setReleaseFormState(prev => ({
+      ...prev,
+      owner: pullRequestDomain.prOwnerRepo?.owner || '',
+      repo: pullRequestDomain.prOwnerRepo?.repo || '',
+      targetCommitish: prev.targetCommitish || repository.currentBranch,
+    }));
+  }, [pullRequestDomain.prOwnerRepo, repository.currentBranch]);
+
+  const handleCreateRelease = useCallback(async () => {
+    if (!window.electronAPI || !github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
+      setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      return;
+    }
+
+    const validation = validateGithubReleaseInput({
+      tagName: releaseForm.tagName,
+      releaseName: releaseForm.releaseName,
+    });
+
+    if (!validation.valid) {
+      if (validation.errors.tagName === 'release.validation.tagRequired') {
+        setReleaseError(tr('Tag-Name darf nicht leer sein.', 'Tag name must not be empty.'));
+        return;
+      }
+      if (validation.errors.tagName === 'release.validation.tagInvalid') {
+        setReleaseError(tr('Tag-Name enthält ungültige Zeichen oder Leerzeichen.', 'Tag name contains invalid characters or whitespace.'));
+        return;
+      }
+      if (validation.errors.releaseName === 'release.validation.nameRequired') {
+        setReleaseError(tr('Release-Name darf nicht leer sein.', 'Release name must not be empty.'));
+        return;
+      }
+      setReleaseError(tr('Release-Name ist zu kurz (mind. 3 Zeichen).', 'Release name is too short (min. 3 chars).'));
+      return;
+    }
+
+    setReleaseSubmitting(true);
+    setReleaseError(null);
+    setReleaseSuccess(null);
+
+    try {
+      const result = await window.electronAPI.githubCreateRelease({
+        owner: pullRequestDomain.prOwnerRepo.owner,
+        repo: pullRequestDomain.prOwnerRepo.repo,
+        tagName: releaseForm.tagName.trim(),
+        targetCommitish: (releaseForm.targetCommitish || '').trim() || repository.currentBranch,
+        releaseName: releaseForm.releaseName.trim(),
+        body: (releaseForm.body || '').trim(),
+        draft: Boolean(releaseForm.draft),
+        prerelease: Boolean(releaseForm.prerelease),
+      });
+
+      if (!result.success) {
+        const errorText = result.error || '';
+        const normalized = errorText.toLowerCase();
+
+        if (normalized.includes('tag existiert bereits') || normalized.includes('already_exists')) {
+          setReleaseError(tr('Dieser Tag existiert bereits. Wähle einen anderen Tag oder verwende den bestehenden Tag.', 'This tag already exists. Choose a different tag or use the existing tag.'));
+          return;
+        }
+
+        if (normalized.includes('berechtigung') || normalized.includes('permission') || normalized.includes('forbidden')) {
+          setReleaseError(tr('Fehlende Berechtigung für das Repository. Prüfe Token-Scopes und Repo-Zugriff.', 'Missing repository permission. Check token scopes and repo access.'));
+          return;
+        }
+
+        if (normalized.includes('targetcommitish') || normalized.includes('target_commitish')) {
+          setReleaseError(tr('Ziel-Branch/Ziel-Commit ist ungültig. Bitte Branch oder SHA prüfen.', 'Target branch/commit is invalid. Please verify branch or SHA.'));
+          return;
+        }
+
+        setReleaseError(errorText || tr('Release konnte nicht erstellt werden.', 'Could not create release.'));
+        return;
+      }
+
+      setReleaseSuccess(result.data);
+      setGitActionToast({
+        msg: tr(`Release ${result.data.tagName} erstellt.`, `Release ${result.data.tagName} created.`),
+        isError: false,
+      });
+      triggerRefresh();
+    } catch (error: any) {
+      setReleaseError(error?.message || tr('Release konnte nicht erstellt werden.', 'Could not create release.'));
+    } finally {
+      setReleaseSubmitting(false);
+    }
+  }, [github.isAuthenticated, pullRequestDomain.prOwnerRepo, releaseForm, repository.currentBranch, tr, triggerRefresh, setGitActionToast]);
 
   const handleOpenPR = (url: string) => {
     window.open(url, '_blank');
@@ -607,6 +723,12 @@ export const useAppState = () => {
     newPRBase,
     setNewPRBase,
     handleCreatePR,
+    releaseForm,
+    setReleaseForm,
+    releaseSubmitting,
+    releaseError,
+    releaseSuccess,
+    handleCreateRelease,
     handleOpenPR,
     handleCopyPRUrl,
     handleCheckoutPR,

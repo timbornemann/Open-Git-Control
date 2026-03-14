@@ -1,6 +1,6 @@
 import React from 'react';
 import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { AppSettingsDto, DeviceFlowStartDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto } from '../../../global';
+import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto } from '../../../global';
 
 export type RemoteStatus = {
   title: string;
@@ -138,6 +138,13 @@ export type AppSidebarProps = {
   newPRBase: string;
   setNewPRBase: (value: string) => void;
   onCreatePR: () => void;
+
+  releaseForm: GitHubCreateReleaseParamsDto;
+  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
+  releaseSubmitting: boolean;
+  releaseError: string | null;
+  releaseSuccess: GitHubReleaseDto | null;
+  onCreateRelease: () => Promise<void>;
 
   settings: AppSettingsDto;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
