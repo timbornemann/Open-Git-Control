@@ -25,6 +25,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [isMergeCommit, setIsMergeCommit] = useState(false);
   const [files, setFiles] = useState<CommitFileDetail[]>([]);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedFileCommitHash, setSelectedFileCommitHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
 
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -38,6 +39,16 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const { tr, locale } = useI18n();
 
   useEffect(() => {
+    setSelectedFilePath(null);
+    setSelectedFileCommitHash(null);
+    setActiveTab('history');
+    setHistoryEntries([]);
+    setBlameLines([]);
+    setHistoryError(null);
+    setBlameError(null);
+  }, [normalizedHash]);
+
+  useEffect(() => {
     if (!normalizedHash || !window.electronAPI) return;
 
     const fetchDetails = async () => {
@@ -45,12 +56,6 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setFilesError(null);
       setFilesSourceHint(null);
       setIsMergeCommit(false);
-      setSelectedFilePath(null);
-      setActiveTab('history');
-      setHistoryEntries([]);
-      setBlameLines([]);
-      setHistoryError(null);
-      setBlameError(null);
 
       try {
         const parentsResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%P', normalizedHash);
@@ -99,8 +104,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   }, [normalizedHash, tr]);
 
   const selectedFile = useMemo(
-    () => files.find(file => file.path === selectedFilePath) ?? null,
-    [files, selectedFilePath],
+    () => selectedFileCommitHash === normalizedHash
+      ? files.find(file => file.path === selectedFilePath) ?? null
+      : null,
+    [files, normalizedHash, selectedFileCommitHash, selectedFilePath],
   );
   const isDeletedFile = selectedFile?.status.startsWith('D') ?? false;
 
@@ -240,7 +247,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {tr('Commit Details', 'Commit details')}: {normalizedHash ? normalizedHash.substring(0, 8) : tr('ungültig', 'invalid')}
         </h4>
         {selectedFile && (
-          <button className="icon-btn" onClick={() => setSelectedFilePath(null)} style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
+          <button className="icon-btn" onClick={() => { setSelectedFilePath(null); setSelectedFileCommitHash(null); }} style={{ fontSize: '0.75rem', padding: '3px 8px' }}>
             {tr('Dateien', 'Files')}
           </button>
         )}
@@ -266,7 +273,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {files.map((file, index) => (
             <li key={`${file.path}-${index}`}>
               <button
-                onClick={() => setSelectedFilePath(file.path)}
+                onClick={() => { setSelectedFilePath(file.path); setSelectedFileCommitHash(normalizedHash); }}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}
               >
                 {getIconForStatus(file.status)}
