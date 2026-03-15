@@ -242,6 +242,7 @@ const App: React.FC = () => {
           onPush={() => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgefuehrt...', 'Running push...'))}
           onPushForceWithLease={() => state.runGitCommand(['push', '--force-with-lease'], tr('Erfolgreich mit force-with-lease gepusht.', 'Push with force-with-lease completed successfully.'), tr('Push --force-with-lease wird ausgefuehrt...', 'Running push --force-with-lease...'))}
           onPushTags={() => state.runGitCommand(['push', '--tags'], tr('Tags erfolgreich gepusht.', 'Tags pushed successfully.'), tr('Push --tags wird ausgefuehrt...', 'Running push --tags...'))}
+          onOpenRepoWorkspace={() => state.setActiveTab('repo')}
           settings={state.settings}
           onUpdateSettings={state.handleUpdateSettings}
           jobs={state.jobs}
