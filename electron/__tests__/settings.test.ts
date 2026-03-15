@@ -75,6 +75,20 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ commitTemplate: 'feat: useful message' }).commitTemplate).toBe('feat: useful message');
   });
 
+  it('normalizes secret scan settings', () => {
+    const oversizedAllowlist = 'a'.repeat(9_500);
+    const normalized = normalizeSettings({
+      secretScanBeforePushEnabled: false,
+      secretScanStrictness: 'high',
+      secretScanAllowlist: oversizedAllowlist,
+    });
+
+    expect(normalized.secretScanBeforePushEnabled).toBe(false);
+    expect(normalized.secretScanStrictness).toBe('high');
+    expect(normalized.secretScanAllowlist.length).toBe(8_000);
+    expect(normalizeSettings({ secretScanStrictness: 'invalid' as never }).secretScanStrictness).toBe('medium');
+  });
+
   it('normalizes AI provider and ollama base URL', () => {
     expect(normalizeSettings({ aiProvider: 'gemini' })).toMatchObject({ aiProvider: 'gemini' });
     expect(normalizeSettings({ aiProvider: 'invalid' as never })).toMatchObject({ aiProvider: 'ollama' });

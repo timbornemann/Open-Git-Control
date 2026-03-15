@@ -1,5 +1,6 @@
-﻿export type AiProvider = 'ollama' | 'gemini';
+export type AiProvider = 'ollama' | 'gemini';
 export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
+export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
 export interface AppSettings {
   theme: AppTheme;
@@ -10,6 +11,9 @@ export interface AppSettings {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  secretScanBeforePushEnabled: boolean;
+  secretScanStrictness: SecretScanStrictness;
+  secretScanAllowlist: string;
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProvider;
   ollamaBaseUrl: string;
@@ -29,6 +33,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  secretScanBeforePushEnabled: true,
+  secretScanStrictness: 'medium',
+  secretScanAllowlist: '',
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
@@ -46,6 +53,7 @@ const MAX_OLLAMA_BASE_URL_LENGTH = 500;
 const MAX_MODEL_LENGTH = 200;
 const MAX_GITHUB_OAUTH_CLIENT_ID_LENGTH = 200;
 const MAX_GITHUB_HOST_LENGTH = 200;
+const MAX_SECRET_SCAN_ALLOWLIST_LENGTH = 8_000;
 
 function normalizeTheme(value: unknown): AppSettings['theme'] {
   switch (value) {
@@ -102,6 +110,23 @@ function normalizeCommitTemplate(value: unknown): string {
 
 function normalizeAiProvider(value: unknown): AiProvider {
   return value === 'gemini' ? 'gemini' : 'ollama';
+}
+
+function normalizeSecretScanStrictness(value: unknown): SecretScanStrictness {
+  if (value === 'low' || value === 'high') {
+    return value;
+  }
+  return 'medium';
+}
+
+function normalizeSecretScanAllowlist(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  if (value.length <= MAX_SECRET_SCAN_ALLOWLIST_LENGTH) {
+    return value;
+  }
+  return value.slice(0, MAX_SECRET_SCAN_ALLOWLIST_LENGTH);
 }
 
 function normalizeOllamaBaseUrl(value: unknown): string {
@@ -171,6 +196,9 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     commitTemplate: normalizeCommitTemplate(value.commitTemplate),
     showSecondaryHistory: normalizeBoolean(value.showSecondaryHistory, DEFAULT_SETTINGS.showSecondaryHistory),
     commitSignoffByDefault: normalizeBoolean(value.commitSignoffByDefault, DEFAULT_SETTINGS.commitSignoffByDefault),
+    secretScanBeforePushEnabled: normalizeBoolean(value.secretScanBeforePushEnabled, DEFAULT_SETTINGS.secretScanBeforePushEnabled),
+    secretScanStrictness: normalizeSecretScanStrictness(value.secretScanStrictness),
+    secretScanAllowlist: normalizeSecretScanAllowlist(value.secretScanAllowlist),
     aiAutoCommitEnabled: normalizeBoolean(value.aiAutoCommitEnabled, DEFAULT_SETTINGS.aiAutoCommitEnabled),
     aiProvider: normalizeAiProvider(value.aiProvider),
     ollamaBaseUrl: normalizeOllamaBaseUrl(value.ollamaBaseUrl),
