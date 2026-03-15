@@ -71,6 +71,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:createPR', params),
   githubCreateRelease: (params: { owner: string; repo: string; tagName: string; targetCommitish?: string; releaseName: string; body?: string; draft?: boolean; prerelease?: boolean }) =>
     ipcRenderer.invoke('github:createRelease', params),
+  githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string }) =>
+    ipcRenderer.invoke('github:getReleaseContext', params),
+  aiGenerateReleaseNotes: (params: {
+    tagName: string;
+    releaseName: string;
+    lastReleaseTag?: string | null;
+    commits: Array<{ hash: string; shortHash: string; subject: string; author: string; date: string }>;
+    language: 'de' | 'en';
+  }) => ipcRenderer.invoke('ai:generateReleaseNotes', params),
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) =>
     ipcRenderer.invoke('github:getWorkflowRuns', params),
   githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) =>

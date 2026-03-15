@@ -7,7 +7,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
-import { aiService } from './AiService';
+import { aiService, type ReleaseCommitInput } from './AiService';
 import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
 import { SecretScanService } from './SecretScanService';
 import { autoUpdater } from 'electron-updater';
@@ -780,6 +780,14 @@ interface StashEntry {
   subject: string;
 }
 
+type ReleaseCommit = {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
+};
+
 function getStorePath(): string {
   return path.join(app.getPath('userData'), 'repos.json');
 }
@@ -1090,6 +1098,26 @@ function parseFileBlame(blameOutput: string): FileBlameLine[] {
   }
 
   return parsed;
+}
+
+function parseReleaseCommits(raw: string): ReleaseCommit[] {
+  if (!raw.trim()) return [];
+
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [hash, shortHash, subject, author, date] = line.split('\x1f');
+      return {
+        hash: String(hash || '').trim(),
+        shortHash: String(shortHash || '').trim(),
+        subject: String(subject || '').trim(),
+        author: String(author || '').trim(),
+        date: String(date || '').trim(),
+      };
+    })
+    .filter((entry) => Boolean(entry.hash && entry.shortHash && entry.subject));
 }
 
 function parseStashList(stashOutput: string): StashEntry[] {
@@ -2013,6 +2041,111 @@ function setupIPC() {
       return { success: true, data: release };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Release konnte nicht erstellt werden.' };
+    }
+  });
+
+  ipcMain.handle('github:getReleaseContext', async (_event, params: {
+    owner: string;
+    repo: string;
+    targetCommitish?: string;
+  }) => {
+    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+
+    const owner = String(params?.owner || '').trim();
+    const repo = String(params?.repo || '').trim();
+    const targetCommitish = String(params?.targetCommitish || '').trim() || 'HEAD';
+
+    if (!owner || !repo) {
+      return { success: false, error: 'Owner und Repository sind erforderlich.' };
+    }
+
+    try {
+      const [existingTags, lastReleaseTag] = await Promise.all([
+        githubService.listRepositoryTags(owner, repo, 300),
+        githubService.getLatestReleaseTag(owner, repo),
+      ]);
+
+      const commitFormat = '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad';
+      let fallbackUsed = false;
+      let commitsRaw = '';
+
+      try {
+        if (lastReleaseTag) {
+          commitsRaw = await gitService.runCommand([
+            'log',
+            `${lastReleaseTag}..${targetCommitish}`,
+            commitFormat,
+            '--date=short',
+            '--max-count=400',
+          ]);
+        } else {
+          commitsRaw = await gitService.runCommand([
+            'log',
+            targetCommitish,
+            commitFormat,
+            '--date=short',
+            '--max-count=150',
+          ]);
+        }
+      } catch {
+        fallbackUsed = true;
+        commitsRaw = await gitService.runCommand([
+          'log',
+          targetCommitish,
+          commitFormat,
+          '--date=short',
+          '--max-count=150',
+        ]);
+      }
+
+      const commitsSinceLastRelease = parseReleaseCommits(commitsRaw);
+      return {
+        success: true,
+        data: {
+          existingTags,
+          lastReleaseTag: lastReleaseTag || null,
+          commitsSinceLastRelease,
+          commitsTarget: targetCommitish,
+          fallbackUsed,
+        },
+      };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Release-Kontext konnte nicht geladen werden.' };
+    }
+  });
+
+  ipcMain.handle('ai:generateReleaseNotes', async (_event, params: {
+    tagName: string;
+    releaseName: string;
+    lastReleaseTag?: string | null;
+    commits: ReleaseCommitInput[];
+    language: 'de' | 'en';
+  }) => {
+    try {
+      const tagName = String(params?.tagName || '').trim();
+      const releaseName = String(params?.releaseName || '').trim();
+      const language = params?.language === 'en' ? 'en' : 'de';
+      const commits = Array.isArray(params?.commits) ? params.commits.slice(0, 400) : [];
+
+      if (!tagName) {
+        return { success: false, error: 'Tag-Name ist erforderlich.' };
+      }
+      if (!releaseName) {
+        return { success: false, error: 'Release-Name ist erforderlich.' };
+      }
+
+      const settings = readSettingsWithMigration();
+      const markdown = await aiService.generateReleaseNotes(settings, getGeminiApiKeyFromSecureStore, {
+        tagName,
+        releaseName,
+        lastReleaseTag: params?.lastReleaseTag || null,
+        commits,
+        language,
+      });
+
+      return { success: true, data: { markdown } };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'KI Release Notes konnten nicht erstellt werden.' };
     }
   });
 
