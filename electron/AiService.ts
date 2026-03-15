@@ -58,6 +58,14 @@ export type AiAutoCommitResult = {
   diagnostics: string[];
 };
 
+export type ReleaseCommitInput = {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
+};
+
 const CHAT_TIMEOUT_MS = 90_000;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_PREVIEW_CHARS = 220;
@@ -488,6 +496,65 @@ export class AiService {
         .map(model => safeString(model.name || model.model).trim())
         .filter(Boolean),
     );
+  }
+
+  async generateReleaseNotes(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    params: {
+      tagName: string;
+      releaseName: string;
+      lastReleaseTag?: string | null;
+      commits: ReleaseCommitInput[];
+      language: 'de' | 'en';
+    },
+  ): Promise<string> {
+    const commits = Array.isArray(params.commits) ? params.commits : [];
+    if (commits.length === 0) {
+      return params.language === 'en'
+        ? `# ${params.releaseName}\n\nNo new commits since the previous release.`
+        : `# ${params.releaseName}\n\nSeit dem letzten Release gibt es keine neuen Commits.`;
+    }
+
+    const systemPrompt = [
+      'You write high-quality software release notes in Markdown.',
+      'Style: clear, factual, concise, informative, and easy to scan.',
+      'Do not invent changes. Use only the provided commit data.',
+      'Group related changes into meaningful sections.',
+      'Include a short summary and a complete changelog section.',
+    ].join(' ');
+
+    const languageInstruction = params.language === 'en'
+      ? 'Write in English.'
+      : 'Write in German.';
+
+    const userPrompt = [
+      `Release name: ${params.releaseName}`,
+      `Release tag: ${params.tagName}`,
+      `Previous release tag: ${params.lastReleaseTag || 'none'}`,
+      languageInstruction,
+      'Commits:',
+      ...commits.map((commit) => `- ${commit.shortHash} | ${commit.subject} | ${commit.author} | ${commit.date}`),
+      'Output valid Markdown only.',
+    ].join('\n');
+
+    try {
+      const result = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+      const markdown = result.trim();
+      if (markdown) return markdown;
+    } catch {
+      // Fallback below
+    }
+
+    const heading = `# ${params.releaseName}`;
+    const intro = params.language === 'en'
+      ? `\n\nTag: \`${params.tagName}\`\n\n## Changelog\n`
+      : `\n\nTag: \`${params.tagName}\`\n\n## Aenderungen\n`;
+    const changelog = commits
+      .map((commit) => `- ${commit.subject} (${commit.shortHash})`)
+      .join('\n');
+
+    return `${heading}${intro}${changelog}`.trim();
   }
 
   async runAutoCommit(

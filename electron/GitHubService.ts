@@ -568,6 +568,51 @@ export class GitHubService {
     };
   }
 
+  async listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {
+    if (!this.octokit) throw new Error('Not authenticated');
+    const safePerPage = Number.isFinite(perPage)
+      ? Math.max(1, Math.min(Math.floor(perPage), 300))
+      : 200;
+
+    const tags: string[] = [];
+    let page = 1;
+
+    while (tags.length < safePerPage) {
+      const remaining = safePerPage - tags.length;
+      const { data } = await this.octokit.rest.repos.listTags({
+        owner,
+        repo,
+        per_page: Math.min(100, remaining),
+        page,
+      });
+
+      const pageTags = (data || [])
+        .map((tag: any) => String(tag?.name || '').trim())
+        .filter(Boolean);
+
+      tags.push(...pageTags);
+      if (!data || data.length < 100) break;
+      page += 1;
+    }
+
+    return [...new Set(tags)];
+  }
+
+  async getLatestReleaseTag(owner: string, repo: string): Promise<string | null> {
+    if (!this.octokit) throw new Error('Not authenticated');
+    const { data } = await this.octokit.rest.repos.listReleases({
+      owner,
+      repo,
+      per_page: 30,
+      page: 1,
+    });
+
+    const first = (data || []).find((release: any) => Boolean(String(release?.tag_name || '').trim()));
+    if (!first) return null;
+    const tag = String(first.tag_name || '').trim();
+    return tag || null;
+  }
+
   async mergePullRequest(
     owner: string,
     repo: string,
