@@ -7,9 +7,10 @@ import { StagingArea } from '../StagingArea';
 import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
+import { SettingsMainContent } from './SettingsMainContent';
 import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
-import { AppSettingsDto } from '../../global';
+import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
 import appLogo from '../../../logo.png';
@@ -47,6 +48,9 @@ type Props = {
   onPull: () => void;
   onPush: () => void;
   settings: AppSettingsDto;
+  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  jobs: GitJobEventDto[];
+  onClearJobs: () => void;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -266,6 +270,9 @@ export const MainView: React.FC<Props> = ({
   onPull,
   onPush,
   settings,
+  onUpdateSettings,
+  jobs,
+  onClearJobs,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
@@ -333,6 +340,7 @@ export const MainView: React.FC<Props> = ({
   }, []);
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
+  const isSettingsView = activeTab === 'settings';
 
   useEffect(() => {
     setActiveDiffRequest(null);
@@ -487,14 +495,23 @@ export const MainView: React.FC<Props> = ({
       </div>
 
       <div ref={contentAreaRef} className="content-area">
-        <div className="pane" style={{ flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }}>
+        <div
+          className="pane"
+          style={
+            isSettingsView
+              ? { minWidth: 0 }
+              : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
+          }
+        >
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>
-              {showGithubGuide
+              {isSettingsView
+                ? tr('Einstellungen', 'Settings')
+                : showGithubGuide
                 ? tr('GitHub Login Anleitung', 'GitHub login guide')
                 : (showRecoveryCenter ? tr('Recovery Center', 'Recovery Center') : (activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph')))}
             </span>
-            {showGithubGuide ? (
+            {isSettingsView ? null : showGithubGuide ? (
               <button
                 className="icon-btn"
                 onClick={onClearGithubAuthHelpMethod}
@@ -526,7 +543,14 @@ export const MainView: React.FC<Props> = ({
             )}
           </div>
           <div className="pane-content" style={{ padding: 0 }}>
-            {activeDiffRequest ? (
+            {isSettingsView ? (
+              <SettingsMainContent
+                settings={settings}
+                onUpdateSettings={onUpdateSettings}
+                jobs={jobs}
+                onClearJobs={onClearJobs}
+              />
+            ) : activeDiffRequest ? (
               <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />
             ) : showGithubGuide ? (
               <GithubAuthGuide
@@ -552,55 +576,59 @@ export const MainView: React.FC<Props> = ({
           </div>
         </div>
 
-        <div
-          className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={tr('Breite zwischen Verlauf und Inspector anpassen', 'Resize history and inspector')}
-          onPointerDown={handleContentResizeStart}
-        />
+        {!isSettingsView && (
+          <>
+            <div
+              className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={tr('Breite zwischen Verlauf und Inspector anpassen', 'Resize history and inspector')}
+              onPointerDown={handleContentResizeStart}
+            />
 
-        <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
-          <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
-            {(selectedCommit || workingTreeSelection) && (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {selectedCommit && commitHistoryStack.length > 0 && (
-                  <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                    {tr('Zurueck', 'Back')}
-                  </button>
+            <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
+              <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
+                {(selectedCommit || workingTreeSelection) && (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {selectedCommit && commitHistoryStack.length > 0 && (
+                      <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                        {tr('Zurueck', 'Back')}
+                      </button>
+                    )}
+                    <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                      {tr('Schliessen', 'Close')}
+                    </button>
+                  </div>
                 )}
-                <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                  {tr('Schliessen', 'Close')}
-                </button>
               </div>
-            )}
-          </div>
-          <div className="pane-content" style={{ overflow: 'hidden' }}>
-            {selectedCommit ? (
-              <CommitDetails
-                hash={selectedCommit}
-                onSelectCommit={handleSelectCommitFromHistory}
-                onOpenDiff={handleOpenDiff}
-              />
-            ) : workingTreeSelection ? (
-              <WorkingTreeFileDetails
-                path={workingTreeSelection.path}
-                source={workingTreeSelection.source}
-                onSelectCommit={handleSelectCommitFromWorkingTree}
-                onOpenDiff={handleOpenDiff}
-              />
-            ) : (
-              <StagingArea
-                repoPath={activeRepo}
-                onRepoChanged={triggerRefresh}
-                onOpenDiff={handleOpenDiff}
-                onSelectFileInspect={handleSelectWorkingTreeFile}
-                settings={settings}
-              />
-            )}
-          </div>
-        </div>
+              <div className="pane-content" style={{ overflow: 'hidden' }}>
+                {selectedCommit ? (
+                  <CommitDetails
+                    hash={selectedCommit}
+                    onSelectCommit={handleSelectCommitFromHistory}
+                    onOpenDiff={handleOpenDiff}
+                  />
+                ) : workingTreeSelection ? (
+                  <WorkingTreeFileDetails
+                    path={workingTreeSelection.path}
+                    source={workingTreeSelection.source}
+                    onSelectCommit={handleSelectCommitFromWorkingTree}
+                    onOpenDiff={handleOpenDiff}
+                  />
+                ) : (
+                  <StagingArea
+                    repoPath={activeRepo}
+                    onRepoChanged={triggerRefresh}
+                    onOpenDiff={handleOpenDiff}
+                    onSelectFileInspect={handleSelectWorkingTreeFile}
+                    settings={settings}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
