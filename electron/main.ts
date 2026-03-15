@@ -9,6 +9,7 @@ import { gitService } from './GitService';
 import { githubService } from './GitHubService';
 import { aiService } from './AiService';
 import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
+import { SecretScanService } from './SecretScanService';
 import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 
@@ -604,6 +605,7 @@ function createJobId(operation: string): string {
 }
 
 let currentAiAutoCommitJob: { id: string; cancelRequested: boolean } | null = null;
+const secretScanService = new SecretScanService(gitService);
 
 function emitJobEvent(webContents: Electron.WebContents, event: JobEventPayload): void {
   webContents.send('job:event', event);
@@ -1145,6 +1147,9 @@ async function buildDiagnosticsReport(): Promise<{ generatedAt: string; appVersi
   lines.push(`autoFetchIntervalMs=${settings.autoFetchIntervalMs}`);
   lines.push(`confirmDangerousOps=${settings.confirmDangerousOps}`);
   lines.push(`showSecondaryHistory=${settings.showSecondaryHistory}`);
+  lines.push(`secretScanBeforePushEnabled=${settings.secretScanBeforePushEnabled}`);
+  lines.push(`secretScanStrictness=${settings.secretScanStrictness}`);
+  lines.push(`secretScanAllowlistEntries=${settings.secretScanAllowlist.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('#')).length}`);
   lines.push(`aiProvider=${settings.aiProvider}`);
   lines.push(`githubHost=${settings.githubHost}`);
   lines.push(`oauthConfigured=${githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost)}`);
@@ -1340,6 +1345,58 @@ function setupIPC() {
         });
       }
       return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:scanPushSecrets', async (event: any) => {
+    const jobId = createJobId('security-secret-scan');
+    const operation = 'security:secret-scan';
+    emitJobEvent(event.sender, {
+      id: jobId,
+      operation,
+      status: 'start',
+      message: 'Secret scan started.',
+      timestamp: Date.now(),
+    });
+
+    try {
+      const settings = readSettingsWithMigration();
+      const result = await secretScanService.scanPushDiffs({
+        strictness: settings.secretScanStrictness,
+        allowlistText: settings.secretScanAllowlist,
+      });
+
+      const findingCount = result.findings.length;
+      const filesWithFindings = new Set(result.findings.map((item) => item.filePath)).size;
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation,
+        status: 'done',
+        message: findingCount > 0
+          ? `Secret scan found ${findingCount} hit(s) in ${filesWithFindings} file(s).`
+          : 'Secret scan finished with no hits.',
+        details: {
+          strictness: result.strictness,
+          findingCount,
+          filesWithFindings,
+          checkedLines: result.stats.checkedLines,
+          stagedLines: result.stats.stagedLines,
+          toPushLines: result.stats.toPushLines,
+          notes: result.notes,
+        },
+        timestamp: Date.now(),
+      });
+
+      return { success: true, data: result };
+    } catch (error: any) {
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation,
+        status: 'failed',
+        message: error?.message || 'Secret scan failed.',
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error?.message || 'Secret scan failed.' };
     }
   });
 

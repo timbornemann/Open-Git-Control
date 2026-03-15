@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gitFetch: () => ipcRenderer.invoke('git:command', 'fetch', '--all', '--prune', '--tags', '--quiet'),
   gitPull: () => ipcRenderer.invoke('git:command', 'pull'),
   gitPush: () => ipcRenderer.invoke('git:command', 'push'),
+  scanPushSecrets: () => ipcRenderer.invoke('git:scanPushSecrets'),
   gitClone: (cloneUrl: string, targetDir: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
