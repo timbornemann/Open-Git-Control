@@ -469,7 +469,7 @@ code, pre {
 .repo-cockpit {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .repo-card {
@@ -484,12 +484,28 @@ code, pre {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-bottom: 1px solid var(--line-subtle);
   background: var(--bg-panel);
 }
 
+.repo-card-header-main {
+  min-width: 0;
+  flex: 1;
+}
+
 .repo-card-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.repo-card-toggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -504,18 +520,24 @@ code, pre {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .repo-card-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .repo-card-toolbar {
   padding: 8px 10px;
   border-bottom: 1px solid var(--line-subtle);
   background: var(--bg-dark);
+  display: flex;
+  gap: 6px;
 }
 
 .repo-filter-input {
@@ -553,6 +575,122 @@ code, pre {
 
 .repo-state-text {
   font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.repo-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  padding: 7px 8px;
+}
+
+.repo-status-success {
+  border-color: var(--status-success-border);
+  background: var(--status-success-soft);
+}
+
+.repo-status-warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-soft);
+}
+
+.repo-status-danger {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-soft);
+}
+
+.repo-status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.repo-status-title {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.repo-status-detail {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.repo-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.repo-card-section {
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.repo-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.repo-inline-fields {
+  display: flex;
+  gap: 6px;
+}
+
+.repo-inline-fields > * {
+  flex: 1;
+}
+
+.repo-check-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.repo-check-row label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.repo-empty-card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.repo-scroll-sm {
+  max-height: 220px;
+}
+
+.repo-scroll-md {
+  max-height: 280px;
+}
+
+.repo-scroll-lg {
+  max-height: 340px;
+}
+
+.repo-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
   color: var(--text-secondary);
 }
 
