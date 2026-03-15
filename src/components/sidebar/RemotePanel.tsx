@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Globe, Plus, RefreshCw, X } from 'lucide-react';
+import { Globe, Plus, RefreshCw, X } from 'lucide-react';
 import { RemoteInfo, RemoteSyncState } from '../../types/git';
 import { DialogFrame } from '../DialogFrame';
 import { useI18n } from '../../i18n';
+import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from './RepoCard';
 
 type RemoteStatus = {
   title: string;
@@ -46,37 +47,32 @@ export const RemotePanel: React.FC<Props> = ({
   const [isRemoteBranchesDialogOpen, setIsRemoteBranchesDialogOpen] = useState(false);
   const remoteOnlyPreview = remoteOnlyBranches.slice(0, 3);
   const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && remoteOnlyBranchesCount === 0 && !remoteSync.lastFetchError && remoteSync.hasUpstream;
+  const statusVariant: 'success' | 'warning' | 'danger' =
+    remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream || remoteOnlyBranchesCount > 0 ? 'warning' : 'success';
   const { tr } = useI18n();
 
   return (
-    <section className="repo-card">
-      <div className="repo-card-header">
-        <button
-          className="icon-btn"
-          onClick={onToggleCollapsed}
-          style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? tr('Remotes anzeigen', 'Show remotes') : tr('Remotes einklappen', 'Collapse remotes')}
-        >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span className="repo-card-title">{tr('Remotes', 'Remotes')}</span>
-        </button>
-        <div className="repo-card-actions">
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onAddRemote} title={tr('Remote hinzufuegen', 'Add remote')}><Plus size={13} /></button>
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
-        </div>
-      </div>
+    <RepoCard>
+      <RepoCardHeader
+        title={tr('Remotes', 'Remotes')}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+        toggleTitle={collapsed ? tr('Remotes anzeigen', 'Show remotes') : tr('Remotes einklappen', 'Collapse remotes')}
+        actions={(
+          <>
+            <button className="icon-btn" style={{ padding: '2px' }} onClick={onAddRemote} title={tr('Remote hinzufuegen', 'Add remote')}><Plus size={13} /></button>
+            <button className="icon-btn" style={{ padding: '2px' }} onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
+          </>
+        )}
+      />
 
       {!collapsed && (
-        <div className="repo-card-content" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <RepoCardContent>
           {isHealthy ? (
-            <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'var(--status-success-soft)', border: '1px solid var(--status-success-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--status-success)' }}>{remoteStatus.title}</span>
-              <span style={{ fontSize: '0.69rem', color: 'var(--text-secondary)' }}>{remoteStatus.detail}</span>
-            </div>
+            <RepoCardStatus variant="success" title={remoteStatus.title} detail={remoteStatus.detail} />
           ) : (
-            <div style={{ padding: '8px', borderRadius: '6px', backgroundColor: remoteStatus.backgroundColor, border: `1px solid ${remoteStatus.borderColor}`, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: remoteStatus.color }}>{remoteStatus.title}</span>
-              <span style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>{remoteStatus.detail}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <RepoCardStatus variant={statusVariant} title={remoteStatus.title} detail={remoteStatus.detail} />
 
               {!remoteSync.hasUpstream && (
                 <button className="staging-tool-btn" onClick={onSetUpstreamForCurrentBranch} style={{ alignSelf: 'flex-start' }}>
@@ -108,7 +104,7 @@ export const RemotePanel: React.FC<Props> = ({
             </div>
           )}
 
-          <div className="repo-card-scroll" style={{ maxHeight: '220px', paddingRight: '2px' }}>
+          <div className="repo-card-scroll repo-scroll-sm">
             {remotes.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {remotes.map(remote => (
@@ -124,7 +120,7 @@ export const RemotePanel: React.FC<Props> = ({
               <div className="repo-state-text">{tr('Keine Remotes konfiguriert.', 'No remotes configured.')}</div>
             )}
           </div>
-        </div>
+        </RepoCardContent>
       )}
 
       <DialogFrame
@@ -156,6 +152,6 @@ export const RemotePanel: React.FC<Props> = ({
           ))}
         </div>
       </DialogFrame>
-    </section>
+    </RepoCard>
   );
 };

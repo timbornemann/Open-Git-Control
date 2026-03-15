@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, GitBranch, Plus, Search } from 'lucide-react';
+import { GitBranch, Plus, Search } from 'lucide-react';
 import { BranchInfo } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 
 type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
@@ -76,18 +77,13 @@ export const BranchPanel: React.FC<Props> = ({
   };
 
   return (
-    <section className="repo-card">
-      <div className="repo-card-header">
-        <button
-          className="icon-btn"
-          onClick={onToggleCollapsed}
-          style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? tr('Branches anzeigen', 'Show branches') : tr('Branches einklappen', 'Collapse branches')}
-        >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span className="repo-card-title">{tr('Branches', 'Branches')}</span>
-        </button>
-        <div className="repo-card-actions">
+    <RepoCard>
+      <RepoCardHeader
+        title={tr('Branches', 'Branches')}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+        toggleTitle={collapsed ? tr('Branches anzeigen', 'Show branches') : tr('Branches einklappen', 'Collapse branches')}
+        actions={(
           <button
             className="icon-btn"
             style={{ padding: '2px' }}
@@ -99,12 +95,12 @@ export const BranchPanel: React.FC<Props> = ({
           >
             <Plus size={13} />
           </button>
-        </div>
-      </div>
+        )}
+      />
 
       {!collapsed && (
         <>
-          <div className="repo-card-toolbar">
+          <RepoCardToolbar>
             <div style={{ position: 'relative' }}>
               <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input
@@ -115,10 +111,10 @@ export const BranchPanel: React.FC<Props> = ({
                 style={{ paddingLeft: '26px' }}
               />
             </div>
-          </div>
+          </RepoCardToolbar>
 
           {isCreatingBranch && (
-            <div className="repo-card-content">
+            <RepoCardContent>
               <input
                 ref={newBranchInputRef}
                 type="text"
@@ -137,10 +133,10 @@ export const BranchPanel: React.FC<Props> = ({
                 }}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--accent-primary)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'monospace' }}
               />
-            </div>
+            </RepoCardContent>
           )}
 
-          <div className="repo-card-content repo-card-scroll">
+          <RepoCardContent className="repo-card-scroll">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div>
                 <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '2px' }}>
@@ -168,9 +164,9 @@ export const BranchPanel: React.FC<Props> = ({
                 {tr('Keine Treffer fuer den Filter.', 'No matches for this filter.')}
               </div>
             )}
-          </div>
+          </RepoCardContent>
         </>
       )}
-    </section>
+    </RepoCard>
   );
 };

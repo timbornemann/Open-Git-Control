@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box, ChevronDown, ChevronRight, ExternalLink, RefreshCw, Wrench } from 'lucide-react';
+import { Box, ExternalLink, RefreshCw, Wrench } from 'lucide-react';
 import { GitSubmoduleInfo } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { RepoCard, RepoCardContent, RepoCardHeader } from './RepoCard';
 
 type Props = {
   submodules: GitSubmoduleInfo[];
@@ -30,20 +31,22 @@ export const SubmodulePanel: React.FC<Props> = ({
   const { tr } = useI18n();
 
   return (
-    <section className="repo-card">
-      <div className="repo-card-header">
-        <button className="icon-btn" onClick={onToggleCollapsed} style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span className="repo-card-title">{tr('Submodule', 'Submodules')}</span>
-        </button>
-        <div className="repo-card-actions">
-          <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={onInitUpdate}><RefreshCw size={11} /> {tr('Init/Update', 'Init/Update')}</button>
-          <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={onSync}><Wrench size={11} /> {tr('Sync', 'Sync')}</button>
-        </div>
-      </div>
+    <RepoCard>
+      <RepoCardHeader
+        title={tr('Submodule', 'Submodules')}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+        toggleTitle={collapsed ? tr('Submodule anzeigen', 'Show submodules') : tr('Submodule einklappen', 'Collapse submodules')}
+        actions={(
+          <>
+            <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={onInitUpdate}><RefreshCw size={11} /> {tr('Init/Update', 'Init/Update')}</button>
+            <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={onSync}><Wrench size={11} /> {tr('Sync', 'Sync')}</button>
+          </>
+        )}
+      />
 
       {!collapsed && (
-        <div className="repo-card-content repo-card-scroll" style={{ maxHeight: '220px' }}>
+        <RepoCardContent className="repo-card-scroll repo-scroll-sm">
           {submodules.length === 0 ? (
             <div className="repo-state-text">{tr('Keine Submodule gefunden.', 'No submodules found.')}</div>
           ) : (
@@ -66,8 +69,8 @@ export const SubmodulePanel: React.FC<Props> = ({
               ))}
             </div>
           )}
-        </div>
+        </RepoCardContent>
       )}
-    </section>
+    </RepoCard>
   );
 };
