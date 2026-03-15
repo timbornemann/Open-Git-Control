@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  secretScanBeforePushEnabled: true,
+  secretScanStrictness: 'medium',
+  secretScanAllowlist: '',
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
@@ -30,6 +33,7 @@ const DEFAULT_SETTINGS: AppSettingsDto = {
 
 type RunGitCommandOptions = {
   skipDirtyGuard?: boolean;
+  skipSecretScan?: boolean;
 };
 
 const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
@@ -257,6 +261,10 @@ export const useAppState = () => {
 
     const command = args[0];
     const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
+    const shouldScanPushSecrets =
+      command === 'push'
+      && settings.secretScanBeforePushEnabled
+      && !options?.skipSecretScan;
 
     if (shouldGuard) {
       try {
@@ -285,6 +293,53 @@ export const useAppState = () => {
       }
     }
 
+    if (shouldScanPushSecrets) {
+      try {
+        const scanResult = await window.electronAPI.scanPushSecrets();
+        if (!scanResult.success) {
+          setGitActionToast({
+            msg: scanResult.error || tr('Secret-Scan vor Push fehlgeschlagen.', 'Secret scan before push failed.'),
+            isError: true,
+          });
+          return false;
+        }
+
+        const findings = scanResult.data.findings || [];
+        if (findings.length > 0) {
+          const contextItems = findings.slice(0, 8).map((finding, index) => ({
+            label: tr(`Treffer ${index + 1}`, `Finding ${index + 1}`),
+            value: `${finding.filePath}:${finding.lineNumber}  ${finding.contextLine}`,
+          }));
+
+          setConfirmDialog({
+            variant: 'danger',
+            title: tr('Moegliche Secrets vor Push erkannt', 'Potential secrets detected before push'),
+            message: tr(
+              `${findings.length} moegliche Secret-Treffer wurden im staged/zu-pushenden Diff gefunden.`,
+              `${findings.length} potential secret hit(s) were found in staged/to-push diffs.`,
+            ),
+            contextItems,
+            irreversible: true,
+            consequences: tr(
+              'Bitte pruefe die Treffer. Ein Push kann vertrauliche Werte unwiderruflich veroeffentlichen.',
+              'Please review these findings. Pushing can irreversibly publish sensitive values.',
+            ),
+            confirmLabel: tr('Trotzdem pushen', 'Push anyway'),
+            onConfirm: async () => {
+              await runGitCommand(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
+            },
+          });
+          return false;
+        }
+      } catch (error: any) {
+        setGitActionToast({
+          msg: error?.message || tr('Secret-Scan vor Push fehlgeschlagen.', 'Secret scan before push failed.'),
+          isError: true,
+        });
+        return false;
+      }
+    }
+
     setIsGitActionRunning(true);
     setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgefÃ¼hrt...`, `Running git ${command}...`));
 
@@ -304,7 +359,7 @@ export const useAppState = () => {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, triggerRefresh, workspace.activeRepo, tr]);
+  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace.activeRepo, tr]);
 
   isGitActionRunningRef.current = isGitActionRunning;
 
@@ -400,9 +455,12 @@ export const useAppState = () => {
         throw new Error(r.error || tr('Fehler beim Setzen des Git-Remotes.', 'Error while setting Git remote.'));
       }
 
-      r = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
-      if (!r.success) {
-        throw new Error(r.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
+      const pushed = await runGitCommand(
+        ['push', '-u', 'origin', 'HEAD'],
+        tr('Branch nach GitHub gepusht.', 'Pushed branch to GitHub.'),
+      );
+      if (!pushed) {
+        throw new Error(tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
       }
 
       repository.setHasRemoteOrigin(true);

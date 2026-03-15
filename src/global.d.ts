@@ -99,6 +99,8 @@ export interface UpdaterOneClickResultDto {
 
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
+export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
+export type SecretScanSourceDto = 'staged' | 'to-push';
 
 export interface AppSettingsDto {
   theme: AppThemeDto;
@@ -109,6 +111,9 @@ export interface AppSettingsDto {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  secretScanBeforePushEnabled: boolean;
+  secretScanStrictness: SecretScanStrictnessDto;
+  secretScanAllowlist: string;
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProviderDto;
   ollamaBaseUrl: string;
@@ -272,6 +277,28 @@ export interface DiagnosticsReportDto {
   report: string;
 }
 
+export interface SecretScanFindingDto {
+  id: string;
+  ruleId: string;
+  severity: 'medium' | 'high' | 'critical';
+  source: SecretScanSourceDto;
+  filePath: string;
+  lineNumber: number;
+  contextLine: string;
+}
+
+export interface SecretScanResultDto {
+  scanned: boolean;
+  strictness: SecretScanStrictnessDto;
+  findings: SecretScanFindingDto[];
+  notes: string[];
+  stats: {
+    checkedLines: number;
+    stagedLines: number;
+    toPushLines: number;
+  };
+}
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
@@ -285,6 +312,7 @@ export interface ElectronAPI {
   gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  scanPushSecrets: () => Promise<IpcResult<SecretScanResultDto>>;
   gitClone: (cloneUrl: string, targetDir: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
