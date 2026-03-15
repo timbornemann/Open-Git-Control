@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowUpCircle, ChevronDown, ChevronRight, Plus, Search, Tag, X } from 'lucide-react';
+import { ArrowUpCircle, Plus, Search, Tag, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 
 type Props = {
   tags: string[];
@@ -21,26 +22,23 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
   }, [query, tags]);
 
   return (
-    <section className="repo-card">
-      <div className="repo-card-header">
-        <button
-          className="icon-btn"
-          onClick={onToggleCollapsed}
-          style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? tr('Tags anzeigen', 'Show tags') : tr('Tags einklappen', 'Collapse tags')}
-        >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span className="repo-card-title">{tr('Tags', 'Tags')}</span>
-        </button>
-        <div className="repo-card-actions">
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onCreateTag} title={tr('Tag erstellen', 'Create tag')}><Plus size={13} /></button>
-          <button className="icon-btn" style={{ padding: '2px' }} onClick={onPushTags} title={tr('Tags pushen', 'Push tags')}><ArrowUpCircle size={13} /></button>
-        </div>
-      </div>
+    <RepoCard>
+      <RepoCardHeader
+        title={tr('Tags', 'Tags')}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+        toggleTitle={collapsed ? tr('Tags anzeigen', 'Show tags') : tr('Tags einklappen', 'Collapse tags')}
+        actions={(
+          <>
+            <button className="icon-btn" style={{ padding: '2px' }} onClick={onCreateTag} title={tr('Tag erstellen', 'Create tag')}><Plus size={13} /></button>
+            <button className="icon-btn" style={{ padding: '2px' }} onClick={onPushTags} title={tr('Tags pushen', 'Push tags')}><ArrowUpCircle size={13} /></button>
+          </>
+        )}
+      />
 
       {!collapsed && (
         <>
-          <div className="repo-card-toolbar">
+          <RepoCardToolbar>
             <div style={{ position: 'relative' }}>
               <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input
@@ -51,9 +49,9 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
                 style={{ paddingLeft: '26px' }}
               />
             </div>
-          </div>
+          </RepoCardToolbar>
 
-          <div className="repo-card-content repo-card-scroll">
+          <RepoCardContent className="repo-card-scroll">
             {filteredTags.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {filteredTags.map(tag => (
@@ -69,9 +67,9 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
                 {query.trim() ? tr('Keine Tags fuer diesen Filter.', 'No tags for this filter.') : tr('Keine Tags vorhanden.', 'No tags available.')}
               </div>
             )}
-          </div>
+          </RepoCardContent>
         </>
       )}
-    </section>
+    </RepoCard>
   );
 };
