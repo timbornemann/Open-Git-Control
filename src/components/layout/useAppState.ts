@@ -709,9 +709,10 @@ export const useAppState = () => {
   ]);
 
   const openReleaseCreator = useCallback(() => {
+    workspace.setActiveTab('repo');
     setShowReleaseCreator(true);
     setReleaseError(null);
-  }, []);
+  }, [workspace]);
 
   const closeReleaseCreator = useCallback(() => {
     setShowReleaseCreator(false);
