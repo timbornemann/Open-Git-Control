@@ -413,6 +413,7 @@ export const useAppState = () => {
   const [releaseContextError, setReleaseContextError] = useState<string | null>(null);
   const [releaseContext, setReleaseContext] = useState<GitHubReleaseContextDto | null>(null);
   const [releaseNotesGenerating, setReleaseNotesGenerating] = useState(false);
+  const [releaseNotesLanguage, setReleaseNotesLanguage] = useState<'de' | 'en'>('en');
 
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
@@ -677,7 +678,7 @@ export const useAppState = () => {
         releaseName,
         lastReleaseTag: releaseContext?.lastReleaseTag || null,
         commits,
-        language: settings.language,
+        language: releaseNotesLanguage,
       });
 
       if (!result.success) {
@@ -702,7 +703,7 @@ export const useAppState = () => {
     releaseContext,
     releaseForm.tagName,
     releaseForm.releaseName,
-    settings.language,
+    releaseNotesLanguage,
     tr,
     setGitActionToast,
   ]);
@@ -932,6 +933,8 @@ export const useAppState = () => {
     refreshReleaseContext,
     releaseNotesGenerating,
     generateReleaseNotesWithAI,
+    releaseNotesLanguage,
+    setReleaseNotesLanguage,
     handleCreateRelease,
     handleOpenPR,
     handleCopyPRUrl,
