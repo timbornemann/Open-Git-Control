@@ -108,7 +108,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
 
   if (!props.activeRepo) {
     return (
-      <div style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-panel)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div className="repo-card" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
           {tr('Kein aktives Repository. Bitte waehle zuerst ein lokales Repository.', 'No active repository. Please select a local repository first.')}
         </div>
@@ -120,7 +120,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div className="repo-cockpit">
       <BranchPanel
         branches={props.branches}
         isCreatingBranch={props.isCreatingBranch}
@@ -169,9 +169,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
       />
 
       {props.hasRemoteOrigin === false && (
-        <>
-          <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-          <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="repo-card" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
               {tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')}
             </div>
@@ -210,13 +208,10 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
               </div>
             )}
           </div>
-        </>
       )}
 
-      <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
-
       {!props.isAuthenticated && (
-        <div style={{ padding: '10px', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="repo-card" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             {tr('Fuer Pull Requests, Releases und Workflows bitte erst bei GitHub anmelden.', 'Please sign in to GitHub first for pull requests, releases, and workflows.')}
           </div>
