@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown,
-  ChevronRight,
   CheckCircle2,
   Clock3,
   Copy,
@@ -17,6 +15,7 @@ import { AppSidebarProps } from './AppSidebar.types';
 import { GithubWorkflowRunDto } from '../../../global';
 import { useI18n } from '../../../i18n';
 import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
+import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '../../sidebar/RepoCard';
 
 type RepoGithubActionsContentProps = Pick<
   AppSidebarProps,
@@ -139,34 +138,35 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
 
   if (!props.prOwnerRepo) {
     return (
-      <div className="repo-card" style={{ padding: '10px' }}>
-        <div className="repo-state-text">
-          {tr('Keine GitHub-Remote-Zuordnung fuer dieses Repo gefunden.', 'No GitHub remote mapping found for this repo.')}
-        </div>
-      </div>
+      <RepoCard>
+        <RepoCardContent>
+          <RepoCardStatus
+            variant="warning"
+            title={tr('Keine GitHub-Remote-Zuordnung fuer dieses Repo gefunden.', 'No GitHub remote mapping found for this repo.')}
+          />
+        </RepoCardContent>
+      </RepoCard>
     );
   }
 
   return (
     <>
-      <section className="repo-card">
-        <div className="repo-card-header">
-          <button className="repo-card-header-btn" onClick={() => setIsPrCollapsed((prev) => !prev)}>
-            {isPrCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-            <span className="repo-card-title">
-              {tr('Pull Requests', 'Pull Requests')} ({props.prOwnerRepo.owner}/{props.prOwnerRepo.repo})
-            </span>
-          </button>
-          <div className="repo-card-actions">
+      <RepoCard>
+        <RepoCardHeader
+          title={`${tr('Pull Requests', 'Pull Requests')} (${props.prOwnerRepo.owner}/${props.prOwnerRepo.repo})`}
+          collapsed={isPrCollapsed}
+          onToggleCollapsed={() => setIsPrCollapsed((prev) => !prev)}
+          toggleTitle={isPrCollapsed ? tr('Pull Requests anzeigen', 'Show pull requests') : tr('Pull Requests einklappen', 'Collapse pull requests')}
+          actions={(
             <button className="icon-btn" style={{ padding: '2px' }} onClick={() => { props.setShowCreatePR(true); props.setNewPRHead(props.currentBranch); }} title={tr('Neuen PR erstellen', 'Create new PR')}>
               <Plus size={13} />
             </button>
-          </div>
-        </div>
+          )}
+        />
 
         {!isPrCollapsed && (
           <>
-            <div className="repo-card-toolbar" style={{ display: 'flex', gap: '4px' }}>
+            <RepoCardToolbar>
               {(['open', 'closed', 'all'] as const).map(filter => (
                 <button
                   key={filter}
@@ -176,13 +176,13 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                   {filter === 'open' ? tr('Offen', 'Open') : filter === 'closed' ? tr('Geschlossen', 'Closed') : tr('Alle', 'All')}
                 </button>
               ))}
-            </div>
+            </RepoCardToolbar>
 
             {props.showCreatePR && (
-              <div className="repo-card-content" style={{ borderBottom: '1px solid var(--line-subtle)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <RepoCardContent className="repo-form-stack" style={{ borderBottom: '1px solid var(--line-subtle)' }}>
                 <input className="repo-filter-input" type="text" placeholder={tr('PR Titel', 'PR title')} value={props.newPRTitle} onChange={e => props.setNewPRTitle(e.target.value)} />
                 <textarea className="repo-filter-input" placeholder={tr('Beschreibung (optional)', 'Description (optional)')} value={props.newPRBody} onChange={e => props.setNewPRBody(e.target.value)} rows={2} style={{ resize: 'vertical' }} />
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div className="repo-inline-fields">
                   <input className="repo-filter-input" type="text" placeholder={tr('Head Branch', 'Head branch')} value={props.newPRHead} onChange={e => props.setNewPRHeadInput(e.target.value)} />
                   <input className="repo-filter-input" type="text" placeholder={tr('Base Branch', 'Base branch')} value={props.newPRBase} onChange={e => props.setNewPRBase(e.target.value)} />
                 </div>
@@ -190,10 +190,10 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                   <button className="staging-tool-btn" onClick={() => props.setShowCreatePR(false)}>{tr('Abbrechen', 'Cancel')}</button>
                   <button className="staging-tool-btn" onClick={props.onCreatePR} disabled={!props.newPRTitle.trim()}>{tr('Erstellen', 'Create')}</button>
                 </div>
-              </div>
+              </RepoCardContent>
             )}
 
-            <div className="repo-card-content repo-card-scroll" style={{ maxHeight: '340px' }}>
+            <RepoCardContent className="repo-card-scroll repo-scroll-lg">
               {props.prLoading && <div className="repo-state-text">{tr('Lade Pull Requests...', 'Loading pull requests...')}</div>}
 
               {!props.prLoading && props.pullRequests.length === 0 && <div className="repo-state-text">{tr('Keine Pull Requests.', 'No pull requests.')}</div>}
@@ -213,7 +213,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                             const ci = props.prCiByNumber[pr.number];
                             const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown');
                             return (
-                              <button onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)} style={{ marginTop: '6px', borderRadius: '999px', border: `1px solid ${badgeStyles.borderColor}`, backgroundColor: badgeStyles.backgroundColor, color: badgeStyles.color, padding: '2px 8px', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer' }}>
+                              <button onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)} className="repo-pill-btn" style={{ marginTop: '6px', borderColor: badgeStyles.borderColor, backgroundColor: badgeStyles.backgroundColor, color: badgeStyles.color }}>
                                 {ci?.badge === 'success' && <CheckCircle2 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
                                 {ci?.badge === 'failure' && <XCircle size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
                                 {ci?.badge === 'pending' && <RefreshCw size={11} className="spin" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
@@ -254,27 +254,27 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                   ))}
                 </div>
               )}
-            </div>
+            </RepoCardContent>
           </>
         )}
-      </section>
+      </RepoCard>
 
-      <section className="repo-card">
-        <div className="repo-card-header">
-          <button className="repo-card-header-btn" onClick={() => setIsReleaseCollapsed((prev) => !prev)}>
-            {isReleaseCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-            <span className="repo-card-title">{tr('Release erstellen', 'Create release')}</span>
-          </button>
-        </div>
+      <RepoCard>
+        <RepoCardHeader
+          title={tr('Release erstellen', 'Create release')}
+          collapsed={isReleaseCollapsed}
+          onToggleCollapsed={() => setIsReleaseCollapsed((prev) => !prev)}
+          toggleTitle={isReleaseCollapsed ? tr('Release anzeigen', 'Show release') : tr('Release einklappen', 'Collapse release')}
+        />
         {!isReleaseCollapsed && (
-          <div className="repo-card-content" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <RepoCardContent className="repo-form-stack">
             <input className="repo-filter-input" type="text" placeholder={tr('Tag-Name (Pflicht)', 'Tag name (required)')} value={props.releaseForm.tagName || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, tagName: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
             <input className="repo-filter-input" type="text" placeholder={tr('Release-Name (Pflicht)', 'Release name (required)')} value={props.releaseForm.releaseName || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, releaseName: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
             <input className="repo-filter-input" type="text" placeholder={tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')} value={props.releaseForm.targetCommitish || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, targetCommitish: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
             <textarea className="repo-filter-input" placeholder={tr('Release Notes (optional)', 'Release notes (optional)')} value={props.releaseForm.body || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, body: e.target.value }))} rows={3} disabled={!props.prOwnerRepo || props.releaseSubmitting} style={{ resize: 'vertical' }} />
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}><input type="checkbox" checked={Boolean(props.releaseForm.draft)} onChange={e => props.setReleaseForm(prev => ({ ...prev, draft: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Entwurf', 'Draft')}</label>
-              <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}><input type="checkbox" checked={Boolean(props.releaseForm.prerelease)} onChange={e => props.setReleaseForm(prev => ({ ...prev, prerelease: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Pre-Release', 'Pre-release')}</label>
+            <div className="repo-check-row">
+              <label><input type="checkbox" checked={Boolean(props.releaseForm.draft)} onChange={e => props.setReleaseForm(prev => ({ ...prev, draft: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Entwurf', 'Draft')}</label>
+              <label><input type="checkbox" checked={Boolean(props.releaseForm.prerelease)} onChange={e => props.setReleaseForm(prev => ({ ...prev, prerelease: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Pre-Release', 'Pre-release')}</label>
             </div>
             {!releaseValidation.valid && <div className="repo-state-text" style={{ color: 'var(--status-warning)' }}>{tr('Bitte gueltigen Tag und Release-Namen angeben.', 'Please provide valid tag and release name.')}</div>}
             {props.releaseError && <div className="repo-state-text" style={{ color: 'var(--status-danger)' }}>{props.releaseError}</div>}
@@ -282,28 +282,28 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button className="staging-tool-btn" onClick={() => { void props.onCreateRelease(); }} disabled={releaseSubmitDisabled}>{props.releaseSubmitting ? tr('Erstelle...', 'Creating...') : tr('Release erstellen', 'Create release')}</button>
             </div>
-          </div>
+          </RepoCardContent>
         )}
-      </section>
+      </RepoCard>
 
-      <section className="repo-card">
-        <div className="repo-card-header">
-          <button className="repo-card-header-btn" onClick={() => setIsWorkflowCollapsed((prev) => !prev)}>
-            {isWorkflowCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-            <span className="repo-card-title">{tr('Actions Workflows', 'Actions workflows')}</span>
-          </button>
-        </div>
+      <RepoCard>
+        <RepoCardHeader
+          title={tr('Actions Workflows', 'Actions workflows')}
+          collapsed={isWorkflowCollapsed}
+          onToggleCollapsed={() => setIsWorkflowCollapsed((prev) => !prev)}
+          toggleTitle={isWorkflowCollapsed ? tr('Workflows anzeigen', 'Show workflows') : tr('Workflows einklappen', 'Collapse workflows')}
+        />
 
         {!isWorkflowCollapsed && (
           <>
-            <div className="repo-card-toolbar">
+            <RepoCardToolbar>
               <div style={{ position: 'relative' }}>
                 <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                 <input className="repo-filter-input" value={workflowQuery} onChange={(event) => setWorkflowQuery(event.target.value)} placeholder={tr('Workflows filtern...', 'Filter workflows...')} style={{ paddingLeft: '26px' }} />
               </div>
-            </div>
+            </RepoCardToolbar>
 
-            <div className="repo-card-content repo-card-scroll" style={{ maxHeight: '280px' }}>
+            <RepoCardContent className="repo-card-scroll repo-scroll-md">
               {isLoadingWorkflowRuns && <div className="repo-state-text">{tr('Lade Workflow-Runs...', 'Loading workflow runs...')}</div>}
               {workflowRunsError && <div className="repo-state-text" style={{ color: 'var(--status-danger)' }}>{workflowRunsError}</div>}
               {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length === 0 && <div className="repo-state-text">{workflowQuery.trim() ? tr('Keine Treffer fuer den Filter.', 'No matches for this filter.') : tr('Keine Workflow-Runs gefunden.', 'No workflow runs found.')}</div>}
@@ -322,10 +322,10 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                   ))}
                 </div>
               )}
-            </div>
+            </RepoCardContent>
           </>
         )}
-      </section>
+      </RepoCard>
     </>
   );
 };
