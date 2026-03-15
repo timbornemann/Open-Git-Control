@@ -52,6 +52,7 @@ type Props = {
   onPush: () => void;
   onPushForceWithLease: () => void;
   onPushTags: () => void;
+  onOpenRepoWorkspace: () => void;
   settings: AppSettingsDto;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   jobs: GitJobEventDto[];
@@ -297,6 +298,7 @@ export const MainView: React.FC<Props> = ({
   onPush,
   onPushForceWithLease,
   onPushTags,
+  onOpenRepoWorkspace,
   settings,
   onUpdateSettings,
   jobs,
@@ -478,6 +480,14 @@ export const MainView: React.FC<Props> = ({
     setSelectedCommit(null);
   }, [setSelectedCommit]);
 
+  const handleStageCommitOpen = useCallback(() => {
+    onOpenRepoWorkspace();
+    onCloseReleaseCreator();
+    setActiveDiffRequest(null);
+    setShowRecoveryCenter(false);
+    handleSelectCommitDirect(null);
+  }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
+
   return (
     <div className="main-view">
       <div className="topbar">
@@ -516,7 +526,7 @@ export const MainView: React.FC<Props> = ({
             onPush={onPush}
             onPushForceWithLease={onPushForceWithLease}
             onPushTags={onPushTags}
-            onStageCommit={() => handleSelectCommitDirect(null)}
+            onStageCommit={handleStageCommitOpen}
             onOpenReleaseCreator={onOpenReleaseCreator}
           />
         </div>
