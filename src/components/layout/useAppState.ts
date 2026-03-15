@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
+import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
@@ -8,6 +8,7 @@ import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
 import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
+import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
 
 const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',
@@ -108,6 +109,9 @@ export const useAppState = () => {
     setNewRepoName('');
     setNewRepoDescription('');
     setConnectError(null);
+    setShowReleaseCreator(false);
+    setReleaseContext(null);
+    setReleaseContextError(null);
   }, []);
 
   const workspace = useWorkspaceDomain({
@@ -404,6 +408,11 @@ export const useAppState = () => {
   const [releaseSubmitting, setReleaseSubmitting] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [releaseSuccess, setReleaseSuccess] = useState<GitHubReleaseDto | null>(null);
+  const [showReleaseCreator, setShowReleaseCreator] = useState(false);
+  const [releaseContextLoading, setReleaseContextLoading] = useState(false);
+  const [releaseContextError, setReleaseContextError] = useState<string | null>(null);
+  const [releaseContext, setReleaseContext] = useState<GitHubReleaseContextDto | null>(null);
+  const [releaseNotesGenerating, setReleaseNotesGenerating] = useState(false);
 
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
@@ -504,6 +513,54 @@ export const useAppState = () => {
     }));
   }, [pullRequestDomain.prOwnerRepo, repository.currentBranch]);
 
+  const refreshReleaseContext = useCallback(async () => {
+    if (!window.electronAPI || !github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
+      setReleaseContext(null);
+      setReleaseContextError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      return;
+    }
+
+    setReleaseContextLoading(true);
+    setReleaseContextError(null);
+
+    try {
+      const result = await window.electronAPI.githubGetReleaseContext({
+        owner: pullRequestDomain.prOwnerRepo.owner,
+        repo: pullRequestDomain.prOwnerRepo.repo,
+        targetCommitish: (releaseForm.targetCommitish || '').trim() || repository.currentBranch,
+      });
+
+      if (!result.success) {
+        setReleaseContext(null);
+        setReleaseContextError(result.error || tr('Release-Kontext konnte nicht geladen werden.', 'Could not load release context.'));
+        return;
+      }
+
+      setReleaseContext(result.data);
+      const existingTag = (releaseForm.tagName || '').trim();
+      if (!existingTag) {
+        const suggestion = suggestNextReleaseTag(result.data.existingTags || []);
+        setReleaseFormState((prev) => ({
+          ...prev,
+          tagName: prev.tagName || suggestion,
+          releaseName: prev.releaseName || `Release ${prev.tagName || suggestion}`,
+        }));
+      }
+    } catch (error: any) {
+      setReleaseContext(null);
+      setReleaseContextError(error?.message || tr('Release-Kontext konnte nicht geladen werden.', 'Could not load release context.'));
+    } finally {
+      setReleaseContextLoading(false);
+    }
+  }, [
+    github.isAuthenticated,
+    pullRequestDomain.prOwnerRepo,
+    releaseForm.tagName,
+    releaseForm.targetCommitish,
+    repository.currentBranch,
+    tr,
+  ]);
+
   const handleCreateRelease = useCallback(async () => {
     if (!window.electronAPI || !github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
       setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
@@ -514,6 +571,8 @@ export const useAppState = () => {
       tagName: releaseForm.tagName,
       releaseName: releaseForm.releaseName,
     });
+    const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
+    const existingTags = new Set((releaseContext?.existingTags || []).map((tag) => tag.toLowerCase()));
 
     if (!validation.valid) {
       if (validation.errors.tagName === 'release.validation.tagRequired') {
@@ -529,6 +588,11 @@ export const useAppState = () => {
         return;
       }
       setReleaseError(tr('Release-Name ist zu kurz (mind. 3 Zeichen).', 'Release name is too short (min. 3 chars).'));
+      return;
+    }
+
+    if (normalizedTag && existingTags.has(normalizedTag)) {
+      setReleaseError(tr('Dieser Tag existiert bereits. Waehle einen anderen Tag.', 'This tag already exists. Choose a different tag.'));
       return;
     }
 
@@ -582,7 +646,80 @@ export const useAppState = () => {
     } finally {
       setReleaseSubmitting(false);
     }
-  }, [github.isAuthenticated, pullRequestDomain.prOwnerRepo, releaseForm, repository.currentBranch, tr, triggerRefresh, setGitActionToast]);
+  }, [github.isAuthenticated, pullRequestDomain.prOwnerRepo, releaseForm, releaseContext?.existingTags, repository.currentBranch, tr, triggerRefresh, setGitActionToast]);
+
+  const generateReleaseNotesWithAI = useCallback(async () => {
+    if (!window.electronAPI) return;
+    if (!github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
+      setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      return;
+    }
+
+    const commits = releaseContext?.commitsSinceLastRelease || [];
+    if (commits.length === 0) {
+      setReleaseError(tr('Keine Commit-Basis fuer KI vorhanden.', 'No commit base for AI generation available.'));
+      return;
+    }
+
+    const tagName = (releaseForm.tagName || '').trim();
+    const releaseName = (releaseForm.releaseName || '').trim() || `Release ${tagName || 'next'}`;
+    if (!tagName) {
+      setReleaseError(tr('Bitte zuerst einen Tag-Namen setzen.', 'Please set a tag name first.'));
+      return;
+    }
+
+    setReleaseNotesGenerating(true);
+    setReleaseError(null);
+
+    try {
+      const result = await window.electronAPI.aiGenerateReleaseNotes({
+        tagName,
+        releaseName,
+        lastReleaseTag: releaseContext?.lastReleaseTag || null,
+        commits,
+        language: settings.language,
+      });
+
+      if (!result.success) {
+        setReleaseError(result.error || tr('KI Release Notes konnten nicht erstellt werden.', 'Could not generate AI release notes.'));
+        return;
+      }
+
+      setReleaseFormState((prev) => ({
+        ...prev,
+        releaseName: prev.releaseName || releaseName,
+        body: result.data.markdown,
+      }));
+      setGitActionToast({ msg: tr('Release Notes mit KI erstellt.', 'AI release notes generated.'), isError: false });
+    } catch (error: any) {
+      setReleaseError(error?.message || tr('KI Release Notes konnten nicht erstellt werden.', 'Could not generate AI release notes.'));
+    } finally {
+      setReleaseNotesGenerating(false);
+    }
+  }, [
+    github.isAuthenticated,
+    pullRequestDomain.prOwnerRepo,
+    releaseContext,
+    releaseForm.tagName,
+    releaseForm.releaseName,
+    settings.language,
+    tr,
+    setGitActionToast,
+  ]);
+
+  const openReleaseCreator = useCallback(() => {
+    setShowReleaseCreator(true);
+    setReleaseError(null);
+  }, []);
+
+  const closeReleaseCreator = useCallback(() => {
+    setShowReleaseCreator(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showReleaseCreator) return;
+    void refreshReleaseContext();
+  }, [showReleaseCreator, refreshReleaseContext]);
 
   const handleOpenPR = (url: string) => {
     window.open(url, '_blank');
@@ -786,6 +923,15 @@ export const useAppState = () => {
     releaseSubmitting,
     releaseError,
     releaseSuccess,
+    showReleaseCreator,
+    openReleaseCreator,
+    closeReleaseCreator,
+    releaseContextLoading,
+    releaseContextError,
+    releaseContext,
+    refreshReleaseContext,
+    releaseNotesGenerating,
+    generateReleaseNotesWithAI,
     handleCreateRelease,
     handleOpenPR,
     handleCopyPRUrl,

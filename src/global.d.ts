@@ -147,6 +147,22 @@ export interface GitHubReleaseDto {
   publishedAt: string | null;
 }
 
+export interface ReleaseCommitDto {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
+}
+
+export interface GitHubReleaseContextDto {
+  existingTags: string[];
+  lastReleaseTag: string | null;
+  commitsSinceLastRelease: ReleaseCommitDto[];
+  commitsTarget: string;
+  fallbackUsed: boolean;
+}
+
 export interface PullRequestDto {
   number: number;
   title: string;
@@ -367,6 +383,14 @@ export interface ElectronAPI {
   >;
 
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
+  githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string }) => Promise<IpcResult<GitHubReleaseContextDto>>;
+  aiGenerateReleaseNotes: (params: {
+    tagName: string;
+    releaseName: string;
+    lastReleaseTag?: string | null;
+    commits: ReleaseCommitDto[];
+    language: 'de' | 'en';
+  }) => Promise<IpcResult<{ markdown: string }>>;
 
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
   githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => Promise<IpcResult<GithubStatusChecksDto>>;
