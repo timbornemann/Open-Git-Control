@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Settings, FolderGit2, Github } from 'lucide-react';
+import { Settings, FolderOpen, FolderGit2, Github } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
@@ -14,11 +14,18 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
   return (
     <div className="activity-bar">
       <button
-        className={`icon-btn ${activeTab === 'repos' ? 'active' : ''}`}
-        onClick={() => setActiveTab('repos')}
-        title={tr('Repositories', 'Repositories')}
+        className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`}
+        onClick={() => setActiveTab('repo')}
+        title={tr('Aktuelles Repository', 'Current repository')}
       >
         <FolderGit2 size={22} />
+      </button>
+      <button
+        className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`}
+        onClick={() => setActiveTab('localRepos')}
+        title={tr('Lokale Repositories', 'Local repositories')}
+      >
+        <FolderOpen size={22} />
       </button>
       <button
         className={`icon-btn ${activeTab === 'github' ? 'active' : ''}`}

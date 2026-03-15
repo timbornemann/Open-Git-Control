@@ -2,7 +2,8 @@ import React from 'react';
 import { AppSidebarProps } from './sidebar/AppSidebar.types';
 import { SidebarActivityBar } from './sidebar/SidebarActivityBar';
 import { SidebarHeader } from './sidebar/SidebarHeader';
-import { ReposSidebarContent } from './sidebar/ReposSidebarContent';
+import { LocalReposSidebarContent } from './sidebar/LocalReposSidebarContent';
+import { RepoSidebarContent } from './sidebar/RepoSidebarContent';
 import { GithubAuthContent } from './sidebar/GithubAuthContent';
 import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
 import { useI18n } from '../../i18n';
@@ -31,9 +32,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
         />
 
         <div className="pane-content" style={{ padding: '8px' }}>
-          {props.activeTab === 'repos' && <ReposSidebarContent {...props} />}
+          {props.activeTab === 'localRepos' && <LocalReposSidebarContent {...props} />}
+          {props.activeTab === 'repo' && <RepoSidebarContent {...props} />}
           {props.activeTab === 'github' && !props.isAuthenticated && <GithubAuthContent {...props} />}
-          {props.activeTab === 'github' && props.isAuthenticated && <GithubConnectedContent {...props} />}
+          {props.activeTab === 'github' && props.isAuthenticated && (
+            <GithubConnectedContent
+              {...props}
+              prOwnerRepo={null}
+              pullRequests={[]}
+              prLoading={false}
+            />
+          )}
           {props.activeTab === 'settings' && (
             <div className="settings-sidebar-nav">
               {settingsTabs.map((tab) => (

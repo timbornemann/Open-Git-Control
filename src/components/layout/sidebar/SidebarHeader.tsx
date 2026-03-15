@@ -23,8 +23,16 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
       className="sidebar-header"
       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
     >
-      <span>{activeTab === 'repos' ? tr('Repositories', 'Repositories') : activeTab === 'github' ? 'GitHub' : tr('Einstellungen', 'Settings')}</span>
-      {activeTab === 'repos' && (
+      <span>
+        {activeTab === 'localRepos'
+          ? tr('Lokale Repositories', 'Local repositories')
+          : activeTab === 'repo'
+            ? tr('Aktuelles Repository', 'Current repository')
+            : activeTab === 'github'
+              ? 'GitHub'
+              : tr('Einstellungen', 'Settings')}
+      </span>
+      {activeTab === 'localRepos' && (
         <div style={{ display: 'flex', gap: '2px' }}>
           <button
             className="icon-btn"
@@ -34,18 +42,18 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           >
             <Plus size={16} />
           </button>
-          {activeRepo && (
-            <button
-              className="icon-btn"
-              style={{ padding: '4px' }}
-              onClick={onRefreshRemoteQuick}
-              title={tr('Remote aktualisieren', 'Refresh remote')}
-              disabled={remoteSync.isFetching || isGitActionRunning}
-            >
-              <RefreshCw size={14} />
-            </button>
-          )}
         </div>
+      )}
+      {activeTab === 'repo' && activeRepo && (
+        <button
+          className="icon-btn"
+          style={{ padding: '4px' }}
+          onClick={onRefreshRemoteQuick}
+          title={tr('Remote aktualisieren', 'Refresh remote')}
+          disabled={remoteSync.isFetching || isGitActionRunning}
+        >
+          <RefreshCw size={14} />
+        </button>
       )}
     </div>
   );
