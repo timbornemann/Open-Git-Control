@@ -21,24 +21,26 @@ export const TopbarActions: React.FC<Props> = ({ activeRepo, isGitActionRunning,
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
 
   return (
-    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-      <button className="icon-btn" onClick={onFetch} disabled={!activeRepo || isGitActionRunning || isFetching} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+    <div className="topbar-actions">
+      <button className="icon-btn topbar-action-btn topbar-action-btn-sync" onClick={onFetch} disabled={!activeRepo || isGitActionRunning || isFetching}>
         <RefreshCw size={16} className={isFetching ? 'spin' : ''} style={{ marginRight: '6px' }} />
-        {isFetching ? tr('Fetch laeuft...', 'Fetch running...') : 'Fetch'}
+        Fetch
       </button>
-      <button className="icon-btn" onClick={onPull} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+      <button className="icon-btn topbar-action-btn topbar-action-btn-sync" onClick={onPull} disabled={!activeRepo || isGitActionRunning}>
         <ArrowDownCircle size={16} className={isPullRunning ? 'spin' : ''} style={{ marginRight: '6px' }} />
-        {isPullRunning ? tr('Pull laeuft...', 'Pull running...') : 'Pull'}
+        Pull
       </button>
-      <button className="icon-btn" onClick={onPush} disabled={!activeRepo || isGitActionRunning} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }}>
+      <button className="icon-btn topbar-action-btn topbar-action-btn-sync" onClick={onPush} disabled={!activeRepo || isGitActionRunning}>
         <ArrowUpCircle size={16} className={isPushRunning ? 'spin' : ''} style={{ marginRight: '6px' }} />
-        {isPushRunning ? tr('Push laeuft...', 'Push running...') : 'Push'}
+        Push
       </button>
-      <button className="icon-btn" onClick={onOpenReleaseCreator} style={{ backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>
+      <button className="icon-btn topbar-action-btn" onClick={onOpenReleaseCreator} disabled={!activeRepo}>
         <Rocket size={16} style={{ marginRight: '6px' }} />
         {tr('Release', 'Release')}
       </button>
-      <button className="icon-btn" onClick={onStageCommit} style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', fontSize: '0.85rem', padding: '6px 12px' }} disabled={!activeRepo}>{tr('Stagen / Commit', 'Stage / Commit')}</button>
+      <button className="icon-btn topbar-action-btn topbar-action-btn-primary" onClick={onStageCommit} disabled={!activeRepo}>
+        {tr('Stagen / Commit', 'Stage / Commit')}
+      </button>
     </div>
   );
 };
