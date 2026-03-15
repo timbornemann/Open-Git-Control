@@ -1,19 +1,23 @@
 import { useCallback, useRef, useState } from 'react';
+import type { AppSettingsDto, SecretScanFindingDto } from '../global';
 
 type RunGitCommandOptions = {
   args: string[];
   successMsg: string;
   actionLabel?: string;
+  skipSecretScan?: boolean;
 };
 
 type Params = {
   activeRepo: string | null;
+  settings?: Pick<AppSettingsDto, 'secretScanBeforePushEnabled'>;
+  onSecretScanBlocked?: (findings: SecretScanFindingDto[], continuePush: () => Promise<void>) => void;
   onSuccess?: () => void;
   onError?: (msg: string) => void;
   onSuccessToast?: (msg: string) => void;
 };
 
-export const useGitActions = ({ activeRepo, onSuccess, onError, onSuccessToast }: Params) => {
+export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuccess, onError, onSuccessToast }: Params) => {
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
@@ -23,14 +27,35 @@ export const useGitActions = ({ activeRepo, onSuccess, onError, onSuccessToast }
     setIsGitActionRunning(value);
   }, []);
 
-  const runGitCommand = useCallback(async ({ args, successMsg, actionLabel }: RunGitCommandOptions) => {
+  const runGitCommand = useCallback(async ({ args, successMsg, actionLabel, skipSecretScan }: RunGitCommandOptions) => {
     if (!window.electronAPI || !activeRepo) return false;
+    const command = args[0];
+
+    const shouldScanPush = command === 'push' && settings?.secretScanBeforePushEnabled && !skipSecretScan;
+    if (shouldScanPush) {
+      const scanResult = await window.electronAPI.scanPushSecrets();
+      if (!scanResult.success) {
+        onError?.(scanResult.error || 'Secret-Scan vor Push fehlgeschlagen.');
+        return false;
+      }
+
+      if (scanResult.data.findings.length > 0) {
+        if (onSecretScanBlocked) {
+          onSecretScanBlocked(scanResult.data.findings, async () => {
+            await runGitCommand({ args, successMsg, actionLabel, skipSecretScan: true });
+          });
+        } else {
+          onError?.('Moegliche Secrets erkannt. Push wurde blockiert.');
+        }
+        return false;
+      }
+    }
 
     syncRunningRef(true);
-    setActiveGitActionLabel(actionLabel || `Git ${args[0]} wird ausgefuehrt...`);
+    setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
 
     try {
-      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
       if (r.success) {
         onSuccessToast?.(successMsg);
         onSuccess?.();
@@ -46,7 +71,7 @@ export const useGitActions = ({ activeRepo, onSuccess, onError, onSuccessToast }
       syncRunningRef(false);
       setActiveGitActionLabel(null);
     }
-  }, [activeRepo, onError, onSuccess, onSuccessToast, syncRunningRef]);
+  }, [activeRepo, onError, onSecretScanBlocked, onSuccess, onSuccessToast, settings?.secretScanBeforePushEnabled, syncRunningRef]);
 
   return {
     isGitActionRunning,
