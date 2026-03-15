@@ -18,6 +18,8 @@ type Props = {
   onRefreshContext: () => Promise<void>;
   onGenerateNotes: () => Promise<void>;
   notesGenerating: boolean;
+  notesLanguage: 'de' | 'en';
+  setNotesLanguage: (value: 'de' | 'en') => void;
 };
 
 export const ReleaseCreator: React.FC<Props> = ({
@@ -34,6 +36,8 @@ export const ReleaseCreator: React.FC<Props> = ({
   onRefreshContext,
   onGenerateNotes,
   notesGenerating,
+  notesLanguage,
+  setNotesLanguage,
 }) => {
   const { tr } = useI18n();
 
@@ -113,6 +117,19 @@ export const ReleaseCreator: React.FC<Props> = ({
         />
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{tr('KI-Sprache', 'AI language')}</span>
+            <select
+              className="repo-filter-input"
+              value={notesLanguage}
+              onChange={(event) => setNotesLanguage(event.target.value === 'de' ? 'de' : 'en')}
+              style={{ width: 'auto', minWidth: '130px', padding: '6px 8px' }}
+              disabled={notesGenerating || releaseSubmitting}
+            >
+              <option value="en">{tr('Englisch', 'English')}</option>
+              <option value="de">{tr('Deutsch', 'German')}</option>
+            </select>
+          </div>
           <div style={{ display: 'flex', gap: '10px' }} className="repo-check-row">
             <label>
               <input

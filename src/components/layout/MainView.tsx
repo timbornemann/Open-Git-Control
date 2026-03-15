@@ -73,6 +73,8 @@ type Props = {
   onRefreshReleaseContext: () => Promise<void>;
   onGenerateReleaseNotes: () => Promise<void>;
   releaseNotesGenerating: boolean;
+  releaseNotesLanguage: 'de' | 'en';
+  setReleaseNotesLanguage: (value: 'de' | 'en') => void;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -316,6 +318,8 @@ export const MainView: React.FC<Props> = ({
   onRefreshReleaseContext,
   onGenerateReleaseNotes,
   releaseNotesGenerating,
+  releaseNotesLanguage,
+  setReleaseNotesLanguage,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
@@ -589,6 +593,8 @@ export const MainView: React.FC<Props> = ({
                 onRefreshContext={onRefreshReleaseContext}
                 onGenerateNotes={onGenerateReleaseNotes}
                 notesGenerating={releaseNotesGenerating}
+                notesLanguage={releaseNotesLanguage}
+                setNotesLanguage={setReleaseNotesLanguage}
               />
             ) : activeDiffRequest ? (
               <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />

@@ -263,6 +263,8 @@ const App: React.FC = () => {
           onRefreshReleaseContext={state.refreshReleaseContext}
           onGenerateReleaseNotes={state.generateReleaseNotesWithAI}
           releaseNotesGenerating={state.releaseNotesGenerating}
+          releaseNotesLanguage={state.releaseNotesLanguage}
+          setReleaseNotesLanguage={state.setReleaseNotesLanguage}
         />
 
         {state.gitActionToast && (
