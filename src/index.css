@@ -205,7 +205,7 @@ code, pre {
   gap: 10px 14px;
   z-index: 10;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .topbar-left {
@@ -220,9 +220,7 @@ code, pre {
   min-width: 0;
   display: flex;
   justify-content: flex-end;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  overflow: visible;
 }
 
 .topbar-right::-webkit-scrollbar {
@@ -268,6 +266,7 @@ code, pre {
   gap: 8px;
   align-items: center;
   flex-wrap: nowrap;
+  position: relative;
 }
 
 .topbar-action-btn {
@@ -282,6 +281,86 @@ code, pre {
 
 .topbar-action-btn-sync {
   min-width: 92px;
+}
+
+.topbar-split-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.topbar-split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+  min-width: 92px;
+}
+
+.topbar-split-toggle {
+  min-width: 34px;
+  width: 34px;
+  padding: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.topbar-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 190px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-dark);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  z-index: 40;
+}
+
+.topbar-dropdown-header {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.topbar-dropdown-sep {
+  height: 1px;
+  background: var(--border-color);
+  opacity: 0.7;
+  margin: 2px 4px 4px;
+}
+
+.topbar-dropdown-item {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.topbar-dropdown-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+.topbar-dropdown-item-label {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.topbar-dropdown-item-hint {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
 }
 
 .topbar-action-btn-primary {
