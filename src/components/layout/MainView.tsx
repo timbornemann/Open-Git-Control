@@ -377,6 +377,23 @@ export const MainView: React.FC<Props> = ({
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
+  const primaryPaneTitle = isSettingsView
+    ? tr('Einstellungen', 'Settings')
+    : isReleaseView
+    ? tr('Release Ersteller', 'Release creator')
+    : showGithubGuide
+    ? tr('GitHub Login Anleitung', 'GitHub login guide')
+    : showRecoveryCenter
+    ? tr('Recovery Center', 'Recovery Center')
+    : activeDiffRequest
+    ? tr('Diff Viewer', 'Diff Viewer')
+    : '';
+  const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || showGithubGuide || showRecoveryCenter || Boolean(activeDiffRequest);
+
+  const handleToggleRecoveryCenter = useCallback(() => {
+    setActiveDiffRequest(null);
+    setShowRecoveryCenter((prev) => !prev);
+  }, []);
 
   useEffect(() => {
     setActiveDiffRequest(null);
@@ -452,83 +469,41 @@ export const MainView: React.FC<Props> = ({
   return (
     <div className="main-view">
       <div className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
+        <div className="topbar-left">
           <img
             src={appLogo}
             alt="Open-Git-Control"
             style={{ width: '22px', height: '22px', objectFit: 'contain', borderRadius: '4px' }}
           />
-          <span style={{ fontWeight: 600, fontSize: '1.1rem', minWidth: 0, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="topbar-repo-title">
             {activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
           </span>
           {currentBranch && (
-            <span
-              style={{
-                fontSize: '0.8rem',
-                padding: '4px 8px',
-                borderRadius: '12px',
-                backgroundColor: 'var(--status-success-soft)',
-                color: 'var(--status-success)',
-                border: '1px solid var(--status-success-border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
+            <span className="topbar-chip topbar-chip-branch">
               <GitBranch size={12} /> {currentBranch}
             </span>
           )}
           {activeRepo && (
-            <span
-              style={{
-                fontSize: '0.78rem',
-                padding: '4px 8px',
-                borderRadius: '12px',
-                backgroundColor: remoteStatus.backgroundColor,
-                color: remoteStatus.color,
-                border: `1px solid ${remoteStatus.borderColor}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
+            <span className="topbar-chip topbar-chip-remote" style={{ backgroundColor: remoteStatus.backgroundColor, color: remoteStatus.color, borderColor: remoteStatus.borderColor }}>
               <RefreshCw size={12} style={{ opacity: remoteSync.isFetching ? 1 : 0.7 }} />
               {remoteStatus.title}
             </span>
           )}
-          {(isGitActionRunning || remoteSync.isFetching) && activeGitActionLabel && (
-            <span
-              style={{
-                fontSize: '0.78rem',
-                padding: '4px 8px',
-                borderRadius: '12px',
-                backgroundColor: 'var(--accent-primary-soft)',
-                color: 'var(--text-accent)',
-                border: '1px solid var(--accent-primary-border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <RefreshCw size={12} className="spin" />
-              {activeGitActionLabel}
-            </span>
-          )}
         </div>
 
-        <div style={{ flex: 1, minWidth: '12px' }} />
-
-        <TopbarActions
-          activeRepo={activeRepo}
-          isGitActionRunning={isGitActionRunning}
-          isFetching={remoteSync.isFetching}
-          activeActionLabel={activeGitActionLabel}
-          onFetch={onFetch}
-          onPull={onPull}
-          onPush={onPush}
-          onStageCommit={() => handleSelectCommitDirect(null)}
-          onOpenReleaseCreator={onOpenReleaseCreator}
-        />
+        <div className="topbar-right">
+          <TopbarActions
+            activeRepo={activeRepo}
+            isGitActionRunning={isGitActionRunning}
+            isFetching={remoteSync.isFetching}
+            activeActionLabel={activeGitActionLabel}
+            onFetch={onFetch}
+            onPull={onPull}
+            onPush={onPush}
+            onStageCommit={() => handleSelectCommitDirect(null)}
+            onOpenReleaseCreator={onOpenReleaseCreator}
+          />
+        </div>
       </div>
 
       <div ref={contentAreaRef} className="content-area">
@@ -540,55 +515,44 @@ export const MainView: React.FC<Props> = ({
               : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
           }
         >
-          <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>
-              {isSettingsView
-                ? tr('Einstellungen', 'Settings')
-                : isReleaseView
-                ? tr('Release Ersteller', 'Release creator')
-                : showGithubGuide
-                ? tr('GitHub Login Anleitung', 'GitHub login guide')
-                : (showRecoveryCenter ? tr('Recovery Center', 'Recovery Center') : (activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph')))}
-            </span>
-            {isSettingsView ? null : isReleaseView ? (
-              <button
-                className="icon-btn"
-                onClick={onCloseReleaseCreator}
-                style={{ fontSize: '0.75rem', padding: '2px 6px' }}
-              >
-                {tr('Zurueck zum Graph', 'Back to graph')}
-              </button>
-            ) : showGithubGuide ? (
-              <button
-                className="icon-btn"
-                onClick={onClearGithubAuthHelpMethod}
-                style={{ fontSize: '0.75rem', padding: '2px 6px' }}
-              >
-                {tr('Zurueck', 'Back')}
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {!activeDiffRequest && (
-                  <button
-                    className="icon-btn"
-                    onClick={() => setShowRecoveryCenter((prev) => !prev)}
-                    style={{ fontSize: '0.75rem', padding: '2px 6px' }}
-                  >
-                    {showRecoveryCenter ? tr('Zum Graph', 'To graph') : tr('Recovery Center', 'Recovery Center')}
-                  </button>
-                )}
-                {activeDiffRequest && (
-                  <button
-                    className="icon-btn"
-                    onClick={() => setActiveDiffRequest(null)}
-                    style={{ fontSize: '0.75rem', padding: '2px 6px' }}
-                  >
-                    {tr('Zurueck zum Graph', 'Back to graph')}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {shouldShowPrimaryPaneHeader && (
+            <div className="pane-header pane-header-main" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{primaryPaneTitle}</span>
+              {isSettingsView ? null : isReleaseView ? (
+                <button
+                  className="icon-btn"
+                  onClick={onCloseReleaseCreator}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                >
+                  {tr('Zurueck zum Graph', 'Back to graph')}
+                </button>
+              ) : showGithubGuide ? (
+                <button
+                  className="icon-btn"
+                  onClick={onClearGithubAuthHelpMethod}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                >
+                  {tr('Zurueck', 'Back')}
+                </button>
+              ) : showRecoveryCenter ? (
+                <button
+                  className="icon-btn"
+                  onClick={() => setShowRecoveryCenter(false)}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                >
+                  {tr('Zurueck zum Graph', 'Back to graph')}
+                </button>
+              ) : activeDiffRequest ? (
+                <button
+                  className="icon-btn"
+                  onClick={() => setActiveDiffRequest(null)}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                >
+                  {tr('Zurueck zum Graph', 'Back to graph')}
+                </button>
+              ) : null}
+            </div>
+          )}
           <div className="pane-content" style={{ padding: 0 }}>
             {isSettingsView ? (
               <SettingsMainContent
@@ -635,6 +599,8 @@ export const MainView: React.FC<Props> = ({
                 refreshTrigger={refreshTrigger}
                 showSecondaryHistory={showSecondaryHistory}
                 onOpenDiff={handleOpenDiff}
+                showRecoveryCenter={showRecoveryCenter}
+                onToggleRecoveryCenter={handleToggleRecoveryCenter}
               />
             )}
           </div>
