@@ -235,6 +235,9 @@ const App: React.FC = () => {
           onPull={() => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.'), tr('Pull wird ausgefuehrt...', 'Running pull...'))}
           onPush={() => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgefuehrt...', 'Running push...'))}
           settings={state.settings}
+          onUpdateSettings={state.handleUpdateSettings}
+          jobs={state.jobs}
+          onClearJobs={state.clearJobs}
         />
 
         {state.gitActionToast && (
