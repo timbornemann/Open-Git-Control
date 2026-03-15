@@ -351,6 +351,43 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <input
             type="checkbox"
+            checked={settings.secretScanBeforePushEnabled}
+            onChange={(e) => onUpdateSettings({ secretScanBeforePushEnabled: e.target.checked })}
+          />
+          {tr('Secret-Scan vor Push aktivieren', 'Enable secret scan before push')}
+        </label>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {tr('Secret-Scan Strengegrad', 'Secret scan strictness')}
+          <select
+            value={settings.secretScanStrictness}
+            onChange={(e) => onUpdateSettings({ secretScanStrictness: e.target.value as 'low' | 'medium' | 'high' })}
+            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)' }}
+          >
+            <option value="low">{tr('Niedrig (nur klare Muster)', 'Low (high-confidence patterns only)')}</option>
+            <option value="medium">{tr('Mittel (empfohlen)', 'Medium (recommended)')}</option>
+            <option value="high">{tr('Hoch (mehr Treffer, mehr False Positives)', 'High (more hits, more false positives)')}</option>
+          </select>
+        </label>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {tr('Projekt-Allowlist fuer Secret-Scan', 'Project allowlist for secret scan')}
+          <textarea
+            rows={4}
+            value={settings.secretScanAllowlist}
+            onChange={(e) => onUpdateSettings({ secretScanAllowlist: e.target.value })}
+            placeholder={tr('Eine Regel pro Zeile. z.B. path:docs/example.env oder regex:^DUMMY_', 'One rule per line. e.g. path:docs/example.env or regex:^DUMMY_')}
+            style={{ padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+        </label>
+
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          {tr('Allowlist-Formate: "path:", "regex:" oder freier Text. Kommentarzeilen mit "#".', 'Allowlist formats: "path:", "regex:", or plain text. Comment lines start with "#".')}
+        </div>
+
+        <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
