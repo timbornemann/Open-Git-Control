@@ -11,6 +11,9 @@ const baseSettings: AppSettings = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  secretScanBeforePushEnabled: true,
+  secretScanStrictness: 'medium',
+  secretScanAllowlist: '',
   aiAutoCommitEnabled: true,
   aiProvider: 'gemini',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
@@ -18,6 +21,7 @@ const baseSettings: AppSettings = {
   geminiModel: 'gemini-1.5-flash',
   hasGeminiApiKey: true,
   githubOauthClientId: '',
+  githubHost: 'github.com',
 };
 
 const fakeGitService = {
