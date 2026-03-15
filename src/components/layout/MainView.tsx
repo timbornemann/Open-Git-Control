@@ -4,13 +4,14 @@ import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
 import { CommitDetails } from '../CommitDetails';
 import { StagingArea } from '../StagingArea';
+import { ReleaseCreator } from '../ReleaseCreator';
 import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { SettingsMainContent } from './SettingsMainContent';
 import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
-import { AppSettingsDto, GitJobEventDto } from '../../global';
+import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { GithubAuthHelpMethod, SettingsTabId } from './sidebar/AppSidebar.types';
 import appLogo from '../../../logo.png';
@@ -52,6 +53,22 @@ type Props = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
   settingsTab: SettingsTabId;
+  showReleaseCreator: boolean;
+  onOpenReleaseCreator: () => void;
+  onCloseReleaseCreator: () => void;
+  prOwnerRepo: { owner: string; repo: string } | null;
+  releaseForm: GitHubCreateReleaseParamsDto;
+  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
+  releaseSubmitting: boolean;
+  releaseError: string | null;
+  releaseSuccess: GitHubReleaseDto | null;
+  onCreateRelease: () => Promise<void>;
+  releaseContextLoading: boolean;
+  releaseContextError: string | null;
+  releaseContext: GitHubReleaseContextDto | null;
+  onRefreshReleaseContext: () => Promise<void>;
+  onGenerateReleaseNotes: () => Promise<void>;
+  releaseNotesGenerating: boolean;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -275,6 +292,22 @@ export const MainView: React.FC<Props> = ({
   jobs,
   onClearJobs,
   settingsTab,
+  showReleaseCreator,
+  onOpenReleaseCreator,
+  onCloseReleaseCreator,
+  prOwnerRepo,
+  releaseForm,
+  setReleaseForm,
+  releaseSubmitting,
+  releaseError,
+  releaseSuccess,
+  onCreateRelease,
+  releaseContextLoading,
+  releaseContextError,
+  releaseContext,
+  onRefreshReleaseContext,
+  onGenerateReleaseNotes,
+  releaseNotesGenerating,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
@@ -343,6 +376,7 @@ export const MainView: React.FC<Props> = ({
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
+  const isReleaseView = activeTab === 'repo' && showReleaseCreator;
 
   useEffect(() => {
     setActiveDiffRequest(null);
@@ -493,6 +527,7 @@ export const MainView: React.FC<Props> = ({
           onPull={onPull}
           onPush={onPush}
           onStageCommit={() => handleSelectCommitDirect(null)}
+          onOpenReleaseCreator={onOpenReleaseCreator}
         />
       </div>
 
@@ -509,11 +544,21 @@ export const MainView: React.FC<Props> = ({
             <span>
               {isSettingsView
                 ? tr('Einstellungen', 'Settings')
+                : isReleaseView
+                ? tr('Release Ersteller', 'Release creator')
                 : showGithubGuide
                 ? tr('GitHub Login Anleitung', 'GitHub login guide')
                 : (showRecoveryCenter ? tr('Recovery Center', 'Recovery Center') : (activeDiffRequest ? tr('Diff Viewer', 'Diff Viewer') : tr('Commit Graph', 'Commit Graph')))}
             </span>
-            {isSettingsView ? null : showGithubGuide ? (
+            {isSettingsView ? null : isReleaseView ? (
+              <button
+                className="icon-btn"
+                onClick={onCloseReleaseCreator}
+                style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+              >
+                {tr('Zurueck zum Graph', 'Back to graph')}
+              </button>
+            ) : showGithubGuide ? (
               <button
                 className="icon-btn"
                 onClick={onClearGithubAuthHelpMethod}
@@ -553,6 +598,22 @@ export const MainView: React.FC<Props> = ({
                 onClearJobs={onClearJobs}
                 activeTab={settingsTab}
               />
+            ) : isReleaseView ? (
+              <ReleaseCreator
+                ownerRepo={prOwnerRepo}
+                releaseForm={releaseForm}
+                setReleaseForm={setReleaseForm}
+                releaseSubmitting={releaseSubmitting}
+                releaseError={releaseError}
+                releaseSuccess={releaseSuccess}
+                onCreateRelease={onCreateRelease}
+                contextLoading={releaseContextLoading}
+                contextError={releaseContextError}
+                context={releaseContext}
+                onRefreshContext={onRefreshReleaseContext}
+                onGenerateNotes={onGenerateReleaseNotes}
+                notesGenerating={releaseNotesGenerating}
+              />
             ) : activeDiffRequest ? (
               <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />
             ) : showGithubGuide ? (
@@ -579,7 +640,7 @@ export const MainView: React.FC<Props> = ({
           </div>
         </div>
 
-        {!isSettingsView && (
+        {!isSettingsView && !isReleaseView && (
           <>
             <div
               className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}

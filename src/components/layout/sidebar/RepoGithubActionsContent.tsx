@@ -14,7 +14,6 @@ import {
 import { AppSidebarProps } from './AppSidebar.types';
 import { GithubWorkflowRunDto } from '../../../global';
 import { useI18n } from '../../../i18n';
-import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '../../sidebar/RepoCard';
 
 type RepoGithubActionsContentProps = Pick<
@@ -42,12 +41,6 @@ type RepoGithubActionsContentProps = Pick<
   | 'newPRBase'
   | 'setNewPRBase'
   | 'onCreatePR'
-  | 'releaseForm'
-  | 'setReleaseForm'
-  | 'releaseSubmitting'
-  | 'releaseError'
-  | 'releaseSuccess'
-  | 'onCreateRelease'
 >;
 
 const getCiBadgeStyles = (badge: string) => {
@@ -72,18 +65,11 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
   const { tr } = useI18n();
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
   const [isPrCollapsed, setIsPrCollapsed] = useState(false);
-  const [isReleaseCollapsed, setIsReleaseCollapsed] = useState(false);
   const [isWorkflowCollapsed, setIsWorkflowCollapsed] = useState(false);
   const [workflowRuns, setWorkflowRuns] = useState<GithubWorkflowRunDto[]>([]);
   const [isLoadingWorkflowRuns, setIsLoadingWorkflowRuns] = useState(false);
   const [workflowRunsError, setWorkflowRunsError] = useState<string | null>(null);
   const [workflowQuery, setWorkflowQuery] = useState('');
-
-  const releaseValidation = validateGithubReleaseInput({
-    tagName: props.releaseForm.tagName || '',
-    releaseName: props.releaseForm.releaseName || '',
-  });
-  const releaseSubmitDisabled = !props.prOwnerRepo || props.releaseSubmitting || !releaseValidation.valid;
 
   useEffect(() => {
     const ownerRepo = props.prOwnerRepo;
@@ -256,33 +242,6 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               )}
             </RepoCardContent>
           </>
-        )}
-      </RepoCard>
-
-      <RepoCard>
-        <RepoCardHeader
-          title={tr('Release erstellen', 'Create release')}
-          collapsed={isReleaseCollapsed}
-          onToggleCollapsed={() => setIsReleaseCollapsed((prev) => !prev)}
-          toggleTitle={isReleaseCollapsed ? tr('Release anzeigen', 'Show release') : tr('Release einklappen', 'Collapse release')}
-        />
-        {!isReleaseCollapsed && (
-          <RepoCardContent className="repo-form-stack">
-            <input className="repo-filter-input" type="text" placeholder={tr('Tag-Name (Pflicht)', 'Tag name (required)')} value={props.releaseForm.tagName || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, tagName: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
-            <input className="repo-filter-input" type="text" placeholder={tr('Release-Name (Pflicht)', 'Release name (required)')} value={props.releaseForm.releaseName || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, releaseName: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
-            <input className="repo-filter-input" type="text" placeholder={tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')} value={props.releaseForm.targetCommitish || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, targetCommitish: e.target.value }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />
-            <textarea className="repo-filter-input" placeholder={tr('Release Notes (optional)', 'Release notes (optional)')} value={props.releaseForm.body || ''} onChange={e => props.setReleaseForm(prev => ({ ...prev, body: e.target.value }))} rows={3} disabled={!props.prOwnerRepo || props.releaseSubmitting} style={{ resize: 'vertical' }} />
-            <div className="repo-check-row">
-              <label><input type="checkbox" checked={Boolean(props.releaseForm.draft)} onChange={e => props.setReleaseForm(prev => ({ ...prev, draft: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Entwurf', 'Draft')}</label>
-              <label><input type="checkbox" checked={Boolean(props.releaseForm.prerelease)} onChange={e => props.setReleaseForm(prev => ({ ...prev, prerelease: e.target.checked }))} disabled={!props.prOwnerRepo || props.releaseSubmitting} />{tr('Pre-Release', 'Pre-release')}</label>
-            </div>
-            {!releaseValidation.valid && <div className="repo-state-text" style={{ color: 'var(--status-warning)' }}>{tr('Bitte gueltigen Tag und Release-Namen angeben.', 'Please provide valid tag and release name.')}</div>}
-            {props.releaseError && <div className="repo-state-text" style={{ color: 'var(--status-danger)' }}>{props.releaseError}</div>}
-            {props.releaseSuccess && <div className="repo-state-text" style={{ color: 'var(--status-success)' }}>{tr('Release erfolgreich erstellt.', 'Release created successfully.')}</div>}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="staging-tool-btn" onClick={() => { void props.onCreateRelease(); }} disabled={releaseSubmitDisabled}>{props.releaseSubmitting ? tr('Erstelle...', 'Creating...') : tr('Release erstellen', 'Create release')}</button>
-            </div>
-          </RepoCardContent>
         )}
       </RepoCard>
 

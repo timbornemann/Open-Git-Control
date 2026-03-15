@@ -243,6 +243,22 @@ const App: React.FC = () => {
           jobs={state.jobs}
           onClearJobs={state.clearJobs}
           settingsTab={settingsTab}
+          showReleaseCreator={state.showReleaseCreator}
+          onOpenReleaseCreator={state.openReleaseCreator}
+          onCloseReleaseCreator={state.closeReleaseCreator}
+          prOwnerRepo={state.prOwnerRepo}
+          releaseForm={state.releaseForm}
+          setReleaseForm={state.setReleaseForm}
+          releaseSubmitting={state.releaseSubmitting}
+          releaseError={state.releaseError}
+          releaseSuccess={state.releaseSuccess}
+          onCreateRelease={state.handleCreateRelease}
+          releaseContextLoading={state.releaseContextLoading}
+          releaseContextError={state.releaseContextError}
+          releaseContext={state.releaseContext}
+          onRefreshReleaseContext={state.refreshReleaseContext}
+          onGenerateReleaseNotes={state.generateReleaseNotesWithAI}
+          releaseNotesGenerating={state.releaseNotesGenerating}
         />
 
         {state.gitActionToast && (
