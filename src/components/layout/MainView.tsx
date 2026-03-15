@@ -535,7 +535,7 @@ export const MainView: React.FC<Props> = ({
         <div
           className="pane"
           style={
-            isSettingsView
+            isSettingsView || isReleaseView
               ? { minWidth: 0 }
               : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
           }
