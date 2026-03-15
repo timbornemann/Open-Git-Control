@@ -14,6 +14,8 @@ interface CommitGraphProps {
   refreshTrigger?: number;
   showSecondaryHistory?: boolean;
   onOpenDiff?: (request: DiffRequest) => void;
+  showRecoveryCenter?: boolean;
+  onToggleRecoveryCenter?: () => void;
 }
 
 const LOG_PAGE_SIZE = 200;
@@ -102,7 +104,7 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
   return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
 });
 
-export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff }) => {
+export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff, showRecoveryCenter = false, onToggleRecoveryCenter }) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
@@ -947,6 +949,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Commits durchsuchen (Hash, Autor, Nachricht, Ref)"
               />
+              <button
+                className="commit-search-nav"
+                style={{ border: '1px solid var(--border-color)', backgroundColor: showRecoveryCenter ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: showRecoveryCenter ? 'var(--text-accent)' : 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                onClick={onToggleRecoveryCenter}
+              >
+                {showRecoveryCenter ? 'Verlauf' : 'Recovery Center'}
+              </button>
               {normalizedSearch && (
                 <div className="commit-search-meta" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
                   <span>{matchedNodes.length} Treffer</span>
