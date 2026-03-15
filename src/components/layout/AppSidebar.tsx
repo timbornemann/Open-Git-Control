@@ -9,6 +9,12 @@ import { useI18n } from '../../i18n';
 
 export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
   const { tr } = useI18n();
+  const settingsTabs = [
+    { id: 'general' as const, label: tr('Allgemein', 'General') },
+    { id: 'integrations' as const, label: tr('Integrationen', 'Integrations') },
+    { id: 'security' as const, label: tr('Sicherheit', 'Security') },
+    { id: 'system' as const, label: tr('System', 'System') },
+  ];
 
   return (
     <>
@@ -29,8 +35,16 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
           {props.activeTab === 'github' && !props.isAuthenticated && <GithubAuthContent {...props} />}
           {props.activeTab === 'github' && props.isAuthenticated && <GithubConnectedContent {...props} />}
           {props.activeTab === 'settings' && (
-            <div style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: 'var(--bg-panel)', color: 'var(--text-secondary)', fontSize: '0.8rem', lineHeight: 1.4 }}>
-              {tr('Die Einstellungen werden jetzt im Hauptfenster angezeigt.', 'Settings are now shown in the main area.')}
+            <div className="settings-sidebar-nav">
+              {settingsTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`settings-sidebar-nav-btn ${props.settingsTab === tab.id ? 'active' : ''}`}
+                  onClick={() => props.onSelectSettingsTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           )}
         </div>

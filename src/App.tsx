@@ -7,6 +7,7 @@ import { Confirm } from './components/Confirm';
 import { DangerConfirm } from './components/DangerConfirm';
 import { Input } from './components/Input';
 import { useAppState } from './components/layout/useAppState';
+import { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
 import { I18nProvider } from './i18n';
 import './index.css';
 
@@ -20,6 +21,7 @@ const App: React.FC = () => {
   const state = useAppState();
   const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -205,6 +207,8 @@ const App: React.FC = () => {
           onUpdateSettings={state.handleUpdateSettings}
           jobs={state.jobs}
           onClearJobs={state.clearJobs}
+          settingsTab={settingsTab}
+          onSelectSettingsTab={setSettingsTab}
         />
 
         <div
@@ -238,6 +242,7 @@ const App: React.FC = () => {
           onUpdateSettings={state.handleUpdateSettings}
           jobs={state.jobs}
           onClearJobs={state.clearJobs}
+          settingsTab={settingsTab}
         />
 
         {state.gitActionToast && (

@@ -14,6 +14,7 @@ export type BranchContextMenuState = { x: number; y: number; branch: string; isH
 
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean }>;
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
+export type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
 
 export type AppSidebarProps = {
   activeTab: 'repos' | 'github' | 'settings';
@@ -150,4 +151,6 @@ export type AppSidebarProps = {
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
+  settingsTab: SettingsTabId;
+  onSelectSettingsTab: (tab: SettingsTabId) => void;
 };

@@ -12,7 +12,7 @@ import { RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
-import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
+import { GithubAuthHelpMethod, SettingsTabId } from './sidebar/AppSidebar.types';
 import appLogo from '../../../logo.png';
 
 type RemoteStatus = {
@@ -51,6 +51,7 @@ type Props = {
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
+  settingsTab: SettingsTabId;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -273,6 +274,7 @@ export const MainView: React.FC<Props> = ({
   onUpdateSettings,
   jobs,
   onClearJobs,
+  settingsTab,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
@@ -549,6 +551,7 @@ export const MainView: React.FC<Props> = ({
                 onUpdateSettings={onUpdateSettings}
                 jobs={jobs}
                 onClearJobs={onClearJobs}
+                activeTab={settingsTab}
               />
             ) : activeDiffRequest ? (
               <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />

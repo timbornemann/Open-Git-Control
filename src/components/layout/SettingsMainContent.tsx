@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { AppSettingsDto, GitJobEventDto, UpdaterStatusDto } from '../../global';
 import { useI18n } from '../../i18n';
+import { SettingsTabId } from './sidebar/AppSidebar.types';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
+  activeTab: SettingsTabId;
 };
-
-type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
 
 const THEME_OPTIONS: Array<{
   value: AppSettingsDto['theme'];
@@ -29,11 +29,11 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   onUpdateSettings,
   jobs,
   onClearJobs,
+  activeTab,
 }) => {
   const { tr, locale } = useI18n();
   const sortedJobs = useMemo(() => [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20), [jobs]);
 
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('general');
   const [isTestingAi, setIsTestingAi] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
@@ -51,13 +51,6 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
     const values = [...modelOptions, selectedModel].filter(Boolean);
     return [...new Set(values)].sort((a, b) => a.localeCompare(b));
   }, [modelOptions, selectedModel]);
-
-  const tabs = useMemo<Array<{ id: SettingsTabId; label: string }>>(() => ([
-    { id: 'general', label: tr('Allgemein', 'General') },
-    { id: 'integrations', label: tr('Integrationen', 'Integrations') },
-    { id: 'security', label: tr('Sicherheit', 'Security') },
-    { id: 'system', label: tr('System', 'System') },
-  ]), [tr]);
 
   const updaterStatusLabel = useMemo(() => {
     if (!updaterStatus) return tr('Lade Update-Status...', 'Loading updater status...');
@@ -243,20 +236,6 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
 
   return (
     <div className="settings-main">
-      <div className="settings-tabs" role="tablist" aria-label={tr('Einstellungsbereiche', 'Settings sections')}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`settings-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       <div className="settings-content">
         {activeTab === 'general' && (
           <div className="settings-grid">
