@@ -24,7 +24,7 @@ export const useWorkspaceDomain = ({
   onNoActiveRepo,
   language,
 }: Params) => {
-  const [activeTab, setActiveTab] = useState<'repos' | 'github' | 'settings'>('repos');
+  const [activeTab, setActiveTab] = useState<'localRepos' | 'repo' | 'github' | 'settings'>('localRepos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});

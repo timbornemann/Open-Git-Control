@@ -4,7 +4,7 @@ import { trByLanguage, type AppLanguage } from '../../../i18n';
 
 type Params = {
   onRepoCloned: (repoPath: string) => Promise<void>;
-  setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
+  setActiveTab: (tab: 'localRepos' | 'repo' | 'github' | 'settings') => void;
   language: AppLanguage;
   githubOauthClientId: string;
   githubHost: string;
@@ -395,7 +395,7 @@ export const useGithubDomain = ({
         setCloneFinished(true);
         setCloneLog(prev => [...prev, `SUCCESS: ${tr('Repository erfolgreich geklont nach', 'Repository cloned successfully to')}: ${result.repoPath}`]);
         await onRepoCloned(result.repoPath);
-        setActiveTab('repos');
+        setActiveTab('repo');
       } else {
         const errorMessage = result.error || tr('Unbekannter Fehler', 'Unknown error');
         setCloneError(errorMessage);
