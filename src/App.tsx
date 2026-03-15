@@ -237,7 +237,11 @@ const App: React.FC = () => {
           showSecondaryHistory={state.settings.showSecondaryHistory}
           onFetch={() => state.refreshRemoteState(true)}
           onPull={() => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.'), tr('Pull wird ausgefuehrt...', 'Running pull...'))}
+          onPullRebase={() => state.runGitCommand(['pull', '--rebase'], tr('Erfolgreich mit Rebase gepullt.', 'Pull with rebase completed successfully.'), tr('Pull --rebase wird ausgefuehrt...', 'Running pull --rebase...'))}
+          onPullFfOnly={() => state.runGitCommand(['pull', '--ff-only'], tr('Erfolgreich mit ff-only gepullt.', 'Pull with ff-only completed successfully.'), tr('Pull --ff-only wird ausgefuehrt...', 'Running pull --ff-only...'))}
           onPush={() => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgefuehrt...', 'Running push...'))}
+          onPushForceWithLease={() => state.runGitCommand(['push', '--force-with-lease'], tr('Erfolgreich mit force-with-lease gepusht.', 'Push with force-with-lease completed successfully.'), tr('Push --force-with-lease wird ausgefuehrt...', 'Running push --force-with-lease...'))}
+          onPushTags={() => state.runGitCommand(['push', '--tags'], tr('Tags erfolgreich gepusht.', 'Tags pushed successfully.'), tr('Push --tags wird ausgefuehrt...', 'Running push --tags...'))}
           settings={state.settings}
           onUpdateSettings={state.handleUpdateSettings}
           jobs={state.jobs}

@@ -47,7 +47,11 @@ type Props = {
   showSecondaryHistory: boolean;
   onFetch: () => void;
   onPull: () => void;
+  onPullRebase: () => void;
+  onPullFfOnly: () => void;
   onPush: () => void;
+  onPushForceWithLease: () => void;
+  onPushTags: () => void;
   settings: AppSettingsDto;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   jobs: GitJobEventDto[];
@@ -286,7 +290,11 @@ export const MainView: React.FC<Props> = ({
   showSecondaryHistory,
   onFetch,
   onPull,
+  onPullRebase,
+  onPullFfOnly,
   onPush,
+  onPushForceWithLease,
+  onPushTags,
   settings,
   onUpdateSettings,
   jobs,
@@ -499,7 +507,11 @@ export const MainView: React.FC<Props> = ({
             activeActionLabel={activeGitActionLabel}
             onFetch={onFetch}
             onPull={onPull}
+            onPullRebase={onPullRebase}
+            onPullFfOnly={onPullFfOnly}
             onPush={onPush}
+            onPushForceWithLease={onPushForceWithLease}
+            onPushTags={onPushTags}
             onStageCommit={() => handleSelectCommitDirect(null)}
             onOpenReleaseCreator={onOpenReleaseCreator}
           />
