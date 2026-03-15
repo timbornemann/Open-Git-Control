@@ -194,17 +194,107 @@ code, pre {
 
 /* Glassmorphism Topbar */
 .topbar {
-  min-height: 60px;
+  min-height: 64px;
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  padding: 8px 24px;
-  gap: 12px;
+  padding: 10px 16px;
+  gap: 10px 14px;
   z-index: 10;
   min-width: 0;
+  overflow: hidden;
+}
+
+.topbar-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.topbar-right {
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.topbar-right::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-repo-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  min-width: 0;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-chip {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.topbar-chip-branch {
+  background-color: var(--status-success-soft);
+  color: var(--status-success);
+  border-color: var(--status-success-border);
+}
+
+.topbar-chip-remote {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.topbar-action-btn {
+  height: 36px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-panel);
+  font-size: 0.85rem;
+  padding: 0 12px;
+  min-width: 96px;
+  white-space: nowrap;
+}
+
+.topbar-action-btn-sync {
+  min-width: 92px;
+}
+
+.topbar-action-btn-primary {
+  min-width: 148px;
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--on-accent);
+}
+
+.topbar-action-btn-primary:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
 }
 
 .content-area {
@@ -262,6 +352,10 @@ code, pre {
   border-bottom: 1px solid var(--border-color);
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+.pane-header-main {
+  min-height: 52px;
 }
 
 .pane-content {
