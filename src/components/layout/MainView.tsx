@@ -29,7 +29,7 @@ type WorkingTreeSelection = {
 };
 
 type Props = {
-  activeTab: 'repos' | 'github' | 'settings';
+  activeTab: 'localRepos' | 'repo' | 'github' | 'settings';
   isAuthenticated: boolean;
   selectedGithubAuthHelpMethod: GithubAuthHelpMethod;
   onClearGithubAuthHelpMethod: () => void;
