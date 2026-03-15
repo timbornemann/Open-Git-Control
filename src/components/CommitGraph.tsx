@@ -910,29 +910,36 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   return (
     <>
       <div className="commit-search-toolbar" style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg-darker)', borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Suche:</span>
-          <button
-            type="button"
-            onClick={() => setActiveSearchPanel('commits')}
-            style={{ border: '1px solid var(--border-color)', backgroundColor: activeSearchPanel === 'commits' ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: activeSearchPanel === 'commits' ? 'var(--text-accent)' : 'var(--text-secondary)', borderRadius: '999px', padding: '4px 9px', fontSize: '0.72rem', cursor: 'pointer' }}
-          >
-            Commit-Suche
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveSearchPanel('forensic');
-              setForensicError(null);
-            }}
-            style={{ border: '1px solid var(--border-color)', backgroundColor: activeSearchPanel === 'forensic' ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: activeSearchPanel === 'forensic' ? 'var(--text-accent)' : 'var(--text-secondary)', borderRadius: '999px', padding: '4px 9px', fontSize: '0.72rem', cursor: 'pointer' }}
-          >
-            Forensische Historie
-          </button>
-        </div>
         {activeSearchPanel === 'commits' && (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                Suchmodus:
+                <select
+                  value={activeSearchPanel}
+                  onChange={(e) => {
+                    const mode = e.target.value as SearchPanel;
+                    setActiveSearchPanel(mode);
+                    if (mode === 'forensic') setForensicError(null);
+                  }}
+                  style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
+                >
+                  <option value="commits">Commit-Suche</option>
+                  <option value="forensic">Forensische Historie</option>
+                </select>
+              </label>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                Feld:
+                <select
+                  value={searchScope}
+                  onChange={(e) => setSearchScope(e.target.value as SearchScope)}
+                  style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
+                >
+                  {(Object.keys(SEARCH_SCOPE_LABELS) as SearchScope[]).map((scope) => (
+                    <option key={scope} value={scope}>{SEARCH_SCOPE_LABELS[scope]}</option>
+                  ))}
+                </select>
+              </label>
               <input
                 className="commit-search-input" style={{ flex: 1, minWidth: '240px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.82rem' }}
                 type="text"
@@ -948,26 +955,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 </div>
               )}
             </div>
-            <div className="commit-search-filters" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {(Object.keys(SEARCH_SCOPE_LABELS) as SearchScope[]).map(scope => (
-                <button
-                  key={scope}
-                  className={`commit-search-chip ${searchScope === scope ? 'active' : ''}`}
-                  style={{
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: searchScope === scope ? 'var(--accent-primary-soft)' : 'var(--bg-panel)',
-                    color: searchScope === scope ? 'var(--text-accent)' : 'var(--text-secondary)',
-                    borderRadius: '999px',
-                    padding: '4px 9px',
-                    fontSize: '0.72rem',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setSearchScope(scope)}
-                >
-                  {SEARCH_SCOPE_LABELS[scope]}
-                </button>
-              ))}
-            </div>
           </>
         )}
       </div>
@@ -975,19 +962,36 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
       <div style={{ borderBottom: '1px solid var(--border-color)', padding: '8px', display: activeSearchPanel === 'forensic' ? 'flex' : 'none', flexDirection: 'column', gap: '8px', background: 'var(--bg-dark)' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Forensik-Modus:</span>
-          {(Object.keys(FORENSIC_SEARCH_TYPE_LABELS) as ForensicSearchType[]).map(type => (
-            <button
-              key={type}
-              onClick={() => {
-                setForensicType(type);
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            Suchmodus:
+            <select
+              value={activeSearchPanel}
+              onChange={(e) => {
+                const mode = e.target.value as SearchPanel;
+                setActiveSearchPanel(mode);
+                if (mode === 'forensic') setForensicError(null);
+              }}
+              style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
+            >
+              <option value="commits">Commit-Suche</option>
+              <option value="forensic">Forensische Historie</option>
+            </select>
+          </label>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            Forensik-Modus:
+            <select
+              value={forensicType}
+              onChange={(e) => {
+                setForensicType(e.target.value as ForensicSearchType);
                 setForensicError(null);
               }}
-              style={{ border: '1px solid var(--border-color)', backgroundColor: forensicType === type ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: forensicType === type ? 'var(--text-accent)' : 'var(--text-secondary)', borderRadius: '999px', padding: '4px 9px', fontSize: '0.72rem', cursor: 'pointer' }}
+              style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
             >
-              {FORENSIC_SEARCH_TYPE_LABELS[type]}
-            </button>
-          ))}
+              {(Object.keys(FORENSIC_SEARCH_TYPE_LABELS) as ForensicSearchType[]).map((type) => (
+                <option key={type} value={type}>{FORENSIC_SEARCH_TYPE_LABELS[type]}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <input
