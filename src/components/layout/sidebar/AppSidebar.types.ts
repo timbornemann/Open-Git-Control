@@ -17,8 +17,8 @@ export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 export type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
 
 export type AppSidebarProps = {
-  activeTab: 'repos' | 'github' | 'settings';
-  setActiveTab: (tab: 'repos' | 'github' | 'settings') => void;
+  activeTab: 'localRepos' | 'repo' | 'github' | 'settings';
+  setActiveTab: (tab: 'localRepos' | 'repo' | 'github' | 'settings') => void;
 
   activeRepo: string | null;
   openRepos: string[];
