@@ -30,21 +30,9 @@ const HelpMethodButton: React.FC<{
   title: string;
 }> = ({ active, onClick, title }) => (
   <button
-    className="icon-btn"
+    className={`icon-btn sidebar-help-action ${active ? 'sidebar-help-action-active' : 'sidebar-help-action-inactive'}`}
     onClick={onClick}
     title={title}
-    style={{
-      padding: '2px',
-      marginLeft: 'auto',
-      color: active ? 'var(--text-accent)' : 'var(--text-secondary)',
-      border: active ? '1px solid var(--accent-primary-border)' : '1px solid transparent',
-      borderRadius: '999px',
-      width: '20px',
-      height: '20px',
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
   >
     <Info size={12} />
   </button>
@@ -93,16 +81,16 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
       <Github size={48} style={{ margin: '0 auto', color: 'var(--text-secondary)' }} />
       <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem' }}>{tr('GitHub verbinden', 'GitHub Connect')}</h3>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 1: Personal Access Token (PAT)', 'Method 1: Personal Access Token (PAT)')}</div>
+      <div className="sidebar-panel-block">
+        <div className="sidebar-panel-row">
+          <div className="sidebar-panel-title">{tr('Methode 1: Personal Access Token (PAT)', 'Method 1: Personal Access Token (PAT)')}</div>
           <HelpMethodButton
             active={selectedGithubAuthHelpMethod === 'pat'}
             onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'pat', onSelectGithubAuthHelpMethod)}
             title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 1 anzeigen', 'Show step-by-step guide for method 1')}
           />
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
+        <p className="sidebar-meta-text">
           {tr('Klassische Anmeldung mit eigenem Token.', 'Classic sign-in with your own token.')}
         </p>
         <a
@@ -124,17 +112,8 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         >
           <ExternalLink size={12} /> {tr('Token erstellen', 'Create token')}
         </a>
-        <div style={{ position: 'relative' }}>
-          <Key
-            size={14}
-            style={{
-              position: 'absolute',
-              left: '8px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-secondary)',
-            }}
-          />
+        <div className="sidebar-search-wrap">
+          <Key size={14} className="sidebar-search-icon" />
           <input
             type="password"
             placeholder="ghp_xxx"
@@ -146,9 +125,8 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             onKeyDown={e => {
               if (e.key === 'Enter') onTokenLogin();
             }}
+            className="sidebar-filter-input"
             style={{
-              width: '100%',
-              boxSizing: 'border-box',
               padding: '8px 8px 8px 28px',
               borderRadius: '4px',
               border: authError ? '1px solid var(--status-danger)' : '1px solid var(--border-color)',
@@ -159,7 +137,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
           />
         </div>
         {authError && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--status-danger)', margin: 0, textAlign: 'left' }}>
+          <p className="sidebar-meta-text" style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
             {authError}
           </p>
         )}
@@ -180,39 +158,39 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 2: OAuth Device Flow (Alternative)', 'Method 2: OAuth Device Flow (Alternative)')}</div>
+      <div className="sidebar-panel-block">
+        <div className="sidebar-panel-row">
+          <div className="sidebar-panel-title">{tr('Methode 2: OAuth Device Flow (Alternative)', 'Method 2: OAuth Device Flow (Alternative)')}</div>
           <HelpMethodButton
             active={selectedGithubAuthHelpMethod === 'device'}
             onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'device', onSelectGithubAuthHelpMethod)}
             title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 2 anzeigen', 'Show step-by-step guide for method 2')}
           />
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
+        <p className="sidebar-meta-text">
           {tr('Browser-Oeffnung mit Einmal-Code. PAT bleibt weiterhin moeglich.', 'Browser-based sign-in with one-time code. PAT remains available.')}
         </p>
 
         {!oauthConfigured && (
-          <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)', textAlign: 'left' }}>
+          <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
             {tr('Device Flow ist nicht konfiguriert (GitHub OAuth Client ID fehlt: Settings oder GITHUB_OAUTH_CLIENT_ID).', 'Device flow is not configured (missing GitHub OAuth Client ID in settings or GITHUB_OAUTH_CLIENT_ID).')}
           </div>
         )}
 
         {deviceFlowError && (
-          <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)', textAlign: 'left' }}>
+          <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
             {deviceFlowError}
           </div>
         )}
 
         {deviceFlow && (
           <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', textAlign: 'left', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '8px', backgroundColor: 'var(--bg-dark)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="sidebar-panel-row">
               <ShieldCheck size={12} />
               {tr('Code', 'Code')}: <strong style={{ letterSpacing: '1px' }}>{deviceFlow.userCode}</strong>
               <button
-                className="icon-btn"
-                style={{ padding: '2px', marginLeft: 'auto' }}
+                className="icon-btn sidebar-row-action-icon"
+                style={{ marginLeft: 'auto' }}
                 onClick={() => navigator.clipboard.writeText(deviceFlow.userCode)}
                 title={tr('Code kopieren', 'Copy code')}
               >
@@ -261,20 +239,20 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, textAlign: 'left' }}>{tr('Methode 3: 1-Klick GitHub Login', 'Method 3: One-click GitHub login')}</div>
+      <div className="sidebar-panel-block">
+        <div className="sidebar-panel-row">
+          <div className="sidebar-panel-title">{tr('Methode 3: 1-Klick GitHub Login', 'Method 3: One-click GitHub login')}</div>
           <HelpMethodButton
             active={selectedGithubAuthHelpMethod === 'web'}
             onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'web', onSelectGithubAuthHelpMethod)}
             title={tr('Schritt-fuer-Schritt-Anleitung fuer Methode 3 anzeigen', 'Show step-by-step guide for method 3')}
           />
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, textAlign: 'left' }}>
+        <p className="sidebar-meta-text">
           {tr('Ohne OAuth App oder Keys: Klick auf Button, im Browser anmelden, fertig.', 'No OAuth app or keys: click button, sign in in browser, done.')}
         </p>
         {webFlowError && (
-          <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)', textAlign: 'left' }}>
+          <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
             {webFlowError}
           </div>
         )}

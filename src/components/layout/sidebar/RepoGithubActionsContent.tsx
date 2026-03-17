@@ -145,7 +145,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
           onToggleCollapsed={() => setIsPrCollapsed((prev) => !prev)}
           toggleTitle={isPrCollapsed ? tr('Pull Requests anzeigen', 'Show pull requests') : tr('Pull Requests einklappen', 'Collapse pull requests')}
           actions={(
-            <button className="icon-btn" style={{ padding: '2px' }} onClick={() => { props.setShowCreatePR(true); props.setNewPRHead(props.currentBranch); }} title={tr('Neuen PR erstellen', 'Create new PR')}>
+            <button className="icon-btn sidebar-row-action-icon" onClick={() => { props.setShowCreatePR(true); props.setNewPRHead(props.currentBranch); }} title={tr('Neuen PR erstellen', 'Create new PR')}>
               <Plus size={13} />
             </button>
           )}
@@ -173,7 +173,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                   <input className="repo-filter-input" type="text" placeholder={tr('Head Branch', 'Head branch')} value={props.newPRHead} onChange={e => props.setNewPRHeadInput(e.target.value)} />
                   <input className="repo-filter-input" type="text" placeholder={tr('Base Branch', 'Base branch')} value={props.newPRBase} onChange={e => props.setNewPRBase(e.target.value)} />
                 </div>
-                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                <div className="sidebar-row-actions">
                   <button className="staging-tool-btn" onClick={() => props.setShowCreatePR(false)}>{tr('Abbrechen', 'Cancel')}</button>
                   <button className="staging-tool-btn" onClick={props.onCreatePR} disabled={!props.newPRTitle.trim()}>{tr('Erstellen', 'Create')}</button>
                 </div>
@@ -186,7 +186,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               {!props.prLoading && props.pullRequests.length === 0 && <div className="repo-state-text">{tr('Keine Pull Requests.', 'No pull requests.')}</div>}
 
               {!props.prLoading && props.pullRequests.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="sidebar-panel-stack">
                   {props.pullRequests.map(pr => (
                     <div key={pr.number} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
@@ -225,7 +225,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <div className="sidebar-row-actions">
                         {pr.state === 'open' && (
                           <>
                             <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'merge')}>{tr('Merge', 'Merge')}</button>
@@ -257,9 +257,9 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
         {!isWorkflowCollapsed && (
           <>
             <RepoCardToolbar>
-              <div style={{ position: 'relative' }}>
-                <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input className="repo-filter-input" value={workflowQuery} onChange={(event) => setWorkflowQuery(event.target.value)} placeholder={tr('Workflows filtern...', 'Filter workflows...')} style={{ paddingLeft: '26px' }} />
+              <div className="sidebar-search-wrap">
+                <Search size={12} className="sidebar-search-icon" />
+                <input className="repo-filter-input sidebar-filter-input" value={workflowQuery} onChange={(event) => setWorkflowQuery(event.target.value)} placeholder={tr('Workflows filtern...', 'Filter workflows...')} />
               </div>
             </RepoCardToolbar>
 
@@ -269,7 +269,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length === 0 && <div className="repo-state-text">{workflowQuery.trim() ? tr('Keine Treffer fuer den Filter.', 'No matches for this filter.') : tr('Keine Workflow-Runs gefunden.', 'No workflow runs found.')}</div>}
 
               {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="sidebar-panel-stack">
                   {filteredWorkflowRuns.map((run) => (
                     <div key={run.id} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-panel)', padding: '6px 8px', display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 8px', alignItems: 'center' }}>
                       <div style={{ minWidth: 0 }}>
