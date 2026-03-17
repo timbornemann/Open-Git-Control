@@ -14,6 +14,7 @@ import {
 import { AppSidebarProps } from './AppSidebar.types';
 import { GithubWorkflowRunDto } from '../../../global';
 import { useI18n } from '../../../i18n';
+import { formatDateTime } from '../../../utils/dateTime';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '../../sidebar/RepoCard';
 
 type RepoGithubActionsContentProps = Pick<
@@ -62,7 +63,7 @@ const formatDuration = (startedAt?: string | null, finishedAt?: string | null): 
 };
 
 export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> = (props) => {
-  const { tr } = useI18n();
+  const { tr, locale } = useI18n();
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
   const [isPrCollapsed, setIsPrCollapsed] = useState(false);
   const [isWorkflowCollapsed, setIsWorkflowCollapsed] = useState(false);
@@ -274,7 +275,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '0.76rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.workflowName || run.name}</div>
                         <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)' }}>{run.status}{run.conclusion ? ` | ${run.conclusion}` : ''} | {run.event}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{new Date(run.createdAt).toLocaleString()} | {formatDuration(run.startedAt, run.updatedAt)}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{formatDateTime(run.createdAt, locale)} | {formatDuration(run.startedAt, run.updatedAt)}</div>
                       </div>
                       <button className="staging-btn-sm" onClick={() => props.onOpenPR(run.htmlUrl)} title={tr('Im Browser oeffnen', 'Open in browser')}><ExternalLink size={12} /></button>
                     </div>
