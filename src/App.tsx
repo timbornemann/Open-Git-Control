@@ -16,6 +16,7 @@ const SIDEBAR_MAX_WIDTH = 560;
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const APP_RESIZER_WIDTH = 8;
 const MIN_MAIN_VIEW_WIDTH = 608;
+const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -30,6 +31,14 @@ const App: React.FC = () => {
     const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
     return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
   }, []);
+
+  const clampSidebarWidth = useCallback((width: number) => {
+    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), width));
+  }, [getSidebarMaxWidth]);
+
+  const resetLayout = useCallback(() => {
+    setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
+  }, [clampSidebarWidth]);
 
   const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -70,6 +79,17 @@ const App: React.FC = () => {
       document.body.style.userSelect = '';
     };
   }, [getSidebarMaxWidth]);
+
+  useEffect(() => {
+    const storedWidthRaw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const storedWidthValue = Number(storedWidthRaw);
+    const normalizedWidth = Number.isFinite(storedWidthValue) ? storedWidthValue : SIDEBAR_DEFAULT_WIDTH;
+    setSidebarWidth(clampSidebarWidth(Math.round(normalizedWidth)));
+  }, [clampSidebarWidth]);
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
 
   useEffect(() => {
     const clampToViewport = () => {
@@ -248,6 +268,7 @@ const App: React.FC = () => {
           jobs={state.jobs}
           onClearJobs={state.clearJobs}
           settingsTab={settingsTab}
+          onResetLayout={resetLayout}
           showReleaseCreator={state.showReleaseCreator}
           onOpenReleaseCreator={state.openReleaseCreator}
           onCloseReleaseCreator={state.closeReleaseCreator}

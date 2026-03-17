@@ -9,6 +9,7 @@ type SettingsMainContentProps = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
   activeTab: SettingsTabId;
+  onResetLayout: () => void;
 };
 
 const THEME_OPTIONS: Array<{
@@ -30,6 +31,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
   jobs,
   onClearJobs,
   activeTab,
+  onResetLayout,
 }) => {
   const { tr, locale } = useI18n();
   const sortedJobs = useMemo(() => [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20), [jobs]);
@@ -254,6 +256,11 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   <option value="en">English</option>
                 </select>
               </label>
+              <div className="settings-inline-actions">
+                <button className="staging-tool-btn" onClick={onResetLayout}>
+                  {tr('Layout zuruecksetzen', 'Reset layout')}
+                </button>
+              </div>
             </section>
 
             <section className="settings-card">
