@@ -91,7 +91,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
       }}
     >
       <Github size={48} style={{ margin: '0 auto', color: 'var(--text-secondary)' }} />
-      <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem' }}>GitHub Connect</h3>
+      <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem' }}>{tr('GitHub verbinden', 'GitHub Connect')}</h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
