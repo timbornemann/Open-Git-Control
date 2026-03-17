@@ -58,6 +58,7 @@ type Props = {
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
   settingsTab: SettingsTabId;
+  onResetLayout: () => void;
   showReleaseCreator: boolean;
   onOpenReleaseCreator: () => void;
   onCloseReleaseCreator: () => void;
@@ -304,6 +305,7 @@ export const MainView: React.FC<Props> = ({
   jobs,
   onClearJobs,
   settingsTab,
+  onResetLayout,
   showReleaseCreator,
   onOpenReleaseCreator,
   onCloseReleaseCreator,
@@ -587,6 +589,7 @@ export const MainView: React.FC<Props> = ({
                 jobs={jobs}
                 onClearJobs={onClearJobs}
                 activeTab={settingsTab}
+                onResetLayout={onResetLayout}
               />
             ) : isReleaseView ? (
               <ReleaseCreator
