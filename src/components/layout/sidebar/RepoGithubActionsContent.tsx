@@ -44,11 +44,11 @@ type RepoGithubActionsContentProps = Pick<
   | 'onCreatePR'
 >;
 
-const getCiBadgeStyles = (badge: string) => {
-  if (badge === 'success') return { color: 'var(--status-success)', backgroundColor: 'var(--status-success-soft)', borderColor: 'var(--status-success-border)', label: 'CI: Success' };
-  if (badge === 'failure') return { color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-soft)', borderColor: 'var(--status-danger-border)', label: 'CI: Failed' };
-  if (badge === 'pending') return { color: 'var(--status-warning)', backgroundColor: 'var(--status-warning-soft)', borderColor: 'var(--status-warning-border)', label: 'CI: Pending' };
-  return { color: 'var(--text-secondary)', backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-color)', label: 'CI: Unknown' };
+const getCiBadgeStyles = (badge: string, tr: (de: string, en: string) => string) => {
+  if (badge === 'success') return { color: 'var(--status-success)', backgroundColor: 'var(--status-success-soft)', borderColor: 'var(--status-success-border)', label: tr('CI: Erfolgreich', 'CI: Success') };
+  if (badge === 'failure') return { color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-soft)', borderColor: 'var(--status-danger-border)', label: tr('CI: Fehlgeschlagen', 'CI: Failed') };
+  if (badge === 'pending') return { color: 'var(--status-warning)', backgroundColor: 'var(--status-warning-soft)', borderColor: 'var(--status-warning-border)', label: tr('CI: Ausstehend', 'CI: Pending') };
+  return { color: 'var(--text-secondary)', backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-color)', label: tr('CI: Unbekannt', 'CI: Unknown') };
 };
 
 const formatDuration = (startedAt?: string | null, finishedAt?: string | null): string => {
@@ -193,12 +193,12 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                         <GitPullRequest size={14} style={{ color: pr.merged ? 'var(--status-merged)' : pr.state === 'open' ? 'var(--status-success)' : 'var(--status-danger)', marginTop: '2px', flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {pr.title}{pr.draft && <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>Draft</span>}
+                            {pr.title}{pr.draft && <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>{tr('Entwurf', 'Draft')}</span>}
                           </div>
                           <div style={{ fontSize: '0.71rem', color: 'var(--text-secondary)', marginTop: '2px' }}>#{pr.number} | {pr.head} {'->'} {pr.base} | {pr.user}</div>
                           {(() => {
                             const ci = props.prCiByNumber[pr.number];
-                            const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown');
+                            const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown', tr);
                             return (
                               <button onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)} className="repo-pill-btn" style={{ marginTop: '6px', borderColor: badgeStyles.borderColor, backgroundColor: badgeStyles.backgroundColor, color: badgeStyles.color }}>
                                 {ci?.badge === 'success' && <CheckCircle2 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />}
@@ -228,9 +228,9 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         {pr.state === 'open' && (
                           <>
-                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'merge')}>Merge</button>
-                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'squash')}>Squash</button>
-                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'rebase')}>Rebase</button>
+                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'merge')}>{tr('Merge', 'Merge')}</button>
+                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'squash')}>{tr('Squash', 'Squash')}</button>
+                            <button className="staging-btn-sm" onClick={() => props.onMergePR(pr.number, 'rebase')}>{tr('Rebase', 'Rebase')}</button>
                           </>
                         )}
                         <button className="staging-btn-sm" onClick={() => props.onOpenPR(pr.htmlUrl)}><ExternalLink size={12} /></button>

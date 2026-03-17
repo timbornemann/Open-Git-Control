@@ -70,20 +70,6 @@ type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
 type ForensicSearchType = 'string' | 'regex' | 'line';
 type SearchPanel = 'commits' | 'forensic';
 
-const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
-  all: 'Alles',
-  subject: 'Nachricht',
-  author: 'Autor',
-  hash: 'Hash',
-  refs: 'Refs',
-};
-
-const FORENSIC_SEARCH_TYPE_LABELS: Record<ForensicSearchType, string> = {
-  string: '-S String',
-  regex: '-G Regex',
-  line: '-L Zeilenbereich',
-};
-
 const getRefKind = (ref: string): RefKind => {
   if (ref.startsWith('tag:')) return 'tag';
   if (ref.startsWith('HEAD ->')) return 'head';
@@ -107,7 +93,7 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
 });
 
 export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff, showRecoveryCenter = false, onToggleRecoveryCenter }) => {
-  const { locale } = useI18n();
+  const { locale, tr } = useI18n();
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
@@ -132,6 +118,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [forensicError, setForensicError] = useState<string | null>(null);
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
+
+  const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
+    all: tr('Alles', 'All'),
+    subject: tr('Nachricht', 'Message'),
+    author: tr('Autor', 'Author'),
+    hash: tr('Hash', 'Hash'),
+    refs: tr('Refs', 'Refs'),
+  }), [tr]);
+
+  const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(() => ({
+    string: tr('-S String', '-S string'),
+    regex: tr('-G Regex', '-G regex'),
+    line: tr('-L Zeilenbereich', '-L line range'),
+  }), [tr]);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const commitCountRef = useRef(0);
   const layoutRef = useRef<GraphLayout | null>(null);
@@ -396,7 +396,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
 
     const normalizedPath = forensicPath.trim();
     if (!normalizedPath) {
-      setForensicError('Bitte einen Pfad fuer die forensische Suche angeben.');
+      setForensicError(tr('Bitte einen Pfad fuer die forensische Suche angeben.', 'Please provide a path for the forensic search.'));
       setForensicResults([]);
       return;
     }
@@ -412,7 +412,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       const start = Number(forensicStartLine);
       const end = Number(forensicEndLine);
       if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
-        setForensicError('Ungueltiger Zeilenbereich. Bitte Start/Ende pruefen.');
+        setForensicError(tr('Ungueltiger Zeilenbereich. Bitte Start/Ende pruefen.', 'Invalid line range. Please check start/end.'));
         setForensicResults([]);
         return;
       }
@@ -420,7 +420,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     } else {
       const searchTerm = forensicValue.trim();
       if (!searchTerm) {
-        setForensicError(forensicType === 'regex' ? 'Bitte Regex angeben.' : 'Bitte Suchstring angeben.');
+        setForensicError(forensicType === 'regex' ? tr('Bitte Regex angeben.', 'Please provide a regex.') : tr('Bitte Suchstring angeben.', 'Please provide a search string.'));
         setForensicResults([]);
         return;
       }
@@ -433,9 +433,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     try {
       const { success, data, error } = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (!success) {
-        const message = String(error || 'Forensische Suche fehlgeschlagen.');
+        const message = String(error || tr('Forensische Suche fehlgeschlagen.', 'Forensic search failed.'));
         const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
-        setForensicError(invalidPattern ? 'Ungueltiges Regex-Muster. Bitte Ausdruck korrigieren.' : message);
+        setForensicError(invalidPattern ? tr('Ungueltiges Regex-Muster. Bitte Ausdruck korrigieren.', 'Invalid regex pattern. Please fix the expression.') : message);
         setForensicResults([]);
         return;
       }
@@ -444,15 +444,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       const nodes = commits.map(commit => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
       setForensicResults(nodes);
       if (commits.length === 0) {
-        setForensicError('Keine Treffer gefunden.');
+        setForensicError(tr('Keine Treffer gefunden.', 'No matches found.'));
       }
     } catch (e: any) {
       setForensicResults([]);
-      setForensicError(String(e?.message || 'Forensische Suche fehlgeschlagen.'));
+      setForensicError(String(e?.message || tr('Forensische Suche fehlgeschlagen.', 'Forensic search failed.')));
     } finally {
       setForensicLoading(false);
     }
-  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath]);
+  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, tr]);
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
     try {
@@ -839,13 +839,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   };
 
   if (!repoPath) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>Bitte waehle ein Repository aus, um den Graphen zu sehen.</div>;
+    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
   }
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Lade Commit-Historie...</div>;
+    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('Lade Commit-Historie...', 'Loading commit history...')}</div>;
   }
   if (!layout || layout.nodes.length === 0) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Keine Commits gefunden.</div>;
+    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('Keine Commits gefunden.', 'No commits found.')}</div>;
   }
 
   const hasWorkingTreeChanges = Boolean(
@@ -921,7 +921,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                Suchmodus:
+                {tr('Suchmodus:', 'Search mode:')}
                 <select
                   value={activeSearchPanel}
                   onChange={(e) => {
@@ -931,19 +931,19 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                   }}
                   style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
                 >
-                  <option value="commits">Commit-Suche</option>
-                  <option value="forensic">Forensische Historie</option>
+                  <option value="commits">{tr('Commit-Suche', 'Commit search')}</option>
+                  <option value="forensic">{tr('Forensische Historie', 'Forensic history')}</option>
                 </select>
               </label>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                Feld:
+                {tr('Feld:', 'Field:')}
                 <select
                   value={searchScope}
                   onChange={(e) => setSearchScope(e.target.value as SearchScope)}
                   style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
                 >
-                  {(Object.keys(SEARCH_SCOPE_LABELS) as SearchScope[]).map((scope) => (
-                    <option key={scope} value={scope}>{SEARCH_SCOPE_LABELS[scope]}</option>
+                  {(Object.keys(searchScopeLabels) as SearchScope[]).map((scope) => (
+                    <option key={scope} value={scope}>{searchScopeLabels[scope]}</option>
                   ))}
                 </select>
               </label>
@@ -952,20 +952,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Commits durchsuchen (Hash, Autor, Nachricht, Ref)"
+                placeholder={tr('Commits durchsuchen (Hash, Autor, Nachricht, Ref)', 'Search commits (hash, author, message, ref)')}
               />
               <button
                 className="commit-search-nav"
                 style={{ border: '1px solid var(--border-color)', backgroundColor: showRecoveryCenter ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: showRecoveryCenter ? 'var(--text-accent)' : 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
                 onClick={onToggleRecoveryCenter}
               >
-                {showRecoveryCenter ? 'Verlauf' : 'Recovery Center'}
+                {showRecoveryCenter ? tr('Verlauf', 'History') : tr('Recovery Center', 'Recovery Center')}
               </button>
               {normalizedSearch && (
                 <div className="commit-search-meta" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                  <span>{matchedNodes.length} Treffer</span>
-                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(-1)} disabled={matchedNodes.length === 0}>Prev</button>
-                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(1)} disabled={matchedNodes.length === 0}>Next</button>
+                  <span>{matchedNodes.length} {tr('Treffer', 'matches')}</span>
+                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(-1)} disabled={matchedNodes.length === 0}>{tr('Zurueck', 'Prev')}</button>
+                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(1)} disabled={matchedNodes.length === 0}>{tr('Weiter', 'Next')}</button>
                 </div>
               )}
             </div>
@@ -977,7 +977,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
       <div style={{ borderBottom: '1px solid var(--border-color)', padding: '8px', display: activeSearchPanel === 'forensic' ? 'flex' : 'none', flexDirection: 'column', gap: '8px', background: 'var(--bg-dark)' }}>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            Suchmodus:
+            {tr('Suchmodus:', 'Search mode:')}
             <select
               value={activeSearchPanel}
               onChange={(e) => {
@@ -987,12 +987,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               }}
               style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
             >
-              <option value="commits">Commit-Suche</option>
-              <option value="forensic">Forensische Historie</option>
+              <option value="commits">{tr('Commit-Suche', 'Commit search')}</option>
+              <option value="forensic">{tr('Forensische Historie', 'Forensic history')}</option>
             </select>
           </label>
           <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            Forensik-Modus:
+            {tr('Forensik-Modus:', 'Forensics mode:')}
             <select
               value={forensicType}
               onChange={(e) => {
@@ -1001,8 +1001,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               }}
               style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
             >
-              {(Object.keys(FORENSIC_SEARCH_TYPE_LABELS) as ForensicSearchType[]).map((type) => (
-                <option key={type} value={type}>{FORENSIC_SEARCH_TYPE_LABELS[type]}</option>
+              {(Object.keys(forensicSearchTypeLabels) as ForensicSearchType[]).map((type) => (
+                <option key={type} value={type}>{forensicSearchTypeLabels[type]}</option>
               ))}
             </select>
           </label>
@@ -1014,7 +1014,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
             onChange={(e) => setForensicPath(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }}
             list="forensic-path-suggestions"
-            placeholder="Dateipfad (z.B. src/components/CommitGraph.tsx)"
+            placeholder={tr('Dateipfad (z.B. src/components/CommitGraph.tsx)', 'File path (e.g. src/components/CommitGraph.tsx)')}
             style={{ flex: 1, minWidth: 260, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
           />
           <datalist id="forensic-path-suggestions">
@@ -1024,8 +1024,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
           </datalist>
           {forensicType === 'line' ? (
             <>
-              <input type="number" min={1} value={forensicStartLine} onChange={(e) => setForensicStartLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder="Startzeile" style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
-              <input type="number" min={1} value={forensicEndLine} onChange={(e) => setForensicEndLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder="Endzeile" style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
+              <input type="number" min={1} value={forensicStartLine} onChange={(e) => setForensicStartLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder={tr('Startzeile', 'Start line')} style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
+              <input type="number" min={1} value={forensicEndLine} onChange={(e) => setForensicEndLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder={tr('Endzeile', 'End line')} style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
             </>
           ) : (
             <input
@@ -1033,12 +1033,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               value={forensicValue}
               onChange={(e) => setForensicValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }}
-              placeholder={forensicType === 'regex' ? 'Regex-Muster (git -G)' : 'Suchstring im Dateiinhalt (git -S)'}
+              placeholder={forensicType === 'regex' ? tr('Regex-Muster (git -G)', 'Regex pattern (git -G)') : tr('Suchstring im Dateiinhalt (git -S)', 'Search string in file content (git -S)')}
               style={{ flex: 1, minWidth: 220, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
             />
           )}
           <button onClick={() => void runForensicSearch()} disabled={forensicLoading} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>
-            {forensicLoading ? 'Suche...' : 'Forensisch suchen'}
+            {forensicLoading ? tr('Suche...', 'Searching...') : tr('Forensisch suchen', 'Run forensic search')}
           </button>
         </div>
         {forensicError && <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>{forensicError}</div>}
@@ -1048,7 +1048,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
               <div key={`forensic-${node.commit.hash}`} style={{ border: '1px solid var(--border-color)', borderRadius: 6, backgroundColor: 'var(--bg-panel)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button onClick={() => onSelectCommit?.(node.commit.hash)} style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'monospace' }}>{node.commit.abbrevHash}</button>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{node.commit.subject}</span>
-                <button onClick={() => onOpenDiff?.({ source: 'commit', path: forensicPath.trim(), commitHash: node.commit.hash, title: `${node.commit.abbrevHash} · ${forensicPath.trim()}` })} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', borderRadius: 4, padding: '3px 6px', fontSize: '0.72rem', cursor: 'pointer' }}>Diff</button>
+                <button onClick={() => onOpenDiff?.({ source: 'commit', path: forensicPath.trim(), commitHash: node.commit.hash, title: `${node.commit.abbrevHash} · ${forensicPath.trim()}` })} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', borderRadius: 4, padding: '3px 6px', fontSize: '0.72rem', cursor: 'pointer' }}>{tr('Diff', 'Diff')}</button>
               </div>
             ))}
           </div>
@@ -1208,7 +1208,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                 <div className="commit-subject-row">
                   <span className="commit-subject">{workingTreeLabel}</span>
                   <span className="commit-meta">
-                    <span className="commit-author">Klicken zum Stage / Commit</span>
+                    <span className="commit-author">{tr('Klicken zum Stage / Commit', 'Click to stage / commit')}</span>
                     <span className="commit-date">{workingTreeCount}</span>
                   </span>
                 </div>
