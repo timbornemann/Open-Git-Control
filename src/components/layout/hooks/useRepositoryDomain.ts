@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
+import { formatTime } from '../../../utils/dateTime';
 
 type Params = {
   activeRepo: string | null;
@@ -61,8 +62,8 @@ export const useRepositoryDomain = ({
 
   const formatLastFetchedAt = useCallback((timestamp: number | null) => {
     if (!timestamp) return tr('Noch nicht aktualisiert', 'Not updated yet');
-    const locale = language === 'en' ? 'en-US' : 'de-DE';
-    return tr('Zuletzt aktualisiert', 'Last updated') + ': ' + new Date(timestamp).toLocaleTimeString(locale, {
+    const locale = getLocale(language);
+    return tr('Zuletzt aktualisiert', 'Last updated') + ': ' + formatTime(timestamp, locale, {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',

@@ -210,7 +210,7 @@ const LEGACY_REGEX_REPLACERS_EN: Array<[RegExp, string]> = [
   [/^(.+) geloescht$/, 'Deleted $1'],
 ];
 
-const getLocale = (language: AppLanguage): string => {
+export const getLocale = (language: AppLanguage): string => {
   return language === 'en' ? 'en-US' : 'de-DE';
 };
 

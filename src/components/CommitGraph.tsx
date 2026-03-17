@@ -6,6 +6,8 @@ import { Confirm, DialogContextItem } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
 import { DiffRequest } from '../types/diff';
+import { useI18n } from '../i18n';
+import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -105,6 +107,7 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
 });
 
 export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff, showRecoveryCenter = false, onToggleRecoveryCenter }) => {
+  const { locale } = useI18n();
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
   const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
@@ -814,15 +817,17 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
     return actions;
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatCommitDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
       const now = new Date();
       const diffMs = now.getTime() - d.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      if (diffDays < 7) return `vor ${diffDays}d`;
-      return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+      if (diffDays === 0) {
+        return formatTime(d, locale, { hour: '2-digit', minute: '2-digit' });
+      }
+      if (diffDays < 7) return formatRelativeTime(d, locale, now);
+      return formatDate(d, locale, { day: '2-digit', month: 'short' });
     } catch { return ''; }
   };
 
@@ -1245,7 +1250,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
                       <span className="commit-stats" title={`${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`}>
                         {formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)}
                       </span>
-                      <span className="commit-date">{formatDate(node.commit.date)}</span>
+                      <span className="commit-date">{formatCommitDate(node.commit.date)}</span>
                     </span>
                   </div>
                 </div>
