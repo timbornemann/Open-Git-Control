@@ -9,6 +9,7 @@ import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
 import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
+import { resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
 
 const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',
@@ -67,6 +68,10 @@ const DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE: SidebarGeneralCollapseState = {
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
+  const [autoOpenConflictResolverPath, setAutoOpenConflictResolverPath] = useState<string | null>(null);
+  const clearAutoOpenConflictResolverPath = useCallback(() => {
+    setAutoOpenConflictResolverPath(null);
+  }, []);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
@@ -106,6 +111,7 @@ export const useAppState = () => {
 
   const resetRepoScopedUi = useCallback(() => {
     setSelectedCommit(null);
+    setAutoOpenConflictResolverPath(null);
     setNewRepoName('');
     setNewRepoDescription('');
     setConnectError(null);
@@ -354,16 +360,72 @@ export const useAppState = () => {
         triggerRefresh();
         return true;
       }
+      triggerRefresh();
+      try {
+        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
+        const conflictPath = resolveConflictPathAfterGitFailure(porcelain, r.error);
+        if (conflictPath) {
+          workspace.setActiveTab('repo');
+          setAutoOpenConflictResolverPath(conflictPath);
+          setGitActionToast({
+            msg: tr(
+              'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+              'Merge conflict: opening the conflict resolver.',
+            ),
+            isError: false,
+          });
+          triggerRefresh();
+          return false;
+        }
+      } catch {
+        // ignore; fall through to generic error toast
+      }
       setGitActionToast({ msg: r.error || tr('Fehler beim AusfÃ¼hren von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
+      triggerRefresh();
+      try {
+        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
+        const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
+        if (conflictPath) {
+          workspace.setActiveTab('repo');
+          setAutoOpenConflictResolverPath(conflictPath);
+          setGitActionToast({
+            msg: tr(
+              'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+              'Merge conflict: opening the conflict resolver.',
+            ),
+            isError: false,
+          });
+          triggerRefresh();
+          return false;
+        }
+      } catch {
+        // ignore
+      }
       setGitActionToast({ msg: e.message, isError: true });
       return false;
     } finally {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace.activeRepo, tr]);
+  }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
+
+  /** For UI paths that call `electronAPI.runGitCommand` directly (e.g. CommitGraph) — opens repo tab + conflict resolver. */
+  const openConflictResolverForPath = useCallback((path: string) => {
+    workspace.setActiveTab('repo');
+    setAutoOpenConflictResolverPath(path);
+    setGitActionToast({
+      msg: tr(
+        'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+        'Merge conflict: opening the conflict resolver.',
+      ),
+      isError: false,
+    });
+    triggerRefresh();
+  }, [setGitActionToast, triggerRefresh, workspace, tr]);
 
   isGitActionRunningRef.current = isGitActionRunning;
 
@@ -818,6 +880,9 @@ export const useAppState = () => {
     triggerRefresh,
     selectedCommit,
     setSelectedCommit,
+    autoOpenConflictResolverPath,
+    clearAutoOpenConflictResolverPath,
+    openConflictResolverForPath,
 
     isGitActionRunning,
     activeGitActionLabel,
