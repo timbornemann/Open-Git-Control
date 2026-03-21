@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { GitStatusDetailed, mergeableDecoratedRefs, normalizeBranchRefForMerge, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
+import { GitStatusDetailed, mergeableDecoratedRefs, normalizeBranchRefForMerge, parseGitLog, parseGitStatusDetailed, resolveConflictPathAfterGitFailure } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -23,6 +23,8 @@ interface CommitGraphProps {
   currentBranch?: string;
   branches?: BranchInfo[];
   onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
+  /** Wenn ein Git-Befehl hier direkt fehlschlaegt (nicht ueber runGitCommand), Konflikt-Resolver oeffnen */
+  onOpenConflictResolverForPath?: (path: string) => void;
 }
 
 const LOG_PAGE_SIZE = 200;
@@ -109,6 +111,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   currentBranch = '',
   branches = [],
   onMergeBranch,
+  onOpenConflictResolverForPath,
 }) => {
   const { locale, tr } = useI18n();
   const [layout, setLayout] = useState<GraphLayout | null>(null);
@@ -480,9 +483,35 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         refreshCommits();
         refreshWorkingTreeStatus();
       } else {
+        refreshCommits();
+        void refreshWorkingTreeStatus();
+        try {
+          const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+          const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
+          const conflictPath = resolveConflictPathAfterGitFailure(porcelain, result.error);
+          if (conflictPath && onOpenConflictResolverForPath) {
+            onOpenConflictResolverForPath(conflictPath);
+            return;
+          }
+        } catch {
+          // fall through to error toast
+        }
         setToast({ msg: result.error || 'Unbekannter Fehler', isError: true });
       }
     } catch (e: any) {
+      refreshCommits();
+      void refreshWorkingTreeStatus();
+      try {
+        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
+        const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
+        if (conflictPath && onOpenConflictResolverForPath) {
+          onOpenConflictResolverForPath(conflictPath);
+          return;
+        }
+      } catch {
+        // ignore
+      }
       setToast({ msg: e.message, isError: true });
     }
   };
