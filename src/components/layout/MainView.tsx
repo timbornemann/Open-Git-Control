@@ -330,6 +330,7 @@ export const MainView: React.FC<Props> = ({
   setReleaseNotesLanguage,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
+  const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
@@ -405,24 +406,29 @@ export const MainView: React.FC<Props> = ({
     ? tr('GitHub Login Anleitung', 'GitHub login guide')
     : showRecoveryCenter
     ? tr('Recovery Center', 'Recovery Center')
+    : activeConflictPath
+    ? tr('Konflikt-Resolver', 'Conflict resolver')
     : activeDiffRequest
     ? tr('Diff Viewer', 'Diff Viewer')
     : '';
-  const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || showGithubGuide || showRecoveryCenter || Boolean(activeDiffRequest);
+  const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     setActiveDiffRequest(null);
+    setActiveConflictPath(null);
     setShowRecoveryCenter((prev) => !prev);
   }, []);
 
   useEffect(() => {
     setActiveDiffRequest(null);
+    setActiveConflictPath(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
     setShowRecoveryCenter(false);
   }, [activeRepo]);
 
   const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
+    setActiveConflictPath(null);
     setActiveDiffRequest((previous) => {
       if (
         previous &&
@@ -436,9 +442,18 @@ export const MainView: React.FC<Props> = ({
     });
   }, []);
 
+  const handleOpenConflictResolver = useCallback((filePath: string) => {
+    setActiveDiffRequest(null);
+    setShowRecoveryCenter(false);
+    setActiveConflictPath(filePath);
+    setWorkingTreeSelection(null);
+    setCommitHistoryStack([]);
+    setSelectedCommit(null);
+  }, [setSelectedCommit]);
   const handleSelectCommitDirect = useCallback((hash: string | null) => {
     const normalized = normalizeCommitHash(hash);
     setWorkingTreeSelection(null);
+    setActiveConflictPath(null);
     setCommitHistoryStack([]);
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
@@ -460,6 +475,7 @@ export const MainView: React.FC<Props> = ({
 
   const handleSelectWorkingTreeFile = useCallback((path: string, source: 'staged' | 'unstaged') => {
     setCommitHistoryStack([]);
+    setActiveConflictPath(null);
     setSelectedCommit(null);
     setWorkingTreeSelection({ path, source });
   }, [setSelectedCommit]);
@@ -468,6 +484,7 @@ export const MainView: React.FC<Props> = ({
     const normalized = normalizeCommitHash(hash);
     if (!normalized) return;
     setWorkingTreeSelection(null);
+    setActiveConflictPath(null);
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
 
@@ -483,6 +500,7 @@ export const MainView: React.FC<Props> = ({
   const closeInspector = useCallback(() => {
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
+    setActiveConflictPath(null);
     setSelectedCommit(null);
   }, [setSelectedCommit]);
 
@@ -490,6 +508,7 @@ export const MainView: React.FC<Props> = ({
     onOpenRepoWorkspace();
     onCloseReleaseCreator();
     setActiveDiffRequest(null);
+    setActiveConflictPath(null);
     setShowRecoveryCenter(false);
     handleSelectCommitDirect(null);
   }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
@@ -577,6 +596,14 @@ export const MainView: React.FC<Props> = ({
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
+              ) : activeConflictPath ? (
+                <button
+                  className="icon-btn"
+                  onClick={() => setActiveConflictPath(null)}
+                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
+                >
+                  {tr('Zurueck zum Graph', 'Back to graph')}
+                </button>
               ) : activeDiffRequest ? (
                 <button
                   className="icon-btn"
@@ -615,6 +642,15 @@ export const MainView: React.FC<Props> = ({
                 notesGenerating={releaseNotesGenerating}
                 notesLanguage={releaseNotesLanguage}
                 setNotesLanguage={setReleaseNotesLanguage}
+              />
+            ) : activeConflictPath ? (
+              <StagingArea
+                repoPath={activeRepo}
+                onRepoChanged={triggerRefresh}
+                onOpenDiff={handleOpenDiff}
+                viewMode="conflictOnly"
+                initialConflictPath={activeConflictPath}
+                settings={settings}
               />
             ) : activeDiffRequest ? (
               <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />
@@ -693,6 +729,7 @@ export const MainView: React.FC<Props> = ({
                     onRepoChanged={triggerRefresh}
                     onOpenDiff={handleOpenDiff}
                     onSelectFileInspect={handleSelectWorkingTreeFile}
+                    onOpenConflictResolver={handleOpenConflictResolver}
                     settings={settings}
                   />
                 )}
@@ -704,3 +741,4 @@ export const MainView: React.FC<Props> = ({
     </div>
   );
 };
+
