@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mergeableDecoratedRefs,
+  mergeTargetFromDecoratedRef,
+  normalizeBranchRefForMerge,
   parseCommitDetails,
   parseGitLog,
   parseGitStatus,
@@ -257,5 +260,23 @@ describe('parseGitSubmoduleStatus', () => {
 
   it('returns empty for non-matching input', () => {
     expect(parseGitSubmoduleStatus('nonsense line')).toEqual([]);
+  });
+});
+
+describe('merge ref helpers', () => {
+  it('normalizes remotes/ prefix for merge', () => {
+    expect(normalizeBranchRefForMerge('remotes/origin/feature')).toBe('origin/feature');
+    expect(normalizeBranchRefForMerge('feature')).toBe('feature');
+  });
+
+  it('maps decorated log refs to merge targets', () => {
+    expect(mergeTargetFromDecoratedRef('tag:v1')).toBeNull();
+    expect(mergeTargetFromDecoratedRef('HEAD')).toBeNull();
+    expect(mergeTargetFromDecoratedRef('HEAD -> main')).toBe('main');
+    expect(mergeTargetFromDecoratedRef('origin/main')).toBe('origin/main');
+  });
+
+  it('lists unique merge candidates excluding current branch', () => {
+    expect(mergeableDecoratedRefs(['HEAD -> main', 'origin/main', 'feature'], 'main')).toEqual(['origin/main', 'feature']);
   });
 });

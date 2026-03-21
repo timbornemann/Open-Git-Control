@@ -255,3 +255,34 @@ export function parseGitReflog(reflogOutput: string): GitReflogEntryDto[] {
     })
     .filter((entry): entry is GitReflogEntryDto => entry !== null);
 }
+
+/** `git branch -a` uses names like `remotes/origin/main`; merge expects `origin/main`. */
+export function normalizeBranchRefForMerge(branchName: string): string {
+  if (branchName.startsWith('remotes/')) {
+    return branchName.slice('remotes/'.length);
+  }
+  return branchName;
+}
+
+/** Decorated ref from `git log` graph (e.g. `HEAD -> main`, `origin/foo`). */
+export function mergeTargetFromDecoratedRef(ref: string): string | null {
+  if (ref.startsWith('tag:')) return null;
+  if (ref === 'HEAD') return null;
+  const headArrow = ref.match(/^HEAD\s*->\s*(.+)$/);
+  if (headArrow) return headArrow[1].trim();
+  return ref;
+}
+
+export function mergeableDecoratedRefs(refs: string[], currentBranch: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const ref of refs) {
+    const target = mergeTargetFromDecoratedRef(ref);
+    if (!target) continue;
+    if (target === currentBranch) continue;
+    if (seen.has(target)) continue;
+    seen.add(target);
+    out.push(target);
+  }
+  return out;
+}
