@@ -9,7 +9,7 @@ import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { SettingsMainContent } from './SettingsMainContent';
-import { RemoteSyncState } from '../../types/git';
+import { BranchInfo, GitMergeMode, RemoteSyncState } from '../../types/git';
 import { DiffRequest } from '../../types/diff';
 import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
@@ -36,6 +36,8 @@ type Props = {
   onClearGithubAuthHelpMethod: () => void;
   activeRepo: string | null;
   currentBranch: string;
+  branches: BranchInfo[];
+  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   remoteSync: RemoteSyncState;
   remoteStatus: RemoteStatus;
   isGitActionRunning: boolean;
@@ -283,6 +285,8 @@ export const MainView: React.FC<Props> = ({
   onClearGithubAuthHelpMethod,
   activeRepo,
   currentBranch,
+  branches,
+  onMergeBranch,
   remoteSync,
   remoteStatus,
   isGitActionRunning,
@@ -518,6 +522,8 @@ export const MainView: React.FC<Props> = ({
         <div className="topbar-right">
           <TopbarActions
             activeRepo={activeRepo}
+            branches={branches}
+            currentBranch={currentBranch}
             isGitActionRunning={isGitActionRunning}
             isFetching={remoteSync.isFetching}
             activeActionLabel={activeGitActionLabel}
@@ -528,6 +534,7 @@ export const MainView: React.FC<Props> = ({
             onPush={onPush}
             onPushForceWithLease={onPushForceWithLease}
             onPushTags={onPushTags}
+            onMergeBranch={onMergeBranch}
             onStageCommit={handleStageCommitOpen}
             onOpenReleaseCreator={onOpenReleaseCreator}
           />
@@ -632,6 +639,9 @@ export const MainView: React.FC<Props> = ({
                 onOpenDiff={handleOpenDiff}
                 showRecoveryCenter={showRecoveryCenter}
                 onToggleRecoveryCenter={handleToggleRecoveryCenter}
+                currentBranch={currentBranch}
+                branches={branches}
+                onMergeBranch={onMergeBranch}
               />
             )}
           </div>

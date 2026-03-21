@@ -146,6 +146,7 @@ const App: React.FC = () => {
           onRefreshRemote={() => state.refreshRemoteState(true)}
           onSetUpstreamForCurrentBranch={state.handleSetUpstreamForCurrentBranch}
           onCheckoutRemoteBranch={state.handleCheckoutRemoteBranch}
+          onMergeRemoteBranch={state.handleMergeBranch}
           isRemotePanelCollapsed={state.isRemotePanelCollapsed}
           onToggleRemotePanelCollapsed={state.toggleRemotePanelCollapsed}
           submodules={state.submodules}
@@ -246,6 +247,8 @@ const App: React.FC = () => {
           onClearGithubAuthHelpMethod={() => setSelectedGithubAuthHelpMethod(null)}
           activeRepo={state.activeRepo}
           currentBranch={state.currentBranch}
+          branches={state.branches}
+          onMergeBranch={state.handleMergeBranch}
           remoteSync={state.remoteSync}
           remoteStatus={state.remoteStatus}
           isGitActionRunning={state.isGitActionRunning}
