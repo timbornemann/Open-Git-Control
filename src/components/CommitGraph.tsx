@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { GitStatusDetailed, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { GitStatusDetailed, mergeableDecoratedRefs, normalizeBranchRefForMerge, parseGitLog, parseGitStatusDetailed } from '../utils/gitParsing';
 import { computeGraphLayout, GraphLayout, GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -8,6 +9,7 @@ import { Input, InputDialogField } from './Input';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
+import { BranchInfo, GitMergeMode } from '../types/git';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -18,6 +20,9 @@ interface CommitGraphProps {
   onOpenDiff?: (request: DiffRequest) => void;
   showRecoveryCenter?: boolean;
   onToggleRecoveryCenter?: () => void;
+  currentBranch?: string;
+  branches?: BranchInfo[];
+  onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
 }
 
 const LOG_PAGE_SIZE = 200;
@@ -92,7 +97,19 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
   return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
 });
 
-export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectCommit, selectedHash, refreshTrigger, showSecondaryHistory = true, onOpenDiff, showRecoveryCenter = false, onToggleRecoveryCenter }) => {
+export const CommitGraph: React.FC<CommitGraphProps> = ({
+  repoPath,
+  onSelectCommit,
+  selectedHash,
+  refreshTrigger,
+  showSecondaryHistory = true,
+  onOpenDiff,
+  showRecoveryCenter = false,
+  onToggleRecoveryCenter,
+  currentBranch = '',
+  branches = [],
+  onMergeBranch,
+}) => {
   const { locale, tr } = useI18n();
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
@@ -101,6 +118,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreCommits, setHasMoreCommits] = useState(true);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toast, setToast } = useToastQueue(4000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
@@ -490,8 +508,27 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
   const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
     e.preventDefault();
     e.stopPropagation();
+    setMergeCtxExpanded(false);
     setContextMenu({ x: e.clientX, y: e.clientY, node });
   };
+
+  const mergeContextPayload = useMemo(() => {
+    if (!contextMenu || !currentBranch || !onMergeBranch) return null;
+    const node = contextMenu.node;
+    const refsHere = mergeableDecoratedRefs(node.commit.refs, currentBranch);
+    const seen = new Set<string>(refsHere);
+    const branchExtras = branches
+      .filter(b => !(b.scope === 'local' && b.name === currentBranch))
+      .filter(b => !seen.has(normalizeBranchRefForMerge(b.name)))
+      .map(b => ({ raw: b.name, label: normalizeBranchRefForMerge(b.name), scope: b.scope }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return {
+      hash: node.commit.hash,
+      shortHash: node.commit.abbrevHash,
+      refsHere,
+      branchExtras,
+    };
+  }, [branches, contextMenu, currentBranch, onMergeBranch]);
 
   const getMenuActions = (node: GraphNode): MenuAction[] => {
     const hash = node.commit.hash;
@@ -1281,38 +1318,151 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({ repoPath, onSelectComm
         )}
       </div>
 
-      {contextMenu && (
+      {contextMenu && (() => {
+        const menuActions = getMenuActions(contextMenu.node);
+        const primaryMenu = menuActions.slice(0, 4);
+        const tailMenu = menuActions.slice(4);
+        const showMergePanel = Boolean(mergeContextPayload && onMergeBranch && currentBranch);
 
-        <div
-          className="ctx-menu-backdrop"
-          onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}
-        >
+        const renderMenuRow = (item: MenuAction, idx: number) => {
+          if (item.separator) {
+            return <div key={`sep-${idx}`} className="ctx-menu-sep" />;
+          }
+          return (
+            <button
+              key={`act-${idx}`}
+              type="button"
+              className={`ctx-menu-item ${item.danger ? 'danger' : ''}`}
+              onClick={() => { setContextMenu(null); item.action(); }}
+            >
+              <span className="ctx-menu-icon">{item.icon}</span>
+              {item.label}
+            </button>
+          );
+        };
+
+        return (
           <div
-            className="ctx-menu"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-            onClick={(e) => e.stopPropagation()}
+            className="ctx-menu-backdrop"
+            onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}
           >
-            <div className="ctx-menu-header">
-              {contextMenu.node.commit.abbrevHash} - {contextMenu.node.commit.subject.slice(0, 30)}{contextMenu.node.commit.subject.length > 30 ? '...' : ''}
+            <div
+              className="ctx-menu"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="ctx-menu-header">
+                {contextMenu.node.commit.abbrevHash} - {contextMenu.node.commit.subject.slice(0, 30)}{contextMenu.node.commit.subject.length > 30 ? '...' : ''}
+              </div>
+              {primaryMenu.map(renderMenuRow)}
+              {showMergePanel && mergeContextPayload && (
+                <div className="ctx-menu-merge-wrap">
+                  <button
+                    type="button"
+                    className="ctx-menu-merge-toggle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMergeCtxExpanded(v => !v);
+                    }}
+                  >
+                    {mergeCtxExpanded
+                      ? <ChevronDown size={14} className="ctx-menu-merge-chevron" />
+                      : <ChevronRight size={14} className="ctx-menu-merge-chevron" />}
+                    {tr('In aktuellen Branch mergen', 'Merge into current branch')}
+                  </button>
+                  {mergeCtxExpanded && (
+                    <div className="ctx-menu-merge-body">
+                      <div className="ctx-menu-merge-group">
+                        <div className="ctx-menu-merge-group-label">{tr('Dieser Commit', 'This commit')}</div>
+                        <button
+                          type="button"
+                          className="ctx-menu-merge-item"
+                          onClick={() => {
+                            setContextMenu(null);
+                            const { hash, shortHash } = mergeContextPayload;
+                            setConfirmDialog({
+                              variant: 'confirm',
+                              title: tr('Commit mergen?', 'Merge commit?'),
+                              message: tr(
+                                'git merge fuegt diesen Commit-Stand in den aktuellen Branch ein (ggf. Merge-Commit).',
+                                'git merge merges this commit into the current branch (may create a merge commit).',
+                              ),
+                              contextItems: [
+                                { label: tr('Commit', 'Commit'), value: shortHash },
+                                { label: tr('Befehl', 'Command'), value: `git merge ${hash}` },
+                              ],
+                              irreversible: false,
+                              consequences: tr(
+                                'Bei Konflikten loest du sie im Working Directory und setzt den Merge fort.',
+                                'If conflicts occur, resolve them in the working tree and continue the merge.',
+                              ),
+                              confirmLabel: tr('Merge starten', 'Start merge'),
+                              onConfirm: async () => {
+                                await runGitAction(
+                                  ['merge', hash],
+                                  tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`),
+                                );
+                              },
+                            });
+                          }}
+                        >
+                          {tr('Merge', 'Merge')} {mergeContextPayload.shortHash}
+                          <span className="ctx-menu-merge-item-hint">
+                            {tr('git merge (Commit-Hash)', 'git merge (commit hash)')}
+                          </span>
+                        </button>
+                      </div>
+                      {mergeContextPayload.refsHere.length > 0 && (
+                        <div className="ctx-menu-merge-group">
+                          <div className="ctx-menu-merge-group-label">{tr('Refs auf diesem Commit', 'Refs at this commit')}</div>
+                          {mergeContextPayload.refsHere.map(ref => (
+                            <button
+                              key={ref}
+                              type="button"
+                              className="ctx-menu-merge-item"
+                              onClick={() => {
+                                setContextMenu(null);
+                                if (onMergeBranch) onMergeBranch(ref, 'default');
+                              }}
+                            >
+                              {ref}
+                              <span className="ctx-menu-merge-item-hint">
+                                {tr('Branch-Ref mergen', 'Merge branch ref')}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {mergeContextPayload.branchExtras.length > 0 && (
+                        <div className="ctx-menu-merge-group">
+                          <div className="ctx-menu-merge-group-label">{tr('Weitere Branches', 'More branches')}</div>
+                          {mergeContextPayload.branchExtras.map(row => (
+                            <button
+                              key={row.raw}
+                              type="button"
+                              className="ctx-menu-merge-item"
+                              onClick={() => {
+                                setContextMenu(null);
+                                if (onMergeBranch) onMergeBranch(row.raw, 'default');
+                              }}
+                            >
+                              {row.label}
+                              <span className="ctx-menu-merge-item-hint">
+                                {row.scope === 'remote' ? tr('Remote-Tracking', 'Remote-tracking') : tr('Lokal', 'Local')}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {tailMenu.map(renderMenuRow)}
             </div>
-            {getMenuActions(contextMenu.node).map((item, idx) => {
-              if (item.separator) {
-                return <div key={idx} className="ctx-menu-sep" />;
-              }
-              return (
-                <button
-                  key={idx}
-                  className={`ctx-menu-item ${item.danger ? 'danger' : ''}`}
-                  onClick={() => { setContextMenu(null); item.action(); }}
-                >
-                  <span className="ctx-menu-icon">{item.icon}</span>
-                  {item.label}
-                </button>
-              );
-            })}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {toast && (
         <div className={`action-toast ${toast.isError ? 'error' : 'success'}`}>
