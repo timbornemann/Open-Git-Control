@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { GitStatusDetailed, FileEntry, parseGitStatusDetailed } from '../utils/gitParsing';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -12,6 +12,9 @@ interface StagingAreaProps {
   onRepoChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
+  onOpenConflictResolver?: (filePath: string) => void;
+  viewMode?: 'default' | 'conflictOnly';
+  initialConflictPath?: string | null;
   settings: AppSettingsDto;
 }
 
@@ -41,6 +44,29 @@ type ConflictEntry = FileEntry & { code: string };
 type GitStatusWithConflicts = GitStatusDetailed & { conflicts: ConflictEntry[] };
 type DiffStats = { files: number; additions: number; deletions: number };
 type FileSection = 'staged' | 'unstaged' | 'untracked';
+type ConflictResolutionChoice = 'ours' | 'theirs' | 'both';
+type ConflictEditorState = {
+  filePath: string;
+  originalContent: string;
+  content: string;
+  isSaving: boolean;
+};
+type ConflictEditorNotice = {
+  kind: 'error' | 'info' | 'success';
+  message: string;
+};
+type ConflictBlock = {
+  start: number;
+  end: number;
+  marker: string;
+  oursLabel: string;
+  theirsLabel: string;
+  ours: string;
+  theirs: string;
+  startLine: number;
+  endLine: number;
+};
+
 type StagingContextMenuState = {
   x: number;
   y: number;
@@ -124,7 +150,84 @@ const extensionPattern = (p: string) => {
   return `*${name.slice(idx)}`;
 };
 
-export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChanged, onOpenDiff, onSelectFileInspect, settings }) => {
+const CONFLICT_BLOCK_PATTERN_SOURCE = '<<<<<<<([^\\r\\n]*)\\r?\\n([\\s\\S]*?)\\r?\\n=======\\r?\\n([\\s\\S]*?)\\r?\\n>>>>>>>([^\\r\\n]*)\\r?\\n?';
+
+const detectLineEnding = (value: string): string => (value.includes('\r\n') ? '\r\n' : '\n');
+
+const lineNumberAt = (content: string, index: number): number => {
+  let line = 1;
+  const max = Math.min(index, content.length);
+  for (let i = 0; i < max; i += 1) {
+    if (content[i] === '\n') line += 1;
+  }
+  return line;
+};
+
+const parseConflictBlocks = (content: string): ConflictBlock[] => {
+  const blocks: ConflictBlock[] = [];
+  const pattern = new RegExp(CONFLICT_BLOCK_PATTERN_SOURCE, 'g');
+  let match: RegExpExecArray | null = null;
+
+  while ((match = pattern.exec(content)) !== null) {
+    const marker = match[0] || '';
+    const start = match.index;
+    const end = start + marker.length;
+    const startLine = lineNumberAt(content, start);
+    const lineCount = marker === '' ? 0 : marker.split(/\r?\n/).length;
+    const endLine = Math.max(startLine, startLine + lineCount - 1);
+
+    blocks.push({
+      start,
+      end,
+      marker,
+      oursLabel: (match[1] || '').trim(),
+      theirsLabel: (match[4] || '').trim(),
+      ours: match[2] || '',
+      theirs: match[3] || '',
+      startLine,
+      endLine,
+    });
+  }
+
+  return blocks;
+};
+
+const joinBothSides = (ours: string, theirs: string, lineEnding: string): string => {
+  if (!ours) return theirs;
+  if (!theirs) return ours;
+  const needsSeparator = !/\r?\n$/.test(ours);
+  return `${ours}${needsSeparator ? lineEnding : ''}${theirs}`;
+};
+
+const buildConflictResolution = (block: ConflictBlock, choice: ConflictResolutionChoice, lineEnding: string): string => {
+  if (choice === 'ours') return block.ours;
+  if (choice === 'theirs') return block.theirs;
+  return joinBothSides(block.ours, block.theirs, lineEnding);
+};
+
+const replaceConflictBlock = (content: string, block: ConflictBlock, replacement: string): string => (
+  `${content.slice(0, block.start)}${replacement}${content.slice(block.end)}`
+);
+
+const conflictSnippet = (content: string): string => {
+  const compact = content
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (compact.length === 0) return '(leer)';
+  return compact.slice(0, 2).join(' | ');
+};
+export const StagingArea: React.FC<StagingAreaProps> = ({
+  repoPath,
+  onRepoChanged,
+  onOpenDiff,
+  onSelectFileInspect,
+  onOpenConflictResolver,
+  viewMode = 'default',
+  initialConflictPath = null,
+  settings,
+}) => {
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [commitMsg, setCommitMsg] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
@@ -146,11 +249,17 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
   const [aiMode, setAiMode] = useState<string>('normal');
   const [aiLastCommit, setAiLastCommit] = useState<string | null>(null);
   const [aiRemainingFiles, setAiRemainingFiles] = useState<number | null>(null);
+  const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
+  const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
+  const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
+  const [conflictEditorNotice, setConflictEditorNotice] = useState<ConflictEditorNotice | null>(null);
+  const autoOpenedConflictPathRef = useRef<string | null>(null);
   const aiConfig = {
     enabled: Boolean(settings.aiAutoCommitEnabled),
     provider: settings.aiProvider,
     model: settings.aiProvider === 'gemini' ? (settings.geminiModel || '') : (settings.ollamaModel || ''),
   };
+  const isConflictOnly = viewMode === 'conflictOnly';
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -451,6 +560,263 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
   const markConflictResolved = (filePath: string) => git(['conflictMarkResolved', filePath], `${basename(filePath)} als geloest markiert`);
 
+  const openConflictEditor = useCallback(async (filePath: string) => {
+    if (!window.electronAPI) return;
+
+    setIsConflictEditorLoading(true);
+    setConflictEditorNotice(null);
+
+    try {
+      const result = await window.electronAPI.readRepoFile(filePath);
+      if (!result.success || typeof result.data !== 'string') {
+        const message = result.error || `Datei konnte nicht geladen werden: ${filePath}`;
+        setConflictEditorNotice({ kind: 'error', message });
+        setToast({ msg: message, isError: true });
+        return;
+      }
+
+      setConflictEditor({
+        filePath,
+        originalContent: result.data,
+        content: result.data,
+        isSaving: false,
+      });
+      setSelectedConflictBlockIndex(0);
+
+      const blockCount = parseConflictBlocks(result.data).length;
+      if (blockCount === 0) {
+        setConflictEditorNotice({ kind: 'info', message: 'Diese Datei enthaelt aktuell keine Konfliktmarker mehr.' });
+      }
+    } catch (error: any) {
+      const message = error?.message || `Datei konnte nicht geladen werden: ${filePath}`;
+      setConflictEditorNotice({ kind: 'error', message });
+      setToast({ msg: message, isError: true });
+    } finally {
+      setIsConflictEditorLoading(false);
+    }
+  }, [setToast]);
+
+  const reloadActiveConflictEditor = useCallback(async () => {
+    if (!conflictEditor) return;
+    await openConflictEditor(conflictEditor.filePath);
+  }, [conflictEditor, openConflictEditor]);
+
+  const conflictBlocks = useMemo(() => {
+    if (!conflictEditor) return [];
+    return parseConflictBlocks(conflictEditor.content);
+  }, [conflictEditor]);
+
+  const selectedConflictBlock = useMemo(() => {
+    if (conflictBlocks.length === 0) return null;
+    const safeIndex = Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1);
+    return conflictBlocks[safeIndex] || null;
+  }, [conflictBlocks, selectedConflictBlockIndex]);
+
+  const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
+
+  useEffect(() => {
+    if (conflictBlocks.length === 0) {
+      if (selectedConflictBlockIndex !== 0) {
+        setSelectedConflictBlockIndex(0);
+      }
+      return;
+    }
+
+    if (selectedConflictBlockIndex > conflictBlocks.length - 1) {
+      setSelectedConflictBlockIndex(conflictBlocks.length - 1);
+    }
+  }, [conflictBlocks.length, selectedConflictBlockIndex]);
+
+  useEffect(() => {
+    if (onOpenConflictResolver && !isConflictOnly) {
+      return;
+    }
+
+    if (!status || status.conflicts.length === 0) {
+      autoOpenedConflictPathRef.current = null;
+      setConflictEditor(null);
+      setConflictEditorNotice(null);
+      setSelectedConflictBlockIndex(0);
+      return;
+    }
+
+    const activePath = conflictEditor?.filePath || null;
+    const activeStillConflicting = activePath ? status.conflicts.some((entry) => entry.path === activePath) : false;
+
+    if (activeStillConflicting) {
+      autoOpenedConflictPathRef.current = activePath;
+      return;
+    }
+
+    const nextPath = status.conflicts[0]?.path;
+    if (!nextPath) return;
+
+    if (!activePath && autoOpenedConflictPathRef.current === nextPath) {
+      return;
+    }
+
+    autoOpenedConflictPathRef.current = nextPath;
+    void openConflictEditor(nextPath);
+  }, [status, conflictEditor, openConflictEditor, onOpenConflictResolver, isConflictOnly]);
+
+  useEffect(() => {
+    if (!isConflictOnly) return;
+    if (!initialConflictPath) return;
+    if (!status || status.conflicts.length === 0) return;
+    if (!status.conflicts.some((entry) => entry.path === initialConflictPath)) return;
+    if (conflictEditor?.filePath === initialConflictPath) return;
+
+    void openConflictEditor(initialConflictPath);
+  }, [isConflictOnly, initialConflictPath, status, conflictEditor, openConflictEditor]);
+  const applyConflictChoiceToSelected = useCallback((choice: ConflictResolutionChoice) => {
+    if (!conflictEditor) return;
+
+    const blocks = parseConflictBlocks(conflictEditor.content);
+    if (blocks.length === 0) {
+      setConflictEditorNotice({ kind: 'info', message: 'Keine Konfliktmarker mehr vorhanden.' });
+      return;
+    }
+
+    const blockIndex = Math.min(selectedConflictBlockIndex, blocks.length - 1);
+    const block = blocks[blockIndex];
+    if (!block) return;
+
+    const nextContent = replaceConflictBlock(
+      conflictEditor.content,
+      block,
+      buildConflictResolution(block, choice, detectLineEnding(conflictEditor.content)),
+    );
+
+    setConflictEditor((prev) => {
+      if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+      return { ...prev, content: nextContent };
+    });
+
+    const selectedLabel = choice === 'ours' ? 'Unseren Stand' : choice === 'theirs' ? 'Deren Stand' : 'Beide Seiten';
+    setConflictEditorNotice({ kind: 'success', message: `${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.` });
+  }, [conflictEditor, selectedConflictBlockIndex]);
+
+  const applyConflictChoiceToAll = useCallback((choice: ConflictResolutionChoice) => {
+    if (!conflictEditor) return;
+
+    const blocks = parseConflictBlocks(conflictEditor.content);
+    if (blocks.length === 0) {
+      setConflictEditorNotice({ kind: 'info', message: 'Keine Konfliktmarker mehr vorhanden.' });
+      return;
+    }
+
+    let nextContent = conflictEditor.content;
+    const lineEnding = detectLineEnding(conflictEditor.content);
+
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const block = blocks[i];
+      nextContent = replaceConflictBlock(nextContent, block, buildConflictResolution(block, choice, lineEnding));
+    }
+
+    setConflictEditor((prev) => {
+      if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+      return { ...prev, content: nextContent };
+    });
+
+    setSelectedConflictBlockIndex(0);
+
+    const selectedLabel = choice === 'ours' ? 'Unseren Stand' : choice === 'theirs' ? 'Deren Stand' : 'Beide Seiten';
+    setConflictEditorNotice({ kind: 'success', message: `${selectedLabel} fuer alle Konfliktbloecke uebernommen.` });
+  }, [conflictEditor]);
+
+  const takeConflictVersionAndReload = useCallback(async (filePath: string, side: 'ours' | 'theirs') => {
+    await takeConflictVersion(filePath, side);
+    await openConflictEditor(filePath);
+  }, [openConflictEditor]);
+
+  const markConflictResolvedAndSync = useCallback(async (filePath: string) => {
+    await markConflictResolved(filePath);
+    if (conflictEditor?.filePath === filePath) {
+      await openConflictEditor(filePath);
+    }
+  }, [conflictEditor, openConflictEditor]);
+
+  const resetConflictEditorDraft = useCallback(() => {
+    if (!conflictEditor) return;
+
+    setConflictEditor((prev) => {
+      if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+      return { ...prev, content: prev.originalContent };
+    });
+
+    setConflictEditorNotice({ kind: 'info', message: 'Lokale Editor-Aenderungen verworfen.' });
+  }, [conflictEditor]);
+
+  const saveConflictEditor = useCallback(async (markResolvedAfterSave: boolean) => {
+    if (!window.electronAPI || !conflictEditor) return;
+
+    const pendingBlocks = parseConflictBlocks(conflictEditor.content);
+    if (markResolvedAfterSave && pendingBlocks.length > 0) {
+      setConflictEditorNotice({
+        kind: 'error',
+        message: 'Vor "Speichern + als geloest markieren" muessen alle Konfliktmarker entfernt sein.',
+      });
+      return;
+    }
+
+    const targetPath = conflictEditor.filePath;
+    const targetContent = conflictEditor.content;
+
+    setConflictEditor((prev) => {
+      if (!prev || prev.filePath !== targetPath) return prev;
+      return { ...prev, isSaving: true };
+    });
+
+    try {
+      const writeResult = await window.electronAPI.writeRepoFile(targetPath, targetContent);
+      if (!writeResult.success) {
+        throw new Error(writeResult.error || 'Datei konnte nicht gespeichert werden.');
+      }
+
+      if (markResolvedAfterSave) {
+        const stageResult = await window.electronAPI.runGitCommand('conflictMarkResolved', targetPath);
+        if (!stageResult.success) {
+          throw new Error(stageResult.error || 'Datei konnte nicht als geloest markiert werden.');
+        }
+      }
+
+      setConflictEditor((prev) => {
+        if (!prev || prev.filePath !== targetPath) return prev;
+        return {
+          ...prev,
+          content: targetContent,
+          originalContent: targetContent,
+          isSaving: false,
+        };
+      });
+
+      setConflictEditorNotice({
+        kind: 'success',
+        message: markResolvedAfterSave
+          ? 'Datei gespeichert und als geloest markiert.'
+          : 'Konfliktdatei gespeichert.',
+      });
+      setToast({
+        msg: markResolvedAfterSave
+          ? `${basename(targetPath)} gespeichert + geloest`
+          : `${basename(targetPath)} gespeichert`,
+        isError: false,
+      });
+
+      if (onRepoChanged) onRepoChanged();
+      await refresh();
+    } catch (error: any) {
+      const message = error?.message || 'Konfliktdatei konnte nicht gespeichert werden.';
+
+      setConflictEditor((prev) => {
+        if (!prev || prev.filePath !== targetPath) return prev;
+        return { ...prev, isSaving: false };
+      });
+      setConflictEditorNotice({ kind: 'error', message });
+      setToast({ msg: message, isError: true });
+    }
+  }, [conflictEditor, onRepoChanged, refresh, setToast]);
+
   const mergeContinue = () => git(['mergeContinue'], 'Merge fortgesetzt', true);
   const mergeAbort = () => {
     setConfirmDialog({
@@ -671,6 +1037,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
 
   return (
     <div className="staging-container">
+      {!isConflictOnly && (
       <div className="staging-toolbar" style={{ flexWrap: 'wrap' }}>
         <button className="staging-tool-btn" onClick={stashChanges} title="Stash">Stash</button>
         <button className="staging-tool-btn" onClick={stashPop} title="Stash Pop">Pop</button>
@@ -707,38 +1074,185 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </span>
         )}
       </div>
+      )}
 
       <div className="staging-files">
         {totalChanges === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Working Tree ist sauber.
+            {isConflictOnly ? 'Keine offenen Konflikte.' : 'Working Tree ist sauber.'}
           </div>
         )}
 
         {visibleConflicts.length > 0 && (
-          <div className="staging-section">
+          <div className="staging-section conflict-section">
             <SectionHeader title="Konflikte" count={visibleConflicts.length} color="var(--status-danger)" />
-            <div style={{ padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="conflict-global-actions">
               <button className="staging-btn-sm" onClick={mergeContinue}>Merge fortsetzen</button>
-              <button className="staging-btn-sm danger" onClick={mergeAbort}>Abbrechen</button>
-              <button className="staging-btn-sm" onClick={rebaseContinue}>Rebase continue</button>
-              <button className="staging-btn-sm danger" onClick={rebaseAbort}>Rebase abort</button>
+              <button className="staging-btn-sm danger" onClick={mergeAbort}>Merge abbrechen</button>
+              <button className="staging-btn-sm" onClick={rebaseContinue}>Rebase fortsetzen</button>
+              <button className="staging-btn-sm danger" onClick={rebaseAbort}>Rebase abbrechen</button>
+              <div className="conflict-global-spacer" />
+              <button className="staging-btn-sm" disabled={!conflictEditor || conflictEditor.isSaving || conflictBlocks.length === 0} onClick={() => applyConflictChoiceToAll('ours')}>Alle: ours</button>
+              <button className="staging-btn-sm" disabled={!conflictEditor || conflictEditor.isSaving || conflictBlocks.length === 0} onClick={() => applyConflictChoiceToAll('theirs')}>Alle: theirs</button>
+              <button className="staging-btn-sm" disabled={!conflictEditor || conflictEditor.isSaving || conflictBlocks.length === 0} onClick={() => applyConflictChoiceToAll('both')}>Alle: beide</button>
             </div>
-            {visibleConflicts.map((f) => (
-              <div key={`c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
-                <span className="staging-status" style={{ color: 'var(--status-danger)', width: 22 }}>{f.code}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className="staging-path" title={f.path}>{f.path}</span>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</div>
+
+            {onOpenConflictResolver && (
+              <div className="conflict-sidebar-list">
+                <div className="conflict-sidebar-hint">
+                  Konflikte im Hauptfenster oeffnen, um sie wie im Diff-Viewer zu bearbeiten.
                 </div>
-                <div className="staging-actions" style={{ opacity: 1, flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' }}>
-                  <button className="staging-btn-sm" onClick={() => takeConflictVersion(f.path, 'ours')}>Take ours</button>
-                  <button className="staging-btn-sm" onClick={() => takeConflictVersion(f.path, 'theirs')}>Take theirs</button>
-                  <button className="staging-btn-sm" onClick={() => showDiff(f.path, false)}>Diff anzeigen</button>
-                  <button className="staging-btn-sm" onClick={() => markConflictResolved(f.path)}>Als geloest markieren</button>
-                </div>
+                {visibleConflicts.map((f) => (
+                  <div key={`sidebar-c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
+                    <span className="staging-status" style={{ color: 'var(--status-danger)', width: 22 }}>{f.code}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span className="staging-path" title={f.path}>{f.path}</span>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</div>
+                    </div>
+                    <div className="staging-actions" style={{ opacity: 1, flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' }}>
+                      <button className="staging-btn-sm" onClick={() => onOpenConflictResolver(f.path)}>Im Hauptfenster</button>
+                      <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'ours'); }}>Ours</button>
+                      <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'theirs'); }}>Theirs</button>
+                      <button className="staging-btn-sm" onClick={() => showDiff(f.path, false)}>Diff</button>
+                      <button className="staging-btn-sm" onClick={() => { void markConflictResolvedAndSync(f.path); }}>Geloest</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            <div className="conflict-layout" style={{ display: onOpenConflictResolver ? 'none' : undefined }}>
+              <div className="conflict-file-list">
+                {visibleConflicts.map((f) => {
+                  const isActive = conflictEditor?.filePath === f.path;
+                  return (
+                    <div key={`c-${f.path}`} className={`conflict-file-entry ${isActive ? 'active' : ''}`}>
+                      <button
+                        className="conflict-file-main"
+                        onClick={() => { void openConflictEditor(f.path); }}
+                        title={f.path}
+                      >
+                        <span className="conflict-file-code">{f.code}</span>
+                        <span className="conflict-file-path">{f.path}</span>
+                        <span className="conflict-file-label">{CONFLICT_LABELS[f.code] || 'Konflikt'}</span>
+                      </button>
+                      <div className="conflict-file-actions">
+                        <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'ours'); }}>Ours</button>
+                        <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'theirs'); }}>Theirs</button>
+                        <button className="staging-btn-sm" onClick={() => showDiff(f.path, false)}>Diff</button>
+                        <button className="staging-btn-sm" onClick={() => { void markConflictResolvedAndSync(f.path); }}>Geloest</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="conflict-editor-panel">
+                {isConflictEditorLoading && (
+                  <div className="conflict-empty-state">Konfliktdatei wird geladen...</div>
+                )}
+
+                {!isConflictEditorLoading && !conflictEditor && (
+                  <div className="conflict-empty-state">Waehle links eine Konfliktdatei aus.</div>
+                )}
+
+                {!isConflictEditorLoading && conflictEditor && (
+                  <>
+                    <div className="conflict-editor-toolbar">
+                      <div className="diff-title-wrap">
+                        <div className="diff-title" title={conflictEditor.filePath}>{conflictEditor.filePath}</div>
+                        <div className="diff-subtitle">
+                          {conflictBlocks.length > 0
+                            ? `${conflictBlocks.length} Konfliktblock${conflictBlocks.length === 1 ? '' : 'e'} erkannt`
+                            : 'Keine Konfliktmarker mehr erkannt'}
+                        </div>
+                      </div>
+                      <div className="conflict-editor-toolbar-actions">
+                        <button className="staging-btn-sm" onClick={reloadActiveConflictEditor} disabled={conflictEditor.isSaving}>Neu laden</button>
+                        <button className="staging-btn-sm" onClick={() => showDiff(conflictEditor.filePath, false)}>Diff anzeigen</button>
+                        <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(conflictEditor.filePath, 'ours'); }} disabled={conflictEditor.isSaving}>Datei: ours</button>
+                        <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(conflictEditor.filePath, 'theirs'); }} disabled={conflictEditor.isSaving}>Datei: theirs</button>
+                      </div>
+                    </div>
+
+                    {conflictEditorNotice && (
+                      <div className={`conflict-editor-notice ${conflictEditorNotice.kind}`}>
+                        {conflictEditorNotice.message}
+                      </div>
+                    )}
+
+                    {conflictBlocks.length > 0 && selectedConflictBlock && (
+                      <div className="conflict-block-workspace">
+                        <div className="conflict-block-list">
+                          {conflictBlocks.map((block, index) => (
+                            <button
+                              key={`block-${block.start}-${index}`}
+                              className={`conflict-block-item ${selectedConflictBlockIndex === index ? 'active' : ''}`}
+                              onClick={() => setSelectedConflictBlockIndex(index)}
+                            >
+                              <span className="conflict-block-item-title">Block {index + 1}</span>
+                              <span className="conflict-block-item-range">Zeile {block.startLine} bis {block.endLine}</span>
+                              <span className="conflict-block-item-snippet">{conflictSnippet(block.ours)} / {conflictSnippet(block.theirs)}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="conflict-block-detail">
+                          <div className="conflict-block-detail-header">
+                            <span>Aktiver Konfliktblock</span>
+                            <span>Zeile {selectedConflictBlock.startLine} bis {selectedConflictBlock.endLine}</span>
+                          </div>
+                          <div className="conflict-block-actions">
+                            <button className="staging-btn-sm" onClick={() => applyConflictChoiceToSelected('ours')} disabled={conflictEditor.isSaving}>Take ours</button>
+                            <button className="staging-btn-sm" onClick={() => applyConflictChoiceToSelected('theirs')} disabled={conflictEditor.isSaving}>Take theirs</button>
+                            <button className="staging-btn-sm" onClick={() => applyConflictChoiceToSelected('both')} disabled={conflictEditor.isSaving}>Take both</button>
+                          </div>
+                          <div className="conflict-block-preview-grid">
+                            <div className="conflict-block-preview ours">
+                              <div className="conflict-block-preview-title">Ours {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}</div>
+                              <pre className="conflict-block-preview-code">{selectedConflictBlock.ours || '(leer)'}</pre>
+                            </div>
+                            <div className="conflict-block-preview theirs">
+                              <div className="conflict-block-preview-title">Theirs {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}</div>
+                              <pre className="conflict-block-preview-code">{selectedConflictBlock.theirs || '(leer)'}</pre>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {conflictBlocks.length === 0 && (
+                      <div className="conflict-empty-inline">
+                        Konfliktmarker wurden entfernt. Du kannst speichern und direkt als geloest markieren.
+                      </div>
+                    )}
+
+                    <div className="conflict-manual-editor">
+                      <div className="conflict-manual-header">
+                        <span>Manuelle Bearbeitung</span>
+                        <div className="conflict-manual-actions">
+                          <button className="staging-btn-sm" onClick={resetConflictEditorDraft} disabled={!isConflictEditorDirty || conflictEditor.isSaving}>Aenderungen verwerfen</button>
+                          <button className="staging-btn-sm" onClick={() => { void saveConflictEditor(false); }} disabled={conflictEditor.isSaving || !isConflictEditorDirty}>Speichern</button>
+                          <button className="staging-btn-sm" onClick={() => { void saveConflictEditor(true); }} disabled={conflictEditor.isSaving || conflictBlocks.length > 0}>Speichern + geloest</button>
+                        </div>
+                      </div>
+                      <textarea
+                        className="conflict-manual-textarea"
+                        spellCheck={false}
+                        value={conflictEditor.content}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          setConflictEditor((prev) => {
+                            if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+                            return { ...prev, content: next };
+                          });
+                        }}
+                        disabled={conflictEditor.isSaving}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -775,6 +1289,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
         )}
       </div>
 
+      {!isConflictOnly && (
       <div className="staging-commit-area">
         <textarea
           className="staging-commit-input"
@@ -852,6 +1367,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
           </button>
         </div>
       </div>
+      )}
 
       {contextMenu && contextEntry && (
         <div className="ctx-menu-backdrop" onClick={() => setContextMenu(null)}>
@@ -957,3 +1473,4 @@ export const StagingArea: React.FC<StagingAreaProps> = ({ repoPath, onRepoChange
     </div>
   );
 };
+
