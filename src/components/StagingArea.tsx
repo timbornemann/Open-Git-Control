@@ -1086,6 +1086,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         {visibleConflicts.length > 0 && (
           <div className="staging-section conflict-section">
             <SectionHeader title="Konflikte" count={visibleConflicts.length} color="var(--status-danger)" />
+            {!onOpenConflictResolver && (
             <div className="conflict-global-actions">
               <button className="staging-btn-sm" onClick={mergeContinue}>Merge fortsetzen</button>
               <button className="staging-btn-sm danger" onClick={mergeAbort}>Merge abbrechen</button>
@@ -1096,31 +1097,26 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               <button className="staging-btn-sm" disabled={!conflictEditor || conflictEditor.isSaving || conflictBlocks.length === 0} onClick={() => applyConflictChoiceToAll('theirs')}>Alle: theirs</button>
               <button className="staging-btn-sm" disabled={!conflictEditor || conflictEditor.isSaving || conflictBlocks.length === 0} onClick={() => applyConflictChoiceToAll('both')}>Alle: beide</button>
             </div>
+            )}
 
             {onOpenConflictResolver && (
               <div className="conflict-sidebar-list">
-                <div className="conflict-sidebar-hint">
-                  Konflikte im Hauptfenster oeffnen, um sie wie im Diff-Viewer zu bearbeiten.
-                </div>
                 {visibleConflicts.map((f) => (
-                  <div key={`sidebar-c-${f.path}`} className="staging-file-row" style={{ alignItems: 'flex-start' }}>
-                    <span className="staging-status" style={{ color: 'var(--status-danger)', width: 22 }}>{f.code}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span className="staging-path" title={f.path}>{f.path}</span>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</div>
-                    </div>
-                    <div className="staging-actions" style={{ opacity: 1, flexWrap: 'wrap', gap: 4, justifyContent: 'flex-end' }}>
-                      <button className="staging-btn-sm" onClick={() => onOpenConflictResolver(f.path)}>Im Hauptfenster</button>
-                      <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'ours'); }}>Ours</button>
-                      <button className="staging-btn-sm" onClick={() => { void takeConflictVersionAndReload(f.path, 'theirs'); }}>Theirs</button>
-                      <button className="staging-btn-sm" onClick={() => showDiff(f.path, false)}>Diff</button>
-                      <button className="staging-btn-sm" onClick={() => { void markConflictResolvedAndSync(f.path); }}>Geloest</button>
-                    </div>
-                  </div>
+                  <button
+                    key={`sidebar-c-${f.path}`}
+                    className="conflict-sidebar-file"
+                    onClick={() => onOpenConflictResolver(f.path)}
+                    title={f.path}
+                  >
+                    <span className="conflict-file-code">{f.code}</span>
+                    <span className="conflict-file-path">{f.path}</span>
+                    <span className="conflict-file-label">{CONFLICT_LABELS[f.code] || 'Konflikt'}</span>
+                  </button>
                 ))}
               </div>
             )}
-            <div className="conflict-layout" style={{ display: onOpenConflictResolver ? 'none' : undefined }}>
+            {!onOpenConflictResolver && (
+            <div className="conflict-layout">
               <div className="conflict-file-list">
                 {visibleConflicts.map((f) => {
                   const isActive = conflictEditor?.filePath === f.path;
@@ -1253,6 +1249,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                 )}
               </div>
             </div>
+            )}
           </div>
         )}
 
