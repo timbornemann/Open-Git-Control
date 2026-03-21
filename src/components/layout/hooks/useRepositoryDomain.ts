@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
+import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
+import { normalizeBranchRefForMerge } from '../../../utils/gitParsing';
 import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
@@ -59,6 +60,20 @@ export const useRepositoryDomain = ({
   const getRemoteBranchShortName = useCallback((branchName: string) => (
     branchName.replace(/^remotes\/[^/]+\//, '')
   ), []);
+
+  const mergeModeArgs = useCallback((mode: GitMergeMode): string[] => {
+    if (mode === 'noFf') return ['--no-ff'];
+    if (mode === 'squash') return ['--squash'];
+    if (mode === 'ffOnly') return ['--ff-only'];
+    return [];
+  }, []);
+
+  const mergeModeLabel = useCallback((mode: GitMergeMode): string => {
+    if (mode === 'noFf') return tr('Ohne Fast-Forward (--no-ff)', 'No fast-forward (--no-ff)');
+    if (mode === 'squash') return tr('Squash-Merge (--squash)', 'Squash merge (--squash)');
+    if (mode === 'ffOnly') return tr('Nur Fast-Forward (--ff-only)', 'Fast-forward only (--ff-only)');
+    return tr('Standard', 'Default');
+  }, [language]);
 
   const formatLastFetchedAt = useCallback((timestamp: number | null) => {
     if (!timestamp) return tr('Noch nicht aktualisiert', 'Not updated yet');
@@ -340,20 +355,29 @@ export const useRepositoryDomain = ({
     });
   };
 
-  const handleMergeBranch = async (branchName: string) => {
+  const handleMergeBranch = async (branchName: string, mode: GitMergeMode = 'default') => {
+    const mergeTarget = normalizeBranchRefForMerge(branchName);
+    const flags = mergeModeArgs(mode);
+    const cmdPreview = ['merge', ...flags, mergeTarget].join(' ');
     setConfirmDialog({
       variant: 'confirm',
       title: tr('Branch mergen?', 'Merge branch?'),
       message: tr('Der ausgewählte Branch wird in den aktuellen Branch gemergt.', 'The selected branch will be merged into the current branch.'),
       contextItems: [
         { label: tr('Quelle', 'Source'), value: branchName },
-        { label: tr('Ziel', 'Target'), value: currentBranch || tr('(unbekannt)', '(unknown)') },
+        { label: tr('Merge-Ziel (ref)', 'Merge ref'), value: mergeTarget },
+        { label: tr('Modus', 'Mode'), value: mergeModeLabel(mode) },
+        { label: tr('Ziel-Branch', 'Target branch'), value: currentBranch || tr('(unbekannt)', '(unknown)') },
+        { label: tr('Befehl', 'Command'), value: `git ${cmdPreview}` },
       ],
       irreversible: false,
       consequences: tr('Es kann zu Konflikten kommen. Bei Erfolg entsteht ggf. ein neuer Merge-Commit.', 'Conflicts may occur. On success, a new merge commit may be created.'),
       confirmLabel: tr('Merge starten', 'Start merge'),
       onConfirm: async () => {
-        await runGitCommand(['merge', branchName], tr(`Branch "${branchName}" gemergt.`, `Merged branch "${branchName}".`));
+        await runGitCommand(
+          ['merge', ...flags, mergeTarget],
+          tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`),
+        );
       },
     });
   };
