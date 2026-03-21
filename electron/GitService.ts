@@ -33,18 +33,27 @@ export class GitService {
     return new Error(detailedMessage);
   }
 
+  private isPathInsideRepo(repoPath: string, filePath: string): boolean {
+    const relative = path.relative(repoPath, filePath);
+    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+  }
+
+  private async execGit(repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv): Promise<string> {
+    const env = envOverrides ? { ...process.env, ...envOverrides } : process.env;
+    try {
+      const { stdout } = await execFileAsync('git', args, { cwd: repoPath, maxBuffer: 20 * 1024 * 1024, env });
+      return stdout.trimEnd();
+    } catch (error: any) {
+      throw this.normalizeGitError(error, args);
+    }
+  }
+
   /**
    * Fuehrt einen Git Befehl im ausgewaehlten Repository aus
    */
   async runCommand(args: string[]): Promise<string> {
     const repoPath = this.ensureRepoPath();
-
-    try {
-      const { stdout } = await execFileAsync('git', args, { cwd: repoPath, maxBuffer: 20 * 1024 * 1024 });
-      return stdout.trimEnd();
-    } catch (error: any) {
-      throw this.normalizeGitError(error, args);
-    }
+    return this.execGit(repoPath, args);
   }
 
   /**
@@ -55,13 +64,7 @@ export class GitService {
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
     }
-
-    try {
-      const { stdout } = await execFileAsync('git', args, { cwd: normalizedPath, maxBuffer: 20 * 1024 * 1024 });
-      return stdout.trimEnd();
-    } catch (error: any) {
-      throw this.normalizeGitError(error, args);
-    }
+    return this.execGit(normalizedPath, args);
   }
 
   /**
@@ -107,10 +110,64 @@ export class GitService {
   }
 
   /**
+   * Liest eine Textdatei innerhalb des aktiven Repositories.
+   */
+  async readRepoFile(relativePath: string): Promise<string> {
+    const repoPath = this.ensureRepoPath();
+    const normalizedRelativePath = (relativePath || '').trim();
+    if (!normalizedRelativePath) {
+      throw new Error('File path is required.');
+    }
+
+    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
+    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
+      throw new Error('File path is outside the current repository.');
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile()) {
+      throw new Error('Target path is not a file.');
+    }
+    if (stat.size > 2 * 1024 * 1024) {
+      throw new Error('File is too large for inline conflict editing (>2MB).');
+    }
+
+    return fs.readFileSync(resolvedPath, 'utf8');
+  }
+
+  /**
+   * Schreibt eine Textdatei innerhalb des aktiven Repositories.
+   */
+  async writeRepoFile(relativePath: string, content: string): Promise<void> {
+    const repoPath = this.ensureRepoPath();
+    const normalizedRelativePath = (relativePath || '').trim();
+    if (!normalizedRelativePath) {
+      throw new Error('File path is required.');
+    }
+
+    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
+    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
+      throw new Error('File path is outside the current repository.');
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile()) {
+      throw new Error('Target path is not a file.');
+    }
+
+    const textValue = typeof content === 'string' ? content : String(content ?? '');
+    fs.writeFileSync(resolvedPath, textValue, 'utf8');
+  }
+
+  /**
    * Setzt einen laufenden Merge nach Konfliktaufloesung fort.
    */
   async continueMerge(): Promise<string> {
-    return this.runCommand(['merge', '--continue']);
+    const repoPath = this.ensureRepoPath();
+    return this.execGit(repoPath, ['merge', '--continue'], {
+      GIT_EDITOR: 'true',
+      GIT_MERGE_AUTOEDIT: 'no',
+    });
   }
 
   /**
@@ -124,7 +181,10 @@ export class GitService {
    * Setzt einen laufenden Rebase nach Konfliktaufloesung fort.
    */
   async continueRebase(): Promise<string> {
-    return this.runCommand(['rebase', '--continue']);
+    const repoPath = this.ensureRepoPath();
+    return this.execGit(repoPath, ['rebase', '--continue'], {
+      GIT_EDITOR: 'true',
+    });
   }
 
   /**

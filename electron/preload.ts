@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),
   getFileBlame: (filePath: string, commitHash?: string) =>
     ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
+  readRepoFile: (filePath: string) => ipcRenderer.invoke('git:readRepoFile', filePath),
+  writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke('git:writeRepoFile', filePath, content),
   openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),
   onCloneProgress: (callback: (line: string) => void) => {
     const handler = (_event: any, line: string) => callback(line);

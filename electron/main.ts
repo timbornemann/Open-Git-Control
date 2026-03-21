@@ -1526,6 +1526,33 @@ function setupIPC() {
   });
 
 
+  ipcMain.handle('git:readRepoFile', async (_event: any, filePath: unknown) => {
+    try {
+      const normalizedPath = String(filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const data = await gitService.readRepoFile(normalizedPath);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:writeRepoFile', async (_event: any, filePath: unknown, content: unknown) => {
+    try {
+      const normalizedPath = String(filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      await gitService.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
   ipcMain.handle('git:openSubmodule', async (_event: any, submodulePath: unknown) => {
     try {
       const relativePath = String(submodulePath || '').trim();
