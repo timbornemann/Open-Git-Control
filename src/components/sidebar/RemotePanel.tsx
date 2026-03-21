@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Globe, Plus, RefreshCw, X } from 'lucide-react';
-import { RemoteInfo, RemoteSyncState } from '../../types/git';
+import { GitMergeMode, RemoteInfo, RemoteSyncState } from '../../types/git';
 import { DialogFrame } from '../DialogFrame';
 import { useI18n } from '../../i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from './RepoCard';
@@ -24,6 +24,7 @@ type Props = {
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;
+  onMergeRemoteBranch: (remoteBranchName: string, mode?: GitMergeMode) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 };
@@ -41,6 +42,7 @@ export const RemotePanel: React.FC<Props> = ({
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
   onCheckoutRemoteBranch,
+  onMergeRemoteBranch,
   collapsed,
   onToggleCollapsed,
 }) => {
@@ -87,9 +89,20 @@ export const RemotePanel: React.FC<Props> = ({
                   </span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {remoteOnlyPreview.map(branch => (
-                      <button key={branch} className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={() => onCheckoutRemoteBranch(branch)}>
-                        {toShortRemoteBranch(branch)}
-                      </button>
+                      <span key={branch} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <button type="button" className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={() => onCheckoutRemoteBranch(branch)}>
+                          {toShortRemoteBranch(branch)}
+                        </button>
+                        <button
+                          type="button"
+                          className="staging-tool-btn"
+                          style={{ fontSize: '0.68rem', padding: '2px 5px' }}
+                          onClick={() => onMergeRemoteBranch(branch, 'default')}
+                          title={tr('In aktuellen Branch mergen', 'Merge into current branch')}
+                        >
+                          {tr('Merge', 'Merge')}
+                        </button>
+                      </span>
                     ))}
                     {remoteOnlyBranchesCount > remoteOnlyPreview.length && (
                       <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={() => setIsRemoteBranchesDialogOpen(true)}>
@@ -139,6 +152,15 @@ export const RemotePanel: React.FC<Props> = ({
                 {toShortRemoteBranch(branch)}
               </span>
               <button
+                type="button"
+                className="staging-tool-btn"
+                onClick={() => onMergeRemoteBranch(branch, 'default')}
+                style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+              >
+                {tr('Mergen', 'Merge')}
+              </button>
+              <button
+                type="button"
                 className="staging-tool-btn"
                 onClick={() => {
                   onCheckoutRemoteBranch(branch);

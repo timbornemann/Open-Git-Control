@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { GitMergeMode } from '../../types/git';
 import { useI18n } from '../../i18n';
 
 type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
@@ -7,7 +8,7 @@ type Props = {
   branchContextMenu: BranchContextMenuState;
   setBranchContextMenu: (value: BranchContextMenuState) => void;
   onCheckout: (branch: string) => void;
-  onMerge: (branch: string) => void;
+  onMerge: (branch: string, mode: GitMergeMode) => void;
   onRename: (branch: string) => void;
   onDelete: (branch: string) => void;
 };
@@ -50,17 +51,49 @@ export const BranchContextMenu: React.FC<Props> = ({
             <span className="ctx-menu-icon">?</span> {tr('Checkout', 'Checkout')}
           </button>
         )}
-        {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
-          <button
-            className="ctx-menu-item"
-            onClick={() => {
-              const b = branchContextMenu.branch;
-              setBranchContextMenu(null);
-              onMerge(b);
-            }}
-          >
-            <span className="ctx-menu-icon">?</span> {tr('In aktuellen Branch mergen', 'Merge into current branch')}
-          </button>
+        {!branchContextMenu.isHead && (
+          <>
+            <button
+              className="ctx-menu-item"
+              onClick={() => {
+                const b = branchContextMenu.branch;
+                setBranchContextMenu(null);
+                onMerge(b, 'default');
+              }}
+            >
+              <span className="ctx-menu-icon">?</span> {tr('In aktuellen Branch mergen', 'Merge into current branch')}
+            </button>
+            <button
+              className="ctx-menu-item"
+              onClick={() => {
+                const b = branchContextMenu.branch;
+                setBranchContextMenu(null);
+                onMerge(b, 'noFf');
+              }}
+            >
+              <span className="ctx-menu-icon">?</span> {tr('Mergen (--no-ff)', 'Merge (--no-ff)')}
+            </button>
+            <button
+              className="ctx-menu-item"
+              onClick={() => {
+                const b = branchContextMenu.branch;
+                setBranchContextMenu(null);
+                onMerge(b, 'squash');
+              }}
+            >
+              <span className="ctx-menu-icon">?</span> {tr('Squash-Merge', 'Squash merge')}
+            </button>
+            <button
+              className="ctx-menu-item"
+              onClick={() => {
+                const b = branchContextMenu.branch;
+                setBranchContextMenu(null);
+                onMerge(b, 'ffOnly');
+              }}
+            >
+              <span className="ctx-menu-icon">?</span> {tr('Nur Fast-Forward (--ff-only)', 'Fast-forward only (--ff-only)')}
+            </button>
+          </>
         )}
         {!branchContextMenu.branch.startsWith('remotes/') && (
           <button
