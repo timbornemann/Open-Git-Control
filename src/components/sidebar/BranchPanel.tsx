@@ -85,8 +85,7 @@ export const BranchPanel: React.FC<Props> = ({
         toggleTitle={collapsed ? tr('Branches anzeigen', 'Show branches') : tr('Branches einklappen', 'Collapse branches')}
         actions={(
           <button
-            className="icon-btn"
-            style={{ padding: '2px' }}
+            className="icon-btn sidebar-row-action-icon"
             onClick={() => {
               onSetCreatingBranch(true);
               onSetNewBranchName('');
@@ -101,14 +100,13 @@ export const BranchPanel: React.FC<Props> = ({
       {!collapsed && (
         <>
           <RepoCardToolbar>
-            <div style={{ position: 'relative' }}>
-              <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <div className="sidebar-search-wrap">
+              <Search size={12} className="sidebar-search-icon" />
               <input
-                className="repo-filter-input"
+                className="repo-filter-input sidebar-filter-input"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
                 placeholder={tr('Branches filtern...', 'Filter branches...')}
-                style={{ paddingLeft: '26px' }}
               />
             </div>
           </RepoCardToolbar>
@@ -137,22 +135,22 @@ export const BranchPanel: React.FC<Props> = ({
           )}
 
           <RepoCardContent className="repo-card-scroll">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="sidebar-group-wrap">
               <div>
-                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                <div className="sidebar-group-label">
                   {tr('Lokal', 'Local')} ({localBranches.length})
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div className="sidebar-group-stack">
                   {localBranches.map(renderBranchRow)}
                   {localBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{tr('Keine lokalen Branches.', 'No local branches.')}</span>}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                <div className="sidebar-group-label">
                   {tr('Remote', 'Remote')} ({remoteBranches.length})
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div className="sidebar-group-stack">
                   {remoteBranches.map(renderBranchRow)}
                   {remoteBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{tr('Keine Remote-Branches.', 'No remote branches.')}</span>}
                 </div>

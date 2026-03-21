@@ -59,13 +59,14 @@ export const RepoList: React.FC<Props> = ({
       {!collapsed && (
         <>
           {openRepos.length > 0 && (
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <div className="sidebar-search-wrap">
+              <Search size={14} className="sidebar-search-icon" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={tr('Repository suchen...', 'Search repository...')}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '7px 8px 7px 28px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                className="sidebar-filter-input"
+                style={{ padding: '7px 8px 7px 28px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
               />
             </div>
           )}
@@ -110,14 +111,14 @@ export const RepoList: React.FC<Props> = ({
                       e.stopPropagation();
                       onTogglePin(repoPath);
                     }}
-                    className="icon-btn"
-                    style={{ padding: '2px', opacity: isPinned ? 1 : 0.7, color: isPinned ? 'var(--status-warning)' : 'var(--text-secondary)' }}
+                    className="icon-btn sidebar-row-action-icon"
+                    style={{ opacity: isPinned ? 1 : 0.7, color: isPinned ? 'var(--status-warning)' : 'var(--text-secondary)' }}
                     title={isPinned ? tr('Favorit entfernen', 'Remove favorite') : tr('Als Favorit markieren', 'Mark as favorite')}
                   >
                     {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Entfernen', 'Remove')}>
+                  <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn sidebar-row-action-icon" style={{ opacity: 0 }} title={tr('Entfernen', 'Remove')}>
                     <X size={12} />
                   </button>
                 </div>
