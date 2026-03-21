@@ -290,6 +290,9 @@ const App: React.FC = () => {
           releaseNotesGenerating={state.releaseNotesGenerating}
           releaseNotesLanguage={state.releaseNotesLanguage}
           setReleaseNotesLanguage={state.setReleaseNotesLanguage}
+          autoOpenConflictResolverPath={state.autoOpenConflictResolverPath}
+          onAutoOpenConflictResolverConsumed={state.clearAutoOpenConflictResolverPath}
+          onOpenConflictResolverForPath={state.openConflictResolverForPath}
         />
 
         {state.gitActionToast && (

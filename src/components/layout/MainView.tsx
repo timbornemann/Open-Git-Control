@@ -79,6 +79,11 @@ type Props = {
   releaseNotesGenerating: boolean;
   releaseNotesLanguage: 'de' | 'en';
   setReleaseNotesLanguage: (value: 'de' | 'en') => void;
+  /** Wenn gesetzt (z. B. nach fehlgeschlagenem Pull/Merge mit Konflikt), Konflikt-Resolver oeffnen */
+  autoOpenConflictResolverPath?: string | null;
+  onAutoOpenConflictResolverConsumed?: () => void;
+  /** CommitGraph & Co.: direkter Git-Fehler mit Konflikt → Repo-Tab + Resolver */
+  onOpenConflictResolverForPath?: (path: string) => void;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -328,6 +333,9 @@ export const MainView: React.FC<Props> = ({
   releaseNotesGenerating,
   releaseNotesLanguage,
   setReleaseNotesLanguage,
+  autoOpenConflictResolverPath,
+  onAutoOpenConflictResolverConsumed,
+  onOpenConflictResolverForPath,
 }) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
@@ -339,6 +347,17 @@ export const MainView: React.FC<Props> = ({
   const contentAreaRef = useRef<HTMLDivElement | null>(null);
   const contentResizeActiveRef = useRef(false);
   const { tr } = useI18n();
+
+  useEffect(() => {
+    if (!autoOpenConflictResolverPath) return;
+    setActiveConflictPath(autoOpenConflictResolverPath);
+    setActiveDiffRequest(null);
+    setShowRecoveryCenter(false);
+    setWorkingTreeSelection(null);
+    setCommitHistoryStack([]);
+    setSelectedCommit(null);
+    onAutoOpenConflictResolverConsumed?.();
+  }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit]);
 
   const primaryPaneBasis = `${(primaryPaneRatio * 100).toFixed(2)}%`;
 
@@ -678,6 +697,7 @@ export const MainView: React.FC<Props> = ({
                 currentBranch={currentBranch}
                 branches={branches}
                 onMergeBranch={onMergeBranch}
+                onOpenConflictResolverForPath={onOpenConflictResolverForPath}
               />
             )}
           </div>
