@@ -1646,6 +1646,31 @@ code, pre {
   padding: 6px 0;
 }
 
+.conflict-sidebar-file {
+  width: calc(100% - 16px);
+  margin: 0 8px 6px;
+  background: var(--bg-dark);
+  border: 1px solid var(--line-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 7px 8px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 8px;
+  cursor: pointer;
+}
+
+.conflict-sidebar-file:hover {
+  border-color: var(--border-color);
+  background: var(--bg-hover);
+}
+
+.conflict-sidebar-file:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent-primary-border);
+}
+
 .conflict-sidebar-hint {
   margin: 0 10px 6px;
   padding: 7px 8px;
@@ -2558,4 +2583,5 @@ body[data-theme='light'] {
 .diff-sbs-cell.empty {
   background: var(--status-untracked-soft);
 }
+
 
