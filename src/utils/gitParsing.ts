@@ -286,3 +286,40 @@ export function mergeableDecoratedRefs(refs: string[], currentBranch: string): s
   }
   return out;
 }
+
+/** Porcelain codes for unmerged / conflicted paths (aligned with StagingArea conflict detection). */
+const CONFLICT_PORCELAIN_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
+
+/** First repo-relative path that is still in a conflict state, or null. */
+export function parseFirstConflictPathFromPorcelain(statusOutput: string): string | null {
+  if (!statusOutput.trim()) return null;
+  for (const line of statusOutput.split('\n')) {
+    if (line.length < 3) continue;
+    const code = `${line[0]}${line[1]}`;
+    if (!CONFLICT_PORCELAIN_CODES.has(code)) continue;
+    return line.substring(3).trim();
+  }
+  return null;
+}
+
+/**
+ * Parses a conflicted file path from stderr/IPC error text (e.g. after `git merge` fails).
+ * Git often prints: `CONFLICT (content): Merge conflict in path/to/file.txt`
+ */
+export function parseFirstConflictPathFromGitError(errorText: string | null | undefined): string | null {
+  if (!errorText) return null;
+  const m = errorText.match(/Merge conflict in\s+([^\r\n]+?)(?:\s*Automatic|\s*Git Output:|$)/i)
+    ?? errorText.match(/Merge conflict in\s+([^\r\n]+)/i);
+  if (!m) return null;
+  return m[1].trim().replace(/\s+$/, '');
+}
+
+/** Prefer porcelain; if missing, parse from error message (merge/cherry-pick/rebase failures). */
+export function resolveConflictPathAfterGitFailure(
+  porcelainData: string | null | undefined,
+  errorText: string | null | undefined,
+): string | null {
+  const fromPorcelain = porcelainData ? parseFirstConflictPathFromPorcelain(porcelainData) : null;
+  if (fromPorcelain) return fromPorcelain;
+  return parseFirstConflictPathFromGitError(errorText);
+}
