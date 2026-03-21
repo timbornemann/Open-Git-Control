@@ -46,6 +46,7 @@ type ReposSidebarContentProps = Pick<
   | 'onRefreshRemote'
   | 'onSetUpstreamForCurrentBranch'
   | 'onCheckoutRemoteBranch'
+  | 'onMergeRemoteBranch'
   | 'isRemotePanelCollapsed'
   | 'onToggleRemotePanelCollapsed'
   | 'submodules'
@@ -104,6 +105,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
   onCheckoutRemoteBranch,
+  onMergeRemoteBranch,
   isRemotePanelCollapsed,
   onToggleRemotePanelCollapsed,
   submodules,
@@ -179,6 +181,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           onRefreshRemote={onRefreshRemote}
           onSetUpstreamForCurrentBranch={onSetUpstreamForCurrentBranch}
           onCheckoutRemoteBranch={onCheckoutRemoteBranch}
+          onMergeRemoteBranch={onMergeRemoteBranch}
           collapsed={isRemotePanelCollapsed}
           onToggleCollapsed={onToggleRemotePanelCollapsed}
         />
