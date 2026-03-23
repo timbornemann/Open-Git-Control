@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { GitStatusDetailed, FileEntry, parseGitStatusDetailed } from '../utils/gitParsing';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -6,6 +6,7 @@ import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
 import { DiffRequest } from '../types/diff';
 import { AppSettingsDto } from '../global';
+import { getConflictLineGutterKinds, normalizeMergeConflictFileContent, splitContentLines, type ConflictGutterKind } from '../utils/conflictLineGutter';
 
 interface StagingAreaProps {
   repoPath: string | null;
@@ -205,6 +206,72 @@ const replaceConflictBlock = (content: string, block: ConflictBlock, replacement
   `${content.slice(0, block.start)}${replacement}${content.slice(block.end)}`
 );
 
+const gutterClassForKind = (kind: ConflictGutterKind): string => {
+  switch (kind) {
+    case 'ours':
+      return 'conflict-gutter-num conflict-gutter-num--ours';
+    case 'theirs':
+      return 'conflict-gutter-num conflict-gutter-num--theirs';
+    case 'marker':
+      return 'conflict-gutter-num conflict-gutter-num--marker';
+    default:
+      return 'conflict-gutter-num conflict-gutter-num--neutral';
+  }
+};
+
+const ConflictSidePreview: React.FC<{ text: string; variant: 'ours' | 'theirs' }> = ({ text, variant }) => {
+  const lines = useMemo(() => {
+    if (!text) return ['(leer)'];
+    return text.split(/\r?\n/);
+  }, [text]);
+
+  return (
+    <>
+      {lines.map((line, i) => (
+        <div key={i} className={`conflict-preview-line conflict-preview-line--${variant}`}>
+          <span className={`conflict-gutter-num conflict-gutter-num--${variant}`}>{i + 1}</span>
+          <span className="conflict-preview-code">{line}</span>
+        </div>
+      ))}
+    </>
+  );
+};
+
+const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
+  content: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}>(({ content, disabled, onChange }, ref) => {
+  const lines = useMemo(() => splitContentLines(content), [content]);
+  const gutterKinds = useMemo(() => getConflictLineGutterKinds(lines), [lines]);
+
+  return (
+    <div className="conflict-manual-edit-scroll" ref={ref}>
+      <div className="conflict-manual-edit-sync">
+        <div className="conflict-manual-gutter-col" aria-hidden>
+          {lines.map((_, i) => {
+            const kind = gutterKinds[i] || 'neutral';
+            return (
+              <div key={i} className={`conflict-manual-gutter-line conflict-manual-gutter-line--${kind}`}>
+                <span className={gutterClassForKind(kind)}>{i + 1}</span>
+              </div>
+            );
+          })}
+        </div>
+        <textarea
+          className="conflict-manual-textarea"
+          spellCheck={false}
+          rows={Math.max(lines.length, 1)}
+          value={content}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  );
+});
+ConflictManualEditor.displayName = 'ConflictManualEditor';
+
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
   onRepoChanged,
@@ -239,6 +306,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
   const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
+  /** Konfliktblock-Anzahl pro Datei (Git zaehlt nur Dateien mit UU etc.) */
+  const [conflictBlockCountsByPath, setConflictBlockCountsByPath] = useState<Record<string, number>>({});
+  const [isConflictBlockCountPending, setIsConflictBlockCountPending] = useState(false);
+  const conflictManualScrollRef = useRef<HTMLDivElement>(null);
   const autoOpenedConflictPathRef = useRef<string | null>(null);
   const aiConfig = {
     enabled: Boolean(settings.aiAutoCommitEnabled),
@@ -555,10 +626,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         return;
       }
 
+      const normalized = normalizeMergeConflictFileContent(result.data);
       setConflictEditor({
         filePath,
-        originalContent: result.data,
-        content: result.data,
+        originalContent: normalized,
+        content: normalized,
         isSaving: false,
       });
       setSelectedConflictBlockIndex(0);
@@ -585,6 +657,57 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     const safeIndex = Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1);
     return conflictBlocks[safeIndex] || null;
   }, [conflictBlocks, selectedConflictBlockIndex]);
+
+  useEffect(() => {
+    if (!repoPath || !window.electronAPI || !status?.conflicts?.length) {
+      setConflictBlockCountsByPath({});
+      setIsConflictBlockCountPending(false);
+      return;
+    }
+    let cancelled = false;
+    setIsConflictBlockCountPending(true);
+    const paths = [...new Set(status.conflicts.map((c) => c.path))].sort();
+    (async () => {
+      const next: Record<string, number> = {};
+      try {
+        for (const path of paths) {
+          const r = await window.electronAPI.readRepoFile(path);
+          if (cancelled) return;
+          next[path] = r.success && typeof r.data === 'string'
+            ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length
+            : 0;
+        }
+        if (!cancelled) {
+          setConflictBlockCountsByPath(next);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsConflictBlockCountPending(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, status]);
+
+  /** Beim Wechseln des Konfliktblocks: in der manuellen Bearbeitung zur Startzeile scrollen */
+  useLayoutEffect(() => {
+    if (!selectedConflictBlock) return;
+    const el = conflictManualScrollRef.current;
+    if (!el) return;
+    const line = selectedConflictBlock.startLine;
+    const run = () => {
+      const ta = el.querySelector('textarea.conflict-manual-textarea');
+      if (!(ta instanceof HTMLTextAreaElement)) return;
+      const lh = parseFloat(getComputedStyle(ta).lineHeight || '18');
+      const scrollTop = Math.max(0, (line - 1) * lh - 56);
+      el.scrollTop = scrollTop;
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, [selectedConflictBlockIndex, selectedConflictBlock?.startLine, conflictEditor?.filePath]);
 
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
@@ -940,6 +1063,16 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const visibleUntracked = activeFilter === 'all' || activeFilter === 'untracked' ? bySearch(status.untracked) : [];
   const visibleConflicts = activeFilter === 'all' || activeFilter === 'conflicts' ? bySearch(status.conflicts) : [];
   const visibleTotal = visibleStaged.length + visibleUnstaged.length + visibleUntracked.length + visibleConflicts.length;
+
+  const blockCountForPath = (path: string) => {
+    if (conflictEditor?.filePath === path) {
+      return conflictBlocks.length;
+    }
+    return conflictBlockCountsByPath[path] ?? 0;
+  };
+
+  const totalConflictBlocksInView = visibleConflicts.reduce((sum, f) => sum + blockCountForPath(f.path), 0);
+  const totalConflictBlocksAll = status.conflicts.reduce((sum, f) => sum + blockCountForPath(f.path), 0);
   const contextEntry = contextMenu?.entry || null;
   const contextDir = contextEntry ? dirname(contextEntry.path) : '';
   const contextTopDir = contextDir.includes('/') ? contextDir.split('/')[0] : '';
@@ -1017,8 +1150,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               color: activeFilter === filter ? 'var(--text-accent)' : undefined,
             }}
             onClick={() => setActiveFilter(filter)}
+            title={filter === 'conflicts' && totalConflictBlocksAll > 0 ? `${totalConflictBlocksAll} Konfliktblock${totalConflictBlocksAll !== 1 ? 'e' : ''}` : undefined}
           >
-            {filter}
+            {filter === 'conflicts' && totalConflictBlocksAll > 0 ? `conflicts (${totalConflictBlocksAll})` : filter}
           </button>
         ))}
         <span className="staging-stat-chip" title="Staged Diff-Statistik">
@@ -1045,11 +1179,24 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
         {visibleConflicts.length > 0 && (
           <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}`}>
-            <SectionHeader title="Konflikte" count={visibleConflicts.length} color="var(--status-danger)" />
+            <div className="staging-section-header">
+              <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
+              <span className="staging-count" title="Konfliktbloecke (<<<<<<< … >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
+                {isConflictBlockCountPending && visibleConflicts.length > 0 ? '…' : totalConflictBlocksInView}
+              </span>
+              <span className="staging-stats-inline">
+                {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
+              </span>
+              <div style={{ flex: 1 }} />
+            </div>
             {!onOpenConflictResolver && (
             <div className="conflict-global-actions" style={{ padding: '10px 16px', backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, color: 'var(--status-danger)', fontSize: '0.85rem' }}>{visibleConflicts.length} Konflikt{visibleConflicts.length !== 1 ? 'e' : ''}</span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 600, color: 'var(--status-danger)', fontSize: '0.85rem' }}>
+                  {isConflictBlockCountPending && visibleConflicts.length > 0
+                    ? 'Konfliktbloecke werden gezaehlt…'
+                    : `${totalConflictBlocksInView} Konfliktblock${totalConflictBlocksInView !== 1 ? 'e' : ''} in ${visibleConflicts.length} Datei${visibleConflicts.length !== 1 ? 'en' : ''}`}
+                </span>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={mergeContinue} title="Merge abschliessen">Merge fortsetzen</button>
@@ -1085,6 +1232,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               <div className="conflict-file-list" style={{ borderRight: '1px solid var(--border-color)', background: 'var(--bg-panel)', overflowY: 'auto' }}>
                 {visibleConflicts.map((f) => {
                   const isActive = conflictEditor?.filePath === f.path;
+                  const blocksForFile = blockCountForPath(f.path);
                   return (
                     <button
                       key={`c-${f.path}`}
@@ -1101,7 +1249,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                     >
                       <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{f.code}</span>
                       <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{f.path}</span>
-                      <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>{CONFLICT_LABELS[f.code] || 'Konflikt'}</span>
+                      <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>
+                        {CONFLICT_LABELS[f.code] || 'Konflikt'}
+                        {blocksForFile > 0
+                          ? ` · ${blocksForFile} Block${blocksForFile !== 1 ? 'e' : ''}`
+                          : (isConflictBlockCountPending ? ' · …' : '')}
+                      </span>
                     </button>
                   );
                 })}
@@ -1158,21 +1311,24 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: 'var(--border-color)', gap: '1px', minHeight: 0 }}>
-                            
                             <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
-                              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-warning-soft)' }}>
+                              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-warning-soft)', flexShrink: 0 }}>
                                 <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-warning)' }}>Aktueller Stand {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}</span>
                                 <button className="staging-btn-sm" style={{ padding: '4px 12px', background: 'var(--status-warning)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }} onClick={() => applyConflictChoiceToSelected('ours')} disabled={conflictEditor.isSaving}>Uebernehmen</button>
                               </div>
-                              <pre style={{ padding: '16px', margin: 0, overflow: 'auto', fontSize: '0.75rem', color: 'var(--text-primary)', minHeight: '80px', fontFamily: 'monospace' }}>{selectedConflictBlock.ours || '(leer)'}</pre>
+                              <div className="conflict-side-preview-scroll" title="Zeilennummern nur fuer diesen Konfliktblock (Aktueller Stand)">
+                                <ConflictSidePreview text={selectedConflictBlock.ours} variant="ours" />
+                              </div>
                             </div>
 
                             <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
-                              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-success-soft)' }}>
+                              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-success-soft)', flexShrink: 0 }}>
                                 <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-success)' }}>Eingehender Stand {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}</span>
                                 <button className="staging-btn-sm" style={{ padding: '4px 12px', background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }} onClick={() => applyConflictChoiceToSelected('theirs')} disabled={conflictEditor.isSaving}>Uebernehmen</button>
                               </div>
-                              <pre style={{ padding: '16px', margin: 0, overflow: 'auto', fontSize: '0.75rem', color: 'var(--text-primary)', minHeight: '80px', fontFamily: 'monospace' }}>{selectedConflictBlock.theirs || '(leer)'}</pre>
+                              <div className="conflict-side-preview-scroll" title="Zeilennummern nur fuer diesen Konfliktblock (Eingehender Stand)">
+                                <ConflictSidePreview text={selectedConflictBlock.theirs} variant="theirs" />
+                              </div>
                             </div>
 
                           </div>
@@ -1184,27 +1340,30 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--bg-darker)' }}>
-                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Manuelle Bearbeitung</span>
+                      <div className="conflict-manual-edit-root">
+                        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Manuelle Bearbeitung</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '720px' }}>
+                              Gesamte Datei mit Zeilennummern; farbig: Aktueller Stand / Eingehender Stand / Marker. Scrollen fuer Kontext ausserhalb der Konfliktmarker.
+                            </span>
+                          </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={resetConflictEditorDraft} disabled={!isConflictEditorDirty || conflictEditor.isSaving}>Aenderungen verwerfen</button>
                             <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={() => { void saveConflictEditor(false); }} disabled={conflictEditor.isSaving || !isConflictEditorDirty}>Speichern</button>
                             <button className="staging-btn-sm" style={{ background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', padding: '4px 16px', fontWeight: 600 }} onClick={() => { void saveConflictEditor(true); }} disabled={conflictEditor.isSaving || conflictBlocks.length > 0}>Speichern + Geloest</button>
                           </div>
                         </div>
-                        <textarea
-                          spellCheck={false}
-                          value={conflictEditor.content}
-                          onChange={(event) => {
-                            const next = event.target.value;
+                        <ConflictManualEditor
+                          ref={conflictManualScrollRef}
+                          content={conflictEditor.content}
+                          disabled={conflictEditor.isSaving}
+                          onChange={(next) => {
                             setConflictEditor((prev) => {
                               if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
                               return { ...prev, content: next };
                             });
                           }}
-                          disabled={conflictEditor.isSaving}
-                          style={{ flex: 1, minHeight: '160px', border: 'none', padding: '16px 20px', background: 'var(--bg-dark)', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '0.75rem', resize: 'none', outline: 'none', overflow: 'auto' }}
                         />
                       </div>
                     </div>
@@ -1321,7 +1480,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             disabled={hasOpenConflicts || !commitMsg.trim() || isCommitting || isAiCommitting || !status || status.staged.length === 0}
           >
             {hasOpenConflicts
-              ? `Konflikte (${status.conflicts.length})`
+              ? `Konflikte (${totalConflictBlocksAll})`
               : (isCommitting ? 'Committing...' : `Commit (${status?.staged.length || 0} | ${formatDiffStats(stagedStats)})`)
             }
           </button>
