@@ -6,31 +6,73 @@ export type ConflictGutterKind = 'neutral' | 'ours' | 'theirs' | 'marker';
  * Assumes standard Git conflict markers (markers on their own lines).
  */
 export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[] {
-  const kinds: ConflictGutterKind[] = [];
-  let zone: 'neutral' | 'ours' | 'theirs' = 'neutral';
+  const kinds: ConflictGutterKind[] = new Array(lines.length).fill('neutral');
+  let i = 0;
 
-  for (const line of lines) {
-    const trimmed = line.trimEnd();
-
-    if (/^<<<<<<</.test(trimmed)) {
-      kinds.push('marker');
-      zone = 'ours';
-      continue;
-    }
-    if (zone === 'ours' && line.trim() === '=======') {
-      kinds.push('marker');
-      zone = 'theirs';
-      continue;
-    }
-    if (/^>>>>>>>/.test(trimmed)) {
-      kinds.push('marker');
-      zone = 'neutral';
+  while (i < lines.length) {
+    const current = lines[i];
+    const isStart = current.trimEnd().startsWith('<<<<<<<');
+    if (!isStart) {
+      i += 1;
       continue;
     }
 
-    if (zone === 'ours') kinds.push('ours');
-    else if (zone === 'theirs') kinds.push('theirs');
-    else kinds.push('neutral');
+    let separatorIndex = -1;
+    let nestedStartBeforeSeparator = -1;
+
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const candidate = lines[j];
+      if (candidate.trimEnd().startsWith('<<<<<<<')) {
+        nestedStartBeforeSeparator = j;
+        break;
+      }
+      if (candidate.trim() === '=======') {
+        separatorIndex = j;
+        break;
+      }
+      if (candidate.trimEnd().startsWith('>>>>>>>')) {
+        break;
+      }
+    }
+
+    if (separatorIndex < 0) {
+      kinds[i] = 'marker';
+      i = nestedStartBeforeSeparator >= 0 ? nestedStartBeforeSeparator : i + 1;
+      continue;
+    }
+
+    let endIndex = -1;
+    let nestedStartBeforeEnd = -1;
+
+    for (let j = separatorIndex + 1; j < lines.length; j += 1) {
+      const candidate = lines[j];
+      if (candidate.trimEnd().startsWith('<<<<<<<')) {
+        nestedStartBeforeEnd = j;
+        break;
+      }
+      if (candidate.trimEnd().startsWith('>>>>>>>')) {
+        endIndex = j;
+        break;
+      }
+    }
+
+    if (endIndex < 0) {
+      kinds[i] = 'marker';
+      kinds[separatorIndex] = 'marker';
+      i = nestedStartBeforeEnd >= 0 ? nestedStartBeforeEnd : i + 1;
+      continue;
+    }
+
+    kinds[i] = 'marker';
+    for (let j = i + 1; j < separatorIndex; j += 1) {
+      kinds[j] = 'ours';
+    }
+    kinds[separatorIndex] = 'marker';
+    for (let j = separatorIndex + 1; j < endIndex; j += 1) {
+      kinds[j] = 'theirs';
+    }
+    kinds[endIndex] = 'marker';
+    i = endIndex + 1;
   }
 
   return kinds;
