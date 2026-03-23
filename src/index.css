@@ -2060,10 +2060,19 @@ code, pre {
 .conflict-side-preview-scroll {
   overflow: auto;
   flex: 1;
-  min-height: 120px;
-  max-height: min(42vh, 420px);
+  min-height: 88px;
+  max-height: min(30vh, 240px);
   padding: 10px 12px;
   background: var(--bg-dark);
+}
+
+.conflict-structured-view {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  max-height: min(46vh, 360px);
+  overflow: hidden;
 }
 
 .conflict-manual-edit-root {
@@ -2072,7 +2081,7 @@ code, pre {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  min-height: 220px;
   background: var(--bg-darker);
 }
 
@@ -2433,6 +2442,10 @@ code, pre {
   .conflict-global-nav-meta {
     order: -1;
     flex-basis: 100%;
+  }
+
+  .conflict-manual-edit-root {
+    min-height: 170px;
   }
 
   .conflict-layout {
