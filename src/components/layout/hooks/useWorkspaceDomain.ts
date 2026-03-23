@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { RepoSortByDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState } from '../layoutTypes';
 
@@ -14,6 +15,82 @@ type Params = {
 type RepoMetaEntry = {
   lastOpened: number;
   pinned: boolean;
+  createdAt: number;
+};
+
+type SortableRepo = {
+  path: string;
+  pinned: boolean;
+  lastOpened: number;
+  createdAt: number;
+  name: string;
+};
+
+const DEFAULT_REPO_SORT_BY: RepoSortByDto = 'lastOpenedDesc';
+
+const toRepoName = (repoPath: string): string => (
+  (repoPath.split(/[\\/]/).pop() || repoPath).toLowerCase()
+);
+
+const normalizeTimestamp = (value: unknown, fallback: number): number => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return fallback;
+};
+
+const compareBySortPreference = (a: SortableRepo, b: SortableRepo, sortBy: RepoSortByDto): number => {
+  if (a.pinned !== b.pinned) {
+    return a.pinned ? -1 : 1;
+  }
+
+  const nameAscCompare = a.name.localeCompare(b.name);
+
+  if (sortBy === 'nameAsc') {
+    if (nameAscCompare !== 0) return nameAscCompare;
+  } else if (sortBy === 'nameDesc') {
+    if (nameAscCompare !== 0) return -nameAscCompare;
+  } else if (sortBy === 'createdAtDesc') {
+    if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+  } else if (sortBy === 'createdAtAsc') {
+    if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+  } else if (a.lastOpened !== b.lastOpened) {
+    return b.lastOpened - a.lastOpened;
+  }
+
+  if (a.lastOpened !== b.lastOpened) {
+    return b.lastOpened - a.lastOpened;
+  }
+  if (a.createdAt !== b.createdAt) {
+    return b.createdAt - a.createdAt;
+  }
+  if (nameAscCompare !== 0) {
+    return nameAscCompare;
+  }
+  return a.path.localeCompare(b.path);
+};
+
+const sortRepoPaths = (
+  repoPaths: string[],
+  metaMap: Record<string, RepoMetaEntry>,
+  sortBy: RepoSortByDto,
+): string[] => {
+  const withMeta: SortableRepo[] = repoPaths.map((repoPath) => {
+    const now = Date.now();
+    const repoMeta = metaMap[repoPath];
+    const lastOpened = normalizeTimestamp(repoMeta?.lastOpened, now);
+    const createdAt = normalizeTimestamp(repoMeta?.createdAt, lastOpened);
+    return {
+      path: repoPath,
+      pinned: Boolean(repoMeta?.pinned),
+      lastOpened,
+      createdAt,
+      name: toRepoName(repoPath),
+    };
+  });
+
+  withMeta.sort((a, b) => compareBySortPreference(a, b, sortBy));
+  return withMeta.map((entry) => entry.path);
 };
 
 export const useWorkspaceDomain = ({
@@ -28,37 +105,23 @@ export const useWorkspaceDomain = ({
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
+  const [repoSortBy, setRepoSortBy] = useState<RepoSortByDto>(DEFAULT_REPO_SORT_BY);
   const [reposLoaded, setReposLoaded] = useState(false);
 
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
   const sortedOpenRepos = useMemo(() => {
-    const withMeta = openRepos.map((path) => ({
-      path,
-      pinned: repoMeta[path]?.pinned || false,
-      lastOpened: repoMeta[path]?.lastOpened || 0,
-      name: (path.split(/[\\/]/).pop() || path).toLowerCase(),
-    }));
-
-    withMeta.sort((a, b) => {
-      if (a.pinned !== b.pinned) {
-        return a.pinned ? -1 : 1;
-      }
-      if (a.lastOpened !== b.lastOpened) {
-        return b.lastOpened - a.lastOpened;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    return withMeta.map((entry) => entry.path);
-  }, [openRepos, repoMeta]);
+    return sortRepoPaths(openRepos, repoMeta, repoSortBy);
+  }, [openRepos, repoMeta, repoSortBy]);
 
   const touchRepo = (repoPath: string) => {
+    const now = Date.now();
     setRepoMeta((prev) => ({
       ...prev,
       [repoPath]: {
         pinned: prev[repoPath]?.pinned || false,
-        lastOpened: Date.now(),
+        lastOpened: now,
+        createdAt: prev[repoPath]?.createdAt || now,
       },
     }));
   };
@@ -68,13 +131,17 @@ export const useWorkspaceDomain = ({
       if (!window.electronAPI) return;
       try {
         const data = await window.electronAPI.getStoredRepos();
+        setRepoSortBy(data.sortBy || DEFAULT_REPO_SORT_BY);
+
         if (data.repos.length > 0) {
           const paths = data.repos.map((r) => r.path);
           const meta: Record<string, RepoMetaEntry> = {};
           for (const repo of data.repos) {
+            const lastOpened = normalizeTimestamp(repo.lastOpened, Date.now());
             meta[repo.path] = {
-              lastOpened: Number.isFinite(repo.lastOpened) ? repo.lastOpened : Date.now(),
+              lastOpened,
               pinned: Boolean(repo.pinned),
+              createdAt: normalizeTimestamp(repo.createdAt, lastOpened),
             };
           }
 
@@ -96,17 +163,20 @@ export const useWorkspaceDomain = ({
   useEffect(() => {
     if (!reposLoaded || !window.electronAPI) return;
 
-    const repos = sortedOpenRepos.map((path) => ({
-      path,
-      lastOpened: repoMeta[path]?.lastOpened || Date.now(),
-      pinned: repoMeta[path]?.pinned || false,
+    const now = Date.now();
+    const repos = sortedOpenRepos.map((repoPath) => ({
+      path: repoPath,
+      lastOpened: normalizeTimestamp(repoMeta[repoPath]?.lastOpened, now),
+      pinned: Boolean(repoMeta[repoPath]?.pinned),
+      createdAt: normalizeTimestamp(repoMeta[repoPath]?.createdAt, now),
     }));
 
     window.electronAPI.setStoredRepos({
       repos,
       activeRepo,
+      sortBy: repoSortBy,
     });
-  }, [sortedOpenRepos, repoMeta, activeRepo, reposLoaded]);
+  }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded]);
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!window.electronAPI || repoPath === activeRepo) return;
@@ -119,21 +189,15 @@ export const useWorkspaceDomain = ({
 
   const handleCloseRepo = async (repoPath: string) => {
     const next = openRepos.filter((r) => r !== repoPath);
+    const nextMeta = { ...repoMeta };
+    delete nextMeta[repoPath];
+
     setOpenRepos(next);
-    setRepoMeta((prev) => {
-      const clone = { ...prev };
-      delete clone[repoPath];
-      return clone;
-    });
+    setRepoMeta(nextMeta);
 
     if (activeRepo === repoPath) {
       if (next.length > 0) {
-        const sortedNext = [...next].sort((a, b) => {
-          const aPinned = repoMeta[a]?.pinned || false;
-          const bPinned = repoMeta[b]?.pinned || false;
-          if (aPinned !== bPinned) return aPinned ? -1 : 1;
-          return (repoMeta[b]?.lastOpened || 0) - (repoMeta[a]?.lastOpened || 0);
-        });
+        const sortedNext = sortRepoPaths(next, nextMeta, repoSortBy);
         const newActive = sortedNext[0];
         if (window.electronAPI) {
           await window.electronAPI.setRepoPath(newActive);
@@ -150,12 +214,14 @@ export const useWorkspaceDomain = ({
   };
 
   const ensureRepoPresent = (repoPath: string) => {
+    const now = Date.now();
     setOpenRepos((prev) => (prev.includes(repoPath) ? prev : [...prev, repoPath]));
     setRepoMeta((prev) => ({
       ...prev,
       [repoPath]: {
         pinned: prev[repoPath]?.pinned || false,
-        lastOpened: Date.now(),
+        lastOpened: now,
+        createdAt: prev[repoPath]?.createdAt || now,
       },
     }));
   };
@@ -212,13 +278,19 @@ export const useWorkspaceDomain = ({
   };
 
   const toggleRepoPin = (repoPath: string) => {
+    const now = Date.now();
     setRepoMeta((prev) => ({
       ...prev,
       [repoPath]: {
         pinned: !prev[repoPath]?.pinned,
-        lastOpened: prev[repoPath]?.lastOpened || Date.now(),
+        lastOpened: normalizeTimestamp(prev[repoPath]?.lastOpened, now),
+        createdAt: normalizeTimestamp(prev[repoPath]?.createdAt, now),
       },
     }));
+  };
+
+  const handleSetRepoSortBy = (sortBy: RepoSortByDto) => {
+    setRepoSortBy(sortBy);
   };
 
   return {
@@ -229,6 +301,8 @@ export const useWorkspaceDomain = ({
     setOpenRepos,
     activeRepo,
     setActiveRepo,
+    repoSortBy,
+    setRepoSortBy: handleSetRepoSortBy,
     handleSwitchRepo,
     handleCloseRepo,
     handleOpenFolder,

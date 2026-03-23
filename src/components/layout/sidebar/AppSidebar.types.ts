@@ -1,6 +1,6 @@
 import React from 'react';
 import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto } from '../../../global';
+import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto, RepoSortByDto } from '../../../global';
 
 export type RemoteStatus = {
   title: string;
@@ -12,7 +12,7 @@ export type RemoteStatus = {
 
 export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
-export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean }>;
+export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 export type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
 
@@ -23,6 +23,8 @@ export type AppSidebarProps = {
   activeRepo: string | null;
   openRepos: string[];
   repoMeta: RepoMetaMap;
+  repoSortBy: RepoSortByDto;
+  onSetRepoSortBy: (sortBy: RepoSortByDto) => void;
   onToggleRepoPin: (repoPath: string) => void;
   onOpenFolder: () => void;
   onSwitchRepo: (repoPath: string) => void;

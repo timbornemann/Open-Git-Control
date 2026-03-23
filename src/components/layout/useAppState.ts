@@ -870,6 +870,8 @@ export const useAppState = () => {
     setActiveTab: workspace.setActiveTab,
     openRepos: workspace.openRepos,
     repoMeta: workspace.repoMeta,
+    repoSortBy: workspace.repoSortBy,
+    setRepoSortBy: workspace.setRepoSortBy,
     activeRepo: workspace.activeRepo,
     handleOpenFolder: workspace.handleOpenFolder,
     handleSwitchRepo: workspace.handleSwitchRepo,
