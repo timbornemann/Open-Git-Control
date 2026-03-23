@@ -1,10 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
+import { RepoSortByDto } from '../../global';
 import { useI18n } from '../../i18n';
 
 type Props = {
   openRepos: string[];
-  repoMeta: Record<string, { lastOpened: number; pinned: boolean }>;
+  repoMeta: Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
+  sortBy: RepoSortByDto;
+  onSortChange: (sortBy: RepoSortByDto) => void;
   activeRepo: string | null;
   onSwitchRepo: (repoPath: string) => void;
   onCloseRepo: (repoPath: string) => void;
@@ -17,6 +20,8 @@ type Props = {
 export const RepoList: React.FC<Props> = ({
   openRepos,
   repoMeta,
+  sortBy,
+  onSortChange,
   activeRepo,
   onSwitchRepo,
   onCloseRepo,
@@ -27,6 +32,13 @@ export const RepoList: React.FC<Props> = ({
 }) => {
   const [query, setQuery] = useState('');
   const { tr, locale } = useI18n();
+  const sortOptions: Array<{ value: RepoSortByDto; label: string }> = [
+    { value: 'lastOpenedDesc', label: tr('Zuletzt geöffnet', 'Last opened') },
+    { value: 'nameAsc', label: tr('Name (A-Z)', 'Name (A-Z)') },
+    { value: 'nameDesc', label: tr('Name (Z-A)', 'Name (Z-A)') },
+    { value: 'createdAtDesc', label: tr('Erstellt (neu-alt)', 'Created (new-old)') },
+    { value: 'createdAtAsc', label: tr('Erstellt (alt-neu)', 'Created (old-new)') },
+  ];
 
   const filteredRepos = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -58,6 +70,39 @@ export const RepoList: React.FC<Props> = ({
 
       {!collapsed && (
         <>
+          {openRepos.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 8px 4px' }}>
+              <label
+                htmlFor="repo-sort-select"
+                style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}
+              >
+                {tr('Sortierung', 'Sort')}
+              </label>
+              <select
+                id="repo-sort-select"
+                value={sortBy}
+                onChange={(e) => onSortChange(e.target.value as RepoSortByDto)}
+                style={{
+                  flex: 1,
+                  maxWidth: '190px',
+                  padding: '5px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-panel)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.78rem',
+                }}
+                title={tr('Sortierreihenfolge für Repositories', 'Repository sort order')}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {openRepos.length > 0 && (
             <div className="sidebar-search-wrap">
               <Search size={14} className="sidebar-search-icon" />

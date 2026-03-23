@@ -111,6 +111,8 @@ const App: React.FC = () => {
           activeRepo={state.activeRepo}
           openRepos={state.openRepos}
           repoMeta={state.repoMeta}
+          repoSortBy={state.repoSortBy}
+          onSetRepoSortBy={state.setRepoSortBy}
           onToggleRepoPin={state.handleToggleRepoPin}
           onOpenFolder={state.handleOpenFolder}
           onSwitchRepo={state.handleSwitchRepo}
