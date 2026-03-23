@@ -1872,6 +1872,178 @@ code, pre {
   background: var(--status-info-soft);
 }
 
+/*
+ * Konflikt: Zeilennummern (ours / theirs / Marker / neutral)
+ *
+ * WICHTIG: Kein vertikales Padding/Margin hier!
+ * Die Gutter-Zeile muss exakt calc(0.72rem * 1.5) = gleiche Höhe wie eine
+ * Textarea-Zeile haben. Vertikales Padding würde pro Zeile akkumulieren und
+ * am Dateiende "Phantom-Zeilen" (Gutter-Nummern ohne Textarea-Inhalt) erzeugen.
+ */
+.conflict-gutter-num {
+  display: inline-block;
+  min-width: 3.25ch;
+  padding: 0 10px 0 6px;   /* nur horizontales Padding! */
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  user-select: none;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  border-radius: 3px;
+}
+
+.conflict-gutter-num--ours {
+  color: var(--status-warning);
+  font-weight: 700;
+  background: var(--status-warning-soft);
+  box-shadow: inset 4px 0 0 0 var(--status-warning);
+}
+
+.conflict-gutter-num--theirs {
+  color: var(--status-success);
+  font-weight: 700;
+  background: var(--status-success-soft);
+  box-shadow: inset 4px 0 0 0 var(--status-success);
+}
+
+.conflict-gutter-num--marker {
+  color: var(--status-info);
+  font-weight: 700;
+  background: var(--status-info-soft);
+  box-shadow: inset 4px 0 0 0 var(--status-info);
+}
+
+.conflict-gutter-num--neutral {
+  color: var(--text-secondary);
+  font-weight: 500;
+  background: transparent;
+}
+
+.conflict-preview-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: calc(0.72rem * 1.5);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 1px 0 1px 4px;
+  margin: 0 -4px 0 -4px;
+  border-radius: 4px;
+}
+
+.conflict-preview-line--ours {
+  background: var(--status-warning-soft);
+  box-shadow: inset 5px 0 0 0 var(--status-warning);
+}
+
+.conflict-preview-line--theirs {
+  background: var(--status-success-soft);
+  box-shadow: inset 5px 0 0 0 var(--status-success);
+}
+
+.conflict-preview-code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.conflict-side-preview-scroll {
+  overflow: auto;
+  flex: 1;
+  min-height: 120px;
+  max-height: min(42vh, 420px);
+  padding: 10px 12px;
+  background: var(--bg-dark);
+}
+
+.conflict-manual-edit-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-darker);
+}
+
+.conflict-manual-edit-scroll {
+  flex: 1;
+  min-height: 200px;
+  overflow: auto;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.conflict-manual-edit-sync {
+  display: flex;
+  align-items: flex-start;
+  min-width: min(100%, 120ch);
+}
+
+.conflict-manual-gutter-col {
+  flex-shrink: 0;
+  padding: 12px 0 12px 10px;
+  border-right: 1px solid var(--line-subtle);
+  background: var(--bg-panel);
+}
+
+.conflict-manual-gutter-line {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  height: calc(0.72rem * 1.5);   /* EXAKTE Höhe = eine Textarea-Zeile, kein vertikales Padding! */
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  margin: 0 -6px;
+  padding-left: 6px;
+  padding-right: 2px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.conflict-manual-gutter-line--ours {
+  background: var(--status-warning-soft);
+  box-shadow: inset 5px 0 0 0 var(--status-warning);
+}
+
+.conflict-manual-gutter-line--theirs {
+  background: var(--status-success-soft);
+  box-shadow: inset 5px 0 0 0 var(--status-success);
+}
+
+.conflict-manual-gutter-line--marker {
+  background: var(--status-info-soft);
+  box-shadow: inset 5px 0 0 0 var(--status-info);
+}
+
+.conflict-manual-gutter-line--neutral {
+  background: transparent;
+}
+
+.conflict-manual-textarea {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 12px 14px 12px 10px;
+  margin: 0;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  overflow-y: hidden; /* vertical scroll lives in .conflict-manual-edit-scroll */
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+  box-sizing: border-box;
+  vertical-align: top;
+}
+
 .conflict-block-workspace {
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
