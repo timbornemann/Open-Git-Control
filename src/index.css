@@ -1876,8 +1876,8 @@ code, pre {
  * Konflikt: Zeilennummern (ours / theirs / Marker / neutral)
  *
  * WICHTIG: Kein vertikales Padding/Margin hier!
- * Die Gutter-Zeile muss exakt calc(0.72rem * 1.5) = gleiche Höhe wie eine
- * Textarea-Zeile haben. Vertikales Padding würde pro Zeile akkumulieren und
+ * Die Gutter-Zeile muss exakt dieselbe Höhe wie eine Textarea-Zeile haben.
+ * Vertikales Padding würde pro Zeile akkumulieren und
  * am Dateiende "Phantom-Zeilen" (Gutter-Nummern ohne Textarea-Inhalt) erzeugen.
  */
 .conflict-gutter-num {
@@ -1962,6 +1962,8 @@ code, pre {
 }
 
 .conflict-manual-edit-root {
+  --conflict-editor-font-size: 12px;
+  --conflict-editor-line-height: 18px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1993,15 +1995,20 @@ code, pre {
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
-  height: calc(0.72rem * 1.5);   /* EXAKTE Höhe = eine Textarea-Zeile, kein vertikales Padding! */
+  height: var(--conflict-editor-line-height);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: var(--conflict-editor-font-size);
+  line-height: var(--conflict-editor-line-height);
   margin: 0 -6px;
   padding-left: 6px;
   padding-right: 2px;
   border-radius: 3px;
   overflow: hidden;
+}
+
+.conflict-manual-gutter-line .conflict-gutter-num {
+  font-size: var(--conflict-editor-font-size);
+  line-height: var(--conflict-editor-line-height);
 }
 
 .conflict-manual-gutter-line--ours {
@@ -2032,8 +2039,8 @@ code, pre {
   background: var(--bg-dark);
   color: var(--text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: var(--conflict-editor-font-size);
+  line-height: var(--conflict-editor-line-height);
   resize: none;
   outline: none;
   overflow-y: hidden; /* vertical scroll lives in .conflict-manual-edit-scroll */
@@ -2042,6 +2049,10 @@ code, pre {
   tab-size: 2;
   box-sizing: border-box;
   vertical-align: top;
+}
+
+.conflict-manual-edit-root .conflict-manual-textarea:focus {
+  box-shadow: inset 0 0 0 1px var(--accent-primary-border);
 }
 
 .conflict-block-workspace {
@@ -2211,7 +2222,7 @@ code, pre {
   flex-wrap: wrap;
 }
 
-.conflict-manual-textarea {
+.conflict-manual-editor .conflict-manual-textarea {
   width: 100%;
   min-height: 210px;
   resize: vertical;
@@ -2224,7 +2235,7 @@ code, pre {
   line-height: 1.45;
 }
 
-.conflict-manual-textarea:focus {
+.conflict-manual-editor .conflict-manual-textarea:focus {
   outline: none;
   box-shadow: inset 0 0 0 1px var(--accent-primary-border);
 }
@@ -2810,5 +2821,3 @@ body[data-theme='light'] {
 .diff-sbs-cell.empty {
   background: var(--status-untracked-soft);
 }
-
-
