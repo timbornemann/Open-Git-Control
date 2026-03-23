@@ -160,6 +160,12 @@ const lineNumberAt = (content: string, index: number): number => {
   return line;
 };
 
+const countLinesInBlock = (value: string): number => {
+  if (value === '') return 0;
+  const withoutSingleTrailingNewline = value.replace(/\r?\n$/, '');
+  return withoutSingleTrailingNewline === '' ? 0 : withoutSingleTrailingNewline.split(/\r?\n/).length;
+};
+
 const parseConflictBlocks = (content: string): ConflictBlock[] => {
   const blocks: ConflictBlock[] = [];
   const pattern = new RegExp(CONFLICT_BLOCK_PATTERN_SOURCE, 'g');
@@ -170,7 +176,7 @@ const parseConflictBlocks = (content: string): ConflictBlock[] => {
     const start = match.index;
     const end = start + marker.length;
     const startLine = lineNumberAt(content, start);
-    const lineCount = marker === '' ? 0 : marker.split(/\r?\n/).length;
+    const lineCount = countLinesInBlock(marker);
     const endLine = Math.max(startLine, startLine + lineCount - 1);
 
     blocks.push({
@@ -244,6 +250,12 @@ const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
 }>(({ content, disabled, onChange }, ref) => {
   const lines = useMemo(() => splitContentLines(content), [content]);
   const gutterKinds = useMemo(() => getConflictLineGutterKinds(lines), [lines]);
+  const textareaHeightPx = useMemo(() => {
+    // Keep textarea height deterministic across platforms to avoid row rounding drift.
+    const lineHeightPx = 18;
+    const verticalPaddingPx = 24; // 12px top + 12px bottom (see index.css)
+    return Math.max(lines.length, 1) * lineHeightPx + verticalPaddingPx;
+  }, [lines.length]);
 
   return (
     <div className="conflict-manual-edit-scroll" ref={ref}>
@@ -261,7 +273,7 @@ const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
         <textarea
           className="conflict-manual-textarea"
           spellCheck={false}
-          rows={Math.max(lines.length, 1)}
+          style={{ height: `${textareaHeightPx}px` }}
           value={content}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
@@ -1592,4 +1604,3 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     </div>
   );
 };
-
