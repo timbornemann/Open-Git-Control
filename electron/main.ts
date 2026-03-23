@@ -747,11 +747,16 @@ interface StoredRepoEntry {
   path: string;
   lastOpened: number;
   pinned: boolean;
+  createdAt: number;
 }
+
+type RepoSortBy = 'lastOpenedDesc' | 'nameAsc' | 'nameDesc' | 'createdAtDesc' | 'createdAtAsc';
+const DEFAULT_REPO_SORT_BY: RepoSortBy = 'lastOpenedDesc';
 
 interface StoredData {
   repos: StoredRepoEntry[];
   activeRepo: string | null;
+  sortBy: RepoSortBy;
 }
 
 interface FileHistoryEntry {
@@ -792,9 +797,40 @@ function getStorePath(): string {
   return path.join(app.getPath('userData'), 'repos.json');
 }
 
+function normalizeRepoSortBy(value: unknown): RepoSortBy {
+  const candidate = typeof value === 'string' ? value : '';
+  switch (candidate) {
+    case 'lastOpenedDesc':
+    case 'nameAsc':
+    case 'nameDesc':
+    case 'createdAtDesc':
+    case 'createdAtAsc':
+      return candidate;
+    default:
+      return DEFAULT_REPO_SORT_BY;
+  }
+}
+
+function resolveRepoCreatedAt(repoPath: string, fallbackTimestamp: number): number {
+  try {
+    const stats = fs.statSync(repoPath);
+    if (Number.isFinite(stats.birthtimeMs) && stats.birthtimeMs > 0) {
+      return Math.floor(stats.birthtimeMs);
+    }
+  } catch {
+    // keep fallback when stats are unavailable
+  }
+
+  if (Number.isFinite(fallbackTimestamp) && fallbackTimestamp > 0) {
+    return Math.floor(fallbackTimestamp);
+  }
+  return Date.now();
+}
+
 function normalizeStoredData(input: Partial<StoredData> | null | undefined): StoredData {
   const reposInput = Array.isArray(input?.repos) ? input.repos : [];
   const seen = new Set<string>();
+  const sortBy = normalizeRepoSortBy(input?.sortBy);
 
   const repos: StoredRepoEntry[] = reposInput
     .map((repo: any) => {
@@ -803,7 +839,10 @@ function normalizeStoredData(input: Partial<StoredData> | null | undefined): Sto
       seen.add(pathValue);
       const lastOpened = Number.isFinite(repo?.lastOpened) ? Number(repo.lastOpened) : Date.now();
       const pinned = typeof repo?.pinned === 'boolean' ? repo.pinned : false;
-      return { path: pathValue, lastOpened, pinned };
+      const createdAt = Number.isFinite(repo?.createdAt)
+        ? Math.floor(Number(repo.createdAt))
+        : resolveRepoCreatedAt(pathValue, lastOpened);
+      return { path: pathValue, lastOpened, pinned, createdAt };
     })
     .filter((repo: StoredRepoEntry | null): repo is StoredRepoEntry => repo !== null);
 
@@ -811,7 +850,7 @@ function normalizeStoredData(input: Partial<StoredData> | null | undefined): Sto
     ? input.activeRepo
     : null;
 
-  return { repos, activeRepo };
+  return { repos, activeRepo, sortBy };
 }
 
 function readStoreData(): StoredData {
@@ -820,7 +859,7 @@ function readStoreData(): StoredData {
     const parsed = JSON.parse(raw) as Partial<StoredData>;
     return normalizeStoredData(parsed);
   } catch {
-    return { repos: [], activeRepo: null };
+    return { repos: [], activeRepo: null, sortBy: DEFAULT_REPO_SORT_BY };
   }
 }
 
