@@ -1321,14 +1321,27 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
                       {conflictBlocks.length > 0 && selectedConflictBlock && (
                         <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
-                          <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-darker)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Konfliktblock {selectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>Zeile {selectedConflictBlock.startLine} - {selectedConflictBlock.endLine}</span>
+                          <div className="conflict-block-header">
+                            <div className="conflict-block-header-meta">
+                              <span className="conflict-block-header-title">Konfliktblock {selectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
+                              <span className="conflict-block-header-range">Zeile {selectedConflictBlock.startLine} - {selectedConflictBlock.endLine}</span>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} disabled={selectedConflictBlockIndex === 0} onClick={() => setSelectedConflictBlockIndex(prev => prev - 1)}>Vorheriger</button>
-                              <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} disabled={selectedConflictBlockIndex === conflictBlocks.length - 1} onClick={() => setSelectedConflictBlockIndex(prev => prev + 1)}>Naechster</button>
+                            <div className="conflict-block-nav">
+                              <button
+                                className="conflict-block-nav-btn conflict-block-nav-btn--prev"
+                                disabled={selectedConflictBlockIndex === 0}
+                                onClick={() => setSelectedConflictBlockIndex(prev => prev - 1)}
+                              >
+                                {'<'} Vorheriger
+                              </button>
+                              <span className="conflict-block-nav-position">{selectedConflictBlockIndex + 1}/{conflictBlocks.length}</span>
+                              <button
+                                className="conflict-block-nav-btn conflict-block-nav-btn--next"
+                                disabled={selectedConflictBlockIndex === conflictBlocks.length - 1}
+                                onClick={() => setSelectedConflictBlockIndex(prev => prev + 1)}
+                              >
+                                Naechster {'>'}
+                              </button>
                             </div>
                           </div>
 
