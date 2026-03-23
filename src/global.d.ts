@@ -4,11 +4,15 @@ export interface StoredRepoEntryDto {
   path: string;
   lastOpened: number;
   pinned: boolean;
+  createdAt: number;
 }
+
+export type RepoSortByDto = 'lastOpenedDesc' | 'nameAsc' | 'nameDesc' | 'createdAtDesc' | 'createdAtAsc';
 
 export interface StoredRepoData {
   repos: StoredRepoEntryDto[];
   activeRepo: string | null;
+  sortBy?: RepoSortByDto;
 }
 
 type IpcSuccessResult<T> = {

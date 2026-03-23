@@ -35,8 +35,9 @@ export const useRepoManager = ({ onRepoChanged, onRepoCleared, onToastSuccess, o
   useEffect(() => {
     if (!reposLoaded || !window.electronAPI) return;
     window.electronAPI.setStoredRepos({
-      repos: openRepos.map(path => ({ path, lastOpened: Date.now(), pinned: false })),
+      repos: openRepos.map(path => ({ path, lastOpened: Date.now(), pinned: false, createdAt: Date.now() })),
       activeRepo,
+      sortBy: 'lastOpenedDesc',
     });
   }, [openRepos, activeRepo, reposLoaded]);
 
