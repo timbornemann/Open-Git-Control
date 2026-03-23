@@ -1872,6 +1872,98 @@ code, pre {
   background: var(--status-info-soft);
 }
 
+.conflict-block-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+}
+
+.conflict-block-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.conflict-block-header-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.conflict-block-header-range {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.conflict-block-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-panel);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.conflict-block-nav-position {
+  min-width: 56px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.conflict-block-nav-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.conflict-block-nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.conflict-block-nav-btn--prev {
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.conflict-block-nav-btn--prev:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.conflict-block-nav-btn--next {
+  background: var(--accent-primary);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 1px var(--accent-primary-border);
+}
+
+.conflict-block-nav-btn--next:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.conflict-block-nav-btn--next:disabled {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+  filter: none;
+}
+
 /*
  * Konflikt: Zeilennummern (ours / theirs / Marker / neutral)
  *
