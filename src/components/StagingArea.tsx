@@ -333,6 +333,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const [isConflictBlockCountPending, setIsConflictBlockCountPending] = useState(false);
   const conflictManualScrollRef = useRef<HTMLDivElement>(null);
   const autoOpenedConflictPathRef = useRef<string | null>(null);
+  const appliedInitialConflictPathRef = useRef<string | null>(null);
   const aiConfig = {
     enabled: Boolean(settings.aiAutoCommitEnabled),
     provider: settings.aiProvider,
@@ -635,7 +636,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   const markConflictResolved = (filePath: string) => git(['conflictMarkResolved', filePath], `${basename(filePath)} als geloest markiert`);
 
-  const openConflictEditor = useCallback(async (filePath: string) => {
+  const openConflictEditor = useCallback(async (filePath: string, initialBlockIndex = 0) => {
     if (!window.electronAPI) return;
 
     setIsConflictEditorLoading(true);
@@ -655,7 +656,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         content: normalized,
         isSaving: false,
       });
-      setSelectedConflictBlockIndex(0);
+      const nextBlockIndex = Number.isFinite(initialBlockIndex)
+        ? Math.max(0, Math.floor(initialBlockIndex))
+        : 0;
+      setSelectedConflictBlockIndex(nextBlockIndex);
     } catch (error: any) {
       const message = error?.message || `Datei konnte nicht geladen werden: ${filePath}`;
       setToast({ msg: message, isError: true });
@@ -778,14 +782,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   }, [status, conflictEditor, openConflictEditor, onOpenConflictResolver, isConflictOnly]);
 
   useEffect(() => {
-    if (!isConflictOnly) return;
+    if (!isConflictOnly) {
+      appliedInitialConflictPathRef.current = null;
+      return;
+    }
     if (!initialConflictPath) return;
     if (!status || status.conflicts.length === 0) return;
+    if (appliedInitialConflictPathRef.current === initialConflictPath) return;
     if (!status.conflicts.some((entry) => entry.path === initialConflictPath)) return;
+
+    appliedInitialConflictPathRef.current = initialConflictPath;
     if (conflictEditor?.filePath === initialConflictPath) return;
 
     void openConflictEditor(initialConflictPath);
-  }, [isConflictOnly, initialConflictPath, status, conflictEditor, openConflictEditor]);
+  }, [isConflictOnly, initialConflictPath, status, conflictEditor?.filePath, openConflictEditor]);
   const applyConflictChoiceToSelected = useCallback((choice: ConflictResolutionChoice) => {
     if (!conflictEditor) return;
 
@@ -1095,10 +1105,50 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   const totalConflictBlocksInView = visibleConflicts.reduce((sum, f) => sum + blockCountForPath(f.path), 0);
   const totalConflictBlocksAll = status.conflicts.reduce((sum, f) => sum + blockCountForPath(f.path), 0);
+  const conflictPaths = [...new Set(status.conflicts.map((entry) => entry.path))].sort((a, b) => a.localeCompare(b));
+  const safeSelectedConflictBlockIndex = conflictBlocks.length > 0
+    ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1)
+    : 0;
+  const activeConflictFileIndex = conflictEditor ? conflictPaths.indexOf(conflictEditor.filePath) : -1;
+  const hasPreviousConflictTarget = Boolean(conflictEditor) && (
+    safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0
+  );
+  const hasNextConflictTarget = Boolean(conflictEditor) && (
+    safeSelectedConflictBlockIndex < conflictBlocks.length - 1
+    || (activeConflictFileIndex >= 0 && activeConflictFileIndex < conflictPaths.length - 1)
+  );
   const contextEntry = contextMenu?.entry || null;
   const contextDir = contextEntry ? dirname(contextEntry.path) : '';
   const contextTopDir = contextDir.includes('/') ? contextDir.split('/')[0] : '';
   const contextExtPattern = contextEntry ? extensionPattern(contextEntry.path) : null;
+
+  const navigateToPreviousConflict = async () => {
+    if (!conflictEditor) return;
+
+    if (safeSelectedConflictBlockIndex > 0) {
+      setSelectedConflictBlockIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (activeConflictFileIndex <= 0) return;
+    const previousPath = conflictPaths[activeConflictFileIndex - 1];
+    if (!previousPath) return;
+    await openConflictEditor(previousPath, Number.MAX_SAFE_INTEGER);
+  };
+
+  const navigateToNextConflict = async () => {
+    if (!conflictEditor) return;
+
+    if (safeSelectedConflictBlockIndex < conflictBlocks.length - 1) {
+      setSelectedConflictBlockIndex((prev) => prev + 1);
+      return;
+    }
+
+    if (activeConflictFileIndex < 0 || activeConflictFileIndex >= conflictPaths.length - 1) return;
+    const nextPath = conflictPaths[activeConflictFileIndex + 1];
+    if (!nextPath) return;
+    await openConflictEditor(nextPath, 0);
+  };
 
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
@@ -1318,30 +1368,41 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                       </div>
                     </div>
 
+                    <div className="conflict-global-nav" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
+                      <button
+                        className="conflict-global-nav-btn conflict-global-nav-btn--prev"
+                        onClick={() => { void navigateToPreviousConflict(); }}
+                        disabled={!hasPreviousConflictTarget || conflictEditor.isSaving}
+                      >
+                        {'<'} Vorheriger Konflikt
+                      </button>
+                      <div className="conflict-global-nav-meta">
+                        <span className="conflict-global-nav-title">Alle Konflikte durchsuchen</span>
+                        <span className="conflict-global-nav-state">
+                          {activeConflictFileIndex >= 0
+                            ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
+                            : 'Datei --'}
+                          {conflictBlocks.length > 0
+                            ? ` · Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
+                            : ' · Keine Konfliktmarker in dieser Datei'}
+                        </span>
+                      </div>
+                      <button
+                        className="conflict-global-nav-btn conflict-global-nav-btn--next"
+                        onClick={() => { void navigateToNextConflict(); }}
+                        disabled={!hasNextConflictTarget || conflictEditor.isSaving}
+                      >
+                        Naechster Konflikt {'>'}
+                      </button>
+                    </div>
+
                     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
                       {conflictBlocks.length > 0 && selectedConflictBlock && (
                         <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
                           <div className="conflict-block-header">
                             <div className="conflict-block-header-meta">
-                              <span className="conflict-block-header-title">Konfliktblock {selectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
+                              <span className="conflict-block-header-title">Konfliktblock {safeSelectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
                               <span className="conflict-block-header-range">Zeile {selectedConflictBlock.startLine} - {selectedConflictBlock.endLine}</span>
-                            </div>
-                            <div className="conflict-block-nav">
-                              <button
-                                className="conflict-block-nav-btn conflict-block-nav-btn--prev"
-                                disabled={selectedConflictBlockIndex === 0}
-                                onClick={() => setSelectedConflictBlockIndex(prev => prev - 1)}
-                              >
-                                {'<'} Vorheriger
-                              </button>
-                              <span className="conflict-block-nav-position">{selectedConflictBlockIndex + 1}/{conflictBlocks.length}</span>
-                              <button
-                                className="conflict-block-nav-btn conflict-block-nav-btn--next"
-                                disabled={selectedConflictBlockIndex === conflictBlocks.length - 1}
-                                onClick={() => setSelectedConflictBlockIndex(prev => prev + 1)}
-                              >
-                                Naechster {'>'}
-                              </button>
                             </div>
                           </div>
 
