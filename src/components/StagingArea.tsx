@@ -270,14 +270,24 @@ const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
             );
           })}
         </div>
-        <textarea
-          className="conflict-manual-textarea"
-          spellCheck={false}
-          style={{ height: `${textareaHeightPx}px` }}
-          value={content}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-        />
+        <div className="conflict-manual-code-col">
+          <div className="conflict-manual-code-bg" aria-hidden>
+            {lines.map((_, i) => {
+              const kind = gutterKinds[i] || 'neutral';
+              return (
+                <div key={i} className={`conflict-manual-code-bg-line conflict-manual-code-bg-line--${kind}`} />
+              );
+            })}
+          </div>
+          <textarea
+            className="conflict-manual-textarea"
+            spellCheck={false}
+            style={{ height: `${textareaHeightPx}px` }}
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+          />
+        </div>
       </div>
     </div>
   );
