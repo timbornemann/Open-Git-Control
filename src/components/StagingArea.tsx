@@ -147,49 +147,156 @@ const extensionPattern = (p: string) => {
   return `*${name.slice(idx)}`;
 };
 
-const CONFLICT_BLOCK_PATTERN_SOURCE = '<<<<<<<([^\\r\\n]*)\\r?\\n([\\s\\S]*?)\\r?\\n=======\\r?\\n([\\s\\S]*?)\\r?\\n>>>>>>>([^\\r\\n]*)\\r?\\n?';
-
 const detectLineEnding = (value: string): string => (value.includes('\r\n') ? '\r\n' : '\n');
 
-const lineNumberAt = (content: string, index: number): number => {
-  let line = 1;
-  const max = Math.min(index, content.length);
-  for (let i = 0; i < max; i += 1) {
-    if (content[i] === '\n') line += 1;
-  }
-  return line;
+type IndexedConflictLine = {
+  text: string;
+  start: number;
+  end: number;
+  lineNumber: number;
 };
 
-const countLinesInBlock = (value: string): number => {
-  if (value === '') return 0;
-  const withoutSingleTrailingNewline = value.replace(/\r?\n$/, '');
-  return withoutSingleTrailingNewline === '' ? 0 : withoutSingleTrailingNewline.split(/\r?\n/).length;
+const splitIndexedConflictLines = (content: string): IndexedConflictLine[] => {
+  if (!content) return [];
+
+  const lines: IndexedConflictLine[] = [];
+  let cursor = 0;
+  let lineNumber = 1;
+
+  while (cursor < content.length) {
+    const lfIndex = content.indexOf('\n', cursor);
+
+    if (lfIndex < 0) {
+      lines.push({
+        text: content.slice(cursor),
+        start: cursor,
+        end: content.length,
+        lineNumber,
+      });
+      break;
+    }
+
+    const textEnd = lfIndex > cursor && content[lfIndex - 1] === '\r' ? lfIndex - 1 : lfIndex;
+    lines.push({
+      text: content.slice(cursor, textEnd),
+      start: cursor,
+      end: lfIndex + 1,
+      lineNumber,
+    });
+    cursor = lfIndex + 1;
+    lineNumber += 1;
+  }
+
+  return lines;
+};
+
+const getConflictStartLabel = (line: string): string | null => {
+  const trimmed = line.trimEnd();
+  if (!trimmed.startsWith('<<<<<<<')) return null;
+  return trimmed.slice(7).trim();
+};
+
+const isConflictSeparatorLine = (line: string): boolean => line.trim() === '=======';
+
+const getConflictEndLabel = (line: string): string | null => {
+  const trimmed = line.trimEnd();
+  if (!trimmed.startsWith('>>>>>>>')) return null;
+  return trimmed.slice(7).trim();
+};
+
+const countConflictMarkerLines = (content: string): { starts: number; separators: number; ends: number } => {
+  const stats = { starts: 0, separators: 0, ends: 0 };
+  if (!content) return stats;
+
+  for (const line of content.split(/\r?\n/)) {
+    if (line.trimEnd().startsWith('<<<<<<<')) {
+      stats.starts += 1;
+      continue;
+    }
+    if (line.trim() === '=======') {
+      stats.separators += 1;
+      continue;
+    }
+    if (line.trimEnd().startsWith('>>>>>>>')) {
+      stats.ends += 1;
+    }
+  }
+
+  return stats;
 };
 
 const parseConflictBlocks = (content: string): ConflictBlock[] => {
-  const blocks: ConflictBlock[] = [];
-  const pattern = new RegExp(CONFLICT_BLOCK_PATTERN_SOURCE, 'g');
-  let match: RegExpExecArray | null = null;
+  const lines = splitIndexedConflictLines(content);
+  if (lines.length === 0) return [];
 
-  while ((match = pattern.exec(content)) !== null) {
-    const marker = match[0] || '';
-    const start = match.index;
-    const end = start + marker.length;
-    const startLine = lineNumberAt(content, start);
-    const lineCount = countLinesInBlock(marker);
-    const endLine = Math.max(startLine, startLine + lineCount - 1);
+  const blocks: ConflictBlock[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const startLabel = getConflictStartLabel(lines[i].text);
+    if (startLabel === null) {
+      i += 1;
+      continue;
+    }
+
+    let separatorIndex = -1;
+    let nestedStartBeforeSeparator = -1;
+
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (getConflictStartLabel(lines[j].text) !== null) {
+        nestedStartBeforeSeparator = j;
+        break;
+      }
+      if (isConflictSeparatorLine(lines[j].text)) {
+        separatorIndex = j;
+        break;
+      }
+      if (getConflictEndLabel(lines[j].text) !== null) {
+        break;
+      }
+    }
+
+    if (separatorIndex < 0) {
+      i = nestedStartBeforeSeparator >= 0 ? nestedStartBeforeSeparator : i + 1;
+      continue;
+    }
+
+    let endIndex = -1;
+    let nestedStartBeforeEnd = -1;
+
+    for (let j = separatorIndex + 1; j < lines.length; j += 1) {
+      if (getConflictStartLabel(lines[j].text) !== null) {
+        nestedStartBeforeEnd = j;
+        break;
+      }
+      if (getConflictEndLabel(lines[j].text) !== null) {
+        endIndex = j;
+        break;
+      }
+    }
+
+    if (endIndex < 0) {
+      i = nestedStartBeforeEnd >= 0 ? nestedStartBeforeEnd : i + 1;
+      continue;
+    }
+
+    const theirsLabel = getConflictEndLabel(lines[endIndex].text) || '';
+    const start = lines[i].start;
+    const end = lines[endIndex].end;
 
     blocks.push({
       start,
       end,
-      marker,
-      oursLabel: (match[1] || '').trim(),
-      theirsLabel: (match[4] || '').trim(),
-      ours: match[2] || '',
-      theirs: match[3] || '',
-      startLine,
-      endLine,
+      marker: content.slice(start, end),
+      oursLabel: startLabel,
+      theirsLabel,
+      ours: content.slice(lines[i].end, lines[separatorIndex].start),
+      theirs: content.slice(lines[separatorIndex].end, lines[endIndex].start),
+      startLine: lines[i].lineNumber,
+      endLine: lines[endIndex].lineNumber,
     });
+
+    i = endIndex + 1;
   }
 
   return blocks;
@@ -334,6 +441,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const conflictManualScrollRef = useRef<HTMLDivElement>(null);
   const autoOpenedConflictPathRef = useRef<string | null>(null);
   const appliedInitialConflictPathRef = useRef<string | null>(null);
+  const autoScrollAnchorRef = useRef<string>('');
   const aiConfig = {
     enabled: Boolean(settings.aiAutoCommitEnabled),
     provider: settings.aiProvider,
@@ -650,16 +758,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       }
 
       const normalized = normalizeMergeConflictFileContent(result.data);
+      const parsedBlocks = parseConflictBlocks(normalized);
+      const requestedIndex = Number.isFinite(initialBlockIndex)
+        ? Math.max(0, Math.floor(initialBlockIndex))
+        : 0;
+      const boundedIndex = parsedBlocks.length > 0
+        ? Math.min(requestedIndex, parsedBlocks.length - 1)
+        : 0;
       setConflictEditor({
         filePath,
         originalContent: normalized,
         content: normalized,
         isSaving: false,
       });
-      const nextBlockIndex = Number.isFinite(initialBlockIndex)
-        ? Math.max(0, Math.floor(initialBlockIndex))
-        : 0;
-      setSelectedConflictBlockIndex(nextBlockIndex);
+      setSelectedConflictBlockIndex(boundedIndex);
     } catch (error: any) {
       const message = error?.message || `Datei konnte nicht geladen werden: ${filePath}`;
       setToast({ msg: message, isError: true });
@@ -683,6 +795,20 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     const safeIndex = Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1);
     return conflictBlocks[safeIndex] || null;
   }, [conflictBlocks, selectedConflictBlockIndex]);
+
+  const conflictMarkerStats = useMemo(() => {
+    if (!conflictEditor) return { starts: 0, separators: 0, ends: 0 };
+    return countConflictMarkerLines(conflictEditor.content);
+  }, [conflictEditor]);
+
+  const hasRawConflictMarkers = conflictMarkerStats.starts + conflictMarkerStats.separators + conflictMarkerStats.ends > 0;
+  const hasBalancedConflictMarkers = (
+    conflictMarkerStats.starts === conflictMarkerStats.separators
+    && conflictMarkerStats.starts === conflictMarkerStats.ends
+  );
+  const isStructuredConflictViewLocked = hasRawConflictMarkers && (
+    !hasBalancedConflictMarkers || conflictBlocks.length !== conflictMarkerStats.starts
+  );
 
   useEffect(() => {
     if (!repoPath || !window.electronAPI || !status?.conflicts?.length) {
@@ -720,6 +846,13 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   /** Beim Wechseln des Konfliktblocks: in der manuellen Bearbeitung zur Startzeile scrollen */
   useLayoutEffect(() => {
     if (!selectedConflictBlock) return;
+    if (isStructuredConflictViewLocked) return;
+    if (!conflictEditor?.filePath) return;
+
+    const anchor = `${conflictEditor.filePath}::${selectedConflictBlockIndex}`;
+    if (autoScrollAnchorRef.current === anchor) return;
+    autoScrollAnchorRef.current = anchor;
+
     const el = conflictManualScrollRef.current;
     if (!el) return;
     const line = selectedConflictBlock.startLine;
@@ -733,7 +866,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     requestAnimationFrame(() => {
       requestAnimationFrame(run);
     });
-  }, [selectedConflictBlockIndex, selectedConflictBlock?.startLine, conflictEditor?.filePath]);
+  }, [selectedConflictBlockIndex, conflictEditor?.filePath, selectedConflictBlock, isStructuredConflictViewLocked]);
 
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
@@ -1110,10 +1243,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1)
     : 0;
   const activeConflictFileIndex = conflictEditor ? conflictPaths.indexOf(conflictEditor.filePath) : -1;
-  const hasPreviousConflictTarget = Boolean(conflictEditor) && (
+  const canUseStructuredConflictNavigation = Boolean(conflictEditor) && !isStructuredConflictViewLocked && conflictBlocks.length > 0;
+  const hasPreviousConflictTarget = canUseStructuredConflictNavigation && (
     safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0
   );
-  const hasNextConflictTarget = Boolean(conflictEditor) && (
+  const hasNextConflictTarget = canUseStructuredConflictNavigation && (
     safeSelectedConflictBlockIndex < conflictBlocks.length - 1
     || (activeConflictFileIndex >= 0 && activeConflictFileIndex < conflictPaths.length - 1)
   );
@@ -1123,7 +1257,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const contextExtPattern = contextEntry ? extensionPattern(contextEntry.path) : null;
 
   const navigateToPreviousConflict = async () => {
-    if (!conflictEditor) return;
+    if (!canUseStructuredConflictNavigation || !conflictEditor) return;
 
     if (safeSelectedConflictBlockIndex > 0) {
       setSelectedConflictBlockIndex((prev) => Math.max(prev - 1, 0));
@@ -1137,7 +1271,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   };
 
   const navigateToNextConflict = async () => {
-    if (!conflictEditor) return;
+    if (!canUseStructuredConflictNavigation || !conflictEditor) return;
 
     if (safeSelectedConflictBlockIndex < conflictBlocks.length - 1) {
       setSelectedConflictBlockIndex((prev) => prev + 1);
@@ -1379,12 +1513,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                       <div className="conflict-global-nav-meta">
                         <span className="conflict-global-nav-title">Alle Konflikte durchsuchen</span>
                         <span className="conflict-global-nav-state">
-                          {activeConflictFileIndex >= 0
-                            ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
-                            : 'Datei --'}
-                          {conflictBlocks.length > 0
+                          {isStructuredConflictViewLocked
+                            ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
+                            : (activeConflictFileIndex >= 0
+                              ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
+                              : 'Datei --')}
+                          {!isStructuredConflictViewLocked && conflictBlocks.length > 0
                             ? ` · Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
-                            : ' · Keine Konfliktmarker in dieser Datei'}
+                            : (!isStructuredConflictViewLocked ? ' · Keine Konfliktmarker in dieser Datei' : '')}
                         </span>
                       </div>
                       <button
@@ -1397,8 +1533,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                     </div>
 
                     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-                      {conflictBlocks.length > 0 && selectedConflictBlock && (
-                        <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }}>
+                      {isStructuredConflictViewLocked && (
+                        <div className="conflict-editor-notice info" style={{ margin: '10px 20px 0' }}>
+                          Konfliktmarker werden aktuell manuell geaendert. Die Vergleichsansicht ist temporaer pausiert, bis die Marker wieder konsistent sind.
+                        </div>
+                      )}
+
+                      {!isStructuredConflictViewLocked && conflictBlocks.length > 0 && selectedConflictBlock && (
+                        <div className="conflict-structured-view">
                           <div className="conflict-block-header">
                             <div className="conflict-block-header-meta">
                               <span className="conflict-block-header-title">Konfliktblock {safeSelectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
