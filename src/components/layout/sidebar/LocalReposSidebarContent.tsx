@@ -6,10 +6,12 @@ type LocalReposSidebarContentProps = Pick<
   AppSidebarProps,
   | 'openRepos'
   | 'repoMeta'
+  | 'repoSortBy'
   | 'activeRepo'
   | 'onOpenFolder'
   | 'onSwitchRepo'
   | 'onCloseRepo'
+  | 'onSetRepoSortBy'
   | 'onToggleRepoPin'
   | 'isRepoPanelCollapsed'
   | 'onToggleRepoPanelCollapsed'
@@ -19,10 +21,12 @@ type LocalReposSidebarContentProps = Pick<
 export const LocalReposSidebarContent: React.FC<LocalReposSidebarContentProps> = ({
   openRepos,
   repoMeta,
+  repoSortBy,
   activeRepo,
   onOpenFolder,
   onSwitchRepo,
   onCloseRepo,
+  onSetRepoSortBy,
   onToggleRepoPin,
   isRepoPanelCollapsed,
   onToggleRepoPanelCollapsed,
@@ -39,6 +43,8 @@ export const LocalReposSidebarContent: React.FC<LocalReposSidebarContentProps> =
     onCloseRepo={onCloseRepo}
     onOpenFolder={onOpenFolder}
     onTogglePin={onToggleRepoPin}
+    sortBy={repoSortBy}
+    onSortChange={onSetRepoSortBy}
     collapsed={isRepoPanelCollapsed}
     onToggleCollapsed={onToggleRepoPanelCollapsed}
   />
