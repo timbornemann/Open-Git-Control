@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { GitBranch, RefreshCw, ExternalLink, Check, Copy } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
@@ -10,10 +10,11 @@ import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { SettingsMainContent } from './SettingsMainContent';
 import { BranchInfo, GitMergeMode, RemoteSyncState } from '../../types/git';
-import { DiffRequest } from '../../types/diff';
 import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { GithubAuthHelpMethod, SettingsTabId } from './sidebar/AppSidebar.types';
+import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDTH } from './hooks/useMainViewPaneResizer';
+import { useMainViewInspector } from './hooks/useMainViewInspector';
 import appLogo from '../../../logo.png';
 
 type RemoteStatus = {
@@ -22,11 +23,6 @@ type RemoteStatus = {
   color: string;
   backgroundColor: string;
   borderColor: string;
-};
-
-type WorkingTreeSelection = {
-  path: string;
-  source: 'staged' | 'unstaged';
 };
 
 type Props = {
@@ -84,27 +80,6 @@ type Props = {
   onAutoOpenConflictResolverConsumed?: () => void;
   /** CommitGraph & Co.: direkter Git-Fehler mit Konflikt → Repo-Tab + Resolver */
   onOpenConflictResolverForPath?: (path: string) => void;
-};
-
-const normalizeCommitHash = (value: string | null | undefined): string | null => {
-  if (!value) return null;
-  const match = String(value).match(/[0-9a-f]{7,40}/i);
-  return match ? match[0] : null;
-};
-
-const PRIMARY_PANE_DEFAULT_RATIO = 0.7;
-const PRIMARY_PANE_MIN_WIDTH = 320;
-const INSPECTOR_PANE_MIN_WIDTH = 280;
-const CONTENT_RESIZER_WIDTH = 8;
-const MAIN_CONTENT_MIN_WIDTH = PRIMARY_PANE_MIN_WIDTH + INSPECTOR_PANE_MIN_WIDTH + CONTENT_RESIZER_WIDTH;
-
-const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number => {
-  const effectiveWidth = Math.max(containerWidth, MAIN_CONTENT_MIN_WIDTH);
-  const minRatio = PRIMARY_PANE_MIN_WIDTH / effectiveWidth;
-  const maxRatio = (effectiveWidth - INSPECTOR_PANE_MIN_WIDTH - CONTENT_RESIZER_WIDTH) / effectiveWidth;
-  const lower = Math.min(minRatio, maxRatio);
-  const upper = Math.max(minRatio, maxRatio);
-  return Math.min(upper, Math.max(lower, ratio));
 };
 
 const linkStyle: React.CSSProperties = {
@@ -337,82 +312,42 @@ export const MainView: React.FC<Props> = ({
   onAutoOpenConflictResolverConsumed,
   onOpenConflictResolverForPath,
 }) => {
-  const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
-  const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
-  const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
-  const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
-  const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
-  const [primaryPaneRatio, setPrimaryPaneRatio] = useState(PRIMARY_PANE_DEFAULT_RATIO);
-  const [isContentResizing, setIsContentResizing] = useState(false);
-  const contentAreaRef = useRef<HTMLDivElement | null>(null);
-  const contentResizeActiveRef = useRef(false);
   const { tr } = useI18n();
 
-  useEffect(() => {
-    if (!autoOpenConflictResolverPath) return;
-    setActiveConflictPath(autoOpenConflictResolverPath);
-    setActiveDiffRequest(null);
-    setShowRecoveryCenter(false);
-    setWorkingTreeSelection(null);
-    setCommitHistoryStack([]);
-    setSelectedCommit(null);
-    onAutoOpenConflictResolverConsumed?.();
-  }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit]);
+  const {
+    primaryPaneBasis,
+    isContentResizing,
+    contentAreaRef,
+    handleContentResizeStart,
+  } = useMainViewPaneResizer();
 
-  const primaryPaneBasis = `${(primaryPaneRatio * 100).toFixed(2)}%`;
-
-  const handleContentResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    contentResizeActiveRef.current = true;
-    setIsContentResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!contentResizeActiveRef.current || !contentAreaRef.current) return;
-      const rect = contentAreaRef.current.getBoundingClientRect();
-      if (rect.width <= 0) return;
-
-      const rawRatio = (event.clientX - rect.left) / rect.width;
-      setPrimaryPaneRatio(clampPrimaryPaneRatio(rawRatio, rect.width));
-    };
-
-    const stopResize = () => {
-      if (!contentResizeActiveRef.current) return;
-      contentResizeActiveRef.current = false;
-      setIsContentResizing(false);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopResize);
-    window.addEventListener('pointercancel', stopResize);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopResize);
-      window.removeEventListener('pointercancel', stopResize);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, []);
-
-  useEffect(() => {
-    const clampToCurrentWidth = () => {
-      if (!contentAreaRef.current) return;
-      const rect = contentAreaRef.current.getBoundingClientRect();
-      if (rect.width <= 0) return;
-
-      setPrimaryPaneRatio(previous => clampPrimaryPaneRatio(previous, rect.width));
-    };
-
-    clampToCurrentWidth();
-    window.addEventListener('resize', clampToCurrentWidth);
-    return () => window.removeEventListener('resize', clampToCurrentWidth);
-  }, []);
+  const {
+    activeDiffRequest,
+    setActiveDiffRequest,
+    activeConflictPath,
+    setActiveConflictPath,
+    showRecoveryCenter,
+    setShowRecoveryCenter,
+    commitHistoryStack,
+    workingTreeSelection,
+    handleToggleRecoveryCenter,
+    handleOpenDiff,
+    handleOpenConflictResolver,
+    handleSelectCommitDirect,
+    handleSelectCommitFromHistory,
+    handleSelectWorkingTreeFile,
+    handleSelectCommitFromWorkingTree,
+    handleCommitBack,
+    closeInspector,
+    handleStageCommitOpen,
+  } = useMainViewInspector({
+    autoOpenConflictResolverPath,
+    onAutoOpenConflictResolverConsumed,
+    setSelectedCommit,
+    activeRepo,
+    onOpenRepoWorkspace,
+    onCloseReleaseCreator,
+  });
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
@@ -431,106 +366,6 @@ export const MainView: React.FC<Props> = ({
     ? tr('Diff Viewer', 'Diff Viewer')
     : '';
   const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
-
-  const handleToggleRecoveryCenter = useCallback(() => {
-    setActiveDiffRequest(null);
-    setActiveConflictPath(null);
-    setShowRecoveryCenter((prev) => !prev);
-  }, []);
-
-  useEffect(() => {
-    setActiveDiffRequest(null);
-    setActiveConflictPath(null);
-    setCommitHistoryStack([]);
-    setWorkingTreeSelection(null);
-    setShowRecoveryCenter(false);
-  }, [activeRepo]);
-
-  const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
-    setActiveConflictPath(null);
-    setActiveDiffRequest((previous) => {
-      if (
-        previous &&
-        previous.source === diffRequest.source &&
-        previous.path === diffRequest.path &&
-        previous.commitHash === diffRequest.commitHash
-      ) {
-        return previous;
-      }
-      return diffRequest;
-    });
-  }, []);
-
-  const handleOpenConflictResolver = useCallback((filePath: string) => {
-    setActiveDiffRequest(null);
-    setShowRecoveryCenter(false);
-    setActiveConflictPath(filePath);
-    setWorkingTreeSelection(null);
-    setCommitHistoryStack([]);
-    setSelectedCommit(null);
-  }, [setSelectedCommit]);
-  const handleSelectCommitDirect = useCallback((hash: string | null) => {
-    const normalized = normalizeCommitHash(hash);
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setCommitHistoryStack([]);
-    setSelectedCommit(normalized);
-  }, [setSelectedCommit]);
-
-  const handleSelectCommitFromHistory = useCallback((hash: string) => {
-    const normalized = normalizeCommitHash(hash);
-    if (!normalized) return;
-
-    if (!selectedCommit) {
-      setSelectedCommit(normalized);
-      return;
-    }
-
-    if (selectedCommit === normalized) return;
-
-    setCommitHistoryStack(prev => [...prev, selectedCommit]);
-    setSelectedCommit(normalized);
-  }, [selectedCommit, setSelectedCommit]);
-
-  const handleSelectWorkingTreeFile = useCallback((path: string, source: 'staged' | 'unstaged') => {
-    setCommitHistoryStack([]);
-    setActiveConflictPath(null);
-    setSelectedCommit(null);
-    setWorkingTreeSelection({ path, source });
-  }, [setSelectedCommit]);
-
-  const handleSelectCommitFromWorkingTree = useCallback((hash: string) => {
-    const normalized = normalizeCommitHash(hash);
-    if (!normalized) return;
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setSelectedCommit(normalized);
-  }, [setSelectedCommit]);
-
-  const handleCommitBack = useCallback(() => {
-    setCommitHistoryStack(prev => {
-      if (prev.length === 0) return prev;
-      const nextHash = normalizeCommitHash(prev[prev.length - 1]);
-      setSelectedCommit(nextHash);
-      return prev.slice(0, -1);
-    });
-  }, [setSelectedCommit]);
-
-  const closeInspector = useCallback(() => {
-    setCommitHistoryStack([]);
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setSelectedCommit(null);
-  }, [setSelectedCommit]);
-
-  const handleStageCommitOpen = useCallback(() => {
-    onOpenRepoWorkspace();
-    onCloseReleaseCreator();
-    setActiveDiffRequest(null);
-    setActiveConflictPath(null);
-    setShowRecoveryCenter(false);
-    handleSelectCommitDirect(null);
-  }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
 
   return (
     <div className="main-view">
@@ -733,7 +568,7 @@ export const MainView: React.FC<Props> = ({
                 {selectedCommit ? (
                   <CommitDetails
                     hash={selectedCommit}
-                    onSelectCommit={handleSelectCommitFromHistory}
+                    onSelectCommit={(hash) => handleSelectCommitFromHistory(hash, selectedCommit)}
                     onOpenDiff={handleOpenDiff}
                   />
                 ) : workingTreeSelection ? (
