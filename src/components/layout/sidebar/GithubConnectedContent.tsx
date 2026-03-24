@@ -18,6 +18,7 @@ import {
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
+import { formatDuration, getCiBadgeStyles } from './githubShared';
 
 type GithubConnectedContentProps = Pick<
   AppSidebarProps,
@@ -66,31 +67,6 @@ type GithubConnectedContentProps = Pick<
   | 'releaseSuccess'
   | 'onCreateRelease'
 >;
-
-
-const getCiBadgeStyles = (badge: string) => {
-  if (badge === 'success') {
-    return { color: 'var(--status-success)', backgroundColor: 'var(--status-success-soft)', borderColor: 'var(--status-success-border)', label: 'CI: Success' };
-  }
-  if (badge === 'failure') {
-    return { color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-soft)', borderColor: 'var(--status-danger-border)', label: 'CI: Failed' };
-  }
-  if (badge === 'pending') {
-    return { color: 'var(--status-warning)', backgroundColor: 'var(--status-warning-soft)', borderColor: 'var(--status-warning-border)', label: 'CI: Pending' };
-  }
-  return { color: 'var(--text-secondary)', backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-color)', label: 'CI: Unknown' };
-};
-
-const formatDuration = (startedAt?: string | null, finishedAt?: string | null): string => {
-  if (!startedAt || !finishedAt) return '—';
-  const start = new Date(startedAt).getTime();
-  const end = new Date(finishedAt).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '—';
-  const totalSec = Math.round((end - start) / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}m ${String(sec).padStart(2, '0')}s`;
-};
 
 const toRepoIdentity = (remoteUrl: string): string | null => {
   const trimmed = (remoteUrl || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
@@ -703,7 +679,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                     </div>
                     {(() => {
                       const ci = prCiByNumber[pr.number];
-                      const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown');
+                            const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown', tr);
                       return (
                         <button
                           onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)}
@@ -758,7 +734,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                             {run.workflowName || run.name}
                           </div>
                           <div style={{ color: 'var(--text-secondary)' }}>
-                            <Clock3 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />Trigger: {run.event} • Duration: {formatDuration(run.startedAt, run.updatedAt)}
+                            <Clock3 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />Trigger: {run.event} • Duration: {formatDuration(run.startedAt, run.updatedAt, '—')}
                           </div>
                         </div>
                         <button className="staging-btn-sm" onClick={() => onOpenPR(run.htmlUrl)} title={tr('Im Browser oeffnen', 'Open in browser')}>

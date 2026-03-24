@@ -16,6 +16,7 @@ import { GithubWorkflowRunDto } from '../../../global';
 import { useI18n } from '../../../i18n';
 import { formatDateTime } from '../../../utils/dateTime';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '../../sidebar/RepoCard';
+import { formatDuration, getCiBadgeStyles } from './githubShared';
 
 type RepoGithubActionsContentProps = Pick<
   AppSidebarProps,
@@ -43,24 +44,6 @@ type RepoGithubActionsContentProps = Pick<
   | 'setNewPRBase'
   | 'onCreatePR'
 >;
-
-const getCiBadgeStyles = (badge: string, tr: (de: string, en: string) => string) => {
-  if (badge === 'success') return { color: 'var(--status-success)', backgroundColor: 'var(--status-success-soft)', borderColor: 'var(--status-success-border)', label: tr('CI: Erfolgreich', 'CI: Success') };
-  if (badge === 'failure') return { color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-soft)', borderColor: 'var(--status-danger-border)', label: tr('CI: Fehlgeschlagen', 'CI: Failed') };
-  if (badge === 'pending') return { color: 'var(--status-warning)', backgroundColor: 'var(--status-warning-soft)', borderColor: 'var(--status-warning-border)', label: tr('CI: Ausstehend', 'CI: Pending') };
-  return { color: 'var(--text-secondary)', backgroundColor: 'var(--bg-dark)', borderColor: 'var(--border-color)', label: tr('CI: Unbekannt', 'CI: Unknown') };
-};
-
-const formatDuration = (startedAt?: string | null, finishedAt?: string | null): string => {
-  if (!startedAt || !finishedAt) return '-';
-  const start = new Date(startedAt).getTime();
-  const end = new Date(finishedAt).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return '-';
-  const totalSec = Math.round((end - start) / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}m ${String(sec).padStart(2, '0')}s`;
-};
 
 export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> = (props) => {
   const { tr, locale } = useI18n();
