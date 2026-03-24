@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'child_process';
+import { execFile, execFileSync, spawn } from 'child_process';
 import * as util from 'util';
 import * as path from 'path';
 import * as os from 'os';
@@ -12,7 +12,8 @@ export class GitService {
   private repoPath: string | null = null;
 
   setRepoPath(newPath: string) {
-    this.repoPath = newPath;
+    const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
+    this.repoPath = this.resolveRepoRoot(normalizedPath);
   }
 
   getRepoPath(): string | null {
@@ -24,6 +25,25 @@ export class GitService {
       throw new Error('No repository path set.');
     }
     return this.repoPath;
+  }
+
+  /**
+   * Normalisiert auf den echten Repository-Root (falls `newPath` innerhalb eines Repos liegt).
+   * Das verhindert pathspec-Fehler bei Dateipfaden, wenn Nutzer Unterordner als Repo oeffnen.
+   */
+  private resolveRepoRoot(candidatePath: string): string {
+    try {
+      const rootPath = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+        cwd: candidatePath,
+        windowsHide: true,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+
+      return rootPath || candidatePath;
+    } catch {
+      return candidatePath;
+    }
   }
 
   private normalizeGitError(error: any, args: string[]): Error {
