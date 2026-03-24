@@ -1,0 +1,420 @@
+import { ipcMain, shell } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
+import { GitService } from '../../GitService';
+import { SecretScanService } from '../../SecretScanService';
+import { AppSettings } from '../../settings';
+import {
+  assertAllowedGitCommand,
+  createJobId,
+  normalizeArgs,
+  validateCommandArgs,
+} from '../gitCommandPolicy';
+import { parseFileBlame, parseFileHistory, parseStashList } from '../parsing';
+import { emitJobEvent } from './jobEvents';
+
+type RegisterGitHandlersDeps = {
+  gitService: GitService;
+  secretScanService: SecretScanService;
+  readSettingsWithMigration: () => AppSettings;
+};
+
+export function registerGitHandlers({
+  gitService,
+  secretScanService,
+  readSettingsWithMigration,
+}: RegisterGitHandlersDeps): void {
+  ipcMain.handle('git:setRepo', async (_event: any, repoPath: string) => {
+    gitService.setRepoPath(repoPath);
+    return true;
+  });
+
+  ipcMain.handle('git:command', async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
+    try {
+      assertAllowedGitCommand(commandName);
+      const normalizedArgs = normalizeArgs(rawArgs);
+      validateCommandArgs(commandName, normalizedArgs);
+
+      const isLongRunning = commandName === 'fetch' || commandName === 'pull' || commandName === 'push';
+      const jobId = isLongRunning ? createJobId(`git-${commandName}`) : null;
+
+      if (jobId) {
+        emitJobEvent(event.sender, {
+          id: jobId,
+          operation: `git:${commandName}`,
+          status: 'start',
+          timestamp: Date.now(),
+        });
+      }
+
+      let data: string;
+      if (commandName === 'status') {
+        data = await gitService.getStatus();
+      } else if (commandName === 'statusPorcelain') {
+        data = await gitService.getStatusPorcelain();
+      } else if (commandName === 'log') {
+        data = await gitService.getLog(
+          Number(normalizedArgs[0]) || 50,
+          normalizedArgs[1] !== 'head',
+          Number(normalizedArgs[2]) || 0,
+        );
+      } else if (commandName === 'branches') {
+        data = await gitService.getBranches();
+      } else if (commandName === 'commitDetails') {
+        data = await gitService.getCommitDetails(normalizedArgs[0]);
+      } else if (commandName === 'conflictTakeOurs') {
+        data = await gitService.checkoutConflictVersion(normalizedArgs[0], 'ours');
+      } else if (commandName === 'conflictTakeTheirs') {
+        data = await gitService.checkoutConflictVersion(normalizedArgs[0], 'theirs');
+      } else if (commandName === 'conflictMarkResolved') {
+        data = await gitService.addFile(normalizedArgs[0]);
+      } else if (commandName === 'mergeContinue') {
+        data = await gitService.continueMerge();
+      } else if (commandName === 'mergeAbort') {
+        data = await gitService.abortMerge();
+      } else if (commandName === 'rebaseContinue') {
+        data = await gitService.continueRebase();
+      } else if (commandName === 'rebaseAbort') {
+        data = await gitService.abortRebase();
+      } else if (commandName === 'submoduleStatus') {
+        data = await gitService.getSubmoduleStatus();
+      } else if (commandName === 'submoduleUpdateInitRecursive') {
+        data = await gitService.updateSubmodulesInitRecursive();
+      } else if (commandName === 'submoduleSyncRecursive') {
+        data = await gitService.syncSubmodulesRecursive();
+      } else if (commandName === 'reflog') {
+        data = await gitService.getReflog(Number(normalizedArgs[0]) || 300);
+      } else if (commandName === 'forensicHistory') {
+        const searchType = normalizedArgs[0];
+        const targetPath = normalizedArgs[1];
+        const searchTerm = normalizedArgs[2] || '';
+        const startLine = Number(normalizedArgs[3]);
+        const endLine = Number(normalizedArgs[4]);
+        const limit = Number(normalizedArgs[5]) || 200;
+
+        if (searchType === 'string') {
+          data = await gitService.getForensicHistoryByString(searchTerm, targetPath, limit);
+        } else if (searchType === 'regex') {
+          data = await gitService.getForensicHistoryByRegex(searchTerm, targetPath, limit);
+        } else {
+          data = await gitService.getForensicHistoryByLineRange(targetPath, startLine, endLine, limit);
+        }
+      } else {
+        data = await gitService.runCommand([commandName, ...normalizedArgs]);
+      }
+
+      if (jobId) {
+        emitJobEvent(event.sender, {
+          id: jobId,
+          operation: `git:${commandName}`,
+          status: 'done',
+          timestamp: Date.now(),
+        });
+      }
+
+      return { success: true, data };
+    } catch (error: any) {
+      if (typeof commandName === 'string' && (commandName === 'fetch' || commandName === 'pull' || commandName === 'push')) {
+        emitJobEvent(event.sender, {
+          id: createJobId(`git-${commandName}`),
+          operation: `git:${commandName}`,
+          status: 'failed',
+          message: error.message,
+          timestamp: Date.now(),
+        });
+      }
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:scanPushSecrets', async (event: any) => {
+    const jobId = createJobId('security-secret-scan');
+    const operation = 'security:secret-scan';
+    emitJobEvent(event.sender, {
+      id: jobId,
+      operation,
+      status: 'start',
+      message: 'Secret scan started.',
+      timestamp: Date.now(),
+    });
+
+    try {
+      const settings = readSettingsWithMigration();
+      const result = await secretScanService.scanPushDiffs({
+        strictness: settings.secretScanStrictness,
+        allowlistText: settings.secretScanAllowlist,
+      });
+
+      const findingCount = result.findings.length;
+      const filesWithFindings = new Set(result.findings.map((item) => item.filePath)).size;
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation,
+        status: 'done',
+        message: findingCount > 0
+          ? `Secret scan found ${findingCount} hit(s) in ${filesWithFindings} file(s).`
+          : 'Secret scan finished with no hits.',
+        details: {
+          strictness: result.strictness,
+          findingCount,
+          filesWithFindings,
+          checkedLines: result.stats.checkedLines,
+          stagedLines: result.stats.stagedLines,
+          toPushLines: result.stats.toPushLines,
+          notes: result.notes,
+        },
+        timestamp: Date.now(),
+      });
+
+      return { success: true, data: result };
+    } catch (error: any) {
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation,
+        status: 'failed',
+        message: error?.message || 'Secret scan failed.',
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error?.message || 'Secret scan failed.' };
+    }
+  });
+
+  ipcMain.handle('git:interactiveRebase', async (_event: any, baseHash: unknown, todoLines: unknown) => {
+    try {
+      const normalizedBase = String(baseHash || '').trim();
+      if (!/^[0-9a-f]{7,40}$/i.test(normalizedBase)) {
+        return { success: false, error: 'Invalid base commit hash.' };
+      }
+
+      if (!Array.isArray(todoLines) || todoLines.length === 0) {
+        return { success: false, error: 'Rebase todo list is empty.' };
+      }
+
+      const normalizedTodo = todoLines
+        .map((line) => String(line || '').trim())
+        .filter(Boolean)
+        .slice(0, 500);
+
+      if (normalizedTodo.length === 0) {
+        return { success: false, error: 'Rebase todo list is empty.' };
+      }
+
+      const data = await gitService.startInteractiveRebase(normalizedBase, normalizedTodo);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:applyPatch', async (_event: any, patch: unknown, options: { cached?: unknown; reverse?: unknown } = {}) => {
+    try {
+      const normalizedPatch = String(patch || '');
+      if (!normalizedPatch.trim()) {
+        return { success: false, error: 'Patch is empty.' };
+      }
+      if (normalizedPatch.length > 2_000_000) {
+        return { success: false, error: 'Patch is too large.' };
+      }
+
+      const data = await gitService.applyPatch(normalizedPatch, {
+        cached: Boolean(options.cached),
+        reverse: Boolean(options.reverse),
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:stashes', async () => {
+    try {
+      const raw = await gitService.getStashes(200);
+      return { success: true, data: parseStashList(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:repoOriginUrl', async (_event: any, repoPath: string) => {
+    try {
+      const normalizedPath = String(repoPath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+
+      const url = await gitService.getRepoOriginUrl(normalizedPath);
+      return { success: true, data: url };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:fileHistory', async (_event: any, filePath: string, commitHash?: string, limit: number = 100) => {
+    try {
+      const normalizedPath = (filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const raw = await gitService.getFileHistory(normalizedPath, limit, commitHash);
+      return { success: true, data: parseFileHistory(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:fileBlame', async (_event: any, filePath: string, commitHash?: string) => {
+    try {
+      const normalizedPath = (filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const raw = await gitService.getFileBlame(normalizedPath, commitHash);
+      return { success: true, data: parseFileBlame(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:readRepoFile', async (_event: any, filePath: unknown) => {
+    try {
+      const normalizedPath = String(filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const data = await gitService.readRepoFile(normalizedPath);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:writeRepoFile', async (_event: any, filePath: unknown, content: unknown) => {
+    try {
+      const normalizedPath = String(filePath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      await gitService.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:openSubmodule', async (_event: any, submodulePath: unknown) => {
+    try {
+      const relativePath = String(submodulePath || '').trim();
+      if (!relativePath) {
+        return { success: false, error: 'Submodule path is required.' };
+      }
+
+      const repoPath = gitService.getRepoPath();
+      if (!repoPath) {
+        return { success: false, error: 'No repository path set.' };
+      }
+
+      const resolvedPath = path.resolve(repoPath, relativePath);
+      const relativeFromRepo = path.relative(repoPath, resolvedPath);
+      if (relativeFromRepo.startsWith('..') || path.isAbsolute(relativeFromRepo)) {
+        return { success: false, error: 'Submodule path is outside the current repository.' };
+      }
+
+      const openError = await shell.openPath(resolvedPath);
+      if (openError) {
+        return { success: false, error: openError };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:addIgnoreRule', async (_event: any, pattern: string) => {
+    try {
+      const normalizedPattern = String(pattern || '').trim().replace(/\\/g, '/');
+      if (!normalizedPattern) {
+        return { success: false, error: 'Pattern is required' };
+      }
+      if (normalizedPattern.length > 400) {
+        return { success: false, error: 'Pattern is too long' };
+      }
+      if (/\r|\n/.test(normalizedPattern)) {
+        return { success: false, error: 'Pattern must be a single line' };
+      }
+
+      const selectedRepo = gitService.getRepoPath();
+      if (!selectedRepo) {
+        return { success: false, error: 'No repository selected' };
+      }
+
+      const repoRoot = await gitService.runCommand(['rev-parse', '--show-toplevel']);
+      const gitignorePath = path.join(repoRoot, '.gitignore');
+      const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
+      const existingRules = new Set(
+        existing
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean),
+      );
+
+      if (existingRules.has(normalizedPattern)) {
+        return { success: true, added: false, pattern: normalizedPattern };
+      }
+
+      const needsLeadingNewline = existing.length > 0 && !existing.endsWith('\n') && !existing.endsWith('\r\n');
+      const nextContent = `${needsLeadingNewline ? '\n' : ''}${normalizedPattern}\n`;
+      fs.appendFileSync(gitignorePath, nextContent, 'utf-8');
+      return { success: true, added: true, pattern: normalizedPattern };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
+    const webContents = event.sender;
+    const jobId = createJobId('git-clone');
+
+    emitJobEvent(webContents, {
+      id: jobId,
+      operation: 'git:clone',
+      status: 'start',
+      timestamp: Date.now(),
+    });
+
+    const result = await gitService.cloneRepo(cloneUrl, targetDir, (line: string) => {
+      webContents.send('clone:progress', line);
+      emitJobEvent(webContents, {
+        id: jobId,
+        operation: 'git:clone',
+        status: 'progress',
+        message: line,
+        timestamp: Date.now(),
+      });
+    });
+
+    emitJobEvent(webContents, {
+      id: jobId,
+      operation: 'git:clone',
+      status: result.success ? 'done' : 'failed',
+      message: result.error,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  });
+
+  ipcMain.handle('git:init', async (_event: any, repoPath: string) => {
+    try {
+      gitService.setRepoPath(repoPath);
+      const out = await gitService.runCommand(['init']);
+      return { success: true, data: out };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+}
