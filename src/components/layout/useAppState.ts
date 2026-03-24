@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
+import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
 import { trByLanguage } from '../../i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
@@ -10,61 +10,13 @@ import { usePullRequests } from '../../hooks/usePullRequests';
 import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
 import { resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
-
-const DEFAULT_SETTINGS: AppSettingsDto = {
-  theme: 'copper-night',
-  language: 'de',
-  autoFetchIntervalMs: 60_000,
-  defaultBranch: 'main',
-  confirmDangerousOps: true,
-  commitTemplate: '',
-  showSecondaryHistory: true,
-  commitSignoffByDefault: false,
-  secretScanBeforePushEnabled: true,
-  secretScanStrictness: 'medium',
-  secretScanAllowlist: '',
-  aiAutoCommitEnabled: false,
-  aiProvider: 'ollama',
-  ollamaBaseUrl: 'http://127.0.0.1:11434',
-  ollamaModel: '',
-  geminiModel: 'gemini-3-flash-preview',
-  hasGeminiApiKey: false,
-  githubOauthClientId: '',
-  githubHost: 'github.com',
-};
-
-type RunGitCommandOptions = {
-  skipDirtyGuard?: boolean;
-  skipSecretScan?: boolean;
-};
-
-const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
-const SIDEBAR_COLLAPSE_STORAGE_KEY = 'open-git-control:sidebar-collapse-by-repo:v1';
-const LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-collapse-by-repo:v1';
-const SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY = 'open-git-control:sidebar-general-collapse:v1';
-const LEGACY_SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY = 'git-organizer:sidebar-general-collapse:v1';
-
-type SidebarCollapseState = {
-  branchPanelCollapsed: boolean;
-  tagPanelCollapsed: boolean;
-  remotePanelCollapsed: boolean;
-  submodulePanelCollapsed: boolean;
-};
-
-type SidebarCollapseByRepo = Record<string, SidebarCollapseState>;
-type SidebarGeneralCollapseState = {
-  repoPanelCollapsed: boolean;
-};
-
-const DEFAULT_SIDEBAR_COLLAPSE_STATE: SidebarCollapseState = {
-  branchPanelCollapsed: false,
-  tagPanelCollapsed: false,
-  remotePanelCollapsed: false,
-  submodulePanelCollapsed: false,
-};
-const DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE: SidebarGeneralCollapseState = {
-  repoPanelCollapsed: false,
-};
+import {
+  DEFAULT_SETTINGS,
+  GUARDED_COMMANDS,
+  type RunGitCommandOptions,
+} from './state/appStateShared';
+import { useSidebarCollapseState } from './state/useSidebarCollapseState';
+import { usePrAndReleaseState } from './state/usePrAndReleaseState';
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
@@ -85,8 +37,39 @@ export const useAppState = () => {
 
   const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
   const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
-  const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
-  const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE);
+
+  const {
+    showCreatePR,
+    setShowCreatePR,
+    newPRTitle,
+    setNewPRTitle,
+    newPRBody,
+    setNewPRBody,
+    newPRHead,
+    setNewPRHead,
+    newPRBase,
+    setNewPRBase,
+    releaseForm,
+    setReleaseFormState,
+    releaseSubmitting,
+    setReleaseSubmitting,
+    releaseError,
+    setReleaseError,
+    releaseSuccess,
+    setReleaseSuccess,
+    showReleaseCreator,
+    setShowReleaseCreator,
+    releaseContextLoading,
+    setReleaseContextLoading,
+    releaseContextError,
+    setReleaseContextError,
+    releaseContext,
+    setReleaseContext,
+    releaseNotesGenerating,
+    setReleaseNotesGenerating,
+    releaseNotesLanguage,
+    setReleaseNotesLanguage,
+  } = usePrAndReleaseState();
 
   const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
 
@@ -129,98 +112,17 @@ export const useAppState = () => {
     language: settings.language,
   });
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_SIDEBAR_COLLAPSE_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as SidebarCollapseByRepo;
-      if (parsed && typeof parsed === 'object') {
-        setSidebarCollapseByRepo(parsed);
-      }
-    } catch {
-      // ignore malformed local storage values
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIDEBAR_COLLAPSE_STORAGE_KEY, JSON.stringify(sidebarCollapseByRepo));
-    } catch {
-      // ignore write errors (e.g. private mode / quota)
-    }
-  }, [sidebarCollapseByRepo]);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<SidebarGeneralCollapseState>;
-      if (!parsed || typeof parsed !== 'object') return;
-      setSidebarGeneralCollapseState({
-        repoPanelCollapsed: Boolean(parsed.repoPanelCollapsed),
-      });
-    } catch {
-      // ignore malformed local storage values
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SIDEBAR_GENERAL_COLLAPSE_STORAGE_KEY, JSON.stringify(sidebarGeneralCollapseState));
-    } catch {
-      // ignore write errors (e.g. private mode / quota)
-    }
-  }, [sidebarGeneralCollapseState]);
-
-  const activeSidebarCollapseState = workspace.activeRepo
-    ? ({ ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(sidebarCollapseByRepo[workspace.activeRepo] || {}) })
-    : DEFAULT_SIDEBAR_COLLAPSE_STATE;
-
-  const updateActiveRepoSidebarCollapse = useCallback((partial: Partial<SidebarCollapseState>) => {
-    const repoPath = workspace.activeRepo;
-    if (!repoPath) return;
-
-    setSidebarCollapseByRepo(prev => {
-      const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[repoPath] || {}) };
-      return {
-        ...prev,
-        [repoPath]: {
-          ...current,
-          ...partial,
-        },
-      };
-    });
-  }, [workspace.activeRepo]);
-
-  const toggleBranchPanelCollapsed = useCallback(() => {
-    updateActiveRepoSidebarCollapse({
-      branchPanelCollapsed: !activeSidebarCollapseState.branchPanelCollapsed,
-    });
-  }, [activeSidebarCollapseState.branchPanelCollapsed, updateActiveRepoSidebarCollapse]);
-
-  const toggleTagPanelCollapsed = useCallback(() => {
-    updateActiveRepoSidebarCollapse({
-      tagPanelCollapsed: !activeSidebarCollapseState.tagPanelCollapsed,
-    });
-  }, [activeSidebarCollapseState.tagPanelCollapsed, updateActiveRepoSidebarCollapse]);
-
-  const toggleRemotePanelCollapsed = useCallback(() => {
-    updateActiveRepoSidebarCollapse({
-      remotePanelCollapsed: !activeSidebarCollapseState.remotePanelCollapsed,
-    });
-  }, [activeSidebarCollapseState.remotePanelCollapsed, updateActiveRepoSidebarCollapse]);
-
-  const toggleSubmodulePanelCollapsed = useCallback(() => {
-    updateActiveRepoSidebarCollapse({
-      submodulePanelCollapsed: !activeSidebarCollapseState.submodulePanelCollapsed,
-    });
-  }, [activeSidebarCollapseState.submodulePanelCollapsed, updateActiveRepoSidebarCollapse]);
-
-  const toggleRepoPanelCollapsed = useCallback(() => {
-    setSidebarGeneralCollapseState(prev => ({
-      ...prev,
-      repoPanelCollapsed: !prev.repoPanelCollapsed,
-    }));
-  }, []);
+  const {
+    activeSidebarCollapseState,
+    sidebarGeneralCollapseState,
+    toggleBranchPanelCollapsed,
+    toggleTagPanelCollapsed,
+    toggleRemotePanelCollapsed,
+    toggleSubmodulePanelCollapsed,
+    toggleRepoPanelCollapsed,
+  } = useSidebarCollapseState({
+    activeRepo: workspace.activeRepo,
+  });
 
   const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
     if (!window.electronAPI) return;
@@ -450,32 +352,6 @@ export const useAppState = () => {
     githubOauthClientId: settings.githubOauthClientId,
     githubHost: settings.githubHost,
   });
-
-  const [showCreatePR, setShowCreatePR] = useState(false);
-  const [newPRTitle, setNewPRTitle] = useState('');
-  const [newPRBody, setNewPRBody] = useState('');
-  const [newPRHead, setNewPRHead] = useState('');
-  const [newPRBase, setNewPRBase] = useState('main');
-
-  const [releaseForm, setReleaseFormState] = useState<GitHubCreateReleaseParamsDto>({
-    owner: '',
-    repo: '',
-    tagName: '',
-    targetCommitish: '',
-    releaseName: '',
-    body: '',
-    draft: false,
-    prerelease: false,
-  });
-  const [releaseSubmitting, setReleaseSubmitting] = useState(false);
-  const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [releaseSuccess, setReleaseSuccess] = useState<GitHubReleaseDto | null>(null);
-  const [showReleaseCreator, setShowReleaseCreator] = useState(false);
-  const [releaseContextLoading, setReleaseContextLoading] = useState(false);
-  const [releaseContextError, setReleaseContextError] = useState<string | null>(null);
-  const [releaseContext, setReleaseContext] = useState<GitHubReleaseContextDto | null>(null);
-  const [releaseNotesGenerating, setReleaseNotesGenerating] = useState(false);
-  const [releaseNotesLanguage, setReleaseNotesLanguage] = useState<'de' | 'en'>('en');
 
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
