@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AiService } from '../AiService';
+import { AiService, parseStatusPorcelain } from '../AiService';
 import { AppSettings } from '../settings';
 
 const baseSettings: AppSettings = {
@@ -58,6 +58,28 @@ describe('AiService gemini secret access', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain('key=secure-key-123');
+  });
+});
+
+describe('AiService porcelain path parsing', () => {
+  it('unquotes file paths with spaces', () => {
+    const entries = parseStatusPorcelain('?? "Docs/App Overview.png"\n');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].path).toBe('Docs/App Overview.png');
+    expect(entries[0].code).toBe('??');
+  });
+
+  it('keeps the destination path for rename entries', () => {
+    const entries = parseStatusPorcelain('R  "Docs/Old Name.png" -> "Docs/App Overview.png"\n');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].path).toBe('Docs/App Overview.png');
+    expect(entries[0].code).toBe('R ');
+  });
+
+  it('decodes escaped quotes from porcelain output', () => {
+    const entries = parseStatusPorcelain('?? "Docs/App \\\"Overview\\\".png"\n');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].path).toBe('Docs/App "Overview".png');
   });
 });
 

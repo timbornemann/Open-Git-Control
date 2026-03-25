@@ -80,7 +80,63 @@ function safeString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
+function decodePorcelainPath(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) {
+    return trimmed;
+  }
+
+  const body = trimmed.slice(1, -1);
+  const bytes: number[] = [];
+  const escapeToByte: Record<string, number> = {
+    a: 0x07,
+    b: 0x08,
+    f: 0x0c,
+    n: 0x0a,
+    r: 0x0d,
+    t: 0x09,
+    v: 0x0b,
+    '\\': 0x5c,
+    '"': 0x22,
+  };
+
+  for (let i = 0; i < body.length; i += 1) {
+    const char = body[i];
+    if (char !== '\\') {
+      bytes.push(...Buffer.from(char, 'utf8'));
+      continue;
+    }
+
+    const escaped = body[i + 1];
+    if (!escaped) {
+      bytes.push(0x5c);
+      break;
+    }
+
+    i += 1;
+    if (/[0-7]/.test(escaped)) {
+      let octal = escaped;
+      while (octal.length < 3 && i + 1 < body.length && /[0-7]/.test(body[i + 1])) {
+        i += 1;
+        octal += body[i];
+      }
+      bytes.push(parseInt(octal, 8));
+      continue;
+    }
+
+    const mapped = escapeToByte[escaped];
+    if (mapped !== undefined) {
+      bytes.push(mapped);
+      continue;
+    }
+
+    bytes.push(...Buffer.from(escaped, 'utf8'));
+  }
+
+  return Buffer.from(bytes).toString('utf8');
+}
+
+export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
   if (!statusOutput.trim()) return [];
 
   return statusOutput
@@ -91,8 +147,9 @@ function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
       const x = line[0];
       const y = line[1];
       const rawPath = line.slice(3).trim();
-      const renamedParts = rawPath.split(' -> ');
-      const path = renamedParts.length > 1 ? renamedParts[renamedParts.length - 1].trim() : rawPath;
+      const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
+      const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
+      const path = decodePorcelainPath(targetPath);
       return { path, x, y, code: `${x}${y}` };
     })
     .filter(entry => entry.path.length > 0);
