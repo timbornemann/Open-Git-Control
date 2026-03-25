@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 
 const execFileAsync = util.promisify(execFile);
+const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
 
 export type CommitStats = { files: number; additions: number; deletions: number };
 
@@ -53,6 +54,47 @@ export class GitService {
     return new Error(detailedMessage);
   }
 
+  private isIndexLockError(error: any): boolean {
+    const text = `${error?.stderr || ''}\n${error?.stdout || ''}\n${error?.message || ''}`;
+    return /index\.lock/i.test(text) && /file exists/i.test(text);
+  }
+
+  private resolveIndexLockPath(repoPath: string): string {
+    try {
+      const gitDirRaw = execFileSync('git', ['rev-parse', '--git-dir'], {
+        cwd: repoPath,
+        windowsHide: true,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      const gitDirPath = path.isAbsolute(gitDirRaw) ? gitDirRaw : path.resolve(repoPath, gitDirRaw || '.git');
+      return path.join(gitDirPath, 'index.lock');
+    } catch {
+      return path.join(repoPath, '.git', 'index.lock');
+    }
+  }
+
+  private removeStaleIndexLockIfSafe(repoPath: string, args: string[]): boolean {
+    const lockPath = this.resolveIndexLockPath(repoPath);
+    if (!fs.existsSync(lockPath)) {
+      return false;
+    }
+
+    try {
+      const stat = fs.statSync(lockPath);
+      const ageMs = Date.now() - stat.mtimeMs;
+      if (!Number.isFinite(ageMs) || ageMs < STALE_INDEX_LOCK_MAX_AGE_MS) {
+        return false;
+      }
+
+      fs.rmSync(lockPath, { force: true });
+      console.warn(`Removed stale git index lock (${lockPath}) and retrying: git ${args.join(' ')}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private isPathInsideRepo(repoPath: string, filePath: string): boolean {
     const relative = path.relative(repoPath, filePath);
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -60,10 +102,25 @@ export class GitService {
 
   private async execGit(repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     const env = envOverrides ? { ...process.env, ...envOverrides } : process.env;
+    const execOptions = {
+      cwd: repoPath,
+      maxBuffer: 20 * 1024 * 1024,
+      env,
+    };
+
     try {
-      const { stdout } = await execFileAsync('git', args, { cwd: repoPath, maxBuffer: 20 * 1024 * 1024, env });
+      const { stdout } = await execFileAsync('git', args, execOptions);
       return stdout.trimEnd();
     } catch (error: any) {
+      if (this.isIndexLockError(error) && this.removeStaleIndexLockIfSafe(repoPath, args)) {
+        try {
+          const { stdout } = await execFileAsync('git', args, execOptions);
+          return stdout.trimEnd();
+        } catch (retryError: any) {
+          throw this.normalizeGitError(retryError, args);
+        }
+      }
+
       throw this.normalizeGitError(error, args);
     }
   }

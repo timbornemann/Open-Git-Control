@@ -110,3 +110,35 @@ describe('GitService repo path normalization', () => {
     fs.rmSync(plainDir, { recursive: true, force: true });
   });
 });
+
+describe('GitService stale index.lock recovery', () => {
+  it('removes stale lock files and retries git command once', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-index-lock-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
+      fs.writeFileSync(path.join(repoDir, 'README.md'), 'test\n', 'utf8');
+      execFileSync('git', ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+      execFileSync(
+        'git',
+        ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'],
+        { cwd: repoDir, stdio: 'ignore' },
+      );
+      fs.writeFileSync(path.join(repoDir, 'CHANGE.txt'), 'change\n', 'utf8');
+
+      const lockPath = path.join(repoDir, '.git', 'index.lock');
+      fs.writeFileSync(lockPath, 'stale lock', 'utf8');
+      const staleDate = new Date(Date.now() - 120_000);
+      fs.utimesSync(lockPath, staleDate, staleDate);
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+
+      await service.addFile('CHANGE.txt');
+      const stagedFiles = await service.runCommand(['diff', '--cached', '--name-only']);
+      expect(stagedFiles.split(/\r?\n/).filter(Boolean)).toContain('CHANGE.txt');
+      expect(fs.existsSync(lockPath)).toBe(false);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
