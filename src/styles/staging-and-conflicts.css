@@ -230,14 +230,23 @@
   background: linear-gradient(180deg, var(--status-danger-soft) 0%, transparent 220px);
 }
 
+.conflict-resolver-header-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
+}
+
 .conflict-global-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
   flex-wrap: wrap;
 }
 
@@ -249,52 +258,110 @@
   position: static;
   top: auto;
   z-index: auto;
-  padding: 7px 16px;
-  background: var(--bg-dark);
-  border-bottom: 1px solid var(--line-subtle);
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
 }
 
-.conflict-global-actions-summary {
-  font-weight: 600;
-  color: var(--status-danger);
-  font-size: 0.83rem;
+.conflict-global-actions-rail {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.conflict-global-actions-buttons {
+.conflict-global-actions-rail--topbar {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group + .conflict-action-group {
+  margin-left: 0;
+  padding-left: 14px;
+  position: relative;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group + .conflict-action-group::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--line-subtle);
+}
+
+.conflict-action-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.conflict-action-group-label {
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.82;
+  padding-right: 4px;
 }
 
 .conflict-action-btn {
-  border: 1px solid var(--border-color);
-  padding: 4px 12px;
-  background: var(--bg-dark);
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  padding: 4px 11px;
+  background: transparent;
   color: var(--text-primary);
-  font-size: 0.74rem;
+  font-size: 0.71rem;
+  font-weight: 600;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-btn {
+  border-color: var(--line-subtle);
 }
 
 .conflict-action-btn:hover:not(:disabled) {
   background: var(--bg-hover);
+  border-color: var(--border-color);
+  box-shadow: 0 0 0 1px var(--line-subtle) inset;
 }
 
 .conflict-action-btn--danger {
   border-color: var(--status-danger-border);
   color: var(--status-danger);
-  background: var(--status-danger-soft);
+  background: transparent;
 }
 
 .conflict-action-btn--danger:hover:not(:disabled) {
   background: var(--status-danger-soft);
-  filter: brightness(1.05);
+  border-color: var(--status-danger-border);
+  box-shadow: 0 0 0 1px var(--status-danger-soft) inset;
 }
 
-.conflict-action-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-color);
-  margin: 0 2px;
+.conflict-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .conflict-sidebar-list {
@@ -448,6 +515,10 @@
   flex-shrink: 0;
 }
 
+.staging-container--conflict .conflict-section--resolve > .conflict-resolver-header-shell {
+  flex-shrink: 0;
+}
+
 .staging-container--conflict .conflict-layout--fill {
   flex: 1;
   min-height: 0;
@@ -525,13 +596,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px 14px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
 }
 
 .conflict-global-nav--header {
-  border-bottom-color: var(--line-subtle);
+  border-bottom-color: transparent;
 }
 
 .conflict-global-nav-meta {
@@ -735,6 +806,56 @@
   flex: 1;
   min-height: 220px;
   background: var(--bg-darker);
+}
+
+.conflict-manual-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line-subtle);
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
+  flex-shrink: 0;
+}
+
+.conflict-manual-action-title {
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.conflict-manual-action-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.conflict-manual-action-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.conflict-manual-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.conflict-manual-action-btn--success {
+  background: var(--status-success);
+  border-color: var(--status-success-border);
+  color: var(--on-accent);
+}
+
+.conflict-manual-action-btn--success:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .conflict-manual-edit-scroll {
@@ -1096,13 +1217,26 @@
     flex-basis: 100%;
   }
 
-  .conflict-global-actions-buttons {
+  .conflict-global-actions-rail:not(.conflict-global-actions-rail--topbar) {
     width: 100%;
+    justify-content: space-between;
+  }
+
+  .conflict-global-actions-rail:not(.conflict-global-actions-rail--topbar) .conflict-action-group {
+    flex: 1 1 280px;
+    justify-content: space-between;
+  }
+
+  .conflict-resolver-header-shell {
+    gap: 10px;
+  }
+
+  .conflict-manual-action-bar {
     justify-content: flex-end;
   }
 
-  .conflict-action-divider {
-    display: none;
+  .conflict-manual-action-title {
+    width: 100%;
   }
 
   .conflict-manual-edit-root {
