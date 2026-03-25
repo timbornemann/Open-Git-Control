@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { normalizeMergeConflictFileContent } from '../../utils/conflictLineGutter';
 import type { ToastMessage } from '../../types/git';
+import { useI18n } from '../../i18n';
 import {
   basename,
   buildConflictResolution,
@@ -41,6 +42,7 @@ export const useConflictResolver = ({
   isConflictOnly,
   onOpenConflictResolver,
 }: Params) => {
+  const { tr } = useI18n();
   const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
   const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
@@ -59,7 +61,7 @@ export const useConflictResolver = ({
     try {
       const result = await window.electronAPI.readRepoFile(filePath);
       if (!result.success || typeof result.data !== 'string') {
-        setToast({ msg: result.error || `Datei konnte nicht geladen werden: ${filePath}`, isError: true });
+        setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
         return;
       }
       const normalized = normalizeMergeConflictFileContent(result.data);
@@ -69,11 +71,11 @@ export const useConflictResolver = ({
       setConflictEditor({ filePath, originalContent: normalized, content: normalized, isSaving: false });
       setSelectedConflictBlockIndex(boundedIndex);
     } catch (error: any) {
-      setToast({ msg: error?.message || `Datei konnte nicht geladen werden: ${filePath}`, isError: true });
+      setToast({ msg: error?.message || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
     } finally {
       setIsConflictEditorLoading(false);
     }
-  }, [setToast]);
+  }, [setToast, tr]);
 
   const reloadActiveConflictEditor = useCallback(async () => {
     if (!conflictEditor) return;
@@ -234,9 +236,13 @@ export const useConflictResolver = ({
       if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
       return { ...prev, content: nextContent };
     });
-    const selectedLabel = choice === 'ours' ? 'Aktueller Stand' : choice === 'theirs' ? 'Eingehender Stand' : 'Beide Seiten';
-    setToast({ msg: `${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.`, isError: false });
-  }, [conflictEditor, selectedConflictBlockIndex, setToast]);
+    const selectedLabel = choice === 'ours'
+      ? tr('Aktueller Stand', 'Current version')
+      : choice === 'theirs'
+      ? tr('Eingehender Stand', 'Incoming version')
+      : tr('Beide Seiten', 'Both sides');
+    setToast({ msg: tr(`${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.`, `Applied ${selectedLabel} for block ${blockIndex + 1}.`), isError: false });
+  }, [conflictEditor, selectedConflictBlockIndex, setToast, tr]);
 
   const applyConflictChoiceToAll = useCallback((choice: ConflictResolutionChoice) => {
     if (!conflictEditor) return;
@@ -252,11 +258,15 @@ export const useConflictResolver = ({
       return { ...prev, content: nextContent };
     });
     setSelectedConflictBlockIndex(0);
-    const selectedLabel = choice === 'ours' ? 'Aktueller Stand' : choice === 'theirs' ? 'Eingehender Stand' : 'Beide Seiten';
-    setToast({ msg: `${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, isError: false });
-  }, [conflictEditor, setToast]);
+    const selectedLabel = choice === 'ours'
+      ? tr('Aktueller Stand', 'Current version')
+      : choice === 'theirs'
+      ? tr('Eingehender Stand', 'Incoming version')
+      : tr('Beide Seiten', 'Both sides');
+    setToast({ msg: tr(`${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, `Applied ${selectedLabel} for all conflict blocks.`), isError: false });
+  }, [conflictEditor, setToast, tr]);
 
-  const markConflictResolved = useCallback((filePath: string) => git(['conflictMarkResolved', filePath], `${basename(filePath)} als geloest markiert`), [git]);
+  const markConflictResolved = useCallback((filePath: string) => git(['conflictMarkResolved', filePath], tr(`${basename(filePath)} als geloest markiert`, `Marked ${basename(filePath)} as resolved`)), [git, tr]);
 
   const markConflictResolvedAndSync = useCallback(async (filePath: string) => {
     await markConflictResolved(filePath);
@@ -271,14 +281,14 @@ export const useConflictResolver = ({
       if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
       return { ...prev, content: prev.originalContent };
     });
-    setToast({ msg: 'Lokale Editor-Aenderungen verworfen.', isError: false });
-  }, [conflictEditor, setToast]);
+    setToast({ msg: tr('Lokale Editor-Aenderungen verworfen.', 'Discarded local editor changes.'), isError: false });
+  }, [conflictEditor, setToast, tr]);
 
   const saveConflictEditor = useCallback(async (markResolvedAfterSave: boolean) => {
     if (!window.electronAPI || !conflictEditor) return;
     const pendingBlocks = parseConflictBlocks(conflictEditor.content);
     if (markResolvedAfterSave && pendingBlocks.length > 0) {
-      setToast({ msg: 'Vor "Speichern + als geloest markieren" muessen alle Konfliktmarker entfernt sein.', isError: true });
+      setToast({ msg: tr('Vor "Speichern + als geloest markieren" muessen alle Konfliktmarker entfernt sein.', 'Before "Save + mark as resolved", all conflict markers must be removed.'), isError: true });
       return;
     }
     const targetPath = conflictEditor.filePath;
@@ -289,16 +299,21 @@ export const useConflictResolver = ({
     });
     try {
       const writeResult = await window.electronAPI.writeRepoFile(targetPath, targetContent);
-      if (!writeResult.success) throw new Error(writeResult.error || 'Datei konnte nicht gespeichert werden.');
+      if (!writeResult.success) throw new Error(writeResult.error || tr('Datei konnte nicht gespeichert werden.', 'Could not save file.'));
       if (markResolvedAfterSave) {
         const stageResult = await window.electronAPI.runGitCommand('conflictMarkResolved', targetPath);
-        if (!stageResult.success) throw new Error(stageResult.error || 'Datei konnte nicht als geloest markiert werden.');
+        if (!stageResult.success) throw new Error(stageResult.error || tr('Datei konnte nicht als geloest markiert werden.', 'Could not mark file as resolved.'));
       }
       setConflictEditor((prev) => {
         if (!prev || prev.filePath !== targetPath) return prev;
         return { ...prev, content: targetContent, originalContent: targetContent, isSaving: false };
       });
-      setToast({ msg: markResolvedAfterSave ? `${basename(targetPath)} gespeichert + geloest` : `${basename(targetPath)} gespeichert`, isError: false });
+      setToast({
+        msg: markResolvedAfterSave
+          ? tr(`${basename(targetPath)} gespeichert + geloest`, `Saved ${basename(targetPath)} + resolved`)
+          : tr(`${basename(targetPath)} gespeichert`, `Saved ${basename(targetPath)}`),
+        isError: false,
+      });
       if (onRepoChanged) onRepoChanged();
       await refresh();
     } catch (error: any) {
@@ -306,37 +321,37 @@ export const useConflictResolver = ({
         if (!prev || prev.filePath !== targetPath) return prev;
         return { ...prev, isSaving: false };
       });
-      setToast({ msg: error?.message || 'Konfliktdatei konnte nicht gespeichert werden.', isError: true });
+      setToast({ msg: error?.message || tr('Konfliktdatei konnte nicht gespeichert werden.', 'Could not save conflict file.'), isError: true });
     }
-  }, [conflictEditor, onRepoChanged, refresh, setToast]);
+  }, [conflictEditor, onRepoChanged, refresh, setToast, tr]);
 
-  const mergeContinue = useCallback(() => git(['mergeContinue'], 'Merge fortgesetzt', true), [git]);
+  const mergeContinue = useCallback(() => git(['mergeContinue'], tr('Merge fortgesetzt', 'Merge continued'), true), [git, tr]);
   const mergeAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: 'Merge abbrechen?',
-      message: 'Der laufende Merge wird verworfen und auf den Zustand vor dem Merge zurueckgesetzt.',
-      contextItems: [{ label: 'Aktion', value: 'git merge --abort' }],
+      title: tr('Merge abbrechen?', 'Abort merge?'),
+      message: tr('Der laufende Merge wird verworfen und auf den Zustand vor dem Merge zurueckgesetzt.', 'The active merge will be discarded and reset to the pre-merge state.'),
+      contextItems: [{ label: tr('Aktion', 'Action'), value: 'git merge --abort' }],
       irreversible: true,
-      consequences: 'Alle noch nicht gesicherten Merge-Konfliktaufloesungen gehen verloren.',
-      confirmLabel: 'Merge abbrechen',
-      onConfirm: () => git(['mergeAbort'], 'Merge abgebrochen', true),
+      consequences: tr('Alle noch nicht gesicherten Merge-Konfliktaufloesungen gehen verloren.', 'All unsaved merge conflict resolutions will be lost.'),
+      confirmLabel: tr('Merge abbrechen', 'Abort merge'),
+      onConfirm: () => git(['mergeAbort'], tr('Merge abgebrochen', 'Merge aborted'), true),
     });
-  }, [setConfirmDialog, git]);
+  }, [setConfirmDialog, git, tr]);
 
-  const rebaseContinue = useCallback(() => git(['rebaseContinue'], 'Rebase fortgesetzt', true), [git]);
+  const rebaseContinue = useCallback(() => git(['rebaseContinue'], tr('Rebase fortgesetzt', 'Rebase continued'), true), [git, tr]);
   const rebaseAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: 'Rebase abbrechen?',
-      message: 'Der laufende Rebase wird verworfen und der vorherige Branch-Zustand wiederhergestellt.',
-      contextItems: [{ label: 'Aktion', value: 'git rebase --abort' }],
+      title: tr('Rebase abbrechen?', 'Abort rebase?'),
+      message: tr('Der laufende Rebase wird verworfen und der vorherige Branch-Zustand wiederhergestellt.', 'The active rebase will be discarded and the previous branch state restored.'),
+      contextItems: [{ label: tr('Aktion', 'Action'), value: 'git rebase --abort' }],
       irreversible: true,
-      consequences: 'Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.',
-      confirmLabel: 'Rebase abbrechen',
-      onConfirm: () => git(['rebaseAbort'], 'Rebase abgebrochen', true),
+      consequences: tr('Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.', 'All unsaved rebase resolutions will be lost.'),
+      confirmLabel: tr('Rebase abbrechen', 'Abort rebase'),
+      onConfirm: () => git(['rebaseAbort'], tr('Rebase abgebrochen', 'Rebase aborted'), true),
     });
-  }, [setConfirmDialog, git]);
+  }, [setConfirmDialog, git, tr]);
 
   const onConflictEditorContentChange = useCallback((filePath: string, nextContent: string) => {
     setConflictEditor((prev) => {
@@ -345,7 +360,7 @@ export const useConflictResolver = ({
     });
   }, []);
 
-  // ── Derived navigation values (need status + editor state) ──────────────
+  // Derived navigation values (need status + editor state)
   const conflictPaths = useMemo(
     () => status ? [...new Set(status.conflicts.map((e) => e.path))].sort((a, b) => a.localeCompare(b)) : [],
     [status],
