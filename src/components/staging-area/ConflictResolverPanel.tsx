@@ -14,10 +14,6 @@ type ConflictResolverPanelProps = {
   onOpenConflictResolver?: (filePath: string) => void;
   isConflictBlockCountPending: boolean;
   totalConflictBlocksInView: number;
-  mergeContinue: () => void;
-  mergeAbort: () => void;
-  rebaseContinue: () => void;
-  rebaseAbort: () => void;
   conflictEditor: ConflictEditorState | null;
   isConflictEditorLoading: boolean;
   blockCountForPath: (path: string) => number;
@@ -49,10 +45,6 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   onOpenConflictResolver,
   isConflictBlockCountPending,
   totalConflictBlocksInView,
-  mergeContinue,
-  mergeAbort,
-  rebaseContinue,
-  rebaseAbort,
   conflictEditor,
   isConflictEditorLoading,
   blockCountForPath,
@@ -85,63 +77,59 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
   return (
     <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}`}>
-      {!onOpenConflictResolver && (
-        <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
-          <button
-            className="conflict-global-nav-btn conflict-global-nav-btn--prev"
-            onClick={() => { void navigateToPreviousConflict(); }}
-            disabled={!hasPreviousConflictTarget || isNavigationBusy}
-          >
-            {'<'} Zurueck
-          </button>
-          <div className="conflict-global-nav-meta">
-            <span className="conflict-global-nav-title">Konflikt-Navigation</span>
-            <span className="conflict-global-nav-state">
-              {isStructuredConflictViewLocked
-                ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
-                : (activeConflictFileIndex >= 0
-                  ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
-                  : 'Datei --')}
-              {!isStructuredConflictViewLocked && conflictBlocks.length > 0
-                ? ` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
-                : (!isStructuredConflictViewLocked ? ' - Keine Konfliktmarker in dieser Datei' : '')}
+      {!onOpenConflictResolver ? (
+        <div className="conflict-resolver-header-shell">
+          <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
+            <button
+              className="conflict-global-nav-btn conflict-global-nav-btn--prev"
+              onClick={() => { void navigateToPreviousConflict(); }}
+              disabled={!hasPreviousConflictTarget || isNavigationBusy}
+            >
+              {'<'} Zurueck
+            </button>
+            <div className="conflict-global-nav-meta">
+              <span className="conflict-global-nav-title">Konflikt-Navigation</span>
+              <span className="conflict-global-nav-state">
+                {isStructuredConflictViewLocked
+                  ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
+                  : (activeConflictFileIndex >= 0
+                    ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
+                    : 'Datei --')}
+                {!isStructuredConflictViewLocked && conflictBlocks.length > 0
+                  ? ` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
+                  : (!isStructuredConflictViewLocked ? ' - Keine Konfliktmarker in dieser Datei' : '')}
+              </span>
+            </div>
+            <button
+              className="conflict-global-nav-btn conflict-global-nav-btn--next"
+              onClick={() => { void navigateToNextConflict(); }}
+              disabled={!hasNextConflictTarget || isNavigationBusy}
+            >
+              Weiter {'>'}
+            </button>
+          </div>
+
+          <div className="staging-section-header conflict-section-header">
+            <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
+            <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
+              {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
             </span>
+            <span className="staging-stats-inline">
+              {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
+            </span>
+            <div style={{ flex: 1 }} />
           </div>
-          <button
-            className="conflict-global-nav-btn conflict-global-nav-btn--next"
-            onClick={() => { void navigateToNextConflict(); }}
-            disabled={!hasNextConflictTarget || isNavigationBusy}
-          >
-            Weiter {'>'}
-          </button>
         </div>
-      )}
-
-      <div className={`staging-section-header${!onOpenConflictResolver ? ' conflict-section-header' : ''}`}>
-        <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
-        <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
-          {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
-        </span>
-        <span className="staging-stats-inline">
-          {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
-        </span>
-        <div style={{ flex: 1 }} />
-      </div>
-
-      {!onOpenConflictResolver && (
-        <div className="conflict-global-actions">
-          <span className="conflict-global-actions-summary">
-            {isConflictBlockCountPending && visibleConflicts.length > 0
-              ? 'Konfliktbloecke werden gezaehlt...'
-              : `${totalConflictBlocksInView} Konfliktblock${totalConflictBlocksInView !== 1 ? 'e' : ''} in ${visibleConflicts.length} Datei${visibleConflicts.length !== 1 ? 'en' : ''}`}
+      ) : (
+        <div className="staging-section-header">
+          <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
+          <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
+            {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
           </span>
-          <div className="conflict-global-actions-buttons">
-            <button className="staging-btn-sm conflict-action-btn" onClick={mergeContinue} title="Merge abschliessen">Merge fortsetzen</button>
-            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={mergeAbort} title="Merge abbrechen">Merge abbrechen</button>
-            <div className="conflict-action-divider" />
-            <button className="staging-btn-sm conflict-action-btn" onClick={rebaseContinue} title="Rebase fortsetzen">Rebase fortsetzen</button>
-            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={rebaseAbort} title="Rebase abbrechen">Rebase abbrechen</button>
-          </div>
+          <span className="staging-stats-inline">
+            {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
+          </span>
+          <div style={{ flex: 1 }} />
         </div>
       )}
 
@@ -294,32 +282,45 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                         <button className="staging-btn-sm" style={{ padding: '6px 24px', border: '1px solid var(--border-color)', background: 'var(--bg-dark)', fontWeight: 600, fontSize: '0.8rem' }} onClick={() => applyConflictChoiceToSelected('both')} disabled={conflictEditor.isSaving}>Beide Staende uebernehmen (Aktueller zuerst)</button>
                       </div>
                     </div>
-                  )}
-
-                  <div className="conflict-manual-edit-root">
-                    <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '8px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>Manuelle Bearbeitung</span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', maxWidth: '720px' }}>
-                          Gesamte Datei mit Zeilennummern; farbig: Aktueller Stand / Eingehender Stand / Marker. Scrollen fuer Kontext ausserhalb der Konfliktmarker.
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={resetConflictEditorDraft} disabled={!isConflictEditorDirty || conflictEditor.isSaving}>Aenderungen verwerfen</button>
-                        <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={() => { void saveConflictEditor(false); }} disabled={conflictEditor.isSaving || !isConflictEditorDirty}>Speichern</button>
-                        <button className="staging-btn-sm" style={{ background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', padding: '4px 16px', fontWeight: 600 }} onClick={() => { void saveConflictEditor(true); }} disabled={conflictEditor.isSaving || conflictBlocks.length > 0}>Speichern + Geloest</button>
-                      </div>
-                    </div>
-                    <ConflictManualEditor
-                      ref={conflictManualScrollRef}
-                      content={conflictEditor.content}
-                      disabled={conflictEditor.isSaving}
-                      onChange={(next) => onConflictEditorContentChange(conflictEditor.filePath, next)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+	                  )}
+	
+		                  <div className="conflict-manual-edit-root">
+		                    <div className="conflict-manual-action-bar">
+		                      <span className="conflict-manual-action-title">Editor-Aktionen</span>
+		                      <div className="conflict-manual-action-buttons">
+		                        <button
+		                          className="staging-btn-sm conflict-manual-action-btn"
+		                          onClick={resetConflictEditorDraft}
+		                          disabled={!isConflictEditorDirty || conflictEditor.isSaving}
+		                        >
+		                          Aenderungen verwerfen
+		                        </button>
+		                        <button
+		                          className="staging-btn-sm conflict-manual-action-btn"
+		                          onClick={() => { void saveConflictEditor(false); }}
+		                          disabled={conflictEditor.isSaving || !isConflictEditorDirty}
+		                        >
+		                          Speichern
+		                        </button>
+		                        <button
+		                          className="staging-btn-sm conflict-manual-action-btn conflict-manual-action-btn--success"
+		                          onClick={() => { void saveConflictEditor(true); }}
+		                          disabled={conflictEditor.isSaving || conflictBlocks.length > 0}
+		                        >
+		                          Speichern + Geloest
+		                        </button>
+		                      </div>
+		                    </div>
+		                    <ConflictManualEditor
+		                      ref={conflictManualScrollRef}
+		                      content={conflictEditor.content}
+		                      disabled={conflictEditor.isSaving}
+		                      onChange={(next) => onConflictEditorContentChange(conflictEditor.filePath, next)}
+		                    />
+		                  </div>
+	                </div>
+	              </div>
+	            )}
           </div>
         </div>
       )}

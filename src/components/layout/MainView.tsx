@@ -248,6 +248,10 @@ export const MainView: React.FC = () => {
     autoOpenConflictResolverPath,
     onAutoOpenConflictResolverConsumed,
     onOpenConflictResolverForPath,
+    onConflictMergeContinue,
+    onConflictMergeAbort,
+    onConflictRebaseContinue,
+    onConflictRebaseAbort,
   } = useAppContext();
   const { tr } = useI18n();
 
@@ -365,6 +369,22 @@ export const MainView: React.FC = () => {
           {shouldShowPrimaryPaneHeader && (
             <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
               <span className="pane-header-main-title">{primaryPaneTitle}</span>
+              {activeConflictPath ? (
+                <div className="pane-header-main-center">
+                  <div className="conflict-global-actions-rail conflict-global-actions-rail--topbar">
+                    <div className="conflict-action-group">
+                      <span className="conflict-action-group-label">Merge</span>
+                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictMergeContinue} disabled={isGitActionRunning} title="Merge abschliessen">Fortsetzen</button>
+                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictMergeAbort} disabled={isGitActionRunning} title="Merge abbrechen">Abbrechen</button>
+                    </div>
+                    <div className="conflict-action-group">
+                      <span className="conflict-action-group-label">Rebase</span>
+                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictRebaseContinue} disabled={isGitActionRunning} title="Rebase fortsetzen">Fortsetzen</button>
+                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictRebaseAbort} disabled={isGitActionRunning} title="Rebase abbrechen">Abbrechen</button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               {isSettingsView ? null : isReleaseView ? (
                 <button
                   className="icon-btn pane-header-nav-btn"

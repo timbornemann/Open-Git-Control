@@ -321,6 +321,10 @@ const App: React.FC = () => {
     autoOpenConflictResolverPath: state.autoOpenConflictResolverPath,
     onAutoOpenConflictResolverConsumed: state.clearAutoOpenConflictResolverPath,
     onOpenConflictResolverForPath: state.openConflictResolverForPath,
+    onConflictMergeContinue: () => { void state.runGitCommand(['mergeContinue'], tr('Merge fortgesetzt.', 'Merge continued.'), tr('Merge wird fortgesetzt...', 'Continuing merge...')); },
+    onConflictMergeAbort: () => { void state.runGitCommand(['mergeAbort'], tr('Merge abgebrochen.', 'Merge aborted.'), tr('Merge wird abgebrochen...', 'Aborting merge...')); },
+    onConflictRebaseContinue: () => { void state.runGitCommand(['rebaseContinue'], tr('Rebase fortgesetzt.', 'Rebase continued.'), tr('Rebase wird fortgesetzt...', 'Continuing rebase...')); },
+    onConflictRebaseAbort: () => { void state.runGitCommand(['rebaseAbort'], tr('Rebase abgebrochen.', 'Rebase aborted.'), tr('Rebase wird abgebrochen...', 'Aborting rebase...')); },
   };
 
   return (
