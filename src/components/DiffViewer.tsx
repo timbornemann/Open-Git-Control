@@ -418,7 +418,28 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         </div>
       </div>
 
-      {isLoading && <div className="diff-empty-state">{tr('Diff wird geladen...', 'Loading diff...')}</div>}
+      {isLoading && (
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {Array.from({ length: 10 }).map((_, i) => {
+            const isAdd = i % 5 === 1;
+            const isDel = i % 5 === 3;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 1 - i * 0.07 }}>
+                <div className="skeleton-line" style={{ width: 28, height: 9, borderRadius: 3, flexShrink: 0, opacity: 0.5 }} />
+                <div
+                  className="skeleton-line"
+                  style={{
+                    height: 9,
+                    width: `${30 + (i * 7) % 55}%`,
+                    borderRadius: 3,
+                    background: isAdd ? 'rgba(79,174,148,0.2)' : isDel ? 'rgba(211,93,105,0.2)' : undefined,
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
       {error && !isLoading && <div className="diff-empty-state error">{error}</div>}
       {!isLoading && !error && !diffText.trim() && <div className="diff-empty-state">{tr('Keine Unterschiede vorhanden.', 'No differences found.')}</div>}
 
@@ -437,7 +458,19 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         <div className="diff-content-scroll">
           {isTooLarge && (
             <div className="diff-large-warning">
-              {tr('Großer Diff erkannt. Anzeige wurde aus Performance-Gründen gekürzt.', 'Large diff detected. Output was truncated for performance.')}
+              <span>
+                {tr(
+                  `Großer Diff: ${diffText.split('\n').length.toLocaleString()} Zeilen – Anzeige auf ${MAX_RENDER_LINES.toLocaleString()} Zeilen gekürzt.`,
+                  `Large diff: ${diffText.split('\n').length.toLocaleString()} lines – display truncated to ${MAX_RENDER_LINES.toLocaleString()} lines.`
+                )}
+              </span>
+              <button
+                className="diff-large-warning-copy"
+                onClick={() => navigator.clipboard.writeText(diffText)}
+                title={tr('Vollständigen Diff in Zwischenablage kopieren', 'Copy full diff to clipboard')}
+              >
+                {tr('Vollständig kopieren', 'Copy full diff')}
+              </button>
             </div>
           )}
 

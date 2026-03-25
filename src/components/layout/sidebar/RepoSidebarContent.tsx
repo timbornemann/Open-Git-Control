@@ -37,6 +37,8 @@ type RepoSidebarContentProps = Pick<
   | 'remoteOnlyBranches'
   | 'onAddRemote'
   | 'onRemoveRemote'
+  | 'onRenameRemote'
+  | 'onSetRemoteUrl'
   | 'onRefreshRemote'
   | 'onSetUpstreamForCurrentBranch'
   | 'onCheckoutRemoteBranch'
@@ -145,6 +147,8 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         remoteOnlyBranches={props.remoteOnlyBranches}
         onAddRemote={props.onAddRemote}
         onRemoveRemote={props.onRemoveRemote}
+        onRenameRemote={props.onRenameRemote}
+        onSetRemoteUrl={props.onSetRemoteUrl}
         onRefreshRemote={props.onRefreshRemote}
         onSetUpstreamForCurrentBranch={props.onSetUpstreamForCurrentBranch}
         onCheckoutRemoteBranch={props.onCheckoutRemoteBranch}

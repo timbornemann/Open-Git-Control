@@ -9,78 +9,12 @@ import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { SettingsMainContent } from './SettingsMainContent';
-import { BranchInfo, GitMergeMode, RemoteSyncState } from '../../types/git';
-import { AppSettingsDto, GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
-import { GithubAuthHelpMethod, SettingsTabId } from './sidebar/AppSidebar.types';
+import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
 import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDTH } from './hooks/useMainViewPaneResizer';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
+import { useAppContext } from '../../contexts/AppStateContext';
 import appLogo from '../../../logo.png';
-
-type RemoteStatus = {
-  title: string;
-  detail: string;
-  color: string;
-  backgroundColor: string;
-  borderColor: string;
-};
-
-type Props = {
-  activeTab: 'localRepos' | 'repo' | 'github' | 'settings';
-  isAuthenticated: boolean;
-  selectedGithubAuthHelpMethod: GithubAuthHelpMethod;
-  onClearGithubAuthHelpMethod: () => void;
-  activeRepo: string | null;
-  currentBranch: string;
-  branches: BranchInfo[];
-  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
-  remoteSync: RemoteSyncState;
-  remoteStatus: RemoteStatus;
-  isGitActionRunning: boolean;
-  activeGitActionLabel: string | null;
-  selectedCommit: string | null;
-  setSelectedCommit: (hash: string | null) => void;
-  refreshTrigger: number;
-  triggerRefresh: () => void;
-  showSecondaryHistory: boolean;
-  onFetch: () => void;
-  onPull: () => void;
-  onPullRebase: () => void;
-  onPullFfOnly: () => void;
-  onPush: () => void;
-  onPushForceWithLease: () => void;
-  onPushTags: () => void;
-  onOpenRepoWorkspace: () => void;
-  settings: AppSettingsDto;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
-  jobs: GitJobEventDto[];
-  onClearJobs: () => void;
-  settingsTab: SettingsTabId;
-  onResetLayout: () => void;
-  showReleaseCreator: boolean;
-  onOpenReleaseCreator: () => void;
-  onCloseReleaseCreator: () => void;
-  prOwnerRepo: { owner: string; repo: string } | null;
-  releaseForm: GitHubCreateReleaseParamsDto;
-  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
-  releaseSubmitting: boolean;
-  releaseError: string | null;
-  releaseSuccess: GitHubReleaseDto | null;
-  onCreateRelease: () => Promise<void>;
-  releaseContextLoading: boolean;
-  releaseContextError: string | null;
-  releaseContext: GitHubReleaseContextDto | null;
-  onRefreshReleaseContext: () => Promise<void>;
-  onGenerateReleaseNotes: () => Promise<void>;
-  releaseNotesGenerating: boolean;
-  releaseNotesLanguage: 'de' | 'en';
-  setReleaseNotesLanguage: (value: 'de' | 'en') => void;
-  /** Wenn gesetzt (z. B. nach fehlgeschlagenem Pull/Merge mit Konflikt), Konflikt-Resolver oeffnen */
-  autoOpenConflictResolverPath?: string | null;
-  onAutoOpenConflictResolverConsumed?: () => void;
-  /** CommitGraph & Co.: direkter Git-Fehler mit Konflikt → Repo-Tab + Resolver */
-  onOpenConflictResolverForPath?: (path: string) => void;
-};
 
 const linkStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -258,60 +192,63 @@ const GithubAuthGuide: React.FC<{
   );
 };
 
-export const MainView: React.FC<Props> = ({
-  activeTab,
-  isAuthenticated,
-  selectedGithubAuthHelpMethod,
-  onClearGithubAuthHelpMethod,
-  activeRepo,
-  currentBranch,
-  branches,
-  onMergeBranch,
-  remoteSync,
-  remoteStatus,
-  isGitActionRunning,
-  activeGitActionLabel,
-  selectedCommit,
-  setSelectedCommit,
-  refreshTrigger,
-  triggerRefresh,
-  showSecondaryHistory,
-  onFetch,
-  onPull,
-  onPullRebase,
-  onPullFfOnly,
-  onPush,
-  onPushForceWithLease,
-  onPushTags,
-  onOpenRepoWorkspace,
-  settings,
-  onUpdateSettings,
-  jobs,
-  onClearJobs,
-  settingsTab,
-  onResetLayout,
-  showReleaseCreator,
-  onOpenReleaseCreator,
-  onCloseReleaseCreator,
-  prOwnerRepo,
-  releaseForm,
-  setReleaseForm,
-  releaseSubmitting,
-  releaseError,
-  releaseSuccess,
-  onCreateRelease,
-  releaseContextLoading,
-  releaseContextError,
-  releaseContext,
-  onRefreshReleaseContext,
-  onGenerateReleaseNotes,
-  releaseNotesGenerating,
-  releaseNotesLanguage,
-  setReleaseNotesLanguage,
-  autoOpenConflictResolverPath,
-  onAutoOpenConflictResolverConsumed,
-  onOpenConflictResolverForPath,
-}) => {
+export const MainView: React.FC = () => {
+  const {
+    activeTab,
+    isAuthenticated,
+    selectedGithubAuthHelpMethod,
+    onClearGithubAuthHelpMethod,
+    activeRepo,
+    currentBranch,
+    branches,
+    onMergeBranch,
+    remoteSync,
+    remoteStatus,
+    isGitActionRunning,
+    activeGitActionLabel,
+    selectedCommit,
+    setSelectedCommit,
+    refreshTrigger,
+    triggerRefresh,
+    showSecondaryHistory,
+    onFetch,
+    onPull,
+    onPullRebase,
+    onPullFfOnly,
+    onPullNoFf,
+    onPush,
+    onPushForceWithLease,
+    onPushTags,
+    onPushSetUpstream,
+    onOpenRepoWorkspace,
+    settings,
+    onUpdateSettings,
+    jobs,
+    onClearJobs,
+    settingsTab,
+    onResetLayout,
+    showReleaseCreator,
+    onOpenReleaseCreator,
+    onCloseReleaseCreator,
+    prOwnerRepo,
+    releaseForm,
+    setReleaseForm,
+    releaseSubmitting,
+    releaseError,
+    releaseSuccess,
+    onCreateRelease,
+    releaseContextLoading,
+    releaseContextError,
+    releaseContext,
+    onRefreshReleaseContext,
+    onGenerateReleaseNotes,
+    releaseNotesGenerating,
+    releaseNotesLanguage,
+    setReleaseNotesLanguage,
+    autoOpenConflictResolverPath,
+    onAutoOpenConflictResolverConsumed,
+    onOpenConflictResolverForPath,
+  } = useAppContext();
   const { tr } = useI18n();
 
   const {
@@ -404,9 +341,11 @@ export const MainView: React.FC<Props> = ({
             onPull={onPull}
             onPullRebase={onPullRebase}
             onPullFfOnly={onPullFfOnly}
+            onPullNoFf={onPullNoFf}
             onPush={onPush}
             onPushForceWithLease={onPushForceWithLease}
             onPushTags={onPushTags}
+            onPushSetUpstream={onPushSetUpstream}
             onMergeBranch={onMergeBranch}
             onStageCommit={handleStageCommitOpen}
             onOpenReleaseCreator={onOpenReleaseCreator}

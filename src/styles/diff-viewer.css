@@ -140,12 +140,32 @@
 }
 
 .diff-large-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
   border: 1px solid var(--status-warning-border);
   color: var(--status-warning);
   background: var(--status-warning-soft);
   border-radius: 6px;
   padding: 7px 10px;
+}
+
+.diff-large-warning-copy {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--status-warning-border);
+  color: var(--status-warning);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.diff-large-warning-copy:hover {
+  background: var(--status-warning-border);
+  color: var(--bg-dark);
 }
 
 .diff-file-header {

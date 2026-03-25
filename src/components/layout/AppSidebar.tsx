@@ -1,5 +1,4 @@
 import React from 'react';
-import { AppSidebarProps } from './sidebar/AppSidebar.types';
 import { SidebarActivityBar } from './sidebar/SidebarActivityBar';
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { LocalReposSidebarContent } from './sidebar/LocalReposSidebarContent';
@@ -7,8 +6,10 @@ import { RepoSidebarContent } from './sidebar/RepoSidebarContent';
 import { GithubAuthContent } from './sidebar/GithubAuthContent';
 import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
 import { useI18n } from '../../i18n';
+import { useAppContext } from '../../contexts/AppStateContext';
 
-export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
+export const AppSidebar: React.FC = () => {
+  const props = useAppContext();
   const { tr } = useI18n();
   const settingsTabs = [
     { id: 'general' as const, label: tr('Allgemein', 'General') },
