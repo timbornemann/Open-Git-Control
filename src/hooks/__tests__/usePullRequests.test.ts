@@ -61,15 +61,15 @@ describe('usePullRequests helpers', () => {
   });
 
   it('ermittelt owner/repo ueber git remote', async () => {
-    const runGitCommand = vi.fn().mockResolvedValue({ success: true, data: 'https://github.com/octo/my-repo.git' });
+    const getRepoOriginUrl = vi.fn().mockResolvedValue({ success: true, data: 'https://github.com/octo/my-repo.git' });
 
     const resolved = await resolvePrOwnerRepo(
-      { runGitCommand } as any,
+      { getRepoOriginUrl } as any,
       '/tmp/repo',
       true,
     );
 
-    expect(runGitCommand).toHaveBeenCalledWith('remote', 'get-url', 'origin');
+    expect(getRepoOriginUrl).toHaveBeenCalledWith('/tmp/repo');
     expect(resolved).toEqual({ owner: 'octo', repo: 'my-repo' });
   });
 });

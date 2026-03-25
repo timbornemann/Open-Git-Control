@@ -174,7 +174,7 @@ export const resolvePrOwnerRepo = async (
   if (!activeRepo || !electronAPI || !isAuthenticated) return null;
 
   try {
-    const response = await electronAPI.runGitCommand('remote', 'get-url', 'origin');
+    const response = await electronAPI.getRepoOriginUrl(activeRepo);
     if (!response.success || !response.data) return null;
     return parsePrOwnerRepoFromRemote(String(response.data), githubHost);
   } catch {
