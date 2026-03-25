@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppSettingsDto } from '../../global';
 import type { ToastMessage } from '../../types/git';
+import { useI18n } from '../../i18n';
 import type { GitStatusWithConflicts } from './types';
 
 type Params = {
@@ -13,6 +14,7 @@ type Params = {
 };
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, settings }: Params) => {
+  const { tr } = useI18n();
   const [commitMsg, setCommitMsg] = useState('');
   const [commitDescription, setCommitDescription] = useState('');
   const [amendCommit, setAmendCommit] = useState(false);
@@ -44,12 +46,12 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     if (!commitMsg.trim() || !window.electronAPI || !status) return;
 
     if (status.conflicts.length > 0) {
-      setToast({ msg: 'Bitte zuerst alle Konflikte aufloesen.', isError: true });
+      setToast({ msg: tr('Bitte zuerst alle Konflikte aufloesen.', 'Please resolve all conflicts first.'), isError: true });
       return;
     }
 
     if (status.staged.length === 0 && !amendCommit) {
-      setToast({ msg: 'Bitte zuerst Dateien stagen.', isError: true });
+      setToast({ msg: tr('Bitte zuerst Dateien stagen.', 'Please stage files first.'), isError: true });
       return;
     }
 
@@ -66,18 +68,18 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       if (r.success) {
         setCommitMsg('');
         setCommitDescription('');
-        setToast({ msg: 'Commit erfolgreich!', isError: false });
+        setToast({ msg: tr('Commit erfolgreich!', 'Commit successful!'), isError: false });
         if (onRepoChanged) onRepoChanged();
         await refresh();
       } else {
-        setToast({ msg: r.error || 'Commit fehlgeschlagen', isError: true });
+        setToast({ msg: r.error || tr('Commit fehlgeschlagen', 'Commit failed'), isError: true });
       }
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
     } finally {
       setIsCommitting(false);
     }
-  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged]);
+  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged, tr]);
 
   return {
     commitMsg, setCommitMsg,
