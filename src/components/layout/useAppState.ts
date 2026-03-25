@@ -71,7 +71,7 @@ export const useAppState = () => {
     setReleaseNotesLanguage,
   } = usePrAndReleaseState();
 
-  const { toast: gitActionToast, setToast: setGitActionToast } = useToastQueue(3000);
+  const { toast: gitActionToast, toasts: gitActionToasts, setToast: setGitActionToast, dismiss: dismissToast } = useToastQueue(3000);
 
   const {
     confirmDialog,
@@ -185,15 +185,15 @@ export const useAppState = () => {
         if (hasLocalChanges) {
           setConfirmDialog({
             variant: 'danger',
-            title: tr('Ungesicherte Ã„nderungen erkannt', 'Uncommitted changes detected'),
-            message: tr(`Vor "git ${args.join(' ')}" wurden lokale Ã„nderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
+            title: tr('Ungesicherte Änderungen erkannt', 'Uncommitted changes detected'),
+            message: tr(`Vor "git ${args.join(' ')}" wurden lokale Änderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
             contextItems: [
               { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
               { label: tr('Hinweis', 'Hint'), value: tr('Working Tree ist nicht sauber', 'Working tree is dirty') },
             ],
             irreversible: false,
-            consequences: tr('Je nach Operation kÃ¶nnen unstaged oder staged Ã„nderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
-            confirmLabel: tr('Trotzdem ausfÃ¼hren', 'Run anyway'),
+            consequences: tr('Je nach Operation können unstaged oder staged Änderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
+            confirmLabel: tr('Trotzdem ausführen', 'Run anyway'),
             onConfirm: async () => {
               await runGitCommand(args, successMsg, actionLabel, { skipDirtyGuard: true });
             },
@@ -253,7 +253,7 @@ export const useAppState = () => {
     }
 
     setIsGitActionRunning(true);
-    setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgefÃ¼hrt...`, `Running git ${command}...`));
+    setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
     try {
       const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
@@ -283,7 +283,7 @@ export const useAppState = () => {
       } catch {
         // ignore; fall through to generic error toast
       }
-      setGitActionToast({ msg: r.error || tr('Fehler beim AusfÃ¼hren von git.', 'Error while running git.'), isError: true });
+      setGitActionToast({ msg: r.error || tr('Fehler beim Ausführen von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
       triggerRefresh();
@@ -694,6 +694,8 @@ export const useAppState = () => {
       }
 
       setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
+      // Fetch remote state so local graph reflects the merge
+      repository.refreshRemoteState(true);
       triggerRefresh();
     } catch (error: any) {
       setGitActionToast({ msg: error?.message || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
@@ -766,6 +768,8 @@ export const useAppState = () => {
     activeGitActionLabel,
     runGitCommand,
     gitActionToast,
+    gitActionToasts,
+    dismissToast,
 
     branches: repository.branches,
     currentBranch: repository.currentBranch,

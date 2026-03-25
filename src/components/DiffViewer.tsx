@@ -28,6 +28,8 @@ interface DiffViewerProps {
   repoPath: string | null;
   request: DiffRequest;
   onClose: () => void;
+  /** When provided, Stage/Unstage/Discard buttons appear per hunk */
+  onRepoChanged?: () => void;
 }
 
 const MAX_RENDER_CHARS = 200000;
@@ -177,14 +179,61 @@ const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
   return output;
 };
 
-export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose }) => {
+/** Reconstruct a minimal unified-diff patch for a single hunk */
+const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
+  // Use the file header lines that contain the --- / +++ paths
+  const diffHeader = fileHeader.filter(l => l.startsWith('diff ') || l.startsWith('index ') || l.startsWith('--- ') || l.startsWith('+++ '));
+  // Count lines so we can build the @@ header
+  let addCount = 0, delCount = 0, ctxCount = 0;
+  for (const row of hunk.rows) {
+    if (row.type === 'add') addCount++;
+    else if (row.type === 'del') delCount++;
+    else ctxCount++;
+  }
+  const leftStart = hunk.rows.find(r => r.leftNo != null)?.leftNo ?? 1;
+  const rightStart = hunk.rows.find(r => r.rightNo != null)?.rightNo ?? 1;
+  const leftLen = delCount + ctxCount;
+  const rightLen = addCount + ctxCount;
+  const hunkHeader = `@@ -${leftStart},${leftLen} +${rightStart},${rightLen} @@`;
+  const hunkLines = hunk.rows.map(row => {
+    const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
+    return prefix + row.text;
+  });
+  return [...diffHeader, hunkHeader, ...hunkLines, ''].join('\n');
+};
+
+export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diffText, setDiffText] = useState('');
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
+  const [hunkOpError, setHunkOpError] = useState<string | null>(null);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const { tr } = useI18n();
+
+  const applyHunk = async (hunk: ParsedHunk, fileHeader: string[], op: 'stage' | 'unstage' | 'discard') => {
+    if (!window.electronAPI) return;
+    setHunkOpError(null);
+    try {
+      const patch = buildHunkPatch(fileHeader, hunk);
+      let result;
+      if (op === 'stage') {
+        result = await window.electronAPI.applyPatch(patch, { cached: true });
+      } else if (op === 'unstage') {
+        result = await window.electronAPI.applyPatch(patch, { cached: true, reverse: true });
+      } else {
+        result = await window.electronAPI.applyPatch(patch, { reverse: true });
+      }
+      if (result.success) {
+        onRepoChanged?.();
+      } else {
+        setHunkOpError(result.error || tr('Hunk-Operation fehlgeschlagen.', 'Hunk operation failed.'));
+      }
+    } catch (e: any) {
+      setHunkOpError(e.message);
+    }
+  };
 
   const readableSourceLabel = (currentRequest: DiffRequest): string => {
     if (currentRequest.source === 'staged') return tr('Staging Area', 'Staging Area');
@@ -404,8 +453,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
             <div className="diff-empty-state">{tr('Keine Hunk-Daten verfügbar.', 'No hunk data available.')}</div>
           )}
 
+          {hunkOpError && (
+            <div className="diff-hunk-op-error">{hunkOpError}</div>
+          )}
+
           {parsed.hunks.map((hunk, hunkIndex) => {
             const rows = viewMode === 'side-by-side' ? sideBySideRows(hunk.rows) : hunk.rows;
+            const canStageHunks = !!onRepoChanged && (request.source === 'staged' || request.source === 'unstaged');
             return (
               <div
                 key={hunk.id}
@@ -414,9 +468,42 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
                   hunkRefs.current[hunkIndex] = element;
                 }}
               >
-                <button className="diff-hunk-header" onClick={() => scrollToHunk(hunkIndex)}>
-                  {hunk.header}
-                </button>
+                <div className="diff-hunk-header-row">
+                  <button className="diff-hunk-header" onClick={() => scrollToHunk(hunkIndex)}>
+                    {hunk.header}
+                  </button>
+                  {canStageHunks && (
+                    <div className="diff-hunk-actions">
+                      {request.source === 'unstaged' && (
+                        <>
+                          <button
+                            className="diff-hunk-action-btn"
+                            onClick={() => applyHunk(hunk, parsed.fileHeader, 'stage')}
+                            title={tr('Diesen Hunk stagen', 'Stage this hunk')}
+                          >
+                            {tr('Stage', 'Stage')}
+                          </button>
+                          <button
+                            className="diff-hunk-action-btn diff-hunk-action-btn--danger"
+                            onClick={() => applyHunk(hunk, parsed.fileHeader, 'discard')}
+                            title={tr('Änderungen in diesem Hunk verwerfen', 'Discard changes in this hunk')}
+                          >
+                            {tr('Verwerfen', 'Discard')}
+                          </button>
+                        </>
+                      )}
+                      {request.source === 'staged' && (
+                        <button
+                          className="diff-hunk-action-btn"
+                          onClick={() => applyHunk(hunk, parsed.fileHeader, 'unstage')}
+                          title={tr('Diesen Hunk unstagen', 'Unstage this hunk')}
+                        >
+                          {tr('Unstage', 'Unstage')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className={viewMode === 'side-by-side' ? 'diff-sbs-wrap' : 'diff-unified-wrap'}>
                   {rows.map((line, lineIndex) => {

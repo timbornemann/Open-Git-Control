@@ -1,6 +1,5 @@
 ﻿export const LEGACY_TEXT_MAP_EN: Record<string, string> = {
   'Bitte wähle ein Repository aus, um den Graphen zu sehen.': 'Please select a repository to view the graph.',
-  'Bitte wÃ¤hle ein Repository aus, um den Graphen zu sehen.': 'Please select a repository to view the graph.',
   'Lade Commit-Historie...': 'Loading commit history...',
   'Keine Commits gefunden.': 'No commits found.',
   'Commits durchsuchen (Hash, Autor, Nachricht, Ref)': 'Search commits (hash, author, message, ref)',
@@ -10,7 +9,6 @@
   'Refs': 'Refs',
   'Mehr laden': 'Load more',
   'Lade weitere Commits…': 'Loading more commits...',
-  'Lade weitere Commitsâ€¦': 'Loading more commits...',
   'Klicken zum Stage / Commit': 'Click for stage / commit',
   'Branch aus Commit auschecken': 'Checkout branch from commit',
   'Es wird ein neuer Branch auf Basis dieses Commits erstellt und ausgecheckt.': 'A new branch based on this commit will be created and checked out.',
