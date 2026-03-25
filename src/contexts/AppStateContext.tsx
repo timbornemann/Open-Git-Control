@@ -50,6 +50,10 @@ export type AppContextValue = AppSidebarProps & {
   autoOpenConflictResolverPath?: string | null;
   onAutoOpenConflictResolverConsumed?: () => void;
   onOpenConflictResolverForPath?: (path: string) => void;
+  onConflictMergeContinue: () => void;
+  onConflictMergeAbort: () => void;
+  onConflictRebaseContinue: () => void;
+  onConflictRebaseAbort: () => void;
 };
 
 export const AppStateContext = createContext<AppContextValue | null>(null);
