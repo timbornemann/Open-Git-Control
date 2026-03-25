@@ -373,14 +373,14 @@ export const MainView: React.FC = () => {
                 <div className="pane-header-main-center">
                   <div className="conflict-global-actions-rail conflict-global-actions-rail--topbar">
                     <div className="conflict-action-group">
-                      <span className="conflict-action-group-label">Merge</span>
-                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictMergeContinue} disabled={isGitActionRunning} title="Merge abschliessen">Fortsetzen</button>
-                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictMergeAbort} disabled={isGitActionRunning} title="Merge abbrechen">Abbrechen</button>
+                      <span className="conflict-action-group-label">{tr('Merge', 'Merge')}</span>
+                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictMergeContinue} disabled={isGitActionRunning} title={tr('Merge abschliessen', 'Complete merge')}>{tr('Fortsetzen', 'Continue')}</button>
+                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictMergeAbort} disabled={isGitActionRunning} title={tr('Merge abbrechen', 'Abort merge')}>{tr('Abbrechen', 'Cancel')}</button>
                     </div>
                     <div className="conflict-action-group">
-                      <span className="conflict-action-group-label">Rebase</span>
-                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictRebaseContinue} disabled={isGitActionRunning} title="Rebase fortsetzen">Fortsetzen</button>
-                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictRebaseAbort} disabled={isGitActionRunning} title="Rebase abbrechen">Abbrechen</button>
+                      <span className="conflict-action-group-label">{tr('Rebase', 'Rebase')}</span>
+                      <button className="staging-btn-sm conflict-action-btn" onClick={onConflictRebaseContinue} disabled={isGitActionRunning} title={tr('Rebase fortsetzen', 'Continue rebase')}>{tr('Fortsetzen', 'Continue')}</button>
+                      <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onConflictRebaseAbort} disabled={isGitActionRunning} title={tr('Rebase abbrechen', 'Abort rebase')}>{tr('Abbrechen', 'Cancel')}</button>
                     </div>
                   </div>
                 </div>
