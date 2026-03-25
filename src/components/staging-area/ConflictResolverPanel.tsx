@@ -81,9 +81,43 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
     return null;
   }
 
+  const isNavigationBusy = isConflictEditorLoading || conflictEditor?.isSaving === true;
+
   return (
     <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}`}>
-      <div className="staging-section-header">
+      {!onOpenConflictResolver && (
+        <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
+          <button
+            className="conflict-global-nav-btn conflict-global-nav-btn--prev"
+            onClick={() => { void navigateToPreviousConflict(); }}
+            disabled={!hasPreviousConflictTarget || isNavigationBusy}
+          >
+            {'<'} Zurueck
+          </button>
+          <div className="conflict-global-nav-meta">
+            <span className="conflict-global-nav-title">Konflikt-Navigation</span>
+            <span className="conflict-global-nav-state">
+              {isStructuredConflictViewLocked
+                ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
+                : (activeConflictFileIndex >= 0
+                  ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
+                  : 'Datei --')}
+              {!isStructuredConflictViewLocked && conflictBlocks.length > 0
+                ? ` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
+                : (!isStructuredConflictViewLocked ? ' - Keine Konfliktmarker in dieser Datei' : '')}
+            </span>
+          </div>
+          <button
+            className="conflict-global-nav-btn conflict-global-nav-btn--next"
+            onClick={() => { void navigateToNextConflict(); }}
+            disabled={!hasNextConflictTarget || isNavigationBusy}
+          >
+            Weiter {'>'}
+          </button>
+        </div>
+      )}
+
+      <div className={`staging-section-header${!onOpenConflictResolver ? ' conflict-section-header' : ''}`}>
         <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
         <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
           {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
@@ -95,20 +129,18 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
       </div>
 
       {!onOpenConflictResolver && (
-        <div className="conflict-global-actions" style={{ padding: '10px 16px', backgroundColor: 'var(--bg-panel)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, color: 'var(--status-danger)', fontSize: '0.85rem' }}>
-              {isConflictBlockCountPending && visibleConflicts.length > 0
-                ? 'Konfliktbloecke werden gezaehlt...'
-                : `${totalConflictBlocksInView} Konfliktblock${totalConflictBlocksInView !== 1 ? 'e' : ''} in ${visibleConflicts.length} Datei${visibleConflicts.length !== 1 ? 'en' : ''}`}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={mergeContinue} title="Merge abschliessen">Merge fortsetzen</button>
-            <button className="staging-btn-sm danger" style={{ border: '1px solid var(--status-danger-border)', color: 'var(--status-danger)', background: 'var(--status-danger-soft)', padding: '4px 12px' }} onClick={mergeAbort} title="Merge abbrechen">Merge abbrechen</button>
-            <div style={{ width: '1px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
-            <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '4px 12px', background: 'var(--bg-dark)' }} onClick={rebaseContinue} title="Rebase fortsetzen">Rebase fortsetzen</button>
-            <button className="staging-btn-sm danger" style={{ border: '1px solid var(--status-danger-border)', color: 'var(--status-danger)', background: 'var(--status-danger-soft)', padding: '4px 12px' }} onClick={rebaseAbort} title="Rebase abbrechen">Rebase abbrechen</button>
+        <div className="conflict-global-actions">
+          <span className="conflict-global-actions-summary">
+            {isConflictBlockCountPending && visibleConflicts.length > 0
+              ? 'Konfliktbloecke werden gezaehlt...'
+              : `${totalConflictBlocksInView} Konfliktblock${totalConflictBlocksInView !== 1 ? 'e' : ''} in ${visibleConflicts.length} Datei${visibleConflicts.length !== 1 ? 'en' : ''}`}
+          </span>
+          <div className="conflict-global-actions-buttons">
+            <button className="staging-btn-sm conflict-action-btn" onClick={mergeContinue} title="Merge abschliessen">Merge fortsetzen</button>
+            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={mergeAbort} title="Merge abbrechen">Merge abbrechen</button>
+            <div className="conflict-action-divider" />
+            <button className="staging-btn-sm conflict-action-btn" onClick={rebaseContinue} title="Rebase fortsetzen">Rebase fortsetzen</button>
+            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={rebaseAbort} title="Rebase abbrechen">Rebase abbrechen</button>
           </div>
         </div>
       )}
@@ -200,36 +232,6 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                       color: 'var(--on-accent)', background: 'var(--status-success)', border: 'none', padding: '6px 16px', fontWeight: 600,
                     }} onClick={() => { void markConflictResolvedAndSync(conflictEditor.filePath); }}>Als geloest markieren</button>
                   </div>
-                </div>
-
-                <div className="conflict-global-nav" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
-                  <button
-                    className="conflict-global-nav-btn conflict-global-nav-btn--prev"
-                    onClick={() => { void navigateToPreviousConflict(); }}
-                    disabled={!hasPreviousConflictTarget || conflictEditor.isSaving}
-                  >
-                    {'<'} Vorheriger Konflikt
-                  </button>
-                  <div className="conflict-global-nav-meta">
-                    <span className="conflict-global-nav-title">Alle Konflikte durchsuchen</span>
-                    <span className="conflict-global-nav-state">
-                      {isStructuredConflictViewLocked
-                        ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
-                        : (activeConflictFileIndex >= 0
-                          ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
-                          : 'Datei --')}
-                      {!isStructuredConflictViewLocked && conflictBlocks.length > 0
-                        ? ` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
-                        : (!isStructuredConflictViewLocked ? ' - Keine Konfliktmarker in dieser Datei' : '')}
-                    </span>
-                  </div>
-                  <button
-                    className="conflict-global-nav-btn conflict-global-nav-btn--next"
-                    onClick={() => { void navigateToNextConflict(); }}
-                    disabled={!hasNextConflictTarget || conflictEditor.isSaving}
-                  >
-                    Naechster Konflikt {'>'}
-                  </button>
                 </div>
 
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
