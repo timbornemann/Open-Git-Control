@@ -11,6 +11,7 @@ import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
 import { BranchInfo, GitMergeMode } from '../types/git';
 import { useCommitGraphData } from './commit-graph/useCommitGraphData';
+import { EmptyState } from './EmptyState';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -773,10 +774,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
   }
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('Lade Commit-Historie...', 'Loading commit history...')}</div>;
+    return <EmptyState title={tr('Lade Commit-Historie...', 'Loading commit history...')} />;
   }
   if (!layout || layout.nodes.length === 0) {
-    return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('Keine Commits gefunden.', 'No commits found.')}</div>;
+    return (
+      <EmptyState
+        title={tr('Keine Commits gefunden.', 'No commits found.')}
+        description={tr('Erstelle deinen ersten Commit im Staging-Bereich.', 'Create your first commit in the staging area.')}
+      />
+    );
   }
 
   const hasWorkingTreeChanges = Boolean(

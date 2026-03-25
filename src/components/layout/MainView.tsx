@@ -507,7 +507,7 @@ export const MainView: React.FC<Props> = ({
                 settings={settings}
               />
             ) : activeDiffRequest ? (
-              <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} />
+              <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} onRepoChanged={triggerRefresh} />
             ) : showGithubGuide ? (
               <GithubAuthGuide
                 method={selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>}

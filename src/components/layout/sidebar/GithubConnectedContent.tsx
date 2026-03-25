@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
+import { EmptyState } from '../../EmptyState';
 import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
 import { formatDuration, getCiBadgeStyles } from './githubShared';
 
@@ -134,6 +135,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   const { tr } = useI18n();
   const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
+  const [mergingPrNumber, setMergingPrNumber] = useState<number | null>(null);
 
   const releaseValidation = validateGithubReleaseInput({
     tagName: releaseForm.tagName || '',
@@ -750,15 +752,61 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   </div>
                 )}
 
+                {mergingPrNumber === pr.number && pr.state === 'open' && (
+                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                      {tr('Merge-Methode wählen:', 'Choose merge method:')}
+                    </div>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
+                      onClick={() => { onMergePR(pr.number, 'merge'); setMergingPrNumber(null); }}
+                      title={tr('Merge-Commit erstellen', 'Create a merge commit')}
+                    >
+                      <span style={{ fontWeight: 600, marginRight: '4px' }}>Merge</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{tr('– Merge-Commit erstellen', '– Create merge commit')}</span>
+                    </button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
+                      onClick={() => { onMergePR(pr.number, 'squash'); setMergingPrNumber(null); }}
+                      title={tr('Commits zusammenfassen', 'Squash all commits into one')}
+                    >
+                      <span style={{ fontWeight: 600, marginRight: '4px' }}>Squash</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{tr('– Zu einem Commit zusammenfassen', '– Squash into one commit')}</span>
+                    </button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
+                      onClick={() => { onMergePR(pr.number, 'rebase'); setMergingPrNumber(null); }}
+                      title={tr('Commits rebasen', 'Rebase commits onto base')}
+                    >
+                      <span style={{ fontWeight: 600, marginRight: '4px' }}>Rebase</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{tr('– Commits auf Base rebasen', '– Rebase commits onto base')}</span>
+                    </button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ width: '100%', marginTop: '2px', opacity: 0.7 }}
+                      onClick={() => setMergingPrNumber(null)}
+                    >
+                      {tr('Abbrechen', 'Cancel')}
+                    </button>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                  {pr.state === 'open' && (
-                    <>
-                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'merge')} title={tr('Merge', 'Merge')}>Merge</button>
-                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'squash')} title={tr('Squash', 'Squash')}>Squash</button>
-                      <button className="staging-btn-sm" onClick={() => onMergePR(pr.number, 'rebase')} title={tr('Rebase', 'Rebase')}>Rebase</button>
-                    </>
+                  {pr.state === 'open' && mergingPrNumber !== pr.number && (
+                    <button
+                      className="staging-btn-sm"
+                      onClick={() => setMergingPrNumber(pr.number)}
+                      title={tr('PR mergen', 'Merge PR')}
+                      style={{ gap: '4px' }}
+                    >
+                      <GitPullRequest size={11} />
+                      {tr('Merge ▾', 'Merge ▾')}
+                    </button>
                   )}
-                  <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title={tr('Im Browser oeffnen', 'Open in browser')}>
+                  <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title={tr('Im Browser öffnen', 'Open in browser')}>
                     <ExternalLink size={12} />
                   </button>
                   <button className="staging-btn-sm" onClick={() => onCopyPRUrl(pr.htmlUrl)} title={tr('URL kopieren', 'Copy URL')}>
@@ -772,16 +820,11 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             ))}
 
           {!prLoading && pullRequests.length === 0 && (
-            <div
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-                padding: '6px 0',
-                textAlign: 'center',
-              }}
-            >
-              {tr('Keine Pull Requests.', 'No pull requests.')}
-            </div>
+            <EmptyState
+              icon={<GitPullRequest size={32} />}
+              title={tr('Keine Pull Requests.', 'No pull requests.')}
+              description={tr('Für dieses Repository gibt es keine offenen PRs.', 'There are no open PRs for this repository.')}
+            />
           )}
         </>
       )}

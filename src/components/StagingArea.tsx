@@ -7,6 +7,7 @@ import { Input } from './Input';
 import { DiffRequest } from '../types/diff';
 import { normalizeMergeConflictFileContent } from '../utils/conflictLineGutter';
 import { ConflictResolverPanel } from './staging-area/ConflictResolverPanel';
+import { StashPanel } from './staging-area/StashPanel';
 import type {
   ConfirmDialogState,
   ConflictEditorState,
@@ -1091,6 +1092,13 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           </div>
         )}
       </div>
+
+      {!isConflictOnly && (
+        <StashPanel
+          repoPath={repoPath}
+          onRepoChanged={onRepoChanged}
+        />
+      )}
 
       {!isConflictOnly && (
       <div className="staging-commit-area">

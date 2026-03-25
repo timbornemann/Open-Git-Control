@@ -9,6 +9,8 @@ import { Input } from './components/Input';
 import { useAppState } from './components/layout/useAppState';
 import { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
 import { I18nProvider } from './i18n';
+import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
+import { CommandPalette, PaletteCommand } from './components/CommandPalette';
 import './index.css';
 
 const SIDEBAR_MIN_WIDTH = 180;
@@ -23,6 +25,7 @@ const App: React.FC = () => {
   const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -101,6 +104,25 @@ const App: React.FC = () => {
     window.addEventListener('resize', clampToViewport);
     return () => window.removeEventListener('resize', clampToViewport);
   }, [getSidebarMaxWidth]);
+
+  const paletteCommands: PaletteCommand[] = [
+    { id: 'tab-repos', label: tr('Lokale Repos', 'Local repos'), keywords: ['local', 'repos', 'lokal'], action: () => state.setActiveTab('localRepos') },
+    { id: 'tab-repo', label: tr('Repository-Ansicht', 'Repository view'), keywords: ['repo', 'branch', 'commits'], action: () => state.setActiveTab('repo') },
+    { id: 'tab-github', label: tr('GitHub', 'GitHub'), keywords: ['github', 'pr', 'pull request'], action: () => state.setActiveTab('github') },
+    { id: 'tab-settings', label: tr('Einstellungen', 'Settings'), keywords: ['settings', 'preferences'], action: () => state.setActiveTab('settings') },
+    { id: 'fetch', label: tr('Fetch (Remote aktualisieren)', 'Fetch (refresh remote)'), keywords: ['fetch', 'remote', 'sync'], action: () => state.refreshRemoteState(true) },
+    { id: 'pull', label: tr('Pull', 'Pull'), keywords: ['pull', 'download'], action: () => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.')) },
+    { id: 'pull-rebase', label: tr('Pull --rebase', 'Pull --rebase'), keywords: ['pull', 'rebase'], action: () => state.runGitCommand(['pull', '--rebase'], tr('Pull mit Rebase abgeschlossen.', 'Pull with rebase completed.')) },
+    { id: 'push', label: tr('Push', 'Push'), keywords: ['push', 'upload'], action: () => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.')) },
+    { id: 'push-force', label: tr('Push --force-with-lease', 'Push --force-with-lease'), keywords: ['push', 'force'], action: () => state.runGitCommand(['push', '--force-with-lease'], tr('Force-Push abgeschlossen.', 'Force push completed.')) },
+    { id: 'open-folder', label: tr('Repository öffnen...', 'Open repository...'), keywords: ['open', 'folder', 'öffnen'], action: () => state.handleOpenFolder() },
+  ];
+
+  useGlobalKeyboardShortcuts({
+    setActiveTab: state.setActiveTab,
+    onFetch: () => state.refreshRemoteState(true),
+    onOpenCommandPalette: () => setIsPaletteOpen(true),
+  });
 
   return (
     <I18nProvider language={state.settings.language}>
@@ -297,9 +319,19 @@ const App: React.FC = () => {
           onOpenConflictResolverForPath={state.openConflictResolverForPath}
         />
 
-        {state.gitActionToast && (
-          <div className={`action-toast ${state.gitActionToast.isError ? 'error' : 'success'}`}>
-            {state.gitActionToast.isError ? 'x' : 'ok'} {state.gitActionToast.msg}
+        {state.gitActionToasts.length > 0 && (
+          <div className="toast-container">
+            {state.gitActionToasts.map((t) => (
+              <div
+                key={t.id}
+                className={`action-toast ${t.isError ? 'error' : 'success'}`}
+                onClick={() => state.dismissToast(t.id)}
+                title={tr('Klicken zum Schließen', 'Click to dismiss')}
+              >
+                <span className="toast-icon">{t.isError ? '✕' : '✓'}</span>
+                <span className="toast-msg">{t.msg}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -365,6 +397,12 @@ const App: React.FC = () => {
             state.setIsCloning(false);
             state.triggerRefresh();
           }}
+        />
+
+        <CommandPalette
+          open={isPaletteOpen}
+          commands={paletteCommands}
+          onClose={() => setIsPaletteOpen(false)}
         />
       </div>
     </I18nProvider>

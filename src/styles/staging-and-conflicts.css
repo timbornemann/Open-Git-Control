@@ -575,8 +575,8 @@
  * Konflikt: Zeilennummern (ours / theirs / Marker / neutral)
  *
  * WICHTIG: Kein vertikales Padding/Margin hier!
- * Die Gutter-Zeile muss exakt dieselbe HÃ¶he wie eine Textarea-Zeile haben.
- * Vertikales Padding wÃ¼rde pro Zeile akkumulieren und
+ * Die Gutter-Zeile muss exakt dieselbe Höhe wie eine Textarea-Zeile haben.
+ * Vertikales Padding würde pro Zeile akkumulieren und
  * am Dateiende "Phantom-Zeilen" (Gutter-Nummern ohne Textarea-Inhalt) erzeugen.
  */
 .conflict-gutter-num {
@@ -1358,3 +1358,117 @@ body[data-theme='light'] {
 }
 
 
+
+/* Stash Panel */
+.stash-panel {
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.stash-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+
+.stash-panel-header:hover {
+  color: var(--text-primary);
+}
+
+.stash-panel-count {
+  margin-left: auto;
+  background: var(--bg-hover);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.7rem;
+}
+
+.stash-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+
+.stash-panel-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 4px 0;
+}
+
+.stash-panel-hint--error {
+  color: var(--status-danger);
+}
+
+.stash-entry {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stash-entry-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.stash-entry-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-family: var(--font-mono, monospace);
+}
+
+.stash-entry-branch {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.stash-entry-subject {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stash-entry-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.stash-entry-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stash-entry-confirm-msg {
+  font-size: 0.78rem;
+  color: var(--status-warning);
+}
+
+.staging-btn-danger {
+  color: var(--status-danger) !important;
+  border-color: var(--status-danger-border) !important;
+}
+
+.staging-btn-danger:hover {
+  background: var(--status-danger-soft) !important;
+}

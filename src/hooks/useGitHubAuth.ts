@@ -69,7 +69,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     try {
       const success = await window.electronAPI.githubAuth(token);
       if (!success) {
-        setAuthError('Token ungÃ¼ltig. Bitte prÃ¼fe die Berechtigungen.');
+        setAuthError('Token ungültig. Bitte prüfe die Berechtigungen.');
         return;
       }
 

@@ -117,7 +117,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.confirmDangerousOps}
             onChange={(e) => onUpdateSettings({ confirmDangerousOps: e.target.checked })}
           />
-          {tr('GefÃƒÂ¤hrliche Git-Operationen bestÃƒÂ¤tigen', 'Confirm dangerous Git operations')}
+          {tr('Gefährliche Git-Operationen bestätigen', 'Confirm dangerous Git operations')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -163,7 +163,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
-          {tr('SekundÃƒÂ¤re Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
+          {tr('Sekundäre Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -172,7 +172,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.commitSignoffByDefault}
             onChange={(e) => onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
           />
-          {tr('Commit Signoff standardmÃƒÂ¤ÃƒÅ¸ig aktiv', 'Enable commit signoff by default')}
+          {tr('Commit Signoff standardmäßig aktiv', 'Enable commit signoff by default')}
         </label>
 
         <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>

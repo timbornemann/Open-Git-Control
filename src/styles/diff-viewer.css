@@ -175,17 +175,64 @@
   box-shadow: 0 0 0 1px var(--accent-primary-soft);
 }
 
-.diff-hunk-header {
-  width: 100%;
-  text-align: left;
-  border: 0;
+.diff-hunk-header-row {
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid var(--border-color);
   background: var(--accent-secondary-soft);
+}
+
+.diff-hunk-header {
+  flex: 1;
+  text-align: left;
+  border: 0;
+  background: transparent;
   color: var(--status-merged);
   font-size: 0.72rem;
   font-family: 'JetBrains Mono', monospace;
   padding: 5px 8px;
   cursor: pointer;
+}
+
+.diff-hunk-actions {
+  display: flex;
+  gap: 4px;
+  padding: 3px 6px;
+  flex-shrink: 0;
+}
+
+.diff-hunk-action-btn {
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.diff-hunk-action-btn:hover {
+  background: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary-border);
+}
+
+.diff-hunk-action-btn--danger:hover {
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+  border-color: var(--status-danger-border);
+}
+
+.diff-hunk-op-error {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+  font-size: 0.78rem;
+  border: 1px solid var(--status-danger-border);
 }
 
 .diff-unified-wrap {
