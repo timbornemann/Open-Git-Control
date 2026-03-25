@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Plus, RefreshCw, X } from 'lucide-react';
+import { Globe, Plus, RefreshCw, X, Edit2 } from 'lucide-react';
 import { GitMergeMode, RemoteInfo, RemoteSyncState } from '../../types/git';
 import { DialogFrame } from '../DialogFrame';
 import { useI18n } from '../../i18n';
@@ -13,6 +13,8 @@ type RemoteStatus = {
   borderColor: string;
 };
 
+type RemoteContextMenu = { x: number; y: number; remote: RemoteInfo } | null;
+
 type Props = {
   remotes: RemoteInfo[];
   remoteSync: RemoteSyncState;
@@ -21,6 +23,8 @@ type Props = {
   remoteOnlyBranches: string[];
   onAddRemote: () => void;
   onRemoveRemote: (name: string) => void;
+  onRenameRemote: (name: string) => void;
+  onSetRemoteUrl: (name: string, currentUrl: string) => void;
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;
@@ -39,6 +43,8 @@ export const RemotePanel: React.FC<Props> = ({
   remoteOnlyBranches,
   onAddRemote,
   onRemoveRemote,
+  onRenameRemote,
+  onSetRemoteUrl,
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
   onCheckoutRemoteBranch,
@@ -47,6 +53,7 @@ export const RemotePanel: React.FC<Props> = ({
   onToggleCollapsed,
 }) => {
   const [isRemoteBranchesDialogOpen, setIsRemoteBranchesDialogOpen] = useState(false);
+  const [remoteCtxMenu, setRemoteCtxMenu] = useState<RemoteContextMenu>(null);
   const remoteOnlyPreview = remoteOnlyBranches.slice(0, 3);
   const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && remoteOnlyBranchesCount === 0 && !remoteSync.lastFetchError && remoteSync.hasUpstream;
   const statusVariant: 'success' | 'warning' | 'danger' =
@@ -121,10 +128,15 @@ export const RemotePanel: React.FC<Props> = ({
             {remotes.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {remotes.map(remote => (
-                  <div key={remote.name} className="repo-list-row">
+                  <div
+                    key={remote.name}
+                    className="repo-list-row"
+                    onContextMenu={e => { e.preventDefault(); setRemoteCtxMenu({ x: e.clientX, y: e.clientY, remote }); }}
+                  >
                     <Globe size={13} style={{ color: 'var(--text-accent)', opacity: 0.7, flexShrink: 0 }} />
                     <span style={{ fontSize: '0.8rem', fontWeight: 500, flexShrink: 0 }}>{remote.name}</span>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={remote.url}>{remote.url}</span>
+                    <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Remote bearbeiten', 'Edit remote')}><Edit2 size={11} /></button>
                     <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Remote entfernen', 'Remove remote')}><X size={11} /></button>
                   </div>
                 ))}
@@ -133,6 +145,28 @@ export const RemotePanel: React.FC<Props> = ({
               <div className="repo-state-text">{tr('Keine Remotes konfiguriert.', 'No remotes configured.')}</div>
             )}
           </div>
+
+          {remoteCtxMenu && (
+            <div className="ctx-menu-backdrop" onClick={() => setRemoteCtxMenu(null)}>
+              <div
+                className="ctx-menu"
+                style={remoteCtxMenu.x > 0 ? { left: remoteCtxMenu.x, top: remoteCtxMenu.y } : { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="ctx-menu-header">{remoteCtxMenu.remote.name}</div>
+                <button className="ctx-menu-item" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRenameRemote(r.name); }}>
+                  <span className="ctx-menu-icon">✎</span> {tr('Umbenennen', 'Rename')}
+                </button>
+                <button className="ctx-menu-item" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onSetRemoteUrl(r.name, r.url); }}>
+                  <span className="ctx-menu-icon">🔗</span> {tr('URL ändern', 'Change URL')}
+                </button>
+                <div className="ctx-menu-sep" />
+                <button className="ctx-menu-item danger" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRemoveRemote(r.name); }}>
+                  <span className="ctx-menu-icon">✕</span> {tr('Entfernen', 'Remove')}
+                </button>
+              </div>
+            </div>
+          )}
         </RepoCardContent>
       )}
 

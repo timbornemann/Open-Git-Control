@@ -350,7 +350,21 @@ export const useRepositoryDomain = ({
       consequences: tr('Wenn der Branch nicht auf dem Remote liegt, kann Arbeit verloren gehen.', 'If the branch is not on remote, work may be lost.'),
       confirmLabel: tr('Branch löschen', 'Delete branch'),
       onConfirm: async () => {
-        await runGitCommand(['branch', '-d', branchName], tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`));
+        const ok = await runGitCommand(['branch', '-d', branchName], tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`));
+        if (!ok) {
+          setConfirmDialog({
+            variant: 'danger',
+            title: tr('Branch force-löschen?', 'Force-delete branch?'),
+            message: tr('Der Branch ist noch nicht vollständig gemergt. Trotzdem löschen (--force)?', 'The branch is not fully merged yet. Delete anyway (--force)?'),
+            contextItems: [{ label: tr('Branch', 'Branch'), value: branchName }],
+            irreversible: true,
+            consequences: tr('Commits die nur in diesem Branch liegen gehen unwiderruflich verloren.', 'Commits only in this branch will be permanently lost.'),
+            confirmLabel: tr('Force-Delete', 'Force-delete'),
+            onConfirm: async () => {
+              await runGitCommand(['branch', '-D', branchName], tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`));
+            },
+          });
+        }
       },
     });
   };
@@ -490,6 +504,47 @@ export const useRepositoryDomain = ({
     });
   };
 
+
+  const handleRenameRemote = async (remoteName: string) => {
+    setInputDialog({
+      title: tr('Remote umbenennen', 'Rename remote'),
+      message: tr('Gib den neuen Namen für diesen Remote ein.', 'Enter the new name for this remote.'),
+      fields: [
+        { id: 'newName', label: tr('Neuer Remote-Name', 'New remote name'), defaultValue: remoteName, required: true },
+      ],
+      contextItems: [{ label: tr('Bisheriger Name', 'Current name'), value: remoteName }],
+      irreversible: false,
+      consequences: tr('Bestehende Push/Pull-Konfigurationen werden aktualisiert.', 'Existing push/pull configurations will be updated.'),
+      confirmLabel: tr('Umbenennen', 'Rename'),
+      onSubmit: async (values) => {
+        const newName = (values.newName || '').trim();
+        if (!newName || newName === remoteName) return;
+        await runGitCommand(['remote', 'rename', remoteName, newName], tr(`Remote umbenannt: "${remoteName}" -> "${newName}".`, `Renamed remote: "${remoteName}" -> "${newName}".`));
+      },
+    });
+  };
+
+  const handleSetRemoteUrl = async (remoteName: string, currentUrl: string) => {
+    setInputDialog({
+      title: tr('Remote-URL ändern', 'Change remote URL'),
+      message: tr('Gib die neue URL für diesen Remote ein.', 'Enter the new URL for this remote.'),
+      fields: [
+        { id: 'url', label: tr('Neue Remote-URL', 'New remote URL'), defaultValue: currentUrl, required: true, type: 'url' },
+      ],
+      contextItems: [
+        { label: tr('Remote', 'Remote'), value: remoteName },
+        { label: tr('Aktuelle URL', 'Current URL'), value: currentUrl },
+      ],
+      irreversible: false,
+      consequences: tr('Push/Pull nutzen danach die neue URL.', 'Push/Pull will use the new URL afterwards.'),
+      confirmLabel: tr('URL speichern', 'Save URL'),
+      onSubmit: async (values) => {
+        const url = (values.url || '').trim();
+        if (!url || url === currentUrl) return;
+        await runGitCommand(['remote', 'set-url', remoteName, url], tr(`URL für "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`));
+      },
+    });
+  };
 
   const handleSubmoduleInitUpdate = async () => {
     await runGitCommand(['submoduleUpdateInitRecursive'], tr('Submodule initialisiert/aktualisiert.', 'Submodules initialized/updated.'));
@@ -647,6 +702,8 @@ export const useRepositoryDomain = ({
     handlePushTags,
     handleAddRemote,
     handleRemoveRemote,
+    handleRenameRemote,
+    handleSetRemoteUrl,
     handleSubmoduleInitUpdate,
     handleSubmoduleSync,
     handleOpenSubmodule,

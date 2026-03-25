@@ -61,6 +61,8 @@ export type AppSidebarProps = {
   remoteOnlyBranches: string[];
   onAddRemote: () => void;
   onRemoveRemote: (name: string) => void;
+  onRenameRemote: (name: string) => void;
+  onSetRemoteUrl: (name: string, currentUrl: string) => void;
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
   onCheckoutRemoteBranch: (remoteBranchName: string) => void;

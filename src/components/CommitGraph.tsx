@@ -149,6 +149,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     line: tr('-L Zeilenbereich', '-L line range'),
   }), [tr]);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(800);
   const {
     layout,
     workingTreeStatus,
@@ -169,6 +171,17 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       setForensicLoading(false);
     },
   });
+
+  useEffect(() => {
+    if (!layout) return;
+    const container = logContainerRef.current?.parentElement;
+    if (!container) return;
+    const onScroll = () => setScrollTop(container.scrollTop);
+    setScrollTop(container.scrollTop);
+    setContainerHeight(container.clientHeight);
+    container.addEventListener('scroll', onScroll, { passive: true });
+    return () => container.removeEventListener('scroll', onScroll);
+  }, [layout]);
 
   useEffect(() => {
     try {
@@ -774,7 +787,17 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
   }
   if (loading) {
-    return <EmptyState title={tr('Lade Commit-Historie...', 'Loading commit history...')} />;
+    return (
+      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 1 - i * 0.09 }}>
+            <div className="skeleton-circle" style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0 }} />
+            <div className="skeleton-line" style={{ height: 10, width: `${45 + (i % 3) * 15}%`, borderRadius: 4 }} />
+            <div className="skeleton-line" style={{ height: 10, width: 70, borderRadius: 4, marginLeft: 'auto', flexShrink: 0 }} />
+          </div>
+        ))}
+      </div>
+    );
   }
   if (!layout || layout.nodes.length === 0) {
     return (
@@ -793,6 +816,16 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const graphWidth = Math.max((layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2, 60);
   const totalHeight = (layout.nodes.length + workingTreeRowOffset) * ROW_HEIGHT;
   const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
+
+  const OVERSCAN = 8;
+  const visibleStartIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT - workingTreeRowOffset) - OVERSCAN);
+  const visibleEndIdx = Math.min(layout.nodes.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT - workingTreeRowOffset) + OVERSCAN);
+  const visibleNodes = layout.nodes.slice(visibleStartIdx, visibleEndIdx);
+  const topSpacerHeight = visibleStartIdx * ROW_HEIGHT;
+  const bottomSpacerHeight = Math.max(0, (layout.nodes.length - visibleEndIdx) * ROW_HEIGHT);
+  const visibleEdges = layout.edges.filter(
+    (e) => Math.min(e.fromRow, e.toRow) <= visibleEndIdx && Math.max(e.fromRow, e.toRow) >= visibleStartIdx
+  );
   const nodeByHash = new Map(layout.nodes.map(node => [node.commit.hash, node]));
   const headNode = layout.nodes.find(node => (
     node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
@@ -1040,7 +1073,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               />
             </>
           )}
-          {layout.edges.map((edge, i) => (
+          {visibleEdges.map((edge, i) => (
             <path
               key={`eg${i}`}
               d={buildEdgePath(edge)}
@@ -1052,7 +1085,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
             />
           ))}
-          {layout.edges.map((edge, i) => (
+          {visibleEdges.map((edge, i) => (
             <path
               key={`em${i}`}
               d={buildEdgePath(edge)}
@@ -1064,7 +1097,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
             />
           ))}
-          {layout.nodes.map((node) => {
+          {visibleNodes.map((node) => {
             const cx = laneX(node.lane);
             const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
             const isSelected = selectedHash === node.commit.hash;
@@ -1154,7 +1187,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           </div>
         )}
 
-        {layout.nodes.map((node) => {
+        {topSpacerHeight > 0 && <div style={{ height: topSpacerHeight }} aria-hidden="true" />}
+        {visibleNodes.map((node) => {
           const isSelected = selectedHash === node.commit.hash;
           const isSecondary = isSecondaryCommit(node.commit.hash);
           const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
@@ -1195,6 +1229,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             </div>
           );
         })}
+        {bottomSpacerHeight > 0 && <div style={{ height: bottomSpacerHeight }} aria-hidden="true" />}
         {(loadingMore || hasMoreCommits) && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 18px', paddingLeft: graphWidth }}>
             <button

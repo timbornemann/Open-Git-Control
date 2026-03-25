@@ -130,6 +130,7 @@ export const useAppState = () => {
     try {
       const next = await window.electronAPI.setSettings(partial);
       setSettings(next);
+      setGitActionToast({ msg: tr('Einstellungen gespeichert.', 'Settings saved.'), isError: false });
     } catch (e: any) {
       setGitActionToast({ msg: e?.message || tr('Einstellungen konnten nicht gespeichert werden.', 'Could not save settings.'), isError: true });
     }
@@ -207,7 +208,37 @@ export const useAppState = () => {
 
     if (shouldScanPushSecrets) {
       try {
-        const scanResult = await window.electronAPI.scanPushSecrets();
+        const SCAN_TIMEOUT_MS = 15000;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('__timeout__')), SCAN_TIMEOUT_MS)
+        );
+        let scanResult: Awaited<ReturnType<typeof window.electronAPI.scanPushSecrets>>;
+        try {
+          scanResult = await Promise.race([window.electronAPI.scanPushSecrets(), timeoutPromise]);
+        } catch (timeoutErr: any) {
+          if (timeoutErr?.message === '__timeout__') {
+            setConfirmDialog({
+              variant: 'danger',
+              title: tr('Secret-Scan Timeout', 'Secret scan timed out'),
+              message: tr(
+                'Der Secret-Scan hat zu lange gedauert (>15s) und wurde abgebrochen. Trotzdem pushen?',
+                'The secret scan took too long (>15s) and was cancelled. Push anyway?',
+              ),
+              contextItems: [],
+              irreversible: false,
+              consequences: tr(
+                'Ohne Secret-Scan könnten vertrauliche Daten gepusht werden.',
+                'Without a secret scan, sensitive data could be pushed.',
+              ),
+              confirmLabel: tr('Trotzdem pushen', 'Push anyway'),
+              onConfirm: async () => {
+                await runGitCommand(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
+              },
+            });
+            return false;
+          }
+          throw timeoutErr;
+        }
         if (!scanResult.success) {
           setGitActionToast({
             msg: scanResult.error || tr('Secret-Scan vor Push fehlgeschlagen.', 'Secret scan before push failed.'),
@@ -809,6 +840,8 @@ export const useAppState = () => {
     handlePushTags: repository.handlePushTags,
     handleAddRemote: repository.handleAddRemote,
     handleRemoveRemote: repository.handleRemoveRemote,
+    handleRenameRemote: repository.handleRenameRemote,
+    handleSetRemoteUrl: repository.handleSetRemoteUrl,
     handleSubmoduleInitUpdate: repository.handleSubmoduleInitUpdate,
     handleSubmoduleSync: repository.handleSubmoduleSync,
     handleOpenSubmodule: repository.handleOpenSubmodule,

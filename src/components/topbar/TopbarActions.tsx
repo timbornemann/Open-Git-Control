@@ -15,9 +15,11 @@ type Props = {
   onPull: () => void;
   onPullRebase: () => void;
   onPullFfOnly: () => void;
+  onPullNoFf: () => void;
   onPush: () => void;
   onPushForceWithLease: () => void;
   onPushTags: () => void;
+  onPushSetUpstream: () => void;
   onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
@@ -40,9 +42,11 @@ export const TopbarActions: React.FC<Props> = ({
   onPull,
   onPullRebase,
   onPullFfOnly,
+  onPullNoFf,
   onPush,
   onPushForceWithLease,
   onPushTags,
+  onPushSetUpstream,
   onMergeBranch,
   onStageCommit,
   onOpenReleaseCreator,
@@ -62,11 +66,16 @@ export const TopbarActions: React.FC<Props> = ({
       action: onPullRebase,
     },
     {
+      label: tr('Kein Fast-Forward (--no-ff)', 'No fast-forward (--no-ff)'),
+      hint: tr('Erzwingt einen Merge-Commit', 'Always creates a merge commit'),
+      action: onPullNoFf,
+    },
+    {
       label: tr('Nur Fast-Forward', 'Fast-forward only'),
       hint: tr('Abbruch bei Merge-Commit-Bedarf', 'Abort if a merge commit would be required'),
       action: onPullFfOnly,
     },
-  ]), [onPullFfOnly, onPullRebase, tr]);
+  ]), [onPullFfOnly, onPullNoFf, onPullRebase, tr]);
 
   const mergeCandidates = useMemo(() => {
     const q = mergeQuery.trim().toLowerCase();
@@ -93,6 +102,11 @@ export const TopbarActions: React.FC<Props> = ({
 
   const pushOptions = useMemo<SplitOption[]>(() => ([
     {
+      label: tr('Upstream setzen (-u)', 'Set upstream (-u)'),
+      hint: tr('Ersten Push + Tracking-Branch setzen', 'First push & set remote tracking branch'),
+      action: onPushSetUpstream,
+    },
+    {
       label: tr('Force with lease', 'Force with lease'),
       hint: tr('Sicheres Force-Push mit Lease-Pruefung', 'Safer force push with lease check'),
       action: onPushForceWithLease,
@@ -102,7 +116,7 @@ export const TopbarActions: React.FC<Props> = ({
       hint: tr('Push inklusive lokaler Tags', 'Push including local tags'),
       action: onPushTags,
     },
-  ]), [onPushForceWithLease, onPushTags, tr]);
+  ]), [onPushForceWithLease, onPushSetUpstream, onPushTags, tr]);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {

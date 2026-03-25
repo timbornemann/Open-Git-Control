@@ -234,8 +234,26 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
                   {isStructuredConflictViewLocked && (
-                    <div className="conflict-editor-notice info" style={{ margin: '10px 20px 0' }}>
-                      Konfliktmarker werden aktuell manuell geaendert. Die Vergleichsansicht ist temporaer pausiert, bis die Marker wieder konsistent sind.
+                    <div className="conflict-editor-notice info" style={{ margin: '10px 20px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span>
+                        ⚠ Unvollständige oder unbalancierte Konfliktmarker erkannt. Die Vergleichsansicht ist pausiert bis alle <code>{'<<<<<<<'}</code> / <code>{'======='}</code> / <code>{'>>>>>>>'}</code> Marker konsistent sind.
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          className="staging-tool-btn"
+                          onClick={() => { void reloadActiveConflictEditor(); }}
+                          title="Datei neu einlesen und Marker-Analyse wiederholen"
+                        >
+                          ↺ Neu laden
+                        </button>
+                        <button
+                          className="staging-tool-btn"
+                          onClick={() => { void resetConflictEditorDraft(); }}
+                          title="Alle manuellen Änderungen verwerfen und Originaldatei wiederherstellen"
+                        >
+                          ✕ Änderungen verwerfen
+                        </button>
+                      </div>
                     </div>
                   )}
 
