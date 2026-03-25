@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import { GitStashEntryDto } from '../../global';
+import { useI18n } from '../../i18n';
 import { EmptyState } from '../EmptyState';
 
 type Props = {
@@ -14,17 +15,12 @@ type Props = {
 type StashOp = 'apply' | 'pop' | 'drop';
 
 export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTrigger }) => {
+  const { tr } = useI18n();
   const [collapsed, setCollapsed] = useState(true);
   const [stashes, setStashes] = useState<GitStashEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [pendingOp, setPendingOp] = useState<{ name: string; op: StashOp } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const tr = (de: string, en: string) => {
-    // Try to read language from HTML lang attribute set by Electron app
-    const lang = document.documentElement.lang || 'de';
-    return lang === 'en' ? en : de;
-  };
 
   const load = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -42,10 +38,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
     } finally {
       setLoading(false);
     }
-  }, [repoPath]);
+  }, [repoPath, tr]);
 
   useEffect(() => {
-    if (!collapsed) load();
+    if (!collapsed) void load();
   }, [collapsed, load, refreshTrigger]);
 
   const runStashOp = async (stashName: string, op: StashOp) => {
@@ -75,11 +71,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
 
   const handleOp = (stash: GitStashEntryDto, op: StashOp) => {
     if (op === 'drop') {
-      // Require confirmation for drop
       setPendingOp({ name: stash.name, op });
-    } else {
-      runStashOp(stash.name, op);
+      return;
     }
+    void runStashOp(stash.name, op);
   };
 
   return (
@@ -111,7 +106,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
             <EmptyState
               icon={<Archive size={24} />}
               title={tr('Keine Stashes vorhanden.', 'No stashes found.')}
-              description={tr('Erstelle einen Stash über den Stash-Button in der Toolbar.', 'Create a stash using the Stash button in the toolbar.')}
+              description={tr('Erstelle einen Stash ueber den Stash-Button in der Toolbar.', 'Create a stash with the stash button in the toolbar.')}
             />
           )}
 
@@ -120,14 +115,14 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
               {pendingOp?.name === stash.name && pendingOp.op === 'drop' ? (
                 <div className="stash-entry-confirm">
                   <span className="stash-entry-confirm-msg">
-                    {tr(`"${stash.subject}" löschen?`, `Delete "${stash.subject}"?`)}
+                    {tr(`"${stash.subject}" loeschen?`, `Delete "${stash.subject}"?`)}
                   </span>
                   <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                     <button
                       className="staging-btn-sm staging-btn-danger"
-                      onClick={() => runStashOp(stash.name, 'drop')}
+                      onClick={() => { void runStashOp(stash.name, 'drop'); }}
                     >
-                      {tr('Löschen', 'Delete')}
+                      {tr('Loeschen', 'Delete')}
                     </button>
                     <button
                       className="staging-btn-sm"
@@ -150,21 +145,21 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
                     <button
                       className="staging-btn-sm"
                       onClick={() => handleOp(stash, 'apply')}
-                      title={tr('Stash anwenden (behält Stash)', 'Apply stash (keep stash)')}
+                      title={tr('Stash anwenden (behaelt Stash)', 'Apply stash (keep stash)')}
                     >
                       {tr('Apply', 'Apply')}
                     </button>
                     <button
                       className="staging-btn-sm"
                       onClick={() => handleOp(stash, 'pop')}
-                      title={tr('Stash anwenden und löschen', 'Apply and delete stash')}
+                      title={tr('Stash anwenden und loeschen', 'Apply and delete stash')}
                     >
                       {tr('Pop', 'Pop')}
                     </button>
                     <button
                       className="staging-btn-sm staging-btn-danger"
                       onClick={() => handleOp(stash, 'drop')}
-                      title={tr('Stash löschen', 'Delete stash')}
+                      title={tr('Stash loeschen', 'Delete stash')}
                     >
                       {tr('Drop', 'Drop')}
                     </button>

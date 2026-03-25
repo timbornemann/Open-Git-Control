@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 import { ConflictManualEditor, ConflictSidePreview } from './ConflictEditorParts';
 import { CONFLICT_LABELS } from './utils';
 import type {
@@ -69,35 +70,55 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   conflictManualScrollRef,
   onConflictEditorContentChange,
 }) => {
+  const { tr } = useI18n();
+
   if (visibleConflicts.length === 0) {
     return null;
   }
 
   const isNavigationBusy = isConflictEditorLoading || conflictEditor?.isSaving === true;
+  const conflictCountTitle = tr(
+    'Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl',
+    'Conflict blocks (<<<<<<< ... >>>>>>>) in visible files, not only file count',
+  );
+  const visibleFilesLabel = tr(
+    `${visibleConflicts.length} Datei${visibleConflicts.length !== 1 ? 'en' : ''}`,
+    `${visibleConflicts.length} file${visibleConflicts.length !== 1 ? 's' : ''}`,
+  );
+  const conflictLabelForCode = (code: string) => {
+    if (code === 'UU') return tr('Beide geaendert', 'Both modified');
+    if (code === 'AA') return tr('Beide hinzugefuegt', 'Both added');
+    if (code === 'DD') return tr('Beide geloescht', 'Both deleted');
+    if (code === 'AU') return tr('Von uns hinzugefuegt', 'Added by us');
+    if (code === 'UA') return tr('Von ihnen hinzugefuegt', 'Added by them');
+    if (code === 'DU') return tr('Von uns geloescht', 'Deleted by us');
+    if (code === 'UD') return tr('Von ihnen geloescht', 'Deleted by them');
+    return CONFLICT_LABELS[code] || tr('Konflikt', 'Conflict');
+  };
 
   return (
     <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}`}>
       {!onOpenConflictResolver ? (
         <div className="conflict-resolver-header-shell">
-          <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label="Konflikt-Navigation ueber alle Dateien">
+          <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label={tr('Konflikt-Navigation ueber alle Dateien', 'Conflict navigation across all files')}>
             <button
               className="conflict-global-nav-btn conflict-global-nav-btn--prev"
               onClick={() => { void navigateToPreviousConflict(); }}
               disabled={!hasPreviousConflictTarget || isNavigationBusy}
             >
-              {'<'} Zurueck
+              {'<'} {tr('Zurueck', 'Back')}
             </button>
             <div className="conflict-global-nav-meta">
-              <span className="conflict-global-nav-title">Konflikt-Navigation</span>
+              <span className="conflict-global-nav-title">{tr('Konflikt-Navigation', 'Conflict navigation')}</span>
               <span className="conflict-global-nav-state">
                 {isStructuredConflictViewLocked
-                  ? 'Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert'
+                  ? tr('Manuelle Marker-Bearbeitung erkannt - Vergleich voruebergehend pausiert', 'Manual marker editing detected - comparison temporarily paused')
                   : (activeConflictFileIndex >= 0
-                    ? `Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`
-                    : 'Datei --')}
+                    ? tr(`Datei ${activeConflictFileIndex + 1} von ${conflictPaths.length}`, `File ${activeConflictFileIndex + 1} of ${conflictPaths.length}`)
+                    : tr('Datei --', 'File --'))}
                 {!isStructuredConflictViewLocked && conflictBlocks.length > 0
-                  ? ` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`
-                  : (!isStructuredConflictViewLocked ? ' - Keine Konfliktmarker in dieser Datei' : '')}
+                  ? tr(` - Block ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`, ` - Block ${safeSelectedConflictBlockIndex + 1} of ${conflictBlocks.length}`)
+                  : (!isStructuredConflictViewLocked ? tr(' - Keine Konfliktmarker in dieser Datei', ' - No conflict markers in this file') : '')}
               </span>
             </div>
             <button
@@ -105,30 +126,26 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
               onClick={() => { void navigateToNextConflict(); }}
               disabled={!hasNextConflictTarget || isNavigationBusy}
             >
-              Weiter {'>'}
+              {tr('Weiter', 'Next')} {'>'}
             </button>
           </div>
 
           <div className="staging-section-header conflict-section-header">
-            <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
-            <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
+            <span style={{ color: 'var(--status-danger)' }}>{tr('Konflikte', 'Conflicts')}</span>
+            <span className="staging-count" title={conflictCountTitle}>
               {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
             </span>
-            <span className="staging-stats-inline">
-              {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
-            </span>
+            <span className="staging-stats-inline">{visibleFilesLabel}</span>
             <div style={{ flex: 1 }} />
           </div>
         </div>
       ) : (
         <div className="staging-section-header">
-          <span style={{ color: 'var(--status-danger)' }}>Konflikte</span>
-          <span className="staging-count" title="Konfliktbloecke (<<<<<<< ... >>>>>>>) in den sichtbaren Dateien, nicht nur Dateianzahl">
+          <span style={{ color: 'var(--status-danger)' }}>{tr('Konflikte', 'Conflicts')}</span>
+          <span className="staging-count" title={conflictCountTitle}>
             {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
           </span>
-          <span className="staging-stats-inline">
-            {visibleConflicts.length} Datei{visibleConflicts.length !== 1 ? 'en' : ''}
-          </span>
+          <span className="staging-stats-inline">{visibleFilesLabel}</span>
           <div style={{ flex: 1 }} />
         </div>
       )}
@@ -144,7 +161,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
             >
               <span className="conflict-file-code">{f.code}</span>
               <span className="conflict-file-path">{f.path}</span>
-              <span className="conflict-file-label">{CONFLICT_LABELS[f.code] || 'Konflikt'}</span>
+              <span className="conflict-file-label">{conflictLabelForCode(f.code)}</span>
             </button>
           ))}
         </div>
@@ -164,10 +181,18 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   key={`c-${f.path}`}
                   className={`conflict-sidebar-file ${isActive ? 'active' : ''}`}
                   style={{
-                    width: '100%', margin: 0, borderRadius: 0, borderTop: 'none', borderRight: 'none', borderBottom: '1px solid var(--line-subtle)',
+                    width: '100%',
+                    margin: 0,
+                    borderRadius: 0,
+                    borderTop: 'none',
+                    borderRight: 'none',
+                    borderBottom: '1px solid var(--line-subtle)',
                     backgroundColor: isActive ? 'var(--bg-dark)' : 'transparent',
                     padding: '12px 16px',
-                    display: 'grid', gridTemplateColumns: '30px minmax(0, 1fr)', gap: '4px 8px', alignItems: 'center',
+                    display: 'grid',
+                    gridTemplateColumns: '30px minmax(0, 1fr)',
+                    gap: '4px 8px',
+                    alignItems: 'center',
                     borderLeft: isActive ? '3px solid var(--status-danger)' : '3px solid transparent',
                   }}
                   onClick={() => { void openConflictEditor(f.path); }}
@@ -176,9 +201,9 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{f.code}</span>
                   <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{f.path}</span>
                   <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>
-                    {CONFLICT_LABELS[f.code] || 'Konflikt'}
+                    {conflictLabelForCode(f.code)}
                     {blocksForFile > 0
-                      ? ` - ${blocksForFile} Block${blocksForFile !== 1 ? 'e' : ''}`
+                      ? tr(` - ${blocksForFile} Block${blocksForFile !== 1 ? 'e' : ''}`, ` - ${blocksForFile} block${blocksForFile !== 1 ? 's' : ''}`)
                       : (isConflictBlockCountPending ? ' - ...' : '')}
                   </span>
                 </button>
@@ -188,11 +213,11 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
           <div className="conflict-editor-panel" style={{ background: 'var(--bg-darker)' }}>
             {isConflictEditorLoading && (
-              <div className="conflict-empty-state">Konfliktdatei wird geladen...</div>
+              <div className="conflict-empty-state">{tr('Konfliktdatei wird geladen...', 'Loading conflict file...')}</div>
             )}
 
             {!isConflictEditorLoading && !conflictEditor && (
-              <div className="conflict-empty-state">Waehle links eine Konfliktdatei aus.</div>
+              <div className="conflict-empty-state">{tr('Waehle links eine Konfliktdatei aus.', 'Select a conflict file on the left.')}</div>
             )}
 
             {!isConflictEditorLoading && conflictEditor && (
@@ -201,24 +226,55 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }} title={conflictEditor.filePath}>{conflictEditor.filePath}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{
-                        color: conflictBlocks.length > 0 ? 'var(--status-warning)' : 'var(--status-success)',
-                        background: conflictBlocks.length > 0 ? 'var(--status-warning-soft)' : 'var(--status-success-soft)',
-                        border: `1px solid ${conflictBlocks.length > 0 ? 'var(--status-warning-border)' : 'var(--status-success-border)'}`,
-                        padding: '2px 8px', fontSize: '0.7rem', fontWeight: 600,
-                      }}>
-                        {conflictBlocks.length > 0 ? `${conflictBlocks.length} ungeloeste${conflictBlocks.length === 1 ? 'r' : ''} Block${conflictBlocks.length === 1 ? '' : 'e'}` : 'Bereit zum Speichern'}
+                      <span
+                        style={{
+                          color: conflictBlocks.length > 0 ? 'var(--status-warning)' : 'var(--status-success)',
+                          background: conflictBlocks.length > 0 ? 'var(--status-warning-soft)' : 'var(--status-success-soft)',
+                          border: `1px solid ${conflictBlocks.length > 0 ? 'var(--status-warning-border)' : 'var(--status-success-border)'}`,
+                          padding: '2px 8px',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {conflictBlocks.length > 0
+                          ? tr(`${conflictBlocks.length} ungeloeste${conflictBlocks.length === 1 ? 'r' : ''} Block${conflictBlocks.length === 1 ? '' : 'e'}`, `${conflictBlocks.length} unresolved block${conflictBlocks.length === 1 ? '' : 's'}`)
+                          : tr('Bereit zum Speichern', 'Ready to save')}
                       </span>
-                      <button className="staging-btn-sm" style={{ padding: '2px 8px', fontSize: '0.7rem', border: '1px solid var(--border-color)', background: 'var(--bg-panel)' }} onClick={reloadActiveConflictEditor} disabled={conflictEditor.isSaving}>Neu laden</button>
+                      <button
+                        className="staging-btn-sm"
+                        style={{ padding: '2px 8px', fontSize: '0.7rem', border: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}
+                        onClick={reloadActiveConflictEditor}
+                        disabled={conflictEditor.isSaving}
+                      >
+                        {tr('Neu laden', 'Reload')}
+                      </button>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '6px 12px', background: 'var(--bg-panel)' }} onClick={() => applyConflictChoiceToAll('ours')} disabled={conflictEditor.isSaving || conflictBlocks.length === 0}>Alle: Aktueller Stand</button>
-                    <button className="staging-btn-sm" style={{ border: '1px solid var(--border-color)', padding: '6px 12px', background: 'var(--bg-panel)' }} onClick={() => applyConflictChoiceToAll('theirs')} disabled={conflictEditor.isSaving || conflictBlocks.length === 0}>Alle: Eingehender Stand</button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ border: '1px solid var(--border-color)', padding: '6px 12px', background: 'var(--bg-panel)' }}
+                      onClick={() => applyConflictChoiceToAll('ours')}
+                      disabled={conflictEditor.isSaving || conflictBlocks.length === 0}
+                    >
+                      {tr('Alle: Aktueller Stand', 'All: current version')}
+                    </button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ border: '1px solid var(--border-color)', padding: '6px 12px', background: 'var(--bg-panel)' }}
+                      onClick={() => applyConflictChoiceToAll('theirs')}
+                      disabled={conflictEditor.isSaving || conflictBlocks.length === 0}
+                    >
+                      {tr('Alle: Eingehender Stand', 'All: incoming version')}
+                    </button>
                     <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
-                    <button className="staging-btn-sm" style={{
-                      color: 'var(--on-accent)', background: 'var(--status-success)', border: 'none', padding: '6px 16px', fontWeight: 600,
-                    }} onClick={() => { void markConflictResolvedAndSync(conflictEditor.filePath); }}>Als geloest markieren</button>
+                    <button
+                      className="staging-btn-sm"
+                      style={{ color: 'var(--on-accent)', background: 'var(--status-success)', border: 'none', padding: '6px 16px', fontWeight: 600 }}
+                      onClick={() => { void markConflictResolvedAndSync(conflictEditor.filePath); }}
+                    >
+                      {tr('Als geloest markieren', 'Mark as resolved')}
+                    </button>
                   </div>
                 </div>
 
@@ -226,22 +282,27 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   {isStructuredConflictViewLocked && (
                     <div className="conflict-editor-notice info" style={{ margin: '10px 20px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <span>
-                        ⚠ Unvollständige oder unbalancierte Konfliktmarker erkannt. Die Vergleichsansicht ist pausiert bis alle <code>{'<<<<<<<'}</code> / <code>{'======='}</code> / <code>{'>>>>>>>'}</code> Marker konsistent sind.
+                        {tr(
+                          'Warnung: Unvollstaendige oder unbalancierte Konfliktmarker erkannt. Die Vergleichsansicht ist pausiert bis alle',
+                          'Warning: Incomplete or unbalanced conflict markers detected. Comparison view is paused until all',
+                        )}{' '}
+                        <code>{'<<<<<<<'}</code> / <code>{'======='}</code> / <code>{'>>>>>>>'}</code>{' '}
+                        {tr('Marker konsistent sind.', 'markers are consistent.')}
                       </span>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           className="staging-tool-btn"
                           onClick={() => { void reloadActiveConflictEditor(); }}
-                          title="Datei neu einlesen und Marker-Analyse wiederholen"
+                          title={tr('Datei neu einlesen und Marker-Analyse wiederholen', 'Reload file and rerun marker analysis')}
                         >
-                          ↺ Neu laden
+                          {tr('Neu laden', 'Reload')}
                         </button>
                         <button
                           className="staging-tool-btn"
                           onClick={() => { void resetConflictEditorDraft(); }}
-                          title="Alle manuellen Änderungen verwerfen und Originaldatei wiederherstellen"
+                          title={tr('Alle manuellen Aenderungen verwerfen und Originaldatei wiederherstellen', 'Discard all manual edits and restore original file')}
                         >
-                          ✕ Änderungen verwerfen
+                          {tr('Aenderungen verwerfen', 'Discard changes')}
                         </button>
                       </div>
                     </div>
@@ -251,76 +312,105 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                     <div className="conflict-structured-view">
                       <div className="conflict-block-header">
                         <div className="conflict-block-header-meta">
-                          <span className="conflict-block-header-title">Konfliktblock {safeSelectedConflictBlockIndex + 1} von {conflictBlocks.length}</span>
-                          <span className="conflict-block-header-range">Zeile {selectedConflictBlock.startLine} - {selectedConflictBlock.endLine}</span>
+                          <span className="conflict-block-header-title">
+                            {tr(`Konfliktblock ${safeSelectedConflictBlockIndex + 1} von ${conflictBlocks.length}`, `Conflict block ${safeSelectedConflictBlockIndex + 1} of ${conflictBlocks.length}`)}
+                          </span>
+                          <span className="conflict-block-header-range">
+                            {tr(`Zeile ${selectedConflictBlock.startLine} - ${selectedConflictBlock.endLine}`, `Line ${selectedConflictBlock.startLine} - ${selectedConflictBlock.endLine}`)}
+                          </span>
                         </div>
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: 'var(--border-color)', gap: '1px', minHeight: 0 }}>
                         <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
                           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-warning-soft)', flexShrink: 0 }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-warning)' }}>Aktueller Stand {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}</span>
-                            <button className="staging-btn-sm" style={{ padding: '4px 12px', background: 'var(--status-warning)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }} onClick={() => applyConflictChoiceToSelected('ours')} disabled={conflictEditor.isSaving}>Uebernehmen</button>
+                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-warning)' }}>
+                              {tr('Aktueller Stand', 'Current version')} {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}
+                            </span>
+                            <button
+                              className="staging-btn-sm"
+                              style={{ padding: '4px 12px', background: 'var(--status-warning)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }}
+                              onClick={() => applyConflictChoiceToSelected('ours')}
+                              disabled={conflictEditor.isSaving}
+                            >
+                              {tr('Uebernehmen', 'Apply')}
+                            </button>
                           </div>
-                          <div className="conflict-side-preview-scroll" title="Zeilennummern nur fuer diesen Konfliktblock (Aktueller Stand)">
+                          <div className="conflict-side-preview-scroll" title={tr('Zeilennummern nur fuer diesen Konfliktblock (Aktueller Stand)', 'Line numbers only for this conflict block (current version)')}>
                             <ConflictSidePreview text={selectedConflictBlock.ours} variant="ours" />
                           </div>
                         </div>
 
                         <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
                           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-success-soft)', flexShrink: 0 }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-success)' }}>Eingehender Stand {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}</span>
-                            <button className="staging-btn-sm" style={{ padding: '4px 12px', background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }} onClick={() => applyConflictChoiceToSelected('theirs')} disabled={conflictEditor.isSaving}>Uebernehmen</button>
+                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-success)' }}>
+                              {tr('Eingehender Stand', 'Incoming version')} {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}
+                            </span>
+                            <button
+                              className="staging-btn-sm"
+                              style={{ padding: '4px 12px', background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }}
+                              onClick={() => applyConflictChoiceToSelected('theirs')}
+                              disabled={conflictEditor.isSaving}
+                            >
+                              {tr('Uebernehmen', 'Apply')}
+                            </button>
                           </div>
-                          <div className="conflict-side-preview-scroll" title="Zeilennummern nur fuer diesen Konfliktblock (Eingehender Stand)">
+                          <div className="conflict-side-preview-scroll" title={tr('Zeilennummern nur fuer diesen Konfliktblock (Eingehender Stand)', 'Line numbers only for this conflict block (incoming version)')}>
                             <ConflictSidePreview text={selectedConflictBlock.theirs} variant="theirs" />
                           </div>
                         </div>
                       </div>
 
                       <div style={{ padding: '12px 20px', background: 'var(--bg-darker)', borderTop: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'center' }}>
-                        <button className="staging-btn-sm" style={{ padding: '6px 24px', border: '1px solid var(--border-color)', background: 'var(--bg-dark)', fontWeight: 600, fontSize: '0.8rem' }} onClick={() => applyConflictChoiceToSelected('both')} disabled={conflictEditor.isSaving}>Beide Staende uebernehmen (Aktueller zuerst)</button>
+                        <button
+                          className="staging-btn-sm"
+                          style={{ padding: '6px 24px', border: '1px solid var(--border-color)', background: 'var(--bg-dark)', fontWeight: 600, fontSize: '0.8rem' }}
+                          onClick={() => applyConflictChoiceToSelected('both')}
+                          disabled={conflictEditor.isSaving}
+                        >
+                          {tr('Beide Staende uebernehmen (Aktueller zuerst)', 'Take both versions (current first)')}
+                        </button>
                       </div>
                     </div>
-	                  )}
-	
-		                  <div className="conflict-manual-edit-root">
-		                    <div className="conflict-manual-action-bar">
-		                      <span className="conflict-manual-action-title">Editor-Aktionen</span>
-		                      <div className="conflict-manual-action-buttons">
-		                        <button
-		                          className="staging-btn-sm conflict-manual-action-btn"
-		                          onClick={resetConflictEditorDraft}
-		                          disabled={!isConflictEditorDirty || conflictEditor.isSaving}
-		                        >
-		                          Aenderungen verwerfen
-		                        </button>
-		                        <button
-		                          className="staging-btn-sm conflict-manual-action-btn"
-		                          onClick={() => { void saveConflictEditor(false); }}
-		                          disabled={conflictEditor.isSaving || !isConflictEditorDirty}
-		                        >
-		                          Speichern
-		                        </button>
-		                        <button
-		                          className="staging-btn-sm conflict-manual-action-btn conflict-manual-action-btn--success"
-		                          onClick={() => { void saveConflictEditor(true); }}
-		                          disabled={conflictEditor.isSaving || conflictBlocks.length > 0}
-		                        >
-		                          Speichern + Geloest
-		                        </button>
-		                      </div>
-		                    </div>
-		                    <ConflictManualEditor
-		                      ref={conflictManualScrollRef}
-		                      content={conflictEditor.content}
-		                      disabled={conflictEditor.isSaving}
-		                      onChange={(next) => onConflictEditorContentChange(conflictEditor.filePath, next)}
-		                    />
-		                  </div>
-	                </div>
-	              </div>
-	            )}
+                  )}
+
+                  <div className="conflict-manual-edit-root">
+                    <div className="conflict-manual-action-bar">
+                      <span className="conflict-manual-action-title">{tr('Editor-Aktionen', 'Editor actions')}</span>
+                      <div className="conflict-manual-action-buttons">
+                        <button
+                          className="staging-btn-sm conflict-manual-action-btn"
+                          onClick={resetConflictEditorDraft}
+                          disabled={!isConflictEditorDirty || conflictEditor.isSaving}
+                        >
+                          {tr('Aenderungen verwerfen', 'Discard changes')}
+                        </button>
+                        <button
+                          className="staging-btn-sm conflict-manual-action-btn"
+                          onClick={() => { void saveConflictEditor(false); }}
+                          disabled={conflictEditor.isSaving || !isConflictEditorDirty}
+                        >
+                          {tr('Speichern', 'Save')}
+                        </button>
+                        <button
+                          className="staging-btn-sm conflict-manual-action-btn conflict-manual-action-btn--success"
+                          onClick={() => { void saveConflictEditor(true); }}
+                          disabled={conflictEditor.isSaving || conflictBlocks.length > 0}
+                        >
+                          {tr('Speichern + Geloest', 'Save + resolved')}
+                        </button>
+                      </div>
+                    </div>
+                    <ConflictManualEditor
+                      ref={conflictManualScrollRef}
+                      content={conflictEditor.content}
+                      disabled={conflictEditor.isSaving}
+                      onChange={(next) => onConflictEditorContentChange(conflictEditor.filePath, next)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
