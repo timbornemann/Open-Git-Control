@@ -6,6 +6,7 @@ export const INSPECTOR_PANE_MIN_WIDTH = 280;
 const CONTENT_RESIZER_WIDTH = 8;
 const MAIN_CONTENT_MIN_WIDTH = PRIMARY_PANE_MIN_WIDTH + INSPECTOR_PANE_MIN_WIDTH + CONTENT_RESIZER_WIDTH;
 const CONTENT_PANE_RATIO_STORAGE_KEY = 'open-git-control.content-pane-ratio';
+const INSPECTOR_PANE_WIDTH_STORAGE_KEY = 'open-git-control.inspector-pane-width';
 
 const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number => {
   const effectiveWidth = Math.max(containerWidth, MAIN_CONTENT_MIN_WIDTH);
@@ -17,7 +18,16 @@ const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number =>
 };
 
 export const useMainViewPaneResizer = () => {
-  const [primaryPaneRatio, setPrimaryPaneRatio] = useState(PRIMARY_PANE_DEFAULT_RATIO);
+  const [primaryPaneRatio, setPrimaryPaneRatio] = useState(() => {
+    const storedRatioRaw = window.localStorage.getItem(CONTENT_PANE_RATIO_STORAGE_KEY);
+    const storedRatio = Number(storedRatioRaw);
+    return Number.isFinite(storedRatio) ? storedRatio : PRIMARY_PANE_DEFAULT_RATIO;
+  });
+  const [preferredInspectorWidth, setPreferredInspectorWidth] = useState<number | null>(() => {
+    const storedWidthRaw = window.localStorage.getItem(INSPECTOR_PANE_WIDTH_STORAGE_KEY);
+    const storedWidth = Number(storedWidthRaw);
+    return Number.isFinite(storedWidth) && storedWidth > 0 ? Math.round(storedWidth) : null;
+  });
   const [isContentResizing, setIsContentResizing] = useState(false);
   const contentAreaRef = useRef<HTMLDivElement | null>(null);
   const contentResizeActiveRef = useRef(false);
@@ -38,8 +48,18 @@ export const useMainViewPaneResizer = () => {
       const rect = contentAreaRef.current.getBoundingClientRect();
       if (rect.width <= 0) return;
 
-      const rawRatio = (event.clientX - rect.left) / rect.width;
-      setPrimaryPaneRatio(clampPrimaryPaneRatio(rawRatio, rect.width));
+      const minPrimaryPx = PRIMARY_PANE_MIN_WIDTH;
+      const maxPrimaryPx = Math.max(minPrimaryPx, rect.width - INSPECTOR_PANE_MIN_WIDTH - CONTENT_RESIZER_WIDTH);
+      const rawPrimaryPx = event.clientX - rect.left;
+      const clampedPrimaryPx = Math.min(maxPrimaryPx, Math.max(minPrimaryPx, rawPrimaryPx));
+      const nextRatio = clampedPrimaryPx / rect.width;
+      const nextInspectorWidth = Math.max(
+        INSPECTOR_PANE_MIN_WIDTH,
+        Math.round(rect.width - clampedPrimaryPx - CONTENT_RESIZER_WIDTH),
+      );
+
+      setPrimaryPaneRatio(clampPrimaryPaneRatio(nextRatio, rect.width));
+      setPreferredInspectorWidth(nextInspectorWidth);
     };
 
     const stopResize = () => {
@@ -64,15 +84,13 @@ export const useMainViewPaneResizer = () => {
   }, []);
 
   useEffect(() => {
-    const storedRatioRaw = window.localStorage.getItem(CONTENT_PANE_RATIO_STORAGE_KEY);
-    const storedRatio = Number(storedRatioRaw);
-    if (!Number.isFinite(storedRatio)) return;
-    setPrimaryPaneRatio(storedRatio);
-  }, []);
-
-  useEffect(() => {
     window.localStorage.setItem(CONTENT_PANE_RATIO_STORAGE_KEY, String(primaryPaneRatio));
   }, [primaryPaneRatio]);
+
+  useEffect(() => {
+    if (!Number.isFinite(preferredInspectorWidth ?? NaN) || preferredInspectorWidth === null) return;
+    window.localStorage.setItem(INSPECTOR_PANE_WIDTH_STORAGE_KEY, String(preferredInspectorWidth));
+  }, [preferredInspectorWidth]);
 
   useEffect(() => {
     const clampToCurrentWidth = () => {
@@ -80,13 +98,20 @@ export const useMainViewPaneResizer = () => {
       const rect = contentAreaRef.current.getBoundingClientRect();
       if (rect.width <= 0) return;
 
-      setPrimaryPaneRatio((previous) => clampPrimaryPaneRatio(previous, rect.width));
+      setPrimaryPaneRatio((previous) => {
+        if (Number.isFinite(preferredInspectorWidth ?? NaN) && preferredInspectorWidth !== null) {
+          const desiredPrimaryPx = rect.width - preferredInspectorWidth - CONTENT_RESIZER_WIDTH;
+          const desiredRatio = desiredPrimaryPx / rect.width;
+          return clampPrimaryPaneRatio(desiredRatio, rect.width);
+        }
+        return clampPrimaryPaneRatio(previous, rect.width);
+      });
     };
 
     clampToCurrentWidth();
     window.addEventListener('resize', clampToCurrentWidth);
     return () => window.removeEventListener('resize', clampToCurrentWidth);
-  }, []);
+  }, [preferredInspectorWidth]);
 
   return {
     primaryPaneBasis,
