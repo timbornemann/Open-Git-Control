@@ -1,6 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { mergeableDecoratedRefs, normalizeBranchRefForMerge, parseGitLog, resolveConflictPathAfterGitFailure } from '../utils/gitParsing';
+import {
+  isMergeInProgressError,
+  mergeableDecoratedRefs,
+  normalizeBranchRefForMerge,
+  parseGitLog,
+  resolveConflictPathAfterGitFailure,
+} from '../utils/gitParsing';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -362,6 +368,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         refreshCommits();
         refreshWorkingTreeStatus();
       } else {
+        const mergeInProgress = isMergeInProgressError(result.error);
         refreshCommits();
         void refreshWorkingTreeStatus();
         try {
@@ -375,9 +382,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         } catch {
           // fall through to error toast
         }
+        if (mergeInProgress) {
+          setToast({
+            msg: tr(
+              'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
+              'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
+            ),
+            isError: true,
+          });
+          return;
+        }
         setToast({ msg: result.error || 'Unbekannter Fehler', isError: true });
       }
     } catch (e: any) {
+      const mergeInProgress = isMergeInProgressError(e?.message);
       refreshCommits();
       void refreshWorkingTreeStatus();
       try {
@@ -390,6 +408,16 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         }
       } catch {
         // ignore
+      }
+      if (mergeInProgress) {
+        setToast({
+          msg: tr(
+            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
+            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
+          ),
+          isError: true,
+        });
+        return;
       }
       setToast({ msg: e.message, isError: true });
     }
