@@ -435,6 +435,35 @@ code, pre {
 
 .pane-header-main {
   min-height: 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.pane-header-main--conflict {
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
+}
+
+.pane-header-main-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pane-header-nav-btn {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+}
+
+.pane-header-nav-btn:hover,
+.pane-header-nav-btn.active {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .pane-content {
