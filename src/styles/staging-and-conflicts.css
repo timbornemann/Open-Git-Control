@@ -233,14 +233,68 @@
 .conflict-global-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
   flex-wrap: wrap;
 }
 
 .conflict-global-spacer {
   flex: 1;
+}
+
+.conflict-section-header {
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 7px 16px;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.conflict-global-actions-summary {
+  font-weight: 600;
+  color: var(--status-danger);
+  font-size: 0.83rem;
+}
+
+.conflict-global-actions-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.conflict-action-btn {
+  border: 1px solid var(--border-color);
+  padding: 4px 12px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-size: 0.74rem;
+}
+
+.conflict-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.conflict-action-btn--danger {
+  border-color: var(--status-danger-border);
+  color: var(--status-danger);
+  background: var(--status-danger-soft);
+}
+
+.conflict-action-btn--danger:hover:not(:disabled) {
+  background: var(--status-danger-soft);
+  filter: brightness(1.05);
+}
+
+.conflict-action-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-color);
+  margin: 0 2px;
 }
 
 .conflict-sidebar-list {
@@ -471,9 +525,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px 14px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--line-subtle);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
   background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
+}
+
+.conflict-global-nav--header {
+  border-bottom-color: var(--line-subtle);
 }
 
 .conflict-global-nav-meta {
@@ -500,9 +558,9 @@
 
 .conflict-global-nav-btn {
   border: none;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.74rem;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -1036,6 +1094,15 @@
   .conflict-global-nav-meta {
     order: -1;
     flex-basis: 100%;
+  }
+
+  .conflict-global-actions-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .conflict-action-divider {
+    display: none;
   }
 
   .conflict-manual-edit-root {
