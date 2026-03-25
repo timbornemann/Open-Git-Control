@@ -51,6 +51,7 @@ export const useConflictResolver = ({
   const autoOpenedConflictPathRef = useRef<string | null>(null);
   const appliedInitialConflictPathRef = useRef<string | null>(null);
   const autoScrollAnchorRef = useRef<string>('');
+  const countedConflictPathsKeyRef = useRef<string>('');
 
   const openConflictEditor = useCallback(async (filePath: string, initialBlockIndex = 0) => {
     if (!window.electronAPI) return;
@@ -109,11 +110,18 @@ export const useConflictResolver = ({
     if (!repoPath || !window.electronAPI || !status?.conflicts?.length) {
       setConflictBlockCountsByPath({});
       setIsConflictBlockCountPending(false);
+      countedConflictPathsKeyRef.current = '';
       return;
     }
+
     let cancelled = false;
-    setIsConflictBlockCountPending(true);
     const paths = [...new Set(status.conflicts.map((c) => c.path))].sort();
+    const pathsKey = `${repoPath}::${paths.join('\u0001')}`;
+    const shouldShowPending = countedConflictPathsKeyRef.current !== pathsKey;
+    if (shouldShowPending) {
+      setIsConflictBlockCountPending(true);
+    }
+
     (async () => {
       const next: Record<string, number> = {};
       try {
@@ -124,11 +132,26 @@ export const useConflictResolver = ({
             ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length
             : 0;
         }
-        if (!cancelled) setConflictBlockCountsByPath(next);
+        if (!cancelled) {
+          setConflictBlockCountsByPath((prev) => {
+            const normalized: Record<string, number> = {};
+            let changed = Object.keys(prev).length !== paths.length;
+            for (const path of paths) {
+              const value = next[path] ?? 0;
+              normalized[path] = value;
+              if (prev[path] !== value) changed = true;
+            }
+            return changed ? normalized : prev;
+          });
+        }
       } finally {
-        if (!cancelled) setIsConflictBlockCountPending(false);
+        if (!cancelled) {
+          countedConflictPathsKeyRef.current = pathsKey;
+          setIsConflictBlockCountPending(false);
+        }
       }
     })();
+
     return () => { cancelled = true; };
   }, [repoPath, status]);
 
