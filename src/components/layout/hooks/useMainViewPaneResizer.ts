@@ -5,6 +5,7 @@ export const PRIMARY_PANE_MIN_WIDTH = 320;
 export const INSPECTOR_PANE_MIN_WIDTH = 280;
 const CONTENT_RESIZER_WIDTH = 8;
 const MAIN_CONTENT_MIN_WIDTH = PRIMARY_PANE_MIN_WIDTH + INSPECTOR_PANE_MIN_WIDTH + CONTENT_RESIZER_WIDTH;
+const CONTENT_PANE_RATIO_STORAGE_KEY = 'open-git-control.content-pane-ratio';
 
 const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number => {
   const effectiveWidth = Math.max(containerWidth, MAIN_CONTENT_MIN_WIDTH);
@@ -61,6 +62,17 @@ export const useMainViewPaneResizer = () => {
       document.body.style.userSelect = '';
     };
   }, []);
+
+  useEffect(() => {
+    const storedRatioRaw = window.localStorage.getItem(CONTENT_PANE_RATIO_STORAGE_KEY);
+    const storedRatio = Number(storedRatioRaw);
+    if (!Number.isFinite(storedRatio)) return;
+    setPrimaryPaneRatio(storedRatio);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(CONTENT_PANE_RATIO_STORAGE_KEY, String(primaryPaneRatio));
+  }, [primaryPaneRatio]);
 
   useEffect(() => {
     const clampToCurrentWidth = () => {
