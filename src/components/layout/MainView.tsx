@@ -363,45 +363,40 @@ export const MainView: React.FC = () => {
           }
         >
           {shouldShowPrimaryPaneHeader && (
-            <div className="pane-header pane-header-main" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{primaryPaneTitle}</span>
+            <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
+              <span className="pane-header-main-title">{primaryPaneTitle}</span>
               {isSettingsView ? null : isReleaseView ? (
                 <button
-                  className="icon-btn"
+                  className="icon-btn pane-header-nav-btn"
                   onClick={onCloseReleaseCreator}
-                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
               ) : showGithubGuide ? (
                 <button
-                  className="icon-btn"
+                  className="icon-btn pane-header-nav-btn"
                   onClick={onClearGithubAuthHelpMethod}
-                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
                 >
                   {tr('Zurueck', 'Back')}
                 </button>
               ) : showRecoveryCenter ? (
                 <button
-                  className="icon-btn"
+                  className="icon-btn pane-header-nav-btn"
                   onClick={() => setShowRecoveryCenter(false)}
-                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
               ) : activeConflictPath ? (
                 <button
-                  className="icon-btn"
+                  className="icon-btn pane-header-nav-btn"
                   onClick={() => setActiveConflictPath(null)}
-                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
               ) : activeDiffRequest ? (
                 <button
-                  className="icon-btn"
+                  className="icon-btn pane-header-nav-btn"
                   onClick={() => setActiveDiffRequest(null)}
-                  style={{ fontSize: '0.75rem', padding: '2px 6px' }}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
