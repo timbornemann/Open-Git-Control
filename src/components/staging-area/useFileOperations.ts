@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FileEntry, parseGitStatusDetailed } from '../../utils/gitParsing';
 import type { DiffRequest } from '../../types/diff';
 import type { ToastMessage } from '../../types/git';
+import { useI18n } from '../../i18n';
 import {
   EMPTY_DIFF_STATS,
   basename,
@@ -34,6 +35,7 @@ export const useFileOperations = ({
   onRepoChanged,
   onOpenDiff,
 }: Params) => {
+  const { tr } = useI18n();
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
@@ -109,12 +111,12 @@ export const useFileOperations = ({
         if (notify && onRepoChanged) onRepoChanged();
         await refresh();
       } else {
-        setToast({ msg: r.error || 'Fehler', isError: true });
+        setToast({ msg: r.error || tr('Fehler', 'Error'), isError: true });
       }
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
     }
-  }, [setToast, onRepoChanged, refresh]);
+  }, [setToast, onRepoChanged, refresh, tr]);
 
   const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
     event.preventDefault();
@@ -129,106 +131,117 @@ export const useFileOperations = ({
     try {
       const result = await window.electronAPI.addIgnoreRule(normalizedPattern);
       if (!result.success) {
-        setToast({ msg: result.error || 'Konnte .gitignore nicht aktualisieren.', isError: true });
+        setToast({ msg: result.error || tr('Konnte .gitignore nicht aktualisieren.', 'Could not update .gitignore.'), isError: true });
         return;
       }
       if (section === 'staged' && entry.x === 'A') {
         await window.electronAPI.runGitCommand('reset', 'HEAD', '--', entry.path);
       }
-      setToast({ msg: result.added ? `Ignore-Regel hinzugefuegt: ${normalizedPattern}` : `Regel existiert bereits: ${normalizedPattern}`, isError: false });
+      setToast({
+        msg: result.added
+          ? tr(`Ignore-Regel hinzugefuegt: ${normalizedPattern}`, `Added ignore rule: ${normalizedPattern}`)
+          : tr(`Regel existiert bereits: ${normalizedPattern}`, `Rule already exists: ${normalizedPattern}`),
+        isError: false,
+      });
       if (onRepoChanged) onRepoChanged();
       await refresh();
     } catch (e: any) {
-      setToast({ msg: e.message || 'Konnte .gitignore nicht aktualisieren.', isError: true });
+      setToast({ msg: e.message || tr('Konnte .gitignore nicht aktualisieren.', 'Could not update .gitignore.'), isError: true });
     }
-  }, [setToast, onRepoChanged, refresh]);
+  }, [setToast, onRepoChanged, refresh, tr]);
 
-  const stageFile = useCallback((f: string) => git(['add', '--', f], `${basename(f)} gestaged`), [git]);
-  const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], `${basename(f)} unstaged`), [git]);
-  const stageAll = useCallback(() => git(['add', '.'], 'Alle Dateien gestaged'), [git]);
-  const unstageAll = useCallback(() => git(['reset', 'HEAD'], 'Alle Dateien unstaged'), [git]);
+  const stageFile = useCallback((f: string) => git(['add', '--', f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)), [git, tr]);
+  const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
+  const stageAll = useCallback(() => git(['add', '.'], tr('Alle Dateien gestaged', 'Staged all files')), [git, tr]);
+  const unstageAll = useCallback(() => git(['reset', 'HEAD'], tr('Alle Dateien unstaged', 'Unstaged all files')), [git, tr]);
 
   const stageAllUntracked = useCallback(async () => {
     if (!window.electronAPI || !status || status.untracked.length === 0) return;
     try {
       for (const entry of status.untracked) {
         const r = await window.electronAPI.runGitCommand('add', '--', entry.path);
-        if (!r.success) throw new Error(r.error || `Fehler beim Stagen von ${entry.path}`);
+        if (!r.success) throw new Error(r.error || tr(`Fehler beim Stagen von ${entry.path}`, `Error staging ${entry.path}`));
       }
       const count = status.untracked.length;
-      setToast({ msg: `${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, isError: false });
+      setToast({
+        msg: tr(
+          `${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`,
+          `Staged ${count} untracked file${count !== 1 ? 's' : ''}`,
+        ),
+        isError: false,
+      });
       await refresh();
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
     }
-  }, [status, setToast, refresh]);
+  }, [status, setToast, refresh, tr]);
 
   const discardFile = useCallback((f: string) => {
     setConfirmDialog({
       variant: 'danger',
-      title: 'Datei-Aenderungen verwerfen?',
-      message: 'Alle nicht gespeicherten Aenderungen dieser Datei werden verworfen.',
-      contextItems: [{ label: 'Datei', value: f }, { label: 'Bereich', value: 'Unstaged Working Tree' }],
+      title: tr('Datei-Aenderungen verwerfen?', 'Discard file changes?'),
+      message: tr('Alle nicht gespeicherten Aenderungen dieser Datei werden verworfen.', 'All unsaved changes in this file will be discarded.'),
+      contextItems: [{ label: tr('Datei', 'File'), value: f }, { label: tr('Bereich', 'Scope'), value: tr('Unstaged Working Tree', 'Unstaged working tree') }],
       irreversible: true,
-      consequences: 'Die verworfenen Zeilen koennen nicht aus Git wiederhergestellt werden.',
-      confirmLabel: 'Aenderungen verwerfen',
-      onConfirm: () => git(['checkout', '--', f], `${basename(f)} verworfen`, true),
+      consequences: tr('Die verworfenen Zeilen koennen nicht aus Git wiederhergestellt werden.', 'Discarded lines cannot be restored from Git.'),
+      confirmLabel: tr('Aenderungen verwerfen', 'Discard changes'),
+      onConfirm: () => git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true),
     });
-  }, [setConfirmDialog, git]);
+  }, [setConfirmDialog, git, tr]);
 
   const discardAll = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: 'Alle unstaged Aenderungen verwerfen?',
-      message: 'Alle lokalen unstaged Aenderungen werden auf den letzten Commit zurueckgesetzt.',
-      contextItems: [{ label: 'Umfang', value: 'Gesamtes Repository' }, { label: 'Betrifft', value: 'Nur unstaged Dateien' }],
+      title: tr('Alle unstaged Aenderungen verwerfen?', 'Discard all unstaged changes?'),
+      message: tr('Alle lokalen unstaged Aenderungen werden auf den letzten Commit zurueckgesetzt.', 'All local unstaged changes will be reset to the last commit.'),
+      contextItems: [{ label: tr('Umfang', 'Scope'), value: tr('Gesamtes Repository', 'Entire repository') }, { label: tr('Betrifft', 'Affects'), value: tr('Nur unstaged Dateien', 'Only unstaged files') }],
       irreversible: true,
-      consequences: 'Nicht gespeicherte Aenderungen gehen unwiderruflich verloren.',
-      confirmLabel: 'Alles verwerfen',
-      onConfirm: () => git(['checkout', '--', '.'], 'Alle Aenderungen verworfen', true),
+      consequences: tr('Nicht gespeicherte Aenderungen gehen unwiderruflich verloren.', 'Unsaved changes will be permanently lost.'),
+      confirmLabel: tr('Alles verwerfen', 'Discard all'),
+      onConfirm: () => git(['checkout', '--', '.'], tr('Alle Aenderungen verworfen', 'Discarded all changes'), true),
     });
-  }, [setConfirmDialog, git]);
+  }, [setConfirmDialog, git, tr]);
 
   const deleteUntracked = useCallback((f: string) => {
     setConfirmDialog({
       variant: 'danger',
-      title: 'Untracked Datei loeschen?',
-      message: 'Die Datei ist nicht versioniert und wird direkt vom Dateisystem entfernt.',
-      contextItems: [{ label: 'Datei', value: f }, { label: 'Git-Status', value: 'Untracked' }],
+      title: tr('Untracked Datei loeschen?', 'Delete untracked file?'),
+      message: tr('Die Datei ist nicht versioniert und wird direkt vom Dateisystem entfernt.', 'The file is not tracked and will be removed from the filesystem.'),
+      contextItems: [{ label: tr('Datei', 'File'), value: f }, { label: tr('Git-Status', 'Git status'), value: tr('Untracked', 'Untracked') }],
       irreversible: true,
-      consequences: 'Die Datei ist danach ohne Backup nicht wiederherstellbar.',
-      confirmLabel: 'Datei loeschen',
-      onConfirm: () => git(['clean', '-f', '--', f], `${basename(f)} geloescht`, true),
+      consequences: tr('Die Datei ist danach ohne Backup nicht wiederherstellbar.', 'The file cannot be restored without backup afterwards.'),
+      confirmLabel: tr('Datei loeschen', 'Delete file'),
+      onConfirm: () => git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true),
     });
-  }, [setConfirmDialog, git]);
+  }, [setConfirmDialog, git, tr]);
 
   const stashChanges = useCallback(() => {
     setInputDialog({
-      title: 'Aenderungen stashen',
-      message: 'Optional eine Nachricht fuer den neuen Stash hinterlegen.',
-      fields: [{ id: 'message', label: 'Stash-Nachricht (optional)', placeholder: 'z.B. WIP: Feature XYZ' }],
-      contextItems: [{ label: 'Repository', value: repoPath ? basename(repoPath) : '(unbekannt)' }],
+      title: tr('Aenderungen stashen', 'Stash changes'),
+      message: tr('Optional eine Nachricht fuer den neuen Stash hinterlegen.', 'Optionally add a message for the new stash.'),
+      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: Feature XYZ', 'e.g. WIP: Feature XYZ') }],
+      contextItems: [{ label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') }],
       irreversible: false,
-      consequences: 'Aenderungen werden temporaer aus dem Working Tree entfernt und im Stash gespeichert.',
-      confirmLabel: 'Stash erstellen',
+      consequences: tr('Aenderungen werden temporaer aus dem Working Tree entfernt und im Stash gespeichert.', 'Changes are temporarily removed from the working tree and saved in the stash.'),
+      confirmLabel: tr('Stash erstellen', 'Create stash'),
       onSubmit: async (values) => {
         const msg = (values.message || '').trim();
         const args = msg ? ['stash', 'push', '-m', msg] : ['stash'];
-        await git(args, 'Aenderungen gestasht', true);
+        await git(args, tr('Aenderungen gestasht', 'Stashed changes'), true);
       },
     });
-  }, [setInputDialog, repoPath, git]);
+  }, [setInputDialog, repoPath, git, tr]);
 
-  const stashPop = useCallback(() => git(['stash', 'pop'], 'Stash angewendet', true), [git]);
+  const stashPop = useCallback(() => git(['stash', 'pop'], tr('Stash angewendet', 'Applied stash'), true), [git, tr]);
 
   const showDiff = useCallback((filePath: string, staged: boolean) => {
     const request: DiffRequest = {
       source: staged ? 'staged' : 'unstaged',
       path: filePath,
-      title: staged ? 'Staged Diff' : 'Unstaged Diff',
+      title: staged ? tr('Staged Diff', 'Staged diff') : tr('Unstaged Diff', 'Unstaged diff'),
     };
     onOpenDiff?.(request);
-  }, [onOpenDiff]);
+  }, [onOpenDiff, tr]);
 
   return {
     status,
