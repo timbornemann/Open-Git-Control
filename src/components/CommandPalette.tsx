@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n';
 
 export type PaletteCommand = {
   id: string;
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => {
+  const { tr } = useI18n();
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +60,6 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
     }
   };
 
-  // Scroll active item into view
   useEffect(() => {
     const el = listRef.current?.querySelector<HTMLButtonElement>(`[data-idx="${activeIdx}"]`);
     el?.scrollIntoView({ block: 'nearest' });
@@ -72,13 +73,13 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
         <input
           ref={inputRef}
           className="cmd-palette-input"
-          placeholder="Befehl suchen... / Search command..."
+          placeholder={tr('Befehl suchen...', 'Search command...')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div ref={listRef} className="cmd-palette-list">
           {filtered.length === 0 && (
-            <div className="cmd-palette-empty">Keine Treffer / No matches</div>
+            <div className="cmd-palette-empty">{tr('Keine Treffer', 'No matches')}</div>
           )}
           {filtered.map((cmd, i) => (
             <button
@@ -94,7 +95,7 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
           ))}
         </div>
         <div className="cmd-palette-footer">
-          ↑↓ navigieren · Enter ausführen · Esc schließen
+          {tr('Pfeile navigieren | Enter ausfuehren | Esc schliessen', 'Arrows navigate | Enter runs | Esc closes')}
         </div>
       </div>
     </div>
