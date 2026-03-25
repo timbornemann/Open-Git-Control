@@ -289,6 +289,12 @@ export function mergeableDecoratedRefs(refs: string[], currentBranch: string): s
 
 /** Porcelain codes for unmerged / conflicted paths (aligned with StagingArea conflict detection). */
 const CONFLICT_PORCELAIN_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
+const MERGE_IN_PROGRESS_PATTERNS: RegExp[] = [
+  /\bMERGE_HEAD\b.*\bexists\b/i,
+  /you have not concluded your merge/i,
+  /you are in the middle of a merge/i,
+  /cannot do .* during a merge/i,
+];
 
 /** First repo-relative path that is still in a conflict state, or null. */
 export function parseFirstConflictPathFromPorcelain(statusOutput: string): string | null {
@@ -312,6 +318,12 @@ export function parseFirstConflictPathFromGitError(errorText: string | null | un
     ?? errorText.match(/Merge conflict in\s+([^\r\n]+)/i);
   if (!m) return null;
   return m[1].trim().replace(/\s+$/, '');
+}
+
+/** Whether git reports an unfinished merge (e.g. MERGE_HEAD exists). */
+export function isMergeInProgressError(errorText: string | null | undefined): boolean {
+  if (!errorText) return false;
+  return MERGE_IN_PROGRESS_PATTERNS.some((pattern) => pattern.test(errorText));
 }
 
 /** Prefer porcelain; if missing, parse from error message (merge/cherry-pick/rebase failures). */

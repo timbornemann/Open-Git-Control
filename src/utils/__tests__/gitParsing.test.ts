@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isMergeInProgressError,
   mergeableDecoratedRefs,
   mergeTargetFromDecoratedRef,
   normalizeBranchRefForMerge,
@@ -278,5 +279,16 @@ describe('merge ref helpers', () => {
 
   it('lists unique merge candidates excluding current branch', () => {
     expect(mergeableDecoratedRefs(['HEAD -> main', 'origin/main', 'feature'], 'main')).toEqual(['origin/main', 'feature']);
+  });
+});
+
+describe('isMergeInProgressError', () => {
+  it('detects MERGE_HEAD related errors', () => {
+    expect(isMergeInProgressError('fatal: You have not concluded your merge (MERGE_HEAD exists).')).toBe(true);
+    expect(isMergeInProgressError('fatal: cannot do a partial commit during a merge.')).toBe(true);
+  });
+
+  it('returns false for unrelated errors', () => {
+    expect(isMergeInProgressError('fatal: bad revision')).toBe(false);
   });
 });
