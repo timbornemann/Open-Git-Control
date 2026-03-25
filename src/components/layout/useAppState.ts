@@ -9,7 +9,7 @@ import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
 import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
-import { resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
+import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
 import {
   DEFAULT_SETTINGS,
   GUARDED_COMMANDS,
@@ -293,6 +293,7 @@ export const useAppState = () => {
         triggerRefresh();
         return true;
       }
+      const mergeInProgress = isMergeInProgressError(r.error);
       triggerRefresh();
       try {
         const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
@@ -303,8 +304,12 @@ export const useAppState = () => {
           setAutoOpenConflictResolverPath(conflictPath);
           setGitActionToast({
             msg: tr(
-              'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
-              'Merge conflict: opening the conflict resolver.',
+              mergeInProgress
+                ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
+                : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+              mergeInProgress
+                ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
+                : 'Merge conflict: opening the conflict resolver.',
             ),
             isError: false,
           });
@@ -314,9 +319,21 @@ export const useAppState = () => {
       } catch {
         // ignore; fall through to generic error toast
       }
+      if (mergeInProgress) {
+        workspace.setActiveTab('repo');
+        setGitActionToast({
+          msg: tr(
+            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen ausfuehren.',
+            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
+          ),
+          isError: true,
+        });
+        return false;
+      }
       setGitActionToast({ msg: r.error || tr('Fehler beim Ausführen von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
+      const mergeInProgress = isMergeInProgressError(e?.message);
       triggerRefresh();
       try {
         const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
@@ -327,8 +344,12 @@ export const useAppState = () => {
           setAutoOpenConflictResolverPath(conflictPath);
           setGitActionToast({
             msg: tr(
-              'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
-              'Merge conflict: opening the conflict resolver.',
+              mergeInProgress
+                ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
+                : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+              mergeInProgress
+                ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
+                : 'Merge conflict: opening the conflict resolver.',
             ),
             isError: false,
           });
@@ -337,6 +358,17 @@ export const useAppState = () => {
         }
       } catch {
         // ignore
+      }
+      if (mergeInProgress) {
+        workspace.setActiveTab('repo');
+        setGitActionToast({
+          msg: tr(
+            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen ausfuehren.',
+            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
+          ),
+          isError: true,
+        });
+        return false;
       }
       setGitActionToast({ msg: e.message, isError: true });
       return false;
