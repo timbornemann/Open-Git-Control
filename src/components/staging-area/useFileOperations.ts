@@ -18,6 +18,8 @@ import type {
   StagingContextMenuState,
 } from './types';
 
+const AI_LOCAL_STATE_EVENT = 'ai:auto-commit-local-state';
+
 type Params = {
   repoPath: string | null;
   setToast: (msg: ToastMessage | null) => void;
@@ -42,9 +44,36 @@ export const useFileOperations = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts'>('all');
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
+  const [isAiAutoCommitRunning, setIsAiAutoCommitRunning] = useState(false);
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const unsubscribe = window.electronAPI.onJobEvent((event) => {
+      if (event.operation !== 'git:aiAutoCommit') return;
+      if (event.status === 'start' || event.status === 'progress') {
+        setIsAiAutoCommitRunning(true);
+        return;
+      }
+      if (event.status === 'done' || event.status === 'failed' || event.status === 'cancelled') {
+        setIsAiAutoCommitRunning(false);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const onLocalState = (event: Event) => {
+      const detail = (event as CustomEvent<{ running?: unknown }>).detail;
+      if (typeof detail?.running === 'boolean') {
+        setIsAiAutoCommitRunning(detail.running);
+      }
+    };
+    window.addEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
+    return () => window.removeEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
+  }, []);
 
   const refresh = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !window.electronAPI || isAiAutoCommitRunning) return;
     try {
       const [statusResult, stagedResult, unstagedResult] = await Promise.all([
         window.electronAPI.runGitCommand('statusPorcelain'),
@@ -70,13 +99,16 @@ export const useFileOperations = ({
     } catch (e) {
       console.error(e);
     }
-  }, [repoPath]);
+  }, [repoPath, isAiAutoCommitRunning]);
 
   useEffect(() => {
     if (!repoPath) {
       setStatus(null);
       setStagedStats(EMPTY_DIFF_STATS);
       setUnstagedStats(EMPTY_DIFF_STATS);
+      return;
+    }
+    if (isAiAutoCommitRunning) {
       return;
     }
     refresh();
@@ -86,7 +118,7 @@ export const useFileOperations = ({
       clearInterval(iv);
       window.removeEventListener('focus', refresh);
     };
-  }, [repoPath, refresh]);
+  }, [repoPath, refresh, isAiAutoCommitRunning]);
 
   useEffect(() => {
     if (!contextMenu) return;

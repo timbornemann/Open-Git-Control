@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppSettingsDto } from '../../global';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
@@ -20,6 +20,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   const [amendCommit, setAmendCommit] = useState(false);
   const [signoffCommit, setSignoffCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const isCommittingRef = useRef(false);
 
   useEffect(() => {
     setSignoffCommit(Boolean(settings.commitSignoffByDefault));
@@ -43,7 +44,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   }, [amendCommit, repoPath]);
 
   const handleCommit = useCallback(async () => {
-    if (!commitMsg.trim() || !window.electronAPI || !status) return;
+    if (isCommittingRef.current || !commitMsg.trim() || !window.electronAPI || !status) return;
 
     if (status.conflicts.length > 0) {
       setToast({ msg: tr('Bitte zuerst alle Konflikte aufloesen.', 'Please resolve all conflicts first.'), isError: true });
@@ -55,6 +56,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       return;
     }
 
+    isCommittingRef.current = true;
     setIsCommitting(true);
     try {
       const commitArgs: string[] = ['commit'];
@@ -77,6 +79,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
     } finally {
+      isCommittingRef.current = false;
       setIsCommitting(false);
     }
   }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged, tr]);
