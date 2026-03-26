@@ -99,6 +99,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const status = fileOps.status;
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
+  const isCommitInputDisabled = hasOpenConflicts || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
 
   const normalizedQuery = fileOps.searchQuery.trim().toLowerCase();
   const bySearch = <T extends { path: string }>(entries: T[]) => entries
@@ -299,16 +300,26 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             placeholder={hasOpenConflicts ? tr('Konflikte aufloesen, danach committen...', 'Resolve conflicts, then commit...') : tr('Commit-Titel...', 'Commit title...')}
             value={commitForm.commitMsg}
             onChange={(e) => commitForm.setCommitMsg(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commitForm.handleCommit(); }}
-            disabled={hasOpenConflicts}
+            onKeyDown={(e) => {
+              if (!isCommitInputDisabled && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                commitForm.handleCommit();
+              }
+            }}
+            disabled={isCommitInputDisabled}
           />
           <textarea
             className="staging-commit-input staging-commit-description"
             placeholder={tr('Commit-Beschreibung (optional)...', 'Commit description (optional)...')}
             value={commitForm.commitDescription}
             onChange={(e) => commitForm.setCommitDescription(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commitForm.handleCommit(); }}
-            disabled={hasOpenConflicts}
+            onKeyDown={(e) => {
+              if (!isCommitInputDisabled && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                commitForm.handleCommit();
+              }
+            }}
+            disabled={isCommitInputDisabled}
           />
           <div className="staging-commit-bar" style={{ gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.72rem', color: hasOpenConflicts ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
