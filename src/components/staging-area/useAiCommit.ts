@@ -5,6 +5,7 @@ import type { GitStatusWithConflicts } from './types';
 
 const AI_STATE_POLL_INTERVAL_MS = 500;
 const LIVE_REFRESH_MIN_INTERVAL_MS = 1_200;
+const AI_TERMINAL_CLEAR_DELAY_MS = 4_000;
 
 type Params = {
   status: GitStatusWithConflicts | null;
@@ -50,6 +51,34 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
   const lastKnownStatusRef = useRef<AiJobStatus>('idle');
   const lastEventTimestampRef = useRef(0);
   const lastRefreshAtRef = useRef(0);
+  const aiTotalFilesRef = useRef<number | null>(null);
+  const terminalClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTerminalClearTimer = useCallback(() => {
+    if (!terminalClearTimerRef.current) return;
+    clearTimeout(terminalClearTimerRef.current);
+    terminalClearTimerRef.current = null;
+  }, []);
+
+  const resetAiProgressUi = useCallback(() => {
+    setAiProgressMessage(null);
+    setAiPhase('idle');
+    setAiMode('normal');
+    setAiLastCommit(null);
+    setAiRemainingFiles(null);
+    setAiProcessedFiles(null);
+    setAiGroupId(null);
+    setAiGroupSize(null);
+    setAiTotalCommits(null);
+    aiTotalFilesRef.current = null;
+  }, []);
+
+  const scheduleTerminalClear = useCallback(() => {
+    clearTerminalClearTimer();
+    terminalClearTimerRef.current = setTimeout(() => {
+      resetAiProgressUi();
+    }, AI_TERMINAL_CLEAR_DELAY_MS);
+  }, [clearTerminalClearTimer, resetAiProgressUi]);
 
   const maybeRefresh = useCallback(() => {
     const now = Date.now();
@@ -80,14 +109,29 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
     if (phase) setAiPhase(phase);
     if (mode) setAiMode(mode);
     if (lastCommit) setAiLastCommit(lastCommit);
-    if (remainingFiles !== null) setAiRemainingFiles(remainingFiles);
-    if (processedFiles !== null) setAiProcessedFiles(processedFiles);
+    if (remainingFiles !== null) {
+      if (aiTotalFilesRef.current === null && processedFiles === null) {
+        aiTotalFilesRef.current = remainingFiles;
+      }
+      setAiRemainingFiles(remainingFiles);
+      if (aiTotalFilesRef.current !== null) {
+        const derivedProcessed = Math.max(0, aiTotalFilesRef.current - remainingFiles);
+        setAiProcessedFiles(derivedProcessed);
+      }
+    }
+    if (processedFiles !== null) {
+      const shouldPreferExplicit = phase === 'done' || aiTotalFilesRef.current === null;
+      if (shouldPreferExplicit) {
+        setAiProcessedFiles(processedFiles);
+      }
+    }
     if (groupId !== null) setAiGroupId(groupId);
     if (groupSize !== null) setAiGroupSize(groupSize);
     if (totalCommits !== null) setAiTotalCommits(totalCommits);
 
     const statusValue = asString(eventRaw.status);
     if (statusValue === 'start' || statusValue === 'progress') {
+      clearTerminalClearTimer();
       lastKnownStatusRef.current = statusValue;
       setIsAiCommitting(true);
       setIsAiJobRunning(true);
@@ -113,8 +157,9 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
 
       lastRefreshAtRef.current = Date.now();
       void refresh();
+      scheduleTerminalClear();
     }
-  }, [maybeRefresh, refresh, tr]);
+  }, [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, tr]);
 
   const pullLatestAiState = useCallback(async () => {
     if (!window.electronAPI) return;
@@ -150,6 +195,10 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
     };
   }, [isAiCommitting, isAiJobRunning, pullLatestAiState]);
 
+  useEffect(() => () => {
+    clearTerminalClearTimer();
+  }, [clearTerminalClearTimer]);
+
   const handleAiAutoCommit = useCallback(async () => {
     if (!window.electronAPI || !status) return;
     if (aiStartLockRef.current || isAiCommitting || isAiJobRunning) return;
@@ -165,11 +214,13 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
       return;
     }
 
+    clearTerminalClearTimer();
     cancelRequestedRef.current = false;
     aiStartLockRef.current = true;
     lastKnownStatusRef.current = 'start';
     lastEventTimestampRef.current = Date.now() - 1;
     lastRefreshAtRef.current = 0;
+    aiTotalFilesRef.current = totalFiles;
 
     setAiPhase('snapshot');
     setAiMode('normal');
@@ -197,6 +248,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
         setAiProgressMessage(errorMessage);
         setIsAiJobRunning(false);
         await refresh();
+        scheduleTerminalClear();
         return;
       }
 
@@ -230,6 +282,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
         setAiProgressMessage(result.data.summary || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
       }
       setIsAiJobRunning(false);
+      scheduleTerminalClear();
     } catch (error: unknown) {
       if (cancelRequestedRef.current) return;
 
@@ -244,12 +297,13 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
       setAiProgressMessage(message);
       setIsAiJobRunning(false);
       await refresh();
+      scheduleTerminalClear();
     } finally {
       aiStartLockRef.current = false;
       cancelRequestedRef.current = false;
       setIsAiCommitting(false);
     }
-  }, [isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, refresh, setToast, status, tr]);
+  }, [clearTerminalClearTimer, isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, refresh, scheduleTerminalClear, setToast, status, tr]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
     if (!window.electronAPI) return;
@@ -270,6 +324,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
         setIsAiCommitting(false);
         setIsAiJobRunning(false);
         setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
+        scheduleTerminalClear();
         return;
       }
 
@@ -283,7 +338,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
         isError: true,
       });
     }
-  }, [isAiCommitting, isAiJobRunning, pullLatestAiState, setToast, tr]);
+  }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, tr]);
 
   return {
     isAiCommitting,
