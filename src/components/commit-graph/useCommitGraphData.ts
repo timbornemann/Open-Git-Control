@@ -4,6 +4,7 @@ import { computeGraphLayout, type GraphLayout } from '../../utils/graphLayout';
 import { parseGitLog, parseGitStatusDetailed, type GitStatusDetailed } from '../../utils/gitParsing';
 
 const LOG_PAGE_SIZE = 200;
+const AI_LOCAL_STATE_EVENT = 'ai:auto-commit-local-state';
 
 type Params = {
   repoPath: string | null;
@@ -26,6 +27,7 @@ export const useCommitGraphData = ({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreCommits, setHasMoreCommits] = useState(true);
+  const [isAiAutoCommitRunning, setIsAiAutoCommitRunning] = useState(false);
 
   const commitCountRef = useRef(0);
   const layoutRef = useRef<GraphLayout | null>(null);
@@ -88,7 +90,7 @@ export const useCommitGraphData = ({
   }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
 
   const refreshWorkingTreeStatus = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !window.electronAPI || isAiAutoCommitRunning) return;
     try {
       const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
       if (success) {
@@ -97,7 +99,7 @@ export const useCommitGraphData = ({
     } catch (e) {
       console.error(e);
     }
-  }, [repoPath]);
+  }, [repoPath, isAiAutoCommitRunning]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -149,14 +151,41 @@ export const useCommitGraphData = ({
   }, [layout, logContainerRef, onRepoCleared, workingTreeStatus]);
 
   useEffect(() => {
+    if (!window.electronAPI) return;
+    const unsubscribe = window.electronAPI.onJobEvent((event) => {
+      if (event.operation !== 'git:aiAutoCommit') return;
+      if (event.status === 'start' || event.status === 'progress') {
+        setIsAiAutoCommitRunning(true);
+        return;
+      }
+      if (event.status === 'done' || event.status === 'failed' || event.status === 'cancelled') {
+        setIsAiAutoCommitRunning(false);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const onLocalState = (event: Event) => {
+      const detail = (event as CustomEvent<{ running?: unknown }>).detail;
+      if (typeof detail?.running === 'boolean') {
+        setIsAiAutoCommitRunning(detail.running);
+      }
+    };
+    window.addEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
+    return () => window.removeEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
+  }, []);
+
+  useEffect(() => {
     if (!repoPath) return;
+    if (isAiAutoCommitRunning) return;
     const intervalId = window.setInterval(refreshWorkingTreeStatus, 3000);
     window.addEventListener('focus', refreshWorkingTreeStatus);
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener('focus', refreshWorkingTreeStatus);
     };
-  }, [refreshWorkingTreeStatus, repoPath]);
+  }, [refreshWorkingTreeStatus, repoPath, isAiAutoCommitRunning]);
 
   useEffect(() => {
     const scrollContainer = logContainerRef.current?.parentElement;
