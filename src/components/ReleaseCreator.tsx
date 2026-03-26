@@ -13,8 +13,44 @@ import {
 } from 'lucide-react';
 import { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '../global';
 import { useI18n } from '../i18n';
+import { ReleaseNotesOptions } from '../types/releaseNotes';
 import { validateGithubReleaseInput } from '../utils/githubReleaseValidation';
 import { suggestNextReleaseTag } from '../utils/releaseTagSuggestion';
+
+type AiOptionToggleProps = {
+  label: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (next: boolean) => void;
+};
+
+const AiOptionToggle: React.FC<AiOptionToggleProps> = ({
+  label,
+  description,
+  checked,
+  disabled,
+  onChange,
+}) => (
+  <label className={`release-ai-option ${disabled ? 'release-ai-option--disabled' : ''}`}>
+    <span className="release-ai-option-text">
+      <strong>{label}</strong>
+      <small>{description}</small>
+    </span>
+    <span className="release-switch">
+      <input
+        type="checkbox"
+        className="release-switch-input"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        disabled={disabled}
+      />
+      <span className="release-switch-track">
+        <span className="release-switch-thumb" />
+      </span>
+    </span>
+  </label>
+);
 
 type Props = {
   ownerRepo: { owner: string; repo: string } | null;
@@ -32,6 +68,8 @@ type Props = {
   notesGenerating: boolean;
   notesLanguage: 'de' | 'en';
   setNotesLanguage: (value: 'de' | 'en') => void;
+  notesOptions: ReleaseNotesOptions;
+  setNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
 };
 
 export const ReleaseCreator: React.FC<Props> = ({
@@ -50,12 +88,15 @@ export const ReleaseCreator: React.FC<Props> = ({
   notesGenerating,
   notesLanguage,
   setNotesLanguage,
+  notesOptions,
+  setNotesOptions,
 }) => {
   const { tr } = useI18n();
 
   const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
   const trimmedTagName = (releaseForm.tagName || '').trim();
   const trimmedTarget = (releaseForm.targetCommitish || '').trim();
+
   const existingTagSet = useMemo(
     () => new Set((context?.existingTags || []).map((tag) => tag.toLowerCase())),
     [context?.existingTags],
@@ -65,6 +106,7 @@ export const ReleaseCreator: React.FC<Props> = ({
     () => suggestNextReleaseTag(context?.existingTags || []),
     [context?.existingTags],
   );
+
   const validation = useMemo(
     () => validateGithubReleaseInput({
       tagName: releaseForm.tagName || '',
@@ -93,9 +135,13 @@ export const ReleaseCreator: React.FC<Props> = ({
   const commitsCount = commits.length;
   const bodyLineCount = (releaseForm.body || '').split(/\r?\n/g).length;
   const bodyCharCount = (releaseForm.body || '').length;
+  const targetForContext = trimmedTarget || context?.commitsTarget || tr('Unbekannt', 'Unknown');
+  const repositoryLabel = ownerRepo
+    ? `${ownerRepo.owner}/${ownerRepo.repo}`
+    : tr('Keine GitHub-Repository-Zuordnung', 'No GitHub repository mapping');
+
   const canGenerateNotes = Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName) && commitsCount > 0;
   const canCreateRelease = Boolean(ownerRepo) && !releaseSubmitting && !tagAlreadyExists && validation.valid;
-  const targetForContext = trimmedTarget || context?.commitsTarget || tr('Unbekannt', 'Unknown');
 
   const createHint = useMemo(() => {
     if (!ownerRepo) {
@@ -110,378 +156,351 @@ export const ReleaseCreator: React.FC<Props> = ({
     return tr('Die Release wird mit den aktuellen Angaben bei GitHub erstellt.', 'The release will be created on GitHub with the current inputs.');
   }, [ownerRepo, tagAlreadyExists, tr, validation.valid, validationMessage]);
 
-  const aiHint = useMemo(() => {
-    if (!ownerRepo) {
-      return tr('KI-Notizen sind erst verfuegbar, wenn das Repository mit GitHub verbunden ist.', 'AI notes are available once the repository is connected to GitHub.');
-    }
-    if (!trimmedTagName) {
-      return tr('Setze zuerst einen Tag-Name, damit KI-Notizen den Release-Kontext kennen.', 'Set a tag name first so AI notes know the release context.');
-    }
-    if (commitsCount === 0) {
-      return tr('Keine Commits seit dem letzten Release gefunden.', 'No commits found since the last release.');
-    }
-    return tr('Die KI erstellt Notizen auf Basis der Commits aus dem rechten Bereich.', 'AI generates notes from the commit list shown on the right side.');
-  }, [commitsCount, ownerRepo, trimmedTagName, tr]);
-
   return (
-    <div className="release-creator">
-      <section className="release-hero">
-        <div className="release-hero-top">
-          <div className="release-hero-copy">
-            <div className="release-hero-eyebrow">{tr('Release Workflow', 'Release workflow')}</div>
-            <h2 className="release-hero-title">{tr('Release strukturiert vorbereiten', 'Prepare release with clear steps')}</h2>
-            <p className="release-hero-subtitle">
-              {tr(
-                'Fuehre Tag, Inhalt und Freigabe nacheinander aus. Alle wichtigen Kontexte sind direkt sichtbar.',
-                'Go through tag, content, and publication in sequence. All key context is visible on one screen.',
-              )}
-            </p>
-          </div>
-          <div className="release-hero-repo">
-            <span className="release-hero-repo-label">{tr('Repository', 'Repository')}</span>
-            <span className="release-hero-repo-value">
-              {ownerRepo
-                ? `${ownerRepo.owner}/${ownerRepo.repo}`
-                : tr('Keine GitHub-Repository-Zuordnung', 'No GitHub repository mapping')}
-            </span>
-          </div>
-        </div>
-
-        <div className="release-hero-stats">
-          <div className="release-hero-stat">
-            <span>{tr('Letztes Release', 'Last release')}</span>
-            <strong>{context?.lastReleaseTag || tr('Keins', 'None')}</strong>
-          </div>
-          <div className="release-hero-stat">
-            <span>{tr('Ziel', 'Target')}</span>
-            <strong>{targetForContext}</strong>
-          </div>
-          <div className="release-hero-stat">
-            <span>{tr('Commits seitdem', 'Commits since')}</span>
-            <strong>{commitsCount}</strong>
-          </div>
-        </div>
-
-        <div className="release-hero-actions">
-          <button
-            className="release-secondary-btn"
-            onClick={() => void onRefreshContext()}
-            disabled={!ownerRepo || contextLoading || releaseSubmitting}
-          >
-            <RefreshCw size={14} className={contextLoading ? 'spin' : ''} />
-            {contextLoading ? tr('Aktualisiere...', 'Refreshing...') : tr('Kontext aktualisieren', 'Refresh context')}
-          </button>
-        </div>
-      </section>
-
-      {!ownerRepo && (
-        <div className="release-alert release-alert--warning">
-          <AlertCircle size={16} />
-          <div>
-            <strong>{tr('GitHub-Zuordnung fehlt.', 'GitHub mapping missing.')}</strong>
-            <p>
-              {tr(
-                'Oeffne ein lokal mit GitHub verbundenes Repository, damit Releases erstellt werden koennen.',
-                'Open a local repository connected to GitHub to create releases.',
-              )}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {contextError && (
-        <div className="release-alert release-alert--danger">
-          <XCircle size={16} />
-          <div>{contextError}</div>
-        </div>
-      )}
-
-      {context?.fallbackUsed && (
-        <div className="release-alert release-alert--warning">
-          <AlertCircle size={16} />
-          <div>
-            {tr(
-              'Letzter Release-Tag lokal nicht gefunden. Es wird stattdessen aktueller Verlauf verwendet.',
-              'Latest release tag was not found locally. Showing recent history instead.',
-            )}
-          </div>
-        </div>
-      )}
-
-      {releaseError && (
-        <div className="release-alert release-alert--danger">
-          <XCircle size={16} />
-          <div>{releaseError}</div>
-        </div>
-      )}
-
-      {releaseSuccess && (
-        <div className="release-alert release-alert--success">
-          <CheckCircle2 size={16} />
-          <div>
-            {tr('Release erfolgreich erstellt.', 'Release created successfully.')}{' '}
-            <a href={releaseSuccess.htmlUrl} target="_blank" rel="noreferrer" className="release-alert-link">
-              {tr('Release oeffnen', 'Open release')} <ExternalLink size={12} />
-            </a>
-          </div>
-        </div>
-      )}
-
-      <div className="release-layout">
-        <div className="release-column-main">
-          <section className="release-card">
-            <div className="release-card-head">
-              <div>
-                <div className="release-step-id">{tr('Schritt 1', 'Step 1')}</div>
-                <h3>{tr('Version und Ziel definieren', 'Define version and target')}</h3>
-              </div>
-            </div>
-
-            <div className="release-form-grid">
-              <label className="release-field">
-                <span className="release-field-label">{tr('Tag-Name (Pflicht)', 'Tag name (required)')}</span>
-                <input
-                  type="text"
-                  className="release-input"
-                  value={releaseForm.tagName || ''}
-                  onChange={(event) => setReleaseForm((prev) => ({ ...prev, tagName: event.target.value }))}
-                  disabled={!ownerRepo || releaseSubmitting}
-                  placeholder={tr('z.B. v1.2.0', 'e.g. v1.2.0')}
-                />
-              </label>
-              <button
-                className="release-tag-btn"
-                onClick={() => setReleaseForm((prev) => ({
-                  ...prev,
-                  tagName: suggestedTag,
-                  releaseName: prev.releaseName || `Release ${suggestedTag}`,
-                }))}
-                disabled={!ownerRepo || releaseSubmitting}
-                title={tr('Tag-Vorschlag uebernehmen', 'Apply suggested tag')}
-              >
-                <Tag size={14} />
-                {suggestedTag}
-              </button>
-              <label className="release-field release-field--full">
-                <span className="release-field-label">{tr('Release-Name (Pflicht)', 'Release name (required)')}</span>
-                <input
-                  type="text"
-                  className="release-input"
-                  value={releaseForm.releaseName || ''}
-                  onChange={(event) => setReleaseForm((prev) => ({ ...prev, releaseName: event.target.value }))}
-                  disabled={!ownerRepo || releaseSubmitting}
-                  placeholder={tr('z.B. Release v1.2.0', 'e.g. Release v1.2.0')}
-                />
-              </label>
-              <label className="release-field release-field--full">
-                <span className="release-field-label">{tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')}</span>
-                <input
-                  type="text"
-                  className="release-input"
-                  value={releaseForm.targetCommitish || ''}
-                  onChange={(event) => setReleaseForm((prev) => ({ ...prev, targetCommitish: event.target.value }))}
-                  disabled={!ownerRepo || releaseSubmitting}
-                  placeholder={tr('z.B. main oder SHA', 'e.g. main or SHA')}
-                />
-              </label>
-            </div>
-
-            {tagAlreadyExists ? (
-              <p className="release-inline release-inline--warning">
-                <XCircle size={13} />
-                {tr('Dieser Tag existiert bereits.', 'This tag already exists.')}
-              </p>
-            ) : validationMessage ? (
-              <p className="release-inline release-inline--warning">
-                <AlertCircle size={13} />
-                {validationMessage}
-              </p>
-            ) : (
-              <p className="release-inline release-inline--muted">
-                <Check size={13} />
-                {tr('Version und Name sind gueltig vorbereitet.', 'Version and name are ready.')}
-              </p>
-            )}
-          </section>
-
-          <section className="release-card">
-            <div className="release-card-head release-card-head--split">
-              <div>
-                <div className="release-step-id">{tr('Schritt 2', 'Step 2')}</div>
-                <h3>{tr('Release Notes schreiben', 'Write release notes')}</h3>
-              </div>
-              <div className="release-notes-actions">
-                <div className="release-language-wrap">
-                  <label htmlFor="release-language">{tr('KI-Sprache', 'AI language')}</label>
-                  <select
-                    id="release-language"
-                    className="release-select"
-                    value={notesLanguage}
-                    onChange={(event) => setNotesLanguage(event.target.value === 'de' ? 'de' : 'en')}
-                    disabled={notesGenerating || releaseSubmitting}
-                  >
-                    <option value="en">{tr('Englisch', 'English')}</option>
-                    <option value="de">{tr('Deutsch', 'German')}</option>
-                  </select>
-                </div>
-                <button
-                  className="release-secondary-btn release-secondary-btn--accent"
-                  onClick={() => void onGenerateNotes()}
-                  disabled={!canGenerateNotes}
-                >
-                  <Sparkles size={14} />
-                  {notesGenerating ? tr('KI erstellt...', 'AI generating...') : tr('KI Notes erstellen', 'Generate AI notes')}
-                </button>
-              </div>
-            </div>
-
-            <p className="release-inline release-inline--muted">
-              <Sparkles size={13} />
-              {aiHint}
-            </p>
-
-            <label className="release-field release-field--full">
-              <span className="release-field-label">{tr('Release Notes (Markdown)', 'Release notes (Markdown)')}</span>
-              <textarea
-                className="release-textarea"
-                value={releaseForm.body || ''}
-                onChange={(event) => setReleaseForm((prev) => ({ ...prev, body: event.target.value }))}
-                rows={14}
-                disabled={!ownerRepo || releaseSubmitting}
-                placeholder={tr(
-                  '- Added\n- Changed\n- Fixed',
-                  '- Added\n- Changed\n- Fixed',
+    <div className="release-creator release-creator--clean">
+      <div className="release-layout-clean">
+        <main className="release-main-clean">
+          <header className="release-head-clean">
+            <div>
+              <p className="release-eyebrow">{tr('Release Workflow', 'Release workflow')}</p>
+              <h1 className="release-title-clean">{tr('Release erstellen', 'Create release')}</h1>
+              <p className="release-subtitle-clean">
+                {tr(
+                  'Version festlegen, Release Notes erstellen und direkt veroeffentlichen.',
+                  'Define version, create release notes, and publish in one flow.',
                 )}
-              />
-            </label>
+              </p>
+            </div>
+            <div className="release-repo-chip" title={repositoryLabel}>{repositoryLabel}</div>
+          </header>
 
-            <div className="release-notes-meta">
-              <span>{tr('Zeilen', 'Lines')}: {bodyLineCount}</span>
-              <span>{tr('Zeichen', 'Characters')}: {bodyCharCount}</span>
+          <section className="release-info-bar">
+            <div className="release-info-item">
+              <span>{tr('Letztes Release', 'Last release')}</span>
+              <strong>{context?.lastReleaseTag || tr('Keins', 'None')}</strong>
+            </div>
+            <div className="release-info-item">
+              <span>{tr('Target', 'Target')}</span>
+              <strong>{targetForContext}</strong>
+            </div>
+            <div className="release-info-item">
+              <span>{tr('Commits seitdem', 'Commits since')}</span>
+              <strong>{commitsCount}</strong>
             </div>
           </section>
 
-          <section className="release-card">
-            <div className="release-card-head">
+          {!ownerRepo && (
+            <div className="release-alert release-alert--warning">
+              <AlertCircle size={16} />
               <div>
-                <div className="release-step-id">{tr('Schritt 3', 'Step 3')}</div>
-                <h3>{tr('Freigabe-Optionen und Erstellung', 'Release options and creation')}</h3>
+                <strong>{tr('GitHub-Zuordnung fehlt.', 'GitHub mapping missing.')}</strong>
+                <p>
+                  {tr(
+                    'Oeffne ein lokal mit GitHub verbundenes Repository, damit Releases erstellt werden koennen.',
+                    'Open a local repository connected to GitHub to create releases.',
+                  )}
+                </p>
               </div>
             </div>
+          )}
+          {contextError && (
+            <div className="release-alert release-alert--danger">
+              <XCircle size={16} />
+              <div>{contextError}</div>
+            </div>
+          )}
+          {context?.fallbackUsed && (
+            <div className="release-alert release-alert--warning">
+              <AlertCircle size={16} />
+              <div>
+                {tr(
+                  'Letzter Release-Tag lokal nicht gefunden. Es wird stattdessen aktueller Verlauf verwendet.',
+                  'Latest release tag was not found locally. Showing recent history instead.',
+                )}
+              </div>
+            </div>
+          )}
+          {releaseError && (
+            <div className="release-alert release-alert--danger">
+              <XCircle size={16} />
+              <div>{releaseError}</div>
+            </div>
+          )}
+          {releaseSuccess && (
+            <div className="release-alert release-alert--success">
+              <CheckCircle2 size={16} />
+              <div>
+                {tr('Release erfolgreich erstellt.', 'Release created successfully.')}{' '}
+                <a href={releaseSuccess.htmlUrl} target="_blank" rel="noreferrer" className="release-alert-link">
+                  {tr('Release oeffnen', 'Open release')} <ExternalLink size={12} />
+                </a>
+              </div>
+            </div>
+          )}
 
-            <div className="release-options-grid">
-              <label className="release-option-card">
-                <input
-                  type="checkbox"
-                  checked={Boolean(releaseForm.draft)}
-                  onChange={(event) => setReleaseForm((prev) => ({ ...prev, draft: event.target.checked }))}
+          <section className="release-form-shell">
+            <section className="release-step-clean">
+              <header className="release-step-title-row">
+                <h2>{tr('1. Version und Ziel', '1. Version and target')}</h2>
+              </header>
+
+              <div className="release-field-grid">
+                <label className="release-field">
+                  <span className="release-field-label">{tr('Tag-Name (Pflicht)', 'Tag name (required)')}</span>
+                  <input
+                    type="text"
+                    className="release-input"
+                    value={releaseForm.tagName || ''}
+                    onChange={(event) => setReleaseForm((prev) => ({ ...prev, tagName: event.target.value }))}
+                    disabled={!ownerRepo || releaseSubmitting}
+                    placeholder={tr('z.B. v1.2.0', 'e.g. v1.2.0')}
+                  />
+                </label>
+                <button
+                  className="release-tag-btn"
+                  onClick={() => setReleaseForm((prev) => ({
+                    ...prev,
+                    tagName: suggestedTag,
+                    releaseName: prev.releaseName || `Release ${suggestedTag}`,
+                  }))}
                   disabled={!ownerRepo || releaseSubmitting}
-                />
-                <span className="release-option-copy">
-                  <strong>{tr('Entwurf', 'Draft')}</strong>
-                  <small>
-                    {tr(
-                      'Release speichern, aber nicht sofort veroeffentlichen.',
-                      'Save the release without publishing it immediately.',
-                    )}
-                  </small>
-                </span>
-              </label>
-              <label className="release-option-card">
-                <input
-                  type="checkbox"
-                  checked={Boolean(releaseForm.prerelease)}
-                  onChange={(event) => setReleaseForm((prev) => ({ ...prev, prerelease: event.target.checked }))}
-                  disabled={!ownerRepo || releaseSubmitting}
-                />
-                <span className="release-option-copy">
-                  <strong>{tr('Pre-Release', 'Pre-release')}</strong>
-                  <small>
-                    {tr(
-                      'Kennzeichnet die Version als Vorabstatus (beta/rc).',
-                      'Marks this version as an early preview (beta/rc).',
-                    )}
-                  </small>
-                </span>
-              </label>
-            </div>
-
-            <button
-              className="release-primary-btn"
-              onClick={() => { void onCreateRelease(); }}
-              disabled={!canCreateRelease}
-            >
-              <Check size={14} />
-              {releaseSubmitting ? tr('Erstelle Release...', 'Creating release...') : tr('Release erstellen', 'Create release')}
-            </button>
-
-            <p className={`release-inline ${canCreateRelease ? 'release-inline--muted' : 'release-inline--warning'}`}>
-              {canCreateRelease ? <Check size={13} /> : <AlertCircle size={13} />}
-              {createHint}
-            </p>
-          </section>
-        </div>
-
-        <aside className="release-column-side">
-          <section className="release-card">
-            <div className="release-card-head release-card-head--split">
-              <div>
-                <div className="release-step-id">{tr('Kontext', 'Context')}</div>
-                <h3>{tr('Release-Basis', 'Release baseline')}</h3>
+                  title={tr('Tag-Vorschlag uebernehmen', 'Apply suggested tag')}
+                >
+                  <Tag size={14} />
+                  {suggestedTag}
+                </button>
+                <label className="release-field release-field--full">
+                  <span className="release-field-label">{tr('Release-Name (Pflicht)', 'Release name (required)')}</span>
+                  <input
+                    type="text"
+                    className="release-input"
+                    value={releaseForm.releaseName || ''}
+                    onChange={(event) => setReleaseForm((prev) => ({ ...prev, releaseName: event.target.value }))}
+                    disabled={!ownerRepo || releaseSubmitting}
+                    placeholder={tr('z.B. Release v1.2.0', 'e.g. Release v1.2.0')}
+                  />
+                </label>
+                <label className="release-field release-field--full">
+                  <span className="release-field-label">{tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')}</span>
+                  <input
+                    type="text"
+                    className="release-input"
+                    value={releaseForm.targetCommitish || ''}
+                    onChange={(event) => setReleaseForm((prev) => ({ ...prev, targetCommitish: event.target.value }))}
+                    disabled={!ownerRepo || releaseSubmitting}
+                    placeholder={tr('z.B. main oder SHA', 'e.g. main or SHA')}
+                  />
+                </label>
               </div>
-              <button
-                className="release-icon-btn"
-                onClick={() => void onRefreshContext()}
-                disabled={!ownerRepo || contextLoading || releaseSubmitting}
-                title={tr('Daten aktualisieren', 'Refresh data')}
-              >
-                <RefreshCw size={14} className={contextLoading ? 'spin' : ''} />
-              </button>
-            </div>
 
-            <div className="release-context-grid">
-              <div className="release-context-cell">
-                <span>{tr('Letzter Tag', 'Last tag')}</span>
-                <strong>{context?.lastReleaseTag || tr('Kein Release', 'No release')}</strong>
-              </div>
-              <div className="release-context-cell">
-                <span>{tr('Target', 'Target')}</span>
-                <strong>{targetForContext}</strong>
-              </div>
-              <div className="release-context-cell">
-                <span>{tr('Commits fuer KI', 'Commits for AI')}</span>
-                <strong>{commitsCount}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="release-card release-card--stretch">
-            <div className="release-card-head">
-              <div>
-                <div className="release-step-id">{tr('Historie', 'History')}</div>
-                <h3>{tr('Commits seit letztem Release', 'Commits since last release')}</h3>
-              </div>
-            </div>
-
-            <div className="release-commit-list">
-              {commitsCount === 0 && (
-                <div className="release-empty-state">
-                  <GitBranch size={16} />
-                  {tr('Keine Commits gefunden.', 'No commits found.')}
-                </div>
+              {tagAlreadyExists ? (
+                <p className="release-inline release-inline--warning">
+                  <XCircle size={13} />
+                  {tr('Dieser Tag existiert bereits.', 'This tag already exists.')}
+                </p>
+              ) : validationMessage ? (
+                <p className="release-inline release-inline--warning">
+                  <AlertCircle size={13} />
+                  {validationMessage}
+                </p>
+              ) : (
+                <p className="release-inline release-inline--muted">
+                  <Check size={13} />
+                  {tr('Version und Name sind gueltig vorbereitet.', 'Version and name are ready.')}
+                </p>
               )}
-              {commits.map((commit) => (
-                <article key={commit.hash} className="release-commit-item">
-                  <div className="release-commit-subject">{commit.subject}</div>
-                  <div className="release-commit-meta">
-                    <code>{commit.shortHash}</code>
-                    <span>{commit.author}</span>
-                    <span><Clock3 size={11} /> {commit.date}</span>
+            </section>
+
+            <section className="release-step-clean release-step-clean--notes-workbench">
+              <header className="release-step-title-row">
+                <h2>{tr('2. Release Notes und Publish', '2. Release notes and publish')}</h2>
+              </header>
+
+              <div className="release-notes-workbench">
+                <aside className="release-notes-side">
+                  <div className="release-ai-panel">
+                    <div className="release-ai-headline">
+                      <div className="release-ai-headline-copy">
+                        <strong>{tr('Tune AI notes', 'Tune AI notes')}</strong>
+                        <span>{tr('Verhalten feinsteuern und dann generieren.', 'Adjust behavior and generate.')}</span>
+                      </div>
+                      <div className="release-language-wrap">
+                        <label htmlFor="release-language">{tr('KI-Sprache', 'AI language')}</label>
+                        <select
+                          id="release-language"
+                          className="release-select"
+                          value={notesLanguage}
+                          onChange={(event) => setNotesLanguage(event.target.value === 'de' ? 'de' : 'en')}
+                          disabled={notesGenerating || releaseSubmitting}
+                        >
+                          <option value="en">{tr('Englisch', 'English')}</option>
+                          <option value="de">{tr('Deutsch', 'German')}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="release-ai-options-list">
+                      <AiOptionToggle
+                        label={tr('Merge-Commits ausblenden', 'Exclude merge commits')}
+                        description={tr('Weniger Rauschen in den KI-Notizen.', 'Reduce noise in AI notes.')}
+                        checked={notesOptions.omitMergeCommits}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, omitMergeCommits: next }))}
+                        disabled={notesGenerating || releaseSubmitting}
+                      />
+                      <AiOptionToggle
+                        label={tr('Nach Bereichen gruppieren', 'Group into sections')}
+                        description={tr('Z.B. Added, Changed, Fixed.', 'E.g. Added, Changed, Fixed.')}
+                        checked={notesOptions.preferGroupedSections}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, preferGroupedSections: next }))}
+                        disabled={notesGenerating || releaseSubmitting}
+                      />
+                      <AiOptionToggle
+                        label={tr('Mehr technische Details', 'More technical details')}
+                        description={tr('Fokus auf technische Aenderungen.', 'Focus on technical changes.')}
+                        checked={notesOptions.includeTechnicalDetails}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeTechnicalDetails: next }))}
+                        disabled={notesGenerating || releaseSubmitting}
+                      />
+                      <AiOptionToggle
+                        label={tr('Breaking-Changes-Abschnitt', 'Breaking changes section')}
+                        description={tr('Wird immer als eigener Abschnitt behandelt.', 'Always handled as a separate section.')}
+                        checked={notesOptions.includeBreakingChangesSection}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeBreakingChangesSection: next }))}
+                        disabled={notesGenerating || releaseSubmitting}
+                      />
+                      <AiOptionToggle
+                        label={tr('Automatische Commit-Liste anhaengen', 'Append automatic commit list')}
+                        description={tr('Wird lokal ohne KI erzeugt.', 'Generated locally without AI.')}
+                        checked={notesOptions.appendAlgorithmicChangeList}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, appendAlgorithmicChangeList: next }))}
+                        disabled={notesGenerating || releaseSubmitting}
+                      />
+                      <AiOptionToggle
+                        label={tr('Commit-Hashes anzeigen', 'Show commit hashes')}
+                        description={tr('Nur fuer die automatische Commit-Liste.', 'Only for the automatic commit list.')}
+                        checked={notesOptions.includeHashesInAlgorithmicList}
+                        onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeHashesInAlgorithmicList: next }))}
+                        disabled={notesGenerating || releaseSubmitting || !notesOptions.appendAlgorithmicChangeList}
+                      />
+                    </div>
+
+                    <div className="release-ai-main-actions">
+                      <button
+                        className="release-ai-generate-btn"
+                        onClick={() => void onGenerateNotes()}
+                        disabled={!canGenerateNotes}
+                      >
+                        <Sparkles size={16} />
+                        {notesGenerating ? tr('KI erstellt Release Notes...', 'AI is generating release notes...') : tr('Release Notes mit KI generieren', 'Generate release notes with AI')}
+                      </button>
+                    </div>
                   </div>
-                </article>
-              ))}
-            </div>
+
+                  <div className="release-publish-panel">
+                    <header className="release-publish-head">
+                      <h3>{tr('3. Veroeffentlichen', '3. Publish')}</h3>
+                    </header>
+
+                    <div className="release-options-grid release-options-grid--compact">
+                      <label className="release-option-card">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(releaseForm.draft)}
+                          onChange={(event) => setReleaseForm((prev) => ({ ...prev, draft: event.target.checked }))}
+                          disabled={!ownerRepo || releaseSubmitting}
+                        />
+                        <span className="release-option-copy">
+                          <strong>{tr('Entwurf', 'Draft')}</strong>
+                          <small>{tr('Release speichern, aber nicht sofort veroeffentlichen.', 'Save the release without publishing it immediately.')}</small>
+                        </span>
+                      </label>
+                      <label className="release-option-card">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(releaseForm.prerelease)}
+                          onChange={(event) => setReleaseForm((prev) => ({ ...prev, prerelease: event.target.checked }))}
+                          disabled={!ownerRepo || releaseSubmitting}
+                        />
+                        <span className="release-option-copy">
+                          <strong>{tr('Pre-Release', 'Pre-release')}</strong>
+                          <small>{tr('Kennzeichnet die Version als Vorabstatus (beta/rc).', 'Marks this version as an early preview (beta/rc).')}</small>
+                        </span>
+                      </label>
+                    </div>
+
+                    <button
+                      className="release-primary-btn"
+                      onClick={() => { void onCreateRelease(); }}
+                      disabled={!canCreateRelease}
+                    >
+                      <Check size={14} />
+                      {releaseSubmitting ? tr('Erstelle Release...', 'Creating release...') : tr('Release erstellen', 'Create release')}
+                    </button>
+
+                    <p className={`release-inline ${canCreateRelease ? 'release-inline--muted' : 'release-inline--warning'}`}>
+                      {canCreateRelease ? <Check size={13} /> : <AlertCircle size={13} />}
+                      {createHint}
+                    </p>
+                  </div>
+                </aside>
+
+                <div className="release-notes-editor-pane">
+                  <label className="release-field release-field--full release-field--editor">
+                    <span className="release-field-label">{tr('Release Notes (Markdown)', 'Release notes (Markdown)')}</span>
+                    <textarea
+                      className="release-textarea release-textarea--editor"
+                      value={releaseForm.body || ''}
+                      onChange={(event) => setReleaseForm((prev) => ({ ...prev, body: event.target.value }))}
+                      rows={20}
+                      disabled={!ownerRepo || releaseSubmitting}
+                      placeholder={tr('- Added\n- Changed\n- Fixed', '- Added\n- Changed\n- Fixed')}
+                    />
+                  </label>
+
+                  <div className="release-notes-meta">
+                    <span>{tr('Zeilen', 'Lines')}: {bodyLineCount}</span>
+                    <span>{tr('Zeichen', 'Characters')}: {bodyCharCount}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
           </section>
+        </main>
+
+        <aside className="release-history-panel">
+          <div className="release-history-toolbar">
+            <div className="release-history-toolbar-copy">
+              <span className="release-eyebrow">{tr('History', 'History')}</span>
+              <strong>{tr('Commits seit letztem Release', 'Commits since last release')}</strong>
+            </div>
+            <button
+              className="staging-tool-btn"
+              onClick={() => void onRefreshContext()}
+              disabled={!ownerRepo || contextLoading || releaseSubmitting}
+              title={tr('Daten aktualisieren', 'Refresh data')}
+            >
+              <RefreshCw size={12} className={contextLoading ? 'spin' : ''} />
+              {contextLoading ? tr('Aktualisiere...', 'Refreshing...') : tr('Aktualisieren', 'Refresh')}
+            </button>
+          </div>
+          <div className="release-history-scroll">
+            {commitsCount === 0 && (
+              <div className="release-empty-state">
+                <GitBranch size={16} />
+                {tr('Keine Commits gefunden.', 'No commits found.')}
+              </div>
+            )}
+            {commits.map((commit) => (
+              <div key={commit.hash} className="release-history-row">
+                <div className="release-history-row-subject">{commit.subject}</div>
+                <div className="release-history-row-meta">
+                  <code>{commit.shortHash}</code>
+                  <span>{commit.author}</span>
+                  <span><Clock3 size={11} /> {commit.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </aside>
       </div>
     </div>
