@@ -1,5 +1,6 @@
-﻿@import './styles/base.css';
+@import './styles/base.css';
 @import './styles/settings-and-sidebar.css';
+@import './styles/release-creator.css';
 @import './styles/commit-graph.css';
 @import './styles/staging-and-conflicts.css';
 @import './styles/diff-viewer.css';
