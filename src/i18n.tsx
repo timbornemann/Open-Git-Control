@@ -119,12 +119,23 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ language, children }
       const tag = node.parentElement.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE') return;
 
-      const original = originalTextNodesRef.current.get(node) ?? node.data;
-
       if (language === 'en') {
-        if (!originalTextNodesRef.current.has(node)) {
-          originalTextNodesRef.current.set(node, node.data);
+        const hadOriginal = originalTextNodesRef.current.has(node);
+        const storedOriginal = originalTextNodesRef.current.get(node);
+        let original = storedOriginal ?? node.data;
+
+        if (hadOriginal) {
+          const translatedStored = translateLegacyToEn(original);
+          // If text changed externally (for example by React state updates),
+          // treat the new value as the new source instead of forcing the old one.
+          if (translatedStored !== node.data) {
+            original = node.data;
+            originalTextNodesRef.current.set(node, original);
+          }
+        } else {
+          originalTextNodesRef.current.set(node, original);
         }
+
         const translated = translateLegacyToEn(original);
         if (translated !== node.data) {
           node.data = translated;
@@ -132,6 +143,7 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({ language, children }
         return;
       }
 
+      const original = originalTextNodesRef.current.get(node) ?? node.data;
       const normalized = normalizeLegacyGerman(original);
       if (normalized !== node.data) {
         node.data = normalized;
