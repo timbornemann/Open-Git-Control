@@ -346,8 +346,22 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                   {aiCommit.aiProgressMessage}
                 </span>
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-                  {`${tr('Phase', 'Phase')}: ${aiCommit.aiPhase} | ${tr('Modus', 'Mode')}: ${aiCommit.aiMode}${aiCommit.aiRemainingFiles !== null ? ` | ${tr('Rest', 'Remaining')}: ${aiCommit.aiRemainingFiles}` : ''}`}
+                  {[
+                    `${tr('Phase', 'Phase')}: ${aiCommit.aiPhase}`,
+                    `${tr('Modus', 'Mode')}: ${aiCommit.aiMode}`,
+                    aiCommit.aiGroupId !== null ? `${tr('Gruppe', 'Group')}: ${aiCommit.aiGroupId}` : null,
+                    aiCommit.aiGroupSize !== null ? `${tr('Batch', 'Batch')}: ${aiCommit.aiGroupSize}` : null,
+                  ].filter(Boolean).join(' | ')}
                 </span>
+                {(aiCommit.aiProcessedFiles !== null || aiCommit.aiRemainingFiles !== null || aiCommit.aiTotalCommits !== null) && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                    {[
+                      aiCommit.aiProcessedFiles !== null ? `${tr('Verarbeitet', 'Processed')}: ${aiCommit.aiProcessedFiles}` : null,
+                      aiCommit.aiRemainingFiles !== null ? `${tr('Rest', 'Remaining')}: ${aiCommit.aiRemainingFiles}` : null,
+                      aiCommit.aiTotalCommits !== null ? `${tr('Commits', 'Commits')}: ${aiCommit.aiTotalCommits}` : null,
+                    ].filter(Boolean).join(' | ')}
+                  </span>
+                )}
                 {aiCommit.aiLastCommit && (
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={aiCommit.aiLastCommit}>
                     {`${tr('Letzter Commit', 'Last commit')}: ${aiCommit.aiLastCommit}`}
