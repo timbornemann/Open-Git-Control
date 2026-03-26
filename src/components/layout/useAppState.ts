@@ -8,6 +8,11 @@ import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
 import { validateGithubReleaseInput } from '../../utils/githubReleaseValidation';
+import {
+  buildAlgorithmicChangeListMarkdown,
+  buildReleaseNotesPromptHints,
+  filterCommitsForReleaseNotes,
+} from '../../utils/releaseNotes';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
 import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
 import {
@@ -69,6 +74,8 @@ export const useAppState = () => {
     setReleaseNotesGenerating,
     releaseNotesLanguage,
     setReleaseNotesLanguage,
+    releaseNotesOptions,
+    setReleaseNotesOptions,
   } = usePrAndReleaseState();
 
   const { toast: gitActionToast, toasts: gitActionToasts, setToast: setGitActionToast, dismiss: dismissToast } = useToastQueue(3000);
@@ -657,11 +664,13 @@ export const useAppState = () => {
       return;
     }
 
-    const commits = releaseContext?.commitsSinceLastRelease || [];
-    if (commits.length === 0) {
+    const sourceCommits = releaseContext?.commitsSinceLastRelease || [];
+    if (sourceCommits.length === 0) {
       setReleaseError(tr('Keine Commit-Basis fuer KI vorhanden.', 'No commit base for AI generation available.'));
       return;
     }
+    const commits = filterCommitsForReleaseNotes(sourceCommits, releaseNotesOptions);
+    const promptHints = buildReleaseNotesPromptHints(releaseNotesOptions, releaseNotesLanguage);
 
     const tagName = (releaseForm.tagName || '').trim();
     const releaseName = (releaseForm.releaseName || '').trim() || `Release ${tagName || 'next'}`;
@@ -680,6 +689,7 @@ export const useAppState = () => {
         lastReleaseTag: releaseContext?.lastReleaseTag || null,
         commits,
         language: releaseNotesLanguage,
+        hints: promptHints,
       });
 
       if (!result.success) {
@@ -687,10 +697,22 @@ export const useAppState = () => {
         return;
       }
 
+      let markdown = result.data.markdown || '';
+      if (releaseNotesOptions.appendAlgorithmicChangeList) {
+        const automaticList = buildAlgorithmicChangeListMarkdown(
+          commits,
+          releaseNotesLanguage,
+          releaseNotesOptions.includeHashesInAlgorithmicList,
+        );
+        if (automaticList) {
+          markdown = `${markdown.trim()}\n\n${automaticList}`.trim();
+        }
+      }
+
       setReleaseFormState((prev) => ({
         ...prev,
         releaseName: prev.releaseName || releaseName,
-        body: result.data.markdown,
+        body: markdown,
       }));
       setGitActionToast({ msg: tr('Release Notes mit KI erstellt.', 'AI release notes generated.'), isError: false });
     } catch (error: any) {
@@ -705,6 +727,7 @@ export const useAppState = () => {
     releaseForm.tagName,
     releaseForm.releaseName,
     releaseNotesLanguage,
+    releaseNotesOptions,
     tr,
     setGitActionToast,
   ]);
@@ -948,6 +971,8 @@ export const useAppState = () => {
     generateReleaseNotesWithAI,
     releaseNotesLanguage,
     setReleaseNotesLanguage,
+    releaseNotesOptions,
+    setReleaseNotesOptions,
     handleCreateRelease,
     handleOpenPR,
     handleCopyPRUrl,

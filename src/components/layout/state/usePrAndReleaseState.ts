@@ -4,6 +4,7 @@ import type {
   GitHubReleaseContextDto,
   GitHubReleaseDto,
 } from '../../../global';
+import { DEFAULT_RELEASE_NOTES_OPTIONS, ReleaseNotesOptions } from '../../../types/releaseNotes';
 
 export const usePrAndReleaseState = () => {
   const [showCreatePR, setShowCreatePR] = useState(false);
@@ -31,6 +32,7 @@ export const usePrAndReleaseState = () => {
   const [releaseContext, setReleaseContext] = useState<GitHubReleaseContextDto | null>(null);
   const [releaseNotesGenerating, setReleaseNotesGenerating] = useState(false);
   const [releaseNotesLanguage, setReleaseNotesLanguage] = useState<'de' | 'en'>('en');
+  const [releaseNotesOptions, setReleaseNotesOptions] = useState<ReleaseNotesOptions>(DEFAULT_RELEASE_NOTES_OPTIONS);
 
   return {
     showCreatePR,
@@ -63,6 +65,7 @@ export const usePrAndReleaseState = () => {
     setReleaseNotesGenerating,
     releaseNotesLanguage,
     setReleaseNotesLanguage,
+    releaseNotesOptions,
+    setReleaseNotesOptions,
   };
 };
-

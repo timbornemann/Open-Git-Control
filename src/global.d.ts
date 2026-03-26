@@ -397,6 +397,7 @@ export interface ElectronAPI {
     lastReleaseTag?: string | null;
     commits: ReleaseCommitDto[];
     language: 'de' | 'en';
+    hints?: string[];
   }) => Promise<IpcResult<{ markdown: string }>>;
 
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
