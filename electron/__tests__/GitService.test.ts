@@ -142,3 +142,75 @@ describe('GitService stale index.lock recovery', () => {
     }
   });
 });
+
+describe('GitService command queue', () => {
+  it('serializes concurrent mutating runCommand calls per repository', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return { stdout: '', stderr: '' };
+    });
+
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo');
+
+    await Promise.all([
+      service.runCommand(['add', '--', 'a.txt']),
+      service.runCommand(['add', '--', 'b.txt']),
+      service.runCommand(['commit', '-m', 'test']),
+    ]);
+
+    expect(fakeExec).toHaveBeenCalledTimes(3);
+    expect(maxInFlight).toBe(1);
+  });
+
+  it('continues processing queued commands after a failed command', async () => {
+    let callCount = 0;
+    const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
+      callCount += 1;
+      if (callCount === 1) {
+        const err: any = new Error('first call failed');
+        err.stderr = 'fatal: test failure';
+        throw err;
+      }
+      return { stdout: 'ok\n', stderr: '' };
+    });
+
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo-2');
+
+    await expect(service.runCommand(['add', '--', 'x.txt'])).rejects.toThrow('fatal: test failure');
+    await expect(service.runCommand(['add', '--', 'y.txt'])).resolves.toBe('ok');
+    expect(fakeExec).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not serialize non-mutating read commands', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return { stdout: '', stderr: '' };
+    });
+
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo-3');
+
+    await Promise.all([
+      service.runCommand(['status', '--short']),
+      service.runCommand(['diff', '--name-only']),
+      service.runCommand(['log', '-1']),
+    ]);
+
+    expect(fakeExec).toHaveBeenCalledTimes(3);
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
+});

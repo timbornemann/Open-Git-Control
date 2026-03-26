@@ -6,11 +6,35 @@ import * as fs from 'fs';
 
 const execFileAsync = util.promisify(execFile);
 const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
+const INDEX_LOCK_RETRY_MAX_ATTEMPTS = 6;
+const INDEX_LOCK_RETRY_BASE_DELAY_MS = 75;
+const INDEX_LOCK_RETRY_MAX_DELAY_MS = 600;
+
+type ExecFileAsyncResult = { stdout: string; stderr: string };
+type ExecFileAsyncRunner = (file: string, args: string[], options: any) => Promise<ExecFileAsyncResult>;
+
+const SERIALIZED_GIT_COMMANDS = new Set<string>([
+  'add',
+  'commit',
+  'reset',
+  'checkout',
+  'merge',
+  'rebase',
+  'cherry-pick',
+  'revert',
+  'stash',
+  'clean',
+  'apply',
+  'submodule',
+]);
 
 export type CommitStats = { files: number; additions: number; deletions: number };
 
 export class GitService {
   private repoPath: string | null = null;
+  private readonly repoExecutionQueue = new Map<string, Promise<void>>();
+
+  constructor(private readonly execFileAsyncRunner: ExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner) {}
 
   setRepoPath(newPath: string) {
     const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
@@ -100,6 +124,43 @@ export class GitService {
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
   }
 
+  private getRepoQueueKey(repoPath: string): string {
+    const resolved = path.resolve(repoPath);
+    return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  }
+
+  private async runSerializedPerRepo<T>(repoPath: string, task: () => Promise<T>): Promise<T> {
+    const queueKey = this.getRepoQueueKey(repoPath);
+    const previous = this.repoExecutionQueue.get(queueKey) || Promise.resolve();
+    let release: () => void = () => {};
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.repoExecutionQueue.set(queueKey, current);
+
+    await previous.catch(() => undefined);
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.repoExecutionQueue.get(queueKey) === current) {
+        this.repoExecutionQueue.delete(queueKey);
+      }
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  private shouldSerializeCommand(args: string[]): boolean {
+    const firstToken = String(args?.[0] || '').trim().toLowerCase();
+    if (!firstToken) return false;
+    return SERIALIZED_GIT_COMMANDS.has(firstToken);
+  }
+
   private async execGit(repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     const env = envOverrides ? { ...process.env, ...envOverrides } : process.env;
     const execOptions = {
@@ -108,21 +169,41 @@ export class GitService {
       env,
     };
 
-    try {
-      const { stdout } = await execFileAsync('git', args, execOptions);
-      return stdout.trimEnd();
-    } catch (error: any) {
-      if (this.isIndexLockError(error) && this.removeStaleIndexLockIfSafe(repoPath, args)) {
+    const executeWithRetries = async (): Promise<string> => {
+      let retryAttempt = 0;
+
+      while (true) {
         try {
-          const { stdout } = await execFileAsync('git', args, execOptions);
+          const { stdout } = await this.execFileAsyncRunner('git', args, execOptions);
           return stdout.trimEnd();
-        } catch (retryError: any) {
-          throw this.normalizeGitError(retryError, args);
+        } catch (error: any) {
+          if (!this.isIndexLockError(error)) {
+            throw this.normalizeGitError(error, args);
+          }
+
+          if (this.removeStaleIndexLockIfSafe(repoPath, args)) {
+            continue;
+          }
+
+          if (retryAttempt >= INDEX_LOCK_RETRY_MAX_ATTEMPTS) {
+            throw this.normalizeGitError(error, args);
+          }
+
+          const delayMs = Math.min(
+            INDEX_LOCK_RETRY_MAX_DELAY_MS,
+            INDEX_LOCK_RETRY_BASE_DELAY_MS * (2 ** retryAttempt),
+          );
+          retryAttempt += 1;
+          await this.sleep(delayMs);
         }
       }
+    };
 
-      throw this.normalizeGitError(error, args);
+    if (!this.shouldSerializeCommand(args)) {
+      return executeWithRetries();
     }
+
+    return this.runSerializedPerRepo(repoPath, executeWithRetries);
   }
 
   /**
