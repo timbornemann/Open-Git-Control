@@ -361,6 +361,7 @@ export interface ElectronAPI {
   ollamaListModels: () => Promise<IpcResult<string[]>>;
   runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
   cancelAiAutoCommit: () => Promise<{ success: boolean; canceled: boolean }>;
+  getAiAutoCommitState: () => Promise<IpcResult<GitJobEventDto | null>>;
   githubAuth: (token: string, host?: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;

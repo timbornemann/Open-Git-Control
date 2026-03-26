@@ -3,9 +3,8 @@ import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
 import type { GitStatusWithConflicts } from './types';
 
-const AI_LOCAL_STATE_EVENT = 'ai:auto-commit-local-state';
-const CANCEL_IPC_TIMEOUT_MS = 4_000;
-const CANCEL_FORCE_COMPLETE_MS = 8_000;
+const AI_STATE_POLL_INTERVAL_MS = 500;
+const LIVE_REFRESH_MIN_INTERVAL_MS = 1_200;
 
 type Params = {
   status: GitStatusWithConflicts | null;
@@ -13,6 +12,24 @@ type Params = {
   refresh: () => Promise<void>;
   onRepoChanged?: () => void;
 };
+
+type AiJobStatus = 'idle' | 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
+
+type AiJobEvent = {
+  operation?: unknown;
+  status?: unknown;
+  message?: unknown;
+  details?: Record<string, unknown>;
+  timestamp?: unknown;
+};
+
+const asNumber = (value: unknown): number | null => (
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+);
+
+const asString = (value: unknown): string | null => (
+  typeof value === 'string' && value.trim().length > 0 ? value : null
+);
 
 export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params) => {
   const { tr } = useI18n();
@@ -23,145 +40,163 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
   const [aiMode, setAiMode] = useState<string>('normal');
   const [aiLastCommit, setAiLastCommit] = useState<string | null>(null);
   const [aiRemainingFiles, setAiRemainingFiles] = useState<number | null>(null);
-  const aiStartLockRef = useRef(false);
-  const aiInvokeSeqRef = useRef(0);
-  const cancelRequestedRef = useRef(false);
-  const backendJobSeenRef = useRef(false);
-  const suppressNonTerminalEventsRef = useRef(false);
-  const cancelForceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [aiProcessedFiles, setAiProcessedFiles] = useState<number | null>(null);
+  const [aiGroupId, setAiGroupId] = useState<number | null>(null);
+  const [aiGroupSize, setAiGroupSize] = useState<number | null>(null);
+  const [aiTotalCommits, setAiTotalCommits] = useState<number | null>(null);
 
-  const emitLocalRunningState = useCallback((running: boolean) => {
-    window.dispatchEvent(new CustomEvent(AI_LOCAL_STATE_EVENT, { detail: { running } }));
-  }, []);
+  const aiStartLockRef = useRef(false);
+  const cancelRequestedRef = useRef(false);
+  const lastKnownStatusRef = useRef<AiJobStatus>('idle');
+  const lastEventTimestampRef = useRef(0);
+  const lastRefreshAtRef = useRef(0);
+
+  const maybeRefresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < LIVE_REFRESH_MIN_INTERVAL_MS) return;
+    lastRefreshAtRef.current = now;
+    void refresh();
+  }, [refresh]);
+
+  const applyAiJobEvent = useCallback((eventRaw: AiJobEvent | null | undefined) => {
+    if (!eventRaw || eventRaw.operation !== 'git:aiAutoCommit') return;
+
+    const eventTimestamp = asNumber(eventRaw.timestamp) ?? Date.now();
+    if (eventTimestamp < lastEventTimestampRef.current) {
+      return;
+    }
+    lastEventTimestampRef.current = eventTimestamp;
+
+    const details = (eventRaw.details && typeof eventRaw.details === 'object') ? eventRaw.details : {};
+    const phase = asString(details.phase);
+    const mode = asString(details.mode);
+    const lastCommit = asString(details.lastCommit);
+    const remainingFiles = asNumber(details.remainingFiles);
+    const processedFiles = asNumber(details.processedFiles);
+    const groupId = asNumber(details.groupId);
+    const groupSize = asNumber(details.groupSize);
+    const totalCommits = asNumber(details.totalCommits);
+
+    if (phase) setAiPhase(phase);
+    if (mode) setAiMode(mode);
+    if (lastCommit) setAiLastCommit(lastCommit);
+    if (remainingFiles !== null) setAiRemainingFiles(remainingFiles);
+    if (processedFiles !== null) setAiProcessedFiles(processedFiles);
+    if (groupId !== null) setAiGroupId(groupId);
+    if (groupSize !== null) setAiGroupSize(groupSize);
+    if (totalCommits !== null) setAiTotalCommits(totalCommits);
+
+    const statusValue = asString(eventRaw.status);
+    if (statusValue === 'start' || statusValue === 'progress') {
+      lastKnownStatusRef.current = statusValue;
+      setIsAiCommitting(true);
+      setIsAiJobRunning(true);
+      setAiProgressMessage(asString(eventRaw.message) || tr('KI arbeitet...', 'AI is working...'));
+      maybeRefresh();
+      return;
+    }
+
+    if (statusValue === 'done' || statusValue === 'failed' || statusValue === 'cancelled') {
+      lastKnownStatusRef.current = statusValue;
+      cancelRequestedRef.current = false;
+      aiStartLockRef.current = false;
+      setIsAiCommitting(false);
+      setIsAiJobRunning(false);
+
+      if (statusValue === 'done') {
+        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
+      } else if (statusValue === 'cancelled') {
+        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit abgebrochen.', 'AI auto-commit cancelled.'));
+      } else {
+        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.'));
+      }
+
+      lastRefreshAtRef.current = Date.now();
+      void refresh();
+    }
+  }, [maybeRefresh, refresh, tr]);
+
+  const pullLatestAiState = useCallback(async () => {
+    if (!window.electronAPI) return;
+    try {
+      const result = await window.electronAPI.getAiAutoCommitState();
+      if (!result?.success || !result.data) return;
+      applyAiJobEvent(result.data as AiJobEvent);
+    } catch {
+      // ignore transient polling failures
+    }
+  }, [applyAiJobEvent]);
 
   useEffect(() => {
     if (!window.electronAPI) return;
-
-    const unsubscribe = window.electronAPI.onJobEvent((event) => {
-      if (event.operation !== 'git:aiAutoCommit') return;
-
-      const details = event.details || {};
-      const phase = typeof details.phase === 'string' ? details.phase : null;
-      const mode = typeof details.mode === 'string' ? details.mode : null;
-      const lastCommit = typeof details.lastCommit === 'string' ? details.lastCommit : null;
-      const remaining = typeof details.remainingFiles === 'number' ? details.remainingFiles : null;
-
-      if (phase) setAiPhase(phase);
-      if (mode) setAiMode(mode);
-      if (lastCommit) setAiLastCommit(lastCommit);
-      if (remaining !== null) setAiRemainingFiles(remaining);
-
-      if (suppressNonTerminalEventsRef.current && (event.status === 'start' || event.status === 'progress')) {
-        return;
-      }
-
-      if (event.status === 'start' || event.status === 'progress') {
-        if (cancelRequestedRef.current) {
-          setAiProgressMessage(tr('Abbruch wird ausgefuehrt...', 'Cancellation in progress...'));
-          setAiPhase('cancelled');
-          return;
-        }
-        backendJobSeenRef.current = true;
-        setIsAiJobRunning(true);
-        setAiProgressMessage(event.message || tr('KI arbeitet...', 'AI is working...'));
-        emitLocalRunningState(true);
-        return;
-      }
-
-      if (event.status === 'done') {
-        if (cancelForceTimerRef.current) {
-          clearTimeout(cancelForceTimerRef.current);
-          cancelForceTimerRef.current = null;
-        }
-        backendJobSeenRef.current = false;
-        cancelRequestedRef.current = false;
-        suppressNonTerminalEventsRef.current = false;
-        aiStartLockRef.current = false;
-        setIsAiJobRunning(false);
-        setIsAiCommitting(false);
-        setAiProgressMessage(event.message || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
-        emitLocalRunningState(false);
-        return;
-      }
-
-      if (event.status === 'failed') {
-        if (cancelForceTimerRef.current) {
-          clearTimeout(cancelForceTimerRef.current);
-          cancelForceTimerRef.current = null;
-        }
-        backendJobSeenRef.current = false;
-        cancelRequestedRef.current = false;
-        suppressNonTerminalEventsRef.current = false;
-        aiStartLockRef.current = false;
-        setIsAiJobRunning(false);
-        setIsAiCommitting(false);
-        setAiProgressMessage(event.message || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.'));
-        emitLocalRunningState(false);
-        return;
-      }
-
-      if (event.status === 'cancelled') {
-        if (cancelForceTimerRef.current) {
-          clearTimeout(cancelForceTimerRef.current);
-          cancelForceTimerRef.current = null;
-        }
-        backendJobSeenRef.current = false;
-        cancelRequestedRef.current = false;
-        suppressNonTerminalEventsRef.current = false;
-        aiStartLockRef.current = false;
-        setIsAiJobRunning(false);
-        setIsAiCommitting(false);
-        setAiProgressMessage(event.message || tr('KI Auto-Commit abgebrochen.', 'AI auto-commit cancelled.'));
-        emitLocalRunningState(false);
-      }
-    });
-
+    const unsubscribe = window.electronAPI.onJobEvent((event) => applyAiJobEvent(event as AiJobEvent));
     return unsubscribe;
-  }, [emitLocalRunningState, tr]);
+  }, [applyAiJobEvent]);
 
   useEffect(() => {
+    void pullLatestAiState();
+  }, [pullLatestAiState]);
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    if (!isAiCommitting && !isAiJobRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      void pullLatestAiState();
+    }, AI_STATE_POLL_INTERVAL_MS);
+
     return () => {
-      if (cancelForceTimerRef.current) {
-        clearTimeout(cancelForceTimerRef.current);
-        cancelForceTimerRef.current = null;
-      }
+      window.clearInterval(intervalId);
     };
-  }, []);
+  }, [isAiCommitting, isAiJobRunning, pullLatestAiState]);
 
   const handleAiAutoCommit = useCallback(async () => {
-    if (!window.electronAPI || !status || aiStartLockRef.current) return;
+    if (!window.electronAPI || !status) return;
+    if (aiStartLockRef.current || isAiCommitting || isAiJobRunning) return;
 
     if (status.conflicts.length > 0) {
       setToast({ msg: tr('Bitte zuerst alle Konflikte aufloesen.', 'Please resolve all conflicts first.'), isError: true });
       return;
     }
 
-    if (status.staged.length + status.unstaged.length + status.untracked.length === 0) {
+    const totalFiles = status.staged.length + status.unstaged.length + status.untracked.length;
+    if (totalFiles === 0) {
       setToast({ msg: tr('Keine Aenderungen fuer KI Auto-Commit vorhanden.', 'No changes available for AI auto-commit.'), isError: true });
       return;
     }
+
+    cancelRequestedRef.current = false;
+    aiStartLockRef.current = true;
+    lastKnownStatusRef.current = 'start';
+    lastEventTimestampRef.current = Date.now() - 1;
+    lastRefreshAtRef.current = 0;
+
     setAiPhase('snapshot');
     setAiMode('normal');
     setAiLastCommit(null);
-    setAiRemainingFiles(status.staged.length + status.unstaged.length + status.untracked.length);
-    setIsAiJobRunning(true);
+    setAiGroupId(null);
+    setAiGroupSize(null);
+    setAiTotalCommits(null);
+    setAiProcessedFiles(0);
+    setAiRemainingFiles(totalFiles);
     setAiProgressMessage(tr('KI startet...', 'AI is starting...'));
-    emitLocalRunningState(true);
-    aiInvokeSeqRef.current += 1;
-    const invokeSeq = aiInvokeSeqRef.current;
-    cancelRequestedRef.current = false;
-    backendJobSeenRef.current = false;
-    suppressNonTerminalEventsRef.current = false;
-    aiStartLockRef.current = true;
     setIsAiCommitting(true);
+    setIsAiJobRunning(true);
+    maybeRefresh();
+
     try {
       const result = await window.electronAPI.runAiAutoCommit();
-      if (invokeSeq !== aiInvokeSeqRef.current || cancelRequestedRef.current) {
-        return;
-      }
+      if (cancelRequestedRef.current) return;
 
       if (!result.success) {
-        setToast({ msg: result.error || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.'), isError: true });
+        const errorMessage = result.error || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.');
+        const cancelled = /abgebrochen|cancel/i.test(errorMessage);
+        setToast({ msg: errorMessage, isError: !cancelled });
+        lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
+        setAiPhase(cancelled ? 'cancelled' : 'failed');
+        setAiProgressMessage(errorMessage);
+        setIsAiJobRunning(false);
+        await refresh();
         return;
       }
 
@@ -170,9 +205,14 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
       const diagnostics = result.data.diagnostics || [];
 
       if (commits.length === 0) {
-        setToast({ msg: result.data.summary || tr('KI hat keine Commits erstellt.', 'AI did not create commits.'), isError: false });
+        setToast({
+          msg: result.data.summary || tr('KI hat keine Commits erstellt.', 'AI did not create commits.'),
+          isError: false,
+        });
       } else {
-        const list = commits.map((commit: { hash: string; subject: string }) => `${commit.hash} ${commit.subject}`).join(' | ');
+        const list = commits
+          .map((commit: { hash: string; subject: string }) => `${commit.hash} ${commit.subject}`)
+          .join(' | ');
         const extra = warnings.length > 0 ? tr(` | Hinweise: ${warnings.length}`, ` | Warnings: ${warnings.length}`) : '';
         setToast({ msg: tr(`KI Commit(s): ${list}${extra}`, `AI commit(s): ${list}${extra}`), isError: false });
       }
@@ -180,68 +220,70 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
       if (diagnostics.length > 0) {
         console.info('AI Auto-Commit diagnostics:', diagnostics);
       }
+
       if (onRepoChanged) onRepoChanged();
       await refresh();
+
+      if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
+        lastKnownStatusRef.current = 'done';
+        setAiPhase('done');
+        setAiProgressMessage(result.data.summary || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
+      }
+      setIsAiJobRunning(false);
     } catch (error: unknown) {
-      if (invokeSeq !== aiInvokeSeqRef.current || cancelRequestedRef.current) {
-        return;
-      }
-      setToast({ msg: error instanceof Error ? error.message : tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.'), isError: true });
+      if (cancelRequestedRef.current) return;
+
+      const message = error instanceof Error
+        ? error.message
+        : tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.');
+
+      const cancelled = /abgebrochen|cancel/i.test(message);
+      setToast({ msg: message, isError: !cancelled });
+      lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
+      setAiPhase(cancelled ? 'cancelled' : 'failed');
+      setAiProgressMessage(message);
+      setIsAiJobRunning(false);
+      await refresh();
     } finally {
-      if (invokeSeq === aiInvokeSeqRef.current) {
-        aiStartLockRef.current = false;
-        setIsAiCommitting(false);
-        if (!backendJobSeenRef.current) {
-          setIsAiJobRunning(false);
-          emitLocalRunningState(false);
-        }
-      }
+      aiStartLockRef.current = false;
+      cancelRequestedRef.current = false;
+      setIsAiCommitting(false);
     }
-  }, [emitLocalRunningState, status, setToast, refresh, onRepoChanged, tr]);
+  }, [isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, refresh, setToast, status, tr]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
     if (!window.electronAPI) return;
 
-    cancelRequestedRef.current = true;
-    suppressNonTerminalEventsRef.current = true;
-    aiInvokeSeqRef.current += 1;
-    aiStartLockRef.current = false;
-    setIsAiCommitting(false);
-    setIsAiJobRunning(true);
-    setAiPhase('cancelled');
-    setAiProgressMessage(tr('Abbruch angefordert...', 'Cancellation requested...'));
-    emitLocalRunningState(true);
-
-    if (cancelForceTimerRef.current) {
-      clearTimeout(cancelForceTimerRef.current);
-      cancelForceTimerRef.current = null;
+    if (!isAiCommitting && !isAiJobRunning) {
+      setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
+      return;
     }
-    cancelForceTimerRef.current = setTimeout(() => {
-      if (!cancelRequestedRef.current) return;
-      cancelRequestedRef.current = false;
-      backendJobSeenRef.current = false;
-      suppressNonTerminalEventsRef.current = true;
-      setIsAiJobRunning(false);
-      setIsAiCommitting(false);
-      setAiPhase('cancelled');
-      setAiProgressMessage(tr('Abbruch lokal abgeschlossen.', 'Cancellation completed locally.'));
-      emitLocalRunningState(false);
-    }, CANCEL_FORCE_COMPLETE_MS);
+
+    cancelRequestedRef.current = true;
+    setAiProgressMessage(tr('Abbruch angefordert...', 'Cancellation requested...'));
+    setIsAiJobRunning(true);
 
     try {
-      const timeout = new Promise<{ success: false; canceled: false }>((resolve) => {
-        setTimeout(() => resolve({ success: false, canceled: false }), CANCEL_IPC_TIMEOUT_MS);
-      });
-      const result = await Promise.race([window.electronAPI.cancelAiAutoCommit(), timeout]);
-      if (result.success && result.canceled) {
-        setAiProgressMessage(tr('Abbruch wird ausgefuehrt...', 'Cancellation in progress...'));
-      } else {
+      const result = await window.electronAPI.cancelAiAutoCommit();
+      if (!result.success || !result.canceled) {
+        cancelRequestedRef.current = false;
+        setIsAiCommitting(false);
+        setIsAiJobRunning(false);
         setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
+        return;
       }
+
+      await pullLatestAiState();
     } catch (error: unknown) {
-      setToast({ msg: error instanceof Error ? error.message : tr('KI Auto-Commit konnte nicht abgebrochen werden.', 'Could not cancel AI auto-commit.'), isError: true });
+      cancelRequestedRef.current = false;
+      setToast({
+        msg: error instanceof Error
+          ? error.message
+          : tr('KI Auto-Commit konnte nicht abgebrochen werden.', 'Could not cancel AI auto-commit.'),
+        isError: true,
+      });
     }
-  }, [emitLocalRunningState, setToast, tr]);
+  }, [isAiCommitting, isAiJobRunning, pullLatestAiState, setToast, tr]);
 
   return {
     isAiCommitting,
@@ -251,6 +293,10 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
     aiMode,
     aiLastCommit,
     aiRemainingFiles,
+    aiProcessedFiles,
+    aiGroupId,
+    aiGroupSize,
+    aiTotalCommits,
     handleAiAutoCommit,
     handleCancelAiAutoCommit,
   };
