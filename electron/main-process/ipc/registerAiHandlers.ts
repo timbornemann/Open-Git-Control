@@ -41,6 +41,19 @@ export function registerAiHandlers({
 
   ipcMain.handle('git:aiAutoCommit', async (event: any) => {
     const webContents = event.sender;
+    if (currentAiAutoCommitJob) {
+      const message = 'KI Auto-Commit laeuft bereits. Bitte den laufenden Job erst abschliessen oder abbrechen.';
+      emitJobEvent(webContents, {
+        id: currentAiAutoCommitJob.id,
+        operation: 'git:aiAutoCommit',
+        status: 'failed',
+        message,
+        details: { phase: 'failed', mode: 'normal' },
+        timestamp: Date.now(),
+      });
+      return { success: false, error: message };
+    }
+
     const jobId = createJobId('git-aiAutoCommit');
     currentAiAutoCommitJob = { id: jobId, cancelRequested: false };
 
@@ -109,11 +122,19 @@ export function registerAiHandlers({
     }
   });
 
-  ipcMain.handle('git:cancelAiAutoCommit', async () => {
+  ipcMain.handle('git:cancelAiAutoCommit', async (event: any) => {
     if (!currentAiAutoCommitJob) {
       return { success: true, canceled: false };
     }
     currentAiAutoCommitJob.cancelRequested = true;
+    emitJobEvent(event.sender, {
+      id: currentAiAutoCommitJob.id,
+      operation: 'git:aiAutoCommit',
+      status: 'progress',
+      message: 'Abbruch angefordert...',
+      details: { phase: 'snapshot', mode: 'normal' },
+      timestamp: Date.now(),
+    });
     return { success: true, canceled: true };
   });
 

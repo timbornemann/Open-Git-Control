@@ -18,6 +18,7 @@ type SnapshotFile = {
   isBinary: boolean;
   preview: string;
   groupKey: string;
+  hydrated: boolean;
 };
 
 type CommitMessage = {
@@ -652,6 +653,7 @@ export class AiService {
     ensureNotCancelled();
 
     const initialStatus = await this.gitService.getStatusPorcelain();
+    ensureNotCancelled();
     const statusEntries = parseStatusPorcelain(initialStatus);
 
     if (statusEntries.some(entry => CONFLICT_CODES.has(entry.code))) {
@@ -662,68 +664,76 @@ export class AiService {
       throw new Error('Working Tree ist sauber. Keine Commits noetig.');
     }
 
-    const snapshotFiles: SnapshotFile[] = [];
-    for (let index = 0; index < statusEntries.length; index += 1) {
-      ensureNotCancelled();
-      const entry = statusEntries[index];
+    const snapshotFiles: SnapshotFile[] = statusEntries.map((entry) => {
       const pathValue = entry.path;
       const changeType = detectChangeType(entry);
+      return {
+        path: pathValue,
+        changeType,
+        additions: 0,
+        deletions: 0,
+        isBinary: false,
+        preview: '(preview pending)',
+        groupKey: buildGroupKey(pathValue, changeType),
+        hydrated: false,
+      };
+    });
+
+    onProgress?.({
+      phase: 'snapshot',
+      message: `Vorgruppierung abgeschlossen: ${snapshotFiles.length} Datei(en) erkannt`,
+      progress: 14,
+      details: {
+        mode: 'normal',
+        processedFiles: snapshotFiles.length,
+        remainingFiles: snapshotFiles.length,
+      },
+    });
+
+    const hydrateSnapshotFile = async (file: SnapshotFile): Promise<void> => {
+      if (file.hydrated) return;
+      ensureNotCancelled();
 
       let numstatRaw = '';
       try {
-        numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--', pathValue]);
+        numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--', file.path]);
       } catch {
         numstatRaw = '';
       }
 
       if (!numstatRaw.trim()) {
         try {
-          numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--cached', '--', pathValue]);
+          numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--cached', '--', file.path]);
         } catch {
           numstatRaw = '';
         }
       }
 
-      const numstat = parseNumstatLine(numstatRaw.split('\\n').find(Boolean) || '');
+      const numstat = parseNumstatLine(numstatRaw.split(/\r?\n/).find(Boolean) || '');
 
       let previewRaw = '';
       try {
-        previewRaw = await this.gitService.runCommand(['diff', '--', pathValue]);
+        previewRaw = await this.gitService.runCommand(['diff', '--', file.path]);
       } catch {
         previewRaw = '';
       }
 
       if (!previewRaw.trim()) {
         try {
-          previewRaw = await this.gitService.runCommand(['diff', '--cached', '--', pathValue]);
+          previewRaw = await this.gitService.runCommand(['diff', '--cached', '--', file.path]);
         } catch {
           previewRaw = '';
         }
       }
 
-      snapshotFiles.push({
-        path: pathValue,
-        changeType,
-        additions: numstat.additions,
-        deletions: numstat.deletions,
-        isBinary: numstat.isBinary,
-        preview: toPreview(previewRaw),
-        groupKey: buildGroupKey(pathValue, changeType),
-      });
+      file.additions = numstat.additions;
+      file.deletions = numstat.deletions;
+      file.isBinary = numstat.isBinary;
+      file.preview = toPreview(previewRaw);
+      file.hydrated = true;
+      ensureNotCancelled();
+    };
 
-      if (index % 5 === 0 || index === statusEntries.length - 1) {
-        onProgress?.({
-          phase: 'snapshot',
-          message: `Snapshot: ${index + 1}/${statusEntries.length} Dateien analysiert`,
-          progress: Math.min(18, 5 + Math.floor(((index + 1) / Math.max(1, statusEntries.length)) * 12)),
-          details: {
-            mode: 'normal',
-            processedFiles: index + 1,
-            remainingFiles: Math.max(0, statusEntries.length - (index + 1)),
-          },
-        });
-      }
-    }
     onProgress?.({
       phase: 'grouping',
       message: `Dateien werden gruppiert (${snapshotFiles.length})...`,
@@ -773,14 +783,21 @@ export class AiService {
           },
         });
 
+        for (const file of windowFiles) {
+          await hydrateSnapshotFile(file);
+        }
+        ensureNotCancelled();
+
         let selectedPaths: string[] = [];
 
         if (mode === 'fallback') {
           selectedPaths = windowFiles.map(file => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
         } else {
           try {
+            ensureNotCancelled();
             modelTurns += 1;
             selectedPaths = await chooseFilesWithAi(settings, windowFiles, getGeminiApiKey);
+            ensureNotCancelled();
           } catch (error: unknown) {
             diagnostics.push(error instanceof Error ? error.message : 'KI-Auswahl fehlgeschlagen.');
             selectedPaths = [];
@@ -854,8 +871,10 @@ export class AiService {
 
           let message: CommitMessage;
           try {
+            ensureNotCancelled();
             modelTurns += 1;
             message = await generateCommitMessageWithAi(settings, batchFiles, getGeminiApiKey);
+            ensureNotCancelled();
           } catch (error: unknown) {
             diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
             message = {
