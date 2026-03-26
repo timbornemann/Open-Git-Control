@@ -317,6 +317,8 @@ const App: React.FC = () => {
     releaseNotesGenerating: state.releaseNotesGenerating,
     releaseNotesLanguage: state.releaseNotesLanguage,
     setReleaseNotesLanguage: state.setReleaseNotesLanguage,
+    releaseNotesOptions: state.releaseNotesOptions,
+    setReleaseNotesOptions: (updater) => state.setReleaseNotesOptions(updater),
 
     autoOpenConflictResolverPath: state.autoOpenConflictResolverPath,
     onAutoOpenConflictResolverConsumed: state.clearAutoOpenConflictResolverPath,

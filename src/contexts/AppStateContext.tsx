@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 import { AppSidebarProps } from '../components/layout/sidebar/AppSidebar.types';
 import { GitHubReleaseContextDto } from '../global';
+import { ReleaseNotesOptions } from '../types/releaseNotes';
 import { GitMergeMode } from '../types/git';
 
 export type AppContextValue = AppSidebarProps & {
@@ -45,6 +46,8 @@ export type AppContextValue = AppSidebarProps & {
   releaseNotesGenerating: boolean;
   releaseNotesLanguage: 'de' | 'en';
   setReleaseNotesLanguage: (value: 'de' | 'en') => void;
+  releaseNotesOptions: ReleaseNotesOptions;
+  setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
 
   // Conflict resolver
   autoOpenConflictResolverPath?: string | null;

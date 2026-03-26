@@ -245,6 +245,8 @@ export const MainView: React.FC = () => {
     releaseNotesGenerating,
     releaseNotesLanguage,
     setReleaseNotesLanguage,
+    releaseNotesOptions,
+    setReleaseNotesOptions,
     autoOpenConflictResolverPath,
     onAutoOpenConflictResolverConsumed,
     onOpenConflictResolverForPath,
@@ -450,6 +452,8 @@ export const MainView: React.FC = () => {
                 notesGenerating={releaseNotesGenerating}
                 notesLanguage={releaseNotesLanguage}
                 setNotesLanguage={setReleaseNotesLanguage}
+                notesOptions={releaseNotesOptions}
+                setNotesOptions={setReleaseNotesOptions}
               />
             ) : activeConflictPath ? (
               <StagingArea
