@@ -565,6 +565,7 @@ export class AiService {
       lastReleaseTag?: string | null;
       commits: ReleaseCommitInput[];
       language: 'de' | 'en';
+      hints?: string[];
     },
   ): Promise<string> {
     const commits = Array.isArray(params.commits) ? params.commits : [];
@@ -585,12 +586,21 @@ export class AiService {
     const languageInstruction = params.language === 'en'
       ? 'Write in English.'
       : 'Write in German.';
+    const hintLines = Array.isArray(params.hints)
+      ? params.hints.filter((hint) => typeof hint === 'string' && hint.trim().length > 0).slice(0, 12)
+      : [];
 
     const userPrompt = [
       `Release name: ${params.releaseName}`,
       `Release tag: ${params.tagName}`,
       `Previous release tag: ${params.lastReleaseTag || 'none'}`,
       languageInstruction,
+      ...(hintLines.length > 0
+        ? [
+            'Additional style instructions:',
+            ...hintLines.map((hint) => `- ${hint}`),
+          ]
+        : []),
       'Commits:',
       ...commits.map((commit) => `- ${commit.shortHash} | ${commit.subject} | ${commit.author} | ${commit.date}`),
       'Output valid Markdown only.',
