@@ -6,8 +6,6 @@ import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteSta
 import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
 import { formatTime } from '../../../utils/dateTime';
 
-const AI_LOCAL_STATE_EVENT = 'ai:auto-commit-local-state';
-
 type Params = {
   activeRepo: string | null;
   refreshTrigger: number;
@@ -46,7 +44,6 @@ export const useRepositoryDomain = ({
   const [remotes, setRemotes] = useState<{ name: string; url: string }[]>([]);
   const [hasRemoteOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
   const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
-  const [isAiAutoCommitRunning, setIsAiAutoCommitRunning] = useState(false);
 
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({
     isFetching: false,
@@ -59,32 +56,6 @@ export const useRepositoryDomain = ({
 
   const isRemoteFetchRunningRef = useRef(false);
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
-
-  useEffect(() => {
-    if (!window.electronAPI) return;
-    const unsubscribe = window.electronAPI.onJobEvent((event) => {
-      if (event.operation !== 'git:aiAutoCommit') return;
-      if (event.status === 'start' || event.status === 'progress') {
-        setIsAiAutoCommitRunning(true);
-        return;
-      }
-      if (event.status === 'done' || event.status === 'failed' || event.status === 'cancelled') {
-        setIsAiAutoCommitRunning(false);
-      }
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const onLocalState = (event: Event) => {
-      const detail = (event as CustomEvent<{ running?: unknown }>).detail;
-      if (typeof detail?.running === 'boolean') {
-        setIsAiAutoCommitRunning(detail.running);
-      }
-    };
-    window.addEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
-    return () => window.removeEventListener(AI_LOCAL_STATE_EVENT, onLocalState as EventListener);
-  }, []);
 
   const getRemoteBranchShortName = useCallback((branchName: string) => (
     branchName.replace(/^remotes\/[^/]+\//, '')
@@ -159,9 +130,6 @@ export const useRepositoryDomain = ({
         setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
         return;
       }
-      if (isAiAutoCommitRunning) {
-        return;
-      }
 
       try {
         const { success, data } = await window.electronAPI.runGitCommand('status', '-sb');
@@ -186,7 +154,7 @@ export const useRepositoryDomain = ({
     };
 
     fetchRemoteTracking();
-  }, [activeRepo, refreshTrigger, isAiAutoCommitRunning]);
+  }, [activeRepo, refreshTrigger]);
 
   useEffect(() => {
     const checkRemote = async () => {
@@ -273,7 +241,6 @@ export const useRepositoryDomain = ({
 
   const refreshRemoteState = useCallback(async (showToast = false) => {
     if (!window.electronAPI || !activeRepo) return false;
-    if (isAiAutoCommitRunning) return false;
     if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
 
     isRemoteFetchRunningRef.current = true;
@@ -308,7 +275,7 @@ export const useRepositoryDomain = ({
       isRemoteFetchRunningRef.current = false;
       setActiveGitActionLabel(current => (current === tr('Fetch wird ausgeführt...', 'Running fetch...') ? null : current));
     }
-  }, [activeRepo, isAiAutoCommitRunning, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, triggerRefresh, language]);
+  }, [activeRepo, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, triggerRefresh, language]);
 
   useEffect(() => {
     if (!activeRepo) {
