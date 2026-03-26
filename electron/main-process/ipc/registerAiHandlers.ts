@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import { AiService, ReleaseCommitInput } from '../../AiService';
 import { AppSettings } from '../../settings';
 import { createJobId } from '../gitCommandPolicy';
-import { emitJobEvent } from './jobEvents';
+import { emitJobEvent, JobEventPayload } from './jobEvents';
 
 type RegisterAiHandlersDeps = {
   aiService: AiService;
@@ -16,6 +16,12 @@ export function registerAiHandlers({
   getGeminiApiKeyFromSecureStore,
 }: RegisterAiHandlersDeps): void {
   let currentAiAutoCommitJob: { id: string; cancelRequested: boolean } | null = null;
+  let latestAiAutoCommitEvent: JobEventPayload | null = null;
+
+  const emitAiAutoCommitEvent = (webContents: Electron.WebContents, payload: JobEventPayload): void => {
+    latestAiAutoCommitEvent = payload;
+    emitJobEvent(webContents, payload);
+  };
 
   ipcMain.handle('ai:testConnection', async () => {
     try {
@@ -43,7 +49,7 @@ export function registerAiHandlers({
     const webContents = event.sender;
     if (currentAiAutoCommitJob) {
       const message = 'KI Auto-Commit laeuft bereits. Bitte den laufenden Job erst abschliessen oder abbrechen.';
-      emitJobEvent(webContents, {
+      emitAiAutoCommitEvent(webContents, {
         id: currentAiAutoCommitJob.id,
         operation: 'git:aiAutoCommit',
         status: 'failed',
@@ -57,7 +63,7 @@ export function registerAiHandlers({
     const jobId = createJobId('git-aiAutoCommit');
     currentAiAutoCommitJob = { id: jobId, cancelRequested: false };
 
-    emitJobEvent(webContents, {
+    emitAiAutoCommitEvent(webContents, {
       id: jobId,
       operation: 'git:aiAutoCommit',
       status: 'start',
@@ -72,7 +78,7 @@ export function registerAiHandlers({
         settings,
         getGeminiApiKeyFromSecureStore,
         (update) => {
-          emitJobEvent(webContents, {
+          emitAiAutoCommitEvent(webContents, {
             id: jobId,
             operation: 'git:aiAutoCommit',
             status: 'progress',
@@ -85,7 +91,7 @@ export function registerAiHandlers({
         () => currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested,
       );
 
-      emitJobEvent(webContents, {
+      emitAiAutoCommitEvent(webContents, {
         id: jobId,
         operation: 'git:aiAutoCommit',
         status: 'done',
@@ -105,7 +111,7 @@ export function registerAiHandlers({
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
       const wasCancelled = /abgebrochen/i.test(message);
 
-      emitJobEvent(webContents, {
+      emitAiAutoCommitEvent(webContents, {
         id: jobId,
         operation: 'git:aiAutoCommit',
         status: wasCancelled ? 'cancelled' : 'failed',
@@ -127,15 +133,30 @@ export function registerAiHandlers({
       return { success: true, canceled: false };
     }
     currentAiAutoCommitJob.cancelRequested = true;
-    emitJobEvent(event.sender, {
+    const previousDetails = (
+      latestAiAutoCommitEvent?.id === currentAiAutoCommitJob.id
+      && latestAiAutoCommitEvent.details
+      && typeof latestAiAutoCommitEvent.details === 'object'
+    )
+      ? latestAiAutoCommitEvent.details
+      : {};
+
+    const phase = typeof previousDetails.phase === 'string' ? previousDetails.phase : 'snapshot';
+    const mode = typeof previousDetails.mode === 'string' ? previousDetails.mode : 'normal';
+
+    emitAiAutoCommitEvent(event.sender, {
       id: currentAiAutoCommitJob.id,
       operation: 'git:aiAutoCommit',
       status: 'progress',
       message: 'Abbruch angefordert...',
-      details: { phase: 'snapshot', mode: 'normal' },
+      details: { ...previousDetails, phase, mode, cancelRequested: true },
       timestamp: Date.now(),
     });
     return { success: true, canceled: true };
+  });
+
+  ipcMain.handle('git:getAiAutoCommitState', async () => {
+    return { success: true, data: latestAiAutoCommitEvent };
   });
 
   ipcMain.handle('ai:generateReleaseNotes', async (_event, params: {

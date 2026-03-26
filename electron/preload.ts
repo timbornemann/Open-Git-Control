@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ollamaListModels: () => ipcRenderer.invoke('ai:listModels'),
   runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
   cancelAiAutoCommit: () => ipcRenderer.invoke('git:cancelAiAutoCommit'),
+  getAiAutoCommitState: () => ipcRenderer.invoke('git:getAiAutoCommitState'),
   githubAuth: (token: string, host?: string) => ipcRenderer.invoke('github:auth', token, host),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
