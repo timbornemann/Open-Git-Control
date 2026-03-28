@@ -1,18 +1,71 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+type RepoUnavailablePayload = {
+  command: string;
+  error: string;
+};
+
+const repoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
+let lastRepoUnavailableNotifyAt = 0;
+
+const REPO_UNAVAILABLE_ERROR_PATTERNS: RegExp[] = [
+  /\[REPO_UNAVAILABLE\]/i,
+  /not a git repository/i,
+  /no repository path set/i,
+  /cannot change to/i,
+];
+
+const isRepoUnavailableError = (errorText: unknown): boolean => {
+  const text = String(errorText || '');
+  if (!text.trim()) return false;
+  return REPO_UNAVAILABLE_ERROR_PATTERNS.some((pattern) => pattern.test(text));
+};
+
+const notifyRepoUnavailable = (payload: RepoUnavailablePayload) => {
+  const now = Date.now();
+  if (now - lastRepoUnavailableNotifyAt < 1200) {
+    return;
+  }
+  lastRepoUnavailableNotifyAt = now;
+  for (const listener of repoUnavailableListeners) {
+    try {
+      listener(payload);
+    } catch {
+      // ignore callback errors
+    }
+  }
+};
+
+const invokeGitCommand = async (commandName: string, ...args: any[]) => {
+  const result = await ipcRenderer.invoke('git:command', commandName, ...args);
+  if (result && !result.success && isRepoUnavailableError(result.error)) {
+    notifyRepoUnavailable({
+      command: String(commandName || ''),
+      error: String(result.error || ''),
+    });
+  }
+  return result;
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
-  runGitCommand: (commandName: string, ...args: any[]) => ipcRenderer.invoke('git:command', commandName, ...args),
+  runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
+  onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
+    repoUnavailableListeners.add(callback);
+    return () => {
+      repoUnavailableListeners.delete(callback);
+    };
+  },
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke('git:interactiveRebase', baseHash, todoLines),
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke('git:applyPatch', patch, options || {}),
   getStashes: () => ipcRenderer.invoke('git:stashes'),
   getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke('git:repoOriginUrl', repoPath),
   addIgnoreRule: (pattern: string) => ipcRenderer.invoke('git:addIgnoreRule', pattern),
-  gitFetch: () => ipcRenderer.invoke('git:command', 'fetch', '--all', '--prune', '--tags', '--quiet'),
-  gitPull: () => ipcRenderer.invoke('git:command', 'pull'),
-  gitPush: () => ipcRenderer.invoke('git:command', 'push'),
+  gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
+  gitPull: () => invokeGitCommand('pull'),
+  gitPush: () => invokeGitCommand('push'),
   scanPushSecrets: () => ipcRenderer.invoke('git:scanPushSecrets'),
   gitClone: (cloneUrl: string, targetDir: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
