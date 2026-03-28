@@ -121,7 +121,7 @@ describe('computeGraphLayout', () => {
     expect((nodeByHash.get('feat111')?.lane ?? 0)).toBeGreaterThan(0);
   });
 
-  it('reuses a recently freed middle lane when no better lane exists', () => {
+  it('does not immediately reuse recently freed side lanes', () => {
     const commits = [
       commit('head001', ['trunk01', 'side01', 'side02'], ['HEAD -> main']),
       commit('side01', []),
@@ -135,7 +135,7 @@ describe('computeGraphLayout', () => {
     const orphan = graph.nodes.find(node => node.commit.hash === 'orphan1');
 
     expect(sideOne?.lane).toBe(1);
-    expect(orphan?.lane).toBe(1);
+    expect((orphan?.lane ?? 0)).toBeGreaterThan(1);
   });
 
   it('handles duplicate parent hashes without duplicating lane reservations', () => {

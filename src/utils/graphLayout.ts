@@ -37,7 +37,7 @@ export interface GraphLayout {
   maxLane: number;
 }
 
-const LANE_REUSE_COOLDOWN_ROWS = 2;
+const LANE_REUSE_COOLDOWN_ROWS = 40;
 const DEFAULT_TRUNK_REFS = ['main', 'master', 'origin/main', 'origin/master'];
 
 function refMatchesTarget(ref: string, target: string): boolean {
@@ -121,10 +121,6 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
       if (!recentlyFreed) {
         return lane;
       }
-    }
-
-    for (let lane = startLane; lane < activeLanes.length; lane++) {
-      if (activeLanes[lane] === null) return lane;
     }
 
     activeLanes.push(null);
