@@ -133,6 +133,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
   const [matchCursor, setMatchCursor] = useState(0);
+  const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
 
   const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
   const [forensicPath, setForensicPath] = useState('');
@@ -218,6 +219,16 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       // ignore write errors
     }
   }, [forensicPathHistory]);
+
+  useEffect(() => {
+    setHighlightedBranchRef(null);
+  }, [repoPath, currentBranch]);
+
+  useEffect(() => {
+    if (!repoPath) return;
+    void refreshCommits();
+    void refreshWorkingTreeStatus();
+  }, [currentBranch, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -949,6 +960,14 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
 
+  const resolveHighlightableBranchRef = (ref: string): string | null => {
+    const target = mergeTargetFromDecoratedRef(ref);
+    if (!target) return null;
+    const normalized = normalizeBranchRefForMerge(target.trim());
+    if (!normalized || normalized.endsWith('/HEAD')) return null;
+    return normalized;
+  };
+
   if (headNode) {
     const stack = [headNode.commit.hash];
     while (stack.length > 0) {
@@ -965,6 +984,90 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
   }
 
+  const branchTipByRef = new Map<string, GraphNode>();
+  for (const node of layout.nodes) {
+    for (const ref of node.commit.refs) {
+      const target = resolveHighlightableBranchRef(ref);
+      if (!target || branchTipByRef.has(target)) continue;
+      branchTipByRef.set(target, node);
+    }
+  }
+
+  const headBranchFromGraph = (() => {
+    const headArrow = headNode.commit.refs.find(ref => ref.startsWith('HEAD ->'));
+    if (!headArrow) return '';
+    return resolveHighlightableBranchRef(headArrow) || '';
+  })();
+  const normalizedCurrentBranch = normalizeBranchRefForMerge((headBranchFromGraph || currentBranch).trim());
+
+  const buildFirstParentPath = (startNode: GraphNode | undefined) => {
+    const path = new Set<string>();
+    let cursor = startNode;
+    while (cursor && !path.has(cursor.commit.hash)) {
+      path.add(cursor.commit.hash);
+      const firstParent = cursor.commit.parentHashes[0];
+      if (!firstParent) break;
+      cursor = nodeByHash.get(firstParent);
+    }
+    return path;
+  };
+
+  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
+    ? highlightedBranchRef
+    : null;
+  const defaultHighlightedBranch = normalizedCurrentBranch && branchTipByRef.has(normalizedCurrentBranch)
+    ? normalizedCurrentBranch
+    : null;
+  const activeHighlightedBranch = manualHighlightedBranch ?? defaultHighlightedBranch;
+  const currentPathHashes = activeHighlightedBranch
+    ? buildFirstParentPath(branchTipByRef.get(activeHighlightedBranch))
+    : new Set<string>();
+
+  const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
+  const selectedBranchTarget = selectedNode
+    ? sortRefs(selectedNode.commit.refs)
+      .map(resolveHighlightableBranchRef)
+      .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
+    : undefined;
+  const inferTipForSelectedCommit = (hash: string) => {
+    let best: { tip: GraphNode; distance: number } | null = null;
+    for (const tip of branchTipByRef.values()) {
+      let cursor: GraphNode | undefined = tip;
+      let distance = 0;
+      const visited = new Set<string>();
+      while (cursor && !visited.has(cursor.commit.hash)) {
+        visited.add(cursor.commit.hash);
+        if (cursor.commit.hash === hash) {
+          if (!best || distance < best.distance) {
+            best = { tip, distance };
+          }
+          break;
+        }
+        const firstParent = cursor.commit.parentHashes[0];
+        if (!firstParent) break;
+        cursor = nodeByHash.get(firstParent);
+        distance++;
+      }
+    }
+    return best?.tip;
+  };
+  const selectedPathStartNode = selectedBranchTarget
+    ? branchTipByRef.get(selectedBranchTarget)
+    : selectedNode
+      ? (inferTipForSelectedCommit(selectedNode.commit.hash) ?? selectedNode)
+      : undefined;
+  const selectedPathHashes = buildFirstParentPath(selectedPathStartNode);
+
+  const hasCurrentPathHighlight = currentPathHashes.size > 0;
+  const hasSelectedPathHighlight = selectedPathHashes.size > 0;
+  const hasAnyPathHighlight = hasCurrentPathHighlight || hasSelectedPathHighlight;
+  const currentPathColor = hasCurrentPathHighlight
+    ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
+    : headNode.color;
+  const selectedPathColor = hasSelectedPathHighlight
+    ? (selectedPathStartNode?.color ?? currentPathColor)
+    : currentPathColor;
+
   const buildEdgePath = (edge: GraphEdge): string => {
     const x1 = laneX(edge.fromLane);
     const y1 = (edge.fromRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
@@ -976,7 +1079,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
 
     const verticalSpan = Math.max(8, y2 - y1);
-    const turnY = y1 + Math.min(ROW_HEIGHT * 0.8, Math.max(10, verticalSpan * 0.42));
+    const turnOffset = Math.min(ROW_HEIGHT * 0.8, Math.max(10, verticalSpan * 0.42));
+    // Keep the lane change close to the parent row so branch origins remain visually anchored.
+    const rawTurnY = y2 - turnOffset;
+    const turnY = Math.max(y1 + 8, Math.min(y2 - 8, rawTurnY));
     const direction = x2 > x1 ? 1 : -1;
     const controlInset = Math.min(14, Math.abs(x2 - x1) * 0.45);
 
@@ -984,14 +1090,76 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   };
 
   const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
+  const edgeKey = (edge: GraphEdge) => `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`;
 
-  const getEdgeStroke = (edge: GraphEdge) => {
+  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
+    const keys = new Set<string>();
+    if (pathHashes.size === 0) return keys;
+    for (const edge of layout.edges) {
+      if (edge.toRow < 0 || edge.toRow >= layout.nodes.length) continue;
+      const fromNode = layout.nodes[edge.fromRow];
+      const toNode = layout.nodes[edge.toRow];
+      if (!fromNode || !toNode) continue;
+      if (!pathHashes.has(fromNode.commit.hash)) continue;
+      if (!pathHashes.has(toNode.commit.hash)) continue;
+      if (fromNode.commit.parentHashes[0] !== toNode.commit.hash) continue;
+      keys.add(edgeKey(edge));
+    }
+    return keys;
+  };
+
+  const currentPathEdgeKeys = buildPathEdgeKeys(currentPathHashes);
+  const selectedPathEdgeKeys = buildPathEdgeKeys(selectedPathHashes);
+  const isEdgeOnCurrentPath = (edge: GraphEdge) => currentPathEdgeKeys.has(edgeKey(edge));
+  const isEdgeOnSelectedPath = (edge: GraphEdge) => selectedPathEdgeKeys.has(edgeKey(edge));
+
+  const getBaseEdgeStroke = (edge: GraphEdge) => {
     const fromNode = layout.nodes[edge.fromRow];
     if (!fromNode) return edge.color;
     if (!showSecondaryHistory || !isSecondaryCommit(fromNode.commit.hash)) {
       return edge.color;
     }
     return edge.kind === 'merge' ? SECONDARY_GRAPH_ACCENT : edge.color;
+  };
+
+  const getEdgeStroke = (edge: GraphEdge) => {
+    const onSelectedPath = isEdgeOnSelectedPath(edge);
+    const onCurrentPath = isEdgeOnCurrentPath(edge);
+    if (onSelectedPath) return selectedPathColor;
+    if (onCurrentPath) return currentPathColor;
+    return getBaseEdgeStroke(edge);
+  };
+
+  const getEdgeOpacity = (edge: GraphEdge, layer: 'glow' | 'core') => {
+    const onSelectedPath = isEdgeOnSelectedPath(edge);
+    const onCurrentPath = isEdgeOnCurrentPath(edge);
+    if (layer === 'glow') {
+      if (onSelectedPath) return 0.38;
+      if (onCurrentPath) return 0.3;
+      if (hasAnyPathHighlight) return 0.04;
+      return 0.1;
+    }
+
+    if (onSelectedPath) return 0.98;
+    if (onCurrentPath) return 0.92;
+    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.32 : 0.42;
+    return edge.kind === 'merge' ? 0.86 : 0.97;
+  };
+
+  const getEdgeWidth = (edge: GraphEdge, layer: 'glow' | 'core') => {
+    const onSelectedPath = isEdgeOnSelectedPath(edge);
+    const onCurrentPath = isEdgeOnCurrentPath(edge);
+    if (layer === 'glow') {
+      if (onSelectedPath) return edge.kind === 'merge' ? 4.4 : 5.2;
+      if (onCurrentPath) return edge.kind === 'merge' ? 4.1 : 4.8;
+      if (hasAnyPathHighlight) return edge.kind === 'merge' ? 2 : 2.4;
+      return edge.kind === 'merge' ? 2.8 : 3.2;
+    }
+
+    if (onSelectedPath) return edge.kind === 'merge' ? 2.45 : 3.3;
+    if (onCurrentPath) return edge.kind === 'merge' ? 2.2 : 2.9;
+    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 1 : 1.4;
+    return edge.kind === 'merge' ? 1.35 : 1.9;
   };
 
   return (
@@ -1188,8 +1356,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               key={`eg${i}`}
               d={buildEdgePath(edge)}
               stroke={getEdgeStroke(edge)}
-              strokeWidth={edge.kind === 'merge' ? 2.8 : 3.2}
-              strokeOpacity={0.1}
+              strokeWidth={getEdgeWidth(edge, 'glow')}
+              strokeOpacity={getEdgeOpacity(edge, 'glow')}
               fill="none"
               strokeLinecap="round"
               strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
@@ -1200,8 +1368,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               key={`em${i}`}
               d={buildEdgePath(edge)}
               stroke={getEdgeStroke(edge)}
-              strokeWidth={edge.kind === 'merge' ? 1.35 : 1.9}
-              strokeOpacity={edge.kind === 'merge' ? 0.86 : 0.97}
+              strokeWidth={getEdgeWidth(edge, 'core')}
+              strokeOpacity={getEdgeOpacity(edge, 'core')}
               fill="none"
               strokeLinecap="round"
               strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
@@ -1211,21 +1379,61 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             const cx = laneX(node.lane);
             const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
             const isSelected = selectedHash === node.commit.hash;
+            const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
+            const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
+            const isOnAnyFocusedPath = isOnCurrentPath || isOnSelectedPath;
+            const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
             const fillColor = node.color;
+            const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.42 : 1;
+            const pathStroke = isOnSelectedPath
+              ? selectedPathColor
+              : isOnCurrentPath
+                ? currentPathColor
+                : fillColor;
 
             return (
               <g key={node.commit.hash}>
                 {isSelected && (
                   <circle
-                    cx={cx} cy={cy} r={r + 6}
-                    fill={fillColor} opacity={0.15}
+                    cx={cx}
+                    cy={cy}
+                    r={r + 10}
+                    fill={fillColor}
+                    opacity={0.24}
                   />
                 )}
                 {isSelected && (
                   <circle
-                    cx={cx} cy={cy} r={r + 3}
-                    fill="none" stroke={fillColor} strokeWidth={1.5} opacity={0.6}
+                    cx={cx}
+                    cy={cy}
+                    r={r + 6}
+                    fill="none"
+                    stroke={fillColor}
+                    strokeWidth={2.6}
+                    opacity={0.9}
+                  />
+                )}
+                {isHeadCommit && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={r + 5}
+                    fill="none"
+                    stroke={currentPathColor}
+                    strokeWidth={2.1}
+                    opacity={0.88}
+                  />
+                )}
+                {isOnAnyFocusedPath && !isSelected && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isOnSelectedPath ? r + 4 : r + 3}
+                    fill="none"
+                    stroke={pathStroke}
+                    strokeWidth={isOnSelectedPath ? 2 : 1.7}
+                    opacity={isOnSelectedPath ? 0.9 : 0.78}
                   />
                 )}
                 {node.isMerge && (
@@ -1237,11 +1445,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                       height={r * 2}
                       transform={`rotate(45 ${cx} ${cy})`}
                       fill={fillColor}
+                      fillOpacity={baseOpacity}
                       stroke="var(--bg-darker)"
                       strokeWidth={2.5}
+                      strokeOpacity={baseOpacity}
                       rx={1.5}
                     />
-                    <circle cx={cx} cy={cy} r={r * 0.34} fill="var(--bg-darker)" />
+                    <circle cx={cx} cy={cy} r={r * 0.34} fill="var(--bg-darker)" fillOpacity={baseOpacity} />
                   </>
                 )}
                 {!node.isMerge && (
@@ -1250,8 +1460,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                     cy={cy}
                     r={r}
                     fill={fillColor}
+                    fillOpacity={baseOpacity}
                     stroke="var(--bg-darker)"
                     strokeWidth={2.5}
+                    strokeOpacity={baseOpacity}
                   />
                 )}
               </g>
@@ -1302,14 +1514,25 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           const isSelected = selectedHash === node.commit.hash;
           const isSecondary = isSecondaryCommit(node.commit.hash);
           const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
+          const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
+          const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
+          const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
+          const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
           const sortedRefs = sortRefs(node.commit.refs);
+          const rowStyle: React.CSSProperties = {
+            height: ROW_HEIGHT,
+            paddingLeft: graphWidth,
+            ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px var(--accent-primary-strong)' } : {}),
+            ...(isOnCurrentPath ? ({ ['--path-highlight-color' as any]: currentPathColor } as React.CSSProperties) : {}),
+            ...(isOnSelectedPath ? ({ ['--selected-path-color' as any]: selectedPathColor } as React.CSSProperties) : {}),
+          };
           return (
             <div
               key={node.commit.hash}
-              className={`commit-row ${isSelected ? 'selected' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''}`}
+              className={`commit-row ${isSelected ? 'selected' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''} ${isOnCurrentPath ? 'path-highlighted' : ''} ${isOnSelectedPath ? 'selected-branch-path' : ''} ${isMutedByPathFocus ? 'path-muted' : ''} ${isHeadCommit ? 'head-current' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
-              style={{ height: ROW_HEIGHT, paddingLeft: graphWidth, ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px var(--accent-primary-strong)' } : {}) }}
+              style={rowStyle}
               data-commit-hash={node.commit.hash}
             >
               <div className="commit-info">
@@ -1317,11 +1540,35 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                 <div className="commit-main">
                   {sortedRefs.length > 0 && (
                     <div className="commit-refs">
-                      {sortedRefs.map((ref, ri) => (
-                        <span key={ri} className={`branch-label ${getRefKind(ref)}`}>
-                          {ref}
-                        </span>
-                      ))}
+                      {sortedRefs.map((ref, ri) => {
+                        const branchTarget = resolveHighlightableBranchRef(ref);
+                        const isActiveBranchRef = Boolean(branchTarget && activeHighlightedBranch === branchTarget);
+                        const branchFocusColor = branchTarget ? (branchTipByRef.get(branchTarget)?.color ?? 'var(--text-accent)') : 'var(--text-accent)';
+
+                        if (!branchTarget) {
+                          return (
+                            <span key={ri} className={`branch-label ${getRefKind(ref)}`}>
+                              {ref}
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <button
+                            key={ri}
+                            type="button"
+                            className={`branch-label ${getRefKind(ref)} branch-toggle ${isActiveBranchRef ? 'active' : ''}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setHighlightedBranchRef((previous) => (previous === branchTarget ? null : branchTarget));
+                            }}
+                            style={isActiveBranchRef ? ({ ['--branch-focus-color' as any]: branchFocusColor } as React.CSSProperties) : undefined}
+                            title={tr('Branch-Pfad hervorheben', 'Highlight branch path')}
+                          >
+                            {ref}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="commit-subject-row">
