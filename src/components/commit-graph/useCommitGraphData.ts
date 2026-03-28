@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type RefObject } from 'react';
 import { computeGraphLayout, type GraphLayout } from '../../utils/graphLayout';
-import { parseGitLog, parseGitStatusDetailed, type GitStatusDetailed } from '../../utils/gitParsing';
+import {
+  isRepoUnavailableError,
+  parseGitLog,
+  parseGitStatusDetailed,
+  type GitStatusDetailed,
+} from '../../utils/gitParsing';
 
 const LOG_PAGE_SIZE = 200;
 
@@ -69,9 +74,23 @@ export const useCommitGraphData = ({
           setLayout(computeGraphLayout(parsedChunk));
         }
       } else {
+        if (isRepoUnavailableError(String(error || ''))) {
+          setLayout(null);
+          setCommitCount(0);
+          commitCountRef.current = 0;
+          setHasMoreCommits(false);
+          return;
+        }
         console.error('Failed to fetch commits:', error);
       }
     } catch (e) {
+      if (isRepoUnavailableError(String((e as any)?.message || e || ''))) {
+        setLayout(null);
+        setCommitCount(0);
+        commitCountRef.current = 0;
+        setHasMoreCommits(false);
+        return;
+      }
       console.error(e);
     } finally {
       if (isAppend) {
@@ -94,7 +113,11 @@ export const useCommitGraphData = ({
       if (success) {
         setWorkingTreeStatus(parseGitStatusDetailed(data || ''));
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (isRepoUnavailableError(String(e?.message || e || ''))) {
+        setWorkingTreeStatus(null);
+        return;
+      }
       console.error(e);
     }
   }, [repoPath]);
