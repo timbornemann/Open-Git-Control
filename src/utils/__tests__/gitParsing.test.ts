@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isMergeInProgressError,
+  isRepoUnavailableError,
   mergeableDecoratedRefs,
   mergeTargetFromDecoratedRef,
   normalizeBranchRefForMerge,
@@ -307,5 +308,17 @@ describe('isMergeInProgressError', () => {
 
   it('returns false for unrelated errors', () => {
     expect(isMergeInProgressError('fatal: bad revision')).toBe(false);
+  });
+});
+
+describe('isRepoUnavailableError', () => {
+  it('detects missing/moved repository errors', () => {
+    expect(isRepoUnavailableError('fatal: not a git repository (or any of the parent directories): .git')).toBe(true);
+    expect(isRepoUnavailableError('[REPO_UNAVAILABLE] Repository is no longer available.')).toBe(true);
+    expect(isRepoUnavailableError('No repository path set.')).toBe(true);
+  });
+
+  it('returns false for unrelated errors', () => {
+    expect(isRepoUnavailableError('fatal: bad revision')).toBe(false);
   });
 });
