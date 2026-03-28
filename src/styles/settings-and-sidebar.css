@@ -124,9 +124,90 @@
   margin: 0;
   max-height: 360px;
   overflow: auto;
-  white-space: pre-wrap;
   font-size: 0.74rem;
   color: var(--text-secondary);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.settings-release-notes.release-notes-plain {
+  white-space: pre-wrap;
+}
+
+.ssc-release-notes {
+  max-height: 220px;
+  overflow: auto;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.ssc-release-notes.release-notes-plain {
+  white-space: pre-wrap;
+}
+
+.settings-release-notes p,
+.ssc-release-notes p {
+  margin: 0 0 0.5rem;
+}
+
+.settings-release-notes ul,
+.settings-release-notes ol,
+.ssc-release-notes ul,
+.ssc-release-notes ol {
+  margin: 0 0 0.6rem 1.15rem;
+  padding: 0;
+}
+
+.settings-release-notes li,
+.ssc-release-notes li {
+  margin: 0.15rem 0;
+}
+
+.settings-release-notes h1,
+.settings-release-notes h2,
+.settings-release-notes h3,
+.settings-release-notes h4,
+.settings-release-notes h5,
+.settings-release-notes h6,
+.ssc-release-notes h1,
+.ssc-release-notes h2,
+.ssc-release-notes h3,
+.ssc-release-notes h4,
+.ssc-release-notes h5,
+.ssc-release-notes h6 {
+  margin: 0.15rem 0 0.4rem;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.settings-release-notes code,
+.ssc-release-notes code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.settings-release-notes pre,
+.ssc-release-notes pre {
+  margin: 0 0 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.settings-release-notes a,
+.ssc-release-notes a {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.settings-release-notes hr,
+.ssc-release-notes hr {
+  border: 0;
+  border-top: 1px solid var(--line-subtle);
+  margin: 0.5rem 0;
 }
 
 .settings-card-header-row {
