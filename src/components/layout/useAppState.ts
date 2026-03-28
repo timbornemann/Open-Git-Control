@@ -37,6 +37,7 @@ export const useAppState = () => {
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
+  const repoUnavailableHandlingRef = useRef<string | null>(null);
 
   const [isConnectingGithubRepo, setIsConnectingGithubRepo] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -388,6 +389,40 @@ export const useAppState = () => {
       setActiveGitActionLabel(null);
     }
   }, [setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
+
+  useEffect(() => {
+    if (!window.electronAPI?.onRepoUnavailable) return;
+
+    const unsubscribe = window.electronAPI.onRepoUnavailable(() => {
+      const repoPath = workspace.activeRepo;
+      if (!repoPath) return;
+      if (repoUnavailableHandlingRef.current === repoPath) return;
+
+      repoUnavailableHandlingRef.current = repoPath;
+
+      void (async () => {
+        try {
+          await workspace.handleCloseRepo(repoPath);
+          const repoName = repoPath.split(/[\\/]/).pop() || repoPath;
+          setGitActionToast({
+            msg: tr(
+              `Repository nicht mehr verfuegbar und geschlossen: ${repoName}`,
+              `Repository is no longer available and was closed: ${repoName}`,
+            ),
+            isError: true,
+          });
+        } finally {
+          window.setTimeout(() => {
+            if (repoUnavailableHandlingRef.current === repoPath) {
+              repoUnavailableHandlingRef.current = null;
+            }
+          }, 800);
+        }
+      })();
+    });
+
+    return unsubscribe;
+  }, [setGitActionToast, tr, workspace]);
 
   /** For UI paths that call `electronAPI.runGitCommand` directly (e.g. CommitGraph) — opens repo tab + conflict resolver. */
   const openConflictResolverForPath = useCallback((path: string) => {

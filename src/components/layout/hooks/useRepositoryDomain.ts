@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { normalizeBranchRefForMerge } from '../../../utils/gitParsing';
+import { validateBranchName } from '../../../utils/gitRefValidation';
 import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
@@ -333,6 +334,14 @@ export const useRepositoryDomain = ({
   const handleCreateBranch = async () => {
     const name = newBranchName.trim();
     if (!name) return;
+    const branchNameError = validateBranchName(name);
+    if (branchNameError) {
+      setGitActionToast({
+        msg: tr('Ungueltiger Branch-Name. Bitte Eingabe pruefen.', 'Invalid branch name. Please check the input.'),
+        isError: true,
+      });
+      return;
+    }
     setIsCreatingBranch(false);
     setNewBranchName('');
     await runGitCommand(['checkout', '-b', name], tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
@@ -408,6 +417,16 @@ export const useRepositoryDomain = ({
           defaultValue: oldName,
           required: true,
           helperText: tr('Der Name darf nicht leer sein und sollte eindeutig sein.', 'Name must not be empty and should be unique.'),
+          validate: (value) => {
+            const trimmed = value.trim();
+            if (!trimmed || trimmed === oldName) return null;
+            const errorCode = validateBranchName(trimmed);
+            if (!errorCode) return null;
+            if (errorCode === 'contains-space') {
+              return tr('Branch-Name darf keine Leerzeichen enthalten.', 'Branch name must not contain spaces.');
+            }
+            return tr('Ungueltiger Branch-Name.', 'Invalid branch name.');
+          },
         },
       ],
       contextItems: [{ label: tr('Bisheriger Name', 'Current name'), value: oldName }],
