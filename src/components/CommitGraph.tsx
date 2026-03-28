@@ -7,6 +7,7 @@ import {
   parseGitLog,
   resolveConflictPathAfterGitFailure,
 } from '../utils/gitParsing';
+import { validateBranchName } from '../utils/gitRefValidation';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
@@ -466,6 +467,23 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     };
   }, [branches, contextMenu, currentBranch, onMergeBranch]);
 
+  const branchNameValidationMessage = useCallback((value: string) => {
+    const errorCode = validateBranchName(value);
+    if (!errorCode) return null;
+
+    if (errorCode === 'contains-space') {
+      return tr(
+        'Branch-Name darf keine Leerzeichen enthalten.',
+        'Branch name must not contain spaces.',
+      );
+    }
+
+    return tr(
+      'Ungueltiger Branch-Name. Vermeide Sonderzeichen wie ~ ^ : ? * [ \\ sowie .. und @{.',
+      'Invalid branch name. Avoid special characters like ~ ^ : ? * [ \\ and patterns like .. or @{.',
+    );
+  }, [tr]);
+
   const getMenuActions = (node: GraphNode): MenuAction[] => {
     const hash = node.commit.hash;
     const shortHash = node.commit.abbrevHash;
@@ -486,6 +504,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                 label: 'Neuer Branch-Name',
                 defaultValue: suggested,
                 required: true,
+                validate: (value) => branchNameValidationMessage(value.trim()),
               },
             ],
             contextItems: [
@@ -536,6 +555,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                 id: 'name',
                 label: 'Branch-Name',
                 required: true,
+                validate: (value) => branchNameValidationMessage(value.trim()),
               },
             ],
             contextItems: [
