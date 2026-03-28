@@ -5,10 +5,23 @@ import {
   isRepoUnavailableError,
   parseGitLog,
   parseGitStatusDetailed,
+  type GitCommit,
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
 
 const LOG_PAGE_SIZE = 200;
+type RefreshMode = 'reset' | 'append' | 'sync';
+
+const mergeUniqueCommits = (base: GitCommit[], incoming: GitCommit[]): GitCommit[] => {
+  const out: GitCommit[] = [];
+  const seen = new Set<string>();
+  for (const commit of [...base, ...incoming]) {
+    if (seen.has(commit.hash)) continue;
+    seen.add(commit.hash);
+    out.push(commit);
+  }
+  return out;
+};
 
 type Params = {
   repoPath: string | null;
@@ -36,18 +49,39 @@ export const useCommitGraphData = ({
   const layoutRef = useRef<GraphLayout | null>(null);
   const pendingScrollTopRef = useRef<number | null>(null);
   const pendingScrollHeightRef = useRef<number | null>(null);
+  const appendInFlightRef = useRef(false);
+  const pendingSyncAfterAppendRef = useRef(false);
+  const lastRepoPathRef = useRef<string | null>(null);
+  const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
 
-  const refreshCommits = useCallback(async (mode: 'reset' | 'append' = 'reset') => {
+  const refreshCommits = useCallback(async (mode: RefreshMode = 'reset') => {
     if (!repoPath || !window.electronAPI) return;
 
     const isAppend = mode === 'append';
+    const isSync = mode === 'sync';
+    if (!isAppend && appendInFlightRef.current) {
+      pendingSyncAfterAppendRef.current = true;
+      return;
+    }
+    if (isAppend && appendInFlightRef.current) {
+      return;
+    }
+
     const shouldShowLoadingState = !layoutRef.current;
     const scrollContainer = logContainerRef.current?.parentElement ?? null;
+    const requestedLimit = isAppend
+      ? LOG_PAGE_SIZE
+      : isSync
+        ? Math.max(LOG_PAGE_SIZE, commitCountRef.current)
+        : LOG_PAGE_SIZE;
 
-    if (isAppend && scrollContainer) {
+    if ((isAppend || isSync) && scrollContainer) {
       pendingScrollTopRef.current = scrollContainer.scrollTop;
       pendingScrollHeightRef.current = scrollContainer.scrollHeight;
-      setLoadingMore(true);
+      if (isAppend) {
+        appendInFlightRef.current = true;
+        setLoadingMore(true);
+      }
     } else {
       pendingScrollTopRef.current = scrollContainer ? scrollContainer.scrollTop : null;
       pendingScrollHeightRef.current = null;
@@ -59,19 +93,22 @@ export const useCommitGraphData = ({
     try {
       const scope = showSecondaryHistory ? 'all' : 'head';
       const offset = isAppend ? commitCountRef.current : 0;
-      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(LOG_PAGE_SIZE), scope, String(offset));
+      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(requestedLimit), scope, String(offset));
       if (success) {
         const parsedChunk = parseGitLog(data || '');
-        const nextCount = (isAppend ? commitCountRef.current : 0) + parsedChunk.length;
-        commitCountRef.current = nextCount;
-        setCommitCount(nextCount);
-        setHasMoreCommits(parsedChunk.length === LOG_PAGE_SIZE);
-
-        if (isAppend && layoutRef.current) {
-          const merged = [...layoutRef.current.nodes.map((node) => node.commit), ...parsedChunk];
+        if (isAppend) {
+          const merged = mergeUniqueCommits(layoutRef.current?.nodes.map((node) => node.commit) ?? [], parsedChunk);
+          const nextCount = merged.length;
+          commitCountRef.current = nextCount;
+          setCommitCount(nextCount);
+          setHasMoreCommits(parsedChunk.length === requestedLimit);
           setLayout(computeGraphLayout(merged));
         } else {
-          setLayout(computeGraphLayout(parsedChunk));
+          const normalized = mergeUniqueCommits([], parsedChunk);
+          commitCountRef.current = normalized.length;
+          setCommitCount(normalized.length);
+          setHasMoreCommits(parsedChunk.length >= requestedLimit);
+          setLayout(computeGraphLayout(normalized));
         }
       } else {
         if (isRepoUnavailableError(String(error || ''))) {
@@ -94,7 +131,14 @@ export const useCommitGraphData = ({
       console.error(e);
     } finally {
       if (isAppend) {
+        appendInFlightRef.current = false;
         setLoadingMore(false);
+        if (pendingSyncAfterAppendRef.current) {
+          pendingSyncAfterAppendRef.current = false;
+          queueMicrotask(() => {
+            void refreshCommits('sync');
+          });
+        }
       } else if (shouldShowLoadingState) {
         setLoading(false);
       }
@@ -102,7 +146,7 @@ export const useCommitGraphData = ({
   }, [logContainerRef, repoPath, showSecondaryHistory]);
 
   const loadMoreCommits = useCallback(async () => {
-    if (loading || loadingMore || !hasMoreCommits) return;
+    if (loading || loadingMore || appendInFlightRef.current || !hasMoreCommits) return;
     await refreshCommits('append');
   }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
 
@@ -132,12 +176,26 @@ export const useCommitGraphData = ({
       layoutRef.current = null;
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
+      appendInFlightRef.current = false;
+      pendingSyncAfterAppendRef.current = false;
+      lastRepoPathRef.current = null;
+      lastSecondaryHistoryRef.current = showSecondaryHistory;
       onRepoCleared?.();
       return;
     }
-    void refreshCommits();
+
+    const repoChanged = lastRepoPathRef.current !== repoPath;
+    const historyModeChanged = lastSecondaryHistoryRef.current !== showSecondaryHistory;
+    lastRepoPathRef.current = repoPath;
+    lastSecondaryHistoryRef.current = showSecondaryHistory;
+
+    const mode: RefreshMode = repoChanged || historyModeChanged || !layoutRef.current || commitCountRef.current === 0
+      ? 'reset'
+      : 'sync';
+
+    void refreshCommits(mode);
     void refreshWorkingTreeStatus();
-  }, [onRepoCleared, refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath]);
+  }, [onRepoCleared, refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory]);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -169,7 +227,7 @@ export const useCommitGraphData = ({
 
     pendingScrollTopRef.current = null;
     pendingScrollHeightRef.current = null;
-  }, [layout, logContainerRef, onRepoCleared, workingTreeStatus]);
+  }, [layout, logContainerRef, onRepoCleared]);
 
   useEffect(() => {
     if (!repoPath) return;
