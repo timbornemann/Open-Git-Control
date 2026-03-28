@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   isMergeInProgressError,
@@ -144,6 +144,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [forensicError, setForensicError] = useState<string | null>(null);
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
+  const didRunInitialBranchEffectRef = useRef(false);
 
   const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
     all: tr('Alles', 'All'),
@@ -158,6 +159,11 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     regex: tr('-G Regex', '-G regex'),
     line: tr('-L Zeilenbereich', '-L line range'),
   }), [tr]);
+  const handleRepoCleared = useCallback(() => {
+    setForensicResults([]);
+    setForensicError(null);
+    setForensicLoading(false);
+  }, []);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(800);
@@ -175,23 +181,54 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     showSecondaryHistory,
     refreshTrigger,
     logContainerRef,
-    onRepoCleared: () => {
-      setForensicResults([]);
-      setForensicError(null);
-      setForensicLoading(false);
-    },
+    onRepoCleared: handleRepoCleared,
   });
 
-  useEffect(() => {
+  const syncViewportMetrics = useCallback((container: HTMLElement) => {
+    const nextTop = container.scrollTop;
+    const nextHeight = container.clientHeight;
+    setScrollTop((previous) => (previous === nextTop ? previous : nextTop));
+    // Guard against transient zero-heights during mount/layout transitions.
+    if (nextHeight > 0) {
+      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
+    }
+  }, []);
+
+  useLayoutEffect(() => {
     if (!layout) return;
     const container = logContainerRef.current?.parentElement;
     if (!container) return;
-    const onScroll = () => setScrollTop(container.scrollTop);
-    setScrollTop(container.scrollTop);
-    setContainerHeight(container.clientHeight);
+
+    const onScroll = () => {
+      syncViewportMetrics(container);
+    };
+    const onWindowResize = () => {
+      syncViewportMetrics(container);
+    };
+
+    syncViewportMetrics(container);
+    const rafId = window.requestAnimationFrame(() => {
+      syncViewportMetrics(container);
+    });
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        syncViewportMetrics(container);
+      });
+      resizeObserver.observe(container);
+    }
+
     container.addEventListener('scroll', onScroll, { passive: true });
-    return () => container.removeEventListener('scroll', onScroll);
-  }, [layout]);
+    window.addEventListener('resize', onWindowResize);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      container.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onWindowResize);
+      resizeObserver?.disconnect();
+    };
+  }, [layout, repoPath, syncViewportMetrics]);
 
   useEffect(() => {
     try {
@@ -225,8 +262,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   }, [repoPath, currentBranch]);
 
   useEffect(() => {
-    if (!repoPath) return;
-    void refreshCommits();
+    if (!repoPath) {
+      didRunInitialBranchEffectRef.current = false;
+      return;
+    }
+    if (!didRunInitialBranchEffectRef.current) {
+      didRunInitialBranchEffectRef.current = true;
+      return;
+    }
+    void refreshCommits('sync');
     void refreshWorkingTreeStatus();
   }, [currentBranch, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
