@@ -14,7 +14,11 @@ import {
   filterCommitsForReleaseNotes,
 } from '../../utils/releaseNotes';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
-import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '../../utils/gitParsing';
+import {
+  isMergeInProgressError,
+  parseRemoteBranchRef,
+  resolveConflictPathAfterGitFailure,
+} from '../../utils/gitParsing';
 import {
   DEFAULT_SETTINGS,
   GUARDED_COMMANDS,
@@ -820,12 +824,34 @@ export const useAppState = () => {
     const normalized = (remoteBranchName || '').trim();
     if (!normalized) return;
 
-    const shortName = normalized.replace(/^remotes\//, '').replace(/^origin\//, '').replace(/^[^/]+\//, '');
-    await runGitCommand(
-      ['checkout', '-b', shortName, '--track', normalized],
-      tr(`Branch ${shortName} aus ${normalized} ausgecheckt.`, `Checked out branch ${shortName} from ${normalized}.`),
+    const parsed = parseRemoteBranchRef(normalized);
+    if (!parsed) {
+      setGitActionToast({
+        msg: tr('Ungueltiger Remote-Branch.', 'Invalid remote branch.'),
+        isError: true,
+      });
+      return;
+    }
+
+    const { remoteRef, localBranchName } = parsed;
+    const createdTrackingBranch = await runGitCommand(
+      ['checkout', '--track', remoteRef],
+      tr(
+        `Branch ${localBranchName} aus ${remoteRef} ausgecheckt.`,
+        `Checked out branch ${localBranchName} from ${remoteRef}.`,
+      ),
     );
-  }, [runGitCommand, tr]);
+
+    if (createdTrackingBranch) return;
+
+    await runGitCommand(
+      ['checkout', localBranchName],
+      tr(
+        `Branch ${localBranchName} ausgecheckt.`,
+        `Checked out branch ${localBranchName}.`,
+      ),
+    );
+  }, [runGitCommand, setGitActionToast, tr]);
 
   const clearJobs = () => setJobs([]);
 
