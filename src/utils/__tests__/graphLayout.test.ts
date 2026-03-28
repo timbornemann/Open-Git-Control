@@ -104,6 +104,23 @@ describe('computeGraphLayout', () => {
     expect(graph.nodes.map(node => node.lane)).toEqual([0, 0, 0]);
   });
 
+  it('anchors lane 0 to main/master refs when visible, even if HEAD points elsewhere', () => {
+    const commits = [
+      commit('feat111', ['feat000'], ['HEAD -> feature/x']),
+      commit('main111', ['main000'], ['main', 'origin/main']),
+      commit('feat000', ['base000']),
+      commit('main000', ['base000']),
+      commit('base000', []),
+    ];
+
+    const graph = computeGraphLayout(commits);
+    const nodeByHash = new Map(graph.nodes.map(node => [node.commit.hash, node]));
+
+    expect(nodeByHash.get('main111')?.lane).toBe(0);
+    expect(nodeByHash.get('main000')?.lane).toBe(0);
+    expect((nodeByHash.get('feat111')?.lane ?? 0)).toBeGreaterThan(0);
+  });
+
   it('reuses a recently freed middle lane when no better lane exists', () => {
     const commits = [
       commit('head001', ['trunk01', 'side01', 'side02'], ['HEAD -> main']),

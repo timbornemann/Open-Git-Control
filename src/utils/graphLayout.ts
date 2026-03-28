@@ -38,6 +38,17 @@ export interface GraphLayout {
 }
 
 const LANE_REUSE_COOLDOWN_ROWS = 2;
+const DEFAULT_TRUNK_REFS = ['main', 'master', 'origin/main', 'origin/master'];
+
+function refMatchesTarget(ref: string, target: string): boolean {
+  const normalizedRef = ref.trim();
+  if (!normalizedRef) return false;
+  if (normalizedRef === target) return true;
+
+  const headArrowMatch = normalizedRef.match(/^HEAD\s*->\s*(.+)$/);
+  if (!headArrowMatch) return false;
+  return headArrowMatch[1].trim() === target;
+}
 
 /**
  * Assigns lanes (columns) to commits and computes edges.
@@ -48,6 +59,10 @@ const LANE_REUSE_COOLDOWN_ROWS = 2;
  * - Avoid immediate lane recycling so unrelated branches do not visually "stack".
  */
 export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
+  if (commits.length === 0) {
+    return { nodes: [], edges: [], maxLane: 0 };
+  }
+
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const activeLanes: (string | null)[] = [];
@@ -55,12 +70,19 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const visibleHashes = new Set(commits.map(c => c.hash));
   const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
 
-  const headCommit = commits.find(commit => (
+  const headCommitCandidate = commits.find(commit => (
     commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
   )) ?? commits[0];
 
+  const anchorRef = DEFAULT_TRUNK_REFS.find((targetRef) => (
+    commits.some((commit) => commit.refs.some((ref) => refMatchesTarget(ref, targetRef)))
+  ));
+  const trunkStartCommit = anchorRef
+    ? (commits.find((commit) => commit.refs.some((ref) => refMatchesTarget(ref, anchorRef))) ?? headCommitCandidate)
+    : headCommitCandidate;
+
   const trunkHashes = new Set<string>();
-  for (let current = headCommit; current; ) {
+  for (let current = trunkStartCommit; current; ) {
     trunkHashes.add(current.hash);
     const firstParent = current.parentHashes[0];
     if (!firstParent || !visibleHashes.has(firstParent)) break;
@@ -91,6 +113,8 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   };
 
   const findFreeLane = (startLane: number, row: number) => {
+    ensureLaneExists(startLane);
+
     for (let lane = startLane; lane < activeLanes.length; lane++) {
       if (activeLanes[lane] !== null) continue;
       const recentlyFreed = row - (laneFreedAtRow[lane] ?? -9999) <= LANE_REUSE_COOLDOWN_ROWS;
