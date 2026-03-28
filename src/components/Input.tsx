@@ -12,6 +12,7 @@ export interface InputDialogField {
   helperText?: string;
   multiline?: boolean;
   type?: 'text' | 'url';
+  validate?: (value: string, values: Record<string, string>) => string | null;
 }
 
 interface InputProps {
@@ -42,7 +43,6 @@ export const Input: React.FC<InputProps> = ({
   onCancel,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
-  const [validationError, setValidationError] = useState<string | null>(null);
   const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const { tr } = useI18n();
 
@@ -57,19 +57,24 @@ export const Input: React.FC<InputProps> = ({
   useEffect(() => {
     if (!open) return;
     setValues(initialValues);
-    setValidationError(null);
   }, [open, initialValues]);
 
-  const handleSubmit = () => {
+  const validationError = useMemo(() => {
     for (const field of fields) {
       const value = values[field.id] ?? '';
       if (field.required && !value.trim()) {
-        setValidationError(tr(`Bitte "${field.label}" ausfüllen.`, `Please fill "${field.label}".`));
-        return;
+        return tr(`Bitte "${field.label}" ausfüllen.`, `Please fill "${field.label}".`);
+      }
+      if (field.validate) {
+        const customError = field.validate(value, values);
+        if (customError) return customError;
       }
     }
+    return null;
+  }, [fields, tr, values]);
 
-    setValidationError(null);
+  const handleSubmit = () => {
+    if (validationError) return;
     onSubmit(values);
   };
 
@@ -82,6 +87,7 @@ export const Input: React.FC<InputProps> = ({
       onEnter={handleSubmit}
       confirmLabel={confirmLabel ?? tr('Speichern', 'Save')}
       cancelLabel={cancelLabel ?? tr('Abbrechen', 'Cancel')}
+      confirmDisabled={Boolean(validationError)}
       initialFocusRef={firstInputRef as React.RefObject<HTMLElement | null>}
     >
       {message && <p className="dialog-message">{message}</p>}
