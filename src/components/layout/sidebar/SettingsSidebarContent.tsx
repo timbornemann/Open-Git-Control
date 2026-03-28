@@ -3,6 +3,7 @@ import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 import { THEME_OPTIONS } from '../settingsShared';
 import { useSettingsAiUpdater } from '../hooks/useSettingsAiUpdater';
+import { ReleaseNotesContent } from '../ReleaseNotesContent';
 
 type SettingsSidebarContentProps = Pick<
   AppSidebarProps,
@@ -300,7 +301,9 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         {updaterStatus?.releaseNotes && (
           <details>
             <summary style={{ cursor: 'pointer', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{tr('Release Notes', 'Release notes')}</summary>
-            <div className="ssc-hint" style={{ marginTop: '6px', whiteSpace: 'pre-wrap' }}>{updaterStatus.releaseNotes}</div>
+            <div style={{ marginTop: '6px' }}>
+              <ReleaseNotesContent className="ssc-hint ssc-release-notes" releaseNotes={updaterStatus.releaseNotes} />
+            </div>
           </details>
         )}
         {updaterStatus?.error && <div className="ssc-hint" style={{ color: 'var(--status-danger)' }}>{updaterStatus.error}</div>}

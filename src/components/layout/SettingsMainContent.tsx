@@ -3,6 +3,7 @@ import type { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { SettingsTabId } from './sidebar/AppSidebar.types';
 import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
+import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';
 
 type SettingsMainContentProps = {
@@ -324,7 +325,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
             {updaterStatus?.releaseNotes && (
               <section className="settings-card">
                 <h3>{tr('Release Notes', 'Release notes')}</h3>
-                <pre className="settings-release-notes">{updaterStatus.releaseNotes}</pre>
+                <ReleaseNotesContent className="settings-release-notes" releaseNotes={updaterStatus.releaseNotes} />
               </section>
             )}
 
