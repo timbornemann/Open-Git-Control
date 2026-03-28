@@ -4,6 +4,7 @@ import {
   mergeableDecoratedRefs,
   mergeTargetFromDecoratedRef,
   normalizeBranchRefForMerge,
+  parseRemoteBranchRef,
   parseCommitDetails,
   parseGitLog,
   parseGitStatus,
@@ -279,6 +280,22 @@ describe('merge ref helpers', () => {
 
   it('lists unique merge candidates excluding current branch', () => {
     expect(mergeableDecoratedRefs(['HEAD -> main', 'origin/main', 'feature'], 'main')).toEqual(['origin/main', 'feature']);
+  });
+
+  it('parses remote refs for safe checkout and keeps branch subpaths', () => {
+    expect(parseRemoteBranchRef('remotes/origin/main')).toEqual({
+      remoteRef: 'origin/main',
+      localBranchName: 'main',
+    });
+    expect(parseRemoteBranchRef('remotes/origin/feature/abc')).toEqual({
+      remoteRef: 'origin/feature/abc',
+      localBranchName: 'feature/abc',
+    });
+    expect(parseRemoteBranchRef('origin/feature/abc')).toEqual({
+      remoteRef: 'origin/feature/abc',
+      localBranchName: 'feature/abc',
+    });
+    expect(parseRemoteBranchRef('invalid')).toBeNull();
   });
 });
 

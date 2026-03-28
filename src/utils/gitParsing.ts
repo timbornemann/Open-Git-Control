@@ -264,6 +264,30 @@ export function normalizeBranchRefForMerge(branchName: string): string {
   return branchName;
 }
 
+export type ParsedRemoteBranchRef = {
+  remoteRef: string;
+  localBranchName: string;
+};
+
+/**
+ * Resolves remote branch labels used in UI (`remotes/origin/feature/x` or `origin/feature/x`)
+ * into a merge/checkout-safe remote ref (`origin/feature/x`) and local branch name (`feature/x`).
+ */
+export function parseRemoteBranchRef(branchName: string): ParsedRemoteBranchRef | null {
+  const normalized = String(branchName || '').trim().replace(/^remotes\//, '');
+  if (!normalized) return null;
+
+  const firstSlash = normalized.indexOf('/');
+  if (firstSlash <= 0 || firstSlash >= normalized.length - 1) {
+    return null;
+  }
+
+  return {
+    remoteRef: normalized,
+    localBranchName: normalized.slice(firstSlash + 1),
+  };
+}
+
 /** Decorated ref from `git log` graph (e.g. `HEAD -> main`, `origin/foo`). */
 export function mergeTargetFromDecoratedRef(ref: string): string | null {
   if (ref.startsWith('tag:')) return null;
