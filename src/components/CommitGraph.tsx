@@ -1134,32 +1134,32 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     const onSelectedPath = isEdgeOnSelectedPath(edge);
     const onCurrentPath = isEdgeOnCurrentPath(edge);
     if (layer === 'glow') {
-      if (onSelectedPath) return 0.38;
-      if (onCurrentPath) return 0.3;
-      if (hasAnyPathHighlight) return 0.04;
-      return 0.1;
+      if (onSelectedPath) return 0.18;
+      if (onCurrentPath) return 0.14;
+      if (hasAnyPathHighlight) return 0.02;
+      return 0.08;
     }
 
-    if (onSelectedPath) return 0.98;
-    if (onCurrentPath) return 0.92;
-    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.32 : 0.42;
-    return edge.kind === 'merge' ? 0.86 : 0.97;
+    if (onSelectedPath) return 0.88;
+    if (onCurrentPath) return 0.8;
+    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.24 : 0.34;
+    return edge.kind === 'merge' ? 0.78 : 0.9;
   };
 
   const getEdgeWidth = (edge: GraphEdge, layer: 'glow' | 'core') => {
     const onSelectedPath = isEdgeOnSelectedPath(edge);
     const onCurrentPath = isEdgeOnCurrentPath(edge);
     if (layer === 'glow') {
-      if (onSelectedPath) return edge.kind === 'merge' ? 4.4 : 5.2;
-      if (onCurrentPath) return edge.kind === 'merge' ? 4.1 : 4.8;
-      if (hasAnyPathHighlight) return edge.kind === 'merge' ? 2 : 2.4;
-      return edge.kind === 'merge' ? 2.8 : 3.2;
+      if (onSelectedPath) return edge.kind === 'merge' ? 3.1 : 3.8;
+      if (onCurrentPath) return edge.kind === 'merge' ? 2.8 : 3.5;
+      if (hasAnyPathHighlight) return edge.kind === 'merge' ? 1.5 : 1.9;
+      return edge.kind === 'merge' ? 2.4 : 2.8;
     }
 
-    if (onSelectedPath) return edge.kind === 'merge' ? 2.45 : 3.3;
-    if (onCurrentPath) return edge.kind === 'merge' ? 2.2 : 2.9;
-    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 1 : 1.4;
-    return edge.kind === 'merge' ? 1.35 : 1.9;
+    if (onSelectedPath) return edge.kind === 'merge' ? 1.9 : 2.5;
+    if (onCurrentPath) return edge.kind === 'merge' ? 1.7 : 2.2;
+    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.9 : 1.2;
+    return edge.kind === 'merge' ? 1.25 : 1.7;
   };
 
   return (
@@ -1385,7 +1385,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
             const fillColor = node.color;
-            const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.42 : 1;
+            const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.72 : 1;
             const pathStroke = isOnSelectedPath
               ? selectedPathColor
               : isOnCurrentPath
@@ -1398,20 +1398,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={r + 10}
+                    r={r + 8}
                     fill={fillColor}
-                    opacity={0.24}
+                    opacity={0.16}
                   />
                 )}
                 {isSelected && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={r + 6}
+                    r={r + 5}
                     fill="none"
                     stroke={fillColor}
-                    strokeWidth={2.6}
-                    opacity={0.9}
+                    strokeWidth={2.2}
+                    opacity={0.75}
                   />
                 )}
                 {isHeadCommit && (
@@ -1421,8 +1421,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                     r={r + 5}
                     fill="none"
                     stroke={currentPathColor}
-                    strokeWidth={2.1}
-                    opacity={0.88}
+                    strokeWidth={1.8}
+                    opacity={0.72}
                   />
                 )}
                 {isOnAnyFocusedPath && !isSelected && (
@@ -1432,8 +1432,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                     r={isOnSelectedPath ? r + 4 : r + 3}
                     fill="none"
                     stroke={pathStroke}
-                    strokeWidth={isOnSelectedPath ? 2 : 1.7}
-                    opacity={isOnSelectedPath ? 0.9 : 0.78}
+                    strokeWidth={isOnSelectedPath ? 1.6 : 1.4}
+                    opacity={isOnSelectedPath ? 0.66 : 0.58}
                   />
                 )}
                 {node.isMerge && (
