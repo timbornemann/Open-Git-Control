@@ -324,6 +324,7 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onRepoUnavailable: (callback: (payload: { command: string; error: string }) => void) => () => void;
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<{ success: boolean; data?: any; error?: string }>;
   getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
