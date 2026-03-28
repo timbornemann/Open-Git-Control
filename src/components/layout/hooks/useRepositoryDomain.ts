@@ -109,7 +109,8 @@ export const useRepositoryDomain = ({
             })
             .filter((branch: BranchInfo | null): branch is BranchInfo => branch !== null);
 
-          const head = parsedBranches.find((b: BranchInfo) => b.isHead)?.name ?? '';
+          const headRaw = parsedBranches.find((b: BranchInfo) => b.isHead)?.name ?? '';
+          const head = /^\((HEAD detached|no branch)/i.test(headRaw) ? '' : headRaw;
           setCurrentBranch(head);
           setBranches(parsedBranches);
         } else {
