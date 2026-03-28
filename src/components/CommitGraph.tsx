@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   isMergeInProgressError,
+  mergeTargetFromDecoratedRef,
   mergeableDecoratedRefs,
   normalizeBranchRefForMerge,
+  parseRemoteBranchRef,
   parseGitLog,
   resolveConflictPathAfterGitFailure,
 } from '../utils/gitParsing';
@@ -488,11 +490,71 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     const hash = node.commit.hash;
     const shortHash = node.commit.abbrevHash;
     const isMerge = node.isMerge;
+    const localBranchNames = new Set(
+      branches
+        .filter(branch => branch.scope === 'local')
+        .map(branch => branch.name),
+    );
+    const checkoutCandidates: { label: string; args: string[]; successMessage: string }[] = [];
+    const seenCheckoutTargets = new Set<string>();
+
+    for (const ref of sortRefs(node.commit.refs)) {
+      const mergeTarget = mergeTargetFromDecoratedRef(ref);
+      if (!mergeTarget) continue;
+      const normalizedTarget = mergeTarget.trim();
+      if (!normalizedTarget) continue;
+      if (normalizedTarget === currentBranch) continue;
+      if (normalizedTarget.endsWith('/HEAD')) continue;
+
+      const parsedRemote = parseRemoteBranchRef(normalizedTarget);
+      if (parsedRemote) {
+        if (localBranchNames.has(parsedRemote.localBranchName)) {
+          const localKey = `local:${parsedRemote.localBranchName}`;
+          if (!seenCheckoutTargets.has(localKey)) {
+            seenCheckoutTargets.add(localKey);
+            checkoutCandidates.push({
+              label: parsedRemote.localBranchName,
+              args: ['checkout', parsedRemote.localBranchName],
+              successMessage: `Branch "${parsedRemote.localBranchName}" ausgecheckt.`,
+            });
+          }
+          continue;
+        }
+
+        const remoteKey = `remote:${parsedRemote.remoteRef}`;
+        if (seenCheckoutTargets.has(remoteKey)) continue;
+        seenCheckoutTargets.add(remoteKey);
+        checkoutCandidates.push({
+          label: parsedRemote.remoteRef,
+          args: ['checkout', '--track', parsedRemote.remoteRef],
+          successMessage: `Tracking-Branch "${parsedRemote.localBranchName}" aus "${parsedRemote.remoteRef}" ausgecheckt.`,
+        });
+        continue;
+      }
+
+      const localKey = `local:${normalizedTarget}`;
+      if (seenCheckoutTargets.has(localKey)) continue;
+      seenCheckoutTargets.add(localKey);
+      checkoutCandidates.push({
+        label: normalizedTarget,
+        args: ['checkout', normalizedTarget],
+        successMessage: `Branch "${normalizedTarget}" ausgecheckt.`,
+      });
+    }
+
+    const checkoutRefActions: MenuAction[] = checkoutCandidates.map(candidate => ({
+      label: `Branch auschecken: ${candidate.label}`,
+      icon: 'CB',
+      action: () => {
+        void runGitAction(candidate.args, candidate.successMessage);
+      },
+    }));
 
     const actions: MenuAction[] = [
+      ...checkoutRefActions,
       {
-        label: `Checkout (Branch von ${shortHash})`,
-        icon: '->',
+        label: `Neuen Branch von ${shortHash} erstellen...`,
+        icon: 'NB',
         action: () => {
           const suggested = `checkout-${shortHash}`;
           setInputDialog({
