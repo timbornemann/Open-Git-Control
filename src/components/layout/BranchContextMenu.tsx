@@ -24,6 +24,7 @@ export const BranchContextMenu: React.FC<Props> = ({
   const { tr } = useI18n();
 
   if (!branchContextMenu) return null;
+  const isRemoteBranch = branchContextMenu.branch.startsWith('remotes/');
 
   return (
     <div
@@ -48,7 +49,9 @@ export const BranchContextMenu: React.FC<Props> = ({
               onCheckout(b);
             }}
           >
-            <span className="ctx-menu-icon">?</span> {tr('Checkout', 'Checkout')}
+            <span className="ctx-menu-icon">?</span> {isRemoteBranch
+              ? tr('Lokalen Tracking-Branch auschecken', 'Checkout local tracking branch')
+              : tr('Checkout', 'Checkout')}
           </button>
         )}
         {!branchContextMenu.isHead && (

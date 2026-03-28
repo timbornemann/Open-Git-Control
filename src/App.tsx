@@ -364,7 +364,13 @@ const App: React.FC = () => {
           <BranchContextMenu
             branchContextMenu={state.branchContextMenu}
             setBranchContextMenu={state.setBranchContextMenu}
-            onCheckout={(branch) => state.runGitCommand(['checkout', branch], tr(`Ausgecheckt: ${branch}`, `Checked out: ${branch}`))}
+            onCheckout={(branch) => {
+              if (branch.startsWith('remotes/')) {
+                void state.handleCheckoutRemoteBranch(branch);
+                return;
+              }
+              void state.runGitCommand(['checkout', branch], tr(`Ausgecheckt: ${branch}`, `Checked out: ${branch}`));
+            }}
             onMerge={state.handleMergeBranch}
             onRename={state.handleRenameBranch}
             onDelete={state.handleDeleteBranch}
