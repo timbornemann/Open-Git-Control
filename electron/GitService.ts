@@ -9,6 +9,12 @@ const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
 const INDEX_LOCK_RETRY_MAX_ATTEMPTS = 6;
 const INDEX_LOCK_RETRY_BASE_DELAY_MS = 75;
 const INDEX_LOCK_RETRY_MAX_DELAY_MS = 600;
+const REPO_UNAVAILABLE_PATTERNS: RegExp[] = [
+  /not a git repository/i,
+  /no repository path set/i,
+  /cannot change to/i,
+  /unable to get current working directory/i,
+];
 
 type ExecFileAsyncResult = { stdout: string; stderr: string };
 type ExecFileAsyncRunner = (file: string, args: string[], options: any) => Promise<ExecFileAsyncResult>;
@@ -73,9 +79,23 @@ export class GitService {
 
   private normalizeGitError(error: any, args: string[]): Error {
     const gitOut = (error?.stderr || '').trim() || (error?.stdout || '').trim();
-    const detailedMessage = gitOut ? `${error.message}\nGit Output: ${gitOut}` : String(error?.message || 'Unknown git error');
-    console.error(`Git Error executing "git ${args.join(' ')}":`, detailedMessage);
-    return new Error(detailedMessage);
+    const fallbackMessage = String(error?.message || 'Unknown git error');
+    const detailedMessage = gitOut ? `${fallbackMessage}\nGit Output: ${gitOut}` : fallbackMessage;
+    const isRepoUnavailable = this.isRepoUnavailableError(detailedMessage);
+    const finalMessage = isRepoUnavailable
+      ? `[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not a Git repo).\nGit Output: ${gitOut || fallbackMessage}`
+      : detailedMessage;
+
+    if (!isRepoUnavailable) {
+      console.error(`Git Error executing "git ${args.join(' ')}":`, finalMessage);
+    }
+    return new Error(finalMessage);
+  }
+
+  private isRepoUnavailableError(errorText: string): boolean {
+    const text = String(errorText || '');
+    if (!text.trim()) return false;
+    return REPO_UNAVAILABLE_PATTERNS.some((pattern) => pattern.test(text));
   }
 
   private isIndexLockError(error: any): boolean {
