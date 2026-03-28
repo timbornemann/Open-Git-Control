@@ -138,6 +138,24 @@ describe('computeGraphLayout', () => {
     expect((orphan?.lane ?? 0)).toBeGreaterThan(1);
   });
 
+  it('reuses the nearest side lane for sequential short-lived merge branches on trunk', () => {
+    const commits = [
+      commit('merge02', ['merge01', 'feat02'], ['HEAD -> main']),
+      commit('feat02', ['merge01']),
+      commit('merge01', ['base000', 'feat01']),
+      commit('feat01', ['base000']),
+      commit('base000', []),
+    ];
+
+    const graph = computeGraphLayout(commits);
+    const nodeByHash = new Map(graph.nodes.map(node => [node.commit.hash, node]));
+
+    expect(nodeByHash.get('merge02')?.lane).toBe(0);
+    expect(nodeByHash.get('merge01')?.lane).toBe(0);
+    expect(nodeByHash.get('feat02')?.lane).toBe(1);
+    expect(nodeByHash.get('feat01')?.lane).toBe(1);
+  });
+
   it('handles duplicate parent hashes without duplicating lane reservations', () => {
     const commits = [
       commit('aaaaaaa', ['bbbbbbb', 'bbbbbbb'], ['HEAD -> main']),

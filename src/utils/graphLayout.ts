@@ -112,13 +112,13 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     }
   };
 
-  const findFreeLane = (startLane: number, row: number) => {
+  const findFreeLane = (startLane: number, row: number, allowRecentlyFreed = false) => {
     ensureLaneExists(startLane);
 
     for (let lane = startLane; lane < activeLanes.length; lane++) {
       if (activeLanes[lane] !== null) continue;
       const recentlyFreed = row - (laneFreedAtRow[lane] ?? -9999) <= LANE_REUSE_COOLDOWN_ROWS;
-      if (!recentlyFreed) {
+      if (allowRecentlyFreed || !recentlyFreed) {
         return lane;
       }
     }
@@ -128,7 +128,13 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     return activeLanes.length - 1;
   };
 
-  const reserveHashInLane = (hash: string, preferredLane: number, startLane: number, row: number) => {
+  const reserveHashInLane = (
+    hash: string,
+    preferredLane: number,
+    startLane: number,
+    row: number,
+    allowRecentlyFreed = false,
+  ) => {
     const existingLane = activeLanes.indexOf(hash);
     if (existingLane !== -1) {
       if (preferredLane >= 0 && existingLane !== preferredLane) {
@@ -146,7 +152,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     let lane = preferredLane;
     ensureLaneExists(Math.max(lane, startLane));
     if (lane < startLane || activeLanes[lane] !== null) {
-      lane = findFreeLane(startLane, row);
+      lane = findFreeLane(startLane, row, allowRecentlyFreed);
     }
 
     activeLanes[lane] = hash;
@@ -179,9 +185,13 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
 
     for (let pi = 1; pi < parents.length; pi++) {
       const parentHash = parents[pi];
-      const preferred = trunkHashes.has(parentHash) ? 0 : -1;
+      const parentOnTrunk = trunkHashes.has(parentHash);
+      const preferred = parentOnTrunk ? 0 : -1;
       const startLane = preferred === 0 ? 0 : 1;
-      reserveHashInLane(parentHash, preferred, startLane, row);
+      // Sequential, already-merged short-lived branches can reuse the closest side lane
+      // without visual collisions, keeping the graph compact instead of stair-stepped.
+      const allowImmediateSideLaneReuse = commitOnTrunk && !parentOnTrunk;
+      reserveHashInLane(parentHash, preferred, startLane, row, allowImmediateSideLaneReuse);
     }
 
     while (activeLanes.length > 1 && activeLanes[activeLanes.length - 1] === null) {
