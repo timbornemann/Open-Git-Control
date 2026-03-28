@@ -14,6 +14,20 @@ describe('validateBranchName', () => {
     expect(isBranchNameValid('Test 1')).toBe(false);
   });
 
+  it('rejects empty or special top-level names', () => {
+    expect(validateBranchName('')).toBe('empty');
+    expect(validateBranchName('   ')).toBe('empty');
+    expect(validateBranchName(null as unknown as string)).toBe('empty');
+    expect(validateBranchName('@')).toBe('is-at');
+  });
+
+  it('rejects slash and trailing-dot edge cases', () => {
+    expect(validateBranchName('/feature/test')).toBe('starts-with-slash');
+    expect(validateBranchName('feature/test/')).toBe('ends-with-slash');
+    expect(validateBranchName('feature//test')).toBe('double-slash');
+    expect(validateBranchName('feature/test.')).toBe('ends-with-dot');
+  });
+
   it('rejects branch names with invalid git ref patterns', () => {
     expect(validateBranchName('foo..bar')).toBe('contains-dot-dot');
     expect(validateBranchName('foo@{bar')).toBe('contains-at-open-brace');
