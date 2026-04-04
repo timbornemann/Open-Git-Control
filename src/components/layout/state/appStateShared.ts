@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
 export type RunGitCommandOptions = {
   skipDirtyGuard?: boolean;
   skipSecretScan?: boolean;
+  skipAutoSetUpstreamOnPushFailure?: boolean;
 };
 
 export const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
@@ -57,4 +58,3 @@ export const DEFAULT_SIDEBAR_COLLAPSE_STATE: SidebarCollapseState = {
 export const DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE: SidebarGeneralCollapseState = {
   repoPanelCollapsed: false,
 };
-

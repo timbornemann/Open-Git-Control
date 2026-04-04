@@ -185,6 +185,30 @@ export const useAppState = () => {
     if (!window.electronAPI || !workspace.activeRepo || args.length === 0) return false;
 
     const command = args[0];
+    const normalizedError = (value: unknown) => String(value || '').toLowerCase();
+    const isMissingUpstreamError = (value: unknown) => {
+      const message = normalizedError(value);
+      return (
+        message.includes('has no upstream branch')
+        || message.includes('no upstream branch')
+        || message.includes('--set-upstream')
+        || message.includes('set-upstream')
+      );
+    };
+    const tryAutoSetUpstreamPush = async (failureMessage: unknown): Promise<boolean> => {
+      if (command !== 'push' || options?.skipAutoSetUpstreamOnPushFailure || !isMissingUpstreamError(failureMessage)) {
+        return false;
+      }
+
+      const fallbackArgs = ['push', ...args.slice(1), '-u', 'origin', 'HEAD'];
+      const fallbackSuccess = await runGitCommand(
+        fallbackArgs,
+        tr('Branch gepusht und Upstream gesetzt.', 'Pushed branch and set upstream.'),
+        tr('Push mit Upstream wird ausgefuehrt...', 'Running push with upstream...'),
+        { ...options, skipAutoSetUpstreamOnPushFailure: true },
+      );
+      return fallbackSuccess;
+    };
     const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
     const shouldScanPushSecrets =
       command === 'push'
@@ -305,6 +329,9 @@ export const useAppState = () => {
         triggerRefresh();
         return true;
       }
+      if (await tryAutoSetUpstreamPush(r.error)) {
+        return true;
+      }
       const mergeInProgress = isMergeInProgressError(r.error);
       triggerRefresh();
       try {
@@ -345,6 +372,9 @@ export const useAppState = () => {
       setGitActionToast({ msg: r.error || tr('Fehler beim Ausführen von git.', 'Error while running git.'), isError: true });
       return false;
     } catch (e: any) {
+      if (await tryAutoSetUpstreamPush(e?.message)) {
+        return true;
+      }
       const mergeInProgress = isMergeInProgressError(e?.message);
       triggerRefresh();
       try {
@@ -1063,7 +1093,6 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
 
 
 
