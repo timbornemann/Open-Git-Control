@@ -78,6 +78,7 @@ export type AppSidebarProps = {
   onToggleSubmodulePanelCollapsed: () => void;
 
   hasRemoteOrigin: boolean | null;
+  forceGithubRepoCreationPrompt: boolean;
   isConnectingGithubRepo: boolean;
   connectError: string | null;
   newRepoName: string;

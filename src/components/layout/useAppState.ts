@@ -21,8 +21,10 @@ import {
 } from '../../utils/gitParsing';
 import {
   compactGitError,
+  isMissingRemotePushError,
   isMissingUpstreamPushError,
   isNoLocalCommitPushError,
+  isRemoteRepositoryMissingError,
   isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
 } from '../../utils/gitPushRecovery';
@@ -84,6 +86,7 @@ export const useAppState = () => {
 
   const [isConnectingGithubRepo, setIsConnectingGithubRepo] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [forceGithubRepoCreationPrompt, setForceGithubRepoCreationPrompt] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [newRepoPrivate, setNewRepoPrivate] = useState(true);
@@ -156,6 +159,7 @@ export const useAppState = () => {
     setNewRepoName('');
     setNewRepoDescription('');
     setConnectError(null);
+    setForceGithubRepoCreationPrompt(false);
     setShowReleaseCreator(false);
     setReleaseContext(null);
     setReleaseContextError(null);
@@ -488,6 +492,22 @@ export const useAppState = () => {
     return false;
   }, [recoverBareRepoForPush, setGitActionToast, tr, workspace]);
 
+  const openGithubRepoCreationRecovery = useCallback((failureMessage: unknown) => {
+    const activeRepoPath = workspace.activeRepo || '';
+    const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';
+    setNewRepoName((prev) => {
+      const trimmed = String(prev || '').trim();
+      return trimmed || suggestedName;
+    });
+    setForceGithubRepoCreationPrompt(true);
+    const shortError = compactGitError(failureMessage, 320);
+    setConnectError(shortError || tr(
+      'Der aktuelle Remote ist nicht mehr nutzbar. Bitte neues GitHub-Repository anlegen oder origin aktualisieren.',
+      'The current remote is no longer usable. Please create a new GitHub repository or update origin.',
+    ));
+    workspace.setActiveTab('repo');
+  }, [tr, workspace.activeRepo, workspace]);
+
   const createGithubRepoAndConnect = useCallback(async (
     options: {
       replaceOriginIfExists?: boolean;
@@ -567,6 +587,8 @@ export const useAppState = () => {
               ),
               isError: false,
             });
+            setForceGithubRepoCreationPrompt(false);
+            setConnectError(null);
             triggerRefresh();
             return true;
           }
@@ -580,6 +602,8 @@ export const useAppState = () => {
           : tr('Neues GitHub-Repository erstellt und verbunden.', 'Created and connected new GitHub repository.'),
         isError: false,
       });
+      setForceGithubRepoCreationPrompt(false);
+      setConnectError(null);
       triggerRefresh();
       return true;
     } catch (e: any) {
@@ -615,9 +639,66 @@ export const useAppState = () => {
       );
       return fallbackSuccess;
     };
-    const maybeRecoverPushRemote = async (failureMessage: unknown): Promise<boolean> => {
-      if (command !== 'push' || options?.skipGithubRecoveryOnPushFailure || !shouldOfferGithubRepoRecoveryOnPushFailure(failureMessage)) {
+    const maybeRecoverRemoteSetup = async (failureMessage: unknown): Promise<boolean> => {
+      const supportsRecovery = command === 'push' || command === 'pull' || command === 'fetch';
+      if (!supportsRecovery || options?.skipGithubRecoveryOnPushFailure || !shouldOfferGithubRepoRecoveryOnPushFailure(failureMessage)) {
         return false;
+      }
+      const missingRemote = isMissingRemotePushError(failureMessage);
+
+      if (isRemoteRepositoryMissingError(failureMessage)) {
+        const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
+        const removeOriginError = String(removeOriginResult.error || '').trim();
+        const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
+        if (!removeOriginResult.success && !originAlreadyMissing) {
+          setGitActionToast({
+            msg: removeOriginResult.error || tr(
+              'Das nicht mehr gueltige origin-Remote konnte nicht automatisch entfernt werden.',
+              'Could not automatically remove the invalid origin remote.',
+            ),
+            isError: true,
+          });
+          return false;
+        }
+
+        const activeRepoPath = workspace.activeRepo || '';
+        const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';
+        setNewRepoName((prev) => {
+          const trimmed = String(prev || '').trim();
+          return trimmed || suggestedName;
+        });
+        setForceGithubRepoCreationPrompt(true);
+        setConnectError(null);
+        workspace.setActiveTab('repo');
+        triggerRefresh();
+        setGitActionToast({
+          msg: tr(
+            'GitHub-Repository nicht mehr vorhanden: origin wurde entfernt. Bitte jetzt Name/Private setzen und neues GitHub-Repository erstellen.',
+            'GitHub repository no longer exists: origin was removed. Please set name/private and create a new GitHub repository now.',
+          ),
+          isError: false,
+        });
+        return true;
+      }
+
+      if (missingRemote) {
+        const activeRepoPath = workspace.activeRepo || '';
+        const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';
+        setNewRepoName((prev) => {
+          const trimmed = String(prev || '').trim();
+          return trimmed || suggestedName;
+        });
+        setForceGithubRepoCreationPrompt(true);
+        setConnectError(null);
+        workspace.setActiveTab('repo');
+        setGitActionToast({
+          msg: tr(
+            'Kein gueltiges origin-Remote konfiguriert. Bitte jetzt Name/Private setzen und GitHub-Repository erstellen.',
+            'No valid origin remote is configured. Please set name/private and create a GitHub repository now.',
+          ),
+          isError: false,
+        });
+        return true;
       }
 
       const shortError = compactGitError(failureMessage);
@@ -632,16 +713,16 @@ export const useAppState = () => {
       if (!isGithubAuthenticated) {
         setConfirmDialog({
           variant: 'confirm',
-          title: tr('Push-Ziel fehlt', 'Push destination missing'),
+          title: tr('GitHub-Verbindung erforderlich', 'GitHub connection required'),
           message: tr(
-            'Der Push konnte nicht ausgefuehrt werden. Melde dich bei GitHub an, dann kann direkt ein Remote-Repository erstellt und verbunden werden.',
-            'Push failed. Sign in to GitHub to create and connect a remote repository directly.',
+            'Das Remote ist nicht mehr gueltig. Melde dich bei GitHub an, danach kannst du direkt ein neues Repository anlegen und verbinden.',
+            'The remote is no longer valid. Sign in to GitHub, then you can create and connect a new repository directly.',
           ),
           contextItems: shortError ? [{ label: tr('Git-Fehler', 'Git error'), value: shortError }] : [],
           irreversible: false,
           consequences: tr(
-            'Nach dem Login kannst du den Push erneut starten oder direkt ein GitHub-Repo anlegen.',
-            'After login you can retry push or create a GitHub repository directly.',
+            'Nach dem Login wird im Repo-Tab wieder das Formular fuer Name/Beschreibung/Private sichtbar.',
+            'After login the repo tab will show the form for name/description/private again.',
           ),
           confirmLabel: tr('Zum GitHub-Tab', 'Go to GitHub tab'),
           onConfirm: async () => {
@@ -651,23 +732,51 @@ export const useAppState = () => {
         return true;
       }
 
-      setConfirmDialog({
-        variant: 'confirm',
-        title: tr('GitHub-Repository jetzt anlegen?', 'Create GitHub repository now?'),
-        message: tr(
-          'Der aktuelle Push-Remote ist nicht nutzbar. Es kann jetzt ein neues GitHub-Repository erstellt, als origin verbunden und direkt gepusht werden.',
-          'The current push remote is not usable. A new GitHub repository can now be created, connected as origin, and pushed immediately.',
+      openGithubRepoCreationRecovery(failureMessage);
+      setGitActionToast({
+        msg: tr(
+          'Remote auf GitHub nicht mehr gueltig. Bitte im Repo-Tab Name/Private einstellen und "GitHub-Repo erstellen & verbinden" ausfuehren.',
+          'GitHub remote is no longer valid. Please set name/private in the repo tab and run "Create & connect GitHub repo".',
         ),
-        contextItems: shortError ? [{ label: tr('Git-Fehler', 'Git error'), value: shortError }] : [],
-        irreversible: false,
-        consequences: tr(
-          'Falls origin bereits existiert, wird dessen URL auf das neue GitHub-Repository gesetzt.',
-          'If origin already exists, its URL will be updated to the new GitHub repository.',
+        isError: true,
+      });
+      return true;
+    };
+    const maybeHandlePushWithoutOrigin = async (): Promise<boolean> => {
+      if (command !== 'push' || options?.skipGithubRecoveryOnPushFailure) {
+        return false;
+      }
+
+      const remotesResult = await window.electronAPI.runGitCommand('remote');
+      if (!remotesResult.success) {
+        return false;
+      }
+
+      const remoteNames = String(remotesResult.data || '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (remoteNames.includes('origin')) {
+        return false;
+      }
+
+      const activeRepoPath = workspace.activeRepo || '';
+      const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';
+      setNewRepoName((prev) => {
+        const trimmed = String(prev || '').trim();
+        return trimmed || suggestedName;
+      });
+      setForceGithubRepoCreationPrompt(true);
+      setConnectError(null);
+      workspace.setActiveTab('repo');
+      triggerRefresh();
+      setGitActionToast({
+        msg: tr(
+          'Kein origin-Remote vorhanden. Bitte jetzt Name/Private setzen und GitHub-Repository erstellen.',
+          'No origin remote is configured. Please set name/private and create a GitHub repository now.',
         ),
-        confirmLabel: tr('Repo erstellen & pushen', 'Create repo & push'),
-        onConfirm: async () => {
-          await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });
-        },
+        isError: false,
       });
       return true;
     };
@@ -676,6 +785,10 @@ export const useAppState = () => {
       command === 'push'
       && settings.secretScanBeforePushEnabled
       && !options?.skipSecretScan;
+
+    if (await maybeHandlePushWithoutOrigin()) {
+      return false;
+    }
 
     if (shouldGuard) {
       try {
@@ -787,6 +900,10 @@ export const useAppState = () => {
     try {
       const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
       if (r.success) {
+        if (forceGithubRepoCreationPrompt && (command === 'push' || command === 'pull' || command === 'fetch')) {
+          setForceGithubRepoCreationPrompt(false);
+          setConnectError(null);
+        }
         setGitActionToast({ msg: successMsg, isError: false });
         triggerRefresh();
         return true;
@@ -831,7 +948,7 @@ export const useAppState = () => {
       if (missingUpstream) {
         return false;
       }
-      if (await maybeRecoverPushRemote(r.error)) {
+      if (await maybeRecoverRemoteSetup(r.error)) {
         return false;
       }
       const mergeInProgress = isMergeInProgressError(r.error);
@@ -914,7 +1031,7 @@ export const useAppState = () => {
       if (missingUpstream) {
         return false;
       }
-      if (await maybeRecoverPushRemote(e?.message)) {
+      if (await maybeRecoverRemoteSetup(e?.message)) {
         return false;
       }
       const mergeInProgress = isMergeInProgressError(e?.message);
@@ -960,7 +1077,7 @@ export const useAppState = () => {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [createGithubRepoAndConnect, ensureInitialCommitForPush, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
+  }, [ensureInitialCommitForPush, forceGithubRepoCreationPrompt, openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
 
   useEffect(() => {
     if (!window.electronAPI?.onRepoUnavailable) return;
@@ -1469,6 +1586,7 @@ export const useAppState = () => {
     remotes: repository.remotes,
     submodules: repository.submodules,
     hasRemoteOrigin: repository.hasRemoteOrigin,
+    forceGithubRepoCreationPrompt,
     remoteSync: repository.remoteSync,
     remoteOnlyBranches: repository.remoteOnlyBranches,
     remoteStatus: repository.remoteStatus,

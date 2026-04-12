@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRe
 import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { normalizeBranchRefForMerge } from '../../../utils/gitParsing';
 import { validateBranchName } from '../../../utils/gitRefValidation';
+import { isRemoteRepositoryMissingError } from '../../../utils/gitPushRecovery';
 import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
@@ -261,6 +262,34 @@ export const useRepositoryDomain = ({
       }
 
       const errorMessage = String(result.error || tr('Remote konnte nicht aktualisiert werden.', 'Could not update remote.'));
+      if (isRemoteRepositoryMissingError(errorMessage)) {
+        const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
+        const removeOriginError = String(removeOriginResult.error || '').trim();
+        const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
+
+        if (removeOriginResult.success || originAlreadyMissing) {
+          setHasRemoteOrigin(false);
+          setRemotes((prev) => prev.filter((remote) => remote.name !== 'origin'));
+          setRemoteSync((prev) => ({
+            ...prev,
+            isFetching: false,
+            lastFetchedAt: null,
+            lastFetchError: null,
+            ahead: 0,
+            behind: 0,
+            hasUpstream: false,
+          }));
+          triggerRefresh();
+          setGitActionToast({
+            msg: tr(
+              'GitHub-Repository nicht mehr vorhanden: origin wurde entfernt. Repository ist jetzt lokal/offline.',
+              'GitHub repository no longer exists: origin was removed. Repository is now local/offline.',
+            ),
+            isError: false,
+          });
+          return true;
+        }
+      }
       setRemoteSync(prev => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
       if (showToast) {
         setGitActionToast({ msg: errorMessage, isError: true });
