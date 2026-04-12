@@ -375,7 +375,7 @@ export function registerGitHandlers({
     }
   });
 
-  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string) => {
+  ipcMain.handle('git:clone', async (event, cloneUrl: string, targetDir: string, targetName?: string) => {
     const webContents = event.sender;
     const jobId = createJobId('git-clone');
 
@@ -395,7 +395,7 @@ export function registerGitHandlers({
         message: line,
         timestamp: Date.now(),
       });
-    });
+    }, targetName);
 
     emitJobEvent(webContents, {
       id: jobId,

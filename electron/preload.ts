@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gitPull: () => invokeGitCommand('pull'),
   gitPush: () => invokeGitCommand('push'),
   scanPushSecrets: () => ipcRenderer.invoke('git:scanPushSecrets'),
-  gitClone: (cloneUrl: string, targetDir: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir),
+  gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir, targetName),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
     ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),

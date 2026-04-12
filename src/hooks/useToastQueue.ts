@@ -16,6 +16,11 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
 
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const latestToastsRef = useRef<ToastEntry[]>([]);
+
+  useEffect(() => {
+    latestToastsRef.current = toasts;
+  }, [toasts]);
 
   const dismiss = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -33,6 +38,12 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
       timersRef.current.clear();
       return;
     }
+
+    const lastToast = latestToastsRef.current[latestToastsRef.current.length - 1];
+    if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError) {
+      return;
+    }
+
     const id = ++nextId;
     setToasts(prev => [...prev.slice(-4), { ...msg, id }]);
     const hideAfterMs = msg.isError ? errorAutoHideMs : autoHideMs;

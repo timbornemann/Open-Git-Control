@@ -214,3 +214,56 @@ describe('GitService command queue', () => {
     expect(maxInFlight).toBeGreaterThan(1);
   });
 });
+
+describe('GitService bare repository handling', () => {
+  it('suppresses worktree status polling commands for bare repositories', async () => {
+    const fakeExec = vi.fn(async () => ({ stdout: 'unexpected\n', stderr: '' }));
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-bare-test-repo.git');
+    (service as any).repoIsBare = true;
+
+    await expect(service.runCommand(['status', '--short'])).resolves.toBe('');
+    await expect(service.runCommand(['status', '--porcelain=v1', '--untracked-files=all'])).resolves.toBe('');
+    await expect(service.runCommand(['diff', '--numstat'])).resolves.toBe('');
+    await expect(service.runCommand(['diff', '--numstat', '--cached'])).resolves.toBe('');
+    await expect(service.runCommand(['submodule', 'status', '--recursive'])).resolves.toBe('');
+
+    expect(fakeExec).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitService expected non-fatal git errors', () => {
+  it('does not log rev-parse upstream lookup failures as console errors', async () => {
+    const error: any = new Error('Command failed');
+    error.stderr = "fatal: no such branch: 'master'";
+
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-nonfatal-upstream-test');
+
+    await expect(
+      service.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
+    ).rejects.toThrow(/no such branch/i);
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('GitService clone target naming', () => {
+  it('derives a stable repo name from a Windows local bare path', () => {
+    const service = new GitService();
+    const repoName = (service as any).deriveCloneRepoName('D:\\Projects\\Software\\zz. Test-remote.git');
+    expect(repoName).toBe('zz. Test-remote');
+  });
+
+  it('sanitizes explicit clone target names', () => {
+    const service = new GitService();
+    const sanitized = (service as any).sanitizeCloneTargetName('demo/repo:name.');
+    expect(sanitized).toBe('demo-repo-name');
+  });
+});

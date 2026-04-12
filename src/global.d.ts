@@ -334,7 +334,7 @@ export interface ElectronAPI {
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
   scanPushSecrets: () => Promise<IpcResult<SecretScanResultDto>>;
-  gitClone: (cloneUrl: string, targetDir: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
+  gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;

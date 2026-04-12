@@ -26,6 +26,8 @@ export type RunGitCommandOptions = {
   skipDirtyGuard?: boolean;
   skipSecretScan?: boolean;
   skipAutoSetUpstreamOnPushFailure?: boolean;
+  skipGithubRecoveryOnPushFailure?: boolean;
+  skipAutoInitialCommitOnPushFailure?: boolean;
 };
 
 export const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);

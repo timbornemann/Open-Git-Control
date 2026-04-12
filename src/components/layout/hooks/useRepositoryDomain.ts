@@ -344,7 +344,18 @@ export const useRepositoryDomain = ({
     }
     setIsCreatingBranch(false);
     setNewBranchName('');
-    await runGitCommand(['checkout', '-b', name], tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
+    const created = await runGitCommand(['checkout', '-b', name], tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
+    if (!created) return;
+
+    if (!hasRemoteOrigin) {
+      return;
+    }
+
+    await runGitCommand(
+      ['push', '-u', 'origin', name],
+      tr(`Branch "${name}" erstellt, auf origin veroeffentlicht und Upstream gesetzt.`, `Created branch "${name}", pushed to origin, and set upstream.`),
+      tr(`Neuer Branch "${name}" wird auf origin veroeffentlicht...`, `Publishing new branch "${name}" to origin...`),
+    );
   };
 
   const handleDeleteBranch = async (branchName: string) => {

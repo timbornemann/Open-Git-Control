@@ -38,13 +38,16 @@ export type CommitStats = { files: number; additions: number; deletions: number 
 
 export class GitService {
   private repoPath: string | null = null;
+  private repoIsBare: boolean | null = null;
   private readonly repoExecutionQueue = new Map<string, Promise<void>>();
 
   constructor(private readonly execFileAsyncRunner: ExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner) {}
 
   setRepoPath(newPath: string) {
     const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
-    this.repoPath = this.resolveRepoRoot(normalizedPath);
+    const resolvedRepoPath = this.resolveRepoRoot(normalizedPath);
+    this.repoPath = resolvedRepoPath;
+    this.repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
   }
 
   getRepoPath(): string | null {
@@ -77,19 +80,75 @@ export class GitService {
     }
   }
 
+  private detectIsBareRepositorySync(candidatePath: string): boolean {
+    try {
+      const output = execFileSync('git', ['rev-parse', '--is-bare-repository'], {
+        cwd: candidatePath,
+        windowsHide: true,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim().toLowerCase();
+      return output === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  private isCurrentRepositoryBare(repoPath: string): boolean {
+    if (typeof this.repoIsBare === 'boolean') {
+      return this.repoIsBare;
+    }
+    this.repoIsBare = this.detectIsBareRepositorySync(repoPath);
+    return this.repoIsBare;
+  }
+
+  private shouldSuppressBareWorkTreeCommand(args: string[]): boolean {
+    const primary = String(args?.[0] || '').trim().toLowerCase();
+    if (!primary) return false;
+
+    if (primary === 'status') {
+      return true;
+    }
+
+    if (primary === 'diff') {
+      return args.some((arg) => String(arg || '').trim().toLowerCase() === '--numstat');
+    }
+
+    if (primary === 'submodule') {
+      const secondary = String(args?.[1] || '').trim().toLowerCase();
+      return secondary === 'status';
+    }
+
+    return false;
+  }
+
   private normalizeGitError(error: any, args: string[]): Error {
     const gitOut = (error?.stderr || '').trim() || (error?.stdout || '').trim();
     const fallbackMessage = String(error?.message || 'Unknown git error');
     const detailedMessage = gitOut ? `${fallbackMessage}\nGit Output: ${gitOut}` : fallbackMessage;
     const isRepoUnavailable = this.isRepoUnavailableError(detailedMessage);
+    const isExpectedNonFatal = this.isExpectedNonFatalGitError(args, detailedMessage);
     const finalMessage = isRepoUnavailable
       ? `[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not a Git repo).\nGit Output: ${gitOut || fallbackMessage}`
       : detailedMessage;
 
-    if (!isRepoUnavailable) {
+    if (!isRepoUnavailable && !isExpectedNonFatal) {
       console.error(`Git Error executing "git ${args.join(' ')}":`, finalMessage);
     }
     return new Error(finalMessage);
+  }
+
+  private isExpectedNonFatalGitError(args: string[], errorText: string): boolean {
+    const primary = String(args?.[0] || '').trim().toLowerCase();
+    const expectsUpstreamRef = args.some((arg) => String(arg || '').trim() === '@{upstream}');
+    if (primary === 'rev-parse' && expectsUpstreamRef) {
+      return (
+        /no upstream configured for branch/i.test(errorText)
+        || /upstream branch .* not stored as a remote-tracking branch/i.test(errorText)
+        || /fatal: no such branch/i.test(errorText)
+      );
+    }
+    return false;
   }
 
   private isRepoUnavailableError(errorText: string): boolean {
@@ -231,6 +290,9 @@ export class GitService {
    */
   async runCommand(args: string[]): Promise<string> {
     const repoPath = this.ensureRepoPath();
+    if (this.isCurrentRepositoryBare(repoPath) && this.shouldSuppressBareWorkTreeCommand(args)) {
+      return '';
+    }
     return this.execGit(repoPath, args);
   }
 
@@ -649,6 +711,26 @@ export class GitService {
     return this.runCommand(args);
   }
 
+  private sanitizeCloneTargetName(value: string): string {
+    const normalized = String(value || '')
+      .trim()
+      .replace(/[\\/]+/g, '-')
+      .replace(/[:*?"<>|]/g, '-')
+      .replace(/\s+/g, ' ')
+      .replace(/\.+$/, '');
+    return normalized || 'repo';
+  }
+
+  private deriveCloneRepoName(cloneSource: string): string {
+    const normalizedSource = String(cloneSource || '')
+      .trim()
+      .replace(/[\\]+/g, '/')
+      .replace(/\/+$/, '');
+    const withoutGitSuffix = normalizedSource.replace(/\.git$/i, '');
+    const lastSegment = withoutGitSuffix.split('/').pop() || 'repo';
+    return this.sanitizeCloneTargetName(lastSegment);
+  }
+
   /**
    * Klont ein Repository mit Fortschrittsanzeige
    */
@@ -656,40 +738,54 @@ export class GitService {
     cloneUrl: string,
     targetDir: string,
     onProgress: (line: string) => void,
+    targetName?: string,
   ): Promise<{ success: boolean; repoPath: string; error?: string }> {
     return new Promise((resolve) => {
-      // Extract repo name from URL for the target folder
-      const repoName = cloneUrl.replace(/\.git$/, '').split('/').pop() || 'repo';
+      const repoName = targetName
+        ? this.sanitizeCloneTargetName(targetName)
+        : this.deriveCloneRepoName(cloneUrl);
       const repoPath = path.join(targetDir, repoName);
+      if (fs.existsSync(repoPath)) {
+        resolve({
+          success: false,
+          repoPath,
+          error: `Destination path already exists: ${repoPath}`,
+        });
+        return;
+      }
+
+      const progressTail: string[] = [];
+      const collectProgress = (data: Buffer) => {
+        const lines = data.toString().split(/\r?\n|\r/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          progressTail.push(trimmed);
+          if (progressTail.length > 24) {
+            progressTail.splice(0, progressTail.length - 24);
+          }
+          onProgress(trimmed);
+        }
+      };
 
       const proc = spawn('git', ['clone', '--progress', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       // Git clone sends progress to stderr
-      proc.stderr.on('data', (data: Buffer) => {
-        const lines = data.toString().split(/\r?\n|\r/);
-        for (const line of lines) {
-          if (line.trim()) {
-            onProgress(line.trim());
-          }
-        }
-      });
-
-      proc.stdout.on('data', (data: Buffer) => {
-        const lines = data.toString().split(/\r?\n|\r/);
-        for (const line of lines) {
-          if (line.trim()) {
-            onProgress(line.trim());
-          }
-        }
-      });
+      proc.stderr.on('data', collectProgress);
+      proc.stdout.on('data', collectProgress);
 
       proc.on('close', (code) => {
         if (code === 0) {
           resolve({ success: true, repoPath });
         } else {
-          resolve({ success: false, repoPath, error: `Git clone beendet mit Exit Code ${code}` });
+          const details = progressTail.slice(-4).join('\n').trim();
+          resolve({
+            success: false,
+            repoPath,
+            error: details || `Git clone exited with code ${code} (source: ${cloneUrl}, target: ${repoPath})`,
+          });
         }
       });
 
