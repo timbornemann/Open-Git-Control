@@ -2,10 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ToastMessage } from '../types/git';
 
 type ToastEntry = ToastMessage & { id: number };
+type UseToastQueueOptions = {
+  autoHideMs?: number;
+  errorAutoHideMs?: number | null;
+};
 
 let nextId = 0;
 
-export const useToastQueue = (autoHideMs = 3000) => {
+export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
+  const options = typeof config === 'number' ? { autoHideMs: config } : config;
+  const autoHideMs = options.autoHideMs ?? 3000;
+  const errorAutoHideMs = options.errorAutoHideMs === undefined ? autoHideMs : options.errorAutoHideMs;
+
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -27,9 +35,12 @@ export const useToastQueue = (autoHideMs = 3000) => {
     }
     const id = ++nextId;
     setToasts(prev => [...prev.slice(-4), { ...msg, id }]);
-    const timer = setTimeout(() => dismiss(id), autoHideMs);
-    timersRef.current.set(id, timer);
-  }, [autoHideMs, dismiss]);
+    const hideAfterMs = msg.isError ? errorAutoHideMs : autoHideMs;
+    if (typeof hideAfterMs === 'number' && hideAfterMs > 0) {
+      const timer = setTimeout(() => dismiss(id), hideAfterMs);
+      timersRef.current.set(id, timer);
+    }
+  }, [autoHideMs, dismiss, errorAutoHideMs]);
 
   useEffect(() => {
     const timers = timersRef.current;

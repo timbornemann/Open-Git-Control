@@ -83,7 +83,10 @@ export const useAppState = () => {
     setReleaseNotesOptions,
   } = usePrAndReleaseState();
 
-  const { toast: gitActionToast, toasts: gitActionToasts, setToast: setGitActionToast, dismiss: dismissToast } = useToastQueue(3000);
+  const { toast: gitActionToast, toasts: gitActionToasts, setToast: setGitActionToast, dismiss: dismissToast } = useToastQueue({
+    autoHideMs: 3000,
+    errorAutoHideMs: null,
+  });
 
   const {
     confirmDialog,

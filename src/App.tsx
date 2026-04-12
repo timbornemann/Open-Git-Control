@@ -44,6 +44,35 @@ const App: React.FC = () => {
     setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
   }, [clampSidebarWidth]);
 
+  const copyToastMessage = useCallback(async (message: string) => {
+    const text = String(message || '');
+    if (!text) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+    } catch {
+      // fallback below
+    }
+
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    try {
+      document.execCommand('copy');
+    } catch {
+      // ignore fallback copy errors
+    } finally {
+      document.body.removeChild(area);
+    }
+  }, []);
+
   const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     sidebarResizeStateRef.current = { startX: event.clientX, startWidth: sidebarWidth };
@@ -351,11 +380,32 @@ const App: React.FC = () => {
                 <div
                   key={t.id}
                   className={`action-toast ${t.isError ? 'error' : 'success'}`}
-                  onClick={() => state.dismissToast(t.id)}
-                  title={tr('Klicken zum Schließen', 'Click to dismiss')}
+                  role="status"
                 >
-                  <span className="toast-icon">{t.isError ? '✕' : '✓'}</span>
-                  <span className="toast-msg">{t.msg}</span>
+                  <div className="toast-main">
+                    <span className="toast-icon">{t.isError ? 'x' : 'ok'}</span>
+                    <span className="toast-msg">{t.msg}</span>
+                  </div>
+                  <div className="toast-actions">
+                    {t.isError && (
+                      <button
+                        type="button"
+                        className="toast-action-btn"
+                        onClick={() => { void copyToastMessage(t.msg); }}
+                        title={tr('Fehlermeldung kopieren', 'Copy error message')}
+                      >
+                        {tr('Kopieren', 'Copy')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="toast-action-btn toast-action-btn-close"
+                      onClick={() => state.dismissToast(t.id)}
+                      title={tr('Meldung schliessen', 'Close message')}
+                    >
+                      {tr('Schliessen', 'Close')}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -443,3 +493,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
