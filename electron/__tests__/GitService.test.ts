@@ -147,6 +147,7 @@ describe('GitService command queue', () => {
   it('serializes concurrent mutating runCommand calls per repository', async () => {
     let inFlight = 0;
     let maxInFlight = 0;
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-'));
 
     const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
       inFlight += 1;
@@ -157,20 +158,25 @@ describe('GitService command queue', () => {
     });
 
     const service = new GitService(fakeExec as any);
-    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo');
+    (service as any).repoPath = repoDir;
 
-    await Promise.all([
-      service.runCommand(['add', '--', 'a.txt']),
-      service.runCommand(['add', '--', 'b.txt']),
-      service.runCommand(['commit', '-m', 'test']),
-    ]);
+    try {
+      await Promise.all([
+        service.runCommand(['add', '--', 'a.txt']),
+        service.runCommand(['add', '--', 'b.txt']),
+        service.runCommand(['commit', '-m', 'test']),
+      ]);
 
-    expect(fakeExec).toHaveBeenCalledTimes(3);
-    expect(maxInFlight).toBe(1);
+      expect(fakeExec).toHaveBeenCalledTimes(3);
+      expect(maxInFlight).toBe(1);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 
   it('continues processing queued commands after a failed command', async () => {
     let callCount = 0;
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-2-'));
     const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
       callCount += 1;
       if (callCount === 1) {
@@ -182,16 +188,21 @@ describe('GitService command queue', () => {
     });
 
     const service = new GitService(fakeExec as any);
-    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo-2');
+    (service as any).repoPath = repoDir;
 
-    await expect(service.runCommand(['add', '--', 'x.txt'])).rejects.toThrow('fatal: test failure');
-    await expect(service.runCommand(['add', '--', 'y.txt'])).resolves.toBe('ok');
-    expect(fakeExec).toHaveBeenCalledTimes(2);
+    try {
+      await expect(service.runCommand(['add', '--', 'x.txt'])).rejects.toThrow('fatal: test failure');
+      await expect(service.runCommand(['add', '--', 'y.txt'])).resolves.toBe('ok');
+      expect(fakeExec).toHaveBeenCalledTimes(2);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 
   it('does not serialize non-mutating read commands', async () => {
     let inFlight = 0;
     let maxInFlight = 0;
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-3-'));
 
     const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
       inFlight += 1;
@@ -202,16 +213,20 @@ describe('GitService command queue', () => {
     });
 
     const service = new GitService(fakeExec as any);
-    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-queue-test-repo-3');
+    (service as any).repoPath = repoDir;
 
-    await Promise.all([
-      service.runCommand(['status', '--short']),
-      service.runCommand(['diff', '--name-only']),
-      service.runCommand(['log', '-1']),
-    ]);
+    try {
+      await Promise.all([
+        service.runCommand(['status', '--short']),
+        service.runCommand(['diff', '--name-only']),
+        service.runCommand(['log', '-1']),
+      ]);
 
-    expect(fakeExec).toHaveBeenCalledTimes(3);
-    expect(maxInFlight).toBeGreaterThan(1);
+      expect(fakeExec).toHaveBeenCalledTimes(3);
+      expect(maxInFlight).toBeGreaterThan(1);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -232,6 +247,33 @@ describe('GitService bare repository handling', () => {
   });
 });
 
+describe('GitService repository availability checks', () => {
+  it('fails early with REPO_UNAVAILABLE when repository path is missing', async () => {
+    const fakeExec = vi.fn(async () => ({ stdout: '', stderr: '' }));
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-missing-repo-path', String(Date.now()));
+    (service as any).repoIsBare = false;
+
+    await expect(service.runCommand(['status', '--short'])).rejects.toThrow(/\[REPO_UNAVAILABLE\]/i);
+    expect(fakeExec).not.toHaveBeenCalled();
+  });
+
+  it('maps spawn git ENOENT to REPO_UNAVAILABLE when repo disappears during command', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repo-race-'));
+    const fakeExec = vi.fn(async () => {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      const err: any = new Error('spawn git ENOENT');
+      err.code = 'ENOENT';
+      throw err;
+    });
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    await expect(service.runCommand(['status', '--short'])).rejects.toThrow(/\[REPO_UNAVAILABLE\]/i);
+  });
+});
+
 describe('GitService expected non-fatal git errors', () => {
   it('does not log rev-parse upstream lookup failures as console errors', async () => {
     const error: any = new Error('Command failed');
@@ -243,14 +285,19 @@ describe('GitService expected non-fatal git errors', () => {
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const service = new GitService(fakeExec as any);
-    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-nonfatal-upstream-test');
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-nonfatal-upstream-test-'));
+    (service as any).repoPath = repoDir;
 
-    await expect(
-      service.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
-    ).rejects.toThrow(/no such branch/i);
+    try {
+      await expect(
+        service.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
+      ).rejects.toThrow(/no such branch/i);
 
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 });
 

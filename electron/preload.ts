@@ -13,6 +13,9 @@ const REPO_UNAVAILABLE_ERROR_PATTERNS: RegExp[] = [
   /not a git repository/i,
   /no repository path set/i,
   /cannot change to/i,
+  /no such file or directory/i,
+  /the system cannot find the path specified/i,
+  /\buv_cwd\b/i,
 ];
 
 const isRepoUnavailableError = (errorText: unknown): boolean => {

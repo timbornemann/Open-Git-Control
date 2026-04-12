@@ -14,6 +14,9 @@ const REPO_UNAVAILABLE_PATTERNS: RegExp[] = [
   /no repository path set/i,
   /cannot change to/i,
   /unable to get current working directory/i,
+  /no such file or directory/i,
+  /the system cannot find the path specified/i,
+  /\buv_cwd\b/i,
 ];
 
 type ExecFileAsyncResult = { stdout: string; stderr: string };
@@ -240,7 +243,29 @@ export class GitService {
     return SERIALIZED_GIT_COMMANDS.has(firstToken);
   }
 
+  private assertRepoPathAvailable(repoPath: string): void {
+    try {
+      const stat = fs.statSync(repoPath);
+      if (!stat.isDirectory()) {
+        throw new Error('Repository path is not a directory.');
+      }
+    } catch {
+      throw new Error('[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not accessible).');
+    }
+  }
+
+  private isRepoPathAccessible(repoPath: string): boolean {
+    try {
+      const stat = fs.statSync(repoPath);
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
   private async execGit(repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv): Promise<string> {
+    this.assertRepoPathAvailable(repoPath);
+
     const env = envOverrides ? { ...process.env, ...envOverrides } : process.env;
     const execOptions = {
       cwd: repoPath,
@@ -256,6 +281,16 @@ export class GitService {
           const { stdout } = await this.execFileAsyncRunner('git', args, execOptions);
           return stdout.trimEnd();
         } catch (error: any) {
+          // Repo can disappear between pre-check and spawn (race). Normalize that to REPO_UNAVAILABLE.
+          if (error?.code === 'ENOENT' && !this.isRepoPathAccessible(repoPath)) {
+            throw new Error('[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not accessible).');
+          }
+
+          // If repo path still exists, ENOENT likely means Git itself is unavailable in PATH.
+          if (error?.code === 'ENOENT' && /spawn\s+git\s+enoent/i.test(String(error?.message || ''))) {
+            throw new Error('Git executable not found in PATH (spawn git ENOENT). Please install Git and restart the app.');
+          }
+
           if (!this.isIndexLockError(error)) {
             throw this.normalizeGitError(error, args);
           }
