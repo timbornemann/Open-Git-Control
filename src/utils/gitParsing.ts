@@ -326,6 +326,9 @@ const REPO_UNAVAILABLE_PATTERNS: RegExp[] = [
   /no repository path set/i,
   /cannot change to/i,
   /unable to get current working directory/i,
+  /no such file or directory/i,
+  /the system cannot find the path specified/i,
+  /\buv_cwd\b/i,
 ];
 
 /** First repo-relative path that is still in a conflict state, or null. */

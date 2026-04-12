@@ -316,6 +316,7 @@ describe('isRepoUnavailableError', () => {
     expect(isRepoUnavailableError('fatal: not a git repository (or any of the parent directories): .git')).toBe(true);
     expect(isRepoUnavailableError('[REPO_UNAVAILABLE] Repository is no longer available.')).toBe(true);
     expect(isRepoUnavailableError('No repository path set.')).toBe(true);
+    expect(isRepoUnavailableError("fatal: cannot change to 'D:/missing': No such file or directory")).toBe(true);
   });
 
   it('returns false for unrelated errors', () => {
