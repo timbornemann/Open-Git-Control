@@ -52,6 +52,7 @@ type RepoSidebarContentProps = Pick<
   | 'isSubmodulePanelCollapsed'
   | 'onToggleSubmodulePanelCollapsed'
   | 'hasRemoteOrigin'
+  | 'forceGithubRepoCreationPrompt'
   | 'isConnectingGithubRepo'
   | 'connectError'
   | 'newRepoName'
@@ -109,6 +110,7 @@ type RepoSidebarContentProps = Pick<
 
 export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => {
   const { tr } = useI18n();
+  const shouldShowGithubConnect = props.hasRemoteOrigin === false || props.forceGithubRepoCreationPrompt;
 
   if (!props.activeRepo) {
     return (
@@ -175,14 +177,18 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         onToggleCollapsed={props.onToggleSubmodulePanelCollapsed}
       />
 
-      {props.hasRemoteOrigin === false && (
+      {shouldShowGithubConnect && (
           <RepoCard>
             <RepoCardHeader title={tr('GitHub Verbindung', 'GitHub connection')} />
             <RepoCardContent className="repo-form-stack">
               <RepoCardStatus
                 variant="warning"
-                title={tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')}
-                detail={tr('Repository direkt auf GitHub erstellen und als origin verbinden.', 'Create a GitHub repository and connect it as origin.')}
+                title={props.hasRemoteOrigin === false
+                  ? tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')
+                  : tr('Remote ist nicht mehr gueltig.', 'Remote is no longer valid.')}
+                detail={props.hasRemoteOrigin === false
+                  ? tr('Repository direkt auf GitHub erstellen und als origin verbinden.', 'Create a GitHub repository and connect it as origin.')
+                  : tr('Bitte ein neues GitHub-Repository anlegen; origin wird dabei automatisch ersetzt.', 'Please create a new GitHub repository; origin will be replaced automatically.')}
               />
               <div className="repo-form-stack">
               <input

@@ -60,6 +60,7 @@ type ReposSidebarContentProps = Pick<
   | 'isSubmodulePanelCollapsed'
   | 'onToggleSubmodulePanelCollapsed'
   | 'hasRemoteOrigin'
+  | 'forceGithubRepoCreationPrompt'
   | 'isConnectingGithubRepo'
   | 'connectError'
   | 'newRepoName'
@@ -123,6 +124,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   isSubmodulePanelCollapsed,
   onToggleSubmodulePanelCollapsed,
   hasRemoteOrigin,
+  forceGithubRepoCreationPrompt,
   isConnectingGithubRepo,
   connectError,
   newRepoName,
@@ -211,7 +213,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
         />
       )}
 
-      {activeRepo && hasRemoteOrigin === false && (
+      {activeRepo && (hasRemoteOrigin === false || forceGithubRepoCreationPrompt) && (
         <>
           <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '8px 0' }} />
           <div
@@ -226,7 +228,9 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
             }}
           >
             <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-              {tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')}
+              {hasRemoteOrigin === false
+                ? tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')
+                : tr('Remote ist nicht mehr gueltig.', 'Remote is no longer valid.')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <input
