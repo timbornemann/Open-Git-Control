@@ -36,6 +36,18 @@ export function isPushAuthOrPermissionError(value: unknown): boolean {
     || message.includes('access denied')
     || message.includes('http 403')
     || message.includes('403 forbidden')
+    || message.includes('requested url returned error: 403')
+    || message.includes('requested url returned error: 404')
+    || (message.includes('repository') && message.includes('not found'))
+  );
+}
+
+export function isRemoteRepositoryMissingError(value: unknown): boolean {
+  const message = normalizeErrorText(value);
+  return (
+    message.includes('repository not found')
+    || message.includes('requested url returned error: 404')
+    || (message.includes('repository') && message.includes('not found'))
   );
 }
 
@@ -64,5 +76,5 @@ export function compactGitError(value: unknown, maxLen = 240): string {
   const compact = String(value || '').replace(/\s+/g, ' ').trim();
   if (!compact) return '';
   if (compact.length <= maxLen) return compact;
-  return `${compact.slice(0, Math.max(0, maxLen - 1))}…`;
+  return `${compact.slice(0, Math.max(0, maxLen - 3))}...`;
 }

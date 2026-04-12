@@ -5,6 +5,7 @@ import {
   isMissingUpstreamPushError,
   isNoLocalCommitPushError,
   isPushAuthOrPermissionError,
+  isRemoteRepositoryMissingError,
   isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
 } from '../gitPushRecovery';
@@ -27,7 +28,14 @@ describe('gitPushRecovery', () => {
     expect(isPushAuthOrPermissionError('remote: Permission to owner/repo.git denied to user.')).toBe(true);
     expect(isPushAuthOrPermissionError('fatal: Authentication failed for https://github.com/owner/repo.git')).toBe(true);
     expect(isPushAuthOrPermissionError('remote: Repository not found.')).toBe(true);
+    expect(isPushAuthOrPermissionError("fatal: unable to access 'https://github.com/owner/repo.git/': The requested URL returned error: 404")).toBe(true);
     expect(isPushAuthOrPermissionError('fatal: No configured push destination.')).toBe(false);
+  });
+
+  it('detects deleted/missing remote repository errors', () => {
+    expect(isRemoteRepositoryMissingError('remote: Repository not found.')).toBe(true);
+    expect(isRemoteRepositoryMissingError("fatal: unable to access 'https://github.com/owner/repo.git/': The requested URL returned error: 404")).toBe(true);
+    expect(isRemoteRepositoryMissingError('fatal: Authentication failed')).toBe(false);
   });
 
   it('offers recovery for remote setup and auth failures', () => {
@@ -52,6 +60,6 @@ describe('gitPushRecovery', () => {
     expect(compactGitError('  fatal:\n  some   error  ')).toBe('fatal: some error');
     const truncated = compactGitError('x'.repeat(300), 20);
     expect(truncated.length).toBe(20);
-    expect(truncated.endsWith('…')).toBe(true);
+    expect(truncated.endsWith('...')).toBe(true);
   });
 });
