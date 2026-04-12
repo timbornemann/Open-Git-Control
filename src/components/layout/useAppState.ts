@@ -278,8 +278,18 @@ export const useAppState = () => {
     }
 
     const switchedPath = cloneResult.repoPath;
+    const ensureRecoveredRepoSelected = async () => {
+      await window.electronAPI.setRepoPath(switchedPath);
+      workspace.setActiveRepo(switchedPath);
+    };
+
     await workspace.addOpenRepo(switchedPath);
-    await workspace.handleCloseRepo(sourceRepoPath);
+    await ensureRecoveredRepoSelected();
+    // Keep the original bare repo open to avoid a close/switch race that could
+    // accidentally redirect follow-up commands to an unrelated repository.
+    triggerRefresh();
+
+    await ensureRecoveredRepoSelected();
 
     const headAfterCloneResult = await window.electronAPI.runGitCommand('show', '--quiet', '--format=%H', 'HEAD');
     const hasLocalCommit = Boolean(headAfterCloneResult.success && String(headAfterCloneResult.data || '').trim());
@@ -301,6 +311,7 @@ export const useAppState = () => {
 
       if (preferredRemoteBranch) {
         const localBranchName = preferredRemoteBranch.replace(/^origin\//, '').trim();
+        await ensureRecoveredRepoSelected();
         const checkoutTracked = await window.electronAPI.runGitCommand(
           'checkout',
           '-b',
@@ -310,6 +321,7 @@ export const useAppState = () => {
         );
 
         if (!checkoutTracked.success) {
+          await ensureRecoveredRepoSelected();
           const checkoutForced = await window.electronAPI.runGitCommand(
             'checkout',
             '-B',
@@ -336,6 +348,7 @@ export const useAppState = () => {
     const originPointsToSource = Boolean(existingOriginUrl) && currentOriginPointer === sourcePointer;
 
     if (!existingOriginUrl || originPointsToSource) {
+      await ensureRecoveredRepoSelected();
       const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
       if (!removeOriginResult.success) {
         workspace.setActiveTab('repo');
@@ -349,6 +362,7 @@ export const useAppState = () => {
         return false;
       }
     } else {
+      await ensureRecoveredRepoSelected();
       const setUrlResult = await window.electronAPI.runGitCommand('remote', 'set-url', 'origin', existingOriginUrl);
       if (!setUrlResult.success) {
         workspace.setActiveTab('repo');
