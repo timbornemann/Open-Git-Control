@@ -231,6 +231,7 @@ const App: React.FC = () => {
     onToggleSubmodulePanelCollapsed: state.toggleSubmodulePanelCollapsed,
 
     hasRemoteOrigin: state.hasRemoteOrigin,
+    forceGithubRepoCreationPrompt: state.forceGithubRepoCreationPrompt,
     isConnectingGithubRepo: state.isConnectingGithubRepo,
     connectError: state.connectError,
     newRepoName: state.newRepoName,
