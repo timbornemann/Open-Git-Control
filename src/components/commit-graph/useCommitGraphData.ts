@@ -260,11 +260,29 @@ export const useCommitGraphData = ({
 
   useEffect(() => {
     if (!repoPath) return;
-    const intervalId = window.setInterval(refreshWorkingTreeStatus, 3000);
-    window.addEventListener('focus', refreshWorkingTreeStatus);
+    const refreshIfVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      void refreshWorkingTreeStatus();
+    };
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void refreshWorkingTreeStatus();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshIfVisible, 3000);
+    window.addEventListener('focus', refreshIfVisible);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshWorkingTreeStatus);
+      window.removeEventListener('focus', refreshIfVisible);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
   }, [refreshWorkingTreeStatus, repoPath]);
 
