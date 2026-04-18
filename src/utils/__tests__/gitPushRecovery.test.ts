@@ -3,7 +3,9 @@ import {
   compactGitError,
   isMissingRemotePushError,
   isMissingUpstreamPushError,
+  isNonFastForwardPushError,
   isNoLocalCommitPushError,
+  isPullBlockedByLocalChangesError,
   isPushAuthOrPermissionError,
   isRemoteRepositoryMissingError,
   isWorkTreeRequiredError,
@@ -48,6 +50,18 @@ describe('gitPushRecovery', () => {
     expect(isNoLocalCommitPushError('error: src refspec HEAD does not match any')).toBe(true);
     expect(isNoLocalCommitPushError('fatal: current branch main does not have any commits yet')).toBe(true);
     expect(isNoLocalCommitPushError('fatal: No configured push destination.')).toBe(false);
+  });
+
+  it('detects non-fast-forward push rejections', () => {
+    expect(isNonFastForwardPushError('! [rejected] main -> main (fetch first)')).toBe(true);
+    expect(isNonFastForwardPushError('Updates were rejected because the tip of your current branch is behind its remote counterpart.')).toBe(true);
+    expect(isNonFastForwardPushError('Everything up-to-date')).toBe(false);
+  });
+
+  it('detects pull failures caused by local uncommitted changes', () => {
+    expect(isPullBlockedByLocalChangesError('error: Your local changes to the following files would be overwritten by merge:')).toBe(true);
+    expect(isPullBlockedByLocalChangesError('Please commit your changes or stash them before you merge.')).toBe(true);
+    expect(isPullBlockedByLocalChangesError('fatal: refusing to merge unrelated histories')).toBe(false);
   });
 
   it('detects work tree required errors', () => {

@@ -72,6 +72,30 @@ export function isWorkTreeRequiredError(value: unknown): boolean {
   );
 }
 
+export function isNonFastForwardPushError(value: unknown): boolean {
+  const message = normalizeErrorText(value);
+  const rejectedPush = message.includes('[rejected]') || message.includes('failed to push some refs');
+  return (
+    message.includes('non-fast-forward')
+    || message.includes('tip of your current branch is behind')
+    || message.includes('updates were rejected because the remote contains work')
+    || (rejectedPush && message.includes('fetch first'))
+  );
+}
+
+export function isPullBlockedByLocalChangesError(value: unknown): boolean {
+  const message = normalizeErrorText(value);
+  return (
+    message.includes('your local changes to the following files would be overwritten by merge')
+    || message.includes('your local changes to the following files would be overwritten by checkout')
+    || message.includes('please commit your changes or stash them before you merge')
+    || message.includes('please commit your changes or stash them before you rebase')
+    || message.includes('cannot pull with rebase: you have unstaged changes')
+    || message.includes('cannot rebase: you have unstaged changes')
+    || message.includes('please commit or stash them')
+  );
+}
+
 export function compactGitError(value: unknown, maxLen = 240): string {
   const compact = String(value || '').replace(/\s+/g, ' ').trim();
   if (!compact) return '';
