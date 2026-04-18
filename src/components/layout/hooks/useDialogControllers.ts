@@ -14,6 +14,13 @@ export const useDialogControllers = () => {
     await action();
   }, [confirmDialog]);
 
+  const executeConfirmDialogSecondary = useCallback(async () => {
+    if (!confirmDialog?.onSecondaryAction) return;
+    const action = confirmDialog.onSecondaryAction;
+    setConfirmDialog(null);
+    await action();
+  }, [confirmDialog]);
+
   const closeInputDialog = useCallback(() => setInputDialog(null), []);
 
   const executeInputDialog = useCallback(async (values: Record<string, string>) => {
@@ -30,6 +37,7 @@ export const useDialogControllers = () => {
     setInputDialog,
     closeConfirmDialog,
     executeConfirmDialog,
+    executeConfirmDialogSecondary,
     closeInputDialog,
     executeInputDialog,
   };

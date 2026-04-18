@@ -10,6 +10,9 @@ export type ConfirmDialogState = {
   consequences: string;
   confirmLabel?: string;
   onConfirm: () => Promise<void> | void;
+  secondaryActionLabel?: string;
+  secondaryActionVariant?: 'default' | 'danger';
+  onSecondaryAction?: () => Promise<void> | void;
 };
 
 export type InputDialogState = {
