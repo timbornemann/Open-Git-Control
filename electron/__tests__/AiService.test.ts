@@ -328,5 +328,98 @@ describe('AiService context extraction and prompts', () => {
     expect(diffCommands).toContain('diff --numstat HEAD -- src/app.ts');
     expect(diffCommands).toContain('diff --no-color --unified=3 HEAD -- src/app.ts');
   });
+
+  it('aborts pending AI requests quickly when cancellation is requested', async () => {
+    let cancelRequested = false;
+
+    const runCommand = vi.fn(async (args: string[]) => {
+      const key = args.join(' ');
+      if (key === 'diff --numstat HEAD -- src/a.ts') return '1\t0\tsrc/a.ts';
+      if (key === 'diff --numstat HEAD -- src/b.ts') return '1\t0\tsrc/b.ts';
+      if (key === 'diff --no-color --unified=3 HEAD -- src/a.ts') return ['@@ -1 +1 @@', '-a', '+aa'].join('\n');
+      if (key === 'diff --no-color --unified=3 HEAD -- src/b.ts') return ['@@ -1 +1 @@', '-b', '+bb'].join('\n');
+      throw new Error(`Unexpected command: ${key}`);
+    });
+
+    const service = new AiService({
+      getRepoPath: () => '/tmp/repo',
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/a.ts\n M src/b.ts\n'),
+      runCommand,
+    } as any);
+
+    let abortCount = 0;
+    const fetchMock = vi.fn(async (_url: string, init: any) => (
+      new Promise((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal?.aborted) {
+          const err: any = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+          return;
+        }
+        signal?.addEventListener('abort', () => {
+          abortCount += 1;
+          const err: any = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      })
+    ));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    setTimeout(() => {
+      cancelRequested = true;
+    }, 10);
+
+    await expect(
+      service.runAutoCommit(
+        { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+        () => '',
+        undefined,
+        () => cancelRequested,
+      ),
+    ).rejects.toThrow('abgebrochen');
+
+    expect(abortCount).toBeGreaterThan(0);
+  });
+
+  it('stops retry loops after repeated commit failures instead of hanging', async () => {
+    const runCommand = vi.fn(async (args: string[]) => {
+      const key = args.join(' ');
+      if (key === 'diff --numstat HEAD -- src/app.ts') return '3\t1\tsrc/app.ts';
+      if (key === 'diff --no-color --unified=3 HEAD -- src/app.ts') {
+        return ['diff --git a/src/app.ts b/src/app.ts', '@@ -1 +1 @@', '-old', '+new'].join('\n');
+      }
+      if (args[0] === 'add') return '';
+      if (args[0] === 'commit') throw new Error('pre-commit hook failed');
+      throw new Error(`Unexpected command: ${key}`);
+    });
+
+    const service = new AiService({
+      getRepoPath: () => '/tmp/repo',
+      getStatusPorcelain: vi.fn()
+        .mockResolvedValueOnce(' M src/app.ts\n')
+        .mockResolvedValueOnce(' M src/app.ts\n'),
+      runCommand,
+    } as any);
+
+    const fetchMock = vi.fn(async () => (
+      okJsonResponse({ message: { content: '{"title":"chore(src): retry commit","description":""}' } })
+    ));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const result = await service.runAutoCommit(
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+      () => '',
+    );
+
+    const commitAttempts = runCommand.mock.calls
+      .map((call) => (Array.isArray(call[0]) ? call[0][0] : ''))
+      .filter((command) => command === 'commit').length;
+
+    expect(commitAttempts).toBeLessThanOrEqual(8);
+    expect(result.commits).toHaveLength(0);
+    expect(result.warnings.some((warning) => warning.includes('wiederholten Commit-Fehlern'))).toBe(true);
+  });
 });
 

@@ -83,6 +83,7 @@ const MAX_COMMIT_FILES_RETRY = 3;
 const MAX_COMMIT_FILES_FALLBACK = 2;
 const MAX_NET_LINES_PER_COMMIT = 450;
 const MAX_RETRIES_PER_GROUP = 2;
+const MAX_GROUP_STALL_CYCLES = 8;
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
 function safeString(value: unknown, fallback = ''): string {
@@ -420,19 +421,45 @@ function parseJsonFromText(rawText: string): Record<string, unknown> | null {
   return null;
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  shouldCancel?: () => boolean,
+): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let abortedByTimeout = false;
+  let abortedByCancel = false;
+  const timeout = setTimeout(() => {
+    abortedByTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+  const cancelPoll = setInterval(() => {
+    if (!shouldCancel?.()) return;
+    abortedByCancel = true;
+    controller.abort();
+  }, 120);
 
   try {
+    if (shouldCancel?.()) {
+      abortedByCancel = true;
+      controller.abort();
+    }
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (error: unknown) {
     if ((error as any)?.name === 'AbortError') {
+      if (abortedByCancel || shouldCancel?.()) {
+        throw new Error('KI Auto-Commit wurde abgebrochen.');
+      }
+      if (abortedByTimeout) {
+        throw new Error(`KI Anfrage Zeitlimit ueberschritten (${Math.round(timeoutMs / 1000)}s).`);
+      }
       throw new Error(`KI Anfrage Zeitlimit ueberschritten (${Math.round(timeoutMs / 1000)}s).`);
     }
     throw error;
   } finally {
     clearTimeout(timeout);
+    clearInterval(cancelPoll);
   }
 }
 
@@ -441,6 +468,7 @@ async function runProviderText(
   systemPrompt: string,
   userPrompt: string,
   getGeminiApiKey: () => string,
+  shouldCancel?: () => boolean,
 ): Promise<string> {
   if (settings.aiProvider === 'gemini') {
     const apiKey = getGeminiApiKey().trim();
@@ -465,6 +493,7 @@ async function runProviderText(
         }),
       },
       CHAT_TIMEOUT_MS,
+      shouldCancel,
     );
 
     if (!response.ok) {
@@ -501,6 +530,7 @@ async function runProviderText(
       }),
     },
     CHAT_TIMEOUT_MS,
+    shouldCancel,
   );
 
   if (!response.ok) {
@@ -562,6 +592,7 @@ async function chooseFilesWithAi(
   settings: AppSettings,
   candidateWindow: SnapshotFile[],
   getGeminiApiKey: () => string,
+  shouldCancel?: () => boolean,
 ): Promise<string[]> {
   if (candidateWindow.length <= 1) {
     return candidateWindow.map(file => file.path);
@@ -589,7 +620,7 @@ async function chooseFilesWithAi(
     'Return JSON only.',
   ].join('\n');
 
-  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel);
   const parsed = parseJsonFromText(raw) || {};
   const selectedRaw = Array.isArray(parsed.selectedPaths) ? parsed.selectedPaths : [];
   const candidateSet = new Set(candidateWindow.map(file => file.path));
@@ -653,6 +684,7 @@ async function generateCommitMessageWithAi(
   settings: AppSettings,
   batch: SnapshotFile[],
   getGeminiApiKey: () => string,
+  shouldCancel?: () => boolean,
 ): Promise<CommitMessage> {
   const systemPrompt = [
     'You write concise and factual git commit messages.',
@@ -678,7 +710,7 @@ async function generateCommitMessageWithAi(
   ].join('\n');
 
   try {
-    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel);
     const parsed = parseJsonFromText(raw) || {};
     const titleRaw = safeString(parsed.title, '').trim();
     const title = clipCommitTitle(titleRaw);
@@ -983,6 +1015,7 @@ export class AiService {
       if (queue.length === 0) continue;
 
       let groupRetries = 0;
+      let stallCycles = 0;
 
       while (queue.length > 0) {
         ensureNotCancelled();
@@ -1017,9 +1050,19 @@ export class AiService {
           selectedPaths = windowFiles.map(file => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
         } else {
           try {
+            onProgress?.({
+              phase: 'grouping',
+              message: `KI waehlt Dateien fuer Gruppe ${groupIndex + 1}/${groupQueues.length}...`,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+              },
+            });
             ensureNotCancelled();
             modelTurns += 1;
-            selectedPaths = await chooseFilesWithAi(settings, windowFiles, getGeminiApiKey);
+            selectedPaths = await chooseFilesWithAi(settings, windowFiles, getGeminiApiKey, shouldCancel);
             ensureNotCancelled();
           } catch (error: unknown) {
             diagnostics.push(error instanceof Error ? error.message : 'KI-Auswahl fehlgeschlagen.');
@@ -1028,6 +1071,23 @@ export class AiService {
         }
 
         if (selectedPaths.length === 0) {
+          stallCycles += 1;
+          if (stallCycles >= MAX_GROUP_STALL_CYCLES) {
+            const message = `Gruppe ${groupIndex + 1} wurde nach ${stallCycles} erfolglosen Auswahl-/Retry-Zyklen uebersprungen.`;
+            warnings.push(message);
+            onProgress?.({
+              phase: 'fallback',
+              message,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+                stallCycles,
+              },
+            });
+            break;
+          }
           if (groupRetries < MAX_RETRIES_PER_GROUP) {
             groupRetries += 1;
             retries += 1;
@@ -1070,7 +1130,24 @@ export class AiService {
         const batchFiles = queue.filter(file => selectedSet.has(file.path));
 
         if (batchFiles.length === 0) {
+          stallCycles += 1;
           warnings.push(`Gruppe ${groupIndex + 1}: KI-Auswahl enthielt keine gueltigen Pfade.`);
+          if (stallCycles >= MAX_GROUP_STALL_CYCLES) {
+            const message = `Gruppe ${groupIndex + 1} wurde wegen wiederholt ungueltiger Auswahl uebersprungen.`;
+            warnings.push(message);
+            onProgress?.({
+              phase: 'fallback',
+              message,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+                stallCycles,
+              },
+            });
+            break;
+          }
           if (groupRetries < MAX_RETRIES_PER_GROUP) {
             groupRetries += 1;
             retries += 1;
@@ -1094,9 +1171,19 @@ export class AiService {
 
           let message: CommitMessage;
           try {
+            onProgress?.({
+              phase: 'committing',
+              message: `KI erstellt Commit-Message fuer ${batchFiles.length} Datei(en)...`,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+              },
+            });
             ensureNotCancelled();
             modelTurns += 1;
-            message = await generateCommitMessageWithAi(settings, batchFiles, getGeminiApiKey);
+            message = await generateCommitMessageWithAi(settings, batchFiles, getGeminiApiKey, shouldCancel);
             ensureNotCancelled();
           } catch (error: unknown) {
             diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
@@ -1131,6 +1218,7 @@ export class AiService {
           }
 
           groupRetries = 0;
+          stallCycles = 0;
           if (mode !== 'normal') {
             mode = 'normal';
             modeTransitions.push('normal');
@@ -1149,6 +1237,23 @@ export class AiService {
           });
         } catch (error: unknown) {
           diagnostics.push(error instanceof Error ? error.message : 'Commit fehlgeschlagen.');
+          stallCycles += 1;
+          if (stallCycles >= MAX_GROUP_STALL_CYCLES) {
+            const message = `Gruppe ${groupIndex + 1} wird nach ${stallCycles} wiederholten Commit-Fehlern uebersprungen.`;
+            warnings.push(message);
+            onProgress?.({
+              phase: 'fallback',
+              message,
+              details: {
+                mode,
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                remainingFiles: snapshotFiles.length - processedFiles,
+                stallCycles,
+              },
+            });
+            break;
+          }
 
           if (groupRetries < MAX_RETRIES_PER_GROUP) {
             groupRetries += 1;
