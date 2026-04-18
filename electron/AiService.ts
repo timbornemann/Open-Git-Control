@@ -36,6 +36,7 @@ type AiCommit = {
 
 type ProgressPhase = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
 type ProgressMode = 'normal' | 'retry' | 'fallback';
+type AutoCommitStrategy = 'standard' | 'large-hybrid';
 
 export type AiProgressUpdate = {
   phase: ProgressPhase;
@@ -84,6 +85,13 @@ const MAX_COMMIT_FILES_FALLBACK = 2;
 const MAX_NET_LINES_PER_COMMIT = 450;
 const MAX_RETRIES_PER_GROUP = 2;
 const MAX_GROUP_STALL_CYCLES = 8;
+const LARGE_BATCH_THRESHOLD = 8;
+const STANDARD_BATCH_THRESHOLD = 7;
+const LARGE_HYBRID_AI_BUDGET_MS = 60_000;
+const LARGE_HYBRID_PLAN_TIMEOUT_MS = 12_000;
+const LARGE_HYBRID_SELECT_TIMEOUT_MS = 10_000;
+const LARGE_HYBRID_MESSAGE_TIMEOUT_MS = 14_000;
+const MIN_AI_CALL_BUDGET_MS = 1_200;
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
 function safeString(value: unknown, fallback = ''): string {
@@ -246,6 +254,25 @@ function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS): strin
   const compact = String(line || '').replace(/\s+/g, ' ').trim();
   if (!compact) return '';
   return compact.length <= maxChars ? compact : `${compact.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+}
+
+function parseNumstatReport(numstatOutput: string): Map<string, { additions: number; deletions: number; isBinary: boolean }> {
+  const byPath = new Map<string, { additions: number; deletions: number; isBinary: boolean }>();
+  const lines = (numstatOutput || '').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parsed = parseNumstatLine(trimmed);
+    const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+    if (!match) continue;
+    const rawPath = match[3].trim();
+    const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
+    const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
+    const decodedPath = decodePorcelainPath(targetPath);
+    if (!decodedPath) continue;
+    byPath.set(decodedPath, parsed);
+  }
+  return byPath;
 }
 
 function pickRepresentativeIndices(length: number): number[] {
@@ -469,6 +496,7 @@ async function runProviderText(
   userPrompt: string,
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
+  timeoutMs = CHAT_TIMEOUT_MS,
 ): Promise<string> {
   if (settings.aiProvider === 'gemini') {
     const apiKey = getGeminiApiKey().trim();
@@ -492,7 +520,7 @@ async function runProviderText(
           generationConfig: { temperature: 0.1 },
         }),
       },
-      CHAT_TIMEOUT_MS,
+      timeoutMs,
       shouldCancel,
     );
 
@@ -529,7 +557,7 @@ async function runProviderText(
         options: { temperature: 0.1 },
       }),
     },
-    CHAT_TIMEOUT_MS,
+    timeoutMs,
     shouldCancel,
   );
 
@@ -593,6 +621,7 @@ async function chooseFilesWithAi(
   candidateWindow: SnapshotFile[],
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
+  timeoutMs = CHAT_TIMEOUT_MS,
 ): Promise<string[]> {
   if (candidateWindow.length <= 1) {
     return candidateWindow.map(file => file.path);
@@ -620,7 +649,7 @@ async function chooseFilesWithAi(
     'Return JSON only.',
   ].join('\n');
 
-  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel);
+  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
   const parsed = parseJsonFromText(raw) || {};
   const selectedRaw = Array.isArray(parsed.selectedPaths) ? parsed.selectedPaths : [];
   const candidateSet = new Set(candidateWindow.map(file => file.path));
@@ -632,6 +661,76 @@ async function chooseFilesWithAi(
 
   const unique = uniqueSorted(selected);
   return unique.length > 0 ? unique.slice(0, MAX_COMMIT_FILES_NORMAL) : [candidateWindow[0].path];
+}
+
+async function planGroupsWithAi(
+  settings: AppSettings,
+  files: SnapshotFile[],
+  getGeminiApiKey: () => string,
+  shouldCancel?: () => boolean,
+  timeoutMs = CHAT_TIMEOUT_MS,
+): Promise<string[][]> {
+  if (files.length <= 1) {
+    return [files.map((file) => file.path)];
+  }
+
+  const candidatePaths = files.map((file) => file.path);
+  const candidateSet = new Set(candidatePaths);
+
+  const systemPrompt = [
+    'You group changed files into coherent commit batches.',
+    'Return strict JSON only.',
+    'Format: {"groups":[{"paths":[string]}]}.',
+    'Each file path must appear exactly once across all groups.',
+    'Only use the provided paths.',
+    'Prefer small coherent groups over large mixed groups.',
+  ].join(' ');
+
+  const userPrompt = [
+    'Changed files:',
+    ...files.map((file, index) => (
+      `${index + 1}. path=${file.path}; type=${file.changeType}; stats=+${file.additions}/-${file.deletions}; area=${getTopDirectory(file.path)}; ext=${getExtension(file.path)}`
+    )),
+    'Return JSON only.',
+  ].join('\n');
+
+  const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
+  const parsed = parseJsonFromText(raw) || {};
+  const parsedGroupsRaw: unknown[] = Array.isArray(parsed.groups) ? parsed.groups : [];
+
+  const normalizedGroups: string[][] = parsedGroupsRaw
+    .map((group): unknown[] => {
+      if (Array.isArray(group)) {
+        return group;
+      }
+      if (group && typeof group === 'object' && Array.isArray((group as any).paths)) {
+        return (group as any).paths;
+      }
+      return [];
+    })
+    .map((group) => (
+      group
+        .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item: string) => item.trim())
+        .filter((item: string) => candidateSet.has(item))
+    ))
+    .map((group) => uniqueSorted(group))
+    .filter((group) => group.length > 0);
+
+  if (normalizedGroups.length === 0) {
+    return [];
+  }
+
+  const flattened = normalizedGroups.flat();
+  const unique = new Set(flattened);
+  if (unique.size !== flattened.length) {
+    return [];
+  }
+  if (unique.size !== candidateSet.size) {
+    return [];
+  }
+
+  return normalizedGroups;
 }
 
 export function buildFallbackCommitMessage(
@@ -685,6 +784,7 @@ async function generateCommitMessageWithAi(
   batch: SnapshotFile[],
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
+  timeoutMs = CHAT_TIMEOUT_MS,
 ): Promise<CommitMessage> {
   const systemPrompt = [
     'You write concise and factual git commit messages.',
@@ -710,7 +810,7 @@ async function generateCommitMessageWithAi(
   ].join('\n');
 
   try {
-    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel);
+    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
     const parsed = parseJsonFromText(raw) || {};
     const titleRaw = safeString(parsed.title, '').trim();
     const title = clipCommitTitle(titleRaw);
@@ -897,7 +997,64 @@ export class AiService {
       }
     }
 
-    onProgress?.({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: { mode: 'normal' } });
+    let mode: ProgressMode = 'normal';
+    let strategy: AutoCommitStrategy = 'standard';
+    let aiBudgetRemainingMs = Number.POSITIVE_INFINITY;
+    let aiBudgetExhausted = false;
+    let processedFiles = 0;
+
+    const commits: AiCommit[] = [];
+    const warnings: string[] = [];
+    const diagnostics: string[] = [];
+    const modeTransitions: string[] = ['normal'];
+    let modelTurns = 0;
+    let retries = 0;
+    let fallbackCommits = 0;
+
+    const buildProgressDetails = (totalFiles: number, extra: Record<string, unknown> = {}): Record<string, unknown> => {
+      const details: Record<string, unknown> = {
+        mode,
+        strategy,
+        remainingFiles: Math.max(0, totalFiles - processedFiles),
+        elapsedMs: Date.now() - runStartedAt,
+        ...extra,
+      };
+      if (Number.isFinite(aiBudgetRemainingMs)) {
+        details.aiBudgetRemainingMs = Math.max(0, Math.floor(aiBudgetRemainingMs));
+      }
+      return details;
+    };
+
+    const getAiTimeoutMs = (defaultTimeoutMs: number): number | null => {
+      if (!Number.isFinite(aiBudgetRemainingMs)) {
+        return defaultTimeoutMs;
+      }
+      if (aiBudgetRemainingMs < MIN_AI_CALL_BUDGET_MS) {
+        return null;
+      }
+      return Math.max(MIN_AI_CALL_BUDGET_MS, Math.min(defaultTimeoutMs, aiBudgetRemainingMs));
+    };
+
+    const consumeAiBudget = (startedAt: number, context: string) => {
+      if (!Number.isFinite(aiBudgetRemainingMs)) return;
+      const wasExhausted = aiBudgetExhausted;
+      aiBudgetRemainingMs = Math.max(0, aiBudgetRemainingMs - (Date.now() - startedAt));
+      if (aiBudgetRemainingMs < MIN_AI_CALL_BUDGET_MS) {
+        aiBudgetExhausted = true;
+        if (!wasExhausted) {
+          warnings.push(`KI-Budget erreicht (${context}); verbleibende Gruppen laufen deterministisch weiter.`);
+        }
+      }
+    };
+
+    const markAiBudgetExhausted = (context: string) => {
+      if (!aiBudgetExhausted) {
+        aiBudgetExhausted = true;
+        warnings.push(`KI-Budget erreicht (${context}); verbleibende Gruppen laufen deterministisch weiter.`);
+      }
+    };
+
+    onProgress?.({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: buildProgressDetails(0) });
     const ensureNotCancelled = () => {
       if (shouldCancel?.()) {
         throw new Error('KI Auto-Commit wurde abgebrochen.');
@@ -933,15 +1090,19 @@ export class AiService {
       };
     });
 
+    if (snapshotFiles.length >= LARGE_BATCH_THRESHOLD) {
+      strategy = 'large-hybrid';
+      aiBudgetRemainingMs = LARGE_HYBRID_AI_BUDGET_MS;
+    }
+
     onProgress?.({
       phase: 'snapshot',
       message: `Vorgruppierung abgeschlossen: ${snapshotFiles.length} Datei(en) erkannt`,
       progress: 14,
-      details: {
-        mode: 'normal',
-        processedFiles: snapshotFiles.length,
+      details: buildProgressDetails(snapshotFiles.length, {
+        processedFiles,
         remainingFiles: snapshotFiles.length,
-      },
+      }),
     });
 
     const hydrateSnapshotFile = async (file: SnapshotFile): Promise<void> => {
@@ -989,25 +1150,99 @@ export class AiService {
       ensureNotCancelled();
     };
 
+    const hydrateLargeBatchSignals = async (files: SnapshotFile[]): Promise<void> => {
+      ensureNotCancelled();
+      let numstatReport = '';
+      try {
+        numstatReport = await this.gitService.runCommand(['diff', '--numstat', 'HEAD', '--']);
+      } catch {
+        numstatReport = '';
+      }
+      const statsByPath = parseNumstatReport(numstatReport);
+
+      for (const file of files) {
+        const stats = statsByPath.get(file.path);
+        file.additions = stats?.additions ?? 0;
+        file.deletions = stats?.deletions ?? 0;
+        file.isBinary = stats?.isBinary ?? false;
+
+        let keyChanges: string[] = [];
+        if (!file.isBinary && (file.changeType === 'untracked' || file.changeType === 'added')) {
+          keyChanges = await readUntrackedSnippet(repoPath, file.path);
+        }
+        if (keyChanges.length === 0) {
+          keyChanges = [
+            clipContextLine(
+              `${file.changeType} in ${getTopDirectory(file.path)} (${getExtension(file.path)}) +${file.additions}/-${file.deletions}`,
+            ),
+          ];
+        }
+        file.keyChanges = keyChanges;
+        file.preview = toContextPreview(keyChanges);
+      }
+      ensureNotCancelled();
+    };
+
     onProgress?.({
       phase: 'grouping',
       message: `Dateien werden gruppiert (${snapshotFiles.length})...`,
       progress: 15,
-      details: { mode: 'normal', remainingFiles: snapshotFiles.length },
+      details: buildProgressDetails(snapshotFiles.length, {
+        groupSize: snapshotFiles.length,
+        step: strategy === 'large-hybrid' ? 'planning-groups' : 'grouping',
+      }),
     });
 
-    const groups = groupFilesDeterministically(snapshotFiles);
-    const groupQueues = groups.map(group => [...group]);
+    let groups = groupFilesDeterministically(snapshotFiles);
+    if (strategy === 'large-hybrid') {
+      await hydrateLargeBatchSignals(snapshotFiles);
 
-    const commits: AiCommit[] = [];
-    const warnings: string[] = [];
-    const diagnostics: string[] = [];
-    const modeTransitions: string[] = ['normal'];
-    let mode: ProgressMode = 'normal';
-    let modelTurns = 0;
-    let retries = 0;
-    let fallbackCommits = 0;
-    let processedFiles = 0;
+      onProgress?.({
+        phase: 'grouping',
+        message: 'KI plant Commit-Gruppen (Hybrid-Modus)...',
+        progress: 16,
+        details: buildProgressDetails(snapshotFiles.length, { step: 'planning-groups' }),
+      });
+
+      let aiPlannedGroups: string[][] = [];
+      const planTimeoutMs = getAiTimeoutMs(LARGE_HYBRID_PLAN_TIMEOUT_MS);
+      if (planTimeoutMs == null) {
+        markAiBudgetExhausted('Gruppenplanung');
+      } else {
+        try {
+          ensureNotCancelled();
+          modelTurns += 1;
+          const aiCallStartedAt = Date.now();
+          aiPlannedGroups = await planGroupsWithAi(
+            settings,
+            snapshotFiles,
+            getGeminiApiKey,
+            shouldCancel,
+            planTimeoutMs,
+          );
+          consumeAiBudget(aiCallStartedAt, 'Gruppenplanung');
+          ensureNotCancelled();
+        } catch (error: unknown) {
+          diagnostics.push(error instanceof Error ? error.message : 'KI-Gruppenplanung fehlgeschlagen.');
+        }
+      }
+
+      if (aiPlannedGroups.length > 0) {
+        const byPath = new Map(snapshotFiles.map((file) => [file.path, file]));
+        groups = aiPlannedGroups
+          .map((groupPaths) => groupPaths.map((pathValue) => byPath.get(pathValue)).filter((file): file is SnapshotFile => Boolean(file)))
+          .filter((group) => group.length > 0);
+      } else {
+        warnings.push('Hybrid-Gruppenplanung ungueltig oder unvollstaendig; deterministische Gruppierung aktiv.');
+        onProgress?.({
+          phase: 'fallback',
+          message: 'Deterministische Gruppenplanung aktiv (Hybrid-Fallback).',
+          details: buildProgressDetails(snapshotFiles.length, { step: 'deterministic-fallback' }),
+        });
+      }
+    }
+
+    const groupQueues = groups.map(group => [...group]);
 
 
     for (let groupIndex = 0; groupIndex < groupQueues.length; groupIndex += 1) {
@@ -1024,6 +1259,20 @@ export class AiService {
           break;
         }
 
+        const remainingBeforeBatch = snapshotFiles.length - processedFiles;
+        if (strategy === 'large-hybrid' && remainingBeforeBatch <= STANDARD_BATCH_THRESHOLD) {
+          strategy = 'standard';
+          onProgress?.({
+            phase: 'grouping',
+            message: `Strategiewechsel: Standard-Modus aktiv (${remainingBeforeBatch} Datei(en) verbleibend).`,
+            details: buildProgressDetails(snapshotFiles.length, {
+              groupId: groupIndex + 1,
+              groupSize: queue.length,
+              step: 'strategy-switch',
+            }),
+          });
+        }
+
         const phase: ProgressPhase = mode === 'fallback' ? 'fallback' : mode === 'retry' ? 'retry' : 'committing';
         const windowFiles = pickWindow(queue, mode);
 
@@ -1031,16 +1280,17 @@ export class AiService {
           phase,
           message: `Gruppe ${groupIndex + 1}/${groupQueues.length}: ${windowFiles.length} Datei(en) werden vorbereitet`,
           progress: Math.min(95, 20 + Math.floor((processedFiles / Math.max(1, snapshotFiles.length)) * 70)),
-          details: {
-            mode,
+          details: buildProgressDetails(snapshotFiles.length, {
             groupId: groupIndex + 1,
             groupSize: queue.length,
-            remainingFiles: snapshotFiles.length - processedFiles,
-          },
+            step: strategy === 'large-hybrid' ? 'hybrid-window' : 'standard-window',
+          }),
         });
 
-        for (const file of windowFiles) {
-          await hydrateSnapshotFile(file);
+        if (strategy === 'standard') {
+          for (const file of windowFiles) {
+            await hydrateSnapshotFile(file);
+          }
         }
         ensureNotCancelled();
 
@@ -1048,21 +1298,47 @@ export class AiService {
 
         if (mode === 'fallback') {
           selectedPaths = windowFiles.map(file => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
+        } else if (strategy === 'large-hybrid' || aiBudgetExhausted) {
+          selectedPaths = windowFiles.map(file => file.path);
+          if (aiBudgetExhausted) {
+            onProgress?.({
+              phase: 'fallback',
+              message: 'Deterministische Dateiauswahl aktiv (KI-Budget erreicht).',
+              details: buildProgressDetails(snapshotFiles.length, {
+                groupId: groupIndex + 1,
+                groupSize: queue.length,
+                step: 'deterministic-fallback',
+              }),
+            });
+          }
         } else {
           try {
             onProgress?.({
               phase: 'grouping',
               message: `KI waehlt Dateien fuer Gruppe ${groupIndex + 1}/${groupQueues.length}...`,
-              details: {
-                mode,
+              details: buildProgressDetails(snapshotFiles.length, {
                 groupId: groupIndex + 1,
                 groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
-              },
+                step: 'selecting-files',
+              }),
             });
             ensureNotCancelled();
             modelTurns += 1;
-            selectedPaths = await chooseFilesWithAi(settings, windowFiles, getGeminiApiKey, shouldCancel);
+            const selectTimeoutMs = getAiTimeoutMs(LARGE_HYBRID_SELECT_TIMEOUT_MS);
+            if (selectTimeoutMs == null) {
+              markAiBudgetExhausted('Dateiauswahl');
+              selectedPaths = windowFiles.map(file => file.path);
+            } else {
+              const aiCallStartedAt = Date.now();
+              selectedPaths = await chooseFilesWithAi(
+                settings,
+                windowFiles,
+                getGeminiApiKey,
+                shouldCancel,
+                selectTimeoutMs,
+              );
+              consumeAiBudget(aiCallStartedAt, 'Dateiauswahl');
+            }
             ensureNotCancelled();
           } catch (error: unknown) {
             diagnostics.push(error instanceof Error ? error.message : 'KI-Auswahl fehlgeschlagen.');
@@ -1078,13 +1354,11 @@ export class AiService {
             onProgress?.({
               phase: 'fallback',
               message,
-              details: {
-                mode,
+              details: buildProgressDetails(snapshotFiles.length, {
                 groupId: groupIndex + 1,
                 groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
                 stallCycles,
-              },
+              }),
             });
             break;
           }
@@ -1098,13 +1372,11 @@ export class AiService {
             onProgress?.({
               phase: 'retry',
               message: `Keine Auswahl erhalten, Retry ${groupRetries}/${MAX_RETRIES_PER_GROUP}`,
-              details: {
-                mode,
+              details: buildProgressDetails(snapshotFiles.length, {
                 groupId: groupIndex + 1,
                 groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
                 retryCount: groupRetries,
-              },
+              }),
             });
             continue;
           }
@@ -1116,12 +1388,11 @@ export class AiService {
           onProgress?.({
             phase: 'fallback',
             message: 'Auto-Fallback aktiv: Mikro-Batches werden verwendet.',
-            details: {
-              mode,
+            details: buildProgressDetails(snapshotFiles.length, {
               groupId: groupIndex + 1,
               groupSize: queue.length,
-              remainingFiles: snapshotFiles.length - processedFiles,
-            },
+              step: 'deterministic-fallback',
+            }),
           });
           continue;
         }
@@ -1138,13 +1409,11 @@ export class AiService {
             onProgress?.({
               phase: 'fallback',
               message,
-              details: {
-                mode,
+              details: buildProgressDetails(snapshotFiles.length, {
                 groupId: groupIndex + 1,
                 groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
                 stallCycles,
-              },
+              }),
             });
             break;
           }
@@ -1167,30 +1436,48 @@ export class AiService {
         try {
           for (const file of batchFiles) {
             await this.gitService.runCommand(['add', '--', file.path]);
+            ensureNotCancelled();
           }
 
           let message: CommitMessage;
-          try {
-            onProgress?.({
-              phase: 'committing',
-              message: `KI erstellt Commit-Message fuer ${batchFiles.length} Datei(en)...`,
-              details: {
-                mode,
-                groupId: groupIndex + 1,
-                groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
-              },
-            });
-            ensureNotCancelled();
-            modelTurns += 1;
-            message = await generateCommitMessageWithAi(settings, batchFiles, getGeminiApiKey, shouldCancel);
-            ensureNotCancelled();
-          } catch (error: unknown) {
-            diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
-            message = {
-              title: clipCommitTitle(`chore: update ${batchFiles.length} file${batchFiles.length === 1 ? '' : 's'}`),
-              description: '',
-            };
+          if (aiBudgetExhausted) {
+            message = buildFallbackCommitMessage(batchFiles);
+          } else {
+            try {
+              onProgress?.({
+                phase: 'committing',
+                message: `KI erstellt Commit-Message fuer ${batchFiles.length} Datei(en)...`,
+                details: buildProgressDetails(snapshotFiles.length, {
+                  groupId: groupIndex + 1,
+                  groupSize: queue.length,
+                  step: 'generating-message',
+                }),
+              });
+              ensureNotCancelled();
+              modelTurns += 1;
+              const messageTimeoutMs = strategy === 'large-hybrid'
+                ? getAiTimeoutMs(LARGE_HYBRID_MESSAGE_TIMEOUT_MS)
+                : CHAT_TIMEOUT_MS;
+
+              if (messageTimeoutMs == null) {
+                markAiBudgetExhausted('Commit-Message');
+                message = buildFallbackCommitMessage(batchFiles);
+              } else {
+                const aiCallStartedAt = Date.now();
+                message = await generateCommitMessageWithAi(
+                  settings,
+                  batchFiles,
+                  getGeminiApiKey,
+                  shouldCancel,
+                  messageTimeoutMs,
+                );
+                consumeAiBudget(aiCallStartedAt, 'Commit-Message');
+              }
+              ensureNotCancelled();
+            } catch (error: unknown) {
+              diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
+              message = buildFallbackCommitMessage(batchFiles);
+            }
           }
 
           const commitArgs = ['commit', '-m', message.title];
@@ -1227,13 +1514,11 @@ export class AiService {
           onProgress?.({
             phase: 'committing',
             message: `Commit erstellt: ${subject}`,
-            details: {
-              mode,
+            details: buildProgressDetails(snapshotFiles.length, {
               groupId: groupIndex + 1,
               groupSize: queue.length,
-              remainingFiles: snapshotFiles.length - processedFiles,
               lastCommit: `${hash} ${subject}`,
-            },
+            }),
           });
         } catch (error: unknown) {
           diagnostics.push(error instanceof Error ? error.message : 'Commit fehlgeschlagen.');
@@ -1244,13 +1529,11 @@ export class AiService {
             onProgress?.({
               phase: 'fallback',
               message,
-              details: {
-                mode,
+              details: buildProgressDetails(snapshotFiles.length, {
                 groupId: groupIndex + 1,
                 groupSize: queue.length,
-                remainingFiles: snapshotFiles.length - processedFiles,
                 stallCycles,
-              },
+              }),
             });
             break;
           }
@@ -1290,12 +1573,11 @@ export class AiService {
       phase: 'done',
       message: summary,
       progress: 100,
-      details: {
-        mode,
+      details: buildProgressDetails(snapshotFiles.length, {
         remainingFiles,
         processedFiles,
         lastCommit: commits.length > 0 ? `${commits[commits.length - 1].hash} ${commits[commits.length - 1].subject}` : null,
-      },
+      }),
     });
 
     return {
