@@ -23,7 +23,9 @@ import {
   compactGitError,
   isMissingRemotePushError,
   isMissingUpstreamPushError,
+  isNonFastForwardPushError,
   isNoLocalCommitPushError,
+  isPullBlockedByLocalChangesError,
   isRemoteRepositoryMissingError,
   isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
@@ -141,6 +143,7 @@ export const useAppState = () => {
     setInputDialog,
     closeConfirmDialog,
     executeConfirmDialog,
+    executeConfirmDialogSecondary,
     closeInputDialog,
     executeInputDialog,
   } = useDialogControllers();
@@ -780,7 +783,104 @@ export const useAppState = () => {
       });
       return true;
     };
+    const runRemoteAheadQuickFix = async (): Promise<void> => {
+      const quickFixOptions: RunGitCommandOptions = {
+        ...options,
+        skipDirtyGuard: true,
+        skipRemoteAheadDirtyGuard: true,
+        skipSecretScan: true,
+      };
+      const quickFixStashMessage = 'Open Git Control quick sync fix';
+
+      const stashed = await runGitCommand(
+        ['stash', 'push', '-u', '-m', quickFixStashMessage],
+        tr('Quick-Fix: Aenderungen wurden im Stash gesichert.', 'Quick fix: saved changes to stash.'),
+        tr('Quick-Fix: stash wird erstellt...', 'Quick fix: creating stash...'),
+        quickFixOptions,
+      );
+      if (!stashed) {
+        return;
+      }
+
+      const pulled = await runGitCommand(
+        ['pull', '--rebase'],
+        tr('Quick-Fix: pull --rebase abgeschlossen.', 'Quick fix: pull --rebase completed.'),
+        tr('Quick-Fix: pull --rebase wird ausgefuehrt...', 'Quick fix: running pull --rebase...'),
+        quickFixOptions,
+      );
+      if (!pulled) {
+        setGitActionToast({
+          msg: tr(
+            'Quick-Fix gestoppt: Pull/Rebase ist fehlgeschlagen. Deine Aenderungen bleiben im neuesten Stash gesichert.',
+            'Quick fix stopped: pull/rebase failed. Your changes remain safe in the latest stash.',
+          ),
+          isError: true,
+        });
+        return;
+      }
+
+      const popped = await runGitCommand(
+        ['stash', 'pop'],
+        tr('Quick-Fix: Stash wurde wieder angewendet.', 'Quick fix: stash reapplied.'),
+        tr('Quick-Fix: Stash wird wieder angewendet...', 'Quick fix: reapplying stash...'),
+        quickFixOptions,
+      );
+      if (!popped) {
+        setGitActionToast({
+          msg: tr(
+            'Quick-Fix fast fertig: Pull/Rebase war erfolgreich, aber Stash-Pop braucht manuelle Aufloesung.',
+            'Quick fix nearly finished: pull/rebase succeeded, but stash pop needs manual resolution.',
+          ),
+          isError: true,
+        });
+        return;
+      }
+
+      setGitActionToast({
+        msg: tr(
+          command === 'push'
+            ? 'Quick-Fix abgeschlossen (stash -> pull --rebase -> stash pop). Du kannst jetzt erneut pushen.'
+            : 'Quick-Fix abgeschlossen (stash -> pull --rebase -> stash pop).',
+          command === 'push'
+            ? 'Quick fix completed (stash -> pull --rebase -> stash pop). You can push again now.'
+            : 'Quick fix completed (stash -> pull --rebase -> stash pop).',
+        ),
+        isError: false,
+      });
+    };
+    const maybeHandleSyncMismatchFailure = (failureMessage: unknown): boolean => {
+      if (command === 'push' && isNonFastForwardPushError(failureMessage)) {
+        workspace.setActiveTab('repo');
+        setGitActionToast({
+          msg: tr(
+            'Push abgelehnt: Remote ist neuer als lokal. Bitte zuerst committen/stashen, dann pull (oder pull --rebase) und danach erneut pushen.',
+            'Push rejected: remote is newer than local. Commit or stash first, then pull (or pull --rebase), and push again.',
+          ),
+          isError: true,
+        });
+        return true;
+      }
+
+      if (command === 'pull' && isPullBlockedByLocalChangesError(failureMessage)) {
+        workspace.setActiveTab('repo');
+        setGitActionToast({
+          msg: tr(
+            'Pull abgebrochen: Lokale uncommitted Aenderungen wuerden ueberschrieben. Bitte zuerst committen oder stashen und dann erneut pullen.',
+            'Pull aborted: local uncommitted changes would be overwritten. Commit or stash first, then pull again.',
+          ),
+          isError: true,
+        });
+        return true;
+      }
+
+      return false;
+    };
     const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
+    const isForcePushLike = command === 'push' && args.some((arg) => arg === '-f' || arg === '--force' || arg === '--force-with-lease');
+    const shouldGuardRemoteAheadWithDirtyState = (
+      !options?.skipRemoteAheadDirtyGuard
+      && (command === 'pull' || (command === 'push' && !isForcePushLike))
+    );
     const shouldScanPushSecrets =
       command === 'push'
       && settings.secretScanBeforePushEnabled
@@ -788,6 +888,84 @@ export const useAppState = () => {
 
     if (await maybeHandlePushWithoutOrigin()) {
       return false;
+    }
+
+    if (shouldGuardRemoteAheadWithDirtyState) {
+      try {
+        const [statusShortResult, statusPorcelainResult] = await Promise.all([
+          window.electronAPI.runGitCommand('status', '-sb'),
+          window.electronAPI.runGitCommand('statusPorcelain'),
+        ]);
+
+        const statusHeader = statusShortResult.success
+          ? String(statusShortResult.data || '').split('\n')[0]?.trim() || ''
+          : '';
+        const behindMatch = statusHeader.match(/behind (\d+)/);
+        const behindCount = behindMatch ? Number(behindMatch[1]) : 0;
+        const hasUpstream = statusHeader.includes('...');
+
+        const changedEntries = statusPorcelainResult.success
+          ? String(statusPorcelainResult.data || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+          : [];
+        const changedFiles = changedEntries.length;
+        const hasLocalChanges = changedFiles > 0;
+
+        if (hasLocalChanges && hasUpstream && behindCount > 0) {
+          const isPushGuard = command === 'push';
+          setConfirmDialog({
+            variant: 'danger',
+            title: tr(
+              isPushGuard ? 'Push jetzt wahrscheinlich blockiert' : 'Pull in diesem Zustand riskant',
+              isPushGuard ? 'Push is likely blocked in this state' : 'Pull is risky in this state',
+            ),
+            message: tr(
+              isPushGuard
+                ? `Remote ist ${behindCount} Commit${behindCount === 1 ? '' : 's'} voraus und es gibt lokale uncommitted Aenderungen. Ein normaler Push wird so oft mit "non-fast-forward" abgelehnt.`
+                : `Remote ist ${behindCount} Commit${behindCount === 1 ? '' : 's'} voraus und es gibt lokale uncommitted Aenderungen. Pull kann so fehlschlagen oder Konflikte erzeugen.`,
+              isPushGuard
+                ? `Remote is ahead by ${behindCount} commit${behindCount === 1 ? '' : 's'} and local changes are still uncommitted. A regular push is often rejected with a non-fast-forward error.`
+                : `Remote is ahead by ${behindCount} commit${behindCount === 1 ? '' : 's'} and local changes are still uncommitted. Pull may fail or create conflicts in this state.`,
+            ),
+            contextItems: [
+              { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+              { label: tr('Remote voraus', 'Remote ahead'), value: String(behindCount) },
+              {
+                label: tr('Lokale Aenderungen', 'Local changes'),
+                value: tr(
+                  `${changedFiles} Datei${changedFiles === 1 ? '' : 'en'} uncommitted`,
+                  `${changedFiles} file${changedFiles === 1 ? '' : 's'} uncommitted`,
+                ),
+              },
+            ],
+            irreversible: false,
+            consequences: tr(
+              'Empfohlen: zuerst committen oder stashen, dann pull (ggf. --rebase), danach push.',
+              'Recommended: commit or stash first, then pull (optionally --rebase), then push.',
+            ),
+            confirmLabel: tr(
+              isPushGuard ? 'Trotzdem pushen' : 'Trotzdem pullen',
+              isPushGuard ? 'Push anyway' : 'Pull anyway',
+            ),
+            secondaryActionLabel: tr('Quick-Fix ausfuehren', 'Run quick fix'),
+            secondaryActionVariant: 'default',
+            onSecondaryAction: async () => {
+              await runRemoteAheadQuickFix();
+            },
+            onConfirm: async () => {
+              await runGitCommand(args, successMsg, actionLabel, {
+                ...options,
+                skipRemoteAheadDirtyGuard: true,
+              });
+            },
+          });
+          return false;
+        }
+      } catch {
+        // continue without blocking if preflight state checks fail
+      }
     }
 
     if (shouldGuard) {
@@ -951,6 +1129,9 @@ export const useAppState = () => {
       if (await maybeRecoverRemoteSetup(r.error)) {
         return false;
       }
+      if (maybeHandleSyncMismatchFailure(r.error)) {
+        return false;
+      }
       const mergeInProgress = isMergeInProgressError(r.error);
       triggerRefresh();
       try {
@@ -1032,6 +1213,9 @@ export const useAppState = () => {
         return false;
       }
       if (await maybeRecoverRemoteSetup(e?.message)) {
+        return false;
+      }
+      if (maybeHandleSyncMismatchFailure(e?.message)) {
         return false;
       }
       const mergeInProgress = isMergeInProgressError(e?.message);
@@ -1708,6 +1892,7 @@ export const useAppState = () => {
     inputDialog,
     closeConfirmDialog,
     executeConfirmDialog,
+    executeConfirmDialogSecondary,
     closeInputDialog,
     executeInputDialog,
   };

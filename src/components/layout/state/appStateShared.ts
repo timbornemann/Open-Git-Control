@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
 
 export type RunGitCommandOptions = {
   skipDirtyGuard?: boolean;
+  skipRemoteAheadDirtyGuard?: boolean;
   skipSecretScan?: boolean;
   skipAutoSetUpstreamOnPushFailure?: boolean;
   skipGithubRecoveryOnPushFailure?: boolean;
