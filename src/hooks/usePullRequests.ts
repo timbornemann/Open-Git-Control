@@ -149,20 +149,44 @@ function normalizeGithubHost(value: string): string {
   return trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
 
+function parseOwnerRepoFromPath(pathValue: string): RepoOwnerRef | null {
+  const sanitizedPath = String(pathValue || '')
+    .trim()
+    .replace(/\/+$/, '');
+  if (!sanitizedPath) return null;
+
+  const pathSegments = sanitizedPath.split('/').filter(Boolean);
+  if (pathSegments.length < 2) return null;
+
+  const owner = decodeURIComponent(pathSegments[pathSegments.length - 2] || '').trim();
+  const repoWithSuffix = decodeURIComponent(pathSegments[pathSegments.length - 1] || '').trim();
+  const repo = repoWithSuffix.replace(/\.git$/i, '').trim();
+
+  if (!owner || !repo) return null;
+  if (/\s/.test(owner) || /\s/.test(repo)) return null;
+
+  return { owner, repo };
+}
+
 export const parsePrOwnerRepoFromRemote = (remoteUrl: string, githubHost: string = 'github.com'): RepoOwnerRef | null => {
   const trimmedRemote = remoteUrl.trim();
-  const host = normalizeGithubHost(githubHost).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const host = normalizeGithubHost(githubHost);
+  if (!trimmedRemote) return null;
 
-  const httpsMatch = trimmedRemote.match(new RegExp(`${host}\/([^/]+)\/([^/.]+)`));
-  const sshMatch = trimmedRemote.match(new RegExp(`${host}:([^/]+)\/([^/.]+)`));
-  const match = httpsMatch || sshMatch;
+  const scpLikeMatch = trimmedRemote.match(/^(?:[^@]+@)?([^:]+):(.+)$/);
+  if (scpLikeMatch && normalizeGithubHost(scpLikeMatch[1] || '') === host) {
+    return parseOwnerRepoFromPath(scpLikeMatch[2] || '');
+  }
 
-  if (!match) return null;
-
-  return {
-    owner: match[1],
-    repo: match[2],
-  };
+  try {
+    const parsedUrl = new URL(trimmedRemote);
+    if (normalizeGithubHost(parsedUrl.host) !== host) {
+      return null;
+    }
+    return parseOwnerRepoFromPath(parsedUrl.pathname || '');
+  } catch {
+    return null;
+  }
 };
 
 export const resolvePrOwnerRepo = async (

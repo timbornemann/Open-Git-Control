@@ -5,6 +5,8 @@ describe('usePullRequests helpers', () => {
   it('erkennt owner/repo aus HTTPS- und SSH-Remote', () => {
     expect(parsePrOwnerRepoFromRemote('https://github.com/octo/my-repo.git')).toEqual({ owner: 'octo', repo: 'my-repo' });
     expect(parsePrOwnerRepoFromRemote('git@github.com:openai/git-organizer.git')).toEqual({ owner: 'openai', repo: 'git-organizer' });
+    expect(parsePrOwnerRepoFromRemote('https://github.com/openai/repo.name.with.dots.git')).toEqual({ owner: 'openai', repo: 'repo.name.with.dots' });
+    expect(parsePrOwnerRepoFromRemote('ssh://git@github.company.local:2222/scm/platform/repo.service.git', 'github.company.local:2222')).toEqual({ owner: 'platform', repo: 'repo.service' });
     expect(parsePrOwnerRepoFromRemote('https://example.com/org/repo.git')).toBeNull();
   });
 
