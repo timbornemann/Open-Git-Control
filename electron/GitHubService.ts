@@ -1,5 +1,5 @@
-﻿const DEVICE_CODE_ENDPOINT = 'https://github.com/login/device/code';
-const ACCESS_TOKEN_ENDPOINT = 'https://github.com/login/oauth/access_token';
+﻿const DEVICE_CODE_PATH = '/login/device/code';
+const ACCESS_TOKEN_PATH = '/login/oauth/access_token';
 
 type DeviceFlowStartResult = {
   deviceCode: string;
@@ -68,6 +68,10 @@ type CheckRunConclusion = WorkflowRunConclusion;
 
 const DEFAULT_HOST = 'github.com';
 
+function oauthEndpointForHost(host: string, path: string): string {
+  return 'https://' + host + path;
+}
+
 export class GitHubService {
   private octokit: any | null = null;
   private token: string | null = null;
@@ -121,11 +125,7 @@ export class GitHubService {
     return envClientId;
   }
 
-  isDeviceFlowConfigured(configuredClientId?: string | null, configuredHost?: string | null): boolean {
-    const host = this.getOauthHost(configuredHost);
-    if (host !== DEFAULT_HOST) {
-      return false;
-    }
+  isDeviceFlowConfigured(configuredClientId?: string | null, _configuredHost?: string | null): boolean {
     return Boolean(this.getOauthClientId(configuredClientId));
   }
 
@@ -170,9 +170,6 @@ export class GitHubService {
 
   async startDeviceFlow(configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowStartResult> {
     const host = this.getOauthHost(configuredHost);
-    if (host !== DEFAULT_HOST) {
-      throw new Error('Device Flow wird aktuell nur fuer github.com unterstuetzt. Bitte PAT-Login nutzen.');
-    }
 
     const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
@@ -183,7 +180,7 @@ export class GitHubService {
     params.set('client_id', clientId);
     params.set('scope', 'repo read:user');
 
-    const response = await fetch(DEVICE_CODE_ENDPOINT, {
+    const response = await fetch(oauthEndpointForHost(host, DEVICE_CODE_PATH), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -225,13 +222,6 @@ export class GitHubService {
 
   async pollDeviceFlow(deviceCode: string, configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowPollResult> {
     const host = this.getOauthHost(configuredHost);
-    if (host !== DEFAULT_HOST) {
-      return {
-        status: 'error',
-        error: 'oauth_host_not_supported',
-        errorDescription: 'Device Flow wird aktuell nur fuer github.com unterstuetzt.',
-      };
-    }
 
     const clientId = this.getOauthClientId(configuredClientId);
     if (!clientId) {
@@ -247,7 +237,7 @@ export class GitHubService {
     params.set('device_code', deviceCode);
     params.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code');
 
-    const response = await fetch(ACCESS_TOKEN_ENDPOINT, {
+    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -305,9 +295,6 @@ export class GitHubService {
 
   async exchangeWebFlowCode(params: WebFlowExchangeParams): Promise<WebFlowExchangeResult> {
     const host = this.getOauthHost(params.configuredHost);
-    if (host !== DEFAULT_HOST) {
-      throw new Error('OAuth Browser Login wird aktuell nur fuer github.com unterstuetzt.');
-    }
 
     const clientId = this.getOauthClientId(params.configuredClientId);
     if (!clientId) {
@@ -325,7 +312,7 @@ export class GitHubService {
       body.set('client_secret', envClientSecret);
     }
 
-    const response = await fetch(ACCESS_TOKEN_ENDPOINT, {
+    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -707,3 +694,4 @@ export class GitHubService {
 }
 
 export const githubService = new GitHubService();
+

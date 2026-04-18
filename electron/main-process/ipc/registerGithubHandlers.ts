@@ -124,14 +124,7 @@ export function registerGithubHandlers({
   ipcMain.handle('github:webLogin', async () => {
     try {
       const settings = readSettingsWithMigration();
-      if (githubService.normalizeHost(settings.githubHost) !== 'github.com') {
-        return {
-          success: false,
-          error: '1-Klick Login wird aktuell nur fuer github.com unterstuetzt. Bitte PAT verwenden.',
-        };
-      }
-
-      const tokenResult = await runGithubCliOneClickLogin();
+      const tokenResult = await runGithubCliOneClickLogin(settings.githubHost);
 
       const authenticated = await githubService.authenticate(tokenResult.accessToken, settings.githubHost);
       if (!authenticated) {
