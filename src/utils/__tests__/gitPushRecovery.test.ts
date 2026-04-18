@@ -23,6 +23,7 @@ describe('gitPushRecovery', () => {
     expect(isMissingRemotePushError('fatal: No configured push destination.')).toBe(true);
     expect(isMissingRemotePushError("fatal: No such remote 'origin'")).toBe(true);
     expect(isMissingRemotePushError('fatal: origin does not appear to be a git repository')).toBe(true);
+    expect(isMissingRemotePushError('fatal: Kein konfiguriertes Push-Ziel.')).toBe(true);
     expect(isMissingRemotePushError('fatal: Authentication failed')).toBe(false);
   });
 
@@ -55,12 +56,14 @@ describe('gitPushRecovery', () => {
   it('detects non-fast-forward push rejections', () => {
     expect(isNonFastForwardPushError('! [rejected] main -> main (fetch first)')).toBe(true);
     expect(isNonFastForwardPushError('Updates were rejected because the tip of your current branch is behind its remote counterpart.')).toBe(true);
+    expect(isNonFastForwardPushError('! [abgelehnt] main -> main (zuerst fetchen)')).toBe(true);
     expect(isNonFastForwardPushError('Everything up-to-date')).toBe(false);
   });
 
   it('detects pull failures caused by local uncommitted changes', () => {
     expect(isPullBlockedByLocalChangesError('error: Your local changes to the following files would be overwritten by merge:')).toBe(true);
     expect(isPullBlockedByLocalChangesError('Please commit your changes or stash them before you merge.')).toBe(true);
+    expect(isPullBlockedByLocalChangesError('Fehler: Lokale Aenderungen an den folgenden Dateien wuerden durch Merge ueberschrieben')).toBe(true);
     expect(isPullBlockedByLocalChangesError('fatal: refusing to merge unrelated histories')).toBe(false);
   });
 
