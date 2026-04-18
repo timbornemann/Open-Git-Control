@@ -30,13 +30,14 @@ export function registerGitHandlers({
   });
 
   ipcMain.handle('git:command', async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
+    let jobId: string | null = null;
     try {
       assertAllowedGitCommand(commandName);
       const normalizedArgs = normalizeArgs(rawArgs);
       validateCommandArgs(commandName, normalizedArgs);
 
       const isLongRunning = commandName === 'fetch' || commandName === 'pull' || commandName === 'push';
-      const jobId = isLongRunning ? createJobId(`git-${commandName}`) : null;
+      jobId = isLongRunning ? createJobId(`git-${commandName}`) : null;
 
       if (jobId) {
         emitJobEvent(event.sender, {
@@ -49,7 +50,9 @@ export function registerGitHandlers({
 
       let data: string;
       if (commandName === 'status') {
-        data = await gitService.getStatus();
+        data = normalizedArgs.length > 0
+          ? await gitService.runCommand(['status', ...normalizedArgs])
+          : await gitService.getStatus();
       } else if (commandName === 'statusPorcelain') {
         data = await gitService.getStatusPorcelain();
       } else if (commandName === 'log') {
@@ -114,9 +117,9 @@ export function registerGitHandlers({
 
       return { success: true, data };
     } catch (error: any) {
-      if (typeof commandName === 'string' && (commandName === 'fetch' || commandName === 'pull' || commandName === 'push')) {
+      if (jobId && typeof commandName === 'string') {
         emitJobEvent(event.sender, {
-          id: createJobId(`git-${commandName}`),
+          id: jobId,
           operation: `git:${commandName}`,
           status: 'failed',
           message: error.message,

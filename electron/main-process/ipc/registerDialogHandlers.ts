@@ -15,15 +15,21 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     }
 
     const selectedPath = filePaths[0];
-    gitService.setRepoPath(selectedPath);
-    const isRepo = await gitService.checkIsRepo();
+    let isRepo = false;
+    try {
+      await gitService.runCommandAtPath(selectedPath, ['rev-parse', '--is-inside-work-tree']);
+      isRepo = true;
+    } catch {
+      isRepo = false;
+    }
+
     return { path: selectedPath, isRepo };
   });
 
   ipcMain.handle('dialog:selectDirectory', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory'],
-      title: 'Zielordner fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¼r Clone auswÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¤hlen',
+      title: 'Zielordner fuer Clone auswaehlen',
     });
     if (canceled) return null;
     return filePaths[0];
