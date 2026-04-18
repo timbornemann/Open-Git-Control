@@ -10,9 +10,12 @@ interface DangerConfirmProps {
   irreversible?: boolean;
   consequences?: string;
   confirmLabel?: string;
+  secondaryActionLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
+  onSecondaryAction?: () => void;
   onCancel: () => void;
+  secondaryActionVariant?: 'default' | 'danger';
 }
 
 export const DangerConfirm: React.FC<DangerConfirmProps> = ({
@@ -23,9 +26,12 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
   irreversible = true,
   consequences,
   confirmLabel,
+  secondaryActionLabel,
   cancelLabel,
   onConfirm,
+  onSecondaryAction,
   onCancel,
+  secondaryActionVariant = 'default',
 }) => {
   const { tr } = useI18n();
 
@@ -38,10 +44,13 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
       irreversible={irreversible}
       consequences={consequences}
       confirmLabel={confirmLabel ?? tr('Trotzdem ausführen', 'Run anyway')}
+      secondaryActionLabel={secondaryActionLabel}
       cancelLabel={cancelLabel}
       onConfirm={onConfirm}
+      onSecondaryAction={onSecondaryAction}
       onCancel={onCancel}
       confirmVariant="danger"
+      secondaryActionVariant={secondaryActionVariant}
     />
   );
 };

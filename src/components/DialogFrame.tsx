@@ -7,11 +7,14 @@ interface DialogFrameProps {
   title: string;
   onClose: () => void;
   onConfirm?: () => void;
+  onSecondaryAction?: () => void;
   onEnter?: () => void;
   confirmLabel?: string;
+  secondaryActionLabel?: string;
   cancelLabel?: string;
   confirmDisabled?: boolean;
   confirmVariant?: 'default' | 'danger';
+  secondaryActionVariant?: 'default' | 'danger';
   closeOnBackdrop?: boolean;
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   children: React.ReactNode;
@@ -31,11 +34,14 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   title,
   onClose,
   onConfirm,
+  onSecondaryAction,
   onEnter,
   confirmLabel,
+  secondaryActionLabel,
   cancelLabel,
   confirmDisabled = false,
   confirmVariant = 'default',
+  secondaryActionVariant = 'default',
   closeOnBackdrop = true,
   initialFocusRef,
   children,
@@ -134,6 +140,14 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
           <button className="dialog-btn dialog-btn-secondary" onClick={onClose}>
             {cancelLabel ?? tr('Abbrechen', 'Cancel')}
           </button>
+          {onSecondaryAction && (
+            <button
+              className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
+              onClick={onSecondaryAction}
+            >
+              {secondaryActionLabel ?? tr('Alternative ausfuehren', 'Run alternative')}
+            </button>
+          )}
           {onConfirm && (
             <button
               className={`dialog-btn ${confirmVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}

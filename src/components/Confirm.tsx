@@ -15,10 +15,13 @@ interface ConfirmProps {
   irreversible?: boolean;
   consequences?: string;
   confirmLabel?: string;
+  secondaryActionLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
+  onSecondaryAction?: () => void;
   onCancel: () => void;
   confirmVariant?: 'default' | 'danger';
+  secondaryActionVariant?: 'default' | 'danger';
 }
 
 export const Confirm: React.FC<ConfirmProps> = ({
@@ -29,10 +32,13 @@ export const Confirm: React.FC<ConfirmProps> = ({
   irreversible = false,
   consequences,
   confirmLabel,
+  secondaryActionLabel,
   cancelLabel,
   onConfirm,
+  onSecondaryAction,
   onCancel,
   confirmVariant = 'default',
+  secondaryActionVariant = 'default',
 }) => {
   const { tr } = useI18n();
 
@@ -44,8 +50,11 @@ export const Confirm: React.FC<ConfirmProps> = ({
       onConfirm={onConfirm}
       onEnter={onConfirm}
       confirmLabel={confirmLabel ?? tr('Fortfahren', 'Continue')}
+      secondaryActionLabel={secondaryActionLabel}
       cancelLabel={cancelLabel ?? tr('Abbrechen', 'Cancel')}
       confirmVariant={confirmVariant}
+      secondaryActionVariant={secondaryActionVariant}
+      onSecondaryAction={onSecondaryAction}
     >
       <p className="dialog-message">{message}</p>
       {contextItems.length > 0 && (

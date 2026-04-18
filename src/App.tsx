@@ -437,6 +437,9 @@ const App: React.FC = () => {
               consequences={state.confirmDialog.consequences}
               confirmLabel={state.confirmDialog.confirmLabel}
               onConfirm={state.executeConfirmDialog}
+              secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
+              secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
+              onSecondaryAction={state.executeConfirmDialogSecondary}
               onCancel={state.closeConfirmDialog}
             />
           )}
@@ -451,6 +454,9 @@ const App: React.FC = () => {
               consequences={state.confirmDialog.consequences}
               confirmLabel={state.confirmDialog.confirmLabel}
               onConfirm={state.executeConfirmDialog}
+              secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
+              secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
+              onSecondaryAction={state.executeConfirmDialogSecondary}
               onCancel={state.closeConfirmDialog}
             />
           )}
