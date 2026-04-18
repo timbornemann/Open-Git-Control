@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countChangedEntriesFromPorcelainV2,
   isMergeInProgressError,
   isRepoUnavailableError,
   mergeableDecoratedRefs,
   mergeTargetFromDecoratedRef,
   normalizeBranchRefForMerge,
+  parseBranchSyncFromPorcelainV2,
   parseRemoteBranchRef,
   parseCommitDetails,
   parseGitLog,
   parseGitStatus,
   parseGitStatusDetailed,
+  parseFirstConflictPathFromPorcelain,
   parseGitSubmoduleStatus,
 } from '../gitParsing';
 
@@ -208,6 +211,19 @@ describe('parseGitStatusDetailed', () => {
     expect(parsed.unstaged.map(entry => entry.path)).toEqual(['src/modified.ts', 'src/both.ts']);
     expect(parsed.untracked.map(entry => entry.path)).toEqual(['src/new.ts']);
   });
+
+  it('decodes quoted and rename paths in porcelain output', () => {
+    const output = [
+      'R  "src/old name.ts" -> "src/new name.ts"',
+      '?? "docs/with spaces.md"',
+      ' M "src/\\303\\244\\303\\266\\303\\274.txt"',
+    ].join('\n');
+
+    const parsed = parseGitStatusDetailed(output);
+    expect(parsed.staged.map((entry) => entry.path)).toEqual(['src/new name.ts']);
+    expect(parsed.untracked.map((entry) => entry.path)).toEqual(['docs/with spaces.md']);
+    expect(parsed.unstaged.map((entry) => entry.path)).toEqual(['src/äöü.txt']);
+  });
 });
 
 describe('parseGitStatus', () => {
@@ -225,6 +241,47 @@ describe('parseGitStatus', () => {
       untracked: ['src/new.ts'],
       deleted: ['src/deleted.ts'],
     });
+  });
+
+  it('uses the rename target path instead of old->new raw text', () => {
+    const output = ['R  "src/old name.ts" -> "src/new name.ts"'].join('\n');
+    expect(parseGitStatus(output).staged).toEqual(['src/new name.ts']);
+  });
+});
+
+describe('porcelain v2 branch parsing', () => {
+  it('parses ahead/behind and upstream from porcelain v2 branch lines', () => {
+    const output = [
+      '# branch.oid 9f0f7f0',
+      '# branch.head main',
+      '# branch.upstream origin/main',
+      '# branch.ab +3 -2',
+      '1 .M N... 100644 100644 100644 abc abc src/app.ts',
+    ].join('\n');
+
+    expect(parseBranchSyncFromPorcelainV2(output)).toEqual({
+      ahead: 3,
+      behind: 2,
+      hasUpstream: true,
+    });
+    expect(countChangedEntriesFromPorcelainV2(output)).toBe(1);
+  });
+
+  it('returns no upstream when branch metadata has no upstream line', () => {
+    const output = ['# branch.oid 9f0f7f0', '# branch.head main'].join('\n');
+    expect(parseBranchSyncFromPorcelainV2(output)).toEqual({
+      ahead: 0,
+      behind: 0,
+      hasUpstream: false,
+    });
+    expect(countChangedEntriesFromPorcelainV2(output)).toBe(0);
+  });
+});
+
+describe('parseFirstConflictPathFromPorcelain', () => {
+  it('decodes quoted conflict paths and rename conflict targets', () => {
+    expect(parseFirstConflictPathFromPorcelain('UU "src/conflict file.ts"')).toBe('src/conflict file.ts');
+    expect(parseFirstConflictPathFromPorcelain('AU "src/old.txt" -> "src/new.txt"')).toBe('src/new.txt');
   });
 });
 
