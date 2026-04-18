@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { normalizeBranchRefForMerge } from '../../../utils/gitParsing';
+import { normalizeBranchRefForMerge, parseBranchSyncFromPorcelainV2, parseGitSubmoduleStatus } from '../../../utils/gitParsing';
 import { validateBranchName } from '../../../utils/gitRefValidation';
 import { isRemoteRepositoryMissingError } from '../../../utils/gitPushRecovery';
 import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
-import { parseGitSubmoduleStatus } from '../../../utils/gitParsing';
 import { formatTime } from '../../../utils/dateTime';
 
 type Params = {
@@ -135,21 +134,19 @@ export const useRepositoryDomain = ({
       }
 
       try {
-        const { success, data } = await window.electronAPI.runGitCommand('status', '-sb');
+        const { success, data } = await window.electronAPI.runGitCommand('status', '--porcelain=v2', '--branch');
         if (!success || !data) {
           setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
           return;
         }
 
-        const header = String(data).split('\n')[0]?.trim() ?? '';
-        const aheadMatch = header.match(/ahead (\d+)/);
-        const behindMatch = header.match(/behind (\d+)/);
+        const parsed = parseBranchSyncFromPorcelainV2(String(data));
 
         setRemoteSync(prev => ({
           ...prev,
-          ahead: aheadMatch ? Number(aheadMatch[1]) : 0,
-          behind: behindMatch ? Number(behindMatch[1]) : 0,
-          hasUpstream: header.includes('...'),
+          ahead: parsed.ahead,
+          behind: parsed.behind,
+          hasUpstream: parsed.hasUpstream,
         }));
       } catch {
         setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
@@ -321,12 +318,32 @@ export const useRepositoryDomain = ({
       return;
     }
 
-    refreshRemoteState();
-    const intervalId = window.setInterval(() => {
-      refreshRemoteState();
-    }, autoFetchIntervalMs);
+    const refreshIfVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      void refreshRemoteState();
+    };
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void refreshRemoteState();
+      }
+    };
 
-    return () => window.clearInterval(intervalId);
+    void refreshRemoteState();
+    const intervalId = window.setInterval(() => {
+      refreshIfVisible();
+    }, autoFetchIntervalMs);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return () => {
+      window.clearInterval(intervalId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
   }, [activeRepo, autoFetchIntervalMs, refreshRemoteState]);
 
 

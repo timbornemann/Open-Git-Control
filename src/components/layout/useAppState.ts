@@ -15,7 +15,9 @@ import {
 } from '../../utils/releaseNotes';
 import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
 import {
+  countChangedEntriesFromPorcelainV2,
   isMergeInProgressError,
+  parseBranchSyncFromPorcelainV2,
   parseRemoteBranchRef,
   resolveConflictPathAfterGitFailure,
 } from '../../utils/gitParsing';
@@ -892,25 +894,13 @@ export const useAppState = () => {
 
     if (shouldGuardRemoteAheadWithDirtyState) {
       try {
-        const [statusShortResult, statusPorcelainResult] = await Promise.all([
-          window.electronAPI.runGitCommand('status', '-sb'),
-          window.electronAPI.runGitCommand('statusPorcelain'),
-        ]);
+        const statusResult = await window.electronAPI.runGitCommand('status', '--porcelain=v2', '--branch');
+        const statusText = statusResult.success ? String(statusResult.data || '') : '';
+        const remoteSyncState = parseBranchSyncFromPorcelainV2(statusText);
+        const behindCount = remoteSyncState.behind;
+        const hasUpstream = remoteSyncState.hasUpstream;
 
-        const statusHeader = statusShortResult.success
-          ? String(statusShortResult.data || '').split('\n')[0]?.trim() || ''
-          : '';
-        const behindMatch = statusHeader.match(/behind (\d+)/);
-        const behindCount = behindMatch ? Number(behindMatch[1]) : 0;
-        const hasUpstream = statusHeader.includes('...');
-
-        const changedEntries = statusPorcelainResult.success
-          ? String(statusPorcelainResult.data || '')
-            .split('\n')
-            .map((line) => line.trim())
-            .filter(Boolean)
-          : [];
-        const changedFiles = changedEntries.length;
+        const changedFiles = countChangedEntriesFromPorcelainV2(statusText);
         const hasLocalChanges = changedFiles > 0;
 
         if (hasLocalChanges && hasUpstream && behindCount > 0) {
