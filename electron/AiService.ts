@@ -1,5 +1,7 @@
 import { GitService, gitService } from './GitService';
 import { AppSettings, AiProvider } from './settings';
+import * as fs from 'fs';
+import * as path from 'path';
 
 type StatusEntry = {
   path: string;
@@ -17,6 +19,7 @@ type SnapshotFile = {
   deletions: number;
   isBinary: boolean;
   preview: string;
+  keyChanges: string[];
   groupKey: string;
   hydrated: boolean;
 };
@@ -70,6 +73,11 @@ export type ReleaseCommitInput = {
 const CHAT_TIMEOUT_MS = 90_000;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_PREVIEW_CHARS = 220;
+const MAX_CONTEXT_LINE_CHARS = 140;
+const MAX_CONTEXT_ITEMS_PER_HUNK = 3;
+const MAX_CONTEXT_HUNKS = 3;
+const MAX_CONTEXT_ITEMS_TOTAL = 12;
+const MAX_UNTRACKED_SNIPPET_LINES = 12;
 const MAX_COMMIT_FILES_NORMAL = 5;
 const MAX_COMMIT_FILES_RETRY = 3;
 const MAX_COMMIT_FILES_FALLBACK = 2;
@@ -233,8 +241,147 @@ function parseNumstatLine(raw: string): { additions: number; deletions: number; 
   };
 }
 
-function toPreview(diffText: string): string {
-  return (diffText || '').replace(/\s+/g, ' ').trim().slice(0, MAX_PREVIEW_CHARS) || '(no preview available)';
+function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS): string {
+  const compact = String(line || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  return compact.length <= maxChars ? compact : `${compact.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+}
+
+function pickRepresentativeIndices(length: number): number[] {
+  if (length <= 0) return [];
+  if (length === 1) return [0];
+  if (length === 2) return [0, 1];
+  const middle = Math.floor((length - 1) / 2);
+  return [...new Set([0, middle, length - 1])];
+}
+
+function pickRepresentativeItems<T>(values: T[], limit = 3): T[] {
+  if (values.length <= limit) return [...values];
+  return pickRepresentativeIndices(values.length)
+    .slice(0, limit)
+    .map((index) => values[index]);
+}
+
+function isDiffMetadataLine(line: string): boolean {
+  return (
+    /^diff --git /i.test(line)
+    || /^index /i.test(line)
+    || /^--- /i.test(line)
+    || /^\+\+\+ /i.test(line)
+    || /^new file mode /i.test(line)
+    || /^deleted file mode /i.test(line)
+    || /^similarity index /i.test(line)
+    || /^rename from /i.test(line)
+    || /^rename to /i.test(line)
+    || /^old mode /i.test(line)
+    || /^new mode /i.test(line)
+    || /^Binary files /i.test(line)
+    || /^GIT binary patch$/i.test(line)
+  );
+}
+
+function deriveStatsFromDiff(diffText: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  const lines = (diffText || '').split(/\r?\n/);
+  for (const line of lines) {
+    if (line.startsWith('+++') || line.startsWith('---')) continue;
+    if (line.startsWith('+')) additions += 1;
+    if (line.startsWith('-')) deletions += 1;
+  }
+  return { additions, deletions };
+}
+
+export function buildStructuredDiffContext(diffText: string): string[] {
+  const lines = (diffText || '').split(/\r?\n/);
+  type Hunk = { header: string; changes: string[] };
+
+  const hunks: Hunk[] = [];
+  const metadataFallback: string[] = [];
+  let currentHunk: Hunk | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+
+    if (line.startsWith('@@')) {
+      currentHunk = {
+        header: clipContextLine(line),
+        changes: [],
+      };
+      hunks.push(currentHunk);
+      continue;
+    }
+
+    if (isDiffMetadataLine(line)) {
+      const metadata = clipContextLine(line);
+      if (metadata) metadataFallback.push(metadata);
+      continue;
+    }
+
+    if ((line.startsWith('+') || line.startsWith('-')) && !line.startsWith('+++') && !line.startsWith('---')) {
+      const normalized = clipContextLine(line);
+      if (!normalized) continue;
+      if (!currentHunk) {
+        currentHunk = { header: clipContextLine('@@ synthetic @@'), changes: [] };
+        hunks.push(currentHunk);
+      }
+      currentHunk.changes.push(normalized);
+      continue;
+    }
+  }
+
+  const result: string[] = [];
+  const chosenHunks = pickRepresentativeItems(hunks, MAX_CONTEXT_HUNKS);
+  for (const hunk of chosenHunks) {
+    if (hunk.header && hunk.header !== '@@ synthetic @@') {
+      result.push(`hunk ${hunk.header}`);
+    }
+    const chosenChanges = pickRepresentativeItems(hunk.changes, MAX_CONTEXT_ITEMS_PER_HUNK);
+    result.push(...chosenChanges);
+  }
+
+  if (result.length === 0) {
+    return pickRepresentativeItems(
+      metadataFallback.filter((line) => !/^index /i.test(line)),
+      MAX_CONTEXT_ITEMS_PER_HUNK,
+    );
+  }
+
+  return result.slice(0, MAX_CONTEXT_ITEMS_TOTAL);
+}
+
+export function buildFileSnippetContext(content: string): string[] {
+  const sourceLines = (content || '')
+    .split(/\r?\n/)
+    .map((line) => clipContextLine(line))
+    .filter(Boolean);
+  if (sourceLines.length === 0) return [];
+
+  const bounded = sourceLines.slice(0, MAX_UNTRACKED_SNIPPET_LINES);
+  return pickRepresentativeItems(bounded, MAX_CONTEXT_ITEMS_PER_HUNK).map((line) => `+ ${line}`);
+}
+
+async function readUntrackedSnippet(repoPath: string, relativePath: string): Promise<string[]> {
+  const absolutePath = path.resolve(repoPath, relativePath);
+  const relative = path.relative(repoPath, absolutePath);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    return [];
+  }
+
+  try {
+    const stat = await fs.promises.stat(absolutePath);
+    if (!stat.isFile()) return [];
+    const raw = await fs.promises.readFile(absolutePath, 'utf8');
+    return buildFileSnippetContext(raw);
+  } catch {
+    return [];
+  }
+}
+
+function toContextPreview(keyChanges: string[]): string {
+  if (keyChanges.length === 0) return '(no preview available)';
+  return keyChanges.join(' | ').slice(0, MAX_PREVIEW_CHARS);
 }
 
 function clipCommitTitle(title: string): string {
@@ -425,11 +572,20 @@ async function chooseFilesWithAi(
     'Return strict JSON only: {"selectedPaths": string[]} with at least 1 and at most 5 items.',
     'Only choose paths from the provided list.',
     'Prefer fine-grained commits.',
+    'Use all candidate signals (path, type, stats, key changes), not only the first candidate.',
+    'When in doubt, choose the safest coherent subset.',
   ].join(' ');
 
   const userPrompt = [
     'Candidates:',
-    ...candidateWindow.map((file, index) => `${index + 1}. ${file.path} | ${file.changeType} | +${file.additions}/-${file.deletions} | ${file.preview}`),
+    ...candidateWindow.flatMap((file, index) => {
+      const keyChanges = file.keyChanges.length > 0 ? file.keyChanges : [file.preview];
+      return [
+        `${index + 1}. path: ${file.path}`,
+        `   type: ${file.changeType}, stats: +${file.additions}/-${file.deletions}, binary: ${file.isBinary ? 'yes' : 'no'}`,
+        ...keyChanges.slice(0, 6).map((line) => `   key_change: ${line}`),
+      ];
+    }),
     'Return JSON only.',
   ].join('\n');
 
@@ -447,37 +603,92 @@ async function chooseFilesWithAi(
   return unique.length > 0 ? unique.slice(0, MAX_COMMIT_FILES_NORMAL) : [candidateWindow[0].path];
 }
 
+export function buildFallbackCommitMessage(
+  batch: Array<{ path: string; changeType: FileChangeType; additions: number; deletions: number }>,
+): CommitMessage {
+  if (!Array.isArray(batch) || batch.length === 0) {
+    return { title: 'chore: update files', description: '' };
+  }
+
+  const weightedScopeCounts = new Map<string, number>();
+  const typeCounts = new Map<FileChangeType, number>();
+  for (const file of batch) {
+    const scope = getTopDirectory(file.path);
+    const weight = Math.max(1, file.additions + file.deletions);
+    weightedScopeCounts.set(scope, (weightedScopeCounts.get(scope) || 0) + weight);
+    typeCounts.set(file.changeType, (typeCounts.get(file.changeType) || 0) + 1);
+  }
+
+  const sortedScopes = [...weightedScopeCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([scope]) => scope);
+  const primaryScope = sortedScopes[0] || 'repo';
+
+  const dominantType = [...typeCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([type]) => type)[0] || 'other';
+  const hasMixedTypes = typeCounts.size > 1;
+
+  const action = hasMixedTypes
+    ? 'update'
+    : dominantType === 'deleted'
+      ? 'remove'
+      : dominantType === 'renamed'
+        ? 'rename'
+        : dominantType === 'added' || dominantType === 'untracked'
+          ? 'add'
+          : 'update';
+
+  const title = clipCommitTitle(`chore(${primaryScope}): ${action} ${batch.length} file${batch.length === 1 ? '' : 's'}`);
+
+  const needsDescription = hasMixedTypes || sortedScopes.length > 1;
+  const description = needsDescription
+    ? `Covers ${sortedScopes.slice(0, 3).join(', ')}.`
+    : '';
+
+  return { title, description };
+}
+
 async function generateCommitMessageWithAi(
   settings: AppSettings,
   batch: SnapshotFile[],
   getGeminiApiKey: () => string,
 ): Promise<CommitMessage> {
   const systemPrompt = [
-    'You write concise git commit messages.',
+    'You write concise and factual git commit messages.',
     'Return strict JSON only: {"title": string, "description": string}.',
     'Title must be imperative, <=72 chars, no trailing period.',
-    'Description should be short and optional-friendly.',
+    'Title must cover the full batch, not just one file.',
+    'Only use single-file specific wording when the batch has exactly one file.',
+    'If uncertain, use a safer and broader summary instead of inventing details.',
+    'Description should be short and only included when it adds essential context.',
   ].join(' ');
 
   const userPrompt = [
     'Files in this commit:',
-    ...batch.map((file) => `- ${file.path} (${file.changeType}, +${file.additions}/-${file.deletions}) ${file.preview}`),
+    ...batch.flatMap((file) => {
+      const keyChanges = file.keyChanges.length > 0 ? file.keyChanges : [file.preview];
+      return [
+        `- path: ${file.path}`,
+        `  type: ${file.changeType}, stats: +${file.additions}/-${file.deletions}, binary: ${file.isBinary ? 'yes' : 'no'}`,
+        ...keyChanges.slice(0, 6).map((line) => `  key_change: ${line}`),
+      ];
+    }),
     'Return JSON only.',
   ].join('\n');
 
   try {
     const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
     const parsed = parseJsonFromText(raw) || {};
-    const title = clipCommitTitle(safeString(parsed.title, '').trim());
+    const titleRaw = safeString(parsed.title, '').trim();
+    const title = clipCommitTitle(titleRaw);
+    if (!titleRaw) {
+      return buildFallbackCommitMessage(batch);
+    }
     const description = safeString(parsed.description, '').trim();
     return { title, description };
   } catch {
-    const first = batch[0];
-    const scope = getTopDirectory(first.path);
-    return {
-      title: clipCommitTitle(`chore(${scope}): update ${batch.length} file${batch.length === 1 ? '' : 's'}`),
-      description: '',
-    };
+    return buildFallbackCommitMessage(batch);
   }
 }
 
@@ -684,6 +895,7 @@ export class AiService {
         deletions: 0,
         isBinary: false,
         preview: '(preview pending)',
+        keyChanges: [],
         groupKey: buildGroupKey(pathValue, changeType),
         hydrated: false,
       };
@@ -706,40 +918,41 @@ export class AiService {
 
       let numstatRaw = '';
       try {
-        numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--', file.path]);
+        numstatRaw = await this.gitService.runCommand(['diff', '--numstat', 'HEAD', '--', file.path]);
       } catch {
         numstatRaw = '';
-      }
-
-      if (!numstatRaw.trim()) {
-        try {
-          numstatRaw = await this.gitService.runCommand(['diff', '--numstat', '--cached', '--', file.path]);
-        } catch {
-          numstatRaw = '';
-        }
       }
 
       const numstat = parseNumstatLine(numstatRaw.split(/\r?\n/).find(Boolean) || '');
 
       let previewRaw = '';
       try {
-        previewRaw = await this.gitService.runCommand(['diff', '--', file.path]);
+        previewRaw = await this.gitService.runCommand(['diff', '--no-color', '--unified=3', 'HEAD', '--', file.path]);
       } catch {
         previewRaw = '';
       }
 
-      if (!previewRaw.trim()) {
-        try {
-          previewRaw = await this.gitService.runCommand(['diff', '--cached', '--', file.path]);
-        } catch {
-          previewRaw = '';
-        }
+      let additions = numstat.additions;
+      let deletions = numstat.deletions;
+      if (additions === 0 && deletions === 0 && previewRaw.trim()) {
+        const derived = deriveStatsFromDiff(previewRaw);
+        additions = derived.additions;
+        deletions = derived.deletions;
       }
 
-      file.additions = numstat.additions;
-      file.deletions = numstat.deletions;
+      let keyChanges = buildStructuredDiffContext(previewRaw);
+      if (keyChanges.length === 0 && (file.changeType === 'untracked' || file.changeType === 'added')) {
+        keyChanges = await readUntrackedSnippet(repoPath, file.path);
+      }
+      if (keyChanges.length === 0) {
+        keyChanges = [clipContextLine(`${file.changeType} file: ${file.path}`)];
+      }
+
+      file.additions = additions;
+      file.deletions = deletions;
       file.isBinary = numstat.isBinary;
-      file.preview = toPreview(previewRaw);
+      file.keyChanges = keyChanges;
+      file.preview = toContextPreview(keyChanges);
       file.hydrated = true;
       ensureNotCancelled();
     };
