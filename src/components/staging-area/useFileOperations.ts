@@ -79,12 +79,30 @@ export const useFileOperations = ({
       setUnstagedStats(EMPTY_DIFF_STATS);
       return;
     }
-    refresh();
-    const iv = setInterval(refresh, 3000);
-    window.addEventListener('focus', refresh);
+    const refreshIfVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      void refresh();
+    };
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void refresh();
+      }
+    };
+
+    void refresh();
+    const iv = setInterval(refreshIfVisible, 3000);
+    window.addEventListener('focus', refreshIfVisible);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
     return () => {
       clearInterval(iv);
-      window.removeEventListener('focus', refresh);
+      window.removeEventListener('focus', refreshIfVisible);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
   }, [repoPath, refresh]);
 
