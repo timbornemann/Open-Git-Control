@@ -221,6 +221,20 @@ export const useCommitGraphData = ({
     lastRepoPathRef.current = repoPath;
     lastSecondaryHistoryRef.current = showSecondaryHistory;
     if (repoChanged) {
+      // Drop previous-repo state immediately to avoid transient sync refreshes
+      // restoring stale scroll positions while the new repo is loading.
+      setLayout(null);
+      layoutRef.current = null;
+      setCommitCount(0);
+      commitCountRef.current = 0;
+      setHasMoreCommits(true);
+      setWorkingTreeStatus(null);
+      pendingScrollTopRef.current = null;
+      pendingScrollHeightRef.current = null;
+      pendingScrollModeRef.current = null;
+      appendInFlightRef.current = false;
+      pendingSyncAfterAppendRef.current = false;
+      autoLoadArmedRef.current = true;
       forceScrollToTopOnNextResetRef.current = true;
     }
 
