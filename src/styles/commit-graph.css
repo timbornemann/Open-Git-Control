@@ -111,7 +111,8 @@
 }
 
 .commit-subject-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, auto);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -135,22 +136,30 @@
 }
 
 .commit-meta {
-  display: flex;
+  --commit-author-width: 120px;
+  --commit-stats-width: 92px;
+  --commit-date-width: 88px;
+  display: grid;
+  grid-template-columns: var(--commit-author-width) var(--commit-stats-width) var(--commit-date-width);
   align-items: center;
-  gap: 12px;
+  column-gap: 10px;
   flex-shrink: 0;
+  justify-items: end;
 }
 
 .commit-author {
+  grid-column: 1;
   font-size: 0.8rem;
   color: var(--text-secondary);
-  max-width: 100px;
+  max-width: var(--commit-author-width);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: right;
 }
 
 .commit-stats {
+  grid-column: 2;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.72rem;
   color: var(--status-info);
@@ -158,6 +167,20 @@
   border: 1px solid var(--status-info-border);
   border-radius: 999px;
   padding: 1px 7px;
+  min-width: var(--commit-stats-width);
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.commit-date {
+  grid-column: 3;
+  width: var(--commit-date-width);
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .commit-refs {
