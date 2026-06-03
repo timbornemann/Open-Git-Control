@@ -173,6 +173,50 @@ export function registerGithubHandlers({
     }
   });
 
+  ipcMain.handle('github:forkRepo', async (_event, params: {
+    owner: string;
+    repo: string;
+    name?: string;
+    defaultBranchOnly?: boolean;
+  }) => {
+    if (!githubService.isAuthenticated()) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const owner = String(params?.owner || '').trim();
+    const repo = String(params?.repo || '').trim();
+    const name = String(params?.name || '').trim();
+
+    if (!owner || !repo) {
+      return { success: false, error: 'Owner and repository are required.' };
+    }
+
+    try {
+      const fork = await githubService.forkRepository(owner, repo, {
+        name: name || undefined,
+        defaultBranchOnly: typeof params?.defaultBranchOnly === 'boolean' ? params.defaultBranchOnly : undefined,
+      });
+      return { success: true, data: fork };
+    } catch (error: any) {
+      const status = Number(error?.status);
+      const apiMessage = typeof error?.response?.data?.message === 'string'
+        ? error.response.data.message
+        : '';
+      const fallback = error?.message || 'Failed to fork repository.';
+
+      if (status === 404) {
+        return { success: false, error: 'Repository not found or no permission to fork it.' };
+      }
+      if (status === 403) {
+        return { success: false, error: 'Forking forbidden for this repository or missing token scope.' };
+      }
+      if (status === 422 && /already exists/i.test(`${fallback} ${apiMessage}`)) {
+        return { success: false, error: 'A fork already exists for this repository.' };
+      }
+      return { success: false, error: apiMessage || fallback };
+    }
+  });
+
   ipcMain.handle('github:logout', async () => {
     githubService.logout();
     clearSavedGithubTokenSecurely();

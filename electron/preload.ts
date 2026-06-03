@@ -124,6 +124,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubLogout: () => ipcRenderer.invoke('github:logout'),
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) =>
     ipcRenderer.invoke('github:createRepo', { name, description, isPrivate }),
+  githubForkRepo: (params: { owner: string; repo: string; name?: string; defaultBranchOnly?: boolean }) =>
+    ipcRenderer.invoke('github:forkRepo', params),
   githubGetPRs: (owner: string, repo: string, state: string) =>
     ipcRenderer.invoke('github:getPRs', owner, repo, state),
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>

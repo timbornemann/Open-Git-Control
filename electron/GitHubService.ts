@@ -423,6 +423,45 @@ export class GitHubService {
     };
   }
 
+  async forkRepository(
+    owner: string,
+    repo: string,
+    options: {
+      name?: string;
+      defaultBranchOnly?: boolean;
+    } = {},
+  ) {
+    if (!this.octokit) throw new Error('Not authenticated');
+
+    const normalizedOwner = String(owner || '').trim();
+    const normalizedRepo = String(repo || '').trim();
+    const normalizedName = String(options.name || '').trim();
+
+    if (!normalizedOwner || !normalizedRepo) {
+      throw new Error('Owner and repository are required.');
+    }
+
+    const { data } = await this.octokit.rest.repos.createFork({
+      owner: normalizedOwner,
+      repo: normalizedRepo,
+      ...(normalizedName ? { name: normalizedName } : {}),
+      ...(typeof options.defaultBranchOnly === 'boolean'
+        ? { default_branch_only: options.defaultBranchOnly }
+        : {}),
+    });
+
+    return {
+      id: data.id,
+      name: data.name,
+      fullName: data.full_name,
+      private: data.private,
+      cloneUrl: data.clone_url,
+      htmlUrl: data.html_url,
+      description: data.description,
+      updatedAt: data.updated_at,
+    };
+  }
+
   async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {
     if (!this.octokit) throw new Error('Not authenticated');
 
