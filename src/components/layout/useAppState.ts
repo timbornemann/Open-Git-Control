@@ -1634,6 +1634,37 @@ export const useAppState = () => {
     });
   }, [pullRequestDomain.prOwnerRepo]);
 
+  const resetReleaseDraft = useCallback((options?: { clearContext?: boolean; clearSuccess?: boolean }) => {
+    const clearContext = options?.clearContext ?? false;
+    const clearSuccess = options?.clearSuccess ?? false;
+    const owner = pullRequestDomain.prOwnerRepo?.owner || '';
+    const repo = pullRequestDomain.prOwnerRepo?.repo || '';
+    const targetCommitish = repository.currentBranch || '';
+
+    setReleaseFormState({
+      owner,
+      repo,
+      tagName: '',
+      targetCommitish,
+      releaseName: '',
+      body: '',
+      draft: false,
+      prerelease: false,
+    });
+    setReleaseError(null);
+    if (clearSuccess) {
+      setReleaseSuccess(null);
+    }
+    if (clearContext) {
+      setReleaseContext(null);
+      setReleaseContextError(null);
+    }
+  }, [
+    pullRequestDomain.prOwnerRepo?.owner,
+    pullRequestDomain.prOwnerRepo?.repo,
+    repository.currentBranch,
+  ]);
+
   useEffect(() => {
     setReleaseFormState(prev => ({
       ...prev,
@@ -1643,7 +1674,7 @@ export const useAppState = () => {
     }));
   }, [pullRequestDomain.prOwnerRepo, repository.currentBranch]);
 
-  const refreshReleaseContext = useCallback(async () => {
+  const refreshReleaseContext = useCallback(async (targetCommitishOverride?: string) => {
     if (!window.electronAPI || !github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
       setReleaseContext(null);
       setReleaseContextError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
@@ -1654,10 +1685,11 @@ export const useAppState = () => {
     setReleaseContextError(null);
 
     try {
+      const targetCommitish = (targetCommitishOverride ?? releaseForm.targetCommitish ?? '').trim() || repository.currentBranch;
       const result = await window.electronAPI.githubGetReleaseContext({
         owner: pullRequestDomain.prOwnerRepo.owner,
         repo: pullRequestDomain.prOwnerRepo.repo,
-        targetCommitish: (releaseForm.targetCommitish || '').trim() || repository.currentBranch,
+        targetCommitish,
       });
 
       if (!result.success) {
@@ -1667,15 +1699,30 @@ export const useAppState = () => {
       }
 
       setReleaseContext(result.data);
-      const existingTag = (releaseForm.tagName || '').trim();
-      if (!existingTag) {
-        const suggestion = suggestNextReleaseTag(result.data.existingTags || []);
-        setReleaseFormState((prev) => ({
+      const suggestion = suggestNextReleaseTag(result.data.existingTags || []);
+      const existingTags = new Set((result.data.existingTags || []).map((tag) => tag.toLowerCase()));
+
+      setReleaseFormState((prev) => {
+        const currentTag = (prev.tagName || '').trim();
+        const currentTagExists = Boolean(currentTag && existingTags.has(currentTag.toLowerCase()));
+        const shouldSuggestTag = !currentTag || currentTagExists;
+        if (!shouldSuggestTag) {
+          return prev;
+        }
+
+        const currentReleaseName = (prev.releaseName || '').trim();
+        const shouldSuggestReleaseName = (
+          !currentReleaseName
+          || currentReleaseName === `Release ${currentTag}`
+          || currentTagExists
+        );
+        const nextTag = suggestion;
+        return {
           ...prev,
-          tagName: prev.tagName || suggestion,
-          releaseName: prev.releaseName || `Release ${prev.tagName || suggestion}`,
-        }));
-      }
+          tagName: nextTag,
+          releaseName: shouldSuggestReleaseName ? `Release ${nextTag}` : prev.releaseName,
+        };
+      });
     } catch (error: any) {
       setReleaseContext(null);
       setReleaseContextError(error?.message || tr('Release-Kontext konnte nicht geladen werden.', 'Could not load release context.'));
@@ -1685,7 +1732,6 @@ export const useAppState = () => {
   }, [
     github.isAuthenticated,
     pullRequestDomain.prOwnerRepo,
-    releaseForm.tagName,
     releaseForm.targetCommitish,
     repository.currentBranch,
     tr,
@@ -1771,12 +1817,25 @@ export const useAppState = () => {
         isError: false,
       });
       triggerRefresh();
+      resetReleaseDraft({ clearContext: true, clearSuccess: false });
+      await refreshReleaseContext(repository.currentBranch || undefined);
     } catch (error: any) {
       setReleaseError(error?.message || tr('Release konnte nicht erstellt werden.', 'Could not create release.'));
     } finally {
       setReleaseSubmitting(false);
     }
-  }, [github.isAuthenticated, pullRequestDomain.prOwnerRepo, releaseForm, releaseContext?.existingTags, repository.currentBranch, tr, triggerRefresh, setGitActionToast]);
+  }, [
+    github.isAuthenticated,
+    pullRequestDomain.prOwnerRepo,
+    refreshReleaseContext,
+    releaseContext?.existingTags,
+    releaseForm,
+    repository.currentBranch,
+    resetReleaseDraft,
+    setGitActionToast,
+    tr,
+    triggerRefresh,
+  ]);
 
   const generateReleaseNotesWithAI = useCallback(async () => {
     if (!window.electronAPI) return;
@@ -1855,9 +1914,9 @@ export const useAppState = () => {
 
   const openReleaseCreator = useCallback(() => {
     workspace.setActiveTab('repo');
+    resetReleaseDraft({ clearContext: true, clearSuccess: true });
     setShowReleaseCreator(true);
-    setReleaseError(null);
-  }, [workspace]);
+  }, [resetReleaseDraft, workspace]);
 
   const closeReleaseCreator = useCallback(() => {
     setShowReleaseCreator(false);
