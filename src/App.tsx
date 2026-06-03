@@ -159,6 +159,8 @@ const App: React.FC = () => {
     { id: 'rebase-continue', label: tr('Rebase fortsetzen', 'Continue rebase'), keywords: ['rebase', 'continue', 'fortsetzen'], action: () => state.runGitCommand(['rebaseContinue'], tr('Rebase fortgesetzt.', 'Rebase continued.')) },
     // Repo
     { id: 'open-folder', label: tr('Repository öffnen...', 'Open repository...'), keywords: ['open', 'folder', 'öffnen'], action: () => state.handleOpenFolder() },
+    { id: 'clone-url', label: tr('Repository per URL klonen...', 'Clone repository from URL...'), keywords: ['clone', 'url', 'ssh', 'http'], action: () => state.handleCloneByUrl() },
+    { id: 'fork-url', label: tr('GitHub-Repository per URL forken...', 'Fork GitHub repository from URL...'), keywords: ['fork', 'github', 'url'], action: () => state.handleForkByUrl() },
     { id: 'add-remote', label: tr('Remote hinzufügen...', 'Add remote...'), keywords: ['remote', 'add', 'hinzufügen'], action: () => { state.setActiveTab('repo'); state.handleAddRemote(); } },
   ];
 
@@ -180,6 +182,7 @@ const App: React.FC = () => {
     onSetRepoSortBy: state.setRepoSortBy,
     onToggleRepoPin: state.handleToggleRepoPin,
     onOpenFolder: state.handleOpenFolder,
+    onCloneByUrl: state.handleCloneByUrl,
     onSwitchRepo: state.handleSwitchRepo,
     onCloseRepo: state.handleCloseRepo,
     isRepoPanelCollapsed: state.isRepoPanelCollapsed,
@@ -272,6 +275,7 @@ const App: React.FC = () => {
     refreshGithubRepos: state.refreshGithubRepos,
     onLogout: state.handleLogout,
     onClone: state.handleClone,
+    onForkByUrl: state.handleForkByUrl,
     isCloning: state.isCloning,
 
     prOwnerRepo: state.prOwnerRepo,

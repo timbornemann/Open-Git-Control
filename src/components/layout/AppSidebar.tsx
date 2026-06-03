@@ -27,6 +27,7 @@ export const AppSidebar: React.FC = () => {
           activeTab={props.activeTab}
           activeRepo={props.activeRepo}
           onOpenFolder={props.onOpenFolder}
+          onCloneByUrl={props.onCloneByUrl}
           onRefreshRemoteQuick={props.onRefreshRemoteQuick}
           remoteSync={props.remoteSync}
           isGitActionRunning={props.isGitActionRunning}

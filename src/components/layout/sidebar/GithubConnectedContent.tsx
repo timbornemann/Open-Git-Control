@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Plus,
   GitPullRequest,
+  GitFork,
   Copy,
   ExternalLink,
   GitBranch,
@@ -34,6 +35,8 @@ type GithubConnectedContentProps = Pick<
   | 'refreshGithubRepos'
   | 'onLogout'
   | 'onClone'
+  | 'onCloneByUrl'
+  | 'onForkByUrl'
   | 'isCloning'
   | 'openRepos'
   | 'activeRepo'
@@ -98,6 +101,8 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   refreshGithubRepos,
   onLogout,
   onClone,
+  onCloneByUrl,
+  onForkByUrl,
   isCloning,
   openRepos,
   activeRepo,
@@ -231,6 +236,15 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
         </div>
         <button className="icon-btn" style={{ padding: '6px' }} onClick={refreshGithubRepos} title={tr('Liste aktualisieren', 'Refresh list')}>
           <RefreshCw size={14} className={isLoadingGithubRepos ? 'spin' : ''} />
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <button className="staging-btn-sm" onClick={onCloneByUrl} title={tr('Beliebiges Repository per HTTP/SSH URL klonen', 'Clone any repository via HTTP/SSH URL')}>
+          <DownloadCloud size={12} /> {tr('Clone per URL', 'Clone via URL')}
+        </button>
+        <button className="staging-btn-sm" onClick={onForkByUrl} title={tr('GitHub-Repository per URL forken und klonen', 'Fork and clone a GitHub repository from URL')}>
+          <GitFork size={12} /> {tr('Fork per URL', 'Fork via URL')}
         </button>
       </div>
 
