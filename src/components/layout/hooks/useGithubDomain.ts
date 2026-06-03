@@ -10,6 +10,20 @@ type Params = {
   githubHost: string;
 };
 
+const deriveRepoNameFromCloneSource = (cloneSource: string): string => {
+  const normalizedSource = String(cloneSource || '').trim();
+  if (!normalizedSource) return 'repository';
+
+  const withoutProtocol = normalizedSource.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const normalizedPath = withoutProtocol
+    .replace(/^git@[^:]+:/i, '')
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .replace(/\.git$/i, '');
+  const lastSegment = normalizedPath.split('/').pop() || 'repository';
+  return lastSegment || 'repository';
+};
+
 export const useGithubDomain = ({
   onRepoCloned,
   setActiveTab,
@@ -373,14 +387,27 @@ export const useGithubDomain = ({
     }
   };
 
-  const handleClone = async (cloneUrl: string, repoName: string) => {
-    if (!window.electronAPI) return;
-    const targetDir = await window.electronAPI.selectDirectory();
-    if (!targetDir) return;
+  const cloneRepository = useCallback(async (
+    cloneUrl: string,
+    options: {
+      repoName?: string;
+      targetDir?: string | null;
+      targetName?: string;
+      switchToRepoTab?: boolean;
+    } = {},
+  ): Promise<boolean> => {
+    if (!window.electronAPI) return false;
+    const normalizedCloneUrl = String(cloneUrl || '').trim();
+    if (!normalizedCloneUrl) {
+      setCloneError(tr('Clone-URL fehlt.', 'Clone URL is required.'));
+      return false;
+    }
+    const targetDir = options.targetDir ?? await window.electronAPI.selectDirectory();
+    if (!targetDir) return false;
 
     setIsCloning(true);
     setCloneLog([]);
-    setCloneRepoName(repoName);
+    setCloneRepoName(options.repoName || options.targetName || deriveRepoNameFromCloneSource(normalizedCloneUrl));
     setCloneFinished(false);
     setCloneError(null);
 
@@ -389,26 +416,34 @@ export const useGithubDomain = ({
     });
 
     try {
-      const result = await window.electronAPI.gitClone(cloneUrl, targetDir);
-      cleanup();
+      const result = await window.electronAPI.gitClone(normalizedCloneUrl, targetDir, options.targetName);
       if (result.success) {
         setCloneFinished(true);
         setCloneLog(prev => [...prev, `SUCCESS: ${tr('Repository erfolgreich geklont nach', 'Repository cloned successfully to')}: ${result.repoPath}`]);
         await onRepoCloned(result.repoPath);
-        setActiveTab('repo');
+        if (options.switchToRepoTab !== false) {
+          setActiveTab('repo');
+        }
+        return true;
       } else {
         const errorMessage = result.error || tr('Unbekannter Fehler', 'Unknown error');
         setCloneError(errorMessage);
         setCloneLog(prev => [...prev, `ERROR: ${errorMessage}`]);
+        return false;
       }
     } catch (e: any) {
-      cleanup();
       setCloneError(e.message);
       setCloneLog(prev => [...prev, `ERROR: ${e.message}`]);
+      return false;
     } finally {
+      cleanup();
       setIsCloning(false);
     }
-  };
+  }, [onRepoCloned, setActiveTab, tr]);
+
+  const handleClone = useCallback(async (cloneUrl: string, repoName: string) => {
+    await cloneRepository(cloneUrl, { repoName });
+  }, [cloneRepository]);
 
   return {
     isAuthenticated,
@@ -447,6 +482,7 @@ export const useGithubDomain = ({
     cloneRepoName,
     cloneFinished,
     cloneError,
+    cloneRepository,
     handleClone,
   };
 };

@@ -38,6 +38,13 @@ export interface GitHubRepositoryDto {
   updatedAt?: string;
 }
 
+export interface GitHubForkParamsDto {
+  owner: string;
+  repo: string;
+  name?: string;
+  defaultBranchOnly?: boolean;
+}
+
 export interface GitHubRepositoryPageDto {
   repos: GitHubRepositoryDto[];
   nextPage: number | null;
@@ -373,6 +380,7 @@ export interface ElectronAPI {
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
   githubLogout: () => Promise<{ success: true } | { success: false; error: string }>;
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;
+  githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: {
     owner: string;

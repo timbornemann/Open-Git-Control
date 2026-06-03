@@ -27,6 +27,7 @@ export type AppSidebarProps = {
   onSetRepoSortBy: (sortBy: RepoSortByDto) => void;
   onToggleRepoPin: (repoPath: string) => void;
   onOpenFolder: () => void;
+  onCloneByUrl: () => void;
   onSwitchRepo: (repoPath: string) => void;
   onCloseRepo: (repoPath: string) => void;
   isRepoPanelCollapsed: boolean;
@@ -119,6 +120,7 @@ export type AppSidebarProps = {
   refreshGithubRepos: () => void;
   onLogout: () => void;
   onClone: (cloneUrl: string, repoName: string) => void;
+  onForkByUrl: () => void;
   isCloning: boolean;
 
   prOwnerRepo: { owner: string; repo: string } | null;

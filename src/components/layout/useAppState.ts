@@ -76,6 +76,76 @@ const normalizeRepoPointer = (value: string): string => (
     .toLowerCase()
 );
 
+type ParsedGithubRepoReference = {
+  host: string;
+  owner: string;
+  repo: string;
+};
+
+const normalizeGitHost = (value: string): string => {
+  const trimmed = String(value || '').trim().toLowerCase();
+  if (!trimmed) return 'github.com';
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  return withoutProtocol.startsWith('www.') ? withoutProtocol.slice(4) : withoutProtocol;
+};
+
+const deriveRepoNameFromCloneSource = (cloneSource: string): string => {
+  const normalizedSource = String(cloneSource || '').trim();
+  if (!normalizedSource) return 'repository';
+
+  const withoutProtocol = normalizedSource.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  const normalizedPath = withoutProtocol
+    .replace(/^git@[^:]+:/i, '')
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .replace(/\.git$/i, '');
+  const lastSegment = normalizedPath.split('/').pop() || 'repository';
+  return lastSegment || 'repository';
+};
+
+const isCloneSourceLikelyRemote = (cloneSource: string): boolean => {
+  const normalizedSource = String(cloneSource || '').trim();
+  if (!normalizedSource) return false;
+  return /^(https?:\/\/|ssh:\/\/|git@[^:]+:)/i.test(normalizedSource);
+};
+
+const parseGithubRepoReference = (cloneSource: string): ParsedGithubRepoReference | null => {
+  const normalizedSource = String(cloneSource || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  if (!normalizedSource) return null;
+
+  const fromHostAndPath = (hostRaw: string, pathRaw: string): ParsedGithubRepoReference | null => {
+    const host = normalizeGitHost(hostRaw);
+    const cleanedPath = String(pathRaw || '').replace(/^\/+/, '');
+    const segments = cleanedPath.split('/').filter(Boolean);
+    if (segments.length < 2) return null;
+
+    const owner = segments[0];
+    const repo = segments[1];
+    if (!owner || !repo) return null;
+    return { host, owner, repo };
+  };
+
+  const scpLikeMatch = normalizedSource.match(/^git@([^:]+):(.+)$/i);
+  if (scpLikeMatch) {
+    return fromHostAndPath(scpLikeMatch[1], scpLikeMatch[2]);
+  }
+
+  const sshLikeMatch = normalizedSource.match(/^ssh:\/\/(?:.+@)?([^/]+)\/(.+)$/i);
+  if (sshLikeMatch) {
+    return fromHostAndPath(sshLikeMatch[1], sshLikeMatch[2]);
+  }
+
+  try {
+    const parsed = new URL(normalizedSource);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return null;
+    }
+    return fromHostAndPath(parsed.host, parsed.pathname);
+  } catch {
+    return null;
+  }
+};
+
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [autoOpenConflictResolverPath, setAutoOpenConflictResolverPath] = useState<string | null>(null);
@@ -1325,6 +1395,196 @@ export const useAppState = () => {
     githubHost: settings.githubHost,
   });
 
+  const cloneFromRemoteSource = useCallback(async (
+    cloneSourceRaw: string,
+    targetNameRaw?: string,
+  ): Promise<boolean> => {
+    const cloneSource = String(cloneSourceRaw || '').trim();
+    if (!cloneSource) {
+      setGitActionToast({ msg: tr('Clone-Quelle fehlt.', 'Clone source is required.'), isError: true });
+      return false;
+    }
+    if (!isCloneSourceLikelyRemote(cloneSource)) {
+      setGitActionToast({
+        msg: tr(
+          'Bitte eine HTTP/HTTPS/SSH URL angeben (z.B. https://..., ssh://... oder git@host:owner/repo.git).',
+          'Please provide an HTTP/HTTPS/SSH URL (for example https://..., ssh://..., or git@host:owner/repo.git).',
+        ),
+        isError: true,
+      });
+      return false;
+    }
+
+    const targetName = String(targetNameRaw || '').trim();
+    return github.cloneRepository(cloneSource, {
+      repoName: deriveRepoNameFromCloneSource(cloneSource),
+      targetName: targetName || undefined,
+    });
+  }, [github, setGitActionToast, tr]);
+
+  const handleCloneByUrl = useCallback(() => {
+    setInputDialog({
+      title: tr('Repository per URL klonen', 'Clone repository from URL'),
+      message: tr(
+        'HTTP/HTTPS oder SSH URL eingeben und Zielordner waehlen.',
+        'Enter an HTTP/HTTPS or SSH URL and choose a target directory.',
+      ),
+      fields: [
+        {
+          id: 'cloneSource',
+          label: tr('Clone-URL', 'Clone URL'),
+          placeholder: 'https://github.com/owner/repo.git',
+          required: true,
+          validate: (value) => {
+            const normalized = String(value || '').trim();
+            if (!normalized) return null;
+            if (isCloneSourceLikelyRemote(normalized)) return null;
+            return tr(
+              'Bitte HTTP/HTTPS/SSH URL angeben (z.B. https://... oder git@host:owner/repo.git).',
+              'Please provide an HTTP/HTTPS/SSH URL (for example https://... or git@host:owner/repo.git).',
+            );
+          },
+        },
+        {
+          id: 'targetName',
+          label: tr('Ordnername (optional)', 'Folder name (optional)'),
+          placeholder: tr('Standard: Name aus URL', 'Default: name from URL'),
+          required: false,
+        },
+      ],
+      contextItems: [],
+      irreversible: false,
+      consequences: tr(
+        'Der Zielordner wird erstellt und das Repository lokal geklont.',
+        'A target folder will be created and the repository will be cloned locally.',
+      ),
+      confirmLabel: tr('Klonen', 'Clone'),
+      onSubmit: async (values) => {
+        const cloned = await cloneFromRemoteSource(values.cloneSource || '', values.targetName || '');
+        if (!cloned) return;
+        setGitActionToast({
+          msg: tr('Repository erfolgreich geklont.', 'Repository cloned successfully.'),
+          isError: false,
+        });
+      },
+    });
+  }, [cloneFromRemoteSource, setGitActionToast, setInputDialog, tr]);
+
+  const handleForkByUrl = useCallback(() => {
+    if (!window.electronAPI) return;
+    if (!github.isAuthenticated) {
+      workspace.setActiveTab('github');
+      setGitActionToast({
+        msg: tr('Bitte zuerst im GitHub-Tab anmelden.', 'Please sign in first in the GitHub tab.'),
+        isError: true,
+      });
+      return;
+    }
+
+    setInputDialog({
+      title: tr('GitHub-Repository forken', 'Fork GitHub repository'),
+      message: tr(
+        'GitHub Repository-URL eingeben. Der Fork wird erstellt und danach geklont.',
+        'Enter a GitHub repository URL. The fork will be created and then cloned.',
+      ),
+      fields: [
+        {
+          id: 'sourceUrl',
+          label: tr('Quell-URL', 'Source URL'),
+          placeholder: 'https://github.com/owner/repo',
+          required: true,
+          validate: (value) => {
+            const normalized = String(value || '').trim();
+            if (!normalized) return null;
+            return parseGithubRepoReference(normalized)
+              ? null
+              : tr(
+                'Bitte gueltige GitHub-URL angeben (https://..., ssh://... oder git@host:owner/repo.git).',
+                'Please provide a valid GitHub URL (https://..., ssh://..., or git@host:owner/repo.git).',
+              );
+          },
+        },
+        {
+          id: 'forkName',
+          label: tr('Fork-Name (optional)', 'Fork name (optional)'),
+          placeholder: tr('Standard: gleicher Name', 'Default: same name'),
+          required: false,
+        },
+      ],
+      contextItems: [
+        {
+          label: tr('GitHub Host', 'GitHub host'),
+          value: normalizeGitHost(settings.githubHost),
+        },
+      ],
+      irreversible: false,
+      consequences: tr(
+        'Ein Fork wird in deinem GitHub-Account erstellt und direkt lokal geklont.',
+        'A fork will be created in your GitHub account and cloned locally right away.',
+      ),
+      confirmLabel: tr('Forken & Klonen', 'Fork & clone'),
+      onSubmit: async (values) => {
+        const sourceUrl = String(values.sourceUrl || '').trim();
+        const parsed = parseGithubRepoReference(sourceUrl);
+        if (!parsed) {
+          setGitActionToast({
+            msg: tr('Ungueltige GitHub-URL.', 'Invalid GitHub URL.'),
+            isError: true,
+          });
+          return;
+        }
+
+        const configuredHost = normalizeGitHost(settings.githubHost);
+        if (parsed.host !== configuredHost) {
+          setGitActionToast({
+            msg: tr(
+              `Host passt nicht zum aktiven GitHub-Host (${configuredHost}).`,
+              `Host does not match the active GitHub host (${configuredHost}).`,
+            ),
+            isError: true,
+          });
+          return;
+        }
+
+        const requestedForkName = String(values.forkName || '').trim();
+        const forkResult = await window.electronAPI.githubForkRepo({
+          owner: parsed.owner,
+          repo: parsed.repo,
+          name: requestedForkName || undefined,
+        });
+
+        if (!forkResult.success) {
+          setGitActionToast({
+            msg: forkResult.error || tr('Fork konnte nicht erstellt werden.', 'Could not create fork.'),
+            isError: true,
+          });
+          return;
+        }
+
+        setGitActionToast({
+          msg: tr(
+            `Fork erstellt: ${forkResult.data.fullName}. Starte Clone...`,
+            `Fork created: ${forkResult.data.fullName}. Starting clone...`,
+          ),
+          isError: false,
+        });
+
+        const cloneSuccess = await github.cloneRepository(forkResult.data.cloneUrl, {
+          repoName: forkResult.data.name,
+        });
+        if (!cloneSuccess) {
+          setGitActionToast({
+            msg: tr(
+              'Fork erstellt, aber Clone fehlgeschlagen. Bitte Clone erneut starten.',
+              'Fork created, but clone failed. Please retry cloning.',
+            ),
+            isError: true,
+          });
+        }
+      },
+    });
+  }, [github, setGitActionToast, setInputDialog, settings.githubHost, tr, workspace]);
+
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
     isAuthenticated: github.isAuthenticated,
@@ -1821,6 +2081,8 @@ export const useAppState = () => {
     cloneFinished: github.cloneFinished,
     cloneError: github.cloneError,
     handleClone: github.handleClone,
+    handleCloneByUrl,
+    handleForkByUrl,
 
     prOwnerRepo: pullRequestDomain.prOwnerRepo,
     prFilter: pullRequestDomain.prFilter,
