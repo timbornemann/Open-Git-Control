@@ -1,17 +1,18 @@
 ﻿import React from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { DownloadCloud, Plus, RefreshCw } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
 type SidebarHeaderProps = Pick<
   AppSidebarProps,
-  'activeTab' | 'activeRepo' | 'onOpenFolder' | 'onRefreshRemoteQuick' | 'remoteSync' | 'isGitActionRunning'
+  'activeTab' | 'activeRepo' | 'onOpenFolder' | 'onCloneByUrl' | 'onRefreshRemoteQuick' | 'remoteSync' | 'isGitActionRunning'
 >;
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   activeTab,
   activeRepo,
   onOpenFolder,
+  onCloneByUrl,
   onRefreshRemoteQuick,
   remoteSync,
   isGitActionRunning,
@@ -41,6 +42,14 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             title={tr('Repository hinzufügen', 'Add repository')}
           >
             <Plus size={16} />
+          </button>
+          <button
+            className="icon-btn"
+            style={{ padding: '4px' }}
+            onClick={onCloneByUrl}
+            title={tr('Repository per URL klonen', 'Clone repository from URL')}
+          >
+            <DownloadCloud size={16} />
           </button>
         </div>
       )}

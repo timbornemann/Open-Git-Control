@@ -12,6 +12,7 @@ type Props = {
   onSwitchRepo: (repoPath: string) => void;
   onCloseRepo: (repoPath: string) => void;
   onOpenFolder: () => void;
+  onCloneByUrl: () => void;
   onTogglePin: (repoPath: string) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
@@ -26,6 +27,7 @@ export const RepoList: React.FC<Props> = ({
   onSwitchRepo,
   onCloseRepo,
   onOpenFolder,
+  onCloneByUrl,
   onTogglePin,
   collapsed,
   onToggleCollapsed,
@@ -182,6 +184,24 @@ export const RepoList: React.FC<Props> = ({
                 {tr('Kein Repository ge\u00f6ffnet.', 'No repository opened.')}
                 <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
                   {tr('Repository \u00f6ffnen', 'Open repository')}
+                </button>
+                <button
+                  onClick={onCloneByUrl}
+                  style={{
+                    marginTop: '8px',
+                    display: 'block',
+                    width: '100%',
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--bg-panel)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {tr('Repository per URL klonen', 'Clone repository from URL')}
                 </button>
               </div>
             )}
