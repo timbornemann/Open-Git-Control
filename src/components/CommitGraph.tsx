@@ -230,6 +230,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     };
   }, [layout, repoPath, syncViewportMetrics]);
 
+  useLayoutEffect(() => {
+    const container = logContainerRef.current?.parentElement;
+    if (!container) return;
+
+    // Hard reset viewport metrics on repository switch so virtualization always
+    // starts from the newest commit row at the top.
+    container.scrollTop = 0;
+    setScrollTop(0);
+    const nextHeight = container.clientHeight;
+    if (nextHeight > 0) {
+      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
+    }
+  }, [repoPath]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(FORENSIC_PATH_HISTORY_STORAGE_KEY);
