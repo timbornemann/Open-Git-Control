@@ -54,7 +54,7 @@ Mit der App kannst du:
 - Reflog-basiertes Recovery direkt in der App ausfuehren
 - staged/unstaged/untracked Aenderungen inkl. Stash und Hunk-Aktionen bearbeiten
 - Merge-/Rebase-Konflikte in einem integrierten Conflict Resolver loesen
-- GitHub-Repos klonen, PRs erstellen/mergen, CI-Status sehen und Releases bauen
+- Repositories per HTTP/SSH URL klonen, GitHub-Repositories per URL forken, PRs erstellen/mergen, CI-Status sehen und Releases bauen
 - AI Auto-Commit und AI Release Notes mit Ollama oder Gemini nutzen
 - vor Pushes automatisch Secret-Scans durchfuehren
 
@@ -204,6 +204,8 @@ Mit der App kannst du:
 - Gespeicherte Login-Session mit Auto-Reconnect
 - GitHub-Repoliste mit Suche, Pagination und Refresh
 - Clone-Workflow mit Progress-Modal
+- Beliebige Remote-Repositories per HTTP/HTTPS/SSH URL klonen
+- Beliebige GitHub-Repositories per URL forken (und den Fork lokal klonen)
 - Erkennung, ob ein GitHub-Repo lokal bereits vorhanden ist
 - Lokales Repo ohne `origin` direkt als neues GitHub-Repo erstellen und verbinden
 
