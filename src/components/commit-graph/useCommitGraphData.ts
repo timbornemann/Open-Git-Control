@@ -60,6 +60,7 @@ export const useCommitGraphData = ({
   const autoLoadArmedRef = useRef(true);
   const lastRepoPathRef = useRef<string | null>(null);
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
+  const forceScrollToTopOnNextResetRef = useRef(false);
 
   useEffect(() => {
     onRepoClearedRef.current = onRepoCleared;
@@ -80,6 +81,7 @@ export const useCommitGraphData = ({
 
     const shouldShowLoadingState = !layoutRef.current;
     const scrollContainer = logContainerRef.current?.parentElement ?? null;
+    const forceTopOnReset = !isAppend && !isSync && forceScrollToTopOnNextResetRef.current;
     const requestedLimitRaw = isAppend
       ? LOG_PAGE_SIZE
       : isSync
@@ -99,9 +101,12 @@ export const useCommitGraphData = ({
         setLoadingMore(true);
       }
     } else {
-      pendingScrollTopRef.current = scrollContainer ? scrollContainer.scrollTop : null;
+      pendingScrollTopRef.current = forceTopOnReset ? 0 : (scrollContainer ? scrollContainer.scrollTop : null);
       pendingScrollHeightRef.current = null;
       pendingScrollModeRef.current = 'reset';
+      if (forceTopOnReset) {
+        forceScrollToTopOnNextResetRef.current = false;
+      }
       if (shouldShowLoadingState) {
         setLoading(true);
       }
@@ -206,6 +211,7 @@ export const useCommitGraphData = ({
       lastRepoPathRef.current = null;
       lastSecondaryHistoryRef.current = showSecondaryHistory;
       pendingScrollModeRef.current = null;
+      forceScrollToTopOnNextResetRef.current = false;
       onRepoClearedRef.current?.();
       return;
     }
@@ -214,6 +220,9 @@ export const useCommitGraphData = ({
     const historyModeChanged = lastSecondaryHistoryRef.current !== showSecondaryHistory;
     lastRepoPathRef.current = repoPath;
     lastSecondaryHistoryRef.current = showSecondaryHistory;
+    if (repoChanged) {
+      forceScrollToTopOnNextResetRef.current = true;
+    }
 
     const mode: RefreshMode = repoChanged || historyModeChanged || !layoutRef.current || commitCountRef.current === 0
       ? 'reset'
