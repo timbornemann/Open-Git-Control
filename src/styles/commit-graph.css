@@ -98,7 +98,7 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 6px 0 6px 4px;
+  padding: 3px 0 3px 4px;
 }
 
 .commit-main {
@@ -107,12 +107,12 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .commit-subject-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, auto);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -137,7 +137,7 @@
 
 .commit-meta {
   --commit-author-width: 120px;
-  --commit-stats-width: 92px;
+  --commit-stats-width: 118px;
   --commit-date-width: 88px;
   display: grid;
   grid-template-columns: var(--commit-author-width) var(--commit-stats-width) var(--commit-date-width);
@@ -167,7 +167,11 @@
   border: 1px solid var(--status-info-border);
   border-radius: 999px;
   padding: 1px 7px;
+  width: var(--commit-stats-width);
   min-width: var(--commit-stats-width);
+  max-width: var(--commit-stats-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -186,19 +190,23 @@
 .commit-refs {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   min-width: 0;
+  overflow: hidden;
 }
 
 .branch-label {
   font-size: 0.7rem;
   font-weight: 600;
-  padding: 2px 6px;
+  padding: 1px 6px;
+  line-height: 1.05;
   border-radius: 999px;
   background-color: var(--accent-secondary-soft);
   color: var(--text-accent);
   border: 1px solid var(--accent-secondary-border);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .branch-label.branch-toggle {
