@@ -469,8 +469,42 @@ export const MainView: React.FC = () => {
                 initialConflictPath={activeConflictPath}
                 settings={settings}
               />
-            ) : activeDiffRequest ? (
-              <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={closeInspector} onRepoChanged={triggerRefresh} />
+            ) : activeDiffRequest || (!showGithubGuide && !showRecoveryCenter) ? (
+              <>
+                <div
+                  aria-hidden={activeDiffRequest ? true : undefined}
+                  style={{
+                    display: activeDiffRequest ? 'none' : 'block',
+                    height: '100%',
+                    overflow: 'auto',
+                  }}
+                >
+                  <CommitGraph
+                    repoPath={activeRepo}
+                    selectedHash={selectedCommit}
+                    navigationRequest={commitNavigationRequest}
+                    onSelectCommit={handleSelectCommitDirect}
+                    refreshTrigger={refreshTrigger}
+                    commitRefreshTrigger={commitRefreshTrigger}
+                    showSecondaryHistory={showSecondaryHistory}
+                    onOpenDiff={handleOpenDiff}
+                    showRecoveryCenter={showRecoveryCenter}
+                    onToggleRecoveryCenter={handleToggleRecoveryCenter}
+                    currentBranch={currentBranch}
+                    branches={branches}
+                    onMergeBranch={onMergeBranch}
+                    onOpenConflictResolverForPath={onOpenConflictResolverForPath}
+                  />
+                </div>
+                {activeDiffRequest && (
+                  <DiffViewer
+                    repoPath={activeRepo}
+                    request={activeDiffRequest}
+                    onClose={closeInspector}
+                    onRepoChanged={triggerRefresh}
+                  />
+                )}
+              </>
             ) : showGithubGuide ? (
               <GithubAuthGuide
                 method={selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>}
@@ -482,24 +516,7 @@ export const MainView: React.FC = () => {
                 onRepoChanged={triggerRefresh}
                 settings={settings}
               />
-            ) : (
-              <CommitGraph
-                repoPath={activeRepo}
-                selectedHash={selectedCommit}
-                navigationRequest={commitNavigationRequest}
-                onSelectCommit={handleSelectCommitDirect}
-                refreshTrigger={refreshTrigger}
-                commitRefreshTrigger={commitRefreshTrigger}
-                showSecondaryHistory={showSecondaryHistory}
-                onOpenDiff={handleOpenDiff}
-                showRecoveryCenter={showRecoveryCenter}
-                onToggleRecoveryCenter={handleToggleRecoveryCenter}
-                currentBranch={currentBranch}
-                branches={branches}
-                onMergeBranch={onMergeBranch}
-                onOpenConflictResolverForPath={onOpenConflictResolverForPath}
-              />
-            )}
+            ) : null}
           </div>
         </div>
 
