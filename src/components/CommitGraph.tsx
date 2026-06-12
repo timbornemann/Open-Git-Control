@@ -8,6 +8,7 @@ import {
   parseRemoteBranchRef,
   parseGitLog,
   resolveConflictPathAfterGitFailure,
+  type GitStatusDetailed,
 } from '../utils/gitParsing';
 import { validateBranchName } from '../utils/gitRefValidation';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
@@ -38,6 +39,8 @@ interface CommitGraphProps {
   onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
   /** Wenn ein Git-Befehl hier direkt fehlschlaegt (nicht ueber runGitCommand), Konflikt-Resolver oeffnen */
   onOpenConflictResolverForPath?: (path: string) => void;
+  workingTreeStatus?: GitStatusDetailed | null;
+  onRefreshWorkingTree?: () => Promise<void>;
 }
 
 const ROW_HEIGHT = 44;
@@ -111,6 +114,155 @@ const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
   return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
 });
 
+const resolveHighlightableBranchRef = (ref: string): string | null => {
+  const target = mergeTargetFromDecoratedRef(ref);
+  if (!target) return null;
+  const normalized = normalizeBranchRefForMerge(target.trim());
+  if (!normalized || normalized.endsWith('/HEAD')) return null;
+  return normalized;
+};
+
+const graphEdgeKey = (edge: GraphEdge) => (
+  `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`
+);
+
+const buildGraphHighlightData = (
+  layout: ReturnType<typeof useCommitGraphData>['layout'],
+  currentBranch: string,
+  selectedHash: string | null | undefined,
+  highlightedBranchRef: string | null,
+) => {
+  const nodes = layout?.nodes || [];
+  const nodeByHash = new Map(nodes.map((node) => [node.commit.hash, node]));
+  const headNode = nodes.find((node) => (
+    node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')
+  )) ?? nodes[0];
+  const reachableFromHead = new Set<string>();
+
+  if (headNode) {
+    const stack = [headNode.commit.hash];
+    while (stack.length > 0) {
+      const hash = stack.pop();
+      if (!hash || reachableFromHead.has(hash)) continue;
+      reachableFromHead.add(hash);
+      const currentNode = nodeByHash.get(hash);
+      if (!currentNode) continue;
+      currentNode.commit.parentHashes.forEach((parentHash) => {
+        if (nodeByHash.has(parentHash) && !reachableFromHead.has(parentHash)) {
+          stack.push(parentHash);
+        }
+      });
+    }
+  }
+
+  const branchTipByRef = new Map<string, GraphNode>();
+  for (const node of nodes) {
+    for (const ref of node.commit.refs) {
+      const target = resolveHighlightableBranchRef(ref);
+      if (!target || branchTipByRef.has(target)) continue;
+      branchTipByRef.set(target, node);
+    }
+  }
+
+  const headArrow = headNode?.commit.refs.find((ref) => ref.startsWith('HEAD ->'));
+  const headBranchFromGraph = headArrow ? resolveHighlightableBranchRef(headArrow) || '' : '';
+  const normalizedCurrentBranch = normalizeBranchRefForMerge((headBranchFromGraph || currentBranch).trim());
+  const buildFirstParentPath = (startNode: GraphNode | undefined) => {
+    const path = new Set<string>();
+    let cursor = startNode;
+    while (cursor && !path.has(cursor.commit.hash)) {
+      path.add(cursor.commit.hash);
+      const firstParent = cursor.commit.parentHashes[0];
+      if (!firstParent) break;
+      cursor = nodeByHash.get(firstParent);
+    }
+    return path;
+  };
+
+  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
+    ? highlightedBranchRef
+    : null;
+  const defaultHighlightedBranch = normalizedCurrentBranch && branchTipByRef.has(normalizedCurrentBranch)
+    ? normalizedCurrentBranch
+    : null;
+  const activeHighlightedBranch = manualHighlightedBranch ?? defaultHighlightedBranch;
+  const currentPathHashes = activeHighlightedBranch
+    ? buildFirstParentPath(branchTipByRef.get(activeHighlightedBranch))
+    : new Set<string>();
+  const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
+  const selectedBranchTarget = selectedNode
+    ? sortRefs(selectedNode.commit.refs)
+      .map(resolveHighlightableBranchRef)
+      .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
+    : undefined;
+
+  const inferTipForSelectedCommit = (hash: string) => {
+    let best: { tip: GraphNode; distance: number } | null = null;
+    for (const tip of branchTipByRef.values()) {
+      let cursor: GraphNode | undefined = tip;
+      let distance = 0;
+      const visited = new Set<string>();
+      while (cursor && !visited.has(cursor.commit.hash)) {
+        visited.add(cursor.commit.hash);
+        if (cursor.commit.hash === hash) {
+          if (!best || distance < best.distance) best = { tip, distance };
+          break;
+        }
+        const firstParent = cursor.commit.parentHashes[0];
+        if (!firstParent) break;
+        cursor = nodeByHash.get(firstParent);
+        distance += 1;
+      }
+    }
+    return best?.tip;
+  };
+  const selectedPathStartNode = selectedBranchTarget
+    ? branchTipByRef.get(selectedBranchTarget)
+    : selectedNode
+      ? (inferTipForSelectedCommit(selectedNode.commit.hash) ?? selectedNode)
+      : undefined;
+  const selectedPathHashes = buildFirstParentPath(selectedPathStartNode);
+  const hasCurrentPathHighlight = currentPathHashes.size > 0;
+  const hasSelectedPathHighlight = selectedPathHashes.size > 0;
+  const currentPathColor = headNode && hasCurrentPathHighlight
+    ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
+    : headNode?.color ?? 'var(--accent-primary)';
+  const selectedPathColor = hasSelectedPathHighlight
+    ? (selectedPathStartNode?.color ?? currentPathColor)
+    : currentPathColor;
+  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
+    const keys = new Set<string>();
+    if (!layout || pathHashes.size === 0) return keys;
+    for (const edge of layout.edges) {
+      if (edge.toRow < 0 || edge.toRow >= nodes.length) continue;
+      const fromNode = nodes[edge.fromRow];
+      const toNode = nodes[edge.toRow];
+      if (!fromNode || !toNode) continue;
+      if (!pathHashes.has(fromNode.commit.hash) || !pathHashes.has(toNode.commit.hash)) continue;
+      if (fromNode.commit.parentHashes[0] !== toNode.commit.hash) continue;
+      keys.add(graphEdgeKey(edge));
+    }
+    return keys;
+  };
+
+  return {
+    nodeByHash,
+    headNode,
+    reachableFromHead,
+    branchTipByRef,
+    activeHighlightedBranch,
+    currentPathHashes,
+    selectedPathHashes,
+    hasCurrentPathHighlight,
+    hasSelectedPathHighlight,
+    hasAnyPathHighlight: hasCurrentPathHighlight || hasSelectedPathHighlight,
+    currentPathColor,
+    selectedPathColor,
+    currentPathEdgeKeys: buildPathEdgeKeys(currentPathHashes),
+    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes),
+  };
+};
+
 export const CommitGraph: React.FC<CommitGraphProps> = ({
   repoPath,
   onSelectCommit,
@@ -126,6 +278,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   branches = [],
   onMergeBranch,
   onOpenConflictResolverForPath,
+  workingTreeStatus: externalWorkingTreeStatus,
+  onRefreshWorkingTree,
 }) => {
   const { locale, tr } = useI18n();
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -182,6 +336,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     refreshCommits,
     loadMoreCommits,
     refreshWorkingTreeStatus,
+    requestCommitStats,
   } = useCommitGraphData({
     repoPath,
     showSecondaryHistory,
@@ -189,6 +344,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     commitRefreshTrigger,
     logContainerRef,
     onRepoCleared: handleRepoCleared,
+    externalWorkingTreeStatus,
+    onRefreshWorkingTree,
   });
 
   const syncViewportMetrics = useCallback((container: HTMLElement) => {
@@ -250,6 +407,25 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
     }
   }, [repoPath]);
+
+  useEffect(() => {
+    if (!selectedHash) return;
+    void requestCommitStats([selectedHash], 'selected');
+  }, [requestCommitStats, selectedHash]);
+
+  useEffect(() => {
+    if (!layout) return;
+    const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 20);
+    const end = Math.min(
+      layout.nodes.length,
+      Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + 20,
+    );
+    const hashes = layout.nodes
+      .slice(start, end)
+      .filter((node) => node.commit.statsState === 'missing' || node.commit.statsState === 'error')
+      .map((node) => node.commit.hash);
+    if (hashes.length > 0) void requestCommitStats(hashes, 'visible');
+  }, [containerHeight, layout, requestCommitStats, scrollTop]);
 
   useEffect(() => {
     if (!navigationRequest || !layout) return;
@@ -1024,6 +1200,66 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     return `${files}f +${additions} -${deletions}`;
   };
 
+  const hasWorkingTreeChanges = Boolean(
+    workingTreeStatus &&
+    (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0)
+  );
+  const workingTreeRowOffset = hasWorkingTreeChanges ? 1 : 0;
+  const visibleWindow = useMemo(() => {
+    if (!layout) {
+      return {
+        visibleStartIdx: 0,
+        visibleEndIdx: 0,
+        visibleNodes: [] as GraphNode[],
+        visibleEdges: [] as GraphEdge[],
+      };
+    }
+
+    const overscan = 8;
+    const visibleStartIdx = Math.max(
+      0,
+      Math.floor(scrollTop / ROW_HEIGHT - workingTreeRowOffset) - overscan,
+    );
+    const visibleEndIdx = Math.min(
+      layout.nodes.length,
+      Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT - workingTreeRowOffset) + overscan,
+    );
+    return {
+      visibleStartIdx,
+      visibleEndIdx,
+      visibleNodes: layout.nodes.slice(visibleStartIdx, visibleEndIdx),
+      visibleEdges: layout.edges.filter(
+        (edge) => (
+          Math.min(edge.fromRow, edge.toRow) <= visibleEndIdx &&
+          Math.max(edge.fromRow, edge.toRow) >= visibleStartIdx
+        ),
+      ),
+    };
+  }, [containerHeight, layout, scrollTop, workingTreeRowOffset]);
+  const highlightData = useMemo(
+    () => buildGraphHighlightData(layout, currentBranch, selectedHash, highlightedBranchRef),
+    [currentBranch, highlightedBranchRef, layout, selectedHash],
+  );
+  const {
+    visibleStartIdx,
+    visibleEndIdx,
+    visibleNodes,
+    visibleEdges,
+  } = visibleWindow;
+  const {
+    headNode: memoizedHeadNode,
+    reachableFromHead,
+    branchTipByRef,
+    activeHighlightedBranch,
+    currentPathHashes,
+    selectedPathHashes,
+    hasAnyPathHighlight,
+    currentPathColor,
+    selectedPathColor,
+    currentPathEdgeKeys,
+    selectedPathEdgeKeys,
+  } = highlightData;
+
   if (!repoPath) {
     return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
   }
@@ -1049,29 +1285,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     );
   }
 
-  const hasWorkingTreeChanges = Boolean(
-    workingTreeStatus &&
-    (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0)
-  );
-  const workingTreeRowOffset = hasWorkingTreeChanges ? 1 : 0;
+  const headNode = memoizedHeadNode as GraphNode;
   const graphWidth = Math.max((layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2, 60);
   const totalHeight = (layout.nodes.length + workingTreeRowOffset) * ROW_HEIGHT;
   const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
-
-  const OVERSCAN = 8;
-  const visibleStartIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT - workingTreeRowOffset) - OVERSCAN);
-  const visibleEndIdx = Math.min(layout.nodes.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT - workingTreeRowOffset) + OVERSCAN);
-  const visibleNodes = layout.nodes.slice(visibleStartIdx, visibleEndIdx);
   const topSpacerHeight = visibleStartIdx * ROW_HEIGHT;
   const bottomSpacerHeight = Math.max(0, (layout.nodes.length - visibleEndIdx) * ROW_HEIGHT);
-  const visibleEdges = layout.edges.filter(
-    (e) => Math.min(e.fromRow, e.toRow) <= visibleEndIdx && Math.max(e.fromRow, e.toRow) >= visibleStartIdx
-  );
-  const nodeByHash = new Map(layout.nodes.map(node => [node.commit.hash, node]));
-  const headNode = layout.nodes.find(node => (
-    node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
-  )) ?? layout.nodes[0];
-  const reachableFromHead = new Set<string>();
   const workingTreeLabel = !workingTreeStatus ? ''
     : workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0
       ? 'Uncommitted Changes'
@@ -1079,114 +1298,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const workingTreeCount = !workingTreeStatus ? 0
     : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
-
-  const resolveHighlightableBranchRef = (ref: string): string | null => {
-    const target = mergeTargetFromDecoratedRef(ref);
-    if (!target) return null;
-    const normalized = normalizeBranchRefForMerge(target.trim());
-    if (!normalized || normalized.endsWith('/HEAD')) return null;
-    return normalized;
-  };
-
-  if (headNode) {
-    const stack = [headNode.commit.hash];
-    while (stack.length > 0) {
-      const hash = stack.pop();
-      if (!hash || reachableFromHead.has(hash)) continue;
-      reachableFromHead.add(hash);
-      const currentNode = nodeByHash.get(hash);
-      if (!currentNode) continue;
-      currentNode.commit.parentHashes.forEach(parentHash => {
-        if (nodeByHash.has(parentHash) && !reachableFromHead.has(parentHash)) {
-          stack.push(parentHash);
-        }
-      });
-    }
-  }
-
-  const branchTipByRef = new Map<string, GraphNode>();
-  for (const node of layout.nodes) {
-    for (const ref of node.commit.refs) {
-      const target = resolveHighlightableBranchRef(ref);
-      if (!target || branchTipByRef.has(target)) continue;
-      branchTipByRef.set(target, node);
-    }
-  }
-
-  const headBranchFromGraph = (() => {
-    const headArrow = headNode.commit.refs.find(ref => ref.startsWith('HEAD ->'));
-    if (!headArrow) return '';
-    return resolveHighlightableBranchRef(headArrow) || '';
-  })();
-  const normalizedCurrentBranch = normalizeBranchRefForMerge((headBranchFromGraph || currentBranch).trim());
-
-  const buildFirstParentPath = (startNode: GraphNode | undefined) => {
-    const path = new Set<string>();
-    let cursor = startNode;
-    while (cursor && !path.has(cursor.commit.hash)) {
-      path.add(cursor.commit.hash);
-      const firstParent = cursor.commit.parentHashes[0];
-      if (!firstParent) break;
-      cursor = nodeByHash.get(firstParent);
-    }
-    return path;
-  };
-
-  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
-    ? highlightedBranchRef
-    : null;
-  const defaultHighlightedBranch = normalizedCurrentBranch && branchTipByRef.has(normalizedCurrentBranch)
-    ? normalizedCurrentBranch
-    : null;
-  const activeHighlightedBranch = manualHighlightedBranch ?? defaultHighlightedBranch;
-  const currentPathHashes = activeHighlightedBranch
-    ? buildFirstParentPath(branchTipByRef.get(activeHighlightedBranch))
-    : new Set<string>();
-
-  const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
-  const selectedBranchTarget = selectedNode
-    ? sortRefs(selectedNode.commit.refs)
-      .map(resolveHighlightableBranchRef)
-      .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
-    : undefined;
-  const inferTipForSelectedCommit = (hash: string) => {
-    let best: { tip: GraphNode; distance: number } | null = null;
-    for (const tip of branchTipByRef.values()) {
-      let cursor: GraphNode | undefined = tip;
-      let distance = 0;
-      const visited = new Set<string>();
-      while (cursor && !visited.has(cursor.commit.hash)) {
-        visited.add(cursor.commit.hash);
-        if (cursor.commit.hash === hash) {
-          if (!best || distance < best.distance) {
-            best = { tip, distance };
-          }
-          break;
-        }
-        const firstParent = cursor.commit.parentHashes[0];
-        if (!firstParent) break;
-        cursor = nodeByHash.get(firstParent);
-        distance++;
-      }
-    }
-    return best?.tip;
-  };
-  const selectedPathStartNode = selectedBranchTarget
-    ? branchTipByRef.get(selectedBranchTarget)
-    : selectedNode
-      ? (inferTipForSelectedCommit(selectedNode.commit.hash) ?? selectedNode)
-      : undefined;
-  const selectedPathHashes = buildFirstParentPath(selectedPathStartNode);
-
-  const hasCurrentPathHighlight = currentPathHashes.size > 0;
-  const hasSelectedPathHighlight = selectedPathHashes.size > 0;
-  const hasAnyPathHighlight = hasCurrentPathHighlight || hasSelectedPathHighlight;
-  const currentPathColor = hasCurrentPathHighlight
-    ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
-    : headNode.color;
-  const selectedPathColor = hasSelectedPathHighlight
-    ? (selectedPathStartNode?.color ?? currentPathColor)
-    : currentPathColor;
 
   const buildEdgePath = (edge: GraphEdge): string => {
     const x1 = laneX(edge.fromLane);
@@ -1210,28 +1321,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   };
 
   const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
-  const edgeKey = (edge: GraphEdge) => `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`;
-
-  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
-    const keys = new Set<string>();
-    if (pathHashes.size === 0) return keys;
-    for (const edge of layout.edges) {
-      if (edge.toRow < 0 || edge.toRow >= layout.nodes.length) continue;
-      const fromNode = layout.nodes[edge.fromRow];
-      const toNode = layout.nodes[edge.toRow];
-      if (!fromNode || !toNode) continue;
-      if (!pathHashes.has(fromNode.commit.hash)) continue;
-      if (!pathHashes.has(toNode.commit.hash)) continue;
-      if (fromNode.commit.parentHashes[0] !== toNode.commit.hash) continue;
-      keys.add(edgeKey(edge));
-    }
-    return keys;
-  };
-
-  const currentPathEdgeKeys = buildPathEdgeKeys(currentPathHashes);
-  const selectedPathEdgeKeys = buildPathEdgeKeys(selectedPathHashes);
-  const isEdgeOnCurrentPath = (edge: GraphEdge) => currentPathEdgeKeys.has(edgeKey(edge));
-  const isEdgeOnSelectedPath = (edge: GraphEdge) => selectedPathEdgeKeys.has(edgeKey(edge));
+  const isEdgeOnCurrentPath = (edge: GraphEdge) => currentPathEdgeKeys.has(graphEdgeKey(edge));
+  const isEdgeOnSelectedPath = (edge: GraphEdge) => selectedPathEdgeKeys.has(graphEdgeKey(edge));
 
   const getBaseEdgeStroke = (edge: GraphEdge) => {
     const fromNode = layout.nodes[edge.fromRow];
@@ -1695,8 +1786,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                     <span className="commit-subject">{node.commit.subject}</span>
                     <span className="commit-meta">
                       <span className="commit-author">{node.commit.author}</span>
-                      <span className="commit-stats" title={`${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`}>
-                        {formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)}
+                      <span
+                        className="commit-stats"
+                        title={node.commit.stats
+                          ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
+                          : tr('Commit-Statistiken werden im Hintergrund geladen.', 'Commit statistics are loading in the background.')}
+                      >
+                        {node.commit.stats
+                          ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)
+                          : '...'}
                       </span>
                       <span className="commit-date">{formatCommitDate(node.commit.date)}</span>
                     </span>

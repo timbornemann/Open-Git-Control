@@ -326,11 +326,71 @@ export interface SecretScanResultDto {
   };
 }
 
+export type CommitStatsStateDto = 'missing' | 'queued' | 'loading' | 'ready' | 'error';
+
+export interface CommitStatsDto {
+  files: number;
+  additions: number;
+  deletions: number;
+}
+
+export interface CommitLogPageDto {
+  raw: string;
+  hasMore: boolean;
+  stats: Record<string, CommitStatsDto>;
+  repoPath: string;
+}
+
+export interface CommitStatsUpdateDto {
+  repoPath: string;
+  hash: string;
+  stats: CommitStatsDto | null;
+  state: 'loading' | 'ready' | 'error';
+}
+
+export interface WorkingTreeSnapshotDto {
+  snapshotId: string;
+  repoPath: string;
+  statusRaw: string;
+  changeCount: number;
+  durationMs: number;
+  largeMode: boolean;
+}
+
+export interface WorkingTreeStatsDto {
+  snapshotId: string;
+  staged: CommitStatsDto;
+  unstaged: CommitStatsDto;
+}
+
+export interface DiffPreviewDto {
+  text: string;
+  truncated: boolean;
+  bytes: number;
+  lines: number;
+}
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
+  requestCommitStats: (
+    hashes: string[],
+    priority?: 'selected' | 'visible' | 'background',
+  ) => Promise<IpcResult<Record<string, { state: 'ready' | 'queued'; stats: CommitStatsDto | null }>>>;
+  onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
+  getWorkingTreeSnapshot: () => Promise<IpcResult<WorkingTreeSnapshotDto>>;
+  getWorkingTreeStats: (snapshotId: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
+  stagePaths: (paths: string[]) => Promise<IpcResult<string>>;
+  getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) => Promise<IpcResult<DiffPreviewDto>>;
+  getFileBlameRange: (
+    filePath: string,
+    commitHash: string | undefined,
+    startLine: number,
+    lineCount: number,
+  ) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onRepoUnavailable: (callback: (payload: { command: string; error: string }) => void) => () => void;
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -341,6 +401,7 @@ export interface ElectronAPI {
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
   scanPushSecrets: () => Promise<IpcResult<SecretScanResultDto>>;
+  cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;

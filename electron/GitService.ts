@@ -3,6 +3,7 @@ import * as util from 'util';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { GitJobKind, GitScheduler } from './GitScheduler';
 
 const execFileAsync = util.promisify(execFile);
 const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
@@ -35,16 +36,27 @@ const SERIALIZED_GIT_COMMANDS = new Set<string>([
   'clean',
   'apply',
   'submodule',
+  'fetch',
+  'pull',
+  'push',
 ]);
 
 export type CommitStats = { files: number; additions: number; deletions: number };
+export type DiffPreviewResult = {
+  text: string;
+  truncated: boolean;
+  bytes: number;
+  lines: number;
+};
 
 export class GitService {
   private repoPath: string | null = null;
   private repoIsBare: boolean | null = null;
-  private readonly repoExecutionQueue = new Map<string, Promise<void>>();
 
-  constructor(private readonly execFileAsyncRunner: ExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner) {}
+  constructor(
+    private readonly execFileAsyncRunner: ExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner,
+    private readonly scheduler: GitScheduler = new GitScheduler(),
+  ) {}
 
   setRepoPath(newPath: string) {
     const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
@@ -206,31 +218,6 @@ export class GitService {
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
   }
 
-  private getRepoQueueKey(repoPath: string): string {
-    const resolved = path.resolve(repoPath);
-    return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-  }
-
-  private async runSerializedPerRepo<T>(repoPath: string, task: () => Promise<T>): Promise<T> {
-    const queueKey = this.getRepoQueueKey(repoPath);
-    const previous = this.repoExecutionQueue.get(queueKey) || Promise.resolve();
-    let release: () => void = () => {};
-    const current = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.repoExecutionQueue.set(queueKey, current);
-
-    await previous.catch(() => undefined);
-    try {
-      return await task();
-    } finally {
-      release();
-      if (this.repoExecutionQueue.get(queueKey) === current) {
-        this.repoExecutionQueue.delete(queueKey);
-      }
-    }
-  }
-
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
@@ -241,6 +228,34 @@ export class GitService {
     const firstToken = String(args?.[0] || '').trim().toLowerCase();
     if (!firstToken) return false;
     return SERIALIZED_GIT_COMMANDS.has(firstToken);
+  }
+
+  private classifyCommand(args: string[], requestedKind?: GitJobKind): GitJobKind {
+    if (requestedKind) return requestedKind;
+    const primary = String(args[0] || '').trim().toLowerCase();
+    const secondary = String(args[1] || '').trim().toLowerCase();
+    if (primary === 'branch') {
+      return ['-d', '-D', '-m', '-M', '-c', '-C', '--delete', '--move', '--copy', '--edit-description']
+        .some((flag) => args.slice(1).includes(flag))
+        ? 'write'
+        : 'polling';
+    }
+    if (primary === 'remote') {
+      return ['add', 'remove', 'rename', 'set-url', 'set-head', 'update', 'prune']
+        .includes(secondary)
+        ? 'write'
+        : 'polling';
+    }
+    if (primary === 'tag') {
+      const isList = args.length === 1 || ['-l', '--list', '--contains', '--points-at'].includes(secondary);
+      return isList ? 'polling' : 'write';
+    }
+    if (primary === 'submodule' && secondary === 'status') return 'polling';
+    if (this.shouldSerializeCommand(args)) return 'write';
+    if (primary === 'status') return 'polling';
+    if (['rev-parse', 'for-each-ref', 'symbolic-ref'].includes(primary)) return 'polling';
+    if (primary === 'diff' && args.includes('--numstat')) return 'background';
+    return 'interactive';
   }
 
   private assertRepoPathAvailable(repoPath: string): void {
@@ -263,7 +278,13 @@ export class GitService {
     }
   }
 
-  private async execGit(repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv): Promise<string> {
+  private async execGit(
+    repoPath: string,
+    args: string[],
+    envOverrides?: NodeJS.ProcessEnv,
+    signal?: AbortSignal,
+    requestedKind?: GitJobKind,
+  ): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
 
     const env = envOverrides ? { ...process.env, ...envOverrides } : process.env;
@@ -271,16 +292,23 @@ export class GitService {
       cwd: repoPath,
       maxBuffer: 20 * 1024 * 1024,
       env,
+      signal,
     };
 
-    const executeWithRetries = async (): Promise<string> => {
+    const executeWithRetries = async (activeSignal: AbortSignal): Promise<string> => {
       let retryAttempt = 0;
+      const activeExecOptions = { ...execOptions, signal: activeSignal };
 
       while (true) {
         try {
-          const { stdout } = await this.execFileAsyncRunner('git', args, execOptions);
+          const { stdout } = await this.execFileAsyncRunner('git', args, activeExecOptions);
           return stdout.trimEnd();
         } catch (error: any) {
+          if (activeSignal.aborted || error?.name === 'AbortError' || error?.code === 'ABORT_ERR') {
+            const aborted = new Error('Git operation was aborted.');
+            aborted.name = 'AbortError';
+            throw aborted;
+          }
           // Repo can disappear between pre-check and spawn (race). Normalize that to REPO_UNAVAILABLE.
           if (error?.code === 'ENOENT' && !this.isRepoPathAccessible(repoPath)) {
             throw new Error('[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not accessible).');
@@ -313,11 +341,17 @@ export class GitService {
       }
     };
 
-    if (!this.shouldSerializeCommand(args)) {
-      return executeWithRetries();
-    }
-
-    return this.runSerializedPerRepo(repoPath, executeWithRetries);
+    const kind = this.classifyCommand(args, requestedKind);
+    return this.scheduler.schedule(
+      repoPath,
+      kind,
+      args[0] || 'git',
+      executeWithRetries,
+      {
+        signal,
+        coalesceKey: kind === 'polling' ? args.join('\0') : undefined,
+      },
+    );
   }
 
   /**
@@ -340,6 +374,18 @@ export class GitService {
       throw new Error('Repository path is required.');
     }
     return this.execGit(normalizedPath, args);
+  }
+
+  async runCommandAtPathWithSignal(repoPath: string, args: string[], signal: AbortSignal): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+    return this.execGit(normalizedPath, args, undefined, signal, 'background');
+  }
+
+  getSchedulerDiagnostics() {
+    return this.scheduler.getDiagnostics();
   }
 
   /**
@@ -368,6 +414,10 @@ export class GitService {
   async getStatusPorcelain(): Promise<string> {
     // -uall lists each untracked file individually instead of collapsing directories.
     return this.runCommand(['status', '--porcelain=v1', '--untracked-files=all']);
+  }
+
+  async getStatusPorcelainAtPath(repoPath: string): Promise<string> {
+    return this.runCommandAtPath(repoPath, ['status', '--porcelain=v1', '--untracked-files=all']);
   }
 
   /**
@@ -635,7 +685,7 @@ export class GitService {
     // Refs use GS (\x1d) as an explicit separator to avoid ambiguities.
     const format = this.getStructuredLogFormat();
     const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
-    const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso', '--numstat'];
+    const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso'];
 
     if (includeAll) {
       args.splice(1, 0, '--all');
@@ -744,6 +794,187 @@ export class GitService {
     }
     args.push('--', filePath);
     return this.runCommand(args);
+  }
+
+  async getFileBlameRange(
+    filePath: string,
+    commitHash: string | undefined,
+    startLine: number,
+    lineCount: number,
+  ): Promise<string> {
+    const safeStart = Number.isFinite(startLine) ? Math.max(1, Math.floor(startLine)) : 1;
+    const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 500)) : 500;
+    const endLine = safeStart + safeCount - 1;
+    const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
+    if (commitHash) {
+      args.push(commitHash);
+    }
+    args.push('--', filePath);
+    return this.runCommand(args);
+  }
+
+  async getCommitStatsAtPath(repoPath: string, hash: string, signal: AbortSignal): Promise<CommitStats> {
+    const normalizedHash = String(hash || '').trim();
+    if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) {
+      throw new Error('Invalid commit hash.');
+    }
+
+    const parentsRaw = await this.runCommandAtPathWithSignal(
+      repoPath,
+      ['rev-list', '--parents', '-n', '1', normalizedHash],
+      signal,
+    );
+    const parentHash = parentsRaw.trim().split(/\s+/)[1] || '';
+    const args = parentHash
+      ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-M', parentHash, normalizedHash]
+      : ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', '-M', normalizedHash];
+    const raw = await this.runCommandAtPathWithSignal(repoPath, args, signal);
+    const stats: CommitStats = { files: 0, additions: 0, deletions: 0 };
+
+    for (const line of raw.split(/\r?\n/)) {
+      const match = line.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+      if (!match) continue;
+      stats.files += 1;
+      if (match[1] !== '-') stats.additions += Number(match[1]);
+      if (match[2] !== '-') stats.deletions += Number(match[2]);
+    }
+    return stats;
+  }
+
+  async stagePaths(paths: string[]): Promise<string> {
+    const repoPath = this.ensureRepoPath();
+    const normalized = [...new Set(
+      paths
+        .map((filePath) => String(filePath || '').trim())
+        .filter(Boolean),
+    )];
+    if (normalized.length === 0) return '';
+
+    return this.scheduler.schedule(repoPath, 'write', 'add --pathspec-from-file=-', () => new Promise<string>((resolve, reject) => {
+      const proc = spawn(
+        'git',
+        ['add', '--pathspec-from-file=-', '--pathspec-file-nul'],
+        { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+      proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+      proc.on('error', reject);
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout.trimEnd());
+          return;
+        }
+        reject(new Error((stderr || stdout || `git add exited with code ${code}`).trim()));
+      });
+      proc.stdin.end(`${normalized.join('\0')}\0`);
+    }));
+  }
+
+  async getDiffPreview(
+    args: string[],
+    limits: { maxBytes?: number; maxLines?: number } = {},
+  ): Promise<DiffPreviewResult> {
+    const repoPath = this.ensureRepoPath();
+    const maxBytes = Math.max(64 * 1024, Math.min(limits.maxBytes || 2 * 1024 * 1024, 8 * 1024 * 1024));
+    const maxLines = Math.max(100, Math.min(limits.maxLines || 5000, 20_000));
+
+    return this.scheduler.schedule(repoPath, 'interactive', args[0] || 'diff', (signal) => new Promise<DiffPreviewResult>((resolve, reject) => {
+      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const chunks: Buffer[] = [];
+      let capturedBytes = 0;
+      let lineCount = 0;
+      let truncated = false;
+      let stderr = '';
+      signal.addEventListener('abort', () => proc.kill(), { once: true });
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        if (truncated) return;
+        const remainingBytes = maxBytes - capturedBytes;
+        if (remainingBytes <= 0) {
+          truncated = true;
+          proc.kill();
+          return;
+        }
+        const accepted = chunk.length > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
+        chunks.push(accepted);
+        capturedBytes += accepted.length;
+        lineCount += accepted.toString('utf8').split('\n').length - 1;
+        if (accepted.length < chunk.length || lineCount >= maxLines) {
+          truncated = true;
+          proc.kill();
+        }
+      });
+      proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+      proc.on('error', reject);
+      proc.on('close', (code, signal) => {
+        if (signal && !truncated) {
+          const error = new Error('Git diff preview was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
+        if (code !== 0 && !truncated && signal == null) {
+          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          return;
+        }
+        let text = Buffer.concat(chunks).toString('utf8');
+        if (lineCount >= maxLines) {
+          text = text.split('\n').slice(0, maxLines).join('\n');
+        }
+        resolve({
+          text,
+          truncated,
+          bytes: Buffer.byteLength(text),
+          lines: text ? text.split('\n').length : 0,
+        });
+      });
+    }));
+  }
+
+  async streamCommandLines(
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const repoPath = this.ensureRepoPath();
+    await this.scheduler.schedule(repoPath, 'interactive', args[0] || 'stream', (schedulerSignal) => new Promise<void>((resolve, reject) => {
+      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      let pending = '';
+      let stderr = '';
+      const abort = () => proc.kill();
+      schedulerSignal.addEventListener('abort', abort, { once: true });
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        pending += chunk.toString('utf8');
+        let newlineIndex = pending.indexOf('\n');
+        while (newlineIndex >= 0) {
+          onLine(pending.slice(0, newlineIndex).replace(/\r$/, ''));
+          pending = pending.slice(newlineIndex + 1);
+          newlineIndex = pending.indexOf('\n');
+        }
+      });
+      proc.stderr.on('data', (chunk: Buffer) => {
+        if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
+      });
+      proc.on('error', reject);
+      proc.on('close', (code, closeSignal) => {
+        schedulerSignal.removeEventListener('abort', abort);
+        if (schedulerSignal.aborted || closeSignal) {
+          const error = new Error('Git stream was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
+        if (code !== 0) {
+          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          return;
+        }
+        if (pending) onLine(pending.replace(/\r$/, ''));
+        resolve();
+      });
+    }), { signal });
   }
 
   private sanitizeCloneTargetName(value: string): string {

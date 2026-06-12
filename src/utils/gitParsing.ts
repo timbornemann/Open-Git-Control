@@ -10,7 +10,8 @@ export interface GitCommit {
     files: number;
     additions: number;
     deletions: number;
-  };
+  } | null;
+  statsState: 'missing' | 'queued' | 'loading' | 'ready' | 'error';
 }
 
 export interface GitStatus {
@@ -82,7 +83,8 @@ export function parseGitLog(logOutput: string): GitCommit[] {
         subject,
         parentHashes,
         refs,
-        stats: { files: 0, additions: 0, deletions: 0 },
+        stats: null,
+        statsState: 'missing',
       };
       continue;
     }
@@ -96,6 +98,10 @@ export function parseGitLog(logOutput: string): GitCommit[] {
 
     const additionsRaw = numstatMatch[1];
     const deletionsRaw = numstatMatch[2];
+    if (!current.stats) {
+      current.stats = { files: 0, additions: 0, deletions: 0 };
+    }
+    current.statsState = 'ready';
     current.stats.files += 1;
     if (additionsRaw !== '-') {
       current.stats.additions += Number(additionsRaw);

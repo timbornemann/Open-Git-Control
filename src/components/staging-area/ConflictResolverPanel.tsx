@@ -8,6 +8,7 @@ import type {
   ConflictEntry,
   ConflictResolutionChoice,
 } from './types';
+import { VirtualList } from '../VirtualList';
 
 type ConflictResolverPanelProps = {
   visibleConflicts: ConflictEntry[];
@@ -152,18 +153,24 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
       {onOpenConflictResolver && (
         <div className="conflict-sidebar-list">
-          {visibleConflicts.map((f) => (
-            <button
-              key={`sidebar-c-${f.path}`}
-              className="conflict-sidebar-file"
-              onClick={() => onOpenConflictResolver(f.path)}
-              title={f.path}
-            >
-              <span className="conflict-file-code">{f.code}</span>
-              <span className="conflict-file-path">{f.path}</span>
-              <span className="conflict-file-label">{conflictLabelForCode(f.code)}</span>
-            </button>
-          ))}
+          <VirtualList
+            items={visibleConflicts}
+            rowHeight={38}
+            maxHeight={342}
+            getKey={(file) => `sidebar-c-${file.path}`}
+            renderItem={(file) => (
+              <button
+                className="conflict-sidebar-file"
+                onClick={() => onOpenConflictResolver(file.path)}
+                title={file.path}
+                style={{ width: '100%', height: 36 }}
+              >
+                <span className="conflict-file-code">{file.code}</span>
+                <span className="conflict-file-path">{file.path}</span>
+                <span className="conflict-file-label">{conflictLabelForCode(file.code)}</span>
+              </button>
+            )}
+          />
         </div>
       )}
 
@@ -173,12 +180,17 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
           style={{ borderBottom: '1px solid var(--border-color)', ...(isConflictOnly ? {} : { minHeight: '360px' }) }}
         >
           <div className="conflict-file-list" style={{ borderRight: '1px solid var(--border-color)', background: 'var(--bg-panel)', overflowY: 'auto' }}>
-            {visibleConflicts.map((f) => {
-              const isActive = conflictEditor?.filePath === f.path;
-              const blocksForFile = blockCountForPath(f.path);
-              return (
+            <VirtualList
+              items={visibleConflicts}
+              rowHeight={62}
+              maxHeight={isConflictOnly ? 744 : 372}
+              overscan={8}
+              getKey={(file) => `c-${file.path}`}
+              renderItem={(file) => {
+                const isActive = conflictEditor?.filePath === file.path;
+                const blocksForFile = blockCountForPath(file.path);
+                return (
                 <button
-                  key={`c-${f.path}`}
                   className={`conflict-sidebar-file ${isActive ? 'active' : ''}`}
                   style={{
                     width: '100%',
@@ -195,20 +207,21 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                     alignItems: 'center',
                     borderLeft: isActive ? '3px solid var(--status-danger)' : '3px solid transparent',
                   }}
-                  onClick={() => { void openConflictEditor(f.path); }}
-                  title={f.path}
+                  onClick={() => { void openConflictEditor(file.path); }}
+                  title={file.path}
                 >
-                  <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{f.code}</span>
-                  <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{f.path}</span>
+                  <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{file.code}</span>
+                  <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{file.path}</span>
                   <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>
-                    {conflictLabelForCode(f.code)}
+                    {conflictLabelForCode(file.code)}
                     {blocksForFile > 0
                       ? tr(` - ${blocksForFile} Block${blocksForFile !== 1 ? 'e' : ''}`, ` - ${blocksForFile} block${blocksForFile !== 1 ? 's' : ''}`)
                       : (isConflictBlockCountPending ? ' - ...' : '')}
                   </span>
                 </button>
-              );
-            })}
+                );
+              }}
+            />
           </div>
 
           <div className="conflict-editor-panel" style={{ background: 'var(--bg-darker)' }}>

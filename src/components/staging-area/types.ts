@@ -1,4 +1,4 @@
-import type { AppSettingsDto } from '../../global';
+import type { AppSettingsDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../../global';
 import type { FileEntry, GitStatusDetailed } from '../../utils/gitParsing';
 import type { DialogContextItem } from '../Confirm';
 import type { InputDialogField } from '../Input';
@@ -14,6 +14,10 @@ export interface StagingAreaProps {
   viewMode?: 'default' | 'conflictOnly';
   initialConflictPath?: string | null;
   settings: AppSettingsDto;
+  workingTreeSnapshot?: WorkingTreeSnapshotDto | null;
+  workingTreeStatus?: GitStatusDetailed | null;
+  workingTreeStats?: WorkingTreeStatsDto | null;
+  onRefreshWorkingTree?: () => Promise<void>;
 }
 
 export type ConfirmDialogState = {

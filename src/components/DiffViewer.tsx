@@ -32,8 +32,8 @@ interface DiffViewerProps {
   onRepoChanged?: () => void;
 }
 
-const MAX_RENDER_CHARS = 200000;
-const MAX_RENDER_LINES = 2500;
+const MAX_RENDER_CHARS = 2 * 1024 * 1024;
+const MAX_RENDER_LINES = 5000;
 const MAX_SINGLE_LINE_LENGTH = 2000;
 const BINARY_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'ico', 'pdf', 'zip', 'gz', '7z', 'rar',
@@ -209,6 +209,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
   const [hunkOpError, setHunkOpError] = useState<string | null>(null);
+  const [sourceTruncated, setSourceTruncated] = useState(false);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const { tr } = useI18n();
 
@@ -248,24 +249,30 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
       setIsLoading(true);
       setError(null);
       setDiffText('');
+      setSourceTruncated(false);
       setActiveHunkIndex(0);
 
       try {
-        let result;
+        let args: string[];
         if (request.source === 'staged') {
-          result = await window.electronAPI.runGitCommand('diff', '--cached', '--', request.path);
+          args = ['diff', '--cached', '--', request.path];
         } else if (request.source === 'unstaged') {
-          result = await window.electronAPI.runGitCommand('diff', '--', request.path);
+          args = ['diff', '--', request.path];
         } else {
-          result = await window.electronAPI.runGitCommand('show', '--format=', '--binary', request.commitHash || '', '--', request.path);
+          args = ['show', '--format=', '--binary', request.commitHash || '', '--', request.path];
         }
+        const result = await window.electronAPI.getDiffPreview(args, {
+          maxBytes: MAX_RENDER_CHARS,
+          maxLines: MAX_RENDER_LINES,
+        });
 
         if (!result.success) {
           setError(result.error || tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
           return;
         }
 
-        setDiffText(String(result.data || ''));
+        setDiffText(result.data.text);
+        setSourceTruncated(result.data.truncated);
       } catch (fetchError: unknown) {
         console.error(fetchError);
         setError(tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
@@ -288,8 +295,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const isTooLarge = useMemo(() => {
     if (!diffText) return false;
     const lineCount = diffText.split('\n').length;
-    return diffText.length > MAX_RENDER_CHARS || lineCount > MAX_RENDER_LINES;
-  }, [diffText]);
+    return sourceTruncated || diffText.length > MAX_RENDER_CHARS || lineCount > MAX_RENDER_LINES;
+  }, [diffText, sourceTruncated]);
 
   const clippedDiffText = useMemo(() => {
     if (!diffText) return '';
@@ -464,13 +471,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
                   `Large diff: ${diffText.split('\n').length.toLocaleString()} lines – display truncated to ${MAX_RENDER_LINES.toLocaleString()} lines.`
                 )}
               </span>
-              <button
-                className="diff-large-warning-copy"
-                onClick={() => navigator.clipboard.writeText(diffText)}
-                title={tr('Vollständigen Diff in Zwischenablage kopieren', 'Copy full diff to clipboard')}
-              >
-                {tr('Vollständig kopieren', 'Copy full diff')}
-              </button>
+              {!sourceTruncated && (
+                <button
+                  className="diff-large-warning-copy"
+                  onClick={() => navigator.clipboard.writeText(diffText)}
+                  title={tr('Vollständigen Diff in Zwischenablage kopieren', 'Copy full diff to clipboard')}
+                >
+                  {tr('Vollständig kopieren', 'Copy full diff')}
+                </button>
+              )}
             </div>
           )}
 

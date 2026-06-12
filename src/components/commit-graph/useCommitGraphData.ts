@@ -10,13 +10,44 @@ import {
 } from '../../utils/gitParsing';
 import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
 
-const LOG_PAGE_SIZE = 200;
+const LOG_PAGE_SIZE = 100;
 const QUICK_REFRESH_LIMIT = 50;
 const LOG_MAX_LIMIT = 5000;
-const LOG_OVERFETCH_COUNT = 1;
 const AUTO_LOAD_TRIGGER_PX = 220;
 const AUTO_LOAD_RESET_PX = 420;
 type RefreshMode = 'reset' | 'append' | 'sync' | 'quick';
+
+type GraphCacheEntry = {
+  commits: GitCommit[];
+  hasMore: boolean;
+  touchedAt: number;
+};
+
+const graphCache = new Map<string, GraphCacheEntry>();
+
+const getGraphCacheKey = (repoPath: string, showSecondaryHistory: boolean) =>
+  `${repoPath.toLowerCase()}\0${showSecondaryHistory ? 'all' : 'head'}`;
+
+const storeGraphCache = (key: string, commits: GitCommit[], hasMore: boolean) => {
+  graphCache.set(key, {
+    commits: commits.slice(0, LOG_MAX_LIMIT),
+    hasMore,
+    touchedAt: Date.now(),
+  });
+  if (graphCache.size <= 8) return;
+  const oldest = [...graphCache.entries()].sort((a, b) => a[1].touchedAt - b[1].touchedAt)[0];
+  if (oldest) graphCache.delete(oldest[0]);
+};
+
+const applyCachedStats = (
+  commits: GitCommit[],
+  stats: Record<string, { files: number; additions: number; deletions: number }>,
+) => commits.map((commit) => {
+  const cached = stats[commit.hash];
+  return cached
+    ? { ...commit, stats: cached, statsState: 'ready' as const }
+    : commit;
+});
 
 const mergeUniqueCommits = (base: GitCommit[], incoming: GitCommit[]): GitCommit[] => {
   const out: GitCommit[] = [];
@@ -36,6 +67,8 @@ type Params = {
   commitRefreshTrigger?: number;
   logContainerRef: RefObject<HTMLDivElement>;
   onRepoCleared?: () => void;
+  externalWorkingTreeStatus?: GitStatusDetailed | null;
+  onRefreshWorkingTree?: () => Promise<void>;
 };
 
 export const useCommitGraphData = ({
@@ -45,6 +78,8 @@ export const useCommitGraphData = ({
   commitRefreshTrigger,
   logContainerRef,
   onRepoCleared,
+  externalWorkingTreeStatus,
+  onRefreshWorkingTree,
 }: Params) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
@@ -66,6 +101,33 @@ export const useCommitGraphData = ({
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
+  const requestGenerationRef = useRef(0);
+  const layoutGenerationRef = useRef(0);
+  const layoutWorkerRef = useRef<Worker | null>(null);
+
+  const updateLayout = useCallback((commits: GitCommit[]) => {
+    const generation = ++layoutGenerationRef.current;
+    const worker = layoutWorkerRef.current;
+    if (worker) {
+      worker.postMessage({ generation, commits });
+      return;
+    }
+    setLayout(computeGraphLayout(commits));
+  }, []);
+
+  useEffect(() => {
+    if (typeof Worker === 'undefined') return;
+    const worker = new Worker(new URL('../../workers/graphLayout.worker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (event: MessageEvent<{ generation: number; layout: GraphLayout }>) => {
+      if (event.data.generation !== layoutGenerationRef.current) return;
+      setLayout(event.data.layout);
+    };
+    layoutWorkerRef.current = worker;
+    return () => {
+      worker.terminate();
+      layoutWorkerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     onRepoClearedRef.current = onRepoCleared;
@@ -92,13 +154,9 @@ export const useCommitGraphData = ({
       ? LOG_PAGE_SIZE
       : isQuick
         ? QUICK_REFRESH_LIMIT
-        : isSync
-          ? Math.max(LOG_PAGE_SIZE, commitCountRef.current)
-          : LOG_PAGE_SIZE;
+        : LOG_PAGE_SIZE;
     const requestedLimit = Math.max(1, Math.min(requestedLimitRaw, LOG_MAX_LIMIT));
-    const fetchLimit = requestedLimit < LOG_MAX_LIMIT
-      ? requestedLimit + LOG_OVERFETCH_COUNT
-      : requestedLimit;
+    const requestGeneration = ++requestGenerationRef.current;
 
     if ((isAppend || isSync || isQuick) && scrollContainer) {
       pendingScrollTopRef.current = isQuick ? 0 : scrollContainer.scrollTop;
@@ -123,45 +181,51 @@ export const useCommitGraphData = ({
     try {
       const scope = showSecondaryHistory ? 'all' : 'head';
       const offset = isAppend ? commitCountRef.current : 0;
-      const { success, data, error } = await window.electronAPI.runGitCommand('log', String(fetchLimit), scope, String(offset));
-      if (success) {
-        const parsedChunk = parseGitLog(data || '');
-        const hasMore = fetchLimit > requestedLimit
-          ? parsedChunk.length > requestedLimit
-          : parsedChunk.length >= requestedLimit;
-        const visibleChunk = hasMore
-          ? parsedChunk.slice(0, requestedLimit)
-          : parsedChunk;
+      const result = await window.electronAPI.getCommitLogPage({
+        limit: requestedLimit,
+        offset,
+        scope,
+      });
+      if (requestGeneration !== requestGenerationRef.current && !isAppend) return;
+      if (result.success) {
+        const data = result.data;
+        const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
+        const visibleChunk = applyCachedStats(parsedChunk, data.stats || {});
+        const hasMore = data.hasMore;
+        const cacheKey = getGraphCacheKey(repoPath, showSecondaryHistory);
         if (isAppend) {
           const merged = mergeUniqueCommits(layoutRef.current?.nodes.map((node) => node.commit) ?? [], visibleChunk);
           const nextCount = merged.length;
           commitCountRef.current = nextCount;
           setCommitCount(nextCount);
           setHasMoreCommits(hasMore);
-          setLayout(computeGraphLayout(merged));
-        } else if (isQuick) {
+          storeGraphCache(cacheKey, merged, hasMore);
+          updateLayout(merged);
+        } else if (isQuick || isSync) {
           const existing = layoutRef.current?.nodes.map((node) => node.commit) ?? [];
           const merged = mergeQuickRefreshCommits(existing, visibleChunk);
           commitCountRef.current = merged.length;
           setCommitCount(merged.length);
           setHasMoreCommits(hasMore || merged.length > visibleChunk.length);
-          setLayout(computeGraphLayout(merged));
+          storeGraphCache(cacheKey, merged, hasMore || merged.length > visibleChunk.length);
+          updateLayout(merged);
         } else {
           const normalized = mergeUniqueCommits([], visibleChunk);
           commitCountRef.current = normalized.length;
           setCommitCount(normalized.length);
           setHasMoreCommits(hasMore);
-          setLayout(computeGraphLayout(normalized));
+          storeGraphCache(cacheKey, normalized, hasMore);
+          updateLayout(normalized);
         }
       } else {
-        if (isRepoUnavailableError(String(error || ''))) {
+        if (isRepoUnavailableError(String(result.error || ''))) {
           setLayout(null);
           setCommitCount(0);
           commitCountRef.current = 0;
           setHasMoreCommits(false);
           return;
         }
-        console.error('Failed to fetch commits:', error);
+        console.error('Failed to fetch commits:', result.error);
       }
     } catch (e) {
       if (isRepoUnavailableError(String((e as any)?.message || e || ''))) {
@@ -187,7 +251,7 @@ export const useCommitGraphData = ({
         setLoading(false);
       }
     }
-  }, [logContainerRef, repoPath, showSecondaryHistory]);
+  }, [logContainerRef, repoPath, showSecondaryHistory, updateLayout]);
 
   const loadMoreCommits = useCallback(async () => {
     if (loading || loadingMore || appendInFlightRef.current || !hasMoreCommits) return;
@@ -196,6 +260,10 @@ export const useCommitGraphData = ({
   }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
 
   const refreshWorkingTreeStatus = useCallback(async () => {
+    if (onRefreshWorkingTree) {
+      await onRefreshWorkingTree();
+      return;
+    }
     if (!repoPath || !window.electronAPI) return;
     try {
       const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
@@ -209,7 +277,7 @@ export const useCommitGraphData = ({
       }
       console.error(e);
     }
-  }, [repoPath]);
+  }, [onRefreshWorkingTree, repoPath]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -236,7 +304,7 @@ export const useCommitGraphData = ({
     const historyModeChanged = lastSecondaryHistoryRef.current !== showSecondaryHistory;
     lastRepoPathRef.current = repoPath;
     lastSecondaryHistoryRef.current = showSecondaryHistory;
-    if (repoChanged) {
+    if (repoChanged || historyModeChanged) {
       // Drop previous-repo state immediately to avoid transient sync refreshes
       // restoring stale scroll positions while the new repo is loading.
       setLayout(null);
@@ -251,16 +319,22 @@ export const useCommitGraphData = ({
       appendInFlightRef.current = false;
       pendingRefreshAfterAppendRef.current = null;
       autoLoadArmedRef.current = true;
-      forceScrollToTopOnNextResetRef.current = true;
+      forceScrollToTopOnNextResetRef.current = repoChanged;
+      const cached = graphCache.get(getGraphCacheKey(repoPath, showSecondaryHistory));
+      if (cached) {
+        cached.touchedAt = Date.now();
+        commitCountRef.current = cached.commits.length;
+        setCommitCount(cached.commits.length);
+        setHasMoreCommits(cached.hasMore);
+        updateLayout(cached.commits);
+      }
     }
 
-    const mode: RefreshMode = repoChanged || historyModeChanged || !layoutRef.current || commitCountRef.current === 0
-      ? 'reset'
-      : 'sync';
+    const mode: RefreshMode = commitCountRef.current === 0 ? 'reset' : 'sync';
 
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
-  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory]);
+  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout]);
 
   useEffect(() => {
     if (commitRefreshTrigger === lastCommitRefreshTriggerRef.current) return;
@@ -306,6 +380,7 @@ export const useCommitGraphData = ({
   }, [layout, logContainerRef]);
 
   useEffect(() => {
+    if (onRefreshWorkingTree) return;
     if (!repoPath) return;
     const refreshIfVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
@@ -331,7 +406,7 @@ export const useCommitGraphData = ({
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-  }, [refreshWorkingTreeStatus, repoPath]);
+  }, [refreshWorkingTreeStatus, onRefreshWorkingTree, repoPath]);
 
   useEffect(() => {
     const scrollContainer = logContainerRef.current?.parentElement;
@@ -354,15 +429,103 @@ export const useCommitGraphData = ({
     return () => scrollContainer.removeEventListener('scroll', onScroll);
   }, [hasMoreCommits, loadMoreCommits, loading, loadingMore, logContainerRef]);
 
+  const updateCommitStats = useCallback((
+    updates: Record<string, { stats: GitCommit['stats']; state: GitCommit['statsState'] }>,
+  ) => {
+    setLayout((current) => {
+      if (!current) return current;
+      let changed = false;
+      const nodes = current.nodes.map((node) => {
+        const update = updates[node.commit.hash];
+        if (!update) return node;
+        if (
+          node.commit.statsState === update.state
+          && JSON.stringify(node.commit.stats) === JSON.stringify(update.stats)
+        ) return node;
+        changed = true;
+        return {
+          ...node,
+          commit: {
+            ...node.commit,
+            stats: update.stats,
+            statsState: update.state,
+          },
+        };
+      });
+      if (!changed) return current;
+      const next = { ...current, nodes };
+      if (repoPath) {
+        storeGraphCache(
+          getGraphCacheKey(repoPath, showSecondaryHistory),
+          nodes.map((node) => node.commit),
+          hasMoreCommits,
+        );
+      }
+      return next;
+    });
+  }, [hasMoreCommits, repoPath, showSecondaryHistory]);
+
+  const requestCommitStats = useCallback(async (
+    hashes: string[],
+    priority: 'selected' | 'visible' | 'background' = 'background',
+  ) => {
+    if (!repoPath || hashes.length === 0) return;
+    const unique = [...new Set(hashes)].slice(0, 500);
+    const result = await window.electronAPI.requestCommitStats(unique, priority);
+    if (!result.success) return;
+    const updates: Record<string, { stats: GitCommit['stats']; state: GitCommit['statsState'] }> = {};
+    for (const [hash, value] of Object.entries(result.data)) {
+      updates[hash] = {
+        stats: value.stats,
+        state: value.state,
+      };
+    }
+    updateCommitStats(updates);
+  }, [repoPath, updateCommitStats]);
+
+  useEffect(() => {
+    if (!repoPath) return;
+    return window.electronAPI.onCommitStats((update) => {
+      if (update.repoPath.toLowerCase() !== repoPath.toLowerCase()) return;
+      updateCommitStats({
+        [update.hash]: {
+          stats: update.stats,
+          state: update.state,
+        },
+      });
+    });
+  }, [repoPath, updateCommitStats]);
+
+  const loadedCommitHashes = layout?.nodes.map((node) => node.commit.hash).join('\0') || '';
+
+  useEffect(() => {
+    if (!layout || !repoPath) return;
+    const idleTimer = window.setTimeout(() => {
+      const missing = layout.nodes
+        .filter((node) => node.commit.statsState === 'missing' || node.commit.statsState === 'error')
+        .map((node) => node.commit.hash);
+      const enqueue = async () => {
+        for (let offset = 0; offset < missing.length; offset += 500) {
+          await requestCommitStats(missing.slice(offset, offset + 500), 'background');
+        }
+      };
+      void enqueue();
+    }, 2000);
+    return () => window.clearTimeout(idleTimer);
+  }, [loadedCommitHashes, repoPath, requestCommitStats]);
+
   return {
     layout,
     commitCount,
-    workingTreeStatus,
+    workingTreeStatus: externalWorkingTreeStatus === undefined
+      ? workingTreeStatus
+      : externalWorkingTreeStatus,
     loading,
     loadingMore,
     hasMoreCommits,
     refreshCommits,
     loadMoreCommits,
     refreshWorkingTreeStatus,
+    requestCommitStats,
   };
 };

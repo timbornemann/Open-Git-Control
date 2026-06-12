@@ -1066,14 +1066,16 @@ export const useAppState = () => {
     if (shouldScanPushSecrets) {
       try {
         const SCAN_TIMEOUT_MS = 15000;
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('__timeout__')), SCAN_TIMEOUT_MS)
-        );
+        let scanTimeoutId: number | null = null;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          scanTimeoutId = window.setTimeout(() => reject(new Error('__timeout__')), SCAN_TIMEOUT_MS);
+        });
         let scanResult: Awaited<ReturnType<typeof window.electronAPI.scanPushSecrets>>;
         try {
           scanResult = await Promise.race([window.electronAPI.scanPushSecrets(), timeoutPromise]);
         } catch (timeoutErr: any) {
           if (timeoutErr?.message === '__timeout__') {
+            await window.electronAPI.cancelSecretScan();
             setConfirmDialog({
               variant: 'danger',
               title: tr('Secret-Scan Timeout', 'Secret scan timed out'),
@@ -1095,6 +1097,8 @@ export const useAppState = () => {
             return false;
           }
           throw timeoutErr;
+        } finally {
+          if (scanTimeoutId !== null) window.clearTimeout(scanTimeoutId);
         }
         if (!scanResult.success) {
           setGitActionToast({

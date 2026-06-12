@@ -52,6 +52,11 @@ describe('registerGitHandlers', () => {
     registerGitHandlers({
       gitService,
       secretScanService: { scanPushDiffs: vi.fn() } as any,
+      commitStatsService: {
+        onUpdate: vi.fn(() => vi.fn()),
+        interruptBackgroundWork: vi.fn(),
+      } as any,
+      workingTreeService: {} as any,
       readSettingsWithMigration: vi.fn() as any,
     });
 
@@ -99,6 +104,11 @@ describe('registerGitHandlers', () => {
     registerGitHandlers({
       gitService,
       secretScanService: { scanPushDiffs: vi.fn() } as any,
+      commitStatsService: {
+        onUpdate: vi.fn(() => vi.fn()),
+        interruptBackgroundWork: vi.fn(),
+      } as any,
+      workingTreeService: {} as any,
       readSettingsWithMigration: vi.fn() as any,
     });
 

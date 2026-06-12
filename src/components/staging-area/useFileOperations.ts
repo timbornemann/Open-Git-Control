@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FileEntry, parseGitStatusDetailed } from '../../utils/gitParsing';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileEntry, parseGitStatusDetailed, type GitStatusDetailed } from '../../utils/gitParsing';
+import type { WorkingTreeStatsDto } from '../../global';
 import type { DiffRequest } from '../../types/diff';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
@@ -25,6 +26,10 @@ type Params = {
   setInputDialog: (d: InputDialogState | null) => void;
   onRepoChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
+  externalStatus?: GitStatusDetailed | null;
+  externalStatusRaw?: string;
+  externalStats?: WorkingTreeStatsDto | null;
+  externalRefresh?: () => Promise<void>;
 };
 
 export const useFileOperations = ({
@@ -34,6 +39,10 @@ export const useFileOperations = ({
   setInputDialog,
   onRepoChanged,
   onOpenDiff,
+  externalStatus,
+  externalStatusRaw,
+  externalStats,
+  externalRefresh,
 }: Params) => {
   const { tr } = useI18n();
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
@@ -42,9 +51,27 @@ export const useFileOperations = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts'>('all');
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
+  const [mutationStartedAt, setMutationStartedAt] = useState<number | null>(null);
+  const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
+  const mutationInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (mutationStartedAt === null) {
+      setMutationElapsedMs(0);
+      return;
+    }
+    const update = () => setMutationElapsedMs(Date.now() - mutationStartedAt);
+    update();
+    const timer = window.setInterval(update, 250);
+    return () => window.clearInterval(timer);
+  }, [mutationStartedAt]);
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
+    if (externalRefresh) {
+      await externalRefresh();
+      return;
+    }
     try {
       const [statusResult, stagedResult, unstagedResult] = await Promise.all([
         window.electronAPI.runGitCommand('statusPorcelain'),
@@ -70,7 +97,29 @@ export const useFileOperations = ({
     } catch (e) {
       console.error(e);
     }
-  }, [repoPath]);
+  }, [externalRefresh, repoPath]);
+
+  useEffect(() => {
+    if (externalStatus === undefined) return;
+    if (!externalStatus) {
+      setStatus(null);
+      return;
+    }
+    const conflicts = parseConflictEntries(externalStatusRaw || '');
+    const conflictPathSet = new Set(conflicts.map((conflict) => conflict.path));
+    setStatus({
+      ...externalStatus,
+      conflicts,
+      staged: externalStatus.staged.filter((file) => !conflictPathSet.has(file.path)),
+      unstaged: externalStatus.unstaged.filter((file) => !conflictPathSet.has(file.path)),
+    });
+  }, [externalStatus, externalStatusRaw]);
+
+  useEffect(() => {
+    if (externalStats === undefined) return;
+    setStagedStats(externalStats?.staged || EMPTY_DIFF_STATS);
+    setUnstagedStats(externalStats?.unstaged || EMPTY_DIFF_STATS);
+  }, [externalStats]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -79,6 +128,7 @@ export const useFileOperations = ({
       setUnstagedStats(EMPTY_DIFF_STATS);
       return;
     }
+    if (externalRefresh) return;
     const refreshIfVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         return;
@@ -104,7 +154,7 @@ export const useFileOperations = ({
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
-  }, [repoPath, refresh]);
+  }, [externalRefresh, repoPath, refresh]);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -122,6 +172,9 @@ export const useFileOperations = ({
 
   const git = useCallback(async (args: string[], msg: string, notify = false) => {
     if (!window.electronAPI) return;
+    if (mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
+    setMutationStartedAt(Date.now());
     try {
       const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (r.success) {
@@ -133,6 +186,9 @@ export const useFileOperations = ({
       }
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
+    } finally {
+      mutationInFlightRef.current = false;
+      setMutationStartedAt(null);
     }
   }, [setToast, onRepoChanged, refresh, tr]);
 
@@ -175,11 +231,12 @@ export const useFileOperations = ({
 
   const stageAllUntracked = useCallback(async () => {
     if (!window.electronAPI || !status || status.untracked.length === 0) return;
+    if (mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
+    setMutationStartedAt(Date.now());
     try {
-      for (const entry of status.untracked) {
-        const r = await window.electronAPI.runGitCommand('add', '--', entry.path);
-        if (!r.success) throw new Error(r.error || tr(`Fehler beim Stagen von ${entry.path}`, `Error staging ${entry.path}`));
-      }
+      const result = await window.electronAPI.stagePaths(status.untracked.map((entry) => entry.path));
+      if (!result.success) throw new Error(result.error);
       const count = status.untracked.length;
       setToast({
         msg: tr(
@@ -191,6 +248,9 @@ export const useFileOperations = ({
       await refresh();
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
+    } finally {
+      mutationInFlightRef.current = false;
+      setMutationStartedAt(null);
     }
   }, [status, setToast, refresh, tr]);
 
@@ -286,5 +346,7 @@ export const useFileOperations = ({
     stashChanges,
     stashPop,
     showDiff,
+    isMutating: mutationStartedAt !== null,
+    mutationElapsedMs,
   };
 };

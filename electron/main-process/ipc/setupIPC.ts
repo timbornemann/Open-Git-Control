@@ -2,6 +2,8 @@ import { AiService } from '../../AiService';
 import { GitService } from '../../GitService';
 import { GitHubService } from '../../GitHubService';
 import { SecretScanService } from '../../SecretScanService';
+import { CommitStatsService } from '../../CommitStatsService';
+import { WorkingTreeService } from '../../WorkingTreeService';
 import { AppSettings } from '../../settings';
 import { UpdaterManager } from '../updaterManager';
 import { registerAiHandlers } from './registerAiHandlers';
@@ -17,6 +19,8 @@ type SetupIpcDeps = {
   githubService: GitHubService;
   aiService: AiService;
   secretScanService: SecretScanService;
+  commitStatsService: CommitStatsService;
+  workingTreeService: WorkingTreeService;
   updaterManager: UpdaterManager;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
@@ -34,13 +38,21 @@ export function setupIPC({
   githubService,
   aiService,
   secretScanService,
+  commitStatsService,
+  workingTreeService,
   updaterManager,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
   buildDiagnosticsReport,
 }: SetupIpcDeps): void {
   registerDialogHandlers({ gitService });
-  registerGitHandlers({ gitService, secretScanService, readSettingsWithMigration });
+  registerGitHandlers({
+    gitService,
+    secretScanService,
+    commitStatsService,
+    workingTreeService,
+    readSettingsWithMigration,
+  });
   registerRepoSettingsHandlers();
   registerUpdaterHandlers({ updaterManager });
   registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore });

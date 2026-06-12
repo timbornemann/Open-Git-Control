@@ -10,10 +10,22 @@ type BuildDiagnosticsReportDependencies = {
   githubService: GitHubService;
   readSettingsWithMigration: () => AppSettings;
   getUpdaterStatus: () => UpdaterStatusPayload;
+  getCommitStatsDiagnostics?: () => Array<{
+    durationMs: number;
+    cacheHit: boolean;
+    aborted: boolean;
+    timestamp: number;
+  }>;
 };
 
 export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDependencies) {
-  const { gitService, githubService, readSettingsWithMigration, getUpdaterStatus } = deps;
+  const {
+    gitService,
+    githubService,
+    readSettingsWithMigration,
+    getUpdaterStatus,
+    getCommitStatsDiagnostics,
+  } = deps;
 
   return async function buildDiagnosticsReport(): Promise<{
     generatedAt: string;
@@ -56,6 +68,23 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`availableVersion=${updaterStatus.availableVersion || ''}`);
     lines.push(`downloaded=${updaterStatus.downloaded}`);
     lines.push(`lastError=${updaterStatus.error || ''}`);
+
+    const gitDiagnostics = gitService.getSchedulerDiagnostics().slice(-20);
+    lines.push('');
+    lines.push('[Git Scheduler]');
+    lines.push(`entries=${gitDiagnostics.length}`);
+    for (const entry of gitDiagnostics) {
+      lines.push(
+        `${new Date(entry.timestamp).toISOString()} kind=${entry.kind} command=${entry.command} durationMs=${entry.durationMs} resultBytes=${entry.resultBytes} aborted=${entry.aborted}`,
+      );
+    }
+
+    const statsDiagnostics = getCommitStatsDiagnostics?.().slice(-20) || [];
+    lines.push('');
+    lines.push('[Commit Stats Cache]');
+    lines.push(`entries=${statsDiagnostics.length}`);
+    lines.push(`cacheHits=${statsDiagnostics.filter((entry) => entry.cacheHit).length}`);
+    lines.push(`aborted=${statsDiagnostics.filter((entry) => entry.aborted).length}`);
 
     if (activeRepo) {
       lines.push('');

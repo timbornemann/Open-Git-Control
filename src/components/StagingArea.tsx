@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FileEntry } from '../utils/gitParsing';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm } from './Confirm';
@@ -24,6 +24,7 @@ import {
   toGitPath,
 } from './staging-area/utils';
 import { useI18n } from '../i18n';
+import { VirtualList } from './VirtualList';
 
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
@@ -35,6 +36,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   viewMode = 'default',
   initialConflictPath = null,
   settings,
+  workingTreeSnapshot,
+  workingTreeStatus,
+  workingTreeStats,
+  onRefreshWorkingTree,
 }) => {
   const { tr } = useI18n();
   const { toast, setToast } = useToastQueue(3000);
@@ -59,7 +64,19 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     await action(values);
   }, [inputDialog]);
 
-  const fileOps = useFileOperations({ repoPath, setToast, setConfirmDialog, setInputDialog, onRepoChanged, onOpenDiff });
+  const hasSharedWorkingTreeStatus = workingTreeStatus !== null && workingTreeStatus !== undefined;
+  const fileOps = useFileOperations({
+    repoPath,
+    setToast,
+    setConfirmDialog,
+    setInputDialog,
+    onRepoChanged,
+    onOpenDiff,
+    externalStatus: hasSharedWorkingTreeStatus ? workingTreeStatus : undefined,
+    externalStatusRaw: hasSharedWorkingTreeStatus ? workingTreeSnapshot?.statusRaw : undefined,
+    externalStats: hasSharedWorkingTreeStatus ? workingTreeStats : undefined,
+    externalRefresh: hasSharedWorkingTreeStatus ? onRefreshWorkingTree : undefined,
+  });
 
   const commitForm = useCommitForm({
     repoPath,
@@ -96,23 +113,35 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     enabled: Boolean(settings.aiAutoCommitEnabled),
   };
 
+  const visibleFiles = useMemo(() => {
+    const status = fileOps.status;
+    if (!status) {
+      return { staged: [], unstaged: [], untracked: [], conflicts: [] };
+    }
+    const normalizedQuery = fileOps.searchQuery.trim().toLowerCase();
+    const bySearch = <T extends { path: string }>(entries: T[]) => entries
+      .filter((entry) => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery))
+      .sort((a, b) => a.path.localeCompare(b.path));
+    return {
+      staged: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'staged' ? bySearch(status.staged) : [],
+      unstaged: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'unstaged' ? bySearch(status.unstaged) : [],
+      untracked: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'untracked' ? bySearch(status.untracked) : [],
+      conflicts: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'conflicts' ? bySearch(status.conflicts) : [],
+    };
+  }, [fileOps.activeFilter, fileOps.searchQuery, fileOps.status]);
+
   if (!repoPath) return null;
   if (!fileOps.status) return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{tr('Lade Status...', 'Loading status...')}</div>;
 
   const status = fileOps.status;
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
-  const isCommitInputDisabled = hasOpenConflicts || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
+  const isCommitInputDisabled = hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
 
-  const normalizedQuery = fileOps.searchQuery.trim().toLowerCase();
-  const bySearch = <T extends { path: string }>(entries: T[]) => entries
-    .filter((entry) => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery))
-    .sort((a, b) => a.path.localeCompare(b.path));
-
-  const visibleStaged = fileOps.activeFilter === 'all' || fileOps.activeFilter === 'staged' ? bySearch(status.staged) : [];
-  const visibleUnstaged = fileOps.activeFilter === 'all' || fileOps.activeFilter === 'unstaged' ? bySearch(status.unstaged) : [];
-  const visibleUntracked = fileOps.activeFilter === 'all' || fileOps.activeFilter === 'untracked' ? bySearch(status.untracked) : [];
-  const visibleConflicts = fileOps.activeFilter === 'all' || fileOps.activeFilter === 'conflicts' ? bySearch(status.conflicts) : [];
+  const visibleStaged = visibleFiles.staged;
+  const visibleUnstaged = visibleFiles.unstaged;
+  const visibleUntracked = visibleFiles.untracked;
+  const visibleConflicts = visibleFiles.conflicts;
   const visibleTotal = visibleStaged.length + visibleUnstaged.length + visibleUntracked.length + visibleConflicts.length;
 
   const totalConflictBlocksInView = visibleConflicts.reduce((sum, f) => sum + conflicts.blockCountForPath(f.path), 0);
@@ -145,18 +174,18 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         <span className="staging-path" title={entry.path}>{entry.path}</span>
         <div className="staging-actions">
           {section === 'staged' && (
-            <button className="staging-btn" onClick={(e) => { e.stopPropagation(); fileOps.unstageFile(entry.path); }} title={tr('Aus Stage entfernen', 'Unstage')}>-</button>
+            <button className="staging-btn" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.unstageFile(entry.path); }} title={tr('Aus Stage entfernen', 'Unstage')}>-</button>
           )}
           {section === 'unstaged' && (
             <>
-              <button className="staging-btn" onClick={(e) => { e.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
-              <button className="staging-btn danger" onClick={(e) => { e.stopPropagation(); fileOps.discardFile(entry.path); }} title={tr('Verwerfen', 'Discard')}>x</button>
+              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
+              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.discardFile(entry.path); }} title={tr('Verwerfen', 'Discard')}>x</button>
             </>
           )}
           {section === 'untracked' && (
             <>
-              <button className="staging-btn" onClick={(e) => { e.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
-              <button className="staging-btn danger" onClick={(e) => { e.stopPropagation(); fileOps.deleteUntracked(entry.path); }} title={tr('Loeschen', 'Delete')}>x</button>
+              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
+              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.deleteUntracked(entry.path); }} title={tr('Loeschen', 'Delete')}>x</button>
             </>
           )}
         </div>
@@ -209,6 +238,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           <span className="staging-stat-chip" title={tr('Unstaged Diff-Statistik', 'Unstaged diff stats')}>
             {tr('Unstaged', 'Unstaged')} {formatDiffStats(fileOps.unstagedStats)}
           </span>
+          {fileOps.isMutating && (
+            <span className="staging-stat-chip">
+              {tr('Git arbeitet', 'Git is working')} {(fileOps.mutationElapsedMs / 1000).toFixed(1)}s
+            </span>
+          )}
           <div style={{ flex: 1 }} />
           {visibleTotal > 0 && (
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
@@ -259,9 +293,15 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         {visibleStaged.length > 0 && (
           <div className="staging-section">
             <SectionHeader title={tr('Staged Aenderungen', 'Staged changes')} count={visibleStaged.length} color="var(--status-success)" statsText={formatDiffStats(fileOps.stagedStats)}
-              actions={<button className="staging-btn-sm" onClick={fileOps.unstageAll} title={tr('Alle unstagen', 'Unstage all')}>- {tr('Alle', 'All')}</button>}
+              actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.unstageAll} title={tr('Alle unstagen', 'Unstage all')}>- {tr('Alle', 'All')}</button>}
             />
-            {visibleStaged.map((f) => <FileRow key={`s-${f.path}`} entry={f} section="staged" />)}
+            <VirtualList
+              items={visibleStaged}
+              rowHeight={28}
+              maxHeight={336}
+              getKey={(file) => `s-${file.path}`}
+              renderItem={(file) => <FileRow entry={file} section="staged" />}
+            />
           </div>
         )}
 
@@ -270,21 +310,33 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             <SectionHeader title={tr('Aenderungen', 'Changes')} count={visibleUnstaged.length} color="var(--status-warning)" statsText={formatDiffStats(fileOps.unstagedStats)}
               actions={
                 <>
-                  <button className="staging-btn-sm" onClick={fileOps.stageAll} title={tr('Alle stagen', 'Stage all')}>+ {tr('Alle', 'All')}</button>
-                  <button className="staging-btn-sm danger" onClick={fileOps.discardAll} title={tr('Alle verwerfen', 'Discard all')}>x {tr('Alle', 'All')}</button>
+                  <button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAll} title={tr('Alle stagen', 'Stage all')}>+ {tr('Alle', 'All')}</button>
+                  <button className="staging-btn-sm danger" disabled={fileOps.isMutating} onClick={fileOps.discardAll} title={tr('Alle verwerfen', 'Discard all')}>x {tr('Alle', 'All')}</button>
                 </>
               }
             />
-            {visibleUnstaged.map((f) => <FileRow key={`u-${f.path}`} entry={f} section="unstaged" />)}
+            <VirtualList
+              items={visibleUnstaged}
+              rowHeight={28}
+              maxHeight={336}
+              getKey={(file) => `u-${file.path}`}
+              renderItem={(file) => <FileRow entry={file} section="unstaged" />}
+            />
           </div>
         )}
 
         {visibleUntracked.length > 0 && (
           <div className="staging-section">
             <SectionHeader title={tr('Untracked', 'Untracked')} count={visibleUntracked.length} color="var(--status-untracked)"
-              actions={<button className="staging-btn-sm" onClick={fileOps.stageAllUntracked} title={tr('Alle untracked stagen', 'Stage all untracked')}>+ {tr('Alle', 'All')}</button>}
+              actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAllUntracked} title={tr('Alle untracked stagen', 'Stage all untracked')}>+ {tr('Alle', 'All')}</button>}
             />
-            {visibleUntracked.map((f) => <FileRow key={`t-${f.path}`} entry={f} section="untracked" />)}
+            <VirtualList
+              items={visibleUntracked}
+              rowHeight={28}
+              maxHeight={336}
+              getKey={(file) => `t-${file.path}`}
+              renderItem={(file) => <FileRow entry={file} section="untracked" />}
+            />
           </div>
         )}
       </div>
@@ -386,7 +438,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               className="staging-tool-btn"
               type="button"
               onClick={aiCommit.handleAiAutoCommit}
-              disabled={commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || !status}
+              disabled={fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || !status}
               title={aiConfig.enabled ? tr('KI entscheidet Staging + Commit-Nachrichten automatisch.', 'AI decides staging + commit messages automatically.') : tr('In Settings zuerst KI Auto-Commit aktivieren.', 'Enable AI auto-commit in settings first.')}
               style={{ opacity: aiConfig.enabled ? 1 : 0.7 }}
             >
@@ -395,7 +447,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             <button
               className="staging-commit-btn"
               onClick={commitForm.handleCommit}
-              disabled={hasOpenConflicts || !commitForm.commitMsg.trim() || commitForm.isCommitting || aiCommit.isAiCommitting || !status || (status.staged.length === 0 && !commitForm.amendCommit)}
+              disabled={fileOps.isMutating || hasOpenConflicts || !commitForm.commitMsg.trim() || commitForm.isCommitting || aiCommit.isAiCommitting || !status || (status.staged.length === 0 && !commitForm.amendCommit)}
             >
               {hasOpenConflicts
                 ? tr(`Konflikte (${totalConflictBlocksAll})`, `Conflicts (${totalConflictBlocksAll})`)

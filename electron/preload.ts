@@ -55,6 +55,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
+  getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>
+    ipcRenderer.invoke('git:commitLogPage', params),
+  requestCommitStats: (
+    hashes: string[],
+    priority?: 'selected' | 'visible' | 'background',
+  ) => ipcRenderer.invoke('git:requestCommitStats', hashes, priority),
+  onCommitStats: (callback: (update: any) => void) => {
+    const handler = (_event: any, update: any) => callback(update);
+    ipcRenderer.on('git:commitStats', handler);
+    return () => ipcRenderer.removeListener('git:commitStats', handler);
+  },
+  getWorkingTreeSnapshot: () => ipcRenderer.invoke('git:workingTreeSnapshot'),
+  getWorkingTreeStats: (snapshotId: string) => ipcRenderer.invoke('git:workingTreeStats', snapshotId),
+  stagePaths: (paths: string[]) => ipcRenderer.invoke('git:stagePaths', paths),
+  getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) =>
+    ipcRenderer.invoke('git:diffPreview', args, limits || {}),
+  getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
+    ipcRenderer.invoke('git:fileBlameRange', filePath, commitHash, startLine, lineCount),
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
     repoUnavailableListeners.add(callback);
     return () => {
@@ -70,6 +88,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gitPull: () => invokeGitCommand('pull'),
   gitPush: () => invokeGitCommand('push'),
   scanPushSecrets: () => ipcRenderer.invoke('git:scanPushSecrets'),
+  cancelSecretScan: () => ipcRenderer.invoke('git:cancelSecretScan'),
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir, targetName),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>

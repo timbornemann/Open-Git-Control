@@ -14,6 +14,7 @@ import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
 import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDTH } from './hooks/useMainViewPaneResizer';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useAppContext } from '../../contexts/AppStateContext';
+import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
 import appLogo from '../../../logo.png';
 
 const linkStyle: React.CSSProperties = {
@@ -259,6 +260,7 @@ export const MainView: React.FC = () => {
     onConflictRebaseAbort,
   } = useAppContext();
   const { tr } = useI18n();
+  const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger);
 
   const {
     primaryPaneBasis,
@@ -468,6 +470,10 @@ export const MainView: React.FC = () => {
                 viewMode="conflictOnly"
                 initialConflictPath={activeConflictPath}
                 settings={settings}
+                workingTreeSnapshot={workingTree.snapshot}
+                workingTreeStatus={workingTree.status}
+                workingTreeStats={workingTree.stats}
+                onRefreshWorkingTree={workingTree.refresh}
               />
             ) : activeDiffRequest || (!showGithubGuide && !showRecoveryCenter) ? (
               <>
@@ -494,6 +500,8 @@ export const MainView: React.FC = () => {
                     branches={branches}
                     onMergeBranch={onMergeBranch}
                     onOpenConflictResolverForPath={onOpenConflictResolverForPath}
+                    workingTreeStatus={workingTree.status}
+                    onRefreshWorkingTree={workingTree.refresh}
                   />
                 </div>
                 {activeDiffRequest && (
@@ -569,6 +577,10 @@ export const MainView: React.FC = () => {
                     onSelectFileInspect={handleSelectWorkingTreeFile}
                     onOpenConflictResolver={handleOpenConflictResolver}
                     settings={settings}
+                    workingTreeSnapshot={workingTree.snapshot}
+                    workingTreeStatus={workingTree.status}
+                    workingTreeStats={workingTree.stats}
+                    onRefreshWorkingTree={workingTree.refresh}
                   />
                 )}
               </div>

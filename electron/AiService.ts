@@ -1159,6 +1159,7 @@ export class AiService {
         numstatReport = '';
       }
       const statsByPath = parseNumstatReport(numstatReport);
+      let contentPreviewBudget = 50;
 
       for (const file of files) {
         const stats = statsByPath.get(file.path);
@@ -1167,8 +1168,13 @@ export class AiService {
         file.isBinary = stats?.isBinary ?? false;
 
         let keyChanges: string[] = [];
-        if (!file.isBinary && (file.changeType === 'untracked' || file.changeType === 'added')) {
+        if (
+          contentPreviewBudget > 0
+          && !file.isBinary
+          && (file.changeType === 'untracked' || file.changeType === 'added')
+        ) {
           keyChanges = await readUntrackedSnippet(repoPath, file.path);
+          contentPreviewBudget -= 1;
         }
         if (keyChanges.length === 0) {
           keyChanges = [
@@ -1434,9 +1440,14 @@ export class AiService {
         }
 
         try {
-          for (const file of batchFiles) {
-            await this.gitService.runCommand(['add', '--', file.path]);
+          if (typeof (this.gitService as any).stagePaths === 'function') {
+            await this.gitService.stagePaths(batchFiles.map((file) => file.path));
             ensureNotCancelled();
+          } else {
+            for (const file of batchFiles) {
+              await this.gitService.runCommand(['add', '--', file.path]);
+              ensureNotCancelled();
+            }
           }
 
           let message: CommitMessage;

@@ -1,15 +1,19 @@
-﻿import { app, BrowserWindow } from 'electron';
-console.log('--- MAIN PROCESS START ---');
-console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
+import { app, BrowserWindow } from 'electron';
+import * as path from 'path';
 import { aiService } from './AiService';
+import { CommitStatsService } from './CommitStatsService';
 import { gitService } from './GitService';
 import { githubService } from './GitHubService';
 import { SecretScanService } from './SecretScanService';
+import { WorkingTreeService } from './WorkingTreeService';
 import { buildDiagnosticsReportFactory } from './main-process/diagnostics';
 import { setupIPC } from './main-process/ipc/setupIPC';
 import { getGeminiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
 import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
+
+console.log('--- MAIN PROCESS START ---');
+console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 
 const isDev = process.env.NODE_ENV === 'development';
 const APP_DISPLAY_NAME = 'Open-Git-Control';
@@ -17,12 +21,18 @@ const WINDOWS_APP_ID = 'com.opengitcontrol.app';
 
 const updaterManager = new UpdaterManager(isDev);
 const secretScanService = new SecretScanService(gitService);
+const workingTreeService = new WorkingTreeService(gitService);
+const commitStatsService = new CommitStatsService(
+  gitService,
+  () => path.join(app.getPath('userData'), 'commit-stats-v1.jsonl'),
+);
 
 const buildDiagnosticsReport = buildDiagnosticsReportFactory({
   gitService,
   githubService,
   readSettingsWithMigration,
   getUpdaterStatus: () => updaterManager.getStatus(),
+  getCommitStatsDiagnostics: () => commitStatsService.getDiagnostics(),
 });
 
 app.whenReady().then(() => {
@@ -36,6 +46,8 @@ app.whenReady().then(() => {
     githubService,
     aiService,
     secretScanService,
+    commitStatsService,
+    workingTreeService,
     updaterManager,
     readSettingsWithMigration,
     getGeminiApiKeyFromSecureStore,

@@ -1,8 +1,10 @@
 import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { CommitStatsPriority, CommitStatsService } from '../../CommitStatsService';
 import { GitService } from '../../GitService';
 import { SecretScanService } from '../../SecretScanService';
+import { WorkingTreeService } from '../../WorkingTreeService';
 import { AppSettings } from '../../settings';
 import {
   assertAllowedGitCommand,
@@ -16,16 +18,34 @@ import { emitJobEvent } from './jobEvents';
 type RegisterGitHandlersDeps = {
   gitService: GitService;
   secretScanService: SecretScanService;
+  commitStatsService: CommitStatsService;
+  workingTreeService: WorkingTreeService;
   readSettingsWithMigration: () => AppSettings;
 };
 
 export function registerGitHandlers({
   gitService,
   secretScanService,
+  commitStatsService,
+  workingTreeService,
   readSettingsWithMigration,
 }: RegisterGitHandlersDeps): void {
+  const commitStatsSubscribers = new Set<any>();
+  let activeSecretScanController: AbortController | null = null;
+  commitStatsService.onUpdate((update) => {
+    for (const webContents of commitStatsSubscribers) {
+      if (webContents.isDestroyed?.()) {
+        commitStatsSubscribers.delete(webContents);
+        continue;
+      }
+      webContents.send('git:commitStats', update);
+    }
+  });
+
   ipcMain.handle('git:setRepo', async (_event: any, repoPath: string) => {
+    commitStatsService.interruptBackgroundWork();
     gitService.setRepoPath(repoPath);
+    commitStatsService.setActiveRepo(gitService.getRepoPath() || repoPath);
     return true;
   });
 
@@ -36,7 +56,7 @@ export function registerGitHandlers({
       const normalizedArgs = normalizeArgs(rawArgs);
       validateCommandArgs(commandName, normalizedArgs);
 
-      const isLongRunning = commandName === 'fetch' || commandName === 'pull' || commandName === 'push';
+      const isLongRunning = ['fetch', 'pull', 'push', 'add', 'commit', 'reset'].includes(commandName);
       jobId = isLongRunning ? createJobId(`git-${commandName}`) : null;
 
       if (jobId) {
@@ -130,7 +150,177 @@ export function registerGitHandlers({
     }
   });
 
+  ipcMain.handle('git:commitLogPage', async (
+    _event: any,
+    params: { limit?: unknown; offset?: unknown; scope?: unknown } = {},
+  ) => {
+    try {
+      const limit = Math.max(1, Math.min(500, Math.floor(Number(params.limit) || 100)));
+      const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
+      const scope = params.scope === 'head' ? 'head' : 'all';
+      const repoPath = gitService.getRepoPath();
+      if (!repoPath) throw new Error('No repository path set.');
+
+      try {
+        await gitService.runCommand(['rev-parse', '--verify', 'HEAD']);
+      } catch (error: any) {
+        if (/\[REPO_UNAVAILABLE\]|not a git repository|no repository path set/i.test(String(error?.message || ''))) {
+          throw error;
+        }
+        return {
+          success: true,
+          data: {
+            raw: '',
+            hasMore: false,
+            stats: {},
+            repoPath,
+          },
+        };
+      }
+
+      const raw = await gitService.getLog(limit + 1, scope === 'all', offset);
+      const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)]
+        .map((match) => match[1]);
+      const hasMore = hashes.length > limit;
+      const visibleHashes = hashes.slice(0, limit);
+      const stats = await commitStatsService.getCachedStats(visibleHashes);
+      return {
+        success: true,
+        data: {
+          raw,
+          hasMore,
+          stats,
+          repoPath,
+        },
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:requestCommitStats', async (
+    event: any,
+    hashes: unknown,
+    requestedPriority: unknown,
+  ) => {
+    try {
+      commitStatsSubscribers.add(event.sender);
+      const normalizedHashes = Array.isArray(hashes)
+        ? hashes.map((hash) => String(hash || '')).slice(0, 500)
+        : [];
+      const priority: CommitStatsPriority = (
+        requestedPriority === 'selected'
+        || requestedPriority === 'visible'
+        || requestedPriority === 'background'
+      ) ? requestedPriority : 'background';
+      const data = await commitStatsService.requestStats(normalizedHashes, priority);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:workingTreeSnapshot', async () => {
+    try {
+      return { success: true, data: await workingTreeService.getSnapshot() };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:workingTreeStats', async (_event: any, snapshotId: unknown) => {
+    try {
+      const normalizedId = String(snapshotId || '').trim();
+      if (!normalizedId) throw new Error('Snapshot ID is required.');
+      return { success: true, data: await workingTreeService.getStats(normalizedId) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:stagePaths', async (event: any, paths: unknown) => {
+    const jobId = createJobId('git-stage-paths');
+    emitJobEvent(event.sender, {
+      id: jobId,
+      operation: 'git:add',
+      status: 'start',
+      timestamp: Date.now(),
+    });
+    try {
+      commitStatsService.interruptBackgroundWork();
+      const normalizedPaths = Array.isArray(paths)
+        ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000)
+        : [];
+      const data = await gitService.stagePaths(normalizedPaths);
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:add',
+        status: 'done',
+        details: { pathCount: normalizedPaths.length },
+        timestamp: Date.now(),
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:add',
+        status: 'failed',
+        message: error.message,
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:diffPreview', async (
+    _event: any,
+    args: unknown,
+    limits: { maxBytes?: unknown; maxLines?: unknown } = {},
+  ) => {
+    try {
+      commitStatsService.interruptBackgroundWork();
+      if (!Array.isArray(args)) throw new Error('Diff arguments are required.');
+      const normalizedArgs = args.map((arg) => String(arg || '')).slice(0, 100);
+      if (!['diff', 'show'].includes(normalizedArgs[0])) {
+        throw new Error('Unsupported diff preview command.');
+      }
+      const data = await gitService.getDiffPreview(normalizedArgs, {
+        maxBytes: Number(limits.maxBytes) || undefined,
+        maxLines: Number(limits.maxLines) || undefined,
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:fileBlameRange', async (
+    _event: any,
+    filePath: unknown,
+    commitHash: unknown,
+    startLine: unknown,
+    lineCount: unknown,
+  ) => {
+    try {
+      commitStatsService.interruptBackgroundWork();
+      const normalizedPath = String(filePath || '').trim();
+      if (!normalizedPath) throw new Error('File path is required.');
+      const raw = await gitService.getFileBlameRange(
+        normalizedPath,
+        String(commitHash || '').trim() || undefined,
+        Number(startLine),
+        Number(lineCount),
+      );
+      return { success: true, data: parseFileBlame(raw) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('git:scanPushSecrets', async (event: any) => {
+    activeSecretScanController?.abort();
+    const controller = new AbortController();
+    activeSecretScanController = controller;
     const jobId = createJobId('security-secret-scan');
     const operation = 'security:secret-scan';
     emitJobEvent(event.sender, {
@@ -146,6 +336,17 @@ export function registerGitHandlers({
       const result = await secretScanService.scanPushDiffs({
         strictness: settings.secretScanStrictness,
         allowlistText: settings.secretScanAllowlist,
+        signal: controller.signal,
+        onProgress: (checkedLines) => {
+          emitJobEvent(event.sender, {
+            id: jobId,
+            operation,
+            status: 'progress',
+            message: `Secret scan checked ${checkedLines} added line(s).`,
+            details: { checkedLines },
+            timestamp: Date.now(),
+          });
+        },
       });
 
       const findingCount = result.findings.length;
@@ -171,15 +372,24 @@ export function registerGitHandlers({
 
       return { success: true, data: result };
     } catch (error: any) {
+      const cancelled = controller.signal.aborted || error?.name === 'AbortError';
       emitJobEvent(event.sender, {
         id: jobId,
         operation,
-        status: 'failed',
-        message: error?.message || 'Secret scan failed.',
+        status: cancelled ? 'cancelled' : 'failed',
+        message: cancelled ? 'Secret scan cancelled.' : error?.message || 'Secret scan failed.',
         timestamp: Date.now(),
       });
-      return { success: false, error: error?.message || 'Secret scan failed.' };
+      return { success: false, error: cancelled ? 'Secret scan cancelled.' : error?.message || 'Secret scan failed.' };
+    } finally {
+      if (activeSecretScanController === controller) activeSecretScanController = null;
     }
+  });
+
+  ipcMain.handle('git:cancelSecretScan', async () => {
+    const cancelled = Boolean(activeSecretScanController);
+    activeSecretScanController?.abort();
+    return { success: true, cancelled };
   });
 
   ipcMain.handle('git:interactiveRebase', async (_event: any, baseHash: unknown, todoLines: unknown) => {

@@ -4,6 +4,7 @@ import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
 import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
+import { VirtualList } from './VirtualList';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -35,6 +36,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [blameLoading, setBlameLoading] = useState(false);
   const [blameError, setBlameError] = useState<string | null>(null);
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
+  const [blameHasMore, setBlameHasMore] = useState(false);
 
   const { tr, locale } = useI18n();
 
@@ -44,6 +46,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     setActiveTab('history');
     setHistoryEntries([]);
     setBlameLines([]);
+    setBlameHasMore(false);
     setHistoryError(null);
     setBlameError(null);
   }, [normalizedHash]);
@@ -154,9 +157,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await window.electronAPI.getFileBlame(selectedFile.path, normalizedHash);
+        const result = await window.electronAPI.getFileBlameRange(selectedFile.path, normalizedHash, 1, 500);
         if (result.success) {
           setBlameLines(result.data || []);
+          setBlameHasMore((result.data || []).length === 500);
         } else {
           setBlameLines([]);
           setBlameError(result.error || tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
@@ -172,6 +176,27 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
 
     fetchBlame();
   }, [activeTab, normalizedHash, isDeletedFile, selectedFile, tr]);
+
+  const loadMoreBlame = async () => {
+    if (!selectedFile || blameLoading || !blameHasMore) return;
+    setBlameLoading(true);
+    try {
+      const result = await window.electronAPI.getFileBlameRange(
+        selectedFile.path,
+        normalizedHash,
+        blameLines.length + 1,
+        500,
+      );
+      if (!result.success) {
+        setBlameError(result.error);
+        return;
+      }
+      setBlameLines((current) => [...current, ...result.data]);
+      setBlameHasMore(result.data.length === 500);
+    } finally {
+      setBlameLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!selectedFile || activeTab !== 'patch' || !normalizedHash) return;
@@ -264,29 +289,36 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           {filesError}
         </div>
       ) : !selectedFile ? (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {filesSourceHint && (
-            <li style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', backgroundColor: 'var(--bg-panel)' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', backgroundColor: 'var(--bg-panel)' }}>
               {filesSourceHint}
-            </li>
+            </div>
           )}
-          {files.map((file, index) => (
-            <li key={`${file.path}-${index}`}>
+          {files.length > 0 && (
+            <VirtualList
+              items={files}
+              rowHeight={42}
+              maxHeight={630}
+              overscan={10}
+              getKey={(file, index) => `${file.path}-${index}`}
+              renderItem={(file) => (
               <button
                 onClick={() => { setSelectedFilePath(file.path); setSelectedFileCommitHash(normalizedHash); }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}
+                style={{ width: '100%', height: 38, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}
               >
                 {getIconForStatus(file.status)}
                 <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.path}</span>
               </button>
-            </li>
-          ))}
+              )}
+            />
+          )}
           {files.length === 0 && (
             <span style={{ color: 'var(--text-secondary)' }}>
               {isMergeCommit ? tr('Keine effektiven Dateiänderungen gegen Parent 1 gefunden.', 'No effective file changes against parent 1 found.') : tr('Keine Dateien geändert.', 'No files changed.')}
             </span>
           )}
-        </ul>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{tr('Datei', 'File')}</div>
@@ -385,6 +417,16 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
                       </div>
                     ))}
                   </div>
+                  {blameHasMore && (
+                    <button
+                      className="staging-tool-btn"
+                      onClick={() => void loadMoreBlame()}
+                      disabled={blameLoading}
+                      style={{ margin: 8 }}
+                    >
+                      {tr('Weitere 500 Zeilen laden', 'Load 500 more lines')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

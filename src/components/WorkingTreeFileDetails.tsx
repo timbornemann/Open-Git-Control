@@ -21,6 +21,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   const [blameLoading, setBlameLoading] = useState(false);
   const [blameError, setBlameError] = useState<string | null>(null);
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
+  const [blameHasMore, setBlameHasMore] = useState(false);
 
   const { tr, locale } = useI18n();
 
@@ -35,6 +36,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     setHistoryEntries([]);
     setBlameError(null);
     setBlameLines([]);
+    setBlameHasMore(false);
   }, [path, source]);
 
   useEffect(() => {
@@ -70,9 +72,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await window.electronAPI.getFileBlame(path, 'HEAD');
+        const result = await window.electronAPI.getFileBlameRange(path, 'HEAD', 1, 500);
         if (result.success) {
           setBlameLines(result.data || []);
+          setBlameHasMore((result.data || []).length === 500);
         } else {
           setBlameLines([]);
           setBlameError(result.error || tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
@@ -88,6 +91,22 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
 
     fetchBlame();
   }, [activeTab, path, tr]);
+
+  const loadMoreBlame = async () => {
+    if (blameLoading || !blameHasMore) return;
+    setBlameLoading(true);
+    try {
+      const result = await window.electronAPI.getFileBlameRange(path, 'HEAD', blameLines.length + 1, 500);
+      if (!result.success) {
+        setBlameError(result.error);
+        return;
+      }
+      setBlameLines((current) => [...current, ...result.data]);
+      setBlameHasMore(result.data.length === 500);
+    } finally {
+      setBlameLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== 'patch' || !path) return;
@@ -171,6 +190,16 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
                   </div>
                 ))}
               </div>
+              {blameHasMore && (
+                <button
+                  className="staging-tool-btn"
+                  onClick={() => void loadMoreBlame()}
+                  disabled={blameLoading}
+                  style={{ margin: 8 }}
+                >
+                  {tr('Weitere 500 Zeilen laden', 'Load 500 more lines')}
+                </button>
+              )}
             </div>
           )}
         </div>

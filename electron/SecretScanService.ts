@@ -207,106 +207,44 @@ function sanitizeContextLine(line: string): string {
     .replace(/\bxox[baprs]-[A-Za-z0-9-]{10,255}\b/g, '[REDACTED_SLACK_TOKEN]');
 }
 
-function parseAddedLinesFromDiff(diff: string, source: SecretScanSource): DiffCandidateLine[] {
-  const lines = (diff || '').split(/\r?\n/);
-  const candidates: DiffCandidateLine[] = [];
-
-  let currentFile = '';
-  let currentNewLineNumber = 0;
-
-  for (const rawLine of lines) {
-    const line = rawLine || '';
-    const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-    if (diffFileMatch) {
-      currentFile = diffFileMatch[2] || diffFileMatch[1] || '';
-      currentNewLineNumber = 0;
-      continue;
-    }
-
-    const plusFileMatch = line.match(/^\+\+\+ b\/(.+)$/);
-    if (plusFileMatch) {
-      currentFile = plusFileMatch[1] || currentFile;
-      continue;
-    }
-
-    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-    if (hunkMatch) {
-      currentNewLineNumber = Number(hunkMatch[1]) || 0;
-      continue;
-    }
-
-    if (!currentFile || currentNewLineNumber <= 0) {
-      continue;
-    }
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      candidates.push({
-        filePath: currentFile,
-        lineNumber: currentNewLineNumber,
-        line: line.slice(1),
-        source,
-      });
-      currentNewLineNumber += 1;
-      continue;
-    }
-
-    if (line.startsWith(' ')) {
-      currentNewLineNumber += 1;
-      continue;
-    }
-  }
-
-  return candidates;
-}
-
 export class SecretScanService {
   constructor(private readonly gitService: GitService) {}
 
-  async scanPushDiffs(options: { strictness: SecretScanStrictness; allowlistText: string }): Promise<SecretScanResult> {
+  async scanPushDiffs(options: {
+    strictness: SecretScanStrictness;
+    allowlistText: string;
+    signal?: AbortSignal;
+    onProgress?: (checkedLines: number) => void;
+  }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
     const notes: string[] = [];
-
-    const stagedDiff = await this.gitService.runCommand(['diff', '--cached', '--no-color', '--unified=0']);
-    const stagedCandidates = parseAddedLinesFromDiff(stagedDiff, 'staged');
-
-    let toPushCandidates: DiffCandidateLine[] = [];
-    try {
-      const upstreamRef = await this.gitService.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
-      if (upstreamRef) {
-        const outgoingDiff = await this.gitService.runCommand(['diff', '--no-color', '--unified=0', `${upstreamRef}..HEAD`]);
-        toPushCandidates = parseAddedLinesFromDiff(outgoingDiff, 'to-push');
-      }
-    } catch {
-      notes.push('No upstream tracking branch available, to-push scan skipped.');
-    }
-
-    const allCandidates = [...stagedCandidates, ...toPushCandidates];
     const findings: SecretScanFinding[] = [];
+    let stagedLines = 0;
+    let toPushLines = 0;
+    let findingLimitNoted = false;
 
-    for (const candidate of allCandidates) {
-      if (shouldIgnorePath(candidate.filePath)) {
-        continue;
-      }
+    const scanCandidate = (candidate: DiffCandidateLine) => {
+      if (candidate.source === 'staged') stagedLines += 1;
+      else toPushLines += 1;
+      const checkedLines = stagedLines + toPushLines;
+      if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
+      if (shouldIgnorePath(candidate.filePath)) return;
 
       for (const pattern of SECRET_PATTERNS) {
-        if (!patternEnabledForStrictness(pattern, strictness)) {
+        if (!patternEnabledForStrictness(pattern, strictness)) continue;
+        if (!pattern.regex.test(candidate.line)) continue;
+        if (isAllowlisted(
+          { filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id },
+          allowlistRules,
+        )) continue;
+        if (findings.length >= 1000) {
+          if (!findingLimitNoted) {
+            notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
+            findingLimitNoted = true;
+          }
           continue;
         }
-
-        if (!pattern.regex.test(candidate.line)) {
-          continue;
-        }
-
-        if (
-          isAllowlisted(
-            { filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id },
-            allowlistRules,
-          )
-        ) {
-          continue;
-        }
-
         findings.push({
           id: `${candidate.source}:${candidate.filePath}:${candidate.lineNumber}:${pattern.id}:${findings.length + 1}`,
           ruleId: pattern.id,
@@ -317,7 +255,54 @@ export class SecretScanService {
           contextLine: sanitizeContextLine(candidate.line),
         });
       }
+    };
+
+    const streamDiff = async (args: string[], source: SecretScanSource) => {
+      let currentFile = '';
+      let currentNewLineNumber = 0;
+      await this.gitService.streamCommandLines(args, (line) => {
+        const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+        if (diffFileMatch) {
+          currentFile = diffFileMatch[2] || diffFileMatch[1] || '';
+          currentNewLineNumber = 0;
+          return;
+        }
+        const plusFileMatch = line.match(/^\+\+\+ b\/(.+)$/);
+        if (plusFileMatch) {
+          currentFile = plusFileMatch[1] || currentFile;
+          return;
+        }
+        const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (hunkMatch) {
+          currentNewLineNumber = Number(hunkMatch[1]) || 0;
+          return;
+        }
+        if (!currentFile || currentNewLineNumber <= 0) return;
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          scanCandidate({
+            filePath: currentFile,
+            lineNumber: currentNewLineNumber,
+            line: line.slice(1),
+            source,
+          });
+          currentNewLineNumber += 1;
+          return;
+        }
+        if (line.startsWith(' ')) currentNewLineNumber += 1;
+      }, options.signal);
+    };
+
+    await streamDiff(['diff', '--cached', '--no-color', '--unified=0'], 'staged');
+    try {
+      const upstreamRef = await this.gitService.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+      if (upstreamRef) {
+        await streamDiff(['diff', '--no-color', '--unified=0', `${upstreamRef}..HEAD`], 'to-push');
+      }
+    } catch (error) {
+      if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
+      notes.push('No upstream tracking branch available, to-push scan skipped.');
     }
+    options.onProgress?.(stagedLines + toPushLines);
 
     return {
       scanned: true,
@@ -325,9 +310,9 @@ export class SecretScanService {
       findings,
       notes,
       stats: {
-        checkedLines: allCandidates.length,
-        stagedLines: stagedCandidates.length,
-        toPushLines: toPushCandidates.length,
+        checkedLines: stagedLines + toPushLines,
+        stagedLines,
+        toPushLines,
       },
     };
   }

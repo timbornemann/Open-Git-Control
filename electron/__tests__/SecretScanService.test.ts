@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { SecretScanService } from '../SecretScanService';
 
 function createGitServiceMock(outputs: Record<string, string | Error>) {
+  const resolve = async (args: string[]) => {
+    const key = args.join(' ');
+    const value = outputs[key];
+    if (value instanceof Error) {
+      throw value;
+    }
+    return typeof value === 'string' ? value : '';
+  };
   return {
-    runCommand: async (args: string[]) => {
-      const key = args.join(' ');
-      const value = outputs[key];
-      if (value instanceof Error) {
-        throw value;
-      }
-      if (typeof value === 'string') {
-        return value;
-      }
-      return '';
+    runCommand: resolve,
+    streamCommandLines: async (args: string[], onLine: (line: string) => void) => {
+      const output = await resolve(args);
+      output.split(/\r?\n/).forEach(onLine);
     },
   } as any;
 }

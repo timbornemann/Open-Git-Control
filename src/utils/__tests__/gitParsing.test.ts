@@ -58,7 +58,8 @@ describe('parseGitLog', () => {
       subject: '',
       parentHashes: [],
       refs: [],
-      stats: { files: 0, additions: 0, deletions: 0 },
+      stats: null,
+      statsState: 'missing',
     });
   });
 
@@ -96,7 +97,8 @@ describe('parseGitLog', () => {
     ].join('');
 
     const parsed = parseGitLog(output);
-    expect(parsed[0].stats).toEqual({ files: 0, additions: 0, deletions: 0 });
+    expect(parsed[0].stats).toBeNull();
+    expect(parsed[0].statsState).toBe('missing');
   });
 
   it('parses merge commits with multiple parents and split refs', () => {
@@ -134,7 +136,8 @@ describe('parseGitLog', () => {
     const parsed = parseGitLog(output);
 
     expect(parsed).toHaveLength(1);
-    expect(parsed[0].stats).toEqual({ files: 0, additions: 0, deletions: 0 });
+    expect(parsed[0].stats).toBeNull();
+    expect(parsed[0].statsState).toBe('missing');
   });
 
 

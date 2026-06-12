@@ -18,10 +18,10 @@ describe('GitService.getLog pagination', () => {
       '--topo-order',
       '-120',
       '--skip=40',
-      '--numstat',
     ]));
     const args = runCommandSpy.mock.calls[0][0];
     expect(args).not.toContain('--all');
+    expect(args).not.toContain('--numstat');
   });
 
   it('clamps invalid offset to 0', async () => {
@@ -33,6 +33,54 @@ describe('GitService.getLog pagination', () => {
     const args = runCommandSpy.mock.calls[0][0];
     expect(args).toContain('--skip=0');
     expect(args).toContain('--all');
+  });
+});
+
+describe('GitService commit statistics', () => {
+  it('diffs a root commit against the empty tree', async () => {
+    const service = new GitService();
+    const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
+      .mockResolvedValueOnce(`${'a'.repeat(40)}`)
+      .mockResolvedValueOnce('10\t2\tsrc/root.ts');
+
+    await expect(service.getCommitStatsAtPath('C:/repo', 'a'.repeat(40), new AbortController().signal))
+      .resolves.toEqual({ files: 1, additions: 10, deletions: 2 });
+    expect(run.mock.calls[1][1]).toEqual([
+      'diff-tree',
+      '--root',
+      '--no-commit-id',
+      '--numstat',
+      '-r',
+      '-M',
+      'a'.repeat(40),
+    ]);
+  });
+
+  it('uses only the first parent for normal and merge commits', async () => {
+    const service = new GitService();
+    const hash = 'c'.repeat(40);
+    const firstParent = 'a'.repeat(40);
+    const secondParent = 'b'.repeat(40);
+    const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
+      .mockResolvedValueOnce(`${hash} ${firstParent}`)
+      .mockResolvedValueOnce('1\t1\tnormal.ts')
+      .mockResolvedValueOnce(`${hash} ${firstParent} ${secondParent}`)
+      .mockResolvedValueOnce('2\t3\tmerge.ts');
+    const signal = new AbortController().signal;
+
+    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal))
+      .resolves.toEqual({ files: 1, additions: 1, deletions: 1 });
+    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal))
+      .resolves.toEqual({ files: 1, additions: 2, deletions: 3 });
+    expect(run.mock.calls[3][1]).toEqual([
+      'diff-tree',
+      '--no-commit-id',
+      '--numstat',
+      '-r',
+      '-M',
+      firstParent,
+      hash,
+    ]);
   });
 });
 
@@ -226,6 +274,32 @@ describe('GitService command queue', () => {
       expect(maxInFlight).toBeGreaterThan(1);
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('GitService scheduler classification', () => {
+  it('treats metadata listings as polling and repository mutations as writes', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-scheduler-classification-'));
+    const runner = vi.fn(async () => ({ stdout: '', stderr: '' }));
+    const service = new GitService(runner as any);
+
+    try {
+      await service.runCommandAtPath(repoPath, ['branch', '-a']);
+      await service.runCommandAtPath(repoPath, ['remote', '-v']);
+      await service.runCommandAtPath(repoPath, ['tag', '-l']);
+      await service.runCommandAtPath(repoPath, ['submodule', 'status', '--recursive']);
+      await service.runCommandAtPath(repoPath, ['branch', '-d', 'old-branch']);
+
+      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual([
+        'polling',
+        'polling',
+        'polling',
+        'polling',
+        'write',
+      ]);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
     }
   });
 });
