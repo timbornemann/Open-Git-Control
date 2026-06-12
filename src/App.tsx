@@ -329,6 +329,8 @@ const App: React.FC = () => {
     commitNavigationRequest: state.commitNavigationRequest,
     refreshTrigger: state.refreshTrigger,
     triggerRefresh: state.triggerRefresh,
+    commitRefreshTrigger: state.commitRefreshTrigger,
+    triggerCommitRefresh: state.triggerCommitRefresh,
     showSecondaryHistory: state.settings.showSecondaryHistory,
 
     onFetch: () => state.refreshRemoteState(true),

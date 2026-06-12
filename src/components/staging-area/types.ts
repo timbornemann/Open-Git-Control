@@ -7,6 +7,7 @@ import type { DiffRequest } from '../../types/diff';
 export interface StagingAreaProps {
   repoPath: string | null;
   onRepoChanged?: () => void;
+  onCommitsCreated?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
   onOpenConflictResolver?: (filePath: string) => void;

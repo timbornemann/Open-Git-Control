@@ -23,6 +23,8 @@ export type AppContextValue = AppSidebarProps & {
   commitNavigationRequest: CommitNavigationRequest | null;
   refreshTrigger: number;
   triggerRefresh: () => void;
+  commitRefreshTrigger: number;
+  triggerCommitRefresh: () => void;
   showSecondaryHistory: boolean;
 
   // Branch merge (used by MainView/TopbarActions and CommitGraph)

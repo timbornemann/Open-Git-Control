@@ -12,6 +12,7 @@ type Params = {
   setToast: (msg: ToastMessage | null) => void;
   refresh: () => Promise<void>;
   onRepoChanged?: () => void;
+  onCommitsCreated?: () => void;
 };
 
 type AiJobStatus = 'idle' | 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
@@ -32,7 +33,7 @@ const asString = (value: unknown): string | null => (
   typeof value === 'string' && value.trim().length > 0 ? value : null
 );
 
-export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params) => {
+export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommitsCreated }: Params) => {
   const { tr } = useI18n();
   const [isAiCommitting, setIsAiCommitting] = useState(false);
   const [isAiJobRunning, setIsAiJobRunning] = useState(false);
@@ -273,7 +274,8 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
         console.info('AI Auto-Commit diagnostics:', diagnostics);
       }
 
-      if (onRepoChanged) onRepoChanged();
+      if (onCommitsCreated) onCommitsCreated();
+      else if (onRepoChanged) onRepoChanged();
       await refresh();
 
       if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
@@ -303,7 +305,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged }: Params
       cancelRequestedRef.current = false;
       setIsAiCommitting(false);
     }
-  }, [clearTerminalClearTimer, isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, refresh, scheduleTerminalClear, setToast, status, tr]);
+  }, [clearTerminalClearTimer, isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, onCommitsCreated, refresh, scheduleTerminalClear, setToast, status, tr]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
     if (!window.electronAPI) return;

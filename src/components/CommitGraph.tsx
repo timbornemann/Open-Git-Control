@@ -28,6 +28,7 @@ interface CommitGraphProps {
   selectedHash?: string | null;
   navigationRequest?: { hash: string; requestId: number } | null;
   refreshTrigger?: number;
+  commitRefreshTrigger?: number;
   showSecondaryHistory?: boolean;
   onOpenDiff?: (request: DiffRequest) => void;
   showRecoveryCenter?: boolean;
@@ -116,6 +117,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   selectedHash,
   navigationRequest,
   refreshTrigger,
+  commitRefreshTrigger,
   showSecondaryHistory = true,
   onOpenDiff,
   showRecoveryCenter = false,
@@ -184,6 +186,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     repoPath,
     showSecondaryHistory,
     refreshTrigger,
+    commitRefreshTrigger,
     logContainerRef,
     onRepoCleared: handleRepoCleared,
   });

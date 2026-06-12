@@ -211,6 +211,8 @@ export const MainView: React.FC = () => {
     commitNavigationRequest,
     refreshTrigger,
     triggerRefresh,
+    commitRefreshTrigger,
+    triggerCommitRefresh,
     showSecondaryHistory,
     onFetch,
     onPull,
@@ -461,6 +463,7 @@ export const MainView: React.FC = () => {
               <StagingArea
                 repoPath={activeRepo}
                 onRepoChanged={triggerRefresh}
+                onCommitsCreated={triggerCommitRefresh}
                 onOpenDiff={handleOpenDiff}
                 viewMode="conflictOnly"
                 initialConflictPath={activeConflictPath}
@@ -486,6 +489,7 @@ export const MainView: React.FC = () => {
                 navigationRequest={commitNavigationRequest}
                 onSelectCommit={handleSelectCommitDirect}
                 refreshTrigger={refreshTrigger}
+                commitRefreshTrigger={commitRefreshTrigger}
                 showSecondaryHistory={showSecondaryHistory}
                 onOpenDiff={handleOpenDiff}
                 showRecoveryCenter={showRecoveryCenter}
@@ -543,6 +547,7 @@ export const MainView: React.FC = () => {
                   <StagingArea
                     repoPath={activeRepo}
                     onRepoChanged={triggerRefresh}
+                    onCommitsCreated={triggerCommitRefresh}
                     onOpenDiff={handleOpenDiff}
                     onSelectFileInspect={handleSelectWorkingTreeFile}
                     onOpenConflictResolver={handleOpenConflictResolver}

@@ -28,6 +28,7 @@ import { useI18n } from '../i18n';
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
   onRepoChanged,
+  onCommitsCreated,
   onOpenDiff,
   onSelectFileInspect,
   onOpenConflictResolver,
@@ -66,6 +67,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setToast,
     refresh: fileOps.refresh,
     onRepoChanged,
+    onCommitsCreated,
     settings,
   });
 
@@ -74,6 +76,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setToast,
     refresh: fileOps.refresh,
     onRepoChanged,
+    onCommitsCreated,
   });
 
   const conflicts = useConflictResolver({

@@ -155,6 +155,7 @@ export const useAppState = () => {
     setAutoOpenConflictResolverPath(null);
   }, []);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [commitRefreshTrigger, setCommitRefreshTrigger] = useState(0);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
@@ -228,6 +229,10 @@ export const useAppState = () => {
 
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
+  }, []);
+
+  const triggerCommitRefresh = useCallback(() => {
+    setCommitRefreshTrigger(prev => prev + 1);
   }, []);
 
   const resetRepoScopedUi = useCallback(() => {
@@ -2064,6 +2069,8 @@ export const useAppState = () => {
 
     refreshTrigger,
     triggerRefresh,
+    commitRefreshTrigger,
+    triggerCommitRefresh,
     selectedCommit,
     setSelectedCommit,
     commitNavigationRequest,

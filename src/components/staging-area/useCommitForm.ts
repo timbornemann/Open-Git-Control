@@ -10,10 +10,11 @@ type Params = {
   setToast: (msg: ToastMessage | null) => void;
   refresh: () => Promise<void>;
   onRepoChanged?: () => void;
+  onCommitsCreated?: () => void;
   settings: AppSettingsDto;
 };
 
-export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, settings }: Params) => {
+export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings }: Params) => {
   const { tr } = useI18n();
   const [commitMsg, setCommitMsg] = useState('');
   const [commitDescription, setCommitDescription] = useState('');
@@ -71,7 +72,8 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
         setCommitMsg('');
         setCommitDescription('');
         setToast({ msg: tr('Commit erfolgreich!', 'Commit successful!'), isError: false });
-        if (onRepoChanged) onRepoChanged();
+        if (onCommitsCreated) onCommitsCreated();
+        else if (onRepoChanged) onRepoChanged();
         await refresh();
       } else {
         setToast({ msg: r.error || tr('Commit fehlgeschlagen', 'Commit failed'), isError: true });
@@ -82,7 +84,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       isCommittingRef.current = false;
       setIsCommitting(false);
     }
-  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged, tr]);
+  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
 
   return {
     commitMsg, setCommitMsg,

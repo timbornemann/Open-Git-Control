@@ -8,13 +8,15 @@ import {
   type GitCommit,
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
+import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
 
 const LOG_PAGE_SIZE = 200;
+const QUICK_REFRESH_LIMIT = 50;
 const LOG_MAX_LIMIT = 5000;
 const LOG_OVERFETCH_COUNT = 1;
 const AUTO_LOAD_TRIGGER_PX = 220;
 const AUTO_LOAD_RESET_PX = 420;
-type RefreshMode = 'reset' | 'append' | 'sync';
+type RefreshMode = 'reset' | 'append' | 'sync' | 'quick';
 
 const mergeUniqueCommits = (base: GitCommit[], incoming: GitCommit[]): GitCommit[] => {
   const out: GitCommit[] = [];
@@ -31,6 +33,7 @@ type Params = {
   repoPath: string | null;
   showSecondaryHistory: boolean;
   refreshTrigger?: number;
+  commitRefreshTrigger?: number;
   logContainerRef: RefObject<HTMLDivElement>;
   onRepoCleared?: () => void;
 };
@@ -39,6 +42,7 @@ export const useCommitGraphData = ({
   repoPath,
   showSecondaryHistory,
   refreshTrigger,
+  commitRefreshTrigger,
   logContainerRef,
   onRepoCleared,
 }: Params) => {
@@ -56,10 +60,11 @@ export const useCommitGraphData = ({
   const pendingScrollHeightRef = useRef<number | null>(null);
   const pendingScrollModeRef = useRef<RefreshMode | null>(null);
   const appendInFlightRef = useRef(false);
-  const pendingSyncAfterAppendRef = useRef(false);
+  const pendingRefreshAfterAppendRef = useRef<RefreshMode | null>(null);
   const autoLoadArmedRef = useRef(true);
   const lastRepoPathRef = useRef<string | null>(null);
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
+  const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
 
   useEffect(() => {
@@ -71,8 +76,9 @@ export const useCommitGraphData = ({
 
     const isAppend = mode === 'append';
     const isSync = mode === 'sync';
+    const isQuick = mode === 'quick';
     if (!isAppend && appendInFlightRef.current) {
-      pendingSyncAfterAppendRef.current = true;
+      pendingRefreshAfterAppendRef.current = mode;
       return;
     }
     if (isAppend && appendInFlightRef.current) {
@@ -84,18 +90,20 @@ export const useCommitGraphData = ({
     const forceTopOnReset = !isAppend && !isSync && forceScrollToTopOnNextResetRef.current;
     const requestedLimitRaw = isAppend
       ? LOG_PAGE_SIZE
-      : isSync
-        ? Math.max(LOG_PAGE_SIZE, commitCountRef.current)
-        : LOG_PAGE_SIZE;
+      : isQuick
+        ? QUICK_REFRESH_LIMIT
+        : isSync
+          ? Math.max(LOG_PAGE_SIZE, commitCountRef.current)
+          : LOG_PAGE_SIZE;
     const requestedLimit = Math.max(1, Math.min(requestedLimitRaw, LOG_MAX_LIMIT));
     const fetchLimit = requestedLimit < LOG_MAX_LIMIT
       ? requestedLimit + LOG_OVERFETCH_COUNT
       : requestedLimit;
 
-    if ((isAppend || isSync) && scrollContainer) {
-      pendingScrollTopRef.current = scrollContainer.scrollTop;
+    if ((isAppend || isSync || isQuick) && scrollContainer) {
+      pendingScrollTopRef.current = isQuick ? 0 : scrollContainer.scrollTop;
       pendingScrollHeightRef.current = isSync ? scrollContainer.scrollHeight : null;
-      pendingScrollModeRef.current = isAppend ? 'append' : 'sync';
+      pendingScrollModeRef.current = isAppend ? 'append' : isQuick ? 'quick' : 'sync';
       if (isAppend) {
         appendInFlightRef.current = true;
         setLoadingMore(true);
@@ -131,6 +139,13 @@ export const useCommitGraphData = ({
           setCommitCount(nextCount);
           setHasMoreCommits(hasMore);
           setLayout(computeGraphLayout(merged));
+        } else if (isQuick) {
+          const existing = layoutRef.current?.nodes.map((node) => node.commit) ?? [];
+          const merged = mergeQuickRefreshCommits(existing, visibleChunk);
+          commitCountRef.current = merged.length;
+          setCommitCount(merged.length);
+          setHasMoreCommits(hasMore || merged.length > visibleChunk.length);
+          setLayout(computeGraphLayout(merged));
         } else {
           const normalized = mergeUniqueCommits([], visibleChunk);
           commitCountRef.current = normalized.length;
@@ -161,10 +176,11 @@ export const useCommitGraphData = ({
       if (isAppend) {
         appendInFlightRef.current = false;
         setLoadingMore(false);
-        if (pendingSyncAfterAppendRef.current) {
-          pendingSyncAfterAppendRef.current = false;
+        if (pendingRefreshAfterAppendRef.current) {
+          const pendingMode = pendingRefreshAfterAppendRef.current;
+          pendingRefreshAfterAppendRef.current = null;
           queueMicrotask(() => {
-            void refreshCommits('sync');
+            void refreshCommits(pendingMode);
           });
         }
       } else if (shouldShowLoadingState) {
@@ -206,7 +222,7 @@ export const useCommitGraphData = ({
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
       appendInFlightRef.current = false;
-      pendingSyncAfterAppendRef.current = false;
+      pendingRefreshAfterAppendRef.current = null;
       autoLoadArmedRef.current = true;
       lastRepoPathRef.current = null;
       lastSecondaryHistoryRef.current = showSecondaryHistory;
@@ -233,7 +249,7 @@ export const useCommitGraphData = ({
       pendingScrollHeightRef.current = null;
       pendingScrollModeRef.current = null;
       appendInFlightRef.current = false;
-      pendingSyncAfterAppendRef.current = false;
+      pendingRefreshAfterAppendRef.current = null;
       autoLoadArmedRef.current = true;
       forceScrollToTopOnNextResetRef.current = true;
     }
@@ -245,6 +261,14 @@ export const useCommitGraphData = ({
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
   }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory]);
+
+  useEffect(() => {
+    if (commitRefreshTrigger === lastCommitRefreshTriggerRef.current) return;
+    lastCommitRefreshTriggerRef.current = commitRefreshTrigger;
+    if (!repoPath) return;
+    void refreshCommits('quick');
+    void refreshWorkingTreeStatus();
+  }, [commitRefreshTrigger, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
   useEffect(() => {
     layoutRef.current = layout;
