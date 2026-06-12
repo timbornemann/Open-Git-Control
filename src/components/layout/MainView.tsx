@@ -267,13 +267,13 @@ export const MainView: React.FC = () => {
 
   const {
     activeDiffRequest,
-    setActiveDiffRequest,
     activeConflictPath,
     setActiveConflictPath,
     showRecoveryCenter,
     setShowRecoveryCenter,
     commitHistoryStack,
     workingTreeSelection,
+    isCommitInspectorOpen,
     handleToggleRecoveryCenter,
     handleOpenDiff,
     handleOpenConflictResolver,
@@ -420,7 +420,7 @@ export const MainView: React.FC = () => {
               ) : activeDiffRequest ? (
                 <button
                   className="icon-btn pane-header-nav-btn"
-                  onClick={() => setActiveDiffRequest(null)}
+                  onClick={closeInspector}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
@@ -467,7 +467,7 @@ export const MainView: React.FC = () => {
                 settings={settings}
               />
             ) : activeDiffRequest ? (
-              <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={() => setActiveDiffRequest(null)} onRepoChanged={triggerRefresh} />
+              <DiffViewer repoPath={activeRepo} request={activeDiffRequest} onClose={closeInspector} onRepoChanged={triggerRefresh} />
             ) : showGithubGuide ? (
               <GithubAuthGuide
                 method={selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>}
@@ -511,10 +511,10 @@ export const MainView: React.FC = () => {
 
             <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
               <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
-                {(selectedCommit || workingTreeSelection) && (
+                <span>{isCommitInspectorOpen && selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
+                {((isCommitInspectorOpen && selectedCommit) || workingTreeSelection) && (
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    {selectedCommit && commitHistoryStack.length > 0 && (
+                    {isCommitInspectorOpen && selectedCommit && commitHistoryStack.length > 0 && (
                       <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
                         {tr('Zurueck', 'Back')}
                       </button>
@@ -526,7 +526,7 @@ export const MainView: React.FC = () => {
                 )}
               </div>
               <div className="pane-content" style={{ overflow: 'hidden' }}>
-                {selectedCommit ? (
+                {isCommitInspectorOpen && selectedCommit ? (
                   <CommitDetails
                     hash={selectedCommit}
                     onSelectCommit={(hash) => handleSelectCommitFromHistory(hash, selectedCommit)}
