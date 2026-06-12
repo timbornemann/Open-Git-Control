@@ -208,6 +208,7 @@ export const MainView: React.FC = () => {
     activeGitActionLabel,
     selectedCommit,
     setSelectedCommit,
+    commitNavigationRequest,
     refreshTrigger,
     triggerRefresh,
     showSecondaryHistory,
@@ -290,6 +291,7 @@ export const MainView: React.FC = () => {
     activeRepo,
     onOpenRepoWorkspace,
     onCloseReleaseCreator,
+    commitNavigationRequest,
   });
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
@@ -481,6 +483,7 @@ export const MainView: React.FC = () => {
               <CommitGraph
                 repoPath={activeRepo}
                 selectedHash={selectedCommit}
+                navigationRequest={commitNavigationRequest}
                 onSelectCommit={handleSelectCommitDirect}
                 refreshTrigger={refreshTrigger}
                 showSecondaryHistory={showSecondaryHistory}

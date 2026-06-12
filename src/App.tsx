@@ -208,6 +208,7 @@ const App: React.FC = () => {
     onCreateTag: state.handleCreateTag,
     onPushTags: state.handlePushTags,
     onDeleteTag: state.handleDeleteTag,
+    onSelectTag: state.handleSelectTag,
     isTagPanelCollapsed: state.isTagPanelCollapsed,
     onToggleTagPanelCollapsed: state.toggleTagPanelCollapsed,
 
@@ -325,6 +326,7 @@ const App: React.FC = () => {
 
     selectedCommit: state.selectedCommit,
     setSelectedCommit: state.setSelectedCommit,
+    commitNavigationRequest: state.commitNavigationRequest,
     refreshTrigger: state.refreshTrigger,
     triggerRefresh: state.triggerRefresh,
     showSecondaryHistory: state.settings.showSecondaryHistory,

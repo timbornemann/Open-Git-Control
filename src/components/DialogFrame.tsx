@@ -48,7 +48,14 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const onEnterRef = useRef(onEnter);
   const { tr } = useI18n();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onEnterRef.current = onEnter;
+  }, [onClose, onEnter]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,15 +80,15 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
-      if (event.key === 'Enter' && onEnter) {
+      if (event.key === 'Enter' && onEnterRef.current) {
         const target = event.target as HTMLElement | null;
         if (target?.tagName !== 'TEXTAREA' && !target?.dataset.dialogNoEnter) {
           event.preventDefault();
-          onEnter();
+          onEnterRef.current();
           return;
         }
       }
@@ -113,7 +120,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       previousFocusRef.current?.focus();
     };
-  }, [open, onClose, onEnter, initialFocusRef]);
+  }, [open, initialFocusRef]);
 
   if (!open) return null;
 

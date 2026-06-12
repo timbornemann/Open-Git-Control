@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '../../../types/diff';
 
 type WorkingTreeSelection = {
@@ -13,6 +13,7 @@ type Params = {
   activeRepo: string | null;
   onOpenRepoWorkspace: () => void;
   onCloseReleaseCreator: () => void;
+  commitNavigationRequest?: { hash: string; requestId: number } | null;
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
@@ -28,12 +29,14 @@ export const useMainViewInspector = ({
   activeRepo,
   onOpenRepoWorkspace,
   onCloseReleaseCreator,
+  commitNavigationRequest,
 }: Params) => {
   const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
   const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
+  const handledNavigationRequestIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!autoOpenConflictResolverPath) return;
@@ -53,6 +56,27 @@ export const useMainViewInspector = ({
     setWorkingTreeSelection(null);
     setShowRecoveryCenter(false);
   }, [activeRepo]);
+
+  useEffect(() => {
+    if (!commitNavigationRequest) return;
+    if (handledNavigationRequestIdRef.current === commitNavigationRequest.requestId) return;
+    handledNavigationRequestIdRef.current = commitNavigationRequest.requestId;
+
+    onOpenRepoWorkspace();
+    onCloseReleaseCreator();
+    setActiveDiffRequest(null);
+    setActiveConflictPath(null);
+    setShowRecoveryCenter(false);
+    setWorkingTreeSelection(null);
+    setCommitHistoryStack([]);
+    setSelectedCommit(commitNavigationRequest.hash);
+  }, [
+    commitNavigationRequest?.requestId,
+    commitNavigationRequest?.hash,
+    onCloseReleaseCreator,
+    onOpenRepoWorkspace,
+    setSelectedCommit,
+  ]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     setActiveDiffRequest(null);
@@ -168,4 +192,3 @@ export const useMainViewInspector = ({
     handleStageCommitOpen,
   };
 };
-

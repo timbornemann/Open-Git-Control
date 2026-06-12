@@ -8,11 +8,12 @@ type Props = {
   onCreateTag: () => void;
   onPushTags: () => void;
   onDeleteTag: (name: string) => void;
+  onSelectTag: (name: string) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 };
 
-export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDeleteTag, collapsed, onToggleCollapsed }) => {
+export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDeleteTag, onSelectTag, collapsed, onToggleCollapsed }) => {
   const { tr } = useI18n();
   const [query, setQuery] = useState('');
 
@@ -55,10 +56,34 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
             {filteredTags.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {filteredTags.map(tag => (
-                  <div key={tag} className="repo-list-row" style={{ border: '1px solid transparent' }}>
+                  <div
+                    key={tag}
+                    className="repo-list-row"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelectTag(tag)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onSelectTag(tag);
+                      }
+                    }}
+                    style={{ border: '1px solid transparent', cursor: 'pointer' }}
+                    title={tr('Zum Commit dieses Tags springen', 'Jump to this tag commit')}
+                  >
                     <Tag size={13} style={{ opacity: 0.7 }} />
                     <span style={{ fontSize: '0.8rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag}</span>
-                    <button onClick={() => onDeleteTag(tag)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Tag loeschen', 'Delete tag')}><X size={11} /></button>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteTag(tag);
+                      }}
+                      className="icon-btn repo-close-btn"
+                      style={{ padding: '2px', opacity: 0 }}
+                      title={tr('Tag loeschen', 'Delete tag')}
+                    >
+                      <X size={11} />
+                    </button>
                   </div>
                 ))}
               </div>

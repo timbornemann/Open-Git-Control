@@ -28,6 +28,7 @@ type RepoSidebarContentProps = Pick<
   | 'onCreateTag'
   | 'onPushTags'
   | 'onDeleteTag'
+  | 'onSelectTag'
   | 'isTagPanelCollapsed'
   | 'onToggleTagPanelCollapsed'
   | 'remotes'
@@ -164,6 +165,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         onCreateTag={props.onCreateTag}
         onPushTags={props.onPushTags}
         onDeleteTag={props.onDeleteTag}
+        onSelectTag={props.onSelectTag}
         collapsed={props.isTagPanelCollapsed}
         onToggleCollapsed={props.onToggleTagPanelCollapsed}
       />

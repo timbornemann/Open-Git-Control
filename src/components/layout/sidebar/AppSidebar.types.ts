@@ -53,6 +53,7 @@ export type AppSidebarProps = {
   onCreateTag: () => void;
   onPushTags: () => void;
   onDeleteTag: (name: string) => void;
+  onSelectTag: (name: string) => void;
   isTagPanelCollapsed: boolean;
   onToggleTagPanelCollapsed: () => void;
 

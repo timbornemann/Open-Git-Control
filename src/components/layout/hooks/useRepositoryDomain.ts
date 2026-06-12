@@ -19,6 +19,7 @@ type Params = {
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
   autoFetchIntervalMs: number;
   language: AppLanguage;
+  onNavigateToCommit: (hash: string) => void;
 };
 
 export const useRepositoryDomain = ({
@@ -33,6 +34,7 @@ export const useRepositoryDomain = ({
   setInputDialog,
   autoFetchIntervalMs,
   language,
+  onNavigateToCommit,
 }: Params) => {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [currentBranch, setCurrentBranch] = useState('');
@@ -538,6 +540,31 @@ export const useRepositoryDomain = ({
     });
   };
 
+  const handleSelectTag = useCallback(async (tagName: string) => {
+    if (!activeRepo || !window.electronAPI) return;
+
+    try {
+      const tagRef = `refs/tags/${tagName}^{commit}`;
+      const result = await window.electronAPI.runGitCommand('show', '--quiet', '--format=%H', tagRef);
+      const hash = String(result.data || '').trim().split(/\s+/)[0] || '';
+
+      if (!result.success || !/^[0-9a-f]{40}$/i.test(hash)) {
+        setGitActionToast({
+          msg: result.error || tr(`Commit fuer Tag "${tagName}" konnte nicht gefunden werden.`, `Could not find the commit for tag "${tagName}".`),
+          isError: true,
+        });
+        return;
+      }
+
+      onNavigateToCommit(hash);
+    } catch (error: any) {
+      setGitActionToast({
+        msg: error?.message || tr(`Tag "${tagName}" konnte nicht geoeffnet werden.`, `Could not open tag "${tagName}".`),
+        isError: true,
+      });
+    }
+  }, [activeRepo, onNavigateToCommit, setGitActionToast, language]);
+
   const handlePushTags = async () => {
     await runGitCommand(['push', '--tags'], tr('Tags gepusht.', 'Pushed tags.'));
   };
@@ -776,6 +803,7 @@ export const useRepositoryDomain = ({
     handleRenameBranch,
     handleCreateTag,
     handleDeleteTag,
+    handleSelectTag,
     handlePushTags,
     handleAddRemote,
     handleRemoveRemote,

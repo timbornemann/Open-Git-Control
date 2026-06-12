@@ -148,6 +148,8 @@ const parseGithubRepoReference = (cloneSource: string): ParsedGithubRepoReferenc
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
+  const [commitNavigationRequest, setCommitNavigationRequest] = useState<{ hash: string; requestId: number } | null>(null);
+  const commitNavigationSequenceRef = useRef(0);
   const [autoOpenConflictResolverPath, setAutoOpenConflictResolverPath] = useState<string | null>(null);
   const clearAutoOpenConflictResolverPath = useCallback(() => {
     setAutoOpenConflictResolverPath(null);
@@ -230,6 +232,7 @@ export const useAppState = () => {
 
   const resetRepoScopedUi = useCallback(() => {
     setSelectedCommit(null);
+    setCommitNavigationRequest(null);
     setAutoOpenConflictResolverPath(null);
     setNewRepoName('');
     setNewRepoDescription('');
@@ -1373,6 +1376,20 @@ export const useAppState = () => {
 
   isGitActionRunningRef.current = isGitActionRunning;
 
+  const navigateToCommit = useCallback((hash: string) => {
+    const normalizedHash = String(hash || '').trim();
+    if (!/^[0-9a-f]{40}$/i.test(normalizedHash)) return;
+
+    workspace.setActiveTab('repo');
+    setShowReleaseCreator(false);
+    setSelectedCommit(normalizedHash);
+    commitNavigationSequenceRef.current += 1;
+    setCommitNavigationRequest({
+      hash: normalizedHash,
+      requestId: commitNavigationSequenceRef.current,
+    });
+  }, [setShowReleaseCreator, workspace.setActiveTab]);
+
   const repository = useRepositoryDomain({
     activeRepo: workspace.activeRepo,
     refreshTrigger,
@@ -1385,6 +1402,7 @@ export const useAppState = () => {
     setInputDialog,
     autoFetchIntervalMs: settings.autoFetchIntervalMs,
     language: settings.language,
+    onNavigateToCommit: navigateToCommit,
   });
 
   const github = useGithubDomain({
@@ -2048,6 +2066,7 @@ export const useAppState = () => {
     triggerRefresh,
     selectedCommit,
     setSelectedCommit,
+    commitNavigationRequest,
     autoOpenConflictResolverPath,
     clearAutoOpenConflictResolverPath,
     openConflictResolverForPath,
@@ -2095,6 +2114,7 @@ export const useAppState = () => {
     handleRenameBranch: repository.handleRenameBranch,
     handleCreateTag: repository.handleCreateTag,
     handleDeleteTag: repository.handleDeleteTag,
+    handleSelectTag: repository.handleSelectTag,
     handlePushTags: repository.handlePushTags,
     handleAddRemote: repository.handleAddRemote,
     handleRemoveRemote: repository.handleRemoveRemote,

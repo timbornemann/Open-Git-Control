@@ -26,6 +26,7 @@ interface CommitGraphProps {
   repoPath: string | null;
   onSelectCommit?: (hash: string | null) => void;
   selectedHash?: string | null;
+  navigationRequest?: { hash: string; requestId: number } | null;
   refreshTrigger?: number;
   showSecondaryHistory?: boolean;
   onOpenDiff?: (request: DiffRequest) => void;
@@ -113,6 +114,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   repoPath,
   onSelectCommit,
   selectedHash,
+  navigationRequest,
   refreshTrigger,
   showSecondaryHistory = true,
   onOpenDiff,
@@ -145,6 +147,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
   const didRunInitialBranchEffectRef = useRef(false);
+  const navigationAttemptRef = useRef<{ requestId: number; attempts: number } | null>(null);
+  const completedNavigationRequestIdRef = useRef<number | null>(null);
 
   const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
     all: tr('Alles', 'All'),
@@ -243,6 +247,61 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
     }
   }, [repoPath]);
+
+  useEffect(() => {
+    if (!navigationRequest || !layout) return;
+    if (completedNavigationRequestIdRef.current === navigationRequest.requestId) return;
+
+    if (navigationAttemptRef.current?.requestId !== navigationRequest.requestId) {
+      navigationAttemptRef.current = { requestId: navigationRequest.requestId, attempts: 0 };
+    }
+
+    const nodeIndex = layout.nodes.findIndex((node) => node.commit.hash === navigationRequest.hash);
+    if (nodeIndex >= 0) {
+      const container = logContainerRef.current?.parentElement;
+      if (!container) return;
+
+      const workingTreeRowOffset = workingTreeStatus && (
+        workingTreeStatus.staged.length > 0
+        || workingTreeStatus.unstaged.length > 0
+        || workingTreeStatus.untracked.length > 0
+      ) ? 1 : 0;
+      const rowTop = (nodeIndex + workingTreeRowOffset) * ROW_HEIGHT;
+      const targetTop = Math.max(0, rowTop - Math.max(0, (container.clientHeight - ROW_HEIGHT) / 2));
+      container.scrollTo({ top: targetTop, behavior: 'smooth' });
+      navigationAttemptRef.current = null;
+      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      return;
+    }
+
+    if (!hasMoreCommits) {
+      navigationAttemptRef.current = null;
+      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      return;
+    }
+    if (loadingMore || loading) return;
+
+    const attempts = navigationAttemptRef.current?.attempts ?? 0;
+    if (attempts >= 25) {
+      navigationAttemptRef.current = null;
+      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      return;
+    }
+
+    navigationAttemptRef.current = {
+      requestId: navigationRequest.requestId,
+      attempts: attempts + 1,
+    };
+    void loadMoreCommits();
+  }, [
+    hasMoreCommits,
+    layout,
+    loadMoreCommits,
+    loading,
+    loadingMore,
+    navigationRequest,
+    workingTreeStatus,
+  ]);
 
   useEffect(() => {
     try {

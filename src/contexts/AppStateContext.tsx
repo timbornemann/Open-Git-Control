@@ -4,6 +4,11 @@ import { GitHubReleaseContextDto } from '../global';
 import { ReleaseNotesOptions } from '../types/releaseNotes';
 import { GitMergeMode } from '../types/git';
 
+export type CommitNavigationRequest = {
+  hash: string;
+  requestId: number;
+};
+
 export type AppContextValue = AppSidebarProps & {
   // Navigation & UI (local App.tsx state)
   onClearGithubAuthHelpMethod: () => void;
@@ -15,6 +20,7 @@ export type AppContextValue = AppSidebarProps & {
   // Commit graph
   selectedCommit: string | null;
   setSelectedCommit: (hash: string | null) => void;
+  commitNavigationRequest: CommitNavigationRequest | null;
   refreshTrigger: number;
   triggerRefresh: () => void;
   showSecondaryHistory: boolean;
