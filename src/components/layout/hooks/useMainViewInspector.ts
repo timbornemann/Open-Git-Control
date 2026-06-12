@@ -36,6 +36,7 @@ export const useMainViewInspector = ({
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
+  const [isCommitInspectorOpen, setIsCommitInspectorOpen] = useState(false);
   const handledNavigationRequestIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export const useMainViewInspector = ({
     setActiveDiffRequest(null);
     setShowRecoveryCenter(false);
     setWorkingTreeSelection(null);
+    setIsCommitInspectorOpen(false);
     setCommitHistoryStack([]);
     setSelectedCommit(null);
     onAutoOpenConflictResolverConsumed?.();
@@ -54,6 +56,7 @@ export const useMainViewInspector = ({
     setActiveConflictPath(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
+    setIsCommitInspectorOpen(false);
     setShowRecoveryCenter(false);
   }, [activeRepo]);
 
@@ -68,6 +71,7 @@ export const useMainViewInspector = ({
     setActiveConflictPath(null);
     setShowRecoveryCenter(false);
     setWorkingTreeSelection(null);
+    setIsCommitInspectorOpen(true);
     setCommitHistoryStack([]);
     setSelectedCommit(commitNavigationRequest.hash);
   }, [
@@ -113,6 +117,7 @@ export const useMainViewInspector = ({
     setWorkingTreeSelection(null);
     setActiveConflictPath(null);
     setCommitHistoryStack([]);
+    setIsCommitInspectorOpen(Boolean(normalized));
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
 
@@ -121,6 +126,7 @@ export const useMainViewInspector = ({
     if (!normalized) return;
 
     if (!selectedCommit) {
+      setIsCommitInspectorOpen(true);
       setSelectedCommit(normalized);
       return;
     }
@@ -128,12 +134,14 @@ export const useMainViewInspector = ({
     if (selectedCommit === normalized) return;
 
     setCommitHistoryStack((prev) => [...prev, selectedCommit]);
+    setIsCommitInspectorOpen(true);
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
 
   const handleSelectWorkingTreeFile = useCallback((path: string, source: 'staged' | 'unstaged') => {
     setCommitHistoryStack([]);
     setActiveConflictPath(null);
+    setIsCommitInspectorOpen(false);
     setSelectedCommit(null);
     setWorkingTreeSelection({ path, source });
   }, [setSelectedCommit]);
@@ -143,6 +151,7 @@ export const useMainViewInspector = ({
     if (!normalized) return;
     setWorkingTreeSelection(null);
     setActiveConflictPath(null);
+    setIsCommitInspectorOpen(true);
     setSelectedCommit(normalized);
   }, [setSelectedCommit]);
 
@@ -150,17 +159,19 @@ export const useMainViewInspector = ({
     setCommitHistoryStack((prev) => {
       if (prev.length === 0) return prev;
       const nextHash = normalizeCommitHash(prev[prev.length - 1]);
+      setIsCommitInspectorOpen(Boolean(nextHash));
       setSelectedCommit(nextHash);
       return prev.slice(0, -1);
     });
   }, [setSelectedCommit]);
 
   const closeInspector = useCallback(() => {
+    setActiveDiffRequest(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
     setActiveConflictPath(null);
-    setSelectedCommit(null);
-  }, [setSelectedCommit]);
+    setIsCommitInspectorOpen(false);
+  }, []);
 
   const handleStageCommitOpen = useCallback(() => {
     onOpenRepoWorkspace();
@@ -180,6 +191,7 @@ export const useMainViewInspector = ({
     setShowRecoveryCenter,
     commitHistoryStack,
     workingTreeSelection,
+    isCommitInspectorOpen,
     handleToggleRecoveryCenter,
     handleOpenDiff,
     handleOpenConflictResolver,
