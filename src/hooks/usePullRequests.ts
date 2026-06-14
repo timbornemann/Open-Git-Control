@@ -7,6 +7,7 @@ import {
   PullRequestCiDto,
   PullRequestDto,
 } from '../global';
+import { useRef } from 'react';
 import { trByLanguage, type AppLanguage } from '../i18n';
 import { RepoOwnerRef } from '../types/git';
 
@@ -38,27 +39,68 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
   const [prFilter, setPrFilter] = useState<'open' | 'closed' | 'all'>('open');
   const [prCiByNumber, setPrCiByNumber] = useState<Record<number, PullRequestCiDto>>({});
+  const ownerRepoKeyRef = useRef('');
 
   useEffect(() => {
+    let active = true;
+
     const parseOwnerRepo = async () => {
-      const ownerRepo = await resolvePrOwnerRepo(window.electronAPI, activeRepo, isAuthenticated, githubHost);
-      setPrOwnerRepo(ownerRepo);
-      if (!ownerRepo) {
+      const resolution = await resolvePrOwnerRepoForRefresh(
+        window.electronAPI,
+        activeRepo,
+        isAuthenticated,
+        githubHost,
+      );
+      if (!active || !resolution.resolved) return;
+
+      const ownerRepo = resolution.ownerRepo;
+      const nextOwnerRepoKey = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : '';
+      if (ownerRepoKeyRef.current !== nextOwnerRepoKey) {
+        ownerRepoKeyRef.current = nextOwnerRepoKey;
         setPullRequests([]);
         setPrCiByNumber({});
       }
+
+      setPrOwnerRepo((previous) => {
+        if (
+          previous?.owner === ownerRepo?.owner
+          && previous?.repo === ownerRepo?.repo
+        ) {
+          return previous;
+        }
+        return ownerRepo;
+      });
     };
+
     void parseOwnerRepo();
+    return () => {
+      active = false;
+    };
   }, [activeRepo, isAuthenticated, refreshTrigger, githubHost]);
 
   useEffect(() => {
+    let active = true;
+
     const fetchPRs = async () => {
+      if (!prOwnerRepo || !isAuthenticated) {
+        setPrLoading(false);
+        return;
+      }
+
       setPrLoading(true);
       const data = await loadPullRequests(window.electronAPI, prOwnerRepo, isAuthenticated, prFilter);
-      setPullRequests(data);
+      if (!active) return;
+
+      if (data !== null) {
+        setPullRequests(data);
+      }
       setPrLoading(false);
     };
+
     void fetchPRs();
+    return () => {
+      active = false;
+    };
   }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
 
   const openPrs = useMemo(() => pullRequests.filter(pr => pr.state === 'open'), [pullRequests]);
@@ -195,14 +237,35 @@ export const resolvePrOwnerRepo = async (
   isAuthenticated: boolean,
   githubHost: string = 'github.com',
 ): Promise<RepoOwnerRef | null> => {
-  if (!activeRepo || !electronAPI || !isAuthenticated) return null;
+  const resolution = await resolvePrOwnerRepoForRefresh(
+    electronAPI,
+    activeRepo,
+    isAuthenticated,
+    githubHost,
+  );
+  return resolution.resolved ? resolution.ownerRepo : null;
+};
+
+const resolvePrOwnerRepoForRefresh = async (
+  electronAPI: ElectronAPI | undefined,
+  activeRepo: string | null,
+  isAuthenticated: boolean,
+  githubHost: string,
+): Promise<{ resolved: true; ownerRepo: RepoOwnerRef | null } | { resolved: false }> => {
+  if (!activeRepo || !electronAPI || !isAuthenticated) {
+    return { resolved: true, ownerRepo: null };
+  }
 
   try {
     const response = await electronAPI.getRepoOriginUrl(activeRepo);
-    if (!response.success || !response.data) return null;
-    return parsePrOwnerRepoFromRemote(String(response.data), githubHost);
+    if (!response.success) return { resolved: false };
+    if (!response.data) return { resolved: true, ownerRepo: null };
+    return {
+      resolved: true,
+      ownerRepo: parsePrOwnerRepoFromRemote(String(response.data), githubHost),
+    };
   } catch {
-    return null;
+    return { resolved: false };
   }
 };
 
@@ -211,15 +274,15 @@ export const loadPullRequests = async (
   prOwnerRepo: RepoOwnerRef | null,
   isAuthenticated: boolean,
   prFilter: 'open' | 'closed' | 'all',
-): Promise<PullRequestDto[]> => {
-  if (!prOwnerRepo || !electronAPI || !isAuthenticated) return [];
+): Promise<PullRequestDto[] | null> => {
+  if (!prOwnerRepo || !electronAPI || !isAuthenticated) return null;
 
   try {
     const result = await electronAPI.githubGetPRs(prOwnerRepo.owner, prOwnerRepo.repo, prFilter);
-    if (!result.success) return [];
+    if (!result.success) return null;
     return result.data || [];
   } catch {
-    return [];
+    return null;
   }
 };
 

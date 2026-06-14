@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Clock3,
@@ -43,7 +43,9 @@ type RepoGithubActionsContentProps = Pick<
   | 'newPRBase'
   | 'setNewPRBase'
   | 'onCreatePR'
->;
+> & {
+  refreshTrigger: number;
+};
 
 export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> = (props) => {
   const { tr, locale } = useI18n();
@@ -54,13 +56,24 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
   const [isLoadingWorkflowRuns, setIsLoadingWorkflowRuns] = useState(false);
   const [workflowRunsError, setWorkflowRunsError] = useState<string | null>(null);
   const [workflowQuery, setWorkflowQuery] = useState('');
+  const ownerRepoKey = props.prOwnerRepo
+    ? `${props.prOwnerRepo.owner}/${props.prOwnerRepo.repo}`
+    : '';
+  const workflowScopeRef = useRef('');
 
   useEffect(() => {
     const ownerRepo = props.prOwnerRepo;
     if (!ownerRepo || !window.electronAPI) {
+      workflowScopeRef.current = '';
       setWorkflowRuns([]);
       setWorkflowRunsError(null);
       return;
+    }
+
+    const workflowScope = `${ownerRepoKey}:${props.currentBranch || ''}`;
+    if (workflowScopeRef.current !== workflowScope) {
+      workflowScopeRef.current = workflowScope;
+      setWorkflowRuns([]);
     }
 
     let active = true;
@@ -77,14 +90,12 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
 
         if (!active) return;
         if (!result.success) {
-          setWorkflowRuns([]);
           setWorkflowRunsError(result.error || tr('Workflows konnten nicht geladen werden.', 'Could not load workflows.'));
           return;
         }
         setWorkflowRuns(result.data || []);
       } catch (error: any) {
         if (!active) return;
-        setWorkflowRuns([]);
         setWorkflowRunsError(error?.message || tr('Workflows konnten nicht geladen werden.', 'Could not load workflows.'));
       } finally {
         if (active) setIsLoadingWorkflowRuns(false);
@@ -95,7 +106,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
     return () => {
       active = false;
     };
-  }, [props.prOwnerRepo, props.currentBranch, tr]);
+  }, [ownerRepoKey, props.currentBranch, props.refreshTrigger, tr]);
 
   const filteredWorkflowRuns = useMemo(() => {
     const normalized = workflowQuery.trim().toLowerCase();
@@ -128,9 +139,19 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
           onToggleCollapsed={() => setIsPrCollapsed((prev) => !prev)}
           toggleTitle={isPrCollapsed ? tr('Pull Requests anzeigen', 'Show pull requests') : tr('Pull Requests einklappen', 'Collapse pull requests')}
           actions={(
-            <button className="icon-btn sidebar-row-action-icon" onClick={() => { props.setShowCreatePR(true); props.setNewPRHead(props.currentBranch); }} title={tr('Neuen PR erstellen', 'Create new PR')}>
-              <Plus size={13} />
-            </button>
+            <>
+              <span
+                className={`repo-refresh-indicator ${props.prLoading && props.pullRequests.length > 0 ? '' : 'repo-refresh-indicator--idle'}`}
+                title={props.prLoading ? tr('Pull Requests werden aktualisiert.', 'Refreshing pull requests.') : undefined}
+                aria-label={props.prLoading ? tr('Pull Requests werden aktualisiert', 'Refreshing pull requests') : undefined}
+                aria-hidden={!props.prLoading}
+              >
+                <RefreshCw size={12} className={props.prLoading ? 'spin' : ''} />
+              </span>
+              <button className="icon-btn sidebar-row-action-icon" onClick={() => { props.setShowCreatePR(true); props.setNewPRHead(props.currentBranch); }} title={tr('Neuen PR erstellen', 'Create new PR')}>
+                <Plus size={13} />
+              </button>
+            </>
           )}
         />
 
@@ -164,11 +185,11 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
             )}
 
             <RepoCardContent className="repo-card-scroll repo-scroll-lg">
-              {props.prLoading && <div className="repo-state-text">{tr('Lade Pull Requests...', 'Loading pull requests...')}</div>}
+              {props.prLoading && props.pullRequests.length === 0 && <div className="repo-state-text">{tr('Lade Pull Requests...', 'Loading pull requests...')}</div>}
 
               {!props.prLoading && props.pullRequests.length === 0 && <div className="repo-state-text">{tr('Keine Pull Requests.', 'No pull requests.')}</div>}
 
-              {!props.prLoading && props.pullRequests.length > 0 && (
+              {props.pullRequests.length > 0 && (
                 <div className="sidebar-panel-stack">
                   {props.pullRequests.map(pr => (
                     <div key={pr.number} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-panel)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -235,6 +256,22 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
           collapsed={isWorkflowCollapsed}
           onToggleCollapsed={() => setIsWorkflowCollapsed((prev) => !prev)}
           toggleTitle={isWorkflowCollapsed ? tr('Workflows anzeigen', 'Show workflows') : tr('Workflows einklappen', 'Collapse workflows')}
+          actions={(
+            <span
+              className={`repo-refresh-indicator ${isLoadingWorkflowRuns || workflowRunsError ? '' : 'repo-refresh-indicator--idle'}`}
+              title={isLoadingWorkflowRuns
+                ? tr('Workflow-Runs werden aktualisiert.', 'Refreshing workflow runs.')
+                : workflowRunsError || undefined}
+              aria-label={isLoadingWorkflowRuns
+                ? tr('Workflow-Runs werden aktualisiert', 'Refreshing workflow runs')
+                : workflowRunsError || undefined}
+              aria-hidden={!isLoadingWorkflowRuns && !workflowRunsError}
+            >
+              {workflowRunsError && !isLoadingWorkflowRuns
+                ? <XCircle size={12} className="repo-refresh-indicator-error" />
+                : <RefreshCw size={12} className={isLoadingWorkflowRuns ? 'spin' : ''} />}
+            </span>
+          )}
         />
 
         {!isWorkflowCollapsed && (
@@ -247,11 +284,11 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
             </RepoCardToolbar>
 
             <RepoCardContent className="repo-card-scroll repo-scroll-md">
-              {isLoadingWorkflowRuns && <div className="repo-state-text">{tr('Lade Workflow-Runs...', 'Loading workflow runs...')}</div>}
-              {workflowRunsError && <div className="repo-state-text" style={{ color: 'var(--status-danger)' }}>{workflowRunsError}</div>}
+              {isLoadingWorkflowRuns && workflowRuns.length === 0 && <div className="repo-state-text">{tr('Lade Workflow-Runs...', 'Loading workflow runs...')}</div>}
+              {workflowRunsError && workflowRuns.length === 0 && <div className="repo-state-text" style={{ color: 'var(--status-danger)' }}>{workflowRunsError}</div>}
               {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length === 0 && <div className="repo-state-text">{workflowQuery.trim() ? tr('Keine Treffer fuer den Filter.', 'No matches for this filter.') : tr('Keine Workflow-Runs gefunden.', 'No workflow runs found.')}</div>}
 
-              {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length > 0 && (
+              {filteredWorkflowRuns.length > 0 && (
                 <div className="sidebar-panel-stack">
                   {filteredWorkflowRuns.map((run) => (
                     <div key={run.id} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: 'var(--bg-panel)', padding: '6px 8px', display: 'grid', gridTemplateColumns: '1fr auto', gap: '4px 8px', alignItems: 'center' }}>

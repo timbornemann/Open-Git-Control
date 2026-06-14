@@ -116,13 +116,9 @@ export const useRepositoryDomain = ({
           const head = /^\((HEAD detached|no branch)/i.test(headRaw) ? '' : headRaw;
           setCurrentBranch(head);
           setBranches(parsedBranches);
-        } else {
-          setCurrentBranch('');
-          setBranches([]);
         }
       } catch {
-        setCurrentBranch('');
-        setBranches([]);
+        // Keep the last known branch list during transient refresh failures.
       }
     };
     fetchBranches();
@@ -138,7 +134,6 @@ export const useRepositoryDomain = ({
       try {
         const { success, data } = await window.electronAPI.runGitCommand('status', '--porcelain=v2', '--branch');
         if (!success || !data) {
-          setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
           return;
         }
 
@@ -151,7 +146,7 @@ export const useRepositoryDomain = ({
           hasUpstream: parsed.hasUpstream,
         }));
       } catch {
-        setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
+        // Keep the last known tracking state during transient refresh failures.
       }
     };
 
@@ -167,12 +162,17 @@ export const useRepositoryDomain = ({
       }
       try {
         const r = await window.electronAPI.runGitCommand('remote', '-v');
-        if (!r.success || !r.data) {
+        if (!r.success) {
+          return;
+        }
+
+        const rawRemoteOutput = String(r.data || '');
+        if (!rawRemoteOutput.trim()) {
           setHasRemoteOrigin(false);
           setRemotes([]);
           return;
         }
-        const lines = String(r.data)
+        const lines = rawRemoteOutput
           .split('\n')
           .map((l: string) => l.trim())
           .filter((l: string) => l.length > 0);
@@ -189,8 +189,7 @@ export const useRepositoryDomain = ({
         }
         setRemotes(parsed);
       } catch {
-        setHasRemoteOrigin(false);
-        setRemotes([]);
+        // Keep the last known remote configuration during transient refresh failures.
       }
     };
     checkRemote();
@@ -247,7 +246,7 @@ export const useRepositoryDomain = ({
 
     isRemoteFetchRunningRef.current = true;
     setActiveGitActionLabel(tr('Fetch wird ausgeführt...', 'Running fetch...'));
-    setRemoteSync(prev => ({ ...prev, isFetching: true, lastFetchError: null }));
+    setRemoteSync(prev => ({ ...prev, isFetching: true }));
 
     try {
       const result = await window.electronAPI.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
@@ -677,16 +676,6 @@ export const useRepositoryDomain = ({
   ));
 
   const remoteStatus: RemoteStatusInfo = (() => {
-    if (remoteSync.isFetching) {
-      return {
-        title: tr('Remote wird aktualisiert...', 'Updating remote...'),
-        detail: tr('Fetch läuft gerade.', 'Fetch is running.'),
-        color: 'var(--text-accent)',
-        backgroundColor: 'var(--accent-primary-soft)',
-        borderColor: 'var(--accent-primary-border)',
-      };
-    }
-
     if (remoteSync.lastFetchError) {
       return {
         title: tr('Remote-Check fehlgeschlagen', 'Remote check failed'),

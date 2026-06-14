@@ -27,6 +27,24 @@ describe('usePullRequests helpers', () => {
     expect(prs).toHaveLength(1);
   });
 
+  it('signalisiert fehlgeschlagene refreshes ohne eine leere liste vorzutäuschen', async () => {
+    const failedResult = await loadPullRequests(
+      { githubGetPRs: vi.fn().mockResolvedValue({ success: false, error: 'temporary failure' }) } as any,
+      { owner: 'octo', repo: 'my-repo' },
+      true,
+      'open',
+    );
+    const thrownResult = await loadPullRequests(
+      { githubGetPRs: vi.fn().mockRejectedValue(new Error('offline')) } as any,
+      { owner: 'octo', repo: 'my-repo' },
+      true,
+      'open',
+    );
+
+    expect(failedResult).toBeNull();
+    expect(thrownResult).toBeNull();
+  });
+
   it('erstellt pull request und nutzt fallback branch', async () => {
     const githubCreatePR = vi.fn().mockResolvedValue({
       success: true,

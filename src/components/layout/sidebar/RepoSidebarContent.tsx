@@ -107,7 +107,9 @@ type RepoSidebarContentProps = Pick<
   | 'releaseError'
   | 'releaseSuccess'
   | 'onCreateRelease'
->;
+> & {
+  refreshTrigger: number;
+};
 
 export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => {
   const { tr } = useI18n();
