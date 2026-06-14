@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../global';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '../utils/gitParsing';
+import { normalizeRepoPathKey } from '../utils/repoPath';
 
 export type WorkingTreeState = {
   snapshot: WorkingTreeSnapshotDto | null;
@@ -21,6 +22,7 @@ export const useWorkingTreeSnapshot = (
   const inFlightRef = useRef<{ generation: number; promise: Promise<void> } | null>(null);
   const generationRef = useRef(0);
   const snapshotRef = useRef<WorkingTreeSnapshotDto | null>(null);
+  const statsRef = useRef<WorkingTreeStatsDto | null>(null);
 
   const refresh = useCallback(async () => {
     if (!repoPath || !window.electronAPI) return;
@@ -35,12 +37,24 @@ export const useWorkingTreeSnapshot = (
           if (generation !== generationRef.current) return;
           if (
             result.success
-            && result.data.repoPath.toLowerCase() === repoPath.toLowerCase()
+            && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)
           ) {
-            snapshotRef.current = result.data;
-            setSnapshot(result.data);
-            setStatus(parseGitStatusDetailed(result.data.statusRaw));
-            setStats((current) => current?.snapshotId === result.data.snapshotId ? current : null);
+            const nextSnapshot = result.data;
+            snapshotRef.current = nextSnapshot;
+            setSnapshot(nextSnapshot);
+            setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
+            if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
+              statsRef.current = null;
+              setStats(null);
+              const statsResult = await window.electronAPI.getWorkingTreeStats(nextSnapshot.snapshotId);
+              if (
+                generation !== generationRef.current
+                || !statsResult.success
+                || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId
+              ) return;
+              statsRef.current = statsResult.data;
+              setStats(statsResult.data);
+            }
             return;
           }
         }
@@ -48,6 +62,7 @@ export const useWorkingTreeSnapshot = (
         const fallback = await window.electronAPI.runGitCommand('statusPorcelain');
         if (generation !== generationRef.current || !fallback.success) return;
         snapshotRef.current = null;
+        statsRef.current = null;
         setSnapshot(null);
         setStatus(parseGitStatusDetailed(fallback.data || ''));
         setStats(null);
@@ -69,6 +84,7 @@ export const useWorkingTreeSnapshot = (
   useEffect(() => {
     generationRef.current += 1;
     snapshotRef.current = null;
+    statsRef.current = null;
     inFlightRef.current = null;
     setSnapshot(null);
     setStatus(null);
@@ -106,28 +122,6 @@ export const useWorkingTreeSnapshot = (
     if (!repoPath || refreshTrigger === undefined) return;
     void refresh();
   }, [refresh, refreshTrigger, repoPath]);
-
-  useEffect(() => {
-    if (!snapshot) return;
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await window.electronAPI.getWorkingTreeStats(snapshot.snapshotId);
-        if (
-          cancelled
-          || !result.success
-          || snapshotRef.current?.snapshotId !== result.data.snapshotId
-        ) return;
-        setStats(result.data);
-      } catch (error) {
-        if (!cancelled) console.error('Failed to refresh working tree stats:', error);
-      }
-    }, 750);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [snapshot]);
 
   return { snapshot, status, stats, loading, refresh };
 };

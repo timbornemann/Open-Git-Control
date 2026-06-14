@@ -37,18 +37,19 @@ describe('GitService.getLog pagination', () => {
 });
 
 describe('GitService commit statistics', () => {
-  it('diffs a root commit against the empty tree', async () => {
+  it('loads root commit statistics with one first-parent show command', async () => {
     const service = new GitService();
     const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
-      .mockResolvedValueOnce(`${'a'.repeat(40)}`)
       .mockResolvedValueOnce('10\t2\tsrc/root.ts');
 
     await expect(service.getCommitStatsAtPath('C:/repo', 'a'.repeat(40), new AbortController().signal))
       .resolves.toEqual({ files: 1, additions: 10, deletions: 2 });
-    expect(run.mock.calls[1][1]).toEqual([
-      'diff-tree',
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][1]).toEqual([
+      'show',
       '--root',
-      '--no-commit-id',
+      '--first-parent',
+      '--format=',
       '--numstat',
       '-r',
       '-M',
@@ -59,12 +60,8 @@ describe('GitService commit statistics', () => {
   it('uses only the first parent for normal and merge commits', async () => {
     const service = new GitService();
     const hash = 'c'.repeat(40);
-    const firstParent = 'a'.repeat(40);
-    const secondParent = 'b'.repeat(40);
     const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
-      .mockResolvedValueOnce(`${hash} ${firstParent}`)
       .mockResolvedValueOnce('1\t1\tnormal.ts')
-      .mockResolvedValueOnce(`${hash} ${firstParent} ${secondParent}`)
       .mockResolvedValueOnce('2\t3\tmerge.ts');
     const signal = new AbortController().signal;
 
@@ -72,13 +69,15 @@ describe('GitService commit statistics', () => {
       .resolves.toEqual({ files: 1, additions: 1, deletions: 1 });
     await expect(service.getCommitStatsAtPath('C:/repo', hash, signal))
       .resolves.toEqual({ files: 1, additions: 2, deletions: 3 });
-    expect(run.mock.calls[3][1]).toEqual([
-      'diff-tree',
-      '--no-commit-id',
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run.mock.calls[1][1]).toEqual([
+      'show',
+      '--root',
+      '--first-parent',
+      '--format=',
       '--numstat',
       '-r',
       '-M',
-      firstParent,
       hash,
     ]);
   });
@@ -297,6 +296,25 @@ describe('GitService scheduler classification', () => {
         'polling',
         'polling',
         'write',
+      ]);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it('runs working-tree numstat requests as polling jobs', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-tree-stats-'));
+    const runner = vi.fn(async () => ({ stdout: '4\t2\tsrc/app.ts\n', stderr: '' }));
+    const service = new GitService(runner as any);
+
+    try {
+      await service.runPollingCommandAtPath(repoPath, ['diff', '--numstat', '--cached']);
+
+      expect(service.getSchedulerDiagnostics()).toEqual([
+        expect.objectContaining({
+          kind: 'polling',
+          command: 'diff',
+        }),
       ]);
     } finally {
       fs.rmSync(repoPath, { recursive: true, force: true });

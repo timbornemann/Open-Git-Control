@@ -35,6 +35,9 @@ const PRIORITY: Record<GitJobKind, number> = {
   background: 3,
 };
 
+const MAX_CONCURRENT_READS = 4;
+const MAX_BACKGROUND_READS = 3;
+
 const abortError = (): Error => {
   const error = new Error('Git operation was aborted.');
   error.name = 'AbortError';
@@ -140,17 +143,23 @@ export class GitScheduler {
       return;
     }
 
-    while (state.activeReads.size < 4) {
+    while (state.activeReads.size < MAX_CONCURRENT_READS) {
+      const activeBackgroundCount = [...state.activeReads]
+        .filter((entry) => entry.kind === 'background')
+        .length;
+      const hasActiveInteractiveRead = [...state.activeReads]
+        .some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
         if (entry.kind === 'write') return false;
-        if (entry.kind === 'background') return state.activeReads.size === 0;
+        if (entry.kind === 'background') {
+          return !hasActiveInteractiveRead && activeBackgroundCount < MAX_BACKGROUND_READS;
+        }
         return true;
       });
       if (nextIndex < 0) return;
       const [entry] = state.queue.splice(nextIndex, 1);
       state.activeReads.add(entry);
       void this.execute(repoPath, state, entry, false);
-      if (entry.kind === 'background') return;
     }
   }
 

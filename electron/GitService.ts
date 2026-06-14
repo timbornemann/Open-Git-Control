@@ -284,6 +284,7 @@ export class GitService {
     envOverrides?: NodeJS.ProcessEnv,
     signal?: AbortSignal,
     requestedKind?: GitJobKind,
+    requestedCoalesceKey?: string,
   ): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
 
@@ -349,7 +350,9 @@ export class GitService {
       executeWithRetries,
       {
         signal,
-        coalesceKey: kind === 'polling' ? args.join('\0') : undefined,
+        coalesceKey: kind === 'polling'
+          ? requestedCoalesceKey ?? args.join('\0')
+          : undefined,
       },
     );
   }
@@ -374,6 +377,18 @@ export class GitService {
       throw new Error('Repository path is required.');
     }
     return this.execGit(normalizedPath, args);
+  }
+
+  async runPollingCommandAtPath(
+    repoPath: string,
+    args: string[],
+    coalesceKey?: string,
+  ): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+    return this.execGit(normalizedPath, args, undefined, undefined, 'polling', coalesceKey);
   }
 
   async runCommandAtPathWithSignal(repoPath: string, args: string[], signal: AbortSignal): Promise<string> {
@@ -819,16 +834,11 @@ export class GitService {
       throw new Error('Invalid commit hash.');
     }
 
-    const parentsRaw = await this.runCommandAtPathWithSignal(
+    const raw = await this.runCommandAtPathWithSignal(
       repoPath,
-      ['rev-list', '--parents', '-n', '1', normalizedHash],
+      ['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', normalizedHash],
       signal,
     );
-    const parentHash = parentsRaw.trim().split(/\s+/)[1] || '';
-    const args = parentHash
-      ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-M', parentHash, normalizedHash]
-      : ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', '-M', normalizedHash];
-    const raw = await this.runCommandAtPathWithSignal(repoPath, args, signal);
     const stats: CommitStats = { files: 0, additions: 0, deletions: 0 };
 
     for (const line of raw.split(/\r?\n/)) {

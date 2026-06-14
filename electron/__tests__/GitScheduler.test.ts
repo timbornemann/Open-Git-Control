@@ -67,4 +67,36 @@ describe('GitScheduler', () => {
     await Promise.all([activeWrite, polling, write]);
     expect(order.indexOf('write')).toBeLessThan(order.indexOf('polling'));
   });
+
+  it('runs three background reads while reserving capacity for polling', async () => {
+    const scheduler = new GitScheduler();
+    const blockers = [deferred<void>(), deferred<void>(), deferred<void>(), deferred<void>()];
+    const started: string[] = [];
+    const backgrounds = blockers.map((blocker, index) => scheduler.schedule(
+      'C:/repo',
+      'background',
+      `stats-${index}`,
+      async () => {
+        started.push(`background-${index}`);
+        await blocker.promise;
+      },
+    ));
+
+    await vi.waitFor(() => {
+      expect(started).toHaveLength(3);
+    });
+    const polling = scheduler.schedule('C:/repo', 'polling', 'status', async () => {
+      started.push('polling');
+    });
+    await expect(polling).resolves.toBeUndefined();
+    expect(started).toContain('polling');
+    expect(started).not.toContain('background-3');
+
+    blockers[0].resolve();
+    await vi.waitFor(() => {
+      expect(started).toContain('background-3');
+    });
+    blockers.slice(1).forEach((blocker) => blocker.resolve());
+    await Promise.all(backgrounds);
+  });
 });

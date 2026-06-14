@@ -126,7 +126,7 @@ describe('CommitStatsService', () => {
         return { files: 1, additions: hash === selectedHash ? 2 : 1, deletions: 0 };
       }),
     } as any;
-    const service = new CommitStatsService(gitService, () => cachePath);
+    const service = new CommitStatsService(gitService, () => cachePath, { maxConcurrent: 1 });
     const ready: string[] = [];
     service.onUpdate((update) => {
       if (update.state === 'ready') ready.push(update.hash);
@@ -139,5 +139,71 @@ describe('CommitStatsService', () => {
 
     expect(calls.slice(0, 3)).toEqual([backgroundHash, selectedHash, backgroundHash]);
     expect(ready).toEqual([selectedHash, backgroundHash]);
+  });
+
+  it('processes up to three background statistics concurrently', async () => {
+    const cachePath = createTempCache();
+    const hashes = ['1', '2', '3', '4'].map((char) => char.repeat(40));
+    const pending = new Map<string, () => void>();
+    const active = new Set<string>();
+    let peakActive = 0;
+    const gitService = {
+      getRepoPath: () => 'C:/repo',
+      runCommandAtPath: vi.fn(async () => 'sha1'),
+      getCommitStatsAtPath: vi.fn(async (_repo: string, hash: string) => {
+        active.add(hash);
+        peakActive = Math.max(peakActive, active.size);
+        await new Promise<void>((resolve) => pending.set(hash, resolve));
+        active.delete(hash);
+        return { files: 1, additions: 1, deletions: 0 };
+      }),
+    } as any;
+    const service = new CommitStatsService(gitService, () => cachePath);
+    const ready: string[] = [];
+    service.onUpdate((update) => {
+      if (update.state === 'ready') ready.push(update.hash);
+    });
+
+    await service.requestStats(hashes, 'background');
+    await waitFor(() => pending.size === 3);
+    expect(peakActive).toBe(3);
+    expect(pending.has(hashes[3])).toBe(false);
+
+    pending.get(hashes[0])?.();
+    await waitFor(() => pending.has(hashes[3]));
+    for (const resolve of pending.values()) resolve();
+    await waitFor(() => ready.length === hashes.length);
+  });
+
+  it('publishes each completed statistic before the remaining work finishes', async () => {
+    const cachePath = createTempCache();
+    const hashes = ['5', '6', '7'].map((char) => char.repeat(40));
+    const pending = new Map<string, () => void>();
+    const gitService = {
+      getRepoPath: () => 'C:/repo',
+      runCommandAtPath: vi.fn(async () => 'sha1'),
+      getCommitStatsAtPath: vi.fn(async (_repo: string, hash: string) => {
+        await new Promise<void>((resolve) => pending.set(hash, resolve));
+        return { files: 1, additions: Number.parseInt(hash[0], 16), deletions: 0 };
+      }),
+    } as any;
+    const service = new CommitStatsService(gitService, () => cachePath);
+    const ready: string[] = [];
+    service.onUpdate((update) => {
+      if (update.state === 'ready') ready.push(update.hash);
+    });
+
+    await service.requestStats(hashes, 'background');
+    await waitFor(() => pending.size === hashes.length);
+    pending.get(hashes[1])?.();
+    await waitFor(() => ready.length === 1);
+
+    expect(ready).toEqual([hashes[1]]);
+    expect(pending.has(hashes[0])).toBe(true);
+    expect(pending.has(hashes[2])).toBe(true);
+
+    pending.get(hashes[0])?.();
+    pending.get(hashes[2])?.();
+    await waitFor(() => ready.length === hashes.length);
   });
 });

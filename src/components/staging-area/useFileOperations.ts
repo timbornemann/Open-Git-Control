@@ -54,6 +54,11 @@ export const useFileOperations = ({
   const [mutationStartedAt, setMutationStartedAt] = useState<number | null>(null);
   const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
   const mutationInFlightRef = useRef(false);
+  const externalRefreshRef = useRef(externalRefresh);
+
+  useEffect(() => {
+    externalRefreshRef.current = externalRefresh;
+  }, [externalRefresh]);
 
   useEffect(() => {
     if (mutationStartedAt === null) {
@@ -78,6 +83,7 @@ export const useFileOperations = ({
         window.electronAPI.runGitCommand('diff', '--numstat', '--cached'),
         window.electronAPI.runGitCommand('diff', '--numstat'),
       ]);
+      if (externalRefreshRef.current) return;
 
       if (statusResult.success) {
         const rawStatus = statusResult.data || '';

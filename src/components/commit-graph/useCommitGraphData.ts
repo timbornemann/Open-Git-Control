@@ -8,6 +8,11 @@ import {
   type GitCommit,
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
+import { normalizeRepoPathKey } from '../../utils/repoPath';
+import {
+  mergeCommitStatsUpdate,
+  type CommitStatsUpdate,
+} from './mergeCommitStatsUpdate';
 import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
 
 const LOG_PAGE_SIZE = 100;
@@ -26,7 +31,7 @@ type GraphCacheEntry = {
 const graphCache = new Map<string, GraphCacheEntry>();
 
 const getGraphCacheKey = (repoPath: string, showSecondaryHistory: boolean) =>
-  `${repoPath.toLowerCase()}\0${showSecondaryHistory ? 'all' : 'head'}`;
+  `${normalizeRepoPathKey(repoPath)}\0${showSecondaryHistory ? 'all' : 'head'}`;
 
 const storeGraphCache = (key: string, commits: GitCommit[], hasMore: boolean) => {
   graphCache.set(key, {
@@ -120,7 +125,25 @@ export const useCommitGraphData = ({
     const worker = new Worker(new URL('../../workers/graphLayout.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<{ generation: number; layout: GraphLayout }>) => {
       if (event.data.generation !== layoutGenerationRef.current) return;
-      setLayout(event.data.layout);
+      setLayout((current) => {
+        if (!current) return event.data.layout;
+        const currentByHash = new Map(
+          current.nodes.map((node) => [node.commit.hash, node.commit]),
+        );
+        let changed = false;
+        const nodes = event.data.layout.nodes.map((node) => {
+          const currentCommit = currentByHash.get(node.commit.hash);
+          if (!currentCommit) return node;
+          const commit = mergeCommitStatsUpdate(node.commit, {
+            stats: currentCommit.stats,
+            state: currentCommit.statsState,
+          });
+          if (commit === node.commit) return node;
+          changed = true;
+          return { ...node, commit };
+        });
+        return changed ? { ...event.data.layout, nodes } : event.data.layout;
+      });
     };
     layoutWorkerRef.current = worker;
     return () => {
@@ -430,7 +453,7 @@ export const useCommitGraphData = ({
   }, [hasMoreCommits, loadMoreCommits, loading, loadingMore, logContainerRef]);
 
   const updateCommitStats = useCallback((
-    updates: Record<string, { stats: GitCommit['stats']; state: GitCommit['statsState'] }>,
+    updates: Record<string, CommitStatsUpdate>,
   ) => {
     setLayout((current) => {
       if (!current) return current;
@@ -438,18 +461,12 @@ export const useCommitGraphData = ({
       const nodes = current.nodes.map((node) => {
         const update = updates[node.commit.hash];
         if (!update) return node;
-        if (
-          node.commit.statsState === update.state
-          && JSON.stringify(node.commit.stats) === JSON.stringify(update.stats)
-        ) return node;
+        const commit = mergeCommitStatsUpdate(node.commit, update);
+        if (commit === node.commit) return node;
         changed = true;
         return {
           ...node,
-          commit: {
-            ...node.commit,
-            stats: update.stats,
-            statsState: update.state,
-          },
+          commit,
         };
       });
       if (!changed) return current;
@@ -473,7 +490,7 @@ export const useCommitGraphData = ({
     const unique = [...new Set(hashes)].slice(0, 500);
     const result = await window.electronAPI.requestCommitStats(unique, priority);
     if (!result.success) return;
-    const updates: Record<string, { stats: GitCommit['stats']; state: GitCommit['statsState'] }> = {};
+    const updates: Record<string, CommitStatsUpdate> = {};
     for (const [hash, value] of Object.entries(result.data)) {
       updates[hash] = {
         stats: value.stats,
@@ -486,7 +503,7 @@ export const useCommitGraphData = ({
   useEffect(() => {
     if (!repoPath) return;
     return window.electronAPI.onCommitStats((update) => {
-      if (update.repoPath.toLowerCase() !== repoPath.toLowerCase()) return;
+      if (normalizeRepoPathKey(update.repoPath) !== normalizeRepoPathKey(repoPath)) return;
       updateCommitStats({
         [update.hash]: {
           stats: update.stats,
@@ -500,18 +517,15 @@ export const useCommitGraphData = ({
 
   useEffect(() => {
     if (!layout || !repoPath) return;
-    const idleTimer = window.setTimeout(() => {
-      const missing = layout.nodes
-        .filter((node) => node.commit.statsState === 'missing' || node.commit.statsState === 'error')
-        .map((node) => node.commit.hash);
-      const enqueue = async () => {
-        for (let offset = 0; offset < missing.length; offset += 500) {
-          await requestCommitStats(missing.slice(offset, offset + 500), 'background');
-        }
-      };
-      void enqueue();
-    }, 2000);
-    return () => window.clearTimeout(idleTimer);
+    const missing = layout.nodes
+      .filter((node) => node.commit.statsState === 'missing' || node.commit.statsState === 'error')
+      .map((node) => node.commit.hash);
+    const enqueue = async () => {
+      for (let offset = 0; offset < missing.length; offset += 500) {
+        await requestCommitStats(missing.slice(offset, offset + 500), 'background');
+      }
+    };
+    void enqueue();
   }, [loadedCommitHashes, repoPath, requestCommitStats]);
 
   return {

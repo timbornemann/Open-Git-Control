@@ -46,17 +46,21 @@ type DiagnosticEntry = {
   timestamp: number;
 };
 
+type ActiveEntry = {
+  entry: QueueEntry;
+  controller: AbortController;
+};
+
 export class CommitStatsService {
   private loaded = false;
   private cache = new Map<string, CacheEntry>();
   private queue: QueueEntry[] = [];
   private queuedKeys = new Set<string>();
-  private active: QueueEntry | null = null;
-  private activeController: AbortController | null = null;
+  private active = new Map<string, ActiveEntry>();
   private listeners = new Set<(update: CommitStatsUpdate) => void>();
   private diagnostics: DiagnosticEntry[] = [];
-  private resumeTimer: NodeJS.Timeout | null = null;
   private objectFormats = new Map<string, string>();
+  private lastAccessedAt = 0;
 
   constructor(
     private readonly gitService: GitService,
@@ -65,6 +69,7 @@ export class CommitStatsService {
       maxEntries?: number;
       compactedEntries?: number;
       maxBytes?: number;
+      maxConcurrent?: number;
     } = {},
   ) {}
 
@@ -74,15 +79,17 @@ export class CommitStatsService {
   }
 
   interruptBackgroundWork(): void {
-    this.activeController?.abort();
+    for (const active of this.active.values()) active.controller.abort();
   }
 
   setActiveRepo(repoPath: string): void {
     const normalized = String(repoPath || '').toLowerCase();
     this.queue = this.queue.filter((entry) => entry.repoPath.toLowerCase() === normalized);
     this.queuedKeys = new Set(this.queue.map((entry) => entry.key));
-    if (this.active && this.active.repoPath.toLowerCase() !== normalized) {
-      this.activeController?.abort();
+    for (const active of this.active.values()) {
+      if (active.entry.repoPath.toLowerCase() !== normalized) {
+        active.controller.abort();
+      }
     }
   }
 
@@ -108,7 +115,7 @@ export class CommitStatsService {
       requestedKeys.add(key);
       const cached = this.cache.get(key);
       if (cached) {
-        cached.accessedAt = Date.now();
+        cached.accessedAt = this.nextAccessedAt();
         result[hash] = { state: 'ready', stats: cached.stats };
         this.recordDiagnostic(0, true, false);
         continue;
@@ -117,21 +124,26 @@ export class CommitStatsService {
       const queued = this.queue.find((entry) => entry.key === key);
       if (queued) {
         if (PRIORITY[priority] < PRIORITY[queued.priority]) queued.priority = priority;
-      } else if (this.active?.key !== key) {
+      } else if (!this.active.has(key)) {
         this.queue.push({ repoPath, objectFormat, hash, key, priority });
         this.queuedKeys.add(key);
       }
     }
 
     this.sortQueue();
+    const lowerPriorityActive = [...this.active.values()]
+      .filter(({ entry }) => (
+        PRIORITY[priority] < PRIORITY[entry.priority]
+        && !requestedKeys.has(entry.key)
+      ))
+      .sort((a, b) => PRIORITY[b.entry.priority] - PRIORITY[a.entry.priority])[0];
     if (
-      this.active
-      && PRIORITY[priority] < PRIORITY[this.active.priority]
-      && !requestedKeys.has(this.active.key)
+      lowerPriorityActive
+      && this.active.size >= this.maxConcurrent()
     ) {
-      this.activeController?.abort();
+      lowerPriorityActive.controller.abort();
     }
-    this.scheduleProcessing();
+    this.pumpProcessing();
     return result;
   }
 
@@ -144,7 +156,7 @@ export class CommitStatsService {
     for (const hash of hashes) {
       const entry = this.cache.get(this.cacheKey(objectFormat, hash));
       if (!entry) continue;
-      entry.accessedAt = Date.now();
+      entry.accessedAt = this.nextAccessedAt();
       result[hash] = entry.stats;
     }
     return result;
@@ -186,6 +198,7 @@ export class CommitStatsService {
             break;
           }
           this.cache.set(this.cacheKey(entry.objectFormat, entry.hash), entry);
+          this.lastAccessedAt = Math.max(this.lastAccessedAt, entry.accessedAt);
         } catch {
           malformed = true;
           break;
@@ -200,22 +213,23 @@ export class CommitStatsService {
     }
   }
 
-  private scheduleProcessing(): void {
-    if (this.active || this.resumeTimer) return;
-    this.resumeTimer = setTimeout(() => {
-      this.resumeTimer = null;
-      void this.processNext();
-    }, 25);
+  private maxConcurrent(): number {
+    const configured = Math.floor(this.limits.maxConcurrent ?? 3);
+    return Math.max(1, Math.min(configured, 3));
   }
 
-  private async processNext(): Promise<void> {
-    if (this.active) return;
-    const entry = this.queue.shift();
-    if (!entry) return;
-    this.queuedKeys.delete(entry.key);
-    this.active = entry;
-    this.activeController = new AbortController();
-    const controller = this.activeController;
+  private pumpProcessing(): void {
+    while (this.active.size < this.maxConcurrent()) {
+      const entry = this.queue.shift();
+      if (!entry) return;
+      this.queuedKeys.delete(entry.key);
+      const controller = new AbortController();
+      this.active.set(entry.key, { entry, controller });
+      void this.processEntry(entry, controller);
+    }
+  }
+
+  private async processEntry(entry: QueueEntry, controller: AbortController): Promise<void> {
     const startedAt = Date.now();
 
     try {
@@ -230,11 +244,15 @@ export class CommitStatsService {
         objectFormat: entry.objectFormat,
         hash: entry.hash,
         stats,
-        accessedAt: Date.now(),
+        accessedAt: this.nextAccessedAt(),
       };
       this.cache.set(entry.key, cacheEntry);
-      this.append(cacheEntry);
       this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats, state: 'ready' });
+      try {
+        this.append(cacheEntry);
+      } catch (error) {
+        console.warn(`Could not persist commit stats for ${entry.hash}:`, error);
+      }
       this.recordDiagnostic(Date.now() - startedAt, false, false);
     } catch (error: any) {
       const aborted = controller.signal.aborted || error?.name === 'AbortError';
@@ -249,9 +267,8 @@ export class CommitStatsService {
         this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'error' });
       }
     } finally {
-      this.active = null;
-      this.activeController = null;
-      this.scheduleProcessing();
+      this.active.delete(entry.key);
+      this.pumpProcessing();
     }
   }
 
@@ -299,6 +316,11 @@ export class CommitStatsService {
 
   private sortQueue(): void {
     this.queue.sort((a, b) => PRIORITY[a.priority] - PRIORITY[b.priority]);
+  }
+
+  private nextAccessedAt(): number {
+    this.lastAccessedAt = Math.max(Date.now(), this.lastAccessedAt + 1);
+    return this.lastAccessedAt;
   }
 
   private recordDiagnostic(durationMs: number, cacheHit: boolean, aborted: boolean): void {
