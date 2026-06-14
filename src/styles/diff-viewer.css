@@ -1,4 +1,4 @@
-﻿/* Diff Viewer */
+/* Diff Viewer */
 .diff-viewer-root {
   height: 100%;
   display: flex;
@@ -328,4 +328,32 @@
 
 .diff-sbs-cell.empty {
   background: var(--status-untracked-soft);
+}
+
+/* Code Syntax Highlighting */
+.hl-comment {
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.hl-string {
+  color: var(--status-success);
+}
+
+.hl-keyword {
+  color: var(--text-accent);
+  font-weight: 500;
+}
+
+.hl-number {
+  color: var(--status-warning);
+}
+
+.hl-type {
+  color: var(--accent-complement);
+}
+
+.hl-function {
+  color: var(--status-info);
 }

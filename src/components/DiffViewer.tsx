@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Columns, FileWarning, LayoutList, X } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
@@ -179,6 +179,8 @@ const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
   return output;
 };
 
+
+
 /** Reconstruct a minimal unified-diff patch for a single hunk */
 const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
   // Use the file header lines that contain the --- / +++ paths
@@ -200,6 +202,49 @@ const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
     return prefix + row.text;
   });
   return [...diffHeader, hunkHeader, ...hunkLines, ''].join('\n');
+};
+
+const highlightLine = (text: string | null | undefined): React.ReactNode[] => {
+  if (typeof text !== 'string' || !text) return [];
+
+  const tokenRegex = /(\/\/.*|#.*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^\`\\]|\\.)*`)|(\b(?:const|let|var|function|class|interface|type|struct|import|export|from|as|return|if|else|for|while|do|switch|case|default|break|continue|new|delete|try|catch|finally|throw|def|fn|func|pub|impl|use|package|go|defer|select|chan|map|range|nil|null|undefined|true|false|void|int|float|string|bool|boolean|any|public|private|protected|static|readonly|async|await|yield)\b)|(\b\d+(?:\.\d+)?\b)|(\b[A-Z][a-zA-Z0-9_]*\b)|(\b[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\())/g;
+
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = tokenRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      result.push(text.slice(lastIndex, match.index));
+    }
+
+    const matchedText = match[0];
+    const key = `hl-${match.index}`;
+
+    if (match[1]) {
+      result.push(<span key={key} className="hl-comment">{matchedText}</span>);
+    } else if (match[2]) {
+      result.push(<span key={key} className="hl-string">{matchedText}</span>);
+    } else if (match[3]) {
+      result.push(<span key={key} className="hl-keyword">{matchedText}</span>);
+    } else if (match[4]) {
+      result.push(<span key={key} className="hl-number">{matchedText}</span>);
+    } else if (match[5]) {
+      result.push(<span key={key} className="hl-type">{matchedText}</span>);
+    } else if (match[6]) {
+      result.push(<span key={key} className="hl-function">{matchedText}</span>);
+    } else {
+      result.push(matchedText);
+    }
+
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    result.push(text.slice(lastIndex));
+  }
+
+  return result;
 };
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged }) => {
@@ -330,34 +375,44 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
       <div key={key} className={lineClass}>
         <span className="diff-lineno">{line.leftNo ?? ''}</span>
         <span className="diff-lineno">{line.rightNo ?? ''}</span>
-        <span className="diff-code" title={line.text}>{line.text || ' '}</span>
+        <span className="diff-code" title={line.text}>
+          {highlightLine(line.text)}
+        </span>
       </div>
     );
   };
 
   const renderSideBySideLine = (line: ParsedLine, key: string) => {
+    const textStr = line.text || '';
     if (line.type === 'context') {
-      const [leftText = '', rightText = leftText] = line.text.split('\x1f');
+      const [leftText = '', rightText = leftText] = textStr.split('\x1f');
       return (
         <div key={key} className="diff-sbs-row">
           <div className="diff-sbs-cell ctx">
             <span className="diff-lineno">{line.leftNo ?? ''}</span>
-            <span className="diff-code" title={leftText}>{leftText || ' '}</span>
+            <span className="diff-code" title={leftText}>
+              {highlightLine(leftText)}
+            </span>
           </div>
           <div className="diff-sbs-cell ctx">
             <span className="diff-lineno">{line.rightNo ?? ''}</span>
-            <span className="diff-code" title={rightText}>{rightText || ' '}</span>
+            <span className="diff-code" title={rightText}>
+              {highlightLine(rightText)}
+            </span>
           </div>
         </div>
       );
     }
 
     if (line.type === 'del') {
+      const [leftText = ''] = textStr.split('\x1f');
       return (
         <div key={key} className="diff-sbs-row">
           <div className="diff-sbs-cell del">
             <span className="diff-lineno">{line.leftNo ?? ''}</span>
-            <span className="diff-code" title={line.text}>{line.text || ' '}</span>
+            <span className="diff-code" title={leftText}>
+              {highlightLine(leftText)}
+            </span>
           </div>
           <div className="diff-sbs-cell empty">
             <span className="diff-lineno"> </span>
@@ -367,6 +422,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
       );
     }
 
+    const [, rightText = ''] = textStr.split('\x1f');
     return (
       <div key={key} className="diff-sbs-row">
         <div className="diff-sbs-cell empty">
@@ -375,7 +431,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         </div>
         <div className="diff-sbs-cell add">
           <span className="diff-lineno">{line.rightNo ?? ''}</span>
-          <span className="diff-code" title={line.text}>{line.text || ' '}</span>
+          <span className="diff-code" title={rightText}>
+            {highlightLine(rightText)}
+          </span>
         </div>
       </div>
     );
