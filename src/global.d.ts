@@ -467,6 +467,7 @@ export interface ElectronAPI {
     lastReleaseTag?: string | null;
     commits: ReleaseCommitDto[];
     language: 'de' | 'en';
+    versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];
   }) => Promise<IpcResult<{ markdown: string }>>;
 

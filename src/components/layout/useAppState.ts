@@ -13,7 +13,10 @@ import {
   buildReleaseNotesPromptHints,
   filterCommitsForReleaseNotes,
 } from '../../utils/releaseNotes';
-import { suggestNextReleaseTag } from '../../utils/releaseTagSuggestion';
+import {
+  ReleaseVersionBump,
+  suggestNextReleaseTag,
+} from '../../utils/releaseTagSuggestion';
 import {
   countChangedEntriesFromPorcelainV2,
   isMergeInProgressError,
@@ -1864,7 +1867,7 @@ export const useAppState = () => {
     triggerRefresh,
   ]);
 
-  const generateReleaseNotesWithAI = useCallback(async () => {
+  const generateReleaseNotesWithAI = useCallback(async (versionBump: ReleaseVersionBump) => {
     if (!window.electronAPI) return;
     if (!github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
       setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
@@ -1896,6 +1899,7 @@ export const useAppState = () => {
         lastReleaseTag: releaseContext?.lastReleaseTag || null,
         commits,
         language: releaseNotesLanguage,
+        versionBump,
         hints: promptHints,
       });
 

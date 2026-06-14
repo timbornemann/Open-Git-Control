@@ -159,6 +159,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     lastReleaseTag?: string | null;
     commits: Array<{ hash: string; shortHash: string; subject: string; author: string; date: string }>;
     language: 'de' | 'en';
+    versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];
   }) => ipcRenderer.invoke('ai:generateReleaseNotes', params),
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) =>

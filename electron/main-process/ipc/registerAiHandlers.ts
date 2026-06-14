@@ -165,12 +165,16 @@ export function registerAiHandlers({
     lastReleaseTag?: string | null;
     commits: ReleaseCommitInput[];
     language: 'de' | 'en';
+    versionBump?: 'major' | 'minor' | 'patch';
     hints?: string[];
   }) => {
     try {
       const tagName = String(params?.tagName || '').trim();
       const releaseName = String(params?.releaseName || '').trim();
       const language = params?.language === 'en' ? 'en' : 'de';
+      const versionBump = params?.versionBump === 'major' || params?.versionBump === 'minor'
+        ? params.versionBump
+        : 'patch';
       const commits = Array.isArray(params?.commits) ? params.commits.slice(0, 400) : [];
       const hints = Array.isArray(params?.hints)
         ? params.hints.filter((hint): hint is string => typeof hint === 'string' && hint.trim().length > 0).slice(0, 12)
@@ -190,6 +194,7 @@ export function registerAiHandlers({
         lastReleaseTag: params?.lastReleaseTag || null,
         commits,
         language,
+        versionBump,
         hints,
       });
 

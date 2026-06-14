@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { suggestNextReleaseTag } from '../releaseTagSuggestion';
+import {
+  detectReleaseVersionBump,
+  suggestNextReleaseTag,
+} from '../releaseTagSuggestion';
 
 describe('suggestNextReleaseTag', () => {
   it('returns default tag when no valid tags are available', () => {
@@ -10,6 +13,17 @@ describe('suggestNextReleaseTag', () => {
   it('increments highest semver patch tag', () => {
     expect(suggestNextReleaseTag(['v1.2.3', 'v1.2.9', 'v1.10.0'])).toBe('v1.10.1');
     expect(suggestNextReleaseTag(['v2.0.0', 'v1.999.999'])).toBe('v2.0.1');
+  });
+
+  it('increments minor and major versions while resetting lower components', () => {
+    expect(suggestNextReleaseTag(['v1.2.9'], 'minor')).toBe('v1.3.0');
+    expect(suggestNextReleaseTag(['v1.2.9'], 'major')).toBe('v2.0.0');
+  });
+
+  it('returns sensible starting versions for repositories without semver tags', () => {
+    expect(suggestNextReleaseTag([], 'patch')).toBe('v0.1.0');
+    expect(suggestNextReleaseTag([], 'minor')).toBe('v0.1.0');
+    expect(suggestNextReleaseTag([], 'major')).toBe('v1.0.0');
   });
 
   it('normalizes tags without v-prefix to v-prefix in suggestion', () => {
@@ -24,5 +38,20 @@ describe('suggestNextReleaseTag', () => {
   it('handles non-array runtime values defensively', () => {
     const unsafeInput = null as unknown as string[];
     expect(suggestNextReleaseTag(unsafeInput)).toBe('v0.1.0');
+  });
+});
+
+describe('detectReleaseVersionBump', () => {
+  it('detects major, minor, and patch changes', () => {
+    expect(detectReleaseVersionBump('v1.2.3', 'v2.0.0')).toBe('major');
+    expect(detectReleaseVersionBump('v1.2.3', 'v1.4.0')).toBe('minor');
+    expect(detectReleaseVersionBump('v1.2.3', 'v1.2.8')).toBe('patch');
+  });
+
+  it('returns null for invalid, unchanged, or lower versions', () => {
+    expect(detectReleaseVersionBump(null, 'v1.0.0')).toBeNull();
+    expect(detectReleaseVersionBump('v1.2.3', 'next')).toBeNull();
+    expect(detectReleaseVersionBump('v1.2.3', 'v1.2.3')).toBeNull();
+    expect(detectReleaseVersionBump('v2.0.0', 'v1.9.9')).toBeNull();
   });
 });

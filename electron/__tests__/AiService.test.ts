@@ -70,6 +70,64 @@ describe('AiService gemini secret access', () => {
   });
 });
 
+describe('AiService release notes', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('passes the semantic release classification to the AI prompt', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
+      candidates: [{
+        content: {
+          parts: [{ text: '# Release v2.0.0\n\nThis major release adds the new workflow.' }],
+        },
+      }],
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const service = new AiService(fakeGitService);
+    const markdown = await service.generateReleaseNotes(baseSettings, () => 'secure-key-123', {
+      tagName: 'v2.0.0',
+      releaseName: 'Release v2.0.0',
+      lastReleaseTag: 'v1.4.2',
+      commits: [{
+        hash: 'abc123',
+        shortHash: 'abc123',
+        subject: 'feat: add new workflow',
+        author: 'Tim',
+        date: '2026-06-14',
+      }],
+      language: 'en',
+      versionBump: 'major',
+    });
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    const systemPrompt = requestBody.systemInstruction.parts[0].text;
+    const userPrompt = requestBody.contents[0].parts[0].text;
+
+    expect(systemPrompt).toContain('semantic version classification');
+    expect(userPrompt).toContain('Semantic version change: major');
+    expect(userPrompt).toContain('Explicitly call this a major release');
+    expect(userPrompt).toContain('breaking changes and migration requirements');
+    expect(markdown).toContain('This major release');
+  });
+
+  it('names the release type in the deterministic fallback without commits', async () => {
+    const service = new AiService(fakeGitService);
+    const markdown = await service.generateReleaseNotes(baseSettings, () => '', {
+      tagName: 'v1.3.0',
+      releaseName: 'Release v1.3.0',
+      lastReleaseTag: 'v1.2.4',
+      commits: [],
+      language: 'de',
+      versionBump: 'minor',
+    });
+
+    expect(markdown).toContain('Dieses Minor Release');
+  });
+});
+
 describe('AiService porcelain path parsing', () => {
   it('unquotes file paths with spaces', () => {
     const entries = parseStatusPorcelain('?? "Docs/App Overview.png"\n');

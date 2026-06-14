@@ -71,6 +71,8 @@ export type ReleaseCommitInput = {
   date: string;
 };
 
+export type ReleaseVersionBump = 'major' | 'minor' | 'patch';
+
 const CHAT_TIMEOUT_MS = 90_000;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_PREVIEW_CHARS = 220;
@@ -908,14 +910,20 @@ export class AiService {
       lastReleaseTag?: string | null;
       commits: ReleaseCommitInput[];
       language: 'de' | 'en';
+      versionBump: ReleaseVersionBump;
       hints?: string[];
     },
   ): Promise<string> {
     const commits = Array.isArray(params.commits) ? params.commits : [];
+    const releaseTypeLabel = params.versionBump === 'major'
+      ? 'Major'
+      : params.versionBump === 'minor'
+        ? 'Minor'
+        : 'Patch';
     if (commits.length === 0) {
       return params.language === 'en'
-        ? `# ${params.releaseName}\n\nNo new commits since the previous release.`
-        : `# ${params.releaseName}\n\nSeit dem letzten Release gibt es keine neuen Commits.`;
+        ? `# ${params.releaseName}\n\nThis ${releaseTypeLabel.toLowerCase()} release has no new commits since the previous release.`
+        : `# ${params.releaseName}\n\nDieses ${releaseTypeLabel} Release enthaelt seit dem vorherigen Release keine neuen Commits.`;
     }
 
     const systemPrompt = [
@@ -924,11 +932,18 @@ export class AiService {
       'Do not invent changes. Use only the provided commit data.',
       'Group related changes into meaningful sections.',
       'Include a short summary and a complete changelog section.',
+      'Use the provided semantic version classification explicitly in the opening summary.',
     ].join(' ');
 
     const languageInstruction = params.language === 'en'
       ? 'Write in English.'
       : 'Write in German.';
+    const releaseTypeInstruction = params.language === 'en'
+      ? `Explicitly call this a ${releaseTypeLabel.toLowerCase()} release in the opening summary.`
+      : `Bezeichne dies in der Einleitung ausdruecklich als ${releaseTypeLabel} Release.`;
+    const majorReleaseInstruction = params.versionBump === 'major'
+      ? 'Give supported breaking changes and migration requirements high visibility, but do not invent any.'
+      : 'Do not infer breaking changes or compatibility claims from the release type alone.';
     const hintLines = Array.isArray(params.hints)
       ? params.hints.filter((hint) => typeof hint === 'string' && hint.trim().length > 0).slice(0, 12)
       : [];
@@ -937,7 +952,10 @@ export class AiService {
       `Release name: ${params.releaseName}`,
       `Release tag: ${params.tagName}`,
       `Previous release tag: ${params.lastReleaseTag || 'none'}`,
+      `Semantic version change: ${params.versionBump}`,
       languageInstruction,
+      releaseTypeInstruction,
+      majorReleaseInstruction,
       ...(hintLines.length > 0
         ? [
             'Additional style instructions:',
@@ -959,8 +977,8 @@ export class AiService {
 
     const heading = `# ${params.releaseName}`;
     const intro = params.language === 'en'
-      ? `\n\nTag: \`${params.tagName}\`\n\n## Changelog\n`
-      : `\n\nTag: \`${params.tagName}\`\n\n## Aenderungen\n`;
+      ? `\n\nRelease type: ${releaseTypeLabel}\n\nTag: \`${params.tagName}\`\n\n## Changelog\n`
+      : `\n\nRelease-Typ: ${releaseTypeLabel}\n\nTag: \`${params.tagName}\`\n\n## Aenderungen\n`;
     const changelog = commits
       .map((commit) => `- ${commit.subject} (${commit.shortHash})`)
       .join('\n');

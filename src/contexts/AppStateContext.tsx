@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import { AppSidebarProps } from '../components/layout/sidebar/AppSidebar.types';
 import { GitHubReleaseContextDto } from '../global';
 import { ReleaseNotesOptions } from '../types/releaseNotes';
+import { ReleaseVersionBump } from '../utils/releaseTagSuggestion';
 import { GitMergeMode } from '../types/git';
 
 export type CommitNavigationRequest = {
@@ -50,7 +51,7 @@ export type AppContextValue = AppSidebarProps & {
   releaseContextError: string | null;
   releaseContext: GitHubReleaseContextDto | null;
   onRefreshReleaseContext: () => Promise<void>;
-  onGenerateReleaseNotes: () => Promise<void>;
+  onGenerateReleaseNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   releaseNotesGenerating: boolean;
   releaseNotesLanguage: 'de' | 'en';
   setReleaseNotesLanguage: (value: 'de' | 'en') => void;

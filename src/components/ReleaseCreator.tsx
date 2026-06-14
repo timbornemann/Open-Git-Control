@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -15,7 +15,11 @@ import { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto
 import { useI18n } from '../i18n';
 import { ReleaseNotesOptions } from '../types/releaseNotes';
 import { validateGithubReleaseInput } from '../utils/githubReleaseValidation';
-import { suggestNextReleaseTag } from '../utils/releaseTagSuggestion';
+import {
+  detectReleaseVersionBump,
+  ReleaseVersionBump,
+  suggestNextReleaseTag,
+} from '../utils/releaseTagSuggestion';
 
 type AiOptionToggleProps = {
   label: string;
@@ -64,7 +68,7 @@ type Props = {
   contextError: string | null;
   context: GitHubReleaseContextDto | null;
   onRefreshContext: () => Promise<void>;
-  onGenerateNotes: () => Promise<void>;
+  onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   notesGenerating: boolean;
   notesLanguage: 'de' | 'en';
   setNotesLanguage: (value: 'de' | 'en') => void;
@@ -92,6 +96,7 @@ export const ReleaseCreator: React.FC<Props> = ({
   setNotesOptions,
 }) => {
   const { tr } = useI18n();
+  const [versionBump, setVersionBump] = useState<ReleaseVersionBump>('patch');
 
   const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
   const trimmedTagName = (releaseForm.tagName || '').trim();
@@ -103,8 +108,12 @@ export const ReleaseCreator: React.FC<Props> = ({
   );
   const tagAlreadyExists = Boolean(normalizedTag && existingTagSet.has(normalizedTag));
   const suggestedTag = useMemo(
-    () => suggestNextReleaseTag(context?.existingTags || []),
-    [context?.existingTags],
+    () => suggestNextReleaseTag(context?.existingTags || [], versionBump),
+    [context?.existingTags, versionBump],
+  );
+  const effectiveVersionBump = useMemo(
+    () => detectReleaseVersionBump(context?.lastReleaseTag, trimmedTagName) || versionBump,
+    [context?.lastReleaseTag, trimmedTagName, versionBump],
   );
 
   const validation = useMemo(
@@ -142,6 +151,28 @@ export const ReleaseCreator: React.FC<Props> = ({
 
   const canGenerateNotes = Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName) && commitsCount > 0;
   const canCreateRelease = Boolean(ownerRepo) && !releaseSubmitting && !tagAlreadyExists && validation.valid;
+
+  const applySuggestedTag = (nextTag: string) => {
+    setReleaseForm((prev) => {
+      const currentTag = (prev.tagName || '').trim();
+      const currentReleaseName = (prev.releaseName || '').trim();
+      const shouldUpdateReleaseName = (
+        !currentReleaseName
+        || currentReleaseName === `Release ${currentTag}`
+      );
+
+      return {
+        ...prev,
+        tagName: nextTag,
+        releaseName: shouldUpdateReleaseName ? `Release ${nextTag}` : prev.releaseName,
+      };
+    });
+  };
+
+  const selectVersionBump = (nextBump: ReleaseVersionBump) => {
+    setVersionBump(nextBump);
+    applySuggestedTag(suggestNextReleaseTag(context?.existingTags || [], nextBump));
+  };
 
   const createHint = useMemo(() => {
     if (!ownerRepo) {
@@ -244,6 +275,36 @@ export const ReleaseCreator: React.FC<Props> = ({
                 <h2>{tr('1. Version und Ziel', '1. Version and target')}</h2>
               </header>
 
+              <div className="release-version-bump">
+                <div className="release-version-bump-copy">
+                  <span className="release-field-label">{tr('Versionssprung', 'Version bump')}</span>
+                  <small>
+                    {tr(
+                      'Legt fest, welche Stelle erhoeht und wie das Release in den KI-Notizen bezeichnet wird.',
+                      'Controls which component is increased and how AI notes classify the release.',
+                    )}
+                  </small>
+                </div>
+                <div
+                  className="release-version-bump-options"
+                  role="group"
+                  aria-label={tr('Versionssprung auswaehlen', 'Select version bump')}
+                >
+                  {(['major', 'minor', 'patch'] as ReleaseVersionBump[]).map((bump) => (
+                    <button
+                      key={bump}
+                      type="button"
+                      className={`release-version-bump-btn ${versionBump === bump ? 'release-version-bump-btn--active' : ''}`}
+                      aria-pressed={versionBump === bump}
+                      onClick={() => selectVersionBump(bump)}
+                      disabled={!ownerRepo || releaseSubmitting}
+                    >
+                      {bump === 'major' ? 'Major' : bump === 'minor' ? 'Minor' : 'Patch'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="release-field-grid">
                 <label className="release-field">
                   <span className="release-field-label">{tr('Tag-Name (Pflicht)', 'Tag name (required)')}</span>
@@ -258,11 +319,7 @@ export const ReleaseCreator: React.FC<Props> = ({
                 </label>
                 <button
                   className="release-tag-btn"
-                  onClick={() => setReleaseForm((prev) => ({
-                    ...prev,
-                    tagName: suggestedTag,
-                    releaseName: prev.releaseName || `Release ${suggestedTag}`,
-                  }))}
+                  onClick={() => applySuggestedTag(suggestedTag)}
                   disabled={!ownerRepo || releaseSubmitting}
                   title={tr('Tag-Vorschlag uebernehmen', 'Apply suggested tag')}
                 >
@@ -387,7 +444,7 @@ export const ReleaseCreator: React.FC<Props> = ({
                     <div className="release-ai-main-actions">
                       <button
                         className="release-ai-generate-btn"
-                        onClick={() => void onGenerateNotes()}
+                        onClick={() => void onGenerateNotes(effectiveVersionBump)}
                         disabled={!canGenerateNotes}
                       >
                         <Sparkles size={16} />
