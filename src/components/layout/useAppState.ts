@@ -931,6 +931,72 @@ export const useAppState = () => {
         isError: false,
       });
     };
+    const runAutostashPullFlow = async (
+      originalArgs: string[],
+      originalSuccessMsg: string,
+      originalActionLabel?: string,
+      originalOptions?: RunGitCommandOptions,
+    ): Promise<void> => {
+      const autostashOptions: RunGitCommandOptions = {
+        ...originalOptions,
+        skipDirtyGuard: true,
+        skipRemoteAheadDirtyGuard: true,
+        skipSecretScan: true,
+      };
+      const stashMessage = `Open Git Control autostash before pull: git ${originalArgs.join(' ')}`;
+
+      const stashed = await runGitCommand(
+        ['stash', 'push', '-u', '-m', stashMessage],
+        tr('Autostash: Aenderungen wurden im Stash gesichert.', 'Autostash: saved local changes to stash.'),
+        tr('Autostash: stash wird erstellt...', 'Autostash: creating stash...'),
+        autostashOptions,
+      );
+      if (!stashed) {
+        return;
+      }
+
+      const pulled = await runGitCommand(
+        originalArgs,
+        originalSuccessMsg,
+        originalActionLabel,
+        autostashOptions,
+      );
+      if (!pulled) {
+        setGitActionToast({
+          msg: tr(
+            'Autostash gestoppt: Pull ist fehlgeschlagen. Deine Aenderungen bleiben im neuesten Stash gesichert.',
+            'Autostash stopped: pull failed. Your changes remain safe in the latest stash.',
+          ),
+          isError: true,
+        });
+        return;
+      }
+
+      const popped = await runGitCommand(
+        ['stash', 'pop'],
+        tr('Autostash: Stash wurde wieder angewendet.', 'Autostash: stash reapplied.'),
+        tr('Autostash: Stash wird wieder angewendet...', 'Autostash: reapplying stash...'),
+        autostashOptions,
+      );
+      if (!popped) {
+        setGitActionToast({
+          msg: tr(
+            'Autostash fast fertig: Pull war erfolgreich, aber Stash-Pop braucht manuelle Aufloesung.',
+            'Autostash nearly finished: pull succeeded, but stash pop needs manual resolution.',
+          ),
+          isError: true,
+        });
+        return;
+      }
+
+      setGitActionToast({
+        msg: tr(
+          'Autostash-Pull erfolgreich abgeschlossen (stash -> pull -> stash pop).',
+          'Autostash pull completed successfully (stash -> pull -> stash pop).',
+        ),
+        isError: false,
+      });
+    };
     const maybeHandleSyncMismatchFailure = (failureMessage: unknown): boolean => {
       if (command === 'push' && isNonFastForwardPushError(failureMessage)) {
         workspace.setActiveTab('repo');
@@ -946,12 +1012,32 @@ export const useAppState = () => {
 
       if (command === 'pull' && isPullBlockedByLocalChangesError(failureMessage)) {
         workspace.setActiveTab('repo');
-        setGitActionToast({
-          msg: tr(
-            'Pull abgebrochen: Lokale uncommitted Aenderungen wuerden ueberschrieben. Bitte zuerst committen oder stashen und dann erneut pullen.',
-            'Pull aborted: local uncommitted changes would be overwritten. Commit or stash first, then pull again.',
+        setConfirmDialog({
+          variant: 'danger',
+          title: tr('Pull durch uncommitted Aenderungen blockiert', 'Pull blocked by uncommitted changes'),
+          message: tr(
+            'Der Pull wurde abgebrochen, da uncommitted Aenderungen ueberschrieben werden koennten. Moechtest du ein Autostash ausfuehren (lokale uncommitted Aenderungen stashen, pullen und Stash wieder anwenden)?',
+            'The pull was aborted because uncommitted changes would be overwritten. Do you want to perform an autostash (stash changes, pull, and reapply stash)?',
           ),
-          isError: true,
+          contextItems: [
+            { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+            {
+              label: tr('Hinweis', 'Hint'),
+              value: tr(
+                'Deine lokalen uncommitted Aenderungen werden voruebergehend gesichert.',
+                'Your local uncommitted changes will be stashed temporarily.',
+              ),
+            },
+          ],
+          irreversible: false,
+          consequences: tr(
+            'Falls beim Wiederanwenden des Stashs Konflikte entstehen, wird der Konflikt-Resolver geoeffnet.',
+            'If conflicts occur when reapplying the stash, the conflict resolver will open.',
+          ),
+          confirmLabel: tr('Mit Autostash ausfuehren', 'Run with autostash'),
+          onConfirm: async () => {
+            await runAutostashPullFlow(args, successMsg, actionLabel, options);
+          },
         });
         return true;
       }
