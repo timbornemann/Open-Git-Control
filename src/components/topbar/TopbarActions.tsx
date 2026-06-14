@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitMerge, RefreshCw, Rocket } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitMerge, History, RefreshCw, Rocket } from 'lucide-react';
 import { BranchInfo, GitMergeMode } from '../../types/git';
 import { normalizeBranchRefForMerge } from '../../utils/gitParsing';
 import { useI18n } from '../../i18n';
@@ -23,6 +23,7 @@ type Props = {
   onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
+  onOpenTimeline?: () => void;
 };
 
 type SplitOption = {
@@ -50,6 +51,7 @@ export const TopbarActions: React.FC<Props> = ({
   onMergeBranch,
   onStageCommit,
   onOpenReleaseCreator,
+  onOpenTimeline,
 }) => {
   const { tr } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
@@ -285,6 +287,10 @@ export const TopbarActions: React.FC<Props> = ({
           </div>
         )}
       </div>
+      <button className="icon-btn topbar-action-btn" onClick={onOpenTimeline} disabled={!activeRepo}>
+        <History size={16} style={{ marginRight: '6px' }} />
+        {tr('Zeitleiste', 'Timeline')}
+      </button>
       <button className="icon-btn topbar-action-btn" onClick={onOpenReleaseCreator} disabled={!activeRepo}>
         <Rocket size={16} style={{ marginRight: '6px' }} />
         {tr('Release', 'Release')}

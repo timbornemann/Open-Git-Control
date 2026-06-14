@@ -406,6 +406,7 @@ export interface ElectronAPI {
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
+  getFileTimelineData: (limit?: number) => Promise<{ success: boolean; data: any[]; error?: string }>;
   readRepoFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   writeRepoFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   openSubmodule: (submodulePath: string) => Promise<{ success: boolean; error?: string }>;

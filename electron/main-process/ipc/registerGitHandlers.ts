@@ -630,4 +630,13 @@ export function registerGitHandlers({
       return { success: false, error: error.message };
     }
   });
+
+  ipcMain.handle('git:getFileTimelineData', async (_event: any, limit?: number) => {
+    try {
+      const commits = await gitService.getFileTimelineData(limit);
+      return { success: true, data: commits };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 }

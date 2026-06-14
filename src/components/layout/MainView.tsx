@@ -9,6 +9,7 @@ import { WorkingTreeFileDetails } from '../WorkingTreeFileDetails';
 import { DiffViewer } from '../DiffViewer';
 import { RecoveryCenter } from '../RecoveryCenter';
 import { SettingsMainContent } from './SettingsMainContent';
+import { FileTimelineView } from '../FileTimelineView';
 import { useI18n } from '../../i18n';
 import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
 import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDTH } from './hooks/useMainViewPaneResizer';
@@ -298,13 +299,22 @@ export const MainView: React.FC = () => {
     commitNavigationRequest,
   });
 
+  const [showTimeline, setShowTimeline] = React.useState(false);
+
+  React.useEffect(() => {
+    setShowTimeline(false);
+  }, [activeRepo]);
+
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
+  const isTimelineView = activeTab === 'repo' && showTimeline;
   const primaryPaneTitle = isSettingsView
     ? tr('Einstellungen', 'Settings')
     : isReleaseView
     ? tr('Release Ersteller', 'Release creator')
+    : isTimelineView
+    ? tr('Codebase-Zeitleiste', 'Codebase Timeline')
     : showGithubGuide
     ? tr('GitHub Login Anleitung', 'GitHub login guide')
     : showRecoveryCenter
@@ -314,7 +324,7 @@ export const MainView: React.FC = () => {
     : activeDiffRequest
     ? tr('Diff Viewer', 'Diff Viewer')
     : '';
-  const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
+  const shouldShowPrimaryPaneHeader = isSettingsView || isReleaseView || isTimelineView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
 
   return (
     <div className="main-view">
@@ -361,6 +371,7 @@ export const MainView: React.FC = () => {
             onMergeBranch={onMergeBranch}
             onStageCommit={handleStageCommitOpen}
             onOpenReleaseCreator={onOpenReleaseCreator}
+            onOpenTimeline={() => setShowTimeline(true)}
           />
         </div>
       </div>
@@ -397,6 +408,13 @@ export const MainView: React.FC = () => {
                 <button
                   className="icon-btn pane-header-nav-btn"
                   onClick={onCloseReleaseCreator}
+                >
+                  {tr('Zurueck zum Graph', 'Back to graph')}
+                </button>
+              ) : isTimelineView ? (
+                <button
+                  className="icon-btn pane-header-nav-btn"
+                  onClick={() => setShowTimeline(false)}
                 >
                   {tr('Zurueck zum Graph', 'Back to graph')}
                 </button>
@@ -460,6 +478,11 @@ export const MainView: React.FC = () => {
                 setNotesLanguage={setReleaseNotesLanguage}
                 notesOptions={releaseNotesOptions}
                 setNotesOptions={setReleaseNotesOptions}
+              />
+            ) : isTimelineView ? (
+              <FileTimelineView
+                repoPath={activeRepo}
+                onClose={() => setShowTimeline(false)}
               />
             ) : activeConflictPath ? (
               <StagingArea

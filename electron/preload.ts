@@ -95,6 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),
   getFileBlame: (filePath: string, commitHash?: string) =>
     ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
+  getFileTimelineData: (limit?: number) => ipcRenderer.invoke('git:getFileTimelineData', limit),
   readRepoFile: (filePath: string) => ipcRenderer.invoke('git:readRepoFile', filePath),
   writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke('git:writeRepoFile', filePath, content),
   openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),

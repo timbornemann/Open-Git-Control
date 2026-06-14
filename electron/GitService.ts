@@ -1007,6 +1007,56 @@ export class GitService {
     return this.sanitizeCloneTargetName(lastSegment);
   }
 
+  async getFileTimelineData(limit: number = 2000): Promise<any[]> {
+    const args = ['log', `-${limit}`, '--name-status', '--pretty=format:COMMIT:%H|%an|%ad|%s', '--date=iso'];
+    const output = await this.runCommand(args);
+    
+    const commits: any[] = [];
+    const lines = output.split('\n');
+    let currentCommit: any = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('COMMIT:')) {
+        const parts = trimmed.substring(7).split('|');
+        currentCommit = {
+          hash: parts[0],
+          author: parts[1],
+          date: parts[2],
+          subject: parts[3],
+          changes: []
+        };
+        commits.push(currentCommit);
+      } else if (currentCommit) {
+        const parts = trimmed.split(/\s+/);
+        if (parts.length >= 2) {
+          const statusChar = parts[0][0]; // A, M, D, R
+          let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
+          if (statusChar === 'A') status = 'added';
+          else if (statusChar === 'D') status = 'deleted';
+          else if (statusChar === 'R') status = 'renamed';
+
+          if (status === 'renamed' && parts.length >= 3) {
+            currentCommit.changes.push({
+              status,
+              path: parts[2],
+              oldPath: parts[1]
+            });
+          } else {
+            currentCommit.changes.push({
+              status,
+              path: parts[1]
+            });
+          }
+        }
+      }
+    }
+
+    return commits;
+  }
+
   /**
    * Klont ein Repository mit Fortschrittsanzeige
    */
