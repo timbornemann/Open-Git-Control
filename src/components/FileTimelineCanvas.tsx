@@ -372,7 +372,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     ctx.fill();
 
     // Dog-ear fold highlight
-    ctx.fillStyle = 'var(--bg-panel)';
+    ctx.fillStyle = '#241d2c';
     ctx.beginPath();
     ctx.moveTo(left + w * 0.6, top);
     ctx.lineTo(left + w * 0.6, top + h * 0.3);
@@ -438,7 +438,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
             ctx.strokeStyle = 'rgba(154, 121, 200, 1.0)'; // Solid purple
             ctx.lineWidth = 4.0;
           } else {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Much brighter neutral lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)'; // Solid, bright and clear neutral lines
             ctx.lineWidth = 2.0;
           }
           ctx.stroke();
@@ -447,13 +447,11 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     };
 
     const drawNodes = (ctx: CanvasRenderingContext2D) => {
-      const pulse = Math.sin(Date.now() / 150) * 0.35 + 0.65; // oscillating glow factor
-
       for (const node of flatNodes) {
         const isFolder = node.type === 'folder';
         const radius = isFolder ? 22 : 16; // Even bigger nodes for better visibility
 
-        // Draw pulse glows for active operations
+        // Draw static glow ring for active operations (removed pulsing / Date.now() to prevent blinking)
         let glowColor = '';
         if (node.status === 'added') glowColor = 'rgba(79, 174, 148, ';
         else if (node.status === 'modified') glowColor = 'rgba(95, 158, 194, ';
@@ -461,56 +459,46 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
         if (glowColor) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 14, 0, Math.PI * 2);
-          ctx.fillStyle = `${glowColor}${0.25 * pulse})`;
+          ctx.arc(node.x, node.y, radius + 10, 0, Math.PI * 2);
+          ctx.fillStyle = `${glowColor}0.15)`; // static 15% opacity
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 6, 0, Math.PI * 2);
-          ctx.strokeStyle = `${glowColor}${0.9 * pulse})`;
-          ctx.lineWidth = 3.0;
-          ctx.stroke();
-        }
-
-        // Hover highlight
-        const isHovered = hoveredNode?.path === node.path;
-        if (isHovered) {
-          ctx.beginPath();
           ctx.arc(node.x, node.y, radius + 5, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.lineWidth = 1.8;
+          ctx.strokeStyle = `${glowColor}0.65)`; // static 65% opacity
+          ctx.lineWidth = 2.0;
           ctx.stroke();
         }
 
-        // Core node circle background
+        // Core node circle background (using hex colors so they are opaque and hide connection lines)
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isFolder ? 'var(--bg-panel)' : 'var(--bg-dark)';
+        ctx.fillStyle = isFolder ? '#241d2c' : '#1a1520';
         ctx.fill();
 
-        // Core node border
+        // Core node border (using hex colors)
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
         if (node.status === 'added') {
-          ctx.strokeStyle = 'var(--status-success)';
+          ctx.strokeStyle = '#4fae94';
           ctx.lineWidth = 3.5;
         } else if (node.status === 'modified') {
-          ctx.strokeStyle = 'var(--status-info)';
+          ctx.strokeStyle = '#5f9ec2';
           ctx.lineWidth = 3.5;
         } else if (node.status === 'renamed') {
-          ctx.strokeStyle = 'var(--status-merged)';
+          ctx.strokeStyle = '#9a79c8';
           ctx.lineWidth = 3.5;
         } else {
-          ctx.strokeStyle = isFolder ? 'var(--text-primary)' : 'rgba(255, 255, 255, 0.6)';
+          ctx.strokeStyle = isFolder ? '#b48be0' : '#b7a8b4';
           ctx.lineWidth = 2.5;
         }
         ctx.stroke();
 
-        // Render Folder / File Icon
-        const iconColor = node.status === 'added' ? 'var(--status-success)' :
-                          node.status === 'modified' ? 'var(--status-info)' :
-                          node.status === 'renamed' ? 'var(--status-merged)' :
-                          'var(--text-primary)';
+        // Render Folder / File Icon (using hex colors)
+        const iconColor = node.status === 'added' ? '#4fae94' :
+                          node.status === 'modified' ? '#5f9ec2' :
+                          node.status === 'renamed' ? '#9a79c8' :
+                          isFolder ? '#b48be0' : '#b7a8b4';
 
         if (isFolder) {
           drawFolderIcon(ctx, node.x, node.y, 20, iconColor);
@@ -525,13 +513,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           
           ctx.beginPath();
           ctx.arc(badgeX, badgeY, 6, 0, Math.PI * 2);
-          ctx.fillStyle = 'var(--bg-darker)';
+          ctx.fillStyle = '#120f15'; // var(--bg-darker)
           ctx.fill();
-          ctx.strokeStyle = 'var(--text-accent)';
+          ctx.strokeStyle = '#b48be0'; // var(--text-accent)
           ctx.lineWidth = 1.2;
           ctx.stroke();
 
-          ctx.fillStyle = 'var(--text-primary)';
+          ctx.fillStyle = '#e9e0e6'; // var(--text-primary)
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -542,7 +530,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         // Always draw text if scale is large enough, otherwise only draw for top-level or folders to reduce clutter if zoomed out massively
         if (scale >= 0.15 || isFolder) {
           ctx.font = isFolder ? 'bold 15px Inter, sans-serif' : 'bold 13px Inter, sans-serif'; // Larger, bolder font
-          ctx.fillStyle = isHovered ? '#ffffff' : 'var(--text-primary)'; // Always bright text
+          ctx.fillStyle = isFolder ? '#e9e0e6' : '#b7a8b4'; // Solid colors: folders are brighter, files are muted lavender-gray
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
 
