@@ -357,3 +357,86 @@
 .hl-function {
   color: var(--status-info);
 }
+
+/* Git Blame Gutter */
+.diff-blame-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
+  border-right: 1px solid var(--line-subtle);
+  background: var(--bg-darker);
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-blame-cell.clickable {
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.diff-blame-cell.clickable:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.diff-blame-cell.new-block {
+  border-top: 1px solid var(--border-color);
+}
+
+.diff-blame-cell.sub-block {
+  border-top: 1px solid transparent;
+  color: color-mix(in srgb, var(--text-secondary) 25%, transparent);
+}
+
+.diff-blame-hash {
+  color: var(--text-accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.diff-blame-author {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.diff-blame-date {
+  color: var(--text-secondary);
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.diff-blame-dot {
+  margin: 0 auto;
+  opacity: 0.25;
+}
+
+.diff-blame-cell.empty {
+  border-right: 1px solid var(--line-subtle);
+  background: var(--bg-darker);
+}
+
+/* Spinner for loading state */
+.spinner-mini {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin-mini-anim 0.8s linear infinite;
+}
+
+@keyframes spin-mini-anim {
+  to {
+    transform: rotate(360deg);
+  }
+}

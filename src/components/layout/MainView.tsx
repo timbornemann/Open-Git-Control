@@ -510,6 +510,10 @@ export const MainView: React.FC = () => {
                     request={activeDiffRequest}
                     onClose={closeInspector}
                     onRepoChanged={triggerRefresh}
+                    onNavigateToCommit={(hash) => {
+                      handleSelectCommitDirect(hash);
+                      closeInspector();
+                    }}
                   />
                 )}
               </>

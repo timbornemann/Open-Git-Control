@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Columns, FileWarning, LayoutList, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Columns, Eye, FileWarning, LayoutList, X } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
+import { GitFileBlameLineDto } from '../types/git';
 
 type DiffViewMode = 'unified' | 'side-by-side';
 type ParsedLineType = 'context' | 'add' | 'del';
@@ -30,6 +31,7 @@ interface DiffViewerProps {
   onClose: () => void;
   /** When provided, Stage/Unstage/Discard buttons appear per hunk */
   onRepoChanged?: () => void;
+  onNavigateToCommit?: (hash: string) => void;
 }
 
 const MAX_RENDER_CHARS = 2 * 1024 * 1024;
@@ -247,7 +249,45 @@ const highlightLine = (text: string | null | undefined): React.ReactNode[] => {
   return result;
 };
 
-export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged }) => {
+const formatBlameDate = (dateStr: string, tr: any) => {
+  if (!dateStr) return '';
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return dateStr;
+
+  const now = Date.now();
+  const diffMs = now - parsed.getTime();
+  const absMs = Math.abs(diffMs);
+
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (absMs < minute) {
+    return tr('Gerade eben', 'Just now');
+  }
+  if (absMs < hour) {
+    const mins = Math.max(1, Math.round(absMs / minute));
+    return tr(`${mins} Min.`, `${mins} m.`);
+  }
+  if (absMs < day) {
+    const hrs = Math.max(1, Math.round(absMs / hour));
+    return tr(`${hrs} Std.`, `${hrs} h.`);
+  }
+  if (absMs < month) {
+    const days = Math.max(1, Math.round(absMs / day));
+    return tr(`${days} T.`, `${days} d.`);
+  }
+  if (absMs < year) {
+    const mos = Math.max(1, Math.round(absMs / month));
+    return tr(`${mos} Mon.`, `${mos} mo.`);
+  }
+  const yrs = Math.max(1, Math.round(absMs / year));
+  return tr(`${yrs} J.`, `${yrs} y.`);
+};
+
+export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged, onNavigateToCommit }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diffText, setDiffText] = useState('');
@@ -257,6 +297,49 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const [sourceTruncated, setSourceTruncated] = useState(false);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const { tr } = useI18n();
+
+  const [showBlame, setShowBlame] = useState(false);
+  const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);
+  const [isBlameLoading, setIsBlameLoading] = useState(false);
+
+  useEffect(() => {
+    setShowBlame(false);
+    setBlameData([]);
+  }, [request]);
+
+  useEffect(() => {
+    const fetchBlame = async () => {
+      if (!showBlame || !repoPath || !window.electronAPI) return;
+
+      setIsBlameLoading(true);
+      try {
+        const commitHashForBlame = (request.source !== 'staged' && request.source !== 'unstaged')
+          ? request.commitHash
+          : undefined;
+
+        const result = await window.electronAPI.getFileBlame(request.path, commitHashForBlame);
+        if (result.success) {
+          setBlameData(result.data);
+        } else {
+          console.error('Failed to fetch blame data:', result.error);
+        }
+      } catch (err) {
+        console.error('Error fetching blame data:', err);
+      } finally {
+        setIsBlameLoading(false);
+      }
+    };
+
+    fetchBlame();
+  }, [showBlame, repoPath, request]);
+
+  const blameMap = useMemo(() => {
+    const map = new Map<number, GitFileBlameLineDto>();
+    for (const item of blameData) {
+      map.set(item.lineNumber, item);
+    }
+    return map;
+  }, [blameData]);
 
   const applyHunk = async (hunk: ParsedHunk, fileHeader: string[], op: 'stage' | 'unstage' | 'discard') => {
     if (!window.electronAPI) return;
@@ -364,15 +447,76 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     hunkRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const renderUnifiedLine = (line: ParsedLine, key: string) => {
+  const renderBlameCell = (line: ParsedLine, prevLine: ParsedLine | undefined, side: 'left' | 'right' = 'right') => {
+    if (!showBlame) return null;
+
+    if (side === 'left' || !line.rightNo) {
+      return <div className="diff-blame-cell empty" />;
+    }
+
+    const blame = blameMap.get(line.rightNo);
+    if (!blame) {
+      return (
+        <div className="diff-blame-cell empty">
+          {isBlameLoading && <span className="spinner-mini" />}
+        </div>
+      );
+    }
+
+    const isUncommitted = blame.commitHash.startsWith('00000000');
+    const isClickable = !!onNavigateToCommit && !isUncommitted;
+    
+    let isNew = true;
+    if (prevLine && prevLine.rightNo) {
+      const prevBlame = blameMap.get(prevLine.rightNo);
+      if (prevBlame && prevBlame.commitHash === blame.commitHash) {
+        isNew = false;
+      }
+    }
+
+    const cellClass = `diff-blame-cell ${isClickable ? 'clickable' : ''} ${isNew ? 'new-block' : 'sub-block'}`;
+
+    const handleClick = () => {
+      if (isClickable && onNavigateToCommit) {
+        onNavigateToCommit(blame.commitHash);
+      }
+    };
+
+    if (!isNew) {
+      return (
+        <div className={cellClass} onClick={handleClick} title={`${blame.author} • ${blame.summary}`}>
+          <span className="diff-blame-dot">•</span>
+        </div>
+      );
+    }
+
+    const displayHash = isUncommitted ? '' : blame.abbrevHash || blame.commitHash.substring(0, 8);
+    const displayAuthor = isUncommitted ? tr('Nicht committet', 'Not committed yet') : blame.author;
+    const displayDate = isUncommitted ? '' : formatBlameDate(blame.authorTime, tr);
+
+    return (
+      <div className={cellClass} onClick={handleClick} title={`${blame.author} • ${blame.summary}`}>
+        {!isUncommitted && <span className="diff-blame-hash">{displayHash}</span>}
+        <span className="diff-blame-author">{displayAuthor}</span>
+        {!isUncommitted && <span className="diff-blame-date">{displayDate}</span>}
+      </div>
+    );
+  };
+
+  const renderUnifiedLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
     const lineClass = line.type === 'add'
       ? 'diff-line add'
       : line.type === 'del'
         ? 'diff-line del'
         : 'diff-line ctx';
 
+    const gridStyle = showBlame
+      ? { gridTemplateColumns: '220px 52px 52px minmax(0, 1fr)' }
+      : undefined;
+
     return (
-      <div key={key} className={lineClass}>
+      <div key={key} className={lineClass} style={gridStyle}>
+        {renderBlameCell(line, prevLine)}
         <span className="diff-lineno">{line.leftNo ?? ''}</span>
         <span className="diff-lineno">{line.rightNo ?? ''}</span>
         <span className="diff-code" title={line.text}>
@@ -382,19 +526,25 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     );
   };
 
-  const renderSideBySideLine = (line: ParsedLine, key: string) => {
+  const renderSideBySideLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
     const textStr = line.text || '';
+    const sbsGridStyle = showBlame
+      ? { gridTemplateColumns: '180px 52px minmax(0, 1fr)' }
+      : undefined;
+
     if (line.type === 'context') {
       const [leftText = '', rightText = leftText] = textStr.split('\x1f');
       return (
         <div key={key} className="diff-sbs-row">
-          <div className="diff-sbs-cell ctx">
+          <div className="diff-sbs-cell ctx" style={sbsGridStyle}>
+            {renderBlameCell(line, prevLine, 'left')}
             <span className="diff-lineno">{line.leftNo ?? ''}</span>
             <span className="diff-code" title={leftText}>
               {highlightLine(leftText)}
             </span>
           </div>
-          <div className="diff-sbs-cell ctx">
+          <div className="diff-sbs-cell ctx" style={sbsGridStyle}>
+            {renderBlameCell(line, prevLine, 'right')}
             <span className="diff-lineno">{line.rightNo ?? ''}</span>
             <span className="diff-code" title={rightText}>
               {highlightLine(rightText)}
@@ -408,13 +558,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
       const [leftText = ''] = textStr.split('\x1f');
       return (
         <div key={key} className="diff-sbs-row">
-          <div className="diff-sbs-cell del">
+          <div className="diff-sbs-cell del" style={sbsGridStyle}>
+            {renderBlameCell(line, prevLine, 'left')}
             <span className="diff-lineno">{line.leftNo ?? ''}</span>
             <span className="diff-code" title={leftText}>
               {highlightLine(leftText)}
             </span>
           </div>
-          <div className="diff-sbs-cell empty">
+          <div className="diff-sbs-cell empty" style={sbsGridStyle}>
+            {renderBlameCell(line, prevLine, 'right')}
             <span className="diff-lineno"> </span>
             <span className="diff-code"> </span>
           </div>
@@ -425,11 +577,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     const [, rightText = ''] = textStr.split('\x1f');
     return (
       <div key={key} className="diff-sbs-row">
-        <div className="diff-sbs-cell empty">
+        <div className="diff-sbs-cell empty" style={sbsGridStyle}>
+          {renderBlameCell(line, prevLine, 'left')}
           <span className="diff-lineno"> </span>
           <span className="diff-code"> </span>
         </div>
-        <div className="diff-sbs-cell add">
+        <div className="diff-sbs-cell add" style={sbsGridStyle}>
+          {renderBlameCell(line, prevLine, 'right')}
           <span className="diff-lineno">{line.rightNo ?? ''}</span>
           <span className="diff-code" title={rightText}>
             {highlightLine(rightText)}
@@ -466,6 +620,17 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
               <Columns size={14} /> {tr('Side-by-Side', 'Side-by-side')}
             </button>
           </div>
+
+          <button
+            className={`diff-toggle-btn ${showBlame ? 'active' : ''}`}
+            onClick={() => setShowBlame(!showBlame)}
+            title={tr('Git Blame einblenden', 'Show Git Blame')}
+            disabled={!canRenderText}
+            style={{ borderRadius: '6px', border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+          >
+            {isBlameLoading ? <span className="spinner-mini" /> : <Eye size={14} />}
+            {tr('Blame', 'Blame')}
+          </button>
 
           <div className="diff-nav-group">
             <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
@@ -612,9 +777,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
                       : line.text;
                     const normalizedLine = { ...line, text: clippedText };
                     const key = `${hunk.id}-${lineIndex}`;
+                    const prevLine = lineIndex > 0 ? rows[lineIndex - 1] : undefined;
                     return viewMode === 'side-by-side'
-                      ? renderSideBySideLine(normalizedLine, key)
-                      : renderUnifiedLine(normalizedLine, key);
+                      ? renderSideBySideLine(normalizedLine, key, prevLine)
+                      : renderUnifiedLine(normalizedLine, key, prevLine);
                   })}
                 </div>
               </div>
