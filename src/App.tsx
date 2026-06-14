@@ -12,6 +12,7 @@ import { I18nProvider } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { CommandPalette, PaletteCommand } from './components/CommandPalette';
 import { AppStateContext, AppContextValue } from './contexts/AppStateContext';
+import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import './index.css';
 
 const SIDEBAR_MIN_WIDTH = 180;
@@ -173,6 +174,7 @@ const App: React.FC = () => {
     // Navigation
     { id: 'tab-repos', label: tr('Lokale Repos', 'Local repos'), keywords: ['local', 'repos', 'lokal'], action: () => state.setActiveTab('localRepos') },
     { id: 'tab-repo', label: tr('Repository-Ansicht', 'Repository view'), keywords: ['repo', 'branch', 'commits'], action: () => state.setActiveTab('repo') },
+    { id: 'tab-planner', label: tr('Projektplanung', 'Project planning'), keywords: ['todo', 'ideas', 'bugs', 'features', 'planung'], action: () => state.setActiveTab('planner') },
     { id: 'tab-github', label: tr('GitHub', 'GitHub'), keywords: ['github', 'pr', 'pull request'], action: () => state.setActiveTab('github') },
     { id: 'tab-settings', label: tr('Einstellungen', 'Settings'), keywords: ['settings', 'preferences'], action: () => state.setActiveTab('settings') },
     // Remote
@@ -404,6 +406,20 @@ const App: React.FC = () => {
   return (
     <I18nProvider language={state.settings.language}>
       <AppStateContext.Provider value={ctxValue}>
+        <ProjectPlannerProvider
+          activeRepo={state.activeRepo}
+          onRepositorySelected={state.addOpenRepo}
+          onRepositoryMaterialized={async (repoPath) => {
+            await state.addOpenRepo(repoPath);
+            state.setActiveTab('planner');
+            state.setGitActionToast({
+              msg: tr('Projektordner erstellt und Git-Repository initialisiert.', 'Created project folder and initialized Git repository.'),
+              isError: false,
+            });
+          }}
+          onToast={(message, isError) => state.setGitActionToast({ msg: message, isError })}
+          setConfirmDialog={state.setConfirmDialog}
+        >
         <div
           className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
           style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
@@ -489,7 +505,9 @@ const App: React.FC = () => {
               onConfirm={state.executeConfirmDialog}
               secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
               secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-              onSecondaryAction={state.executeConfirmDialogSecondary}
+              onSecondaryAction={state.confirmDialog.onSecondaryAction
+                ? state.executeConfirmDialogSecondary
+                : undefined}
               onCancel={state.closeConfirmDialog}
             />
           )}
@@ -506,7 +524,9 @@ const App: React.FC = () => {
               onConfirm={state.executeConfirmDialog}
               secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
               secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-              onSecondaryAction={state.executeConfirmDialogSecondary}
+              onSecondaryAction={state.confirmDialog.onSecondaryAction
+                ? state.executeConfirmDialogSecondary
+                : undefined}
               onCancel={state.closeConfirmDialog}
             />
           )}
@@ -544,6 +564,7 @@ const App: React.FC = () => {
             onClose={() => setIsPaletteOpen(false)}
           />
         </div>
+        </ProjectPlannerProvider>
       </AppStateContext.Provider>
     </I18nProvider>
   );

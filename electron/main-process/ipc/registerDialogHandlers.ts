@@ -34,4 +34,14 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     if (canceled) return null;
     return filePaths[0];
   });
+
+  ipcMain.handle('dialog:selectProjectParentDirectory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Speicherort fuer neues Projekt auswaehlen',
+      buttonLabel: 'Speicherort auswaehlen',
+    });
+    if (canceled) return null;
+    return filePaths[0];
+  });
 }

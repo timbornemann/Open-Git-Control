@@ -17,6 +17,7 @@ import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useAppContext } from '../../contexts/AppStateContext';
 import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
 import appLogo from '../../../logo.png';
+import { ProjectPlannerView } from '../ProjectPlannerView';
 
 const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
 
@@ -372,9 +373,10 @@ export const MainView: React.FC = () => {
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
+  const isPlannerView = activeTab === 'planner';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
   const isTimelineView = activeTab === 'repo' && showTimeline;
-  const canShowInspectorPane = !isSettingsView && !isReleaseView;
+  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isReleaseView;
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
   const primaryPaneTitle = isSettingsView
     ? tr('Einstellungen', 'Settings')
@@ -403,14 +405,16 @@ export const MainView: React.FC = () => {
             style={{ width: '22px', height: '22px', objectFit: 'contain', borderRadius: '4px' }}
           />
           <span className="topbar-repo-title">
-            {activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
+            {isPlannerView
+              ? tr('Projektplanung', 'Project planning')
+              : activeRepo ? activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
           </span>
-          {currentBranch && (
+          {!isPlannerView && currentBranch && (
             <span className="topbar-chip topbar-chip-branch">
               <GitBranch size={12} /> {currentBranch}
             </span>
           )}
-          {activeRepo && (
+          {!isPlannerView && activeRepo && (
             <span className="topbar-chip topbar-chip-remote" style={{ backgroundColor: remoteStatus.backgroundColor, color: remoteStatus.color, borderColor: remoteStatus.borderColor }}>
               <RefreshCw size={12} style={{ opacity: remoteSync.isFetching ? 1 : 0.7 }} />
               {remoteStatus.title}
@@ -419,7 +423,7 @@ export const MainView: React.FC = () => {
         </div>
 
         <div className="topbar-right">
-          <TopbarActions
+          {!isPlannerView && <TopbarActions
             activeRepo={activeRepo}
             branches={branches}
             currentBranch={currentBranch}
@@ -440,7 +444,7 @@ export const MainView: React.FC = () => {
             onOpenReleaseCreator={onOpenReleaseCreator}
             onOpenTimeline={handleOpenTimeline}
             isTimelineLoading={isTimelineLoading}
-          />
+          />}
           {canShowInspectorPane && (
             <button
               className="icon-btn topbar-panel-toggle"
@@ -458,7 +462,7 @@ export const MainView: React.FC = () => {
         <div
           className="pane"
           style={
-            isSettingsView || isReleaseView || !showInspectorPane
+            isSettingsView || isPlannerView || isReleaseView || !showInspectorPane
               ? { minWidth: 0 }
               : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
           }
@@ -528,7 +532,9 @@ export const MainView: React.FC = () => {
             </div>
           )}
           <div className="pane-content" style={{ padding: 0 }}>
-            {isSettingsView ? (
+            {isPlannerView ? (
+              <ProjectPlannerView />
+            ) : isSettingsView ? (
               <SettingsMainContent
                 settings={settings}
                 onUpdateSettings={onUpdateSettings}

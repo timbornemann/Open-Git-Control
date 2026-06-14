@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RepoSortByDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState } from '../layoutTypes';
+import { AppTabId } from '../sidebar/AppSidebar.types';
 
 type Params = {
   triggerRefresh: () => void;
@@ -101,7 +102,7 @@ export const useWorkspaceDomain = ({
   onNoActiveRepo,
   language,
 }: Params) => {
-  const [activeTab, setActiveTab] = useState<'localRepos' | 'repo' | 'github' | 'settings'>('localRepos');
+  const [activeTab, setActiveTab] = useState<AppTabId>('localRepos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});

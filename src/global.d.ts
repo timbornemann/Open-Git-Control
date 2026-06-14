@@ -1,4 +1,11 @@
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from './types/git';
+import type {
+  PlannerItem,
+  PlannerItemInput,
+  PlannerProject,
+  PlannerProjectInput,
+  ProjectPlannerData,
+} from './types/projectPlanner';
 
 export interface StoredRepoEntryDto {
   path: string;
@@ -373,6 +380,7 @@ export interface DiffPreviewDto {
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
+  selectProjectParentDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
@@ -414,6 +422,22 @@ export interface ElectronAPI {
   onJobEvent: (callback: (event: GitJobEventDto) => void) => () => void;
   getStoredRepos: () => Promise<StoredRepoData>;
   setStoredRepos: (data: StoredRepoData) => Promise<boolean>;
+  plannerGetData: () => Promise<IpcResult<ProjectPlannerData>>;
+  plannerEnsureRepositoryProject: (repoPath: string) => Promise<IpcResult<PlannerProject>>;
+  plannerCreateProject: (input: PlannerProjectInput) => Promise<IpcResult<PlannerProject>>;
+  plannerUpdateProject: (
+    projectId: string,
+    input: Partial<PlannerProjectInput>,
+  ) => Promise<IpcResult<PlannerProject>>;
+  plannerDeleteProject: (projectId: string) => Promise<IpcResult<boolean>>;
+  plannerCreateItem: (projectId: string, input: PlannerItemInput) => Promise<IpcResult<PlannerItem>>;
+  plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => Promise<IpcResult<PlannerItem>>;
+  plannerDeleteItem: (itemId: string) => Promise<IpcResult<boolean>>;
+  plannerMaterializeProject: (
+    projectId: string,
+    parentDirectory: string,
+    folderName: string,
+  ) => Promise<IpcResult<{ project: PlannerProject; repoPath: string }>>;
   getSettings: () => Promise<AppSettingsDto>;
   setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
   setGeminiApiKey: (apiKey: string) => Promise<AppSettingsDto>;

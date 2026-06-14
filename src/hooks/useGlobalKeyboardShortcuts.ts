@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 
-type TabId = 'localRepos' | 'repo' | 'github' | 'settings';
+import { AppTabId } from '../components/layout/sidebar/AppSidebar.types';
 
 type ShortcutHandlers = {
-  setActiveTab: (tab: TabId) => void;
+  setActiveTab: (tab: AppTabId) => void;
   onFetch: () => void;
   onOpenCommandPalette: () => void;
 };
@@ -26,9 +26,9 @@ export const useGlobalKeyboardShortcuts = ({
       const ctrl = e.ctrlKey || e.metaKey;
       if (!ctrl) return;
 
-      // Tab switching: Ctrl+1/2/3/4
+      // Keep the established Ctrl+1..4 mapping; the planner is available on Ctrl+5.
       if (!e.shiftKey && !e.altKey) {
-        const tabs: TabId[] = ['localRepos', 'repo', 'github', 'settings'];
+        const tabs: AppTabId[] = ['localRepos', 'repo', 'github', 'settings', 'planner'];
         const idx = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < tabs.length) {
           e.preventDefault();

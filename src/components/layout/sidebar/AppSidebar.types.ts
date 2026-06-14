@@ -15,10 +15,11 @@ export type BranchContextMenuState = { x: number; y: number; branch: string; isH
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 export type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
+export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
 
 export type AppSidebarProps = {
-  activeTab: 'localRepos' | 'repo' | 'github' | 'settings';
-  setActiveTab: (tab: 'localRepos' | 'repo' | 'github' | 'settings') => void;
+  activeTab: AppTabId;
+  setActiveTab: (tab: AppTabId) => void;
 
   activeRepo: string | null;
   openRepos: string[];

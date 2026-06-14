@@ -12,6 +12,7 @@ import { registerDialogHandlers } from './registerDialogHandlers';
 import { registerGitHandlers } from './registerGitHandlers';
 import { registerGithubHandlers } from './registerGithubHandlers';
 import { registerRepoSettingsHandlers } from './registerRepoSettingsHandlers';
+import { registerProjectPlannerHandlers } from './registerProjectPlannerHandlers';
 import { registerUpdaterHandlers } from './registerUpdaterHandlers';
 
 type SetupIpcDeps = {
@@ -54,6 +55,7 @@ export function setupIPC({
     readSettingsWithMigration,
   });
   registerRepoSettingsHandlers();
+  registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
   registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore });
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });

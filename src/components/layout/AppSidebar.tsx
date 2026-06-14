@@ -7,6 +7,7 @@ import { GithubAuthContent } from './sidebar/GithubAuthContent';
 import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
 import { useI18n } from '../../i18n';
 import { useAppContext } from '../../contexts/AppStateContext';
+import { ProjectPlannerSidebarContent } from '../project-planner/ProjectPlannerSidebarContent';
 
 type AppSidebarProps = {
   isCollapsed: boolean;
@@ -48,6 +49,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, onToggleCol
           <div className="pane-content" style={{ padding: '8px' }}>
             {props.activeTab === 'localRepos' && <LocalReposSidebarContent {...props} />}
             {props.activeTab === 'repo' && <RepoSidebarContent {...props} />}
+            {props.activeTab === 'planner' && <ProjectPlannerSidebarContent />}
             {props.activeTab === 'github' && !props.isAuthenticated && <GithubAuthContent {...props} />}
             {props.activeTab === 'github' && props.isAuthenticated && (
               <GithubConnectedContent

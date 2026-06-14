@@ -53,6 +53,7 @@ const invokeGitCommand = async (commandName: string, ...args: any[]) => {
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
+  selectProjectParentDirectory: () => ipcRenderer.invoke('dialog:selectProjectParentDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>
@@ -111,6 +112,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getStoredRepos: () => ipcRenderer.invoke('repos:getStored'),
   setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
+  plannerGetData: () => ipcRenderer.invoke('planner:getData'),
+  plannerEnsureRepositoryProject: (repoPath: string) => ipcRenderer.invoke('planner:ensureRepositoryProject', repoPath),
+  plannerCreateProject: (input: any) => ipcRenderer.invoke('planner:createProject', input),
+  plannerUpdateProject: (projectId: string, input: any) => ipcRenderer.invoke('planner:updateProject', projectId, input),
+  plannerDeleteProject: (projectId: string) => ipcRenderer.invoke('planner:deleteProject', projectId),
+  plannerCreateItem: (projectId: string, input: any) => ipcRenderer.invoke('planner:createItem', projectId, input),
+  plannerUpdateItem: (itemId: string, input: any) => ipcRenderer.invoke('planner:updateItem', itemId, input),
+  plannerDeleteItem: (itemId: string) => ipcRenderer.invoke('planner:deleteItem', itemId),
+  plannerMaterializeProject: (projectId: string, parentDirectory: string, folderName: string) =>
+    ipcRenderer.invoke('planner:materializeProject', projectId, parentDirectory, folderName),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
   setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),

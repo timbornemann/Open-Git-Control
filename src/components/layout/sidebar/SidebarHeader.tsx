@@ -32,6 +32,8 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
           ? tr('Lokale Repositories', 'Local repositories')
           : activeTab === 'repo'
             ? tr('Aktuelles Repository', 'Current repository')
+            : activeTab === 'planner'
+              ? tr('Projektplanung', 'Project planning')
             : activeTab === 'github'
               ? 'GitHub'
               : tr('Einstellungen', 'Settings')}

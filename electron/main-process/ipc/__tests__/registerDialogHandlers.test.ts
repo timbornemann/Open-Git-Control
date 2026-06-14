@@ -62,8 +62,10 @@ describe('registerDialogHandlers', () => {
 
     const openDirectoryHandler = handlers.get('dialog:openDirectory');
     const selectDirectoryHandler = handlers.get('dialog:selectDirectory');
+    const selectProjectParentDirectoryHandler = handlers.get('dialog:selectProjectParentDirectory');
     expect(openDirectoryHandler).toBeTruthy();
     expect(selectDirectoryHandler).toBeTruthy();
+    expect(selectProjectParentDirectoryHandler).toBeTruthy();
 
     const openResult = await openDirectoryHandler!();
     expect(openResult).toEqual({ path: 'D:/tmp/not-a-repo', isRepo: false });
@@ -73,6 +75,15 @@ describe('registerDialogHandlers', () => {
     expect(showOpenDialogMock).toHaveBeenLastCalledWith({
       properties: ['openDirectory'],
       title: 'Zielordner fuer Clone auswaehlen',
+    });
+
+    showOpenDialogMock.mockResolvedValueOnce({ canceled: false, filePaths: ['D:/tmp/projects'] });
+    const projectParentResult = await selectProjectParentDirectoryHandler!();
+    expect(projectParentResult).toBe('D:/tmp/projects');
+    expect(showOpenDialogMock).toHaveBeenLastCalledWith({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Speicherort fuer neues Projekt auswaehlen',
+      buttonLabel: 'Speicherort auswaehlen',
     });
   });
 });

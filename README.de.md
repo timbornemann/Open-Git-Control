@@ -48,6 +48,7 @@ Mit der App kannst du:
 
 - lokale Repositories oeffnen, verwalten und schnell wechseln
 - neue Repositories direkt aus einem Ordner initialisieren (`git init`)
+- Repository-Arbeit und zukuenftige Projektideen mit Status, Dringlichkeit, Beschreibung und freien Tags planen
 - Branches, Remotes, Tags und Submodule in einer Sidebar verwalten
 - Commits in einem visuellen Commit-Graph durchsuchen und bearbeiten
 - forensische Historien-Suchen (`-S`, `-G`, `-L`) aus der UI starten
@@ -73,6 +74,11 @@ Mit der App kannst du:
   - zuletzt aktive Repositories
   - Sortierung
   - Favoriten
+- Projektplanung:
+  - repositorybezogene Todos, Bugs, Features und Notizen
+  - Status, Dringlichkeit, Beschreibung und frei definierbare Tags
+  - zukuenftige Projekte, die noch kein Git-Repository besitzen
+  - Projektordner erstellen, `git init` ausfuehren und alle Planungseintraege automatisch zugeordnet behalten
 - Resizable Layout:
   - Sidebar-Breite
   - Breite zwischen Graph und Inspector

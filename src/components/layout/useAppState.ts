@@ -2156,6 +2156,7 @@ export const useAppState = () => {
     repoSortBy: workspace.repoSortBy,
     setRepoSortBy: workspace.setRepoSortBy,
     activeRepo: workspace.activeRepo,
+    addOpenRepo: workspace.addOpenRepo,
     handleOpenFolder: workspace.handleOpenFolder,
     handleSwitchRepo: workspace.handleSwitchRepo,
     handleCloseRepo: workspace.handleCloseRepo,
@@ -2177,6 +2178,7 @@ export const useAppState = () => {
     runGitCommand,
     gitActionToast,
     gitActionToasts,
+    setGitActionToast,
     dismissToast,
 
     branches: repository.branches,
@@ -2321,6 +2323,7 @@ export const useAppState = () => {
     handleCreateGithubRepoForCurrent,
 
     confirmDialog,
+    setConfirmDialog,
     inputDialog,
     closeConfirmDialog,
     executeConfirmDialog,
