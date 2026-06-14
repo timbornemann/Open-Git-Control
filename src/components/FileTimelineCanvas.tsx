@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -52,7 +52,6 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
   const [hoveredNode, setHoveredNode] = useState<LayoutNode | null>(null);
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(new Set());
 
-  const mousePosRef = useRef({ x: 0, y: 0, isOver: false });
   const isDraggingRef = useRef(false);
   const dragMovedRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -241,6 +240,48 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     }
   }, [flatNodes, dimensions]);
 
+  // Helper to check hover target on demand (only when mouse moves or zooms)
+  const checkHover = useCallback((mouseX: number, mouseY: number, tx: number, ty: number, s: number, nodes: LayoutNode[]) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Convert screen mouse coordinates to world space coordinates
+    const worldX = (mouseX - tx) / s;
+    const worldY = (mouseY - ty) / s;
+
+    let match: LayoutNode | null = null;
+    for (const node of nodes) {
+      const radius = node.type === 'folder' ? 16 : 12;
+
+      // 1. Circle collision check first (extremely fast)
+      const dist = Math.hypot(worldX - node.x, worldY - node.y);
+      if (dist <= radius + 5) {
+        match = node;
+        break;
+      }
+
+      // 2. Spatial bounding box check before calling the expensive measureText
+      const isNearX = worldX >= node.x + radius && worldX <= node.x + radius + 250;
+      const isNearY = worldY >= node.y - 12 && worldY <= node.y + 12;
+
+      if (isNearX && isNearY) {
+        // Only run measureText if we are actually near the node's text label
+        const textWidth = ctx.measureText(node.name).width;
+        if (worldX <= node.x + radius + 10 + textWidth) {
+          match = node;
+          break;
+        }
+      }
+    }
+
+    if (match?.path !== hoveredNode?.path) {
+      setHoveredNode(match);
+    }
+  }, [hoveredNode]);
+
   // Mouse / Wheel Event Handlers for Panning & Zooming
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return; // Left mouse only
@@ -257,12 +298,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    mousePosRef.current = { x, y, isOver: true };
-
     if (isDraggingRef.current) {
       dragMovedRef.current = true;
       setTranslateX(e.clientX - dragStartRef.current.x);
       setTranslateY(e.clientY - dragStartRef.current.y);
+    } else {
+      checkHover(x, y, translateX, translateY, scale, flatNodes);
     }
   };
 
@@ -280,12 +321,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         }
         return next;
       });
+      setHoveredNode(null); // Clear hover since the tree layout changes
     }
   };
 
   const handleMouseLeave = () => {
     isDraggingRef.current = false;
-    mousePosRef.current.isOver = false;
     setHoveredNode(null);
   };
 
@@ -309,6 +350,9 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     setScale(newScale);
     setTranslateX(newTranslateX);
     setTranslateY(newTranslateY);
+
+    // Update hover after zoom
+    checkHover(mouseX, mouseY, newTranslateX, newTranslateY, newScale, flatNodes);
   };
 
   const zoomIn = () => {
@@ -381,7 +425,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     ctx.fill();
   };
 
-  // Animation and Drawing Loop
+  // Animation and Drawing Loop (Render on Demand, no continuous loop)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || dimensions.width === 0 || dimensions.height === 0) return;
@@ -390,7 +434,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     if (!ctx) return;
 
     const devicePixelRatio = window.devicePixelRatio || 1;
-    let animationId: number;
+
+    // Viewport bounds in world coordinates for culling
+    const leftBound = (-100 - translateX) / scale;
+    const rightBound = (dimensions.width + 250 - translateX) / scale;
+    const topBound = (-50 - translateY) / scale;
+    const bottomBound = (dimensions.height + 50 - translateY) / scale;
 
     const drawGrid = (ctx: CanvasRenderingContext2D) => {
       ctx.fillStyle = 'rgba(150, 130, 160, 0.4)';
@@ -417,6 +466,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
       ctx.lineWidth = 2.5; // Thicker lines globally
       for (const node of flatNodes) {
         for (const child of node.children) {
+          // Viewport culling for connections: skip if both node and child are off-screen
+          const isNodeVisible = node.x >= leftBound && node.x <= rightBound && node.y >= topBound && node.y <= bottomBound;
+          const isChildVisible = child.x >= leftBound && child.x <= rightBound && child.y >= topBound && child.y <= bottomBound;
+          if (!isNodeVisible && !isChildVisible) {
+            continue;
+          }
+
           ctx.beginPath();
           ctx.moveTo(node.x, node.y);
 
@@ -448,6 +504,11 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
     const drawNodes = (ctx: CanvasRenderingContext2D) => {
       for (const node of flatNodes) {
+        // Viewport culling: skip drawing if node is completely off-screen
+        if (node.x + 250 < leftBound || node.x - 50 > rightBound || node.y + 50 < topBound || node.y - 50 > bottomBound) {
+          continue;
+        }
+
         const isFolder = node.type === 'folder';
         const radius = isFolder ? 22 : 16; // Even bigger nodes for better visibility
 
@@ -545,74 +606,19 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
       }
     };
 
-    const checkHover = () => {
-      const pos = mousePosRef.current;
-      if (!pos.isOver) {
-        if (hoveredNode !== null) setHoveredNode(null);
-        return;
-      }
+    // Render once on demand
+    ctx.clearRect(0, 0, dimensions.width * devicePixelRatio, dimensions.height * devicePixelRatio);
+    ctx.save();
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+    ctx.translate(translateX, translateY);
+    ctx.scale(scale, scale);
 
-      // Convert screen mouse coordinates to world space coordinates
-      const worldX = (pos.x - translateX) / scale;
-      const worldY = (pos.y - translateY) / scale;
+    drawGrid(ctx);
+    drawConnections(ctx);
+    drawNodes(ctx);
 
-      let match: LayoutNode | null = null;
-      for (const node of flatNodes) {
-        const radius = node.type === 'folder' ? 16 : 12;
-        // Increase hit box for horizontal text
-        const textWidth = ctx.measureText(node.name).width;
-        
-        // Check circle collision
-        const dist = Math.hypot(worldX - node.x, worldY - node.y);
-        if (dist <= radius + 5) {
-          match = node;
-          break;
-        }
-
-        // Check text box collision
-        if (
-          worldX >= node.x + radius &&
-          worldX <= node.x + radius + 10 + textWidth &&
-          worldY >= node.y - 10 &&
-          worldY <= node.y + 10
-        ) {
-          match = node;
-          break;
-        }
-      }
-
-      if (match?.path !== hoveredNode?.path) {
-        setHoveredNode(match);
-      }
-    };
-
-    const render = () => {
-      ctx.clearRect(0, 0, dimensions.width * devicePixelRatio, dimensions.height * devicePixelRatio);
-
-      ctx.save();
-      ctx.scale(devicePixelRatio, devicePixelRatio);
-
-      // Apply camera zoom & pan
-      ctx.translate(translateX, translateY);
-      ctx.scale(scale, scale);
-
-      drawGrid(ctx);
-      drawConnections(ctx);
-      drawNodes(ctx);
-
-      ctx.restore();
-
-      checkHover();
-
-      animationId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animationId);
-    };
-  }, [dimensions, translateX, translateY, scale, flatNodes, hoveredNode]);
+    ctx.restore();
+  }, [dimensions, translateX, translateY, scale, flatNodes]);
 
   // Translate hovered node position into screen coordinates for tooltip placement
   const tooltipPos = useMemo(() => {
