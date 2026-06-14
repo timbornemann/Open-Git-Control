@@ -197,6 +197,7 @@ const GithubAuthGuide: React.FC<{
 export const MainView: React.FC = () => {
   const {
     activeTab,
+    setActiveTab,
     isAuthenticated,
     selectedGithubAuthHelpMethod,
     onClearGithubAuthHelpMethod,
@@ -311,6 +312,8 @@ export const MainView: React.FC = () => {
       if (result.success) {
         const chronCommits = [...result.data].reverse();
         setTimelineCommits(chronCommits);
+        onCloseReleaseCreator(); // Ensure Release Creator is closed to avoid view conflicts
+        setActiveTab('repo'); // Force active tab to 'repo' so isTimelineView evaluates to true
         setShowTimeline(true);
       } else {
         alert(result.error || tr('Timeline-Daten konnten nicht geladen werden.', 'Could not load timeline data.'));
@@ -326,6 +329,12 @@ export const MainView: React.FC = () => {
     setShowTimeline(false);
     setTimelineCommits([]);
   }, [activeRepo]);
+
+  React.useEffect(() => {
+    if (showReleaseCreator) {
+      setShowTimeline(false);
+    }
+  }, [showReleaseCreator]);
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
