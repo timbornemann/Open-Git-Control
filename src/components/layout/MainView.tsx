@@ -300,9 +300,31 @@ export const MainView: React.FC = () => {
   });
 
   const [showTimeline, setShowTimeline] = React.useState(false);
+  const [isTimelineLoading, setIsTimelineLoading] = React.useState(false);
+  const [timelineCommits, setTimelineCommits] = React.useState<any[]>([]);
+
+  const handleOpenTimeline = async () => {
+    if (!activeRepo || !window.electronAPI) return;
+    setIsTimelineLoading(true);
+    try {
+      const result = await window.electronAPI.getFileTimelineData(1500); // Limit to last 1500 commits for performance
+      if (result.success) {
+        const chronCommits = [...result.data].reverse();
+        setTimelineCommits(chronCommits);
+        setShowTimeline(true);
+      } else {
+        alert(result.error || tr('Timeline-Daten konnten nicht geladen werden.', 'Could not load timeline data.'));
+      }
+    } catch (err: any) {
+      alert(err.message || tr('Fehler beim Laden der Zeitleiste.', 'Error loading timeline.'));
+    } finally {
+      setIsTimelineLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     setShowTimeline(false);
+    setTimelineCommits([]);
   }, [activeRepo]);
 
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
@@ -371,7 +393,8 @@ export const MainView: React.FC = () => {
             onMergeBranch={onMergeBranch}
             onStageCommit={handleStageCommitOpen}
             onOpenReleaseCreator={onOpenReleaseCreator}
-            onOpenTimeline={() => setShowTimeline(true)}
+            onOpenTimeline={handleOpenTimeline}
+            isTimelineLoading={isTimelineLoading}
           />
         </div>
       </div>
@@ -481,8 +504,8 @@ export const MainView: React.FC = () => {
               />
             ) : isTimelineView ? (
               <FileTimelineView
-                repoPath={activeRepo}
                 onClose={() => setShowTimeline(false)}
+                commits={timelineCommits}
               />
             ) : activeConflictPath ? (
               <StagingArea

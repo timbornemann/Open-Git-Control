@@ -24,6 +24,7 @@ type Props = {
   onStageCommit: () => void;
   onOpenReleaseCreator: () => void;
   onOpenTimeline?: () => void;
+  isTimelineLoading?: boolean;
 };
 
 type SplitOption = {
@@ -52,6 +53,7 @@ export const TopbarActions: React.FC<Props> = ({
   onStageCommit,
   onOpenReleaseCreator,
   onOpenTimeline,
+  isTimelineLoading = false,
 }) => {
   const { tr } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
@@ -287,8 +289,8 @@ export const TopbarActions: React.FC<Props> = ({
           </div>
         )}
       </div>
-      <button className="icon-btn topbar-action-btn" onClick={onOpenTimeline} disabled={!activeRepo}>
-        <History size={16} style={{ marginRight: '6px' }} />
+      <button className="icon-btn topbar-action-btn" onClick={onOpenTimeline} disabled={!activeRepo || isTimelineLoading}>
+        <History size={16} className={isTimelineLoading ? 'spin' : ''} style={{ marginRight: '6px' }} />
         {tr('Zeitleiste', 'Timeline')}
       </button>
       <button className="icon-btn topbar-action-btn" onClick={onOpenReleaseCreator} disabled={!activeRepo}>

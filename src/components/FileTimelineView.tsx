@@ -24,46 +24,23 @@ type CommitStep = {
 };
 
 type FileTimelineViewProps = {
-  repoPath: string | null;
   onClose: () => void;
+  commits: CommitStep[];
 };
 
-export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ repoPath, onClose }) => {
+export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, commits }) => {
   const { tr } = useI18n();
-  const [commits, setCommits] = useState<CommitStep[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(commits.length > 0 ? commits.length - 1 : 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(800); // ms per step
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch file timeline data on load
+  // Reset index when commits array changes
   useEffect(() => {
-    const loadTimeline = async () => {
-      if (!repoPath || !window.electronAPI) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await window.electronAPI.getFileTimelineData(1500); // Limit to last 1500 commits for performance
-        if (result.success) {
-          // git log returns newest first. Reverse to chronological order (oldest first)
-          const chronCommits = [...result.data].reverse();
-          setCommits(chronCommits);
-          setCurrentIndex(chronCommits.length > 0 ? chronCommits.length - 1 : 0);
-        } else {
-          setError(result.error || tr('Timeline-Daten konnten nicht geladen werden.', 'Could not load timeline data.'));
-        }
-      } catch (err: any) {
-        setError(err.message || tr('Fehler beim Laden der Zeitleiste.', 'Error loading timeline.'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadTimeline();
-  }, [repoPath, tr]);
+    setCurrentIndex(commits.length > 0 ? commits.length - 1 : 0);
+    setIsPlaying(false);
+  }, [commits]);
 
   // Autoplay Logic
   useEffect(() => {
@@ -173,24 +150,6 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ repoPath, on
     setIsPlaying(false);
     setCurrentIndex(commits.length - 1);
   };
-
-  if (isLoading) {
-    return (
-      <div className="diff-empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <span className="spinner-mini" style={{ width: '20px', height: '20px', borderWidth: '3px' }} />
-        <span>{tr('Historie wird analysiert...', 'Analyzing history...')}</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="diff-empty-state error" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <span>{error}</span>
-        <button className="staging-btn-sm" onClick={onClose}>{tr('Zurück', 'Back')}</button>
-      </div>
-    );
-  }
 
   if (commits.length === 0) {
     return (

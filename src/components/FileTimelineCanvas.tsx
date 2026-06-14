@@ -330,7 +330,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     let animationId: number;
 
     const drawGrid = (ctx: CanvasRenderingContext2D) => {
-      ctx.fillStyle = 'rgba(60, 48, 70, 0.25)';
+      ctx.fillStyle = 'rgba(150, 130, 160, 0.4)';
       const gridSize = 40;
 
       const left = -translateX / scale;
@@ -366,17 +366,17 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           );
 
           if (child.status === 'added') {
-            ctx.strokeStyle = 'rgba(79, 174, 148, 0.45)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(79, 174, 148, 0.95)';
+            ctx.lineWidth = 2.5;
           } else if (child.status === 'modified') {
-            ctx.strokeStyle = 'rgba(95, 158, 194, 0.45)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(95, 158, 194, 0.95)';
+            ctx.lineWidth = 2.5;
           } else if (child.status === 'renamed') {
-            ctx.strokeStyle = 'rgba(154, 121, 200, 0.45)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(154, 121, 200, 0.95)';
+            ctx.lineWidth = 2.5;
           } else {
-            ctx.strokeStyle = 'rgba(60, 48, 70, 0.5)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(150, 135, 165, 0.35)';
+            ctx.lineWidth = 1.8;
           }
           ctx.stroke();
         }
@@ -388,7 +388,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
       for (const node of flatNodes) {
         const isFolder = node.type === 'folder';
-        const radius = isFolder ? 15 : 9;
+        const radius = isFolder ? 18 : 12;
 
         // Draw pulse glows for active operations
         let glowColor = '';
@@ -398,14 +398,14 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
         if (glowColor) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 8, 0, Math.PI * 2);
-          ctx.fillStyle = `${glowColor}${0.1 * pulse})`;
+          ctx.arc(node.x, node.y, radius + 10, 0, Math.PI * 2);
+          ctx.fillStyle = `${glowColor}${0.18 * pulse})`;
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = `${glowColor}${0.6 * pulse})`;
-          ctx.lineWidth = 1.5;
+          ctx.arc(node.x, node.y, radius + 5, 0, Math.PI * 2);
+          ctx.strokeStyle = `${glowColor}${0.8 * pulse})`;
+          ctx.lineWidth = 2.0;
           ctx.stroke();
         }
 
@@ -413,9 +413,9 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         const isHovered = hoveredNode?.path === node.path;
         if (isHovered) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 5, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-          ctx.lineWidth = 1.5;
+          ctx.arc(node.x, node.y, radius + 6, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.lineWidth = 1.8;
           ctx.stroke();
         }
 
@@ -430,16 +430,16 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
         if (node.status === 'added') {
           ctx.strokeStyle = 'var(--status-success)';
-          ctx.lineWidth = 2.0;
+          ctx.lineWidth = 3.0;
         } else if (node.status === 'modified') {
           ctx.strokeStyle = 'var(--status-info)';
-          ctx.lineWidth = 2.0;
+          ctx.lineWidth = 3.0;
         } else if (node.status === 'renamed') {
           ctx.strokeStyle = 'var(--status-merged)';
-          ctx.lineWidth = 2.0;
+          ctx.lineWidth = 3.0;
         } else {
-          ctx.strokeStyle = isFolder ? 'var(--border-color)' : 'rgba(110, 90, 120, 0.45)';
-          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = isFolder ? 'var(--text-accent)' : '#b49bb5';
+          ctx.lineWidth = isFolder ? 1.8 : 1.5;
         }
         ctx.stroke();
 
@@ -447,25 +447,25 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         const iconColor = node.status === 'added' ? 'var(--status-success)' :
                           node.status === 'modified' ? 'var(--status-info)' :
                           node.status === 'renamed' ? 'var(--status-merged)' :
-                          isFolder ? 'var(--text-accent)' : 'var(--text-secondary)';
+                          isFolder ? 'var(--text-accent)' : 'var(--text-primary)';
 
         if (isFolder) {
-          drawFolderIcon(ctx, node.x, node.y, 11, iconColor);
+          drawFolderIcon(ctx, node.x, node.y, 16, iconColor);
         } else {
-          drawFileIcon(ctx, node.x, node.y, 8, iconColor);
+          drawFileIcon(ctx, node.x, node.y, 12, iconColor);
         }
 
         // Draw names (Level of Detail optimization: hide text if zoomed out too far)
         if (scale >= 0.45) {
-          ctx.font = isFolder ? '500 10px Inter, sans-serif' : '400 10px Inter, sans-serif';
-          ctx.fillStyle = isHovered ? 'var(--text-primary)' : 'var(--text-secondary)';
+          ctx.font = isFolder ? 'bold 11px Inter, sans-serif' : '500 11px Inter, sans-serif';
+          ctx.fillStyle = isHovered ? '#ffffff' : 'var(--text-primary)';
           ctx.textAlign = 'center';
 
           // Backdrop shadow for crisp readability
-          ctx.strokeStyle = 'rgba(18, 15, 21, 0.85)';
-          ctx.lineWidth = 3;
-          ctx.strokeText(node.name, node.x, node.y + radius + 13);
-          ctx.fillText(node.name, node.x, node.y + radius + 13);
+          ctx.strokeStyle = 'rgba(18, 15, 21, 0.9)';
+          ctx.lineWidth = 4;
+          ctx.strokeText(node.name, node.x, node.y + radius + 15);
+          ctx.fillText(node.name, node.x, node.y + radius + 15);
         }
       }
     };
@@ -483,7 +483,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
       let match: LayoutNode | null = null;
       for (const node of flatNodes) {
-        const radius = node.type === 'folder' ? 15 : 9;
+        const radius = node.type === 'folder' ? 18 : 12;
         const dist = Math.hypot(worldX - node.x, worldY - node.y);
         if (dist <= radius + 5) {
           match = node;
@@ -527,7 +527,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
   // Translate hovered node position into screen coordinates for tooltip placement
   const tooltipPos = useMemo(() => {
     if (!hoveredNode) return null;
-    const radius = hoveredNode.type === 'folder' ? 15 : 9;
+    const radius = hoveredNode.type === 'folder' ? 18 : 12;
     return {
       x: hoveredNode.x * scale + translateX,
       y: hoveredNode.y * scale + translateY - radius - 8
