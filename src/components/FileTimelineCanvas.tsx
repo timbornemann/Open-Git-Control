@@ -82,9 +82,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
   // Recursively build tree coordinate layout (Left-to-Right Horizontal Tree)
   const layoutTree = useMemo(() => {
-    if (!fileTree) return null;
+    if (!fileTree || dimensions.width === 0 || dimensions.height === 0) return null;
+
+    let maxDepth = 1;
 
     const buildLayoutTree = (node: FileNode, depth: number): LayoutNode => {
+      if (depth > maxDepth) maxDepth = depth;
+      
       const childrenNodes: LayoutNode[] = [];
       const isCollapsed = collapsedPaths.has(node.path);
       const hasChildren = !!node.children && node.children.size > 0;
@@ -115,7 +119,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         path: node.path,
         type: node.type,
         status: node.status,
-        x: depth * 400 + 60, // Spread horizontally much more (400px per depth)
+        x: 0, // Assigned dynamically later
         y: 0,
         width: logicalHeight,
         children: childrenNodes,
@@ -123,6 +127,29 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         isCollapsed
       };
     };
+
+    const tree = buildLayoutTree(fileTree, 0);
+
+    const vSpacing = 24; // Vertical spacing very tight (24px) for massive compression
+    const totalLeaves = tree.width;
+    const naturalHeight = totalLeaves * vSpacing;
+    
+    // Calculate required scale to fit vertically (with some margin)
+    const requiredScaleY = (dimensions.height * 0.85) / Math.max(naturalHeight, 150);
+    
+    // Calculate target natural width to fill horizontal space at that scale
+    const targetNaturalWidth = (dimensions.width * 0.75) / requiredScaleY;
+    
+    // Dynamic horizontal spacing so that it stretches perfectly to fill the screen width
+    const dynamicHSpacing = Math.max(350, targetNaturalWidth / Math.max(1, maxDepth));
+
+    const assignCoordinates = (node: LayoutNode, depth: number) => {
+      node.x = depth * dynamicHSpacing + 60;
+      for (const child of node.children) {
+        assignCoordinates(child, depth + 1);
+      }
+    };
+    assignCoordinates(tree, 0);
 
     const assignY = (node: LayoutNode, topOffset: number, vSpacing: number) => {
       if (node.children.length === 0) {
@@ -141,8 +168,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
       node.y = (firstChild.y + lastChild.y) / 2;
     };
 
-    const tree = buildLayoutTree(fileTree, 0);
-    assignY(tree, 0, 40); // Vertical spacing 40px for compact dense layout
+    assignY(tree, 0, vSpacing);
 
     // Shift tree so root node is centered at Y = 0
     const rootY = tree.y;
@@ -155,7 +181,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     offsetTree(tree);
 
     return tree;
-  }, [fileTree, collapsedPaths]);
+  }, [fileTree, collapsedPaths, dimensions.width, dimensions.height]);
 
   // Flattened layout nodes for faster rendering and hover checking
   const flatNodes = useMemo(() => {
@@ -189,18 +215,21 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
     const treeWidth = maxX - minX;
 
-    // Scale to fit horizontally, but don't zoom out too much!
-    // File trees are naturally very tall, so we want the user to scroll vertically
-    // instead of squishing everything into an unreadable microscopic vertical line.
+    const treeHeight = maxY - minY;
+
+    // Scale to fit BOTH horizontally and vertically so it fits on one page!
     const scaleX = (dimensions.width * 0.85) / Math.max(treeWidth, 150);
-    const newScale = Math.max(0.65, Math.min(scaleX, 1.0)); // Keep it readable!
+    const scaleY = (dimensions.height * 0.85) / Math.max(treeHeight, 150);
+    // Remove the 0.05 minimum limit so it truly scales down to fit any size repository
+    const newScale = Math.min(scaleX, scaleY, 1.5); 
+
+    const centerY = (minY + maxY) / 2;
 
     // Place root on the left
-    setTranslateX(Math.max(60, dimensions.width * 0.1));
+    setTranslateX(Math.max(40, dimensions.width * 0.05));
     
-    // Center vertically on the Root Node (which is at Y = 0)
-    // instead of centering on the midpoint of the entire massive tree
-    setTranslateY(dimensions.height / 2);
+    // Center vertically
+    setTranslateY(dimensions.height / 2 - centerY * newScale);
     setScale(newScale);
   };
 
@@ -385,7 +414,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     };
 
     const drawConnections = (ctx: CanvasRenderingContext2D) => {
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2.5; // Thicker lines globally
       for (const node of flatNodes) {
         for (const child of node.children) {
           ctx.beginPath();
@@ -400,17 +429,17 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           );
 
           if (child.status === 'added') {
-            ctx.strokeStyle = 'rgba(79, 174, 148, 0.85)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(79, 174, 148, 1.0)'; // Solid green
+            ctx.lineWidth = 4.0;
           } else if (child.status === 'modified') {
-            ctx.strokeStyle = 'rgba(95, 158, 194, 0.85)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(95, 158, 194, 1.0)'; // Solid blue
+            ctx.lineWidth = 4.0;
           } else if (child.status === 'renamed') {
-            ctx.strokeStyle = 'rgba(154, 121, 200, 0.85)';
-            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = 'rgba(154, 121, 200, 1.0)'; // Solid purple
+            ctx.lineWidth = 4.0;
           } else {
-            ctx.strokeStyle = 'rgba(150, 135, 165, 0.35)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Much brighter neutral lines
+            ctx.lineWidth = 2.0;
           }
           ctx.stroke();
         }
@@ -422,7 +451,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
       for (const node of flatNodes) {
         const isFolder = node.type === 'folder';
-        const radius = isFolder ? 16 : 12;
+        const radius = isFolder ? 22 : 16; // Even bigger nodes for better visibility
 
         // Draw pulse glows for active operations
         let glowColor = '';
@@ -432,14 +461,14 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
         if (glowColor) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 10, 0, Math.PI * 2);
-          ctx.fillStyle = `${glowColor}${0.18 * pulse})`;
+          ctx.arc(node.x, node.y, radius + 14, 0, Math.PI * 2);
+          ctx.fillStyle = `${glowColor}${0.25 * pulse})`;
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = `${glowColor}${0.8 * pulse})`;
-          ctx.lineWidth = 2.0;
+          ctx.arc(node.x, node.y, radius + 6, 0, Math.PI * 2);
+          ctx.strokeStyle = `${glowColor}${0.9 * pulse})`;
+          ctx.lineWidth = 3.0;
           ctx.stroke();
         }
 
@@ -464,16 +493,16 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
         if (node.status === 'added') {
           ctx.strokeStyle = 'var(--status-success)';
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 3.5;
         } else if (node.status === 'modified') {
           ctx.strokeStyle = 'var(--status-info)';
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 3.5;
         } else if (node.status === 'renamed') {
           ctx.strokeStyle = 'var(--status-merged)';
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 3.5;
         } else {
-          ctx.strokeStyle = isFolder ? 'var(--text-accent)' : '#b49bb5';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = isFolder ? 'var(--text-primary)' : 'rgba(255, 255, 255, 0.6)';
+          ctx.lineWidth = 2.5;
         }
         ctx.stroke();
 
@@ -481,12 +510,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         const iconColor = node.status === 'added' ? 'var(--status-success)' :
                           node.status === 'modified' ? 'var(--status-info)' :
                           node.status === 'renamed' ? 'var(--status-merged)' :
-                          isFolder ? 'var(--text-accent)' : 'var(--text-primary)';
+                          'var(--text-primary)';
 
         if (isFolder) {
-          drawFolderIcon(ctx, node.x, node.y, 14, iconColor);
+          drawFolderIcon(ctx, node.x, node.y, 20, iconColor);
         } else {
-          drawFileIcon(ctx, node.x, node.y, 11, iconColor);
+          drawFileIcon(ctx, node.x, node.y, 16, iconColor);
         }
 
         // Fold / Unfold indicator badge for folders with children
@@ -510,17 +539,18 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         }
 
         // Draw names horizontally to the right
-        if (scale >= 0.35) {
-          ctx.font = isFolder ? 'bold 12px Inter, sans-serif' : '500 12px Inter, sans-serif';
-          ctx.fillStyle = isHovered ? '#ffffff' : (isFolder ? 'var(--text-primary)' : 'var(--text-secondary)');
+        // Always draw text if scale is large enough, otherwise only draw for top-level or folders to reduce clutter if zoomed out massively
+        if (scale >= 0.15 || isFolder) {
+          ctx.font = isFolder ? 'bold 15px Inter, sans-serif' : 'bold 13px Inter, sans-serif'; // Larger, bolder font
+          ctx.fillStyle = isHovered ? '#ffffff' : 'var(--text-primary)'; // Always bright text
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
 
-          // Backdrop shadow for crisp readability
-          ctx.strokeStyle = 'rgba(18, 15, 21, 0.9)';
-          ctx.lineWidth = 4;
+          // Stronger Backdrop shadow for crisp readability
+          ctx.strokeStyle = 'rgba(18, 15, 21, 1.0)';
+          ctx.lineWidth = 5;
           
-          const textOffsetX = node.x + radius + 10;
+          const textOffsetX = node.x + radius + 12;
           ctx.strokeText(node.name, textOffsetX, node.y);
           ctx.fillText(node.name, textOffsetX, node.y);
         }
