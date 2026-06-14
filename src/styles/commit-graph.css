@@ -15,6 +15,7 @@
 .commit-graph-container {
   position: relative;
   padding: 0;
+  container-type: inline-size;
 }
 
 .commit-graph-svg {
@@ -268,6 +269,61 @@
 
 .working-tree-row .commit-hash {
   color: var(--status-warning);
+}
+
+@container (max-width: 760px) {
+  .commit-row {
+    padding-right: 8px;
+  }
+
+  .commit-info {
+    gap: 6px;
+  }
+
+  .commit-hash,
+  .commit-refs,
+  .commit-author,
+  .commit-stats {
+    display: none;
+  }
+
+  .commit-main {
+    gap: 0;
+  }
+
+  .commit-subject-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .commit-meta {
+    display: block;
+  }
+
+  .commit-date {
+    display: block;
+    width: 76px;
+    font-size: 0.75rem;
+  }
+}
+
+@container (max-width: 440px) {
+  .commit-row {
+    padding-right: 6px;
+  }
+
+  .commit-subject-row {
+    gap: 5px;
+  }
+
+  .commit-subject {
+    font-size: 0.8rem;
+  }
+
+  .commit-date {
+    width: 62px;
+    font-size: 0.7rem;
+  }
 }
 
 /* Context Menu */

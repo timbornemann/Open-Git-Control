@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, RefreshCw, ExternalLink, Check, Copy } from 'lucide-react';
+import { GitBranch, RefreshCw, ExternalLink, Check, Copy, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { TopbarActions } from '../topbar/TopbarActions';
 import { CommitGraph } from '../CommitGraph';
 import { CommitDetails } from '../CommitDetails';
@@ -17,6 +17,8 @@ import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useAppContext } from '../../contexts/AppStateContext';
 import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
 import appLogo from '../../../logo.png';
+
+const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
 
 const linkStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -303,6 +305,27 @@ export const MainView: React.FC = () => {
   const [showTimeline, setShowTimeline] = React.useState(false);
   const [isTimelineLoading, setIsTimelineLoading] = React.useState(false);
   const [timelineCommits, setTimelineCommits] = React.useState<any[]>([]);
+  const inspectorManuallyCollapsedRef = React.useRef(
+    window.localStorage.getItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
+  );
+  const [isInspectorPaneVisible, setIsInspectorPaneVisible] = React.useState(() => {
+    return window.innerWidth > 900 && !inspectorManuallyCollapsedRef.current;
+  });
+
+  const handleToggleInspectorPane = React.useCallback(() => {
+    setIsInspectorPaneVisible((previous) => {
+      const next = !previous;
+      inspectorManuallyCollapsedRef.current = !next;
+      window.localStorage.setItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY, String(!next));
+      return next;
+    });
+  }, []);
+
+  const handleHideInspectorPane = React.useCallback(() => {
+    inspectorManuallyCollapsedRef.current = true;
+    window.localStorage.setItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY, 'true');
+    setIsInspectorPaneVisible(false);
+  }, []);
 
   const handleOpenTimeline = async () => {
     if (!activeRepo || !window.electronAPI) return;
@@ -336,10 +359,23 @@ export const MainView: React.FC = () => {
     }
   }, [showReleaseCreator]);
 
+  React.useEffect(() => {
+    const compactViewport = window.matchMedia('(max-width: 900px)');
+    const syncInspectorWithViewport = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsInspectorPaneVisible(!event.matches && !inspectorManuallyCollapsedRef.current);
+    };
+
+    syncInspectorWithViewport(compactViewport);
+    compactViewport.addEventListener('change', syncInspectorWithViewport);
+    return () => compactViewport.removeEventListener('change', syncInspectorWithViewport);
+  }, []);
+
   const showGithubGuide = activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod);
   const isSettingsView = activeTab === 'settings';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
   const isTimelineView = activeTab === 'repo' && showTimeline;
+  const canShowInspectorPane = !isSettingsView && !isReleaseView;
+  const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
   const primaryPaneTitle = isSettingsView
     ? tr('Einstellungen', 'Settings')
     : isReleaseView
@@ -405,6 +441,16 @@ export const MainView: React.FC = () => {
             onOpenTimeline={handleOpenTimeline}
             isTimelineLoading={isTimelineLoading}
           />
+          {canShowInspectorPane && (
+            <button
+              className="icon-btn topbar-panel-toggle"
+              onClick={handleToggleInspectorPane}
+              title={showInspectorPane ? tr('Rechten Inspector schließen', 'Close right inspector') : tr('Rechten Inspector öffnen', 'Open right inspector')}
+              aria-label={showInspectorPane ? tr('Rechten Inspector schließen', 'Close right inspector') : tr('Rechten Inspector öffnen', 'Open right inspector')}
+            >
+              {showInspectorPane ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -412,7 +458,7 @@ export const MainView: React.FC = () => {
         <div
           className="pane"
           style={
-            isSettingsView || isReleaseView
+            isSettingsView || isReleaseView || !showInspectorPane
               ? { minWidth: 0 }
               : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
           }
@@ -587,7 +633,7 @@ export const MainView: React.FC = () => {
           </div>
         </div>
 
-        {!isSettingsView && !isReleaseView && (
+        {showInspectorPane && (
           <>
             <div
               className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}
@@ -597,21 +643,31 @@ export const MainView: React.FC = () => {
               onPointerDown={handleContentResizeStart}
             />
 
-            <div className="pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
+            <div className="pane inspector-pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
               <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>{isCommitInspectorOpen && selectedCommit ? tr('Commit Inspector', 'Commit Inspector') : workingTreeSelection ? tr('Datei-Inspector', 'File inspector') : tr('Working Directory', 'Working Directory')}</span>
-                {((isCommitInspectorOpen && selectedCommit) || workingTreeSelection) && (
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {isCommitInspectorOpen && selectedCommit && commitHistoryStack.length > 0 && (
-                      <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                        {tr('Zurueck', 'Back')}
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {((isCommitInspectorOpen && selectedCommit) || workingTreeSelection) && (
+                    <>
+                      {isCommitInspectorOpen && selectedCommit && commitHistoryStack.length > 0 && (
+                        <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                          {tr('Zurueck', 'Back')}
+                        </button>
+                      )}
+                      <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                        {tr('Schliessen', 'Close')}
                       </button>
-                    )}
-                    <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                      {tr('Schliessen', 'Close')}
-                    </button>
-                  </div>
-                )}
+                    </>
+                  )}
+                  <button
+                    className="icon-btn inspector-pane-close"
+                    onClick={handleHideInspectorPane}
+                    title={tr('Inspector ausblenden', 'Hide inspector')}
+                    aria-label={tr('Inspector ausblenden', 'Hide inspector')}
+                  >
+                    <PanelRightClose size={16} />
+                  </button>
+                </div>
               </div>
               <div className="pane-content" style={{ overflow: 'hidden' }}>
                 {isCommitInspectorOpen && selectedCommit ? (

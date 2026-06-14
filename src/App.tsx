@@ -19,7 +19,9 @@ const SIDEBAR_MAX_WIDTH = 560;
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const APP_RESIZER_WIDTH = 8;
 const MIN_MAIN_VIEW_WIDTH = 608;
+const COMPACT_LAYOUT_MAX_WIDTH = 900;
 const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
+const SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.sidebar-manually-collapsed';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -28,10 +30,19 @@ const App: React.FC = () => {
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const sidebarManuallyCollapsedRef = useRef(
+    window.localStorage.getItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
+  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH || sidebarManuallyCollapsedRef.current;
+  });
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const getSidebarMaxWidth = useCallback(() => {
+    if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
+      return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - 44));
+    }
     const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
     return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
   }, []);
@@ -42,7 +53,19 @@ const App: React.FC = () => {
 
   const resetLayout = useCallback(() => {
     setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
+    sidebarManuallyCollapsedRef.current = false;
+    window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, 'false');
+    setIsSidebarCollapsed(false);
   }, [clampSidebarWidth]);
+
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((previous) => {
+      const next = !previous;
+      sidebarManuallyCollapsedRef.current = next;
+      window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, String(next));
+      return next;
+    });
+  }, []);
 
   const copyToastMessage = useCallback(async (message: string) => {
     const text = String(message || '');
@@ -123,6 +146,17 @@ const App: React.FC = () => {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    const compactViewport = window.matchMedia(`(max-width: ${COMPACT_LAYOUT_MAX_WIDTH}px)`);
+    const syncSidebarWithViewport = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsSidebarCollapsed(event.matches || sidebarManuallyCollapsedRef.current);
+    };
+
+    syncSidebarWithViewport(compactViewport);
+    compactViewport.addEventListener('change', syncSidebarWithViewport);
+    return () => compactViewport.removeEventListener('change', syncSidebarWithViewport);
+  }, []);
 
   useEffect(() => {
     const clampToViewport = () => {
@@ -370,16 +404,24 @@ const App: React.FC = () => {
   return (
     <I18nProvider language={state.settings.language}>
       <AppStateContext.Provider value={ctxValue}>
-        <div className="app-container" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
-          <AppSidebar />
-
-          <div
-            className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={tr('Sidebar-Breite anpassen', 'Resize sidebar width')}
-            onPointerDown={handleSidebarResizeStart}
+        <div
+          className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+          style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+        >
+          <AppSidebar
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapsed={handleToggleSidebar}
           />
+
+          {!isSidebarCollapsed && (
+            <div
+              className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label={tr('Sidebar-Breite anpassen', 'Resize sidebar width')}
+              onPointerDown={handleSidebarResizeStart}
+            />
+          )}
 
           <MainView />
 

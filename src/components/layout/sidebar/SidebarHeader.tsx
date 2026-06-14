@@ -1,12 +1,14 @@
 ﻿import React from 'react';
-import { DownloadCloud, Plus, RefreshCw } from 'lucide-react';
+import { DownloadCloud, PanelLeftClose, Plus, RefreshCw } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
 type SidebarHeaderProps = Pick<
   AppSidebarProps,
   'activeTab' | 'activeRepo' | 'onOpenFolder' | 'onCloneByUrl' | 'onRefreshRemoteQuick' | 'remoteSync' | 'isGitActionRunning'
->;
+> & {
+  onCollapse: () => void;
+};
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   activeTab,
@@ -16,6 +18,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   onRefreshRemoteQuick,
   remoteSync,
   isGitActionRunning,
+  onCollapse,
 }) => {
   const { tr } = useI18n();
 
@@ -33,37 +36,48 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               ? 'GitHub'
               : tr('Einstellungen', 'Settings')}
       </span>
-      {activeTab === 'localRepos' && (
-        <div style={{ display: 'flex', gap: '2px' }}>
+      <div className="sidebar-header-actions">
+        {activeTab === 'localRepos' && (
+          <>
+            <button
+              className="icon-btn"
+              style={{ padding: '4px' }}
+              onClick={onOpenFolder}
+              title={tr('Repository hinzufügen', 'Add repository')}
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              className="icon-btn"
+              style={{ padding: '4px' }}
+              onClick={onCloneByUrl}
+              title={tr('Repository per URL klonen', 'Clone repository from URL')}
+            >
+              <DownloadCloud size={16} />
+            </button>
+          </>
+        )}
+        {activeTab === 'repo' && activeRepo && (
           <button
             className="icon-btn"
             style={{ padding: '4px' }}
-            onClick={onOpenFolder}
-            title={tr('Repository hinzufügen', 'Add repository')}
+            onClick={onRefreshRemoteQuick}
+            title={tr('Remote aktualisieren', 'Refresh remote')}
+            disabled={remoteSync.isFetching || isGitActionRunning}
           >
-            <Plus size={16} />
+            <RefreshCw size={14} />
           </button>
-          <button
-            className="icon-btn"
-            style={{ padding: '4px' }}
-            onClick={onCloneByUrl}
-            title={tr('Repository per URL klonen', 'Clone repository from URL')}
-          >
-            <DownloadCloud size={16} />
-          </button>
-        </div>
-      )}
-      {activeTab === 'repo' && activeRepo && (
+        )}
         <button
           className="icon-btn"
           style={{ padding: '4px' }}
-          onClick={onRefreshRemoteQuick}
-          title={tr('Remote aktualisieren', 'Refresh remote')}
-          disabled={remoteSync.isFetching || isGitActionRunning}
+          onClick={onCollapse}
+          title={tr('Sidebar schließen', 'Close sidebar')}
+          aria-label={tr('Sidebar schließen', 'Close sidebar')}
         >
-          <RefreshCw size={14} />
+          <PanelLeftClose size={16} />
         </button>
-      )}
+      </div>
     </div>
   );
 };
