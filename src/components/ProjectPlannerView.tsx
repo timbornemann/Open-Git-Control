@@ -62,7 +62,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [itemDialogOpen, setItemDialogOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<PlannerItem | null>(null);
   const [materializeParent, setMaterializeParent] = React.useState<string | null>(null);
-  const handledCreateProjectRequestRef = React.useRef(0);
+  const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
 
   React.useEffect(() => {
     if (
