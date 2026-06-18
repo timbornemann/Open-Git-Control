@@ -353,7 +353,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(235px, 1fr));
+  grid-template-columns: repeat(6, minmax(235px, 1fr));
   gap: 10px;
   padding: 14px 16px;
   overflow: auto;
@@ -399,6 +399,7 @@
 }
 
 .planner-column-idea .planner-column-header span { color: var(--text-accent); }
+.planner-column-bug .planner-column-header span { color: var(--status-warning); }
 .planner-column-planned .planner-column-header span { color: var(--status-info); }
 .planner-column-in-progress .planner-column-header span { color: var(--accent-primary); }
 .planner-column-blocked .planner-column-header span { color: var(--status-danger); }

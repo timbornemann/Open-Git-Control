@@ -11,7 +11,7 @@ import {
 } from '../../types/projectPlanner';
 
 export const PRIORITY_OPTIONS: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
-export const STATUS_OPTIONS: PlannerStatus[] = ['idea', 'planned', 'in-progress', 'blocked', 'done'];
+export const STATUS_OPTIONS: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
 
 export const usePlannerLabels = () => {
   const { tr } = useI18n();
@@ -24,6 +24,7 @@ export const usePlannerLabels = () => {
     } satisfies Record<PlannerPriority, string>,
     status: {
       idea: tr('Idee', 'Idea'),
+      bug: tr('Bug', 'Bug'),
       planned: tr('Geplant', 'Planned'),
       'in-progress': tr('In Arbeit', 'In progress'),
       blocked: tr('Blockiert', 'Blocked'),

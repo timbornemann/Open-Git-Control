@@ -5,7 +5,7 @@ import * as path from 'path';
 
 export type PlannerProjectKind = 'repository' | 'planned';
 export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type PlannerStatus = 'idea' | 'planned' | 'in-progress' | 'blocked' | 'done';
+export type PlannerStatus = 'idea' | 'bug' | 'planned' | 'in-progress' | 'blocked' | 'done';
 
 export interface PlannerProject {
   id: string;
@@ -49,8 +49,11 @@ const EMPTY_DATA: ProjectPlannerData = {
   items: [],
 };
 
-const PRIORITIES = new Set<PlannerPriority>(['low', 'medium', 'high', 'urgent']);
-const STATUSES = new Set<PlannerStatus>(['idea', 'planned', 'in-progress', 'blocked', 'done']);
+export const PLANNER_PRIORITIES: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
+export const PLANNER_STATUSES: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
+
+const PRIORITIES = new Set<PlannerPriority>(PLANNER_PRIORITIES);
+const STATUSES = new Set<PlannerStatus>(PLANNER_STATUSES);
 
 const cleanText = (value: unknown, maxLength: number): string => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
@@ -289,6 +292,36 @@ export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInpu
     priority: input.priority !== undefined && PRIORITIES.has(input.priority) ? input.priority : current.priority,
     status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status,
     tags: input.tags === undefined ? current.tags : normalizeTags(input.tags),
+    updatedAt: Date.now(),
+  };
+  const items = [...data.items];
+  items[index] = updated;
+  writeProjectPlannerData({ ...data, items });
+  return updated;
+}
+
+export function movePlannerItem(
+  itemId: string,
+  input: { projectId?: string; status?: PlannerStatus },
+): PlannerItem {
+  const data = readProjectPlannerData();
+  const index = data.items.findIndex((item) => item.id === itemId);
+  if (index < 0) throw new Error('Item not found.');
+
+  const current = data.items[index];
+  let projectId = current.projectId;
+  if (input.projectId !== undefined) {
+    const nextProjectId = cleanText(input.projectId, 100);
+    if (!data.projects.some((project) => project.id === nextProjectId)) {
+      throw new Error('Project not found.');
+    }
+    projectId = nextProjectId;
+  }
+
+  const updated: PlannerItem = {
+    ...current,
+    projectId,
+    status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status,
     updatedAt: Date.now(),
   };
   const items = [...data.items];

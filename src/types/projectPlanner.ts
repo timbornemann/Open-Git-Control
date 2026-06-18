@@ -1,6 +1,6 @@
 export type PlannerProjectKind = 'repository' | 'planned';
 export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type PlannerStatus = 'idea' | 'planned' | 'in-progress' | 'blocked' | 'done';
+export type PlannerStatus = 'idea' | 'bug' | 'planned' | 'in-progress' | 'blocked' | 'done';
 
 export interface PlannerProject {
   id: string;

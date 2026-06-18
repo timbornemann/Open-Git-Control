@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AlertTriangle,
   Archive,
+  Bug,
   CheckCircle2,
   CircleDot,
   FolderGit2,
@@ -28,6 +29,7 @@ import {
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,
+  bug: <Bug size={14} />,
   planned: <CircleDot size={14} />,
   'in-progress': <Rocket size={14} />,
   blocked: <AlertTriangle size={14} />,
