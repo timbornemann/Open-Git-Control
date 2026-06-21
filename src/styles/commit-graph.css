@@ -340,6 +340,7 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   min-width: 220px;
+  max-width: calc(100vw - 16px);
   padding: 4px 0;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
   backdrop-filter: blur(12px);
