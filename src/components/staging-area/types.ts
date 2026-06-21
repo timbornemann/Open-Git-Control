@@ -28,7 +28,7 @@ export type ConfirmDialogState = {
   irreversible: boolean;
   consequences: string;
   confirmLabel?: string;
-  onConfirm: () => Promise<void> | void;
+  onConfirm: () => Promise<unknown> | unknown;
 };
 
 export type InputDialogState = {

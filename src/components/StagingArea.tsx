@@ -45,6 +45,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const { toast, setToast } = useToastQueue(3000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
+  const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
 
   const isConflictOnly = viewMode === 'conflictOnly';
 
@@ -63,6 +64,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setInputDialog(null);
     await action(values);
   }, [inputDialog]);
+  const triggerStashRefresh = useCallback(() => {
+    setStashRefreshTrigger((value) => value + 1);
+  }, []);
 
   const hasSharedWorkingTreeStatus = workingTreeStatus !== null && workingTreeStatus !== undefined;
   const fileOps = useFileOperations({
@@ -71,6 +75,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setConfirmDialog,
     setInputDialog,
     onRepoChanged,
+    onStashChanged: triggerStashRefresh,
     onOpenDiff,
     externalStatus: hasSharedWorkingTreeStatus ? workingTreeStatus : undefined,
     externalStatusRaw: hasSharedWorkingTreeStatus ? workingTreeSnapshot?.statusRaw : undefined,
@@ -337,6 +342,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         <StashPanel
           repoPath={repoPath}
           onRepoChanged={onRepoChanged}
+          refreshTrigger={stashRefreshTrigger}
         />
       )}
 
@@ -459,6 +465,10 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                 <button className="ctx-menu-item" disabled={fileOps.isMutating} onClick={() => { fileOps.setContextMenu(null); fileOps.stashFile(contextEntry.path, contextSection); }}>
                   <span className="ctx-menu-icon">ST</span>
                   {tr('Datei stashen...', 'Stash file...')}
+                </button>
+                <button className="ctx-menu-item" disabled={fileOps.isMutating} onClick={() => { fileOps.setContextMenu(null); fileOps.stashAll(); }}>
+                  <span className="ctx-menu-icon">ALL</span>
+                  {tr('Alle Aenderungen stashen...', 'Stash all changes...')}
                 </button>
                 <div className="ctx-menu-sep" />
               </>

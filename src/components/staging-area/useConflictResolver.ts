@@ -22,7 +22,7 @@ type Params = {
   status: GitStatusWithConflicts | null;
   setToast: (msg: ToastMessage | null) => void;
   setConfirmDialog: (d: ConfirmDialogState | null) => void;
-  git: (args: string[], msg: string, notify?: boolean) => Promise<void>;
+  git: (args: string[], msg: string, notify?: boolean) => Promise<boolean>;
   refresh: () => Promise<void>;
   onRepoChanged?: () => void;
   initialConflictPath?: string | null;

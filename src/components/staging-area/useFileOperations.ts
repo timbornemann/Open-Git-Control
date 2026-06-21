@@ -25,6 +25,7 @@ type Params = {
   setConfirmDialog: (d: ConfirmDialogState | null) => void;
   setInputDialog: (d: InputDialogState | null) => void;
   onRepoChanged?: () => void;
+  onStashChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
   externalStatus?: GitStatusDetailed | null;
   externalStatusRaw?: string;
@@ -38,6 +39,7 @@ export const useFileOperations = ({
   setConfirmDialog,
   setInputDialog,
   onRepoChanged,
+  onStashChanged,
   onOpenDiff,
   externalStatus,
   externalStatusRaw,
@@ -176,8 +178,8 @@ export const useFileOperations = ({
   }, [contextMenu]);
 
   const git = useCallback(async (args: string[], msg: string, notify = false) => {
-    if (!window.electronAPI) return;
-    if (mutationInFlightRef.current) return;
+    if (!window.electronAPI) return false;
+    if (mutationInFlightRef.current) return false;
     mutationInFlightRef.current = true;
     setMutationStartedAt(Date.now());
     try {
@@ -186,11 +188,14 @@ export const useFileOperations = ({
         setToast({ msg, isError: false });
         if (notify && onRepoChanged) onRepoChanged();
         await refresh();
+        return true;
       } else {
         setToast({ msg: r.error || tr('Fehler', 'Error'), isError: true });
+        return false;
       }
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });
+      return false;
     } finally {
       mutationInFlightRef.current = false;
       setMutationStartedAt(null);
@@ -321,10 +326,40 @@ export const useFileOperations = ({
           '--',
           filePath,
         ];
-        await git(args, tr(`${basename(filePath)} gestasht`, `Stashed ${basename(filePath)}`), true);
+        const ok = await git(args, tr(`${basename(filePath)} gestasht`, `Stashed ${basename(filePath)}`), true);
+        if (ok) onStashChanged?.();
       },
     });
-  }, [setInputDialog, repoPath, git, tr]);
+  }, [setInputDialog, repoPath, git, onStashChanged, tr]);
+
+  const stashAll = useCallback(() => {
+    const trackedCount = (status?.staged.length || 0) + (status?.unstaged.length || 0);
+    const untrackedCount = status?.untracked.length || 0;
+    setInputDialog({
+      title: tr('Alle Aenderungen stashen', 'Stash all changes'),
+      message: tr('Optional eine Nachricht fuer den neuen Stash mit allen lokalen Aenderungen hinterlegen.', 'Optionally add a message for the new stash with all local changes.'),
+      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: groesserer Umbau', 'e.g. WIP: larger change') }],
+      contextItems: [
+        { label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') },
+        { label: tr('Tracked', 'Tracked'), value: String(trackedCount) },
+        { label: tr('Untracked', 'Untracked'), value: String(untrackedCount) },
+      ],
+      irreversible: false,
+      consequences: tr('Staged, unstaged und untracked Dateien werden in einen neuen Stash verschoben.', 'Staged, unstaged and untracked files are moved into a new stash.'),
+      confirmLabel: tr('Alles stashen', 'Stash all'),
+      onSubmit: async (values) => {
+        const msg = (values.message || '').trim();
+        const args = [
+          'stash',
+          'push',
+          '--include-untracked',
+          ...(msg ? ['-m', msg] : []),
+        ];
+        const ok = await git(args, tr('Alle Aenderungen gestasht', 'Stashed all changes'), true);
+        if (ok) onStashChanged?.();
+      },
+    });
+  }, [setInputDialog, repoPath, status, git, onStashChanged, tr]);
 
   const showDiff = useCallback((filePath: string, staged: boolean) => {
     const request: DiffRequest = {
@@ -356,6 +391,7 @@ export const useFileOperations = ({
     discardAll,
     deleteUntracked,
     stashFile,
+    stashAll,
     showDiff,
     isMutating: mutationStartedAt !== null,
     mutationElapsedMs,
