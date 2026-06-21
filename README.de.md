@@ -307,6 +307,7 @@ Mit der App kannst du:
 - Planner-Endpunkte fuer:
   - Projekte, Repositories, Tabs und Todos abfragen
   - naechste offene Todos nach Dringlichkeit abrufen
+  - flachen Projektkontext an jedem Todo liefern (`projectName`, `projectKind`, `projectRepoPath`), damit Agenten Todos direkt zuordnen koennen
   - Todos erstellen, aktualisieren, verschieben und loeschen
   - geplante Projekte erstellen
   - Planner-Projekt fuer einen Repository-Pfad sicherstellen

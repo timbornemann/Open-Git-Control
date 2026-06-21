@@ -307,6 +307,7 @@ With the app, you can:
 - Planner endpoints for:
   - listing projects, repositories, tabs, and todos
   - retrieving the next open todos ordered by urgency
+  - returning flat project context on every todo (`projectName`, `projectKind`, `projectRepoPath`) for agent-friendly association
   - creating, updating, moving, and deleting todos
   - creating planned projects
   - ensuring a planner project exists for a repository path
