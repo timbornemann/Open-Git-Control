@@ -20,6 +20,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, onToggleCol
   const settingsTabs = [
     { id: 'general' as const, label: tr('Allgemein', 'General') },
     { id: 'integrations' as const, label: tr('Integrationen', 'Integrations') },
+    { id: 'api' as const, label: tr('API & MCP', 'API & MCP') },
     { id: 'security' as const, label: tr('Sicherheit', 'Security') },
     { id: 'system' as const, label: tr('System', 'System') },
   ];

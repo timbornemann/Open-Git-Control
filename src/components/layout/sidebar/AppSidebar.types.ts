@@ -14,7 +14,7 @@ export type BranchContextMenuState = { x: number; y: number; branch: string; isH
 
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
-export type SettingsTabId = 'general' | 'integrations' | 'security' | 'system';
+export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
 
 export type AppSidebarProps = {

@@ -5,6 +5,7 @@ import { SettingsTabId } from './sidebar/AppSidebar.types';
 import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';
+import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
@@ -236,6 +237,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
             </section>
           </div>
         )}
+
+        {activeTab === 'api' && <ApiMcpSettingsPanel />}
 
         {activeTab === 'security' && (
           <div className="settings-grid">

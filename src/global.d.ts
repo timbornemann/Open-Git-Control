@@ -142,6 +142,20 @@ export interface AppSettingsDto {
   githubHost: string;
 }
 
+export interface PlanningApiInfoDto {
+  enabled: boolean;
+  status: 'starting' | 'running' | 'disabled' | 'error';
+  host: string;
+  port: number | null;
+  preferredPort: number;
+  baseUrl: string | null;
+  apiUrl: string | null;
+  mcpUrl: string | null;
+  docsUrl: string | null;
+  openApiUrl: string | null;
+  error?: string;
+}
+
 
 
 export interface GitHubCreateReleaseParamsDto {
@@ -442,6 +456,7 @@ export interface ElectronAPI {
   setSettings: (partial: Partial<AppSettingsDto>) => Promise<AppSettingsDto>;
   setGeminiApiKey: (apiKey: string) => Promise<AppSettingsDto>;
   clearGeminiApiKey: () => Promise<AppSettingsDto>;
+  getPlanningApiInfo: () => Promise<PlanningApiInfoDto>;
   getAppVersion: () => Promise<string>;
   getUpdaterStatus: () => Promise<UpdaterStatusDto>;
   checkForAppUpdates: () => Promise<{ success: boolean; error?: string }>;

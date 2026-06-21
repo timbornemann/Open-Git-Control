@@ -116,6 +116,131 @@
   flex-wrap: wrap;
 }
 
+.settings-api-status-grid,
+.settings-api-command-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.settings-api-copy-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 150px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  padding: 7px 8px;
+}
+
+.settings-api-copy-label {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.settings-api-copy-row code,
+.settings-api-command-block pre,
+.settings-api-endpoint-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.settings-api-copy-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 0.74rem;
+}
+
+.settings-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.72rem;
+  padding: 5px 7px;
+  white-space: nowrap;
+}
+
+.settings-copy-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.settings-api-command-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  padding: 9px;
+}
+
+.settings-api-command-block pre {
+  margin: 0;
+  overflow: auto;
+  color: var(--text-primary);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.settings-api-endpoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-api-endpoint-row {
+  display: grid;
+  grid-template-columns: 78px minmax(180px, 280px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.settings-api-method {
+  color: var(--text-accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.settings-api-endpoint-row code {
+  color: var(--text-primary);
+  font-size: 0.73rem;
+  word-break: break-word;
+}
+
+@media (max-width: 860px) {
+  .settings-api-copy-row,
+  .settings-api-endpoint-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-api-copy-row code {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .settings-copy-btn {
+    width: fit-content;
+  }
+}
+
 .settings-danger {
   color: var(--status-danger) !important;
 }

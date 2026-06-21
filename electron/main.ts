@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { aiService } from './AiService';
 import { CommitStatsService } from './CommitStatsService';
@@ -22,6 +22,11 @@ const WINDOWS_APP_ID = 'com.opengitcontrol.app';
 
 const updaterManager = new UpdaterManager(isDev);
 let planningApiServer: PlanningApiServerHandle | null = null;
+let planningApiError: string | null = null;
+const preferredPlanningApiPort = (() => {
+  const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
+})();
 const secretScanService = new SecretScanService(gitService);
 const workingTreeService = new WorkingTreeService(gitService);
 const commitStatsService = new CommitStatsService(
@@ -35,6 +40,27 @@ const buildDiagnosticsReport = buildDiagnosticsReportFactory({
   readSettingsWithMigration,
   getUpdaterStatus: () => updaterManager.getStatus(),
   getCommitStatsDiagnostics: () => commitStatsService.getDiagnostics(),
+});
+
+ipcMain.handle('planning-api:getInfo', async () => {
+  const disabled = process.env.OPEN_GIT_CONTROL_API_DISABLED === 'true';
+  const serverUrl = planningApiServer?.url || null;
+  const parsedUrl = serverUrl ? new URL(serverUrl) : null;
+  const normalizedBaseUrl = serverUrl ? `${serverUrl}/api/` : null;
+
+  return {
+    enabled: !disabled,
+    status: disabled ? 'disabled' : planningApiServer ? 'running' : planningApiError ? 'error' : 'starting',
+    host: parsedUrl?.hostname || '127.0.0.1',
+    port: parsedUrl ? Number(parsedUrl.port) : null,
+    preferredPort: preferredPlanningApiPort,
+    baseUrl: serverUrl,
+    apiUrl: normalizedBaseUrl,
+    mcpUrl: serverUrl ? `${serverUrl}/mcp` : null,
+    docsUrl: normalizedBaseUrl,
+    openApiUrl: serverUrl ? `${serverUrl}/api/openapi.json` : null,
+    ...(planningApiError ? { error: planningApiError } : {}),
+  };
 });
 
 app.whenReady().then(() => {
@@ -62,9 +88,11 @@ app.whenReady().then(() => {
     void startPlanningApiServer({ gitService })
       .then((server) => {
         planningApiServer = server;
+        planningApiError = null;
         console.log(`[planning-api] Listening at ${server.url}/api/`);
       })
       .catch((error) => {
+        planningApiError = error instanceof Error ? error.message : String(error);
         console.error('[planning-api] Failed to start:', error);
       });
   }
