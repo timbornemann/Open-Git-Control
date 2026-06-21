@@ -23,6 +23,7 @@ Language: **English (main)** | Deutsche Version: [README.de.md](README.de.md)
   - [12) Security and Safety](#12-security-and-safety)
   - [13) System, Updates, Job Center](#13-system-updates-job-center)
   - [14) Shortcuts and Productivity](#14-shortcuts-and-productivity)
+  - [15) Local Planning API and MCP Tools](#15-local-planning-api-and-mcp-tools)
 - [Install Git (where and how)](#install-git-where-and-how)
 - [Install the App](#install-the-app)
 - [Typical Workflows](#typical-workflows)
@@ -49,6 +50,7 @@ With the app, you can:
 - open, manage, and quickly switch local repositories
 - initialize new repositories directly from a folder (`git init`)
 - plan repository work and future project ideas with statuses, priorities, descriptions, and free-form tags
+- expose planning data to local agents through a REST API and MCP-style JSON-RPC tools
 - manage branches, remotes, tags, and submodules in a sidebar
 - browse and operate on commits in a visual commit graph
 - run forensic history searches (`-S`, `-G`, `-L`) from the UI
@@ -77,6 +79,7 @@ With the app, you can:
 - Project planning:
   - repository-specific todos, bugs, features, and notes
   - status, priority, description, and free-form tags
+  - dedicated tabs/statuses: idea, bug, planned, in-progress, blocked, done
   - future projects that do not have a Git repository yet
   - create a project folder, run `git init`, and keep all planning items assigned automatically
 - Resizable layout:
@@ -294,6 +297,31 @@ With the app, you can:
 - `Ctrl+Shift+P`: command palette
 - `Ctrl+Enter`: execute commit (in commit fields)
 
+### 15) Local Planning API and MCP Tools
+
+- Local HTTP API for project planning, bound to `127.0.0.1`
+- Preferred port: `2990`; if it is occupied, the app tries the next available local port
+- API documentation is served at `http://127.0.0.1:2990/api/`
+- Machine-readable API description at `/api/openapi.json`
+- Planner endpoints for:
+  - listing projects, repositories, tabs, and todos
+  - retrieving the next open todos ordered by urgency
+  - creating, updating, moving, and deleting todos
+  - creating planned projects
+  - ensuring a planner project exists for a repository path
+- Tab-specific endpoints such as `/api/tabs/bug/todos` and `/api/tabs/working/todos`
+  - `working` is accepted as an alias for `in-progress`
+- Agent shortcuts:
+  - `GET /api/agent/next`
+  - `GET /api/mcp/tools`
+  - `POST /api/mcp/tools/call`
+- MCP-style JSON-RPC endpoint at `/mcp`
+  - supports `initialize`, `tools/list`, and `tools/call`
+  - exposes planning tools such as `get_next_todos`, `list_todos`, `create_todo`, `move_todo`, and `delete_todo`
+- Runtime controls:
+  - `OPEN_GIT_CONTROL_API_PORT=2990` to choose the preferred port
+  - `OPEN_GIT_CONTROL_API_DISABLED=true` to disable the local API server
+
 ## Install Git (where and how)
 
 Git must be installed and available in your `PATH`.
@@ -430,6 +458,13 @@ Output is in `release/`.
 2. Select a reflog entry.
 3. Create a recovery branch or (carefully) hard reset.
 
+### 7) Agent planning API flow
+
+1. Start Open-Git-Control.
+2. Open `http://127.0.0.1:2990/api/` for the local API documentation.
+3. Ask an external agent to call `GET /api/agent/next?repoPath=...` to find open work for a repository.
+4. Let the agent create or move planning items through `/api/todos` or `/mcp` tool calls.
+
 ## Settings (Overview)
 
 - `General`:
@@ -457,6 +492,8 @@ Output is in `release/`.
 
 - Git operations run locally against your selected repository.
 - Repositories/settings are stored in the app user-data directory.
+- Planning projects and todos are stored locally in the app user-data directory.
+- The local planning API binds to `127.0.0.1` and exposes planning data to local processes on your machine.
 - GitHub token and Gemini key are stored OS-encrypted via Electron `safeStorage` when available.
 - If OS encryption is unavailable, secrets are not stored persistently.
 
@@ -485,3 +522,6 @@ Output is in `release/`.
   - `origin` must point to GitHub and auth must be active.
 - Auto-update not available
   - Update features are only active in installed production builds, not in `npm run dev`.
+- Planning API not available on port `2990`
+  - Another process may already use the port; check the app log for the actual local API URL.
+  - Set `OPEN_GIT_CONTROL_API_PORT` before starting the app to choose another preferred port.

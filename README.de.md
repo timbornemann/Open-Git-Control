@@ -23,6 +23,7 @@ Sprache: **Deutsch** | English main version: [README.md](README.md)
   - [12) Security und Safety](#12-security-und-safety)
   - [13) System, Updates, Job Center](#13-system-updates-job-center)
   - [14) Shortcuts und Produktivitaet](#14-shortcuts-und-produktivitaet)
+  - [15) Lokale Planning API und MCP-Tools](#15-lokale-planning-api-und-mcp-tools)
 - [Git installieren (wie und wo)](#git-installieren-wie-und-wo)
 - [Installation der App](#installation-der-app)
 - [Typische Ablaeufe](#typische-ablaeufe)
@@ -49,6 +50,7 @@ Mit der App kannst du:
 - lokale Repositories oeffnen, verwalten und schnell wechseln
 - neue Repositories direkt aus einem Ordner initialisieren (`git init`)
 - Repository-Arbeit und zukuenftige Projektideen mit Status, Dringlichkeit, Beschreibung und freien Tags planen
+- Planungsdaten ueber eine lokale REST-API und MCP-aehnliche JSON-RPC-Tools fuer lokale Agenten bereitstellen
 - Branches, Remotes, Tags und Submodule in einer Sidebar verwalten
 - Commits in einem visuellen Commit-Graph durchsuchen und bearbeiten
 - forensische Historien-Suchen (`-S`, `-G`, `-L`) aus der UI starten
@@ -77,6 +79,7 @@ Mit der App kannst du:
 - Projektplanung:
   - repositorybezogene Todos, Bugs, Features und Notizen
   - Status, Dringlichkeit, Beschreibung und frei definierbare Tags
+  - eigene Tabs/Status: idea, bug, planned, in-progress, blocked, done
   - zukuenftige Projekte, die noch kein Git-Repository besitzen
   - Projektordner erstellen, `git init` ausfuehren und alle Planungseintraege automatisch zugeordnet behalten
 - Resizable Layout:
@@ -294,6 +297,31 @@ Mit der App kannst du:
 - `Ctrl+Shift+P`: Command Palette
 - `Ctrl+Enter`: Commit ausfuehren (in Commit-Feldern)
 
+### 15) Lokale Planning API und MCP-Tools
+
+- Lokale HTTP-API fuer die Projektplanung, gebunden an `127.0.0.1`
+- Bevorzugter Port: `2990`; wenn er belegt ist, versucht die App den naechsten freien lokalen Port
+- API-Dokumentation unter `http://127.0.0.1:2990/api/`
+- Maschinenlesbare API-Beschreibung unter `/api/openapi.json`
+- Planner-Endpunkte fuer:
+  - Projekte, Repositories, Tabs und Todos abfragen
+  - naechste offene Todos nach Dringlichkeit abrufen
+  - Todos erstellen, aktualisieren, verschieben und loeschen
+  - geplante Projekte erstellen
+  - Planner-Projekt fuer einen Repository-Pfad sicherstellen
+- Tab-spezifische Endpunkte wie `/api/tabs/bug/todos` und `/api/tabs/working/todos`
+  - `working` wird als Alias fuer `in-progress` akzeptiert
+- Agenten-Shortcuts:
+  - `GET /api/agent/next`
+  - `GET /api/mcp/tools`
+  - `POST /api/mcp/tools/call`
+- MCP-aehnlicher JSON-RPC-Endpunkt unter `/mcp`
+  - unterstuetzt `initialize`, `tools/list` und `tools/call`
+  - stellt Planning-Tools wie `get_next_todos`, `list_todos`, `create_todo`, `move_todo` und `delete_todo` bereit
+- Runtime-Steuerung:
+  - `OPEN_GIT_CONTROL_API_PORT=2990` fuer den bevorzugten Port
+  - `OPEN_GIT_CONTROL_API_DISABLED=true` zum Deaktivieren des lokalen API-Servers
+
 ## Git installieren (wie und wo)
 
 Git muss installiert und im `PATH` verfuegbar sein.
@@ -430,6 +458,13 @@ Output liegt in `release/`.
 2. Reflog-Eintrag auswaehlen.
 3. Recovery-Branch erstellen oder (vorsichtig) hard reset.
 
+### 7) Agenten-Planning-API-Flow
+
+1. Open-Git-Control starten.
+2. `http://127.0.0.1:2990/api/` fuer die lokale API-Dokumentation oeffnen.
+3. Einen externen Agenten `GET /api/agent/next?repoPath=...` aufrufen lassen, um offene Arbeit fuer ein Repository zu finden.
+4. Der Agent kann Planungseintraege ueber `/api/todos` oder `/mcp`-Toolaufrufe erstellen oder verschieben.
+
 ## Einstellungen (Uebersicht)
 
 - `General`:
@@ -457,6 +492,8 @@ Output liegt in `release/`.
 
 - Git-Operationen laufen lokal gegen dein ausgewaehltes Repo.
 - Repositories/Settings werden im User-Data-Verzeichnis der App gespeichert.
+- Planungsprojekte und Todos werden lokal im User-Data-Verzeichnis der App gespeichert.
+- Die lokale Planning API bindet an `127.0.0.1` und stellt Planungsdaten lokalen Prozessen auf deinem Rechner bereit.
 - GitHub-Token und Gemini-Key werden ueber Electron `safeStorage` OS-verschluesselt gespeichert, wenn verfuegbar.
 - Falls OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
 
@@ -485,4 +522,7 @@ Output liegt in `release/`.
   - `origin` muss auf GitHub zeigen und Auth muss aktiv sein.
 - Auto-Update nicht verfuegbar
   - Update-Funktionen sind nur in installierten Production Builds aktiv, nicht in `npm run dev`.
+- Planning API ist nicht auf Port `2990` erreichbar
+  - Eventuell nutzt ein anderer Prozess den Port; im App-Log steht die tatsaechliche lokale API-URL.
+  - `OPEN_GIT_CONTROL_API_PORT` vor dem App-Start setzen, um einen anderen bevorzugten Port zu waehlen.
 
