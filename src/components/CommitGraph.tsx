@@ -57,6 +57,13 @@ interface ContextMenuState {
   node: GraphNode;
 }
 
+type ContextMenuPlacement = {
+  left: number;
+  top: number;
+  maxHeight: number;
+  ready: boolean;
+};
+
 interface MenuAction {
   label: string;
   icon: string;
@@ -283,6 +290,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
 }) => {
   const { locale, tr } = useI18n();
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toast, setToast } = useToastQueue(4000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -292,6 +300,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
   const [matchCursor, setMatchCursor] = useState(0);
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
   const [forensicPath, setForensicPath] = useState('');
@@ -537,6 +546,54 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     };
   }, []);
 
+  const updateContextMenuPlacement = useCallback(() => {
+    if (!contextMenu || !contextMenuRef.current) return;
+
+    const margin = 8;
+    const menu = contextMenuRef.current;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const maxHeight = Math.max(160, viewportHeight - margin * 2);
+    const menuWidth = menu.offsetWidth;
+    const fullMenuHeight = Math.max(menu.scrollHeight, menu.offsetHeight);
+    const visibleMenuHeight = Math.min(fullMenuHeight, maxHeight);
+
+    const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
+    const maxTop = Math.max(margin, viewportHeight - visibleMenuHeight - margin);
+    const left = Math.min(Math.max(margin, contextMenu.x), maxLeft);
+    const top = Math.min(Math.max(margin, contextMenu.y), maxTop);
+
+    setContextMenuPlacement((current) => {
+      if (
+        current
+        && current.left === left
+        && current.top === top
+        && current.maxHeight === maxHeight
+        && current.ready
+      ) {
+        return current;
+      }
+      return { left, top, maxHeight, ready: true };
+    });
+  }, [contextMenu]);
+
+  useLayoutEffect(() => {
+    if (!contextMenu) {
+      setContextMenuPlacement(null);
+      return;
+    }
+
+    updateContextMenuPlacement();
+    const frame = window.requestAnimationFrame(updateContextMenuPlacement);
+    return () => window.cancelAnimationFrame(frame);
+  }, [contextMenu, mergeCtxExpanded, updateContextMenuPlacement]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    window.addEventListener('resize', updateContextMenuPlacement);
+    return () => window.removeEventListener('resize', updateContextMenuPlacement);
+  }, [contextMenu, updateContextMenuPlacement]);
+
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
@@ -755,6 +812,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setMergeCtxExpanded(false);
+    setContextMenuPlacement({
+      left: e.clientX,
+      top: e.clientY,
+      maxHeight: Math.max(160, window.innerHeight - 16),
+      ready: false,
+    });
     setContextMenu({ x: e.clientX, y: e.clientY, node });
   };
 
@@ -1857,8 +1920,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}
           >
             <div
+              ref={contextMenuRef}
               className="ctx-menu"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
+              style={{
+                left: contextMenuPlacement?.left ?? contextMenu.x,
+                top: contextMenuPlacement?.top ?? contextMenu.y,
+                maxHeight: contextMenuPlacement?.maxHeight,
+                overflowY: 'auto',
+                visibility: contextMenuPlacement?.ready ? 'visible' : 'hidden',
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="ctx-menu-header">
