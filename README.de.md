@@ -51,6 +51,7 @@ Mit der App kannst du:
 - neue Repositories direkt aus einem Ordner initialisieren (`git init`)
 - Repository-Arbeit und zukuenftige Projektideen mit Status, Dringlichkeit, Beschreibung und freien Tags planen
 - Planungsdaten ueber eine lokale REST-API und MCP-aehnliche JSON-RPC-Tools fuer lokale Agenten bereitstellen
+- lokale Agenten Git-Status, Branches, Commits, Diffs und Remotes lesen lassen und bestaetigte Git-Aktionen ueber die API ausfuehren
 - Branches, Remotes, Tags und Submodule in einer Sidebar verwalten
 - Commits in einem visuellen Commit-Graph durchsuchen und bearbeiten
 - forensische Historien-Suchen (`-S`, `-G`, `-L`) aus der UI starten
@@ -309,6 +310,14 @@ Mit der App kannst du:
   - Todos erstellen, aktualisieren, verschieben und loeschen
   - geplante Projekte erstellen
   - Planner-Projekt fuer einen Repository-Pfad sicherstellen
+- Git-Endpunkte fuer:
+  - Repository-Status, Branch-Sync, Working-Tree-Statistiken und Diffs lesen
+  - Commits, lokale Branches, Remote-Branches und Remotes listen
+  - Pfade stagen/unstagen
+  - Commits aus staged changes erstellen
+  - Branches erstellen, auschecken, umbenennen und loeschen
+  - Fetch, Pull und Push ausfuehren
+- Schreibende Git-Endpunkte erwarten `{"confirm":true}` im JSON-Body
 - Tab-spezifische Endpunkte wie `/api/tabs/bug/todos` und `/api/tabs/working/todos`
   - `working` wird als Alias fuer `in-progress` akzeptiert
 - Agenten-Shortcuts:
@@ -318,6 +327,7 @@ Mit der App kannst du:
 - MCP-aehnlicher JSON-RPC-Endpunkt unter `/mcp`
   - unterstuetzt `initialize`, `tools/list` und `tools/call`
   - stellt Planning-Tools wie `get_next_todos`, `list_todos`, `create_todo`, `move_todo` und `delete_todo` bereit
+  - stellt Git-Tools wie `get_git_status`, `get_working_tree`, `get_git_diff`, `list_branches`, `create_branch`, `checkout_branch`, `stage_paths`, `create_commit`, `fetch_remote`, `pull_remote` und `push_remote` bereit
 - Runtime-Steuerung:
   - `OPEN_GIT_CONTROL_API_PORT=2990` fuer den bevorzugten Port
   - `OPEN_GIT_CONTROL_API_DISABLED=true` zum Deaktivieren des lokalen API-Servers
@@ -464,6 +474,8 @@ Output liegt in `release/`.
 2. `http://127.0.0.1:2990/api/` fuer die lokale API-Dokumentation oeffnen.
 3. Einen externen Agenten `GET /api/agent/next?repoPath=...` aufrufen lassen, um offene Arbeit fuer ein Repository zu finden.
 4. Der Agent kann Planungseintraege ueber `/api/todos` oder `/mcp`-Toolaufrufe erstellen oder verschieben.
+5. Fuer Implementierungsarbeit kann der Agent `GET /api/git/status`, `GET /api/git/diff` und `GET /api/git/branches` nutzen.
+6. Fuer Schreibaktionen wie Stage, Commit, Branch-Wechsel, Pull oder Push muss `confirm:true` explizit gesetzt werden.
 
 ## Einstellungen (Uebersicht)
 

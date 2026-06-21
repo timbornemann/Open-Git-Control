@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { execFileSync } from 'child_process';
+import { GitService } from '../../GitService';
 import { createPlannerItem } from '../projectPlannerStore';
 
 const { getPathMock } = vi.hoisted(() => ({
@@ -36,7 +38,11 @@ describe('planningApiServer', () => {
   beforeEach(async () => {
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-planning-api-'));
     getPathMock.mockReturnValue(tempDirectory);
-    server = await startPlanningApiServer({ preferredPort: 0, maxPortSearch: 0 });
+    server = await startPlanningApiServer({
+      preferredPort: 0,
+      maxPortSearch: 0,
+      gitService: new GitService(),
+    });
   });
 
   afterEach(async () => {
@@ -149,5 +155,87 @@ describe('planningApiServer', () => {
     expect(call.result.structuredContent.todos).toEqual([
       expect.objectContaining({ title: 'Implement API client' }),
     ]);
+  });
+
+  it('exposes Git status, branch, staging, commit, and MCP Git tools', async () => {
+    const repoPath = path.join(tempDirectory, 'repo');
+    fs.mkdirSync(repoPath);
+    const git = (args: string[]) => execFileSync('git', args, {
+      cwd: repoPath,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    git(['init']);
+    git(['config', 'user.email', 'agent@example.test']);
+    git(['config', 'user.name', 'Agent Test']);
+    fs.writeFileSync(path.join(repoPath, 'README.md'), '# Test\n', 'utf8');
+    git(['add', 'README.md']);
+    git(['commit', '-m', 'Initial commit']);
+    fs.writeFileSync(path.join(repoPath, 'feature.txt'), 'agent work\n', 'utf8');
+
+    const status = await requestJson('/api/git/status?repoPath=' + encodeURIComponent(repoPath));
+    expect(status.data.untracked).toEqual([
+      expect.objectContaining({ path: 'feature.txt' }),
+    ]);
+
+    const branch = await requestJson('/api/git/branches', {
+      method: 'POST',
+      body: JSON.stringify({
+        repoPath,
+        name: 'agent/api-test',
+        checkout: true,
+        confirm: true,
+      }),
+    });
+    expect(branch.data).toMatchObject({
+      name: 'agent/api-test',
+      checkedOut: true,
+    });
+
+    const branches = await requestJson('/api/git/branches?repoPath=' + encodeURIComponent(repoPath));
+    expect(branches.data.local).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'agent/api-test', current: true }),
+      ]),
+    );
+
+    const stage = await requestJson('/api/git/stage', {
+      method: 'POST',
+      body: JSON.stringify({ repoPath, paths: ['feature.txt'], confirm: true }),
+    });
+    expect(stage.data.paths).toEqual(['feature.txt']);
+
+    const commit = await requestJson('/api/git/commit', {
+      method: 'POST',
+      body: JSON.stringify({ repoPath, title: 'Add agent feature file', confirm: true }),
+    });
+    expect(commit.data.hash).toMatch(/^[0-9a-f]{40}$/i);
+
+    const commits = await requestJson('/api/git/commits?repoPath=' + encodeURIComponent(repoPath) + '&scope=head&limit=2');
+    expect(commits.data.commits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ subject: 'Add agent feature file' }),
+      ]),
+    );
+
+    const mcpStatus = await requestJson('/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'get_git_status',
+          arguments: { repoPath },
+        },
+      }),
+    });
+    expect(mcpStatus.result).toMatchObject({
+      isError: false,
+      structuredContent: {
+        changeCount: 0,
+      },
+    });
   });
 });

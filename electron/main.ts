@@ -59,7 +59,7 @@ app.whenReady().then(() => {
   createMainWindow(isDev, APP_DISPLAY_NAME, __dirname);
   updaterManager.configureAutoUpdates();
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
-    void startPlanningApiServer()
+    void startPlanningApiServer({ gitService })
       .then((server) => {
         planningApiServer = server;
         console.log(`[planning-api] Listening at ${server.url}/api/`);

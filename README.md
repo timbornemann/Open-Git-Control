@@ -51,6 +51,7 @@ With the app, you can:
 - initialize new repositories directly from a folder (`git init`)
 - plan repository work and future project ideas with statuses, priorities, descriptions, and free-form tags
 - expose planning data to local agents through a REST API and MCP-style JSON-RPC tools
+- let local agents read Git status, branches, commits, diffs, remotes, and perform confirmed Git actions through the API
 - manage branches, remotes, tags, and submodules in a sidebar
 - browse and operate on commits in a visual commit graph
 - run forensic history searches (`-S`, `-G`, `-L`) from the UI
@@ -309,6 +310,14 @@ With the app, you can:
   - creating, updating, moving, and deleting todos
   - creating planned projects
   - ensuring a planner project exists for a repository path
+- Git endpoints for:
+  - reading repository status, branch sync, working-tree stats, and diffs
+  - listing commits, local branches, remote branches, and remotes
+  - staging/unstaging paths
+  - creating commits from staged changes
+  - creating, checking out, renaming, and deleting branches
+  - running fetch, pull, and push
+- Write-capable Git endpoints require `{"confirm":true}` in the JSON body
 - Tab-specific endpoints such as `/api/tabs/bug/todos` and `/api/tabs/working/todos`
   - `working` is accepted as an alias for `in-progress`
 - Agent shortcuts:
@@ -318,6 +327,7 @@ With the app, you can:
 - MCP-style JSON-RPC endpoint at `/mcp`
   - supports `initialize`, `tools/list`, and `tools/call`
   - exposes planning tools such as `get_next_todos`, `list_todos`, `create_todo`, `move_todo`, and `delete_todo`
+  - exposes Git tools such as `get_git_status`, `get_working_tree`, `get_git_diff`, `list_branches`, `create_branch`, `checkout_branch`, `stage_paths`, `create_commit`, `fetch_remote`, `pull_remote`, and `push_remote`
 - Runtime controls:
   - `OPEN_GIT_CONTROL_API_PORT=2990` to choose the preferred port
   - `OPEN_GIT_CONTROL_API_DISABLED=true` to disable the local API server
@@ -464,6 +474,8 @@ Output is in `release/`.
 2. Open `http://127.0.0.1:2990/api/` for the local API documentation.
 3. Ask an external agent to call `GET /api/agent/next?repoPath=...` to find open work for a repository.
 4. Let the agent create or move planning items through `/api/todos` or `/mcp` tool calls.
+5. For implementation work, let the agent inspect `GET /api/git/status`, `GET /api/git/diff`, and `GET /api/git/branches`.
+6. For write actions such as staging, commits, branch changes, pull, or push, send `confirm:true` explicitly.
 
 ## Settings (Overview)
 
