@@ -477,7 +477,47 @@
 .repo-cockpit {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  margin: -8px;
+  min-height: calc(100% + 16px);
+  background: var(--bg-dark);
+}
+
+.repo-cockpit-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 16px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+
+.repo-cockpit-kicker {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.repo-cockpit-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.repo-cockpit-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
 }
 
 .repo-card {
@@ -485,6 +525,17 @@
   border-radius: 8px;
   background: var(--bg-dark);
   overflow: hidden;
+}
+
+.repo-cockpit > .repo-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.repo-cockpit > .repo-card + .repo-card {
+  border-top: 1px solid var(--line-subtle);
 }
 
 .repo-card-header {
@@ -495,6 +546,12 @@
   padding: 9px 10px;
   border-bottom: 1px solid var(--line-subtle);
   background: var(--bg-panel);
+}
+
+.repo-cockpit .repo-card-header {
+  padding: 9px 16px;
+  background: var(--bg-dark);
+  border-bottom-color: var(--line-subtle);
 }
 
 .repo-card-header-main {
@@ -524,6 +581,10 @@
   padding: 0;
 }
 
+.repo-card-toggle:hover .repo-card-title {
+  color: var(--text-accent);
+}
+
 .repo-card-title {
   font-size: 0.8rem;
   font-weight: 600;
@@ -548,6 +609,11 @@
   gap: 6px;
 }
 
+.repo-cockpit .repo-card-toolbar {
+  padding: 8px 16px;
+  background: var(--bg-dark);
+}
+
 .repo-filter-input {
   width: 100%;
   box-sizing: border-box;
@@ -563,6 +629,12 @@
   padding: 8px 10px;
 }
 
+.repo-cockpit .repo-card-content {
+  padding-left: 16px;
+  padding-right: 16px;
+  background: transparent;
+}
+
 .repo-card-scroll {
   max-height: 260px;
   overflow: auto;
@@ -576,6 +648,10 @@
   gap: 8px;
   padding: 5px 6px;
   border-radius: 6px;
+}
+
+.repo-cockpit .repo-list-row {
+  border-radius: 5px;
 }
 
 .repo-list-row:hover {

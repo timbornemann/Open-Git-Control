@@ -128,8 +128,16 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
     );
   }
 
+  const repoName = props.activeRepo.split(/[\\/]/).filter(Boolean).pop() || props.activeRepo;
+
   return (
     <div className="repo-cockpit">
+      <div className="repo-cockpit-header">
+        <div className="repo-cockpit-kicker">{tr('Repository-Arbeitsbereich', 'Repository workspace')}</div>
+        <div className="repo-cockpit-title" title={repoName}>{repoName}</div>
+        <div className="repo-cockpit-path" title={props.activeRepo}>{props.activeRepo}</div>
+      </div>
+
       <BranchPanel
         branches={props.branches}
         isCreatingBranch={props.isCreatingBranch}
