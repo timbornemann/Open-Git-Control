@@ -32,6 +32,7 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
     width: 1200,
     height: 800,
     title: appDisplayName,
+    autoHideMenuBar: true,
     ...(windowIconPath ? { icon: windowIconPath } : {}),
     webPreferences: {
       preload: path.join(mainProcessDir, 'preload.js'),
@@ -39,6 +40,8 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
       contextIsolation: true,
     },
   });
+  win.setMenuBarVisibility(false);
+  win.removeMenu();
 
   if (isDev) {
     win.loadURL('http://localhost:5173');
