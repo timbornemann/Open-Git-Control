@@ -66,6 +66,9 @@ type TodoQueryOptions = {
 };
 
 type EnrichedTodo = PlannerItem & {
+  projectName: string;
+  projectKind: PlannerProject['kind'];
+  projectRepoPath: string | null;
   project: Pick<PlannerProject, 'id' | 'name' | 'kind' | 'repoPath'>;
   urgencyRank: number;
 };
@@ -507,6 +510,9 @@ const enrichTodos = (items: PlannerItem[], projects: PlannerProject[]): Enriched
       if (!project) return null;
       return {
         ...item,
+        projectName: project.name,
+        projectKind: project.kind,
+        projectRepoPath: project.repoPath,
         project: {
           id: project.id,
           name: project.name,

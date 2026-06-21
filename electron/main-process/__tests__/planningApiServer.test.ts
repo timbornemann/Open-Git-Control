@@ -105,6 +105,16 @@ describe('planningApiServer', () => {
       'Release notes',
       'Later cleanup',
     ]);
+    expect(next.data.todos[0]).toMatchObject({
+      projectId,
+      projectName: 'Agent Project',
+      projectKind: 'planned',
+      projectRepoPath: null,
+      project: {
+        id: projectId,
+        name: 'Agent Project',
+      },
+    });
 
     const move = await requestJson(`/api/todos/${low.data.id}/move`, {
       method: 'POST',
@@ -153,7 +163,10 @@ describe('planningApiServer', () => {
     });
     expect(call.result.isError).toBe(false);
     expect(call.result.structuredContent.todos).toEqual([
-      expect.objectContaining({ title: 'Implement API client' }),
+      expect.objectContaining({
+        title: 'Implement API client',
+        projectName: 'MCP Project',
+      }),
     ]);
   });
 
