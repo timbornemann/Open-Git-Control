@@ -123,12 +123,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       .filter((entry) => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => a.path.localeCompare(b.path));
     return {
-      staged: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'staged' ? bySearch(status.staged) : [],
-      unstaged: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'unstaged' ? bySearch(status.unstaged) : [],
-      untracked: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'untracked' ? bySearch(status.untracked) : [],
-      conflicts: fileOps.activeFilter === 'all' || fileOps.activeFilter === 'conflicts' ? bySearch(status.conflicts) : [],
+      staged: bySearch(status.staged),
+      unstaged: bySearch(status.unstaged),
+      untracked: bySearch(status.untracked),
+      conflicts: bySearch(status.conflicts),
     };
-  }, [fileOps.activeFilter, fileOps.searchQuery, fileOps.status]);
+  }, [fileOps.searchQuery, fileOps.status]);
 
   if (!repoPath) return null;
   if (!fileOps.status) return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{tr('Lade Status...', 'Loading status...')}</div>;
@@ -143,19 +143,27 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const visibleUntracked = visibleFiles.untracked;
   const visibleConflicts = visibleFiles.conflicts;
   const visibleTotal = visibleStaged.length + visibleUnstaged.length + visibleUntracked.length + visibleConflicts.length;
+  const visibleSectionCount = [
+    visibleConflicts.length,
+    visibleStaged.length,
+    visibleUnstaged.length,
+    visibleUntracked.length,
+  ].filter((count) => count > 0).length;
+  const maxListHeight = (itemCount: number) => {
+    if (itemCount <= 0) return 0;
+    if (visibleSectionCount <= 1) return 720;
+    if (visibleSectionCount === 2) return 520;
+    return 380;
+  };
 
   const totalConflictBlocksInView = visibleConflicts.reduce((sum, f) => sum + conflicts.blockCountForPath(f.path), 0);
   const totalConflictBlocksAll = status.conflicts.reduce((sum, f) => sum + conflicts.blockCountForPath(f.path), 0);
 
   const contextEntry = fileOps.contextMenu?.entry || null;
+  const contextSection = fileOps.contextMenu?.section || null;
   const contextDir = contextEntry ? dirname(contextEntry.path) : '';
   const contextTopDir = contextDir.includes('/') ? contextDir.split('/')[0] : '';
   const contextExtPattern = contextEntry ? extensionPattern(contextEntry.path) : null;
-  const filterLabel = (filter: 'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts') => {
-    if (filter === 'all') return tr('alles', 'all');
-    if (filter === 'conflicts') return tr('Konflikte', 'conflicts');
-    return filter;
-  };
 
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
@@ -206,49 +214,33 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   return (
     <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
       {!isConflictOnly && (
-        <div className="staging-toolbar" style={{ flexWrap: 'wrap' }}>
-          <button className="staging-tool-btn" onClick={fileOps.stashChanges} title={tr('Stash', 'Stash')}>{tr('Stash', 'Stash')}</button>
-          <button className="staging-tool-btn" onClick={fileOps.stashPop} title={tr('Stash anwenden (pop)', 'Apply stash (pop)')}>{tr('Pop', 'Pop')}</button>
-          <input
-            value={fileOps.searchQuery}
-            onChange={(e) => fileOps.setSearchQuery(e.target.value)}
-            placeholder={tr('Datei suchen...', 'Search file...')}
-            style={{ flex: 1, minWidth: '170px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.76rem' }}
-          />
-          {(['all', 'staged', 'unstaged', 'untracked', 'conflicts'] as const).map((filter) => (
-            <button
-              key={filter}
-              className="staging-tool-btn"
-              style={{
-                backgroundColor: fileOps.activeFilter === filter ? 'var(--accent-primary-soft)' : undefined,
-                borderColor: fileOps.activeFilter === filter ? 'var(--accent-primary-border)' : undefined,
-                color: fileOps.activeFilter === filter ? 'var(--text-accent)' : undefined,
-              }}
-              onClick={() => fileOps.setActiveFilter(filter)}
-              title={filter === 'conflicts' && totalConflictBlocksAll > 0 ? tr(`${totalConflictBlocksAll} Konfliktblock${totalConflictBlocksAll !== 1 ? 'e' : ''}`, `${totalConflictBlocksAll} conflict block${totalConflictBlocksAll !== 1 ? 's' : ''}`) : undefined}
-            >
-              {filter === 'conflicts' && totalConflictBlocksAll > 0
-                ? tr(`Konflikte (${totalConflictBlocksAll})`, `conflicts (${totalConflictBlocksAll})`)
-                : filterLabel(filter)}
-            </button>
-          ))}
-          <span className="staging-stat-chip" title={tr('Staged Diff-Statistik', 'Staged diff stats')}>
-            {tr('Staged', 'Staged')} {formatDiffStats(fileOps.stagedStats)}
-          </span>
-          <span className="staging-stat-chip" title={tr('Unstaged Diff-Statistik', 'Unstaged diff stats')}>
-            {tr('Unstaged', 'Unstaged')} {formatDiffStats(fileOps.unstagedStats)}
-          </span>
-          {fileOps.isMutating && (
-            <span className="staging-stat-chip">
-              {tr('Git arbeitet', 'Git is working')} {(fileOps.mutationElapsedMs / 1000).toFixed(1)}s
+        <div className="staging-toolbar">
+          <div className="staging-search-row">
+            <input
+              className="staging-search-input"
+              value={fileOps.searchQuery}
+              onChange={(e) => fileOps.setSearchQuery(e.target.value)}
+              placeholder={tr('Datei suchen...', 'Search file...')}
+            />
+          </div>
+          <div className="staging-toolbar-stats">
+            <span className="staging-stat-chip" title={tr('Staged Diff-Statistik', 'Staged diff stats')}>
+              {tr('Staged', 'Staged')} {formatDiffStats(fileOps.stagedStats)}
             </span>
-          )}
-          <div style={{ flex: 1 }} />
-          {visibleTotal > 0 && (
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              {tr(`${visibleTotal} sichtbar`, `${visibleTotal} visible`)}
+            <span className="staging-stat-chip" title={tr('Unstaged Diff-Statistik', 'Unstaged diff stats')}>
+              {tr('Unstaged', 'Unstaged')} {formatDiffStats(fileOps.unstagedStats)}
             </span>
-          )}
+            {fileOps.isMutating && (
+              <span className="staging-stat-chip">
+                {tr('Git arbeitet', 'Git is working')} {(fileOps.mutationElapsedMs / 1000).toFixed(1)}s
+              </span>
+            )}
+            {visibleTotal > 0 && (
+              <span className="staging-visible-count">
+                {tr(`${visibleTotal} sichtbar`, `${visibleTotal} visible`)}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -298,7 +290,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             <VirtualList
               items={visibleStaged}
               rowHeight={28}
-              maxHeight={336}
+              maxHeight={maxListHeight(visibleStaged.length)}
               getKey={(file) => `s-${file.path}`}
               renderItem={(file) => <FileRow entry={file} section="staged" />}
             />
@@ -318,7 +310,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             <VirtualList
               items={visibleUnstaged}
               rowHeight={28}
-              maxHeight={336}
+              maxHeight={maxListHeight(visibleUnstaged.length)}
               getKey={(file) => `u-${file.path}`}
               renderItem={(file) => <FileRow entry={file} section="unstaged" />}
             />
@@ -333,7 +325,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
             <VirtualList
               items={visibleUntracked}
               rowHeight={28}
-              maxHeight={336}
+              maxHeight={maxListHeight(visibleUntracked.length)}
               getKey={(file) => `t-${file.path}`}
               renderItem={(file) => <FileRow entry={file} section="untracked" />}
             />
@@ -462,24 +454,33 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         <div className="ctx-menu-backdrop" onClick={() => fileOps.setContextMenu(null)}>
           <div className="ctx-menu" style={{ left: fileOps.contextMenu.x, top: fileOps.contextMenu.y }} onClick={(e) => e.stopPropagation()}>
             <div className="ctx-menu-header">{contextEntry.path}</div>
-            <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, fileOps.contextMenu!.section, toGitPath(contextEntry.path)); }}>
+            {contextSection && (
+              <>
+                <button className="ctx-menu-item" disabled={fileOps.isMutating} onClick={() => { fileOps.setContextMenu(null); fileOps.stashFile(contextEntry.path, contextSection); }}>
+                  <span className="ctx-menu-icon">ST</span>
+                  {tr('Datei stashen...', 'Stash file...')}
+                </button>
+                <div className="ctx-menu-sep" />
+              </>
+            )}
+            <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, contextSection || fileOps.contextMenu!.section, toGitPath(contextEntry.path)); }}>
               <span className="ctx-menu-icon">IG</span>
               {tr('Datei zu .gitignore hinzufuegen', 'Add file to .gitignore')}
             </button>
             {contextDir && (
-              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, fileOps.contextMenu!.section, `${contextDir}/`); }}>
+              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, contextSection || fileOps.contextMenu!.section, `${contextDir}/`); }}>
                 <span className="ctx-menu-icon">DIR</span>
                 {tr(`Ordner ignorieren (${contextDir}/)`, `Ignore folder (${contextDir}/)`)}
               </button>
             )}
             {contextTopDir && contextTopDir !== contextDir && (
-              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, fileOps.contextMenu!.section, `${contextTopDir}/`); }}>
+              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, contextSection || fileOps.contextMenu!.section, `${contextTopDir}/`); }}>
                 <span className="ctx-menu-icon">TOP</span>
                 {tr(`Oberordner ignorieren (${contextTopDir}/)`, `Ignore top-level folder (${contextTopDir}/)`)}
               </button>
             )}
             {contextExtPattern && (
-              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, fileOps.contextMenu!.section, contextExtPattern); }}>
+              <button className="ctx-menu-item" onClick={() => { fileOps.setContextMenu(null); fileOps.addIgnoreRule(contextEntry, contextSection || fileOps.contextMenu!.section, contextExtPattern); }}>
                 <span className="ctx-menu-icon">EXT</span>
                 {tr(`Dateityp ignorieren (${contextExtPattern})`, `Ignore file type (${contextExtPattern})`)}
               </button>

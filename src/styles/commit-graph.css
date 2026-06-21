@@ -378,15 +378,20 @@
   transition: background-color 0.1s;
 }
 
-.ctx-menu-item:hover {
+.ctx-menu-item:hover:not(:disabled) {
   background-color: var(--bg-hover);
+}
+
+.ctx-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .ctx-menu-item.danger {
   color: var(--status-danger);
 }
 
-.ctx-menu-item.danger:hover {
+.ctx-menu-item.danger:hover:not(:disabled) {
   background-color: var(--status-danger-soft);
 }
 

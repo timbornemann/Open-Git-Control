@@ -49,7 +49,6 @@ export const useFileOperations = ({
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'staged' | 'unstaged' | 'untracked' | 'conflicts'>('all');
   const [contextMenu, setContextMenu] = useState<StagingContextMenuState | null>(null);
   const [mutationStartedAt, setMutationStartedAt] = useState<number | null>(null);
   const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
@@ -299,24 +298,33 @@ export const useFileOperations = ({
     });
   }, [setConfirmDialog, git, tr]);
 
-  const stashChanges = useCallback(() => {
+  const stashFile = useCallback((filePath: string, section: FileSection) => {
     setInputDialog({
-      title: tr('Aenderungen stashen', 'Stash changes'),
-      message: tr('Optional eine Nachricht fuer den neuen Stash hinterlegen.', 'Optionally add a message for the new stash.'),
-      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: Feature XYZ', 'e.g. WIP: Feature XYZ') }],
-      contextItems: [{ label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') }],
+      title: tr('Datei stashen', 'Stash file'),
+      message: tr('Optional eine Nachricht fuer den neuen Datei-Stash hinterlegen.', 'Optionally add a message for the new file stash.'),
+      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: einzelne Datei', 'e.g. WIP: single file') }],
+      contextItems: [
+        { label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') },
+        { label: tr('Datei', 'File'), value: filePath },
+        { label: tr('Bereich', 'Section'), value: section },
+      ],
       irreversible: false,
-      consequences: tr('Aenderungen werden temporaer aus dem Working Tree entfernt und im Stash gespeichert.', 'Changes are temporarily removed from the working tree and saved in the stash.'),
+      consequences: tr('Nur diese Datei wird in einen neuen Stash verschoben. Untracked Dateien werden bei Bedarf eingeschlossen.', 'Only this file is moved into a new stash. Untracked files are included when needed.'),
       confirmLabel: tr('Stash erstellen', 'Create stash'),
       onSubmit: async (values) => {
         const msg = (values.message || '').trim();
-        const args = msg ? ['stash', 'push', '-m', msg] : ['stash'];
-        await git(args, tr('Aenderungen gestasht', 'Stashed changes'), true);
+        const args = [
+          'stash',
+          'push',
+          ...(section === 'untracked' ? ['--include-untracked'] : []),
+          ...(msg ? ['-m', msg] : []),
+          '--',
+          filePath,
+        ];
+        await git(args, tr(`${basename(filePath)} gestasht`, `Stashed ${basename(filePath)}`), true);
       },
     });
   }, [setInputDialog, repoPath, git, tr]);
-
-  const stashPop = useCallback(() => git(['stash', 'pop'], tr('Stash angewendet', 'Applied stash'), true), [git, tr]);
 
   const showDiff = useCallback((filePath: string, staged: boolean) => {
     const request: DiffRequest = {
@@ -335,8 +343,6 @@ export const useFileOperations = ({
     unstagedStats,
     searchQuery,
     setSearchQuery,
-    activeFilter,
-    setActiveFilter,
     contextMenu,
     setContextMenu,
     openFileContextMenu,
@@ -349,8 +355,7 @@ export const useFileOperations = ({
     discardFile,
     discardAll,
     deleteUntracked,
-    stashChanges,
-    stashPop,
+    stashFile,
     showDiff,
     isMutating: mutationStartedAt !== null,
     mutationElapsedMs,
