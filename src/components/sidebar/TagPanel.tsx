@@ -31,8 +31,8 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
         toggleTitle={collapsed ? tr('Tags anzeigen', 'Show tags') : tr('Tags einklappen', 'Collapse tags')}
         actions={(
           <>
-            <button className="icon-btn" style={{ padding: '2px' }} onClick={onCreateTag} title={tr('Tag erstellen', 'Create tag')}><Plus size={13} /></button>
-            <button className="icon-btn" style={{ padding: '2px' }} onClick={onPushTags} title={tr('Tags pushen', 'Push tags')}><ArrowUpCircle size={13} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onCreateTag} title={tr('Tag erstellen', 'Create tag')}><Plus size={13} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onPushTags} title={tr('Tags pushen', 'Push tags')}><ArrowUpCircle size={13} /></button>
           </>
         )}
       />
@@ -40,25 +40,24 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
       {!collapsed && (
         <>
           <RepoCardToolbar>
-            <div style={{ position: 'relative' }}>
-              <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+            <div className="sidebar-search-wrap tag-search-wrap">
+              <Search size={12} className="sidebar-search-icon" />
               <input
-                className="repo-filter-input"
+                className="repo-filter-input sidebar-filter-input"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={tr('Tags filtern...', 'Filter tags...')}
-                style={{ paddingLeft: '26px' }}
               />
             </div>
           </RepoCardToolbar>
 
           <RepoCardContent className="repo-card-scroll">
             {filteredTags.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div className="tag-grid">
                 {filteredTags.map(tag => (
                   <div
                     key={tag}
-                    className="repo-list-row"
+                    className="tag-card"
                     role="button"
                     tabIndex={0}
                     onClick={() => onSelectTag(tag)}
@@ -68,18 +67,16 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
                         onSelectTag(tag);
                       }
                     }}
-                    style={{ border: '1px solid transparent', cursor: 'pointer' }}
                     title={tr('Zum Commit dieses Tags springen', 'Jump to this tag commit')}
                   >
-                    <Tag size={13} style={{ opacity: 0.7 }} />
-                    <span style={{ fontSize: '0.8rem', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tag}</span>
+                    <Tag size={12} className="tag-card-icon" />
+                    <span className="tag-card-name">{tag}</span>
                     <button
                       onClick={(event) => {
                         event.stopPropagation();
                         onDeleteTag(tag);
                       }}
-                      className="icon-btn repo-close-btn"
-                      style={{ padding: '2px', opacity: 0 }}
+                      className="icon-btn repo-close-btn tag-card-delete"
                       title={tr('Tag loeschen', 'Delete tag')}
                     >
                       <X size={11} />
