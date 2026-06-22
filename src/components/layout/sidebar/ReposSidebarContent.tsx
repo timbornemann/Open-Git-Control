@@ -152,6 +152,22 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
       />
 
       {activeRepo && (
+        <RemotePanel
+          remotes={remotes}
+          remoteSync={remoteSync}
+          remoteStatus={remoteStatus}
+          onAddRemote={onAddRemote}
+          onRemoveRemote={onRemoveRemote}
+          onRenameRemote={onRenameRemote}
+          onSetRemoteUrl={onSetRemoteUrl}
+          onRefreshRemote={onRefreshRemote}
+          onSetUpstreamForCurrentBranch={onSetUpstreamForCurrentBranch}
+          collapsed={isRemotePanelCollapsed}
+          onToggleCollapsed={onToggleRemotePanelCollapsed}
+        />
+      )}
+
+      {activeRepo && (
         <BranchPanel
           branches={branches}
           isCreatingBranch={isCreatingBranch}
@@ -176,22 +192,6 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           onSelectTag={onSelectTag}
           collapsed={isTagPanelCollapsed}
           onToggleCollapsed={onToggleTagPanelCollapsed}
-        />
-      )}
-
-      {activeRepo && (
-        <RemotePanel
-          remotes={remotes}
-          remoteSync={remoteSync}
-          remoteStatus={remoteStatus}
-          onAddRemote={onAddRemote}
-          onRemoveRemote={onRemoveRemote}
-          onRenameRemote={onRenameRemote}
-          onSetRemoteUrl={onSetRemoteUrl}
-          onRefreshRemote={onRefreshRemote}
-          onSetUpstreamForCurrentBranch={onSetUpstreamForCurrentBranch}
-          collapsed={isRemotePanelCollapsed}
-          onToggleCollapsed={onToggleRemotePanelCollapsed}
         />
       )}
 

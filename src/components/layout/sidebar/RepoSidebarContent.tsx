@@ -134,20 +134,6 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         <div className="repo-cockpit-path" title={props.activeRepo}>{props.activeRepo}</div>
       </div>
 
-      <BranchPanel
-        branches={props.branches}
-        isCreatingBranch={props.isCreatingBranch}
-        newBranchName={props.newBranchName}
-        newBranchInputRef={props.newBranchInputRef}
-        onSetCreatingBranch={props.onSetCreatingBranch}
-        onSetNewBranchName={props.onSetNewBranchName}
-        onCreateBranch={props.onCreateBranch}
-        onCheckoutBranch={props.onCheckoutBranch}
-        onSetBranchContextMenu={props.onSetBranchContextMenu}
-        collapsed={props.isBranchPanelCollapsed}
-        onToggleCollapsed={props.onToggleBranchPanelCollapsed}
-      />
-
       <RemotePanel
         remotes={props.remotes}
         remoteSync={props.remoteSync}
@@ -160,6 +146,20 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         onSetUpstreamForCurrentBranch={props.onSetUpstreamForCurrentBranch}
         collapsed={props.isRemotePanelCollapsed}
         onToggleCollapsed={props.onToggleRemotePanelCollapsed}
+      />
+
+      <BranchPanel
+        branches={props.branches}
+        isCreatingBranch={props.isCreatingBranch}
+        newBranchName={props.newBranchName}
+        newBranchInputRef={props.newBranchInputRef}
+        onSetCreatingBranch={props.onSetCreatingBranch}
+        onSetNewBranchName={props.onSetNewBranchName}
+        onCreateBranch={props.onCreateBranch}
+        onCheckoutBranch={props.onCheckoutBranch}
+        onSetBranchContextMenu={props.onSetBranchContextMenu}
+        collapsed={props.isBranchPanelCollapsed}
+        onToggleCollapsed={props.onToggleBranchPanelCollapsed}
       />
 
       <TagPanel
