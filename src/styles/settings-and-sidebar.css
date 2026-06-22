@@ -614,6 +614,12 @@
   background: var(--bg-dark);
 }
 
+.branch-search-wrap {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
 .repo-filter-input {
   width: 100%;
   box-sizing: border-box;
@@ -652,6 +658,59 @@
 
 .repo-cockpit .repo-list-row {
   border-radius: 5px;
+}
+
+.branch-row {
+  min-height: 28px;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.branch-row-local:not(.branch-row-current) {
+  cursor: pointer;
+}
+
+.branch-row-remote {
+  color: var(--text-secondary);
+}
+
+.branch-row-local:not(.branch-row-current):hover,
+.branch-row-remote:hover {
+  border-color: var(--line-subtle);
+}
+
+.branch-row-current {
+  color: var(--text-accent);
+  background: var(--accent-primary-soft);
+  border-color: var(--accent-primary-border);
+}
+
+.branch-row-icon {
+  flex-shrink: 0;
+  opacity: 0.62;
+}
+
+.branch-row-current .branch-row-icon {
+  opacity: 1;
+}
+
+.branch-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.branch-head-badge {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .repo-list-row:hover {

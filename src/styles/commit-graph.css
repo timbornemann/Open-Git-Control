@@ -408,6 +408,27 @@
   color: var(--text-secondary);
 }
 
+.ctx-menu-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.ctx-menu-help {
+  display: none;
+  margin-top: 3px;
+  white-space: normal;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+
+.ctx-menu-item:hover .ctx-menu-help,
+.ctx-menu-item:focus-visible .ctx-menu-help {
+  display: block;
+}
+
 .ctx-menu-sep {
   height: 1px;
   background: var(--border-color);

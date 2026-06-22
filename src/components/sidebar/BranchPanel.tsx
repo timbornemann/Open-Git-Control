@@ -52,26 +52,22 @@ export const BranchPanel: React.FC<Props> = ({
 
   const renderBranchRow = (branch: BranchInfo) => {
     const isLocal = branch.scope === 'local';
+    const displayName = isLocal ? branch.name : (branch.name.split('/').filter(Boolean).pop() || branch.name);
 
     return (
       <div
         key={branch.name}
-        className="repo-list-row"
-        style={{
-          color: branch.isHead ? 'var(--accent-primary)' : isLocal ? 'var(--text-primary)' : 'var(--text-secondary)',
-          cursor: !branch.isHead && isLocal ? 'pointer' : 'default',
-          backgroundColor: branch.isHead ? 'var(--accent-primary-soft)' : undefined,
-          border: branch.isHead ? '1px solid var(--accent-primary-border)' : '1px solid transparent',
-        }}
+        className={`repo-list-row branch-row ${isLocal ? 'branch-row-local' : 'branch-row-remote'} ${branch.isHead ? 'branch-row-current' : ''}`}
+        title={branch.name}
         onClick={() => !branch.isHead && isLocal && onCheckoutBranch(branch.name)}
         onContextMenu={event => {
           event.preventDefault();
           onSetBranchContextMenu({ x: event.clientX, y: event.clientY, branch: branch.name, isHead: branch.isHead });
         }}
       >
-        <GitBranch size={13} style={{ opacity: branch.isHead ? 1 : 0.65, flexShrink: 0 }} />
-        <span style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{branch.name}</span>
-        {branch.isHead && <span style={{ fontSize: '0.67rem', color: 'var(--text-secondary)', fontWeight: 700 }}>HEAD</span>}
+        <GitBranch size={13} className="branch-row-icon" />
+        <span className="branch-row-name">{displayName}</span>
+        {branch.isHead && <span className="branch-head-badge">HEAD</span>}
       </div>
     );
   };
@@ -100,7 +96,7 @@ export const BranchPanel: React.FC<Props> = ({
       {!collapsed && (
         <>
           <RepoCardToolbar>
-            <div className="sidebar-search-wrap">
+            <div className="sidebar-search-wrap branch-search-wrap">
               <Search size={12} className="sidebar-search-icon" />
               <input
                 className="repo-filter-input sidebar-filter-input"
