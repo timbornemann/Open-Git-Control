@@ -60,10 +60,6 @@ export const useRepositoryDomain = ({
   const isRemoteFetchRunningRef = useRef(false);
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
-  const getRemoteBranchShortName = useCallback((branchName: string) => (
-    branchName.replace(/^remotes\/[^/]+\//, '')
-  ), []);
-
   const mergeModeArgs = useCallback((mode: GitMergeMode): string[] => {
     if (mode === 'noFf') return ['--no-ff'];
     if (mode === 'squash') return ['--squash'];
@@ -665,16 +661,6 @@ export const useRepositoryDomain = ({
     }
   };
 
-  const localBranchNames = new Set(
-    branches
-      .filter(branch => branch.scope === 'local')
-      .map(branch => branch.name)
-  );
-
-  const remoteOnlyBranches = branches.filter(branch => (
-    branch.scope === 'remote' && !localBranchNames.has(getRemoteBranchShortName(branch.name))
-  ));
-
   const remoteStatus: RemoteStatusInfo = (() => {
     if (remoteSync.lastFetchError) {
       return {
@@ -746,16 +732,6 @@ export const useRepositoryDomain = ({
       };
     }
 
-    if (remoteOnlyBranches.length > 0) {
-      return {
-        title: tr(`${remoteOnlyBranches.length} zusätzl. Remote-Branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`, `${remoteOnlyBranches.length} additional remote branch${remoteOnlyBranches.length === 1 ? '' : 'es'}`),
-        detail: tr('Auf dem Remote gibt es weitere Branches.', 'There are more branches on the remote.'),
-        color: 'var(--status-warning)',
-        backgroundColor: 'var(--status-warning-soft)',
-        borderColor: 'var(--status-warning-border)',
-      };
-    }
-
     return {
       title: tr('Remote ist aktuell', 'Remote is up to date'),
       detail: formatLastFetchedAt(remoteSync.lastFetchedAt),
@@ -783,7 +759,6 @@ export const useRepositoryDomain = ({
     hasRemoteOrigin,
     setHasRemoteOrigin,
     remoteSync,
-    remoteOnlyBranches,
     remoteStatus,
     refreshRemoteState,
     handleCreateBranch,

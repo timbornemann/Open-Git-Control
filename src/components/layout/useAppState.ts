@@ -2203,7 +2203,6 @@ export const useAppState = () => {
     hasRemoteOrigin: repository.hasRemoteOrigin,
     forceGithubRepoCreationPrompt,
     remoteSync: repository.remoteSync,
-    remoteOnlyBranches: repository.remoteOnlyBranches,
     remoteStatus: repository.remoteStatus,
     refreshRemoteState: repository.refreshRemoteState,
     isRemotePanelCollapsed: activeSidebarCollapseState.remotePanelCollapsed,

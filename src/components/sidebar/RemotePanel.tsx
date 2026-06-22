@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Globe, Plus, RefreshCw, X, Edit2 } from 'lucide-react';
-import { GitMergeMode, RemoteInfo, RemoteSyncState } from '../../types/git';
-import { DialogFrame } from '../DialogFrame';
+import { Edit2, Globe, Plus, RefreshCw, X } from 'lucide-react';
+import { RemoteInfo, RemoteSyncState } from '../../types/git';
 import { useI18n } from '../../i18n';
-import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from './RepoCard';
+import { RepoCard, RepoCardContent, RepoCardHeader } from './RepoCard';
 
 type RemoteStatus = {
   title: string;
@@ -15,49 +14,62 @@ type RemoteStatus = {
 
 type RemoteContextMenu = { x: number; y: number; remote: RemoteInfo } | null;
 
+type MenuLabelProps = {
+  label: React.ReactNode;
+  help: React.ReactNode;
+};
+
 type Props = {
   remotes: RemoteInfo[];
   remoteSync: RemoteSyncState;
   remoteStatus: RemoteStatus;
-  remoteOnlyBranchesCount: number;
-  remoteOnlyBranches: string[];
   onAddRemote: () => void;
   onRemoveRemote: (name: string) => void;
   onRenameRemote: (name: string) => void;
   onSetRemoteUrl: (name: string, currentUrl: string) => void;
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
-  onCheckoutRemoteBranch: (remoteBranchName: string) => void;
-  onMergeRemoteBranch: (remoteBranchName: string, mode?: GitMergeMode) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 };
 
-const toShortRemoteBranch = (name: string) => name.replace(/^remotes\//, '');
+const toCompactRemoteUrl = (url: string) => {
+  const trimmed = url.trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  const sshMatch = trimmed.match(/^git@([^:]+):(.+)$/);
+  if (sshMatch) return `${sshMatch[1]}/${sshMatch[2]}`;
+
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.hostname}${parsed.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return trimmed.replace(/^https?:\/\//i, '').replace(/^ssh:\/\//i, '');
+  }
+};
+
+const MenuLabel: React.FC<MenuLabelProps> = ({ label, help }) => (
+  <span className="ctx-menu-label">
+    <span>{label}</span>
+    <span className="ctx-menu-help">{help}</span>
+  </span>
+);
 
 export const RemotePanel: React.FC<Props> = ({
   remotes,
   remoteSync,
   remoteStatus,
-  remoteOnlyBranchesCount,
-  remoteOnlyBranches,
   onAddRemote,
   onRemoveRemote,
   onRenameRemote,
   onSetRemoteUrl,
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
-  onCheckoutRemoteBranch,
-  onMergeRemoteBranch,
   collapsed,
   onToggleCollapsed,
 }) => {
-  const [isRemoteBranchesDialogOpen, setIsRemoteBranchesDialogOpen] = useState(false);
   const [remoteCtxMenu, setRemoteCtxMenu] = useState<RemoteContextMenu>(null);
-  const remoteOnlyPreview = remoteOnlyBranches.slice(0, 3);
-  const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && remoteOnlyBranchesCount === 0 && !remoteSync.lastFetchError && remoteSync.hasUpstream;
+  const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && !remoteSync.lastFetchError && remoteSync.hasUpstream;
   const statusVariant: 'success' | 'warning' | 'danger' =
-    remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream || remoteOnlyBranchesCount > 0 ? 'warning' : 'success';
+    remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream ? 'warning' : 'success';
   const { tr } = useI18n();
 
   return (
@@ -69,77 +81,55 @@ export const RemotePanel: React.FC<Props> = ({
         toggleTitle={collapsed ? tr('Remotes anzeigen', 'Show remotes') : tr('Remotes einklappen', 'Collapse remotes')}
         actions={(
           <>
-            <button className="icon-btn" style={{ padding: '2px' }} onClick={onAddRemote} title={tr('Remote hinzufuegen', 'Add remote')}><Plus size={13} /></button>
-            <button className="icon-btn" style={{ padding: '2px' }} onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onAddRemote} title={tr('Remote hinzufuegen', 'Add remote')}><Plus size={13} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
           </>
         )}
       />
 
       {!collapsed && (
-        <RepoCardContent>
-          {isHealthy ? (
-            <RepoCardStatus variant="success" title={remoteStatus.title} detail={remoteStatus.detail} />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <RepoCardStatus variant={statusVariant} title={remoteStatus.title} detail={remoteStatus.detail} />
-
+        <RepoCardContent className="remote-card-content">
+          <div className="remote-overview-list">
+            <div className={`remote-overview-row remote-overview-row-${isHealthy ? 'success' : statusVariant}`}>
+              <span className="remote-overview-marker" />
+              <span className="remote-overview-copy">
+                <span className="remote-overview-title">{remoteStatus.title}</span>
+                {remoteStatus.detail && <span className="remote-overview-detail">{remoteStatus.detail}</span>}
+              </span>
               {!remoteSync.hasUpstream && (
-                <button className="staging-tool-btn" onClick={onSetUpstreamForCurrentBranch} style={{ alignSelf: 'flex-start' }}>
+                <button className="staging-tool-btn remote-overview-action" onClick={onSetUpstreamForCurrentBranch}>
                   {tr('Upstream setzen', 'Set upstream')}
                 </button>
               )}
-
-              {remoteOnlyBranchesCount > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <span style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>
-                    {tr(`${remoteOnlyBranchesCount} Branches nur auf Remote. Schnell auschecken:`, `${remoteOnlyBranchesCount} branches only on remote. Quick checkout:`)}
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {remoteOnlyPreview.map(branch => (
-                      <span key={branch} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                        <button type="button" className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={() => onCheckoutRemoteBranch(branch)}>
-                          {toShortRemoteBranch(branch)}
-                        </button>
-                        <button
-                          type="button"
-                          className="staging-tool-btn"
-                          style={{ fontSize: '0.68rem', padding: '2px 5px' }}
-                          onClick={() => onMergeRemoteBranch(branch, 'default')}
-                          title={tr('In aktuellen Branch mergen', 'Merge into current branch')}
-                        >
-                          {tr('Merge', 'Merge')}
-                        </button>
-                      </span>
-                    ))}
-                    {remoteOnlyBranchesCount > remoteOnlyPreview.length && (
-                      <button className="staging-tool-btn" style={{ fontSize: '0.72rem', padding: '2px 6px' }} onClick={() => setIsRemoteBranchesDialogOpen(true)}>
-                        {tr(`Alle anzeigen (${remoteOnlyBranchesCount})`, `Show all (${remoteOnlyBranchesCount})`)}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {remoteSync.lastFetchError && <span style={{ fontSize: '0.73rem', color: 'var(--status-danger)' }}>{remoteSync.lastFetchError}</span>}
             </div>
-          )}
 
-          <div className="repo-card-scroll repo-scroll-sm">
+          </div>
+
+          <div className="repo-card-scroll repo-scroll-sm remote-list-scroll">
             {remotes.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {remotes.map(remote => (
-                  <div
-                    key={remote.name}
-                    className="repo-list-row"
-                    onContextMenu={e => { e.preventDefault(); setRemoteCtxMenu({ x: e.clientX, y: e.clientY, remote }); }}
-                  >
-                    <Globe size={13} style={{ color: 'var(--text-accent)', opacity: 0.7, flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.8rem', fontWeight: 500, flexShrink: 0 }}>{remote.name}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={remote.url}>{remote.url}</span>
-                    <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Remote bearbeiten', 'Edit remote')}><Edit2 size={11} /></button>
-                    <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn" style={{ padding: '2px', opacity: 0 }} title={tr('Remote entfernen', 'Remove remote')}><X size={11} /></button>
-                  </div>
-                ))}
+              <div className="remote-list">
+                {remotes.map(remote => {
+                  const compactUrl = toCompactRemoteUrl(remote.url);
+
+                  return (
+                    <div
+                      key={remote.name}
+                      className="repo-list-row remote-row"
+                      title={remote.url}
+                      onContextMenu={e => { e.preventDefault(); setRemoteCtxMenu({ x: e.clientX, y: e.clientY, remote }); }}
+                    >
+                      <Globe size={13} className="remote-row-icon" />
+                      <span className="remote-row-copy">
+                        <span className="remote-row-name">{remote.name}</span>
+                        <span className="remote-row-url">{compactUrl}</span>
+                      </span>
+                      <span className="remote-row-actions">
+                        <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn remote-row-action" title={tr('Remote bearbeiten', 'Edit remote')}><Edit2 size={11} /></button>
+                        <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn remote-row-action" title={tr('Remote entfernen', 'Remove remote')}><X size={11} /></button>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="repo-state-text">{tr('Keine Remotes konfiguriert.', 'No remotes configured.')}</div>
@@ -153,61 +143,49 @@ export const RemotePanel: React.FC<Props> = ({
                 style={remoteCtxMenu.x > 0 ? { left: remoteCtxMenu.x, top: remoteCtxMenu.y } : { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }}
                 onClick={e => e.stopPropagation()}
               >
-                <div className="ctx-menu-header">{remoteCtxMenu.remote.name}</div>
-                <button className="ctx-menu-item" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRenameRemote(r.name); }}>
-                  <span className="ctx-menu-icon">✎</span> {tr('Umbenennen', 'Rename')}
+                <div className="ctx-menu-header remote-menu-header" title={remoteCtxMenu.remote.url}>
+                  <span className="remote-menu-name">{remoteCtxMenu.remote.name}</span>
+                  <span className="remote-menu-url">{toCompactRemoteUrl(remoteCtxMenu.remote.url)}</span>
+                </div>
+                <button
+                  className="ctx-menu-item"
+                  title={tr('Benennt diesen Remote-Eintrag um.', 'Renames this remote entry.')}
+                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRenameRemote(r.name); }}
+                >
+                  <span className="ctx-menu-icon">RN</span>
+                  <MenuLabel
+                    label={tr('Umbenennen', 'Rename')}
+                    help={tr('Aendert nur den lokalen Namen wie origin oder upstream.', 'Changes only the local name like origin or upstream.')}
+                  />
                 </button>
-                <button className="ctx-menu-item" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onSetRemoteUrl(r.name, r.url); }}>
-                  <span className="ctx-menu-icon">🔗</span> {tr('URL ändern', 'Change URL')}
+                <button
+                  className="ctx-menu-item"
+                  title={tr('Aendert die URL, zu der dieser Remote zeigt.', 'Changes the URL this remote points to.')}
+                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onSetRemoteUrl(r.name, r.url); }}
+                >
+                  <span className="ctx-menu-icon">URL</span>
+                  <MenuLabel
+                    label={tr('URL aendern', 'Change URL')}
+                    help={tr('Wechselt das Ziel fuer Fetch, Pull und Push dieses Remotes.', 'Changes the target for fetch, pull, and push for this remote.')}
+                  />
                 </button>
                 <div className="ctx-menu-sep" />
-                <button className="ctx-menu-item danger" onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRemoveRemote(r.name); }}>
-                  <span className="ctx-menu-icon">✕</span> {tr('Entfernen', 'Remove')}
+                <button
+                  className="ctx-menu-item danger"
+                  title={tr('Entfernt diesen Remote aus der lokalen Repository-Konfiguration.', 'Removes this remote from the local repository configuration.')}
+                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRemoveRemote(r.name); }}
+                >
+                  <span className="ctx-menu-icon">DEL</span>
+                  <MenuLabel
+                    label={tr('Entfernen', 'Remove')}
+                    help={tr('Loescht nur den Remote-Eintrag lokal. Das entfernte Repository bleibt bestehen.', 'Deletes only the local remote entry. The remote repository remains untouched.')}
+                  />
                 </button>
               </div>
             </div>
           )}
         </RepoCardContent>
       )}
-
-      <DialogFrame
-        open={isRemoteBranchesDialogOpen}
-        title={tr('Remote-Branches ohne lokales Gegenstueck', 'Remote branches without local counterpart')}
-        onClose={() => setIsRemoteBranchesDialogOpen(false)}
-        cancelLabel={tr('Schliessen', 'Close')}
-      >
-        <p className="dialog-message">
-          {tr('Diese Branches existieren auf dem Remote, aber nicht lokal. Du kannst sie direkt auschecken.', 'These branches exist on the remote, but not locally. You can check them out directly.')}
-        </p>
-        <div style={{ border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden', maxHeight: '320px' }}>
-          {remoteOnlyBranches.map((branch) => (
-            <div key={branch} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 9px', borderBottom: '1px solid var(--line-subtle)' }}>
-              <span style={{ fontFamily: 'monospace', fontSize: '0.77rem', color: 'var(--text-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {toShortRemoteBranch(branch)}
-              </span>
-              <button
-                type="button"
-                className="staging-tool-btn"
-                onClick={() => onMergeRemoteBranch(branch, 'default')}
-                style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-              >
-                {tr('Mergen', 'Merge')}
-              </button>
-              <button
-                type="button"
-                className="staging-tool-btn"
-                onClick={() => {
-                  onCheckoutRemoteBranch(branch);
-                  setIsRemoteBranchesDialogOpen(false);
-                }}
-                style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-              >
-                {tr('Auschecken', 'Checkout')}
-              </button>
-            </div>
-          ))}
-        </div>
-      </DialogFrame>
     </RepoCard>
   );
 };

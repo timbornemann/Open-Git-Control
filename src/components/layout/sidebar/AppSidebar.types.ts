@@ -1,5 +1,5 @@
 import React from 'react';
-import { BranchInfo, GitMergeMode, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
+import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto, RepoSortByDto } from '../../../global';
 
 export type RemoteStatus = {
@@ -60,16 +60,12 @@ export type AppSidebarProps = {
 
   remotes: { name: string; url: string }[];
   remoteStatus: RemoteStatus;
-  remoteOnlyBranchesCount: number;
-  remoteOnlyBranches: string[];
   onAddRemote: () => void;
   onRemoveRemote: (name: string) => void;
   onRenameRemote: (name: string) => void;
   onSetRemoteUrl: (name: string, currentUrl: string) => void;
   onRefreshRemote: () => void;
   onSetUpstreamForCurrentBranch: () => void;
-  onCheckoutRemoteBranch: (remoteBranchName: string) => void;
-  onMergeRemoteBranch: (remoteBranchName: string, mode?: GitMergeMode) => void;
   isRemotePanelCollapsed: boolean;
   onToggleRemotePanelCollapsed: () => void;
 

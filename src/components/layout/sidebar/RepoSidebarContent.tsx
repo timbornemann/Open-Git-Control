@@ -34,16 +34,12 @@ type RepoSidebarContentProps = Pick<
   | 'remotes'
   | 'remoteSync'
   | 'remoteStatus'
-  | 'remoteOnlyBranchesCount'
-  | 'remoteOnlyBranches'
   | 'onAddRemote'
   | 'onRemoveRemote'
   | 'onRenameRemote'
   | 'onSetRemoteUrl'
   | 'onRefreshRemote'
   | 'onSetUpstreamForCurrentBranch'
-  | 'onCheckoutRemoteBranch'
-  | 'onMergeRemoteBranch'
   | 'isRemotePanelCollapsed'
   | 'onToggleRemotePanelCollapsed'
   | 'submodules'
@@ -156,16 +152,12 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         remotes={props.remotes}
         remoteSync={props.remoteSync}
         remoteStatus={props.remoteStatus}
-        remoteOnlyBranchesCount={props.remoteOnlyBranchesCount}
-        remoteOnlyBranches={props.remoteOnlyBranches}
         onAddRemote={props.onAddRemote}
         onRemoveRemote={props.onRemoveRemote}
         onRenameRemote={props.onRenameRemote}
         onSetRemoteUrl={props.onSetRemoteUrl}
         onRefreshRemote={props.onRefreshRemote}
         onSetUpstreamForCurrentBranch={props.onSetUpstreamForCurrentBranch}
-        onCheckoutRemoteBranch={props.onCheckoutRemoteBranch}
-        onMergeRemoteBranch={props.onMergeRemoteBranch}
         collapsed={props.isRemotePanelCollapsed}
         onToggleCollapsed={props.onToggleRemotePanelCollapsed}
       />

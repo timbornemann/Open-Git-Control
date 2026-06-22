@@ -43,16 +43,12 @@ type ReposSidebarContentProps = Pick<
   | 'remotes'
   | 'remoteSync'
   | 'remoteStatus'
-  | 'remoteOnlyBranchesCount'
-  | 'remoteOnlyBranches'
   | 'onAddRemote'
   | 'onRemoveRemote'
   | 'onRenameRemote'
   | 'onSetRemoteUrl'
   | 'onRefreshRemote'
   | 'onSetUpstreamForCurrentBranch'
-  | 'onCheckoutRemoteBranch'
-  | 'onMergeRemoteBranch'
   | 'isRemotePanelCollapsed'
   | 'onToggleRemotePanelCollapsed'
   | 'submodules'
@@ -109,16 +105,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   remotes,
   remoteSync,
   remoteStatus,
-  remoteOnlyBranchesCount,
-  remoteOnlyBranches,
   onAddRemote,
   onRemoveRemote,
   onRenameRemote,
   onSetRemoteUrl,
   onRefreshRemote,
   onSetUpstreamForCurrentBranch,
-  onCheckoutRemoteBranch,
-  onMergeRemoteBranch,
   isRemotePanelCollapsed,
   onToggleRemotePanelCollapsed,
   submodules,
@@ -192,16 +184,12 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           remotes={remotes}
           remoteSync={remoteSync}
           remoteStatus={remoteStatus}
-          remoteOnlyBranchesCount={remoteOnlyBranchesCount}
-          remoteOnlyBranches={remoteOnlyBranches}
           onAddRemote={onAddRemote}
           onRemoveRemote={onRemoveRemote}
           onRenameRemote={onRenameRemote}
           onSetRemoteUrl={onSetRemoteUrl}
           onRefreshRemote={onRefreshRemote}
           onSetUpstreamForCurrentBranch={onSetUpstreamForCurrentBranch}
-          onCheckoutRemoteBranch={onCheckoutRemoteBranch}
-          onMergeRemoteBranch={onMergeRemoteBranch}
           collapsed={isRemotePanelCollapsed}
           onToggleCollapsed={onToggleRemotePanelCollapsed}
         />

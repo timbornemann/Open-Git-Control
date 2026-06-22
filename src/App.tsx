@@ -250,16 +250,12 @@ const App: React.FC = () => {
 
     remotes: state.remotes,
     remoteStatus: state.remoteStatus,
-    remoteOnlyBranchesCount: state.remoteOnlyBranches.length,
-    remoteOnlyBranches: state.remoteOnlyBranches.map((branch) => branch.name),
     onAddRemote: state.handleAddRemote,
     onRemoveRemote: state.handleRemoveRemote,
     onRenameRemote: state.handleRenameRemote,
     onSetRemoteUrl: state.handleSetRemoteUrl,
     onRefreshRemote: () => state.refreshRemoteState(true),
     onSetUpstreamForCurrentBranch: state.handleSetUpstreamForCurrentBranch,
-    onCheckoutRemoteBranch: state.handleCheckoutRemoteBranch,
-    onMergeRemoteBranch: state.handleMergeBranch,
     isRemotePanelCollapsed: state.isRemotePanelCollapsed,
     onToggleRemotePanelCollapsed: state.toggleRemotePanelCollapsed,
 
