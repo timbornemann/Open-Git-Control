@@ -198,17 +198,24 @@ export const useRepositoryDomain = ({
     }
     const fetchTags = async () => {
       try {
-        const { success, data } = await window.electronAPI.runGitCommand('tag', '-l');
-        if (success && data) {
-          setTags(
-            String(data)
-              .split('\n')
-              .map((t: string) => t.trim())
-              .filter((t: string) => t.length > 0)
-          );
-        } else {
-          setTags([]);
+        const parseTags = (value: unknown) => String(value || '')
+          .split('\n')
+          .map((t: string) => t.trim())
+          .filter((t: string) => t.length > 0);
+
+        const byDate = await window.electronAPI.runGitCommand(
+          'for-each-ref',
+          '--sort=-creatordate',
+          '--format=%(refname:short)',
+          'refs/tags'
+        );
+        if (byDate.success) {
+          setTags(parseTags(byDate.data));
+          return;
         }
+
+        const byVersion = await window.electronAPI.runGitCommand('tag', '-l', '--sort=-v:refname');
+        setTags(byVersion.success ? parseTags(byVersion.data) : []);
       } catch {
         setTags([]);
       }
