@@ -304,9 +304,12 @@ Mit der App kannst du:
 - Bevorzugter Port: `2990`; wenn er belegt ist, versucht die App den naechsten freien lokalen Port
 - API-Dokumentation unter `http://127.0.0.1:2990/api/`
 - Maschinenlesbare API-Beschreibung unter `/api/openapi.json`
-- Alle Daten-, Git- und MCP-Endpunkte erfordern ein pro App-Prozess erzeugtes Token
+- Alle Daten-, Git- und MCP-Endpunkte erfordern einen API-Token
   - Token und Headername stehen in den Einstellungen unter `API/MCP`
   - Token als `x-open-git-control-token: <TOKEN>` oder `Authorization: Bearer <TOKEN>` senden
+  - Nutzer koennen einen persistenten Token fuer 1 Tag, 1 Monat, 1 Jahr oder dauerhaft generieren
+  - Persistente API-Token werden ueber Electron `safeStorage` OS-verschluesselt gespeichert; abgelaufene Tokens werden automatisch entfernt
+  - Ohne persistenten Token nutzt die App einen temporaeren Token fuer den aktuellen App-Prozess
 - Planner-Endpunkte fuer:
   - Projekte, Repositories, Tabs und Todos abfragen
   - naechste offene Todos nach Dringlichkeit abrufen
@@ -335,7 +338,7 @@ Mit der App kannst du:
 - Runtime-Steuerung:
   - `OPEN_GIT_CONTROL_API_PORT=2990` fuer den bevorzugten Port
   - `OPEN_GIT_CONTROL_API_DISABLED=true` zum Deaktivieren des lokalen API-Servers
-  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>` fuer ein fest vorgegebenes API-Token
+  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>` fuer ein fest vorgegebenes API-Token, das gespeicherte/generierte Tokens ueberschreibt
 
 ## Git installieren (wie und wo)
 
@@ -511,7 +514,7 @@ Output liegt in `release/`.
 - Repositories/Settings werden im User-Data-Verzeichnis der App gespeichert.
 - Planungsprojekte und Todos werden lokal im User-Data-Verzeichnis der App gespeichert.
 - Die lokale Planning API bindet an `127.0.0.1` und stellt Planungsdaten lokalen Prozessen auf deinem Rechner bereit.
-- GitHub-Token und Gemini-Key werden ueber Electron `safeStorage` OS-verschluesselt gespeichert, wenn verfuegbar.
+- GitHub-Token, Gemini-Key und persistente Planning-API-Token werden ueber Electron `safeStorage` OS-verschluesselt gespeichert, wenn verfuegbar.
 - Falls OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
 
 ## Verfuegbare npm-Skripte

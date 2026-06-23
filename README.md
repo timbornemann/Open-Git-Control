@@ -304,6 +304,12 @@ With the app, you can:
 - Preferred port: `2990`; if it is occupied, the app tries the next available local port
 - API documentation is served at `http://127.0.0.1:2990/api/`
 - Machine-readable API description at `/api/openapi.json`
+- All data, Git, and MCP endpoints require an API token
+  - Token and header name are shown in Settings under `API/MCP`
+  - Send the token as `x-open-git-control-token: <TOKEN>` or `Authorization: Bearer <TOKEN>`
+  - Users can generate a persistent token for 1 day, 1 month, 1 year, or forever
+  - Persistent API tokens are stored OS-encrypted via Electron `safeStorage`; expired tokens are removed automatically
+  - Without a persistent token, the app uses a temporary token for the current app process
 - Planner endpoints for:
   - listing projects, repositories, tabs, and todos
   - retrieving the next open todos ordered by urgency
@@ -332,6 +338,7 @@ With the app, you can:
 - Runtime controls:
   - `OPEN_GIT_CONTROL_API_PORT=2990` to choose the preferred port
   - `OPEN_GIT_CONTROL_API_DISABLED=true` to disable the local API server
+  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>` to force a fixed API token and override saved/generated tokens
 
 ## Install Git (where and how)
 
@@ -507,7 +514,7 @@ Output is in `release/`.
 - Repositories/settings are stored in the app user-data directory.
 - Planning projects and todos are stored locally in the app user-data directory.
 - The local planning API binds to `127.0.0.1` and exposes planning data to local processes on your machine.
-- GitHub token and Gemini key are stored OS-encrypted via Electron `safeStorage` when available.
+- GitHub token, Gemini key, and persistent Planning API token are stored OS-encrypted via Electron `safeStorage` when available.
 - If OS encryption is unavailable, secrets are not stored persistently.
 
 ## Available npm Scripts
