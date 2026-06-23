@@ -1,4 +1,5 @@
 import * as http from 'http';
+import * as crypto from 'crypto';
 import { URL } from 'url';
 import { GitService, gitService as defaultGitService } from '../GitService';
 import {
@@ -28,6 +29,8 @@ const PORT_SEARCH_LIMIT = 25;
 const MAX_BODY_BYTES = 1_000_000;
 const MCP_PROTOCOL_VERSION = '2025-06-18';
 const SERVER_NAME = 'open-git-control-planner';
+const AUTH_HEADER_NAME = 'x-open-git-control-token';
+const AUTH_BEARER_PREFIX = 'bearer ';
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'OPTIONS';
 type JsonObject = Record<string, unknown>;
@@ -89,12 +92,15 @@ type PlanningApiServerOptions = {
   preferredPort?: number;
   maxPortSearch?: number;
   gitService?: GitService;
+  authToken?: string;
 };
 
 export type PlanningApiServerHandle = {
   host: string;
   port: number;
   url: string;
+  authToken: string;
+  authHeaderName: string;
   close: () => Promise<void>;
 };
 
@@ -217,6 +223,79 @@ const parseLimit = (value: unknown, fallback?: number): number | undefined => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.min(500, Math.floor(parsed));
+};
+
+const createAuthToken = (configuredToken?: string): string => {
+  const configured = cleanString(configuredToken ?? process.env.OPEN_GIT_CONTROL_API_TOKEN);
+  if (configured.length >= 16) return configured;
+  return crypto.randomBytes(32).toString('base64url');
+};
+
+const headerValue = (value: string | string[] | undefined): string => (
+  Array.isArray(value) ? String(value[0] || '') : String(value || '')
+);
+
+const isAllowedCorsOrigin = (origin: string): boolean => {
+  if (!origin) return false;
+  try {
+    const parsed = new URL(origin);
+    const protocolAllowed = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const hostname = parsed.hostname.toLowerCase();
+    return protocolAllowed && (
+      hostname === 'localhost'
+      || hostname === '127.0.0.1'
+      || hostname === '::1'
+      || hostname === '[::1]'
+    );
+  } catch {
+    return false;
+  }
+};
+
+const timingSafeTokenEquals = (candidate: string, expected: string): boolean => {
+  const candidateBuffer = Buffer.from(candidate);
+  const expectedBuffer = Buffer.from(expected);
+  if (candidateBuffer.length !== expectedBuffer.length) return false;
+  return crypto.timingSafeEqual(candidateBuffer, expectedBuffer);
+};
+
+const getRequestAuthToken = (request: http.IncomingMessage): string => {
+  const headerToken = headerValue(request.headers[AUTH_HEADER_NAME]);
+  if (headerToken) return headerToken.trim();
+
+  const authorization = headerValue(request.headers.authorization).trim();
+  if (authorization.toLowerCase().startsWith(AUTH_BEARER_PREFIX)) {
+    return authorization.slice(AUTH_BEARER_PREFIX.length).trim();
+  }
+  return '';
+};
+
+const isPublicApiRequest = (url: URL, method: HttpMethod): boolean => {
+  if (method !== 'GET') return false;
+  return (
+    url.pathname === '/'
+    || url.pathname === '/api'
+    || url.pathname === '/api/'
+    || url.pathname === '/api/health'
+    || url.pathname === '/api/openapi.json'
+  );
+};
+
+const requireAuthorizedRequest = (
+  request: http.IncomingMessage,
+  url: URL,
+  method: HttpMethod,
+  authToken: string,
+): void => {
+  if (isPublicApiRequest(url, method)) return;
+  const token = getRequestAuthToken(request);
+  if (!token || !timingSafeTokenEquals(token, authToken)) {
+    throw new ApiError(
+      401,
+      'UNAUTHORIZED',
+      `Missing or invalid API token. Provide it as ${AUTH_HEADER_NAME} or Authorization: Bearer <token>.`,
+    );
+  }
 };
 
 const parseStringArray = (value: unknown, fieldName: string, maxLength = 200): string[] => {
@@ -890,6 +969,11 @@ const routeApi = async (ctx: RequestContext): Promise<unknown> => {
       status: 'ok',
       baseUrl: `${ctx.baseUrl}/api/`,
       mcpUrl: `${ctx.baseUrl}/mcp`,
+      auth: {
+        required: true,
+        headerName: AUTH_HEADER_NAME,
+        bearerSupported: true,
+      },
       statuses: PLANNER_STATUSES,
       priorities: PLANNER_PRIORITIES,
     };
@@ -1634,11 +1718,11 @@ const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> => (
   })
 );
 
-const createPlanningApiRequestHandler = (deps: { gitService: GitService }) => async (
+const createPlanningApiRequestHandler = (deps: { gitService: GitService; authToken: string }) => async (
   request: http.IncomingMessage,
   response: http.ServerResponse,
 ): Promise<void> => {
-  setCommonHeaders(response);
+  setCommonHeaders(response, request);
 
   try {
     const method = (request.method || 'GET').toUpperCase() as HttpMethod;
@@ -1652,6 +1736,7 @@ const createPlanningApiRequestHandler = (deps: { gitService: GitService }) => as
     }
 
     const url = new URL(request.url || '/', `http://${request.headers.host || `${DEFAULT_HOST}:${DEFAULT_PORT}`}`);
+    requireAuthorizedRequest(request, url, method, deps.authToken);
     if (url.pathname === '/') {
       redirect(response, '/api/');
       return;
@@ -1709,8 +1794,10 @@ export async function startPlanningApiServer(
   const host = options.host || DEFAULT_HOST;
   const preferredPort = normalizePreferredPort(options.preferredPort ?? getConfiguredPort());
   const maxPortSearch = options.maxPortSearch ?? PORT_SEARCH_LIMIT;
+  const authToken = createAuthToken(options.authToken);
   const handler = createPlanningApiRequestHandler({
     gitService: options.gitService || defaultGitService,
+    authToken,
   });
 
   for (let offset = 0; offset <= maxPortSearch; offset += 1) {
@@ -1723,6 +1810,8 @@ export async function startPlanningApiServer(
         host,
         port: actualPort,
         url: `http://${host}:${actualPort}`,
+        authToken,
+        authHeaderName: AUTH_HEADER_NAME,
         close: () => new Promise((resolve, reject) => {
           server.close((error) => (error ? reject(error) : resolve()));
         }),
@@ -1770,10 +1859,14 @@ const getConfiguredPort = (): number => {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_PORT;
 };
 
-const setCommonHeaders = (response: http.ServerResponse): void => {
-  response.setHeader('Access-Control-Allow-Origin', '*');
+const setCommonHeaders = (response: http.ServerResponse, request?: http.IncomingMessage): void => {
+  const origin = headerValue(request?.headers.origin);
+  if (isAllowedCorsOrigin(origin)) {
+    response.setHeader('Access-Control-Allow-Origin', origin);
+    response.setHeader('Vary', 'Origin');
+  }
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'content-type, accept, mcp-protocol-version');
+  response.setHeader('Access-Control-Allow-Headers', `content-type, accept, mcp-protocol-version, authorization, ${AUTH_HEADER_NAME}`);
   response.setHeader('Access-Control-Max-Age', '86400');
   response.setHeader('Cache-Control', 'no-store');
 };
@@ -1820,6 +1913,7 @@ const apiIndex = (baseUrl: string): string => `<!doctype html>
 
   <h2>Konventionen</h2>
   <p>Alle REST-Antworten nutzen <code>{"success":true,"data":...}</code> oder <code>{"success":false,"error":...}</code>. Prioritaeten: <code>${PLANNER_PRIORITIES.join(', ')}</code>. Tabs/Status: <code>${PLANNER_STATUSES.join(', ')}</code>. Der Alias <code>working</code> wird als <code>in-progress</code> behandelt.</p>
+  <p>Alle Daten-, Git- und MCP-Endpunkte benoetigen ein pro App-Prozess erzeugtes Token. Sende es als <code>${AUTH_HEADER_NAME}: &lt;TOKEN&gt;</code> oder <code>Authorization: Bearer &lt;TOKEN&gt;</code>. Das aktuelle Token findest du in den Open-Git-Control Einstellungen unter API/MCP.</p>
 
   <h2>REST-Endpunkte</h2>
   <table>
@@ -1862,16 +1956,16 @@ const apiIndex = (baseUrl: string): string => `<!doctype html>
   <p>Schreibende Git-Endpunkte erwarten <code>{"confirm":true}</code> im JSON-Body. Das gilt fuer Branch-, Stage-/Unstage-, Commit- und Remote-Aktionen.</p>
 
   <h2>Beispiele</h2>
-  <pre>curl "${baseUrl}/api/agent/next?repoPath=D:%5CProjects%5CApp&limit=5"</pre>
-  <pre>curl -X POST "${baseUrl}/api/todos" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"title\":\"Login Bug fixen\",\"status\":\"bug\",\"priority\":\"urgent\",\"tags\":[\"auth\",\"bug\"]}"</pre>
-  <pre>curl -X POST "${baseUrl}/api/todos/TODO_ID/move" -H "content-type: application/json" -d "{\"tab\":\"working\"}"</pre>
-  <pre>curl "${baseUrl}/api/git/status?repoPath=D:%5CProjects%5CApp"</pre>
-  <pre>curl -X POST "${baseUrl}/api/git/branches" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"name\":\"agent/work\",\"checkout\":true,\"confirm\":true}"</pre>
-  <pre>curl -X POST "${baseUrl}/api/git/commit" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"title\":\"Implement planned work\",\"confirm\":true}"</pre>
+  <pre>curl "${baseUrl}/api/agent/next?repoPath=D:%5CProjects%5CApp&limit=5" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;"</pre>
+  <pre>curl -X POST "${baseUrl}/api/todos" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"title\":\"Login Bug fixen\",\"status\":\"bug\",\"priority\":\"urgent\",\"tags\":[\"auth\",\"bug\"]}"</pre>
+  <pre>curl -X POST "${baseUrl}/api/todos/TODO_ID/move" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;" -H "content-type: application/json" -d "{\"tab\":\"working\"}"</pre>
+  <pre>curl "${baseUrl}/api/git/status?repoPath=D:%5CProjects%5CApp" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;"</pre>
+  <pre>curl -X POST "${baseUrl}/api/git/branches" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"name\":\"agent/work\",\"checkout\":true,\"confirm\":true}"</pre>
+  <pre>curl -X POST "${baseUrl}/api/git/commit" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;" -H "content-type: application/json" -d "{\"repoPath\":\"D:\\\\Projects\\\\App\",\"title\":\"Implement planned work\",\"confirm\":true}"</pre>
 
   <h2>MCP JSON-RPC</h2>
   <p>Der Endpunkt <code>/mcp</code> unterstuetzt <code>initialize</code>, <code>tools/list</code> und <code>tools/call</code>.</p>
-  <pre>curl -X POST "${baseUrl}/mcp" -H "content-type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"</pre>
+  <pre>curl -X POST "${baseUrl}/mcp" -H "${AUTH_HEADER_NAME}: &lt;TOKEN&gt;" -H "content-type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"</pre>
 </main>
 </body>
 </html>`;
@@ -1884,8 +1978,29 @@ const openApiSpec = (baseUrl: string): JsonObject => ({
     description: 'Local API for repository todos, project planning, and agent tools.',
   },
   servers: [{ url: `${baseUrl}/api` }],
+  components: {
+    securitySchemes: {
+      openGitControlToken: {
+        type: 'apiKey',
+        in: 'header',
+        name: AUTH_HEADER_NAME,
+      },
+      bearerToken: {
+        type: 'http',
+        scheme: 'bearer',
+      },
+    },
+    schemas: {
+      PlannerStatus: { type: 'string', enum: PLANNER_STATUSES },
+      PlannerPriority: { type: 'string', enum: PLANNER_PRIORITIES },
+    },
+  },
+  security: [
+    { openGitControlToken: [] },
+    { bearerToken: [] },
+  ],
   paths: {
-    '/health': { get: { summary: 'API health and planner metadata' } },
+    '/health': { get: { summary: 'API health and planner metadata', security: [] } },
     '/projects': {
       get: { summary: 'List planning projects' },
       post: { summary: 'Create planned project' },
@@ -1939,11 +2054,5 @@ const openApiSpec = (baseUrl: string): JsonObject => ({
     '/git/remotes/push': { post: { summary: 'Run git push' } },
     '/mcp/tools': { get: { summary: 'List MCP-style tools' } },
     '/mcp/tools/call': { post: { summary: 'Call MCP-style tool over REST' } },
-  },
-  components: {
-    schemas: {
-      PlannerStatus: { type: 'string', enum: PLANNER_STATUSES },
-      PlannerPriority: { type: 'string', enum: PLANNER_PRIORITIES },
-    },
   },
 });

@@ -59,11 +59,12 @@ const EndpointTable: React.FC<{ endpoints: EndpointInfo[] }> = ({ endpoints }) =
   </div>
 );
 
-const buildAgentConfig = (mcpUrl: string): string => JSON.stringify({
+const buildAgentConfig = (mcpUrl: string, authHeaderName: string, authToken: string | null): string => JSON.stringify({
   mcpServers: {
     'open-git-control': {
       type: 'http',
       url: mcpUrl,
+      ...(authToken ? { headers: { [authHeaderName]: authToken } } : {}),
     },
   },
 }, null, 2);
@@ -98,6 +99,9 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const openApiUrl = apiInfo?.openApiUrl || `${baseUrl}/api/openapi.json`;
   const apiHost = apiInfo?.host || '127.0.0.1';
   const apiPort = String(apiInfo?.port || apiInfo?.preferredPort || 2990);
+  const authHeaderName = apiInfo?.authHeaderName || 'x-open-git-control-token';
+  const authToken = apiInfo?.authToken || null;
+  const authHeader = `-H "${authHeaderName}: ${authToken || '<TOKEN>'}"`;
 
   const planningEndpoints = useMemo<EndpointInfo[]>(() => [
     { method: 'GET', path: '/api/health', description: tr('Status, Port und MCP-Adresse pruefen.', 'Check status, port, and MCP URL.') },
@@ -142,11 +146,11 @@ export const ApiMcpSettingsPanel: React.FC = () => {
     { method: 'POST', path: '/api/mcp/tools/call', description: tr('MCP-Tool ueber REST-Wrapper ausfuehren.', 'Run an MCP tool through the REST wrapper.') },
   ], [tr]);
 
-  const nextTodosCurl = `curl "${baseUrl}/api/agent/next?repoPath=<REPO_PATH_URL_ENCODED>&limit=10"`;
-  const createTodoCurl = `curl -X POST "${baseUrl}/api/todos" -H "content-type: application/json" -d "{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"title\\":\\"Naechste Arbeit\\",\\"status\\":\\"planned\\",\\"priority\\":\\"high\\"}"`;
-  const listToolsCurl = `curl -X POST "${mcpUrl}" -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"tools/list\\"}"`;
-  const callToolCurl = `curl -X POST "${mcpUrl}" -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":2,\\"method\\":\\"tools/call\\",\\"params\\":{\\"name\\":\\"get_next_todos\\",\\"arguments\\":{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"limit\\":5}}}"`;
-  const mcpConfig = buildAgentConfig(mcpUrl);
+  const nextTodosCurl = `curl "${baseUrl}/api/agent/next?repoPath=<REPO_PATH_URL_ENCODED>&limit=10" ${authHeader}`;
+  const createTodoCurl = `curl -X POST "${baseUrl}/api/todos" ${authHeader} -H "content-type: application/json" -d "{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"title\\":\\"Naechste Arbeit\\",\\"status\\":\\"planned\\",\\"priority\\":\\"high\\"}"`;
+  const listToolsCurl = `curl -X POST "${mcpUrl}" ${authHeader} -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"tools/list\\"}"`;
+  const callToolCurl = `curl -X POST "${mcpUrl}" ${authHeader} -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":2,\\"method\\":\\"tools/call\\",\\"params\\":{\\"name\\":\\"get_next_todos\\",\\"arguments\\":{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"limit\\":5}}}"`;
+  const mcpConfig = buildAgentConfig(mcpUrl, authHeaderName, authToken);
 
   return (
     <div className="settings-grid">
@@ -174,6 +178,8 @@ export const ApiMcpSettingsPanel: React.FC = () => {
           <CopyValueRow label={tr('API-Doku', 'API docs')} value={docsUrl} />
           <CopyValueRow label="OpenAPI" value={openApiUrl} />
           <CopyValueRow label="MCP" value={mcpUrl} />
+          <CopyValueRow label={tr('Token-Header', 'Token header')} value={authHeaderName} />
+          <CopyValueRow label={tr('API-Token', 'API token')} value={authToken || tr('Noch nicht verfuegbar', 'Not available yet')} />
         </div>
       </section>
 
@@ -181,8 +187,8 @@ export const ApiMcpSettingsPanel: React.FC = () => {
         <h3>{tr('KI-Agent verbinden', 'Connect an AI agent')}</h3>
         <p>
           {tr(
-            'Wenn dein Agent HTTP-MCP oder JSON-RPC ueber HTTP unterstuetzt, verwende die MCP-URL direkt. Fuer reine REST-Agenten reichen die /api-Endpunkte.',
-            'If your agent supports HTTP MCP or JSON-RPC over HTTP, use the MCP URL directly. For REST-only agents, use the /api endpoints.',
+            'Wenn dein Agent HTTP-MCP oder JSON-RPC ueber HTTP unterstuetzt, verwende die MCP-URL direkt. Fuer reine REST-Agenten reichen die /api-Endpunkte. Sende bei allen Daten- und Tool-Aufrufen den Token-Header mit.',
+            'If your agent supports HTTP MCP or JSON-RPC over HTTP, use the MCP URL directly. For REST-only agents, use the /api endpoints. Send the token header with all data and tool calls.',
           )}
         </p>
         <div className="settings-api-command-block">

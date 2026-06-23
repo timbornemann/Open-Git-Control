@@ -23,6 +23,10 @@ export const useRepoManager = ({ onRepoChanged, onRepoCleared, onToastSuccess, o
           const active = data.activeRepo && paths.includes(data.activeRepo) ? data.activeRepo : paths[0];
           await window.electronAPI.setRepoPath(active);
           setActiveRepo(active);
+        } else {
+          await window.electronAPI.clearRepoPath();
+          setActiveRepo(null);
+          onRepoCleared?.();
         }
       } catch (error) {
         console.error(error);
@@ -60,6 +64,9 @@ export const useRepoManager = ({ onRepoChanged, onRepoCleared, onToastSuccess, o
         setActiveRepo(nextActive);
         onRepoChanged?.();
       } else {
+        if (window.electronAPI) {
+          await window.electronAPI.clearRepoPath();
+        }
         setActiveRepo(null);
         onRepoCleared?.();
       }

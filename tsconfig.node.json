@@ -10,6 +10,6 @@
     "outDir": "dist-electron",
     "strict": true
   },
-  "include": ["electron", "vite.config.ts"],
+  "include": ["electron"],
   "exclude": ["electron/__tests__/**"]
 }

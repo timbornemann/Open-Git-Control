@@ -29,6 +29,7 @@ describe('planningApiServer', () => {
       ...init,
       headers: {
         'content-type': 'application/json',
+        [server.authHeaderName]: server.authToken,
         ...(init.headers || {}),
       },
     });
@@ -42,6 +43,7 @@ describe('planningApiServer', () => {
       preferredPort: 0,
       maxPortSearch: 0,
       gitService: new GitService(),
+      authToken: 'test-planning-api-token',
     });
   });
 
@@ -71,6 +73,24 @@ describe('planningApiServer', () => {
 
     const openApi = await requestJson('/api/openapi.json');
     expect(openApi.data.paths['/todos/{todoId}/move']).toBeTruthy();
+    expect(openApi.data.components.securitySchemes.openGitControlToken.name).toBe(server!.authHeaderName);
+  });
+
+  it('requires a token for protected API and MCP routes', async () => {
+    const protectedResponse = await fetch(`${server!.url}/api/projects`);
+    expect(protectedResponse.status).toBe(401);
+    const protectedBody = await protectedResponse.json();
+    expect(protectedBody.error.code).toBe('UNAUTHORIZED');
+
+    const mcpResponse = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(mcpResponse.status).toBe(401);
+
+    const publicHealth = await fetch(`${server!.url}/api/health`);
+    expect(publicHealth.status).toBe(200);
   });
 
   it('creates todos, sorts open work by urgency, and moves todos through the working alias', async () => {

@@ -65,6 +65,11 @@ export class GitService {
     this.repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
   }
 
+  clearRepoPath() {
+    this.repoPath = null;
+    this.repoIsBare = null;
+  }
+
   getRepoPath(): string | null {
     return this.repoPath;
   }

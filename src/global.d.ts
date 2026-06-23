@@ -154,6 +154,9 @@ export interface PlanningApiInfoDto {
   mcpUrl: string | null;
   docsUrl: string | null;
   openApiUrl: string | null;
+  authRequired: boolean;
+  authHeaderName: string;
+  authToken: string | null;
   error?: string;
 }
 
@@ -397,6 +400,7 @@ export interface ElectronAPI {
   selectDirectory: () => Promise<string | null>;
   selectProjectParentDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
+  clearRepoPath: () => Promise<boolean>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (

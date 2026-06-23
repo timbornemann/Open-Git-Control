@@ -152,6 +152,10 @@ export const useWorkspaceDomain = ({
           const active = data.activeRepo && paths.includes(data.activeRepo) ? data.activeRepo : paths[0];
           await window.electronAPI.setRepoPath(active);
           setActiveRepo(active);
+        } else {
+          await window.electronAPI.clearRepoPath();
+          setActiveRepo(null);
+          onNoActiveRepo();
         }
       } catch (e) {
         console.error(e);
@@ -208,6 +212,9 @@ export const useWorkspaceDomain = ({
         onRepoActivated();
         triggerRefresh();
       } else {
+        if (window.electronAPI) {
+          await window.electronAPI.clearRepoPath();
+        }
         setActiveRepo(null);
         onNoActiveRepo();
       }

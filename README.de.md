@@ -304,6 +304,9 @@ Mit der App kannst du:
 - Bevorzugter Port: `2990`; wenn er belegt ist, versucht die App den naechsten freien lokalen Port
 - API-Dokumentation unter `http://127.0.0.1:2990/api/`
 - Maschinenlesbare API-Beschreibung unter `/api/openapi.json`
+- Alle Daten-, Git- und MCP-Endpunkte erfordern ein pro App-Prozess erzeugtes Token
+  - Token und Headername stehen in den Einstellungen unter `API/MCP`
+  - Token als `x-open-git-control-token: <TOKEN>` oder `Authorization: Bearer <TOKEN>` senden
 - Planner-Endpunkte fuer:
   - Projekte, Repositories, Tabs und Todos abfragen
   - naechste offene Todos nach Dringlichkeit abrufen
@@ -318,7 +321,7 @@ Mit der App kannst du:
   - Commits aus staged changes erstellen
   - Branches erstellen, auschecken, umbenennen und loeschen
   - Fetch, Pull und Push ausfuehren
-- Schreibende Git-Endpunkte erwarten `{"confirm":true}` im JSON-Body
+- Schreibende Git-Endpunkte erwarten zusaetzlich zum Token `{"confirm":true}` im JSON-Body
 - Tab-spezifische Endpunkte wie `/api/tabs/bug/todos` und `/api/tabs/working/todos`
   - `working` wird als Alias fuer `in-progress` akzeptiert
 - Agenten-Shortcuts:
@@ -332,6 +335,7 @@ Mit der App kannst du:
 - Runtime-Steuerung:
   - `OPEN_GIT_CONTROL_API_PORT=2990` fuer den bevorzugten Port
   - `OPEN_GIT_CONTROL_API_DISABLED=true` zum Deaktivieren des lokalen API-Servers
+  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>` fuer ein fest vorgegebenes API-Token
 
 ## Git installieren (wie und wo)
 

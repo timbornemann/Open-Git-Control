@@ -59,6 +59,9 @@ ipcMain.handle('planning-api:getInfo', async () => {
     mcpUrl: serverUrl ? `${serverUrl}/mcp` : null,
     docsUrl: normalizedBaseUrl,
     openApiUrl: serverUrl ? `${serverUrl}/api/openapi.json` : null,
+    authRequired: true,
+    authHeaderName: planningApiServer?.authHeaderName || 'x-open-git-control-token',
+    authToken: planningApiServer?.authToken || null,
     ...(planningApiError ? { error: planningApiError } : {}),
   };
 });

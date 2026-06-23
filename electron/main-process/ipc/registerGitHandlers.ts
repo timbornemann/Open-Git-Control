@@ -49,6 +49,13 @@ export function registerGitHandlers({
     return true;
   });
 
+  ipcMain.handle('git:clearRepo', async () => {
+    commitStatsService.interruptBackgroundWork();
+    gitService.clearRepoPath();
+    commitStatsService.setActiveRepo('');
+    return true;
+  });
+
   ipcMain.handle('git:command', async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
     let jobId: string | null = null;
     try {
