@@ -67,6 +67,29 @@ describe('SecretScanService', () => {
     expect(result.findings).toHaveLength(0);
   });
 
+  it('falls back to unpushed HEAD commits when no upstream is configured', async () => {
+    const commitHash = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const outgoingCommitDiff = [
+      'diff --git a/.env b/.env',
+      '+++ b/.env',
+      '@@ -0,0 +1 @@',
+      '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF',
+    ].join('\n');
+
+    const service = new SecretScanService(createGitServiceMock({
+      'diff --cached --no-color --unified=0': '',
+      'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
+      'rev-list --reverse --topo-order HEAD --not --remotes': commitHash,
+      [`show --format= --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: outgoingCommitDiff,
+    }));
+
+    const result = await service.scanPushDiffs({ strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].source).toBe('to-push');
+    expect(result.notes.join('\n')).toContain('No upstream tracking branch available; scanned 1 HEAD commit');
+  });
+
   it('scans commits that would only be published by push --tags', async () => {
     const tagCommit = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const tagDiff = [

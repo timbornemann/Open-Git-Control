@@ -296,6 +296,22 @@ export class SecretScanService {
       }, options.signal);
     };
 
+    const scanCommits = async (commits: string[], source: SecretScanSource) => {
+      for (const commitHash of commits) {
+        if (options.signal?.aborted) {
+          const aborted = new Error('Secret scan was aborted.');
+          aborted.name = 'AbortError';
+          throw aborted;
+        }
+        await streamDiff(['show', '--format=', '--no-color', '--unified=0', '--find-renames', '--find-copies', commitHash], source);
+      }
+    };
+
+    const parseCommitList = (raw: string) => raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^[0-9a-f]{40}$/i.test(line));
+
     await streamDiff(['diff', '--cached', '--no-color', '--unified=0'], 'staged');
     try {
       const upstreamRef = await this.gitService.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
@@ -304,25 +320,26 @@ export class SecretScanService {
       }
     } catch (error) {
       if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
-      notes.push('No upstream tracking branch available, to-push scan skipped.');
+      try {
+        const unpushedCommitsRaw = await this.gitService.runCommand(['rev-list', '--reverse', '--topo-order', 'HEAD', '--not', '--remotes']);
+        const unpushedCommits = parseCommitList(unpushedCommitsRaw);
+        await scanCommits(unpushedCommits, 'to-push');
+        notes.push(
+          unpushedCommits.length > 0
+            ? `No upstream tracking branch available; scanned ${unpushedCommits.length} HEAD commit(s) not reachable from remotes.`
+            : 'No upstream tracking branch available; no unpushed HEAD commits were found outside remote refs.',
+        );
+      } catch (fallbackError) {
+        if (options.signal?.aborted || (fallbackError as any)?.name === 'AbortError') throw fallbackError;
+        notes.push('No upstream tracking branch available, and fallback to-push scan failed.');
+      }
     }
 
     if (options.includeTags) {
       try {
         const tagOnlyCommitsRaw = await this.gitService.runCommand(['rev-list', '--reverse', '--topo-order', '--tags', '--not', '--remotes']);
-        const tagOnlyCommits = tagOnlyCommitsRaw
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => /^[0-9a-f]{40}$/i.test(line));
-
-        for (const commitHash of tagOnlyCommits) {
-          if (options.signal?.aborted) {
-            const aborted = new Error('Secret scan was aborted.');
-            aborted.name = 'AbortError';
-            throw aborted;
-          }
-          await streamDiff(['show', '--format=', '--no-color', '--unified=0', '--find-renames', '--find-copies', commitHash], 'tag');
-        }
+        const tagOnlyCommits = parseCommitList(tagOnlyCommitsRaw);
+        await scanCommits(tagOnlyCommits, 'tag');
 
         if (tagOnlyCommits.length > 0) {
           notes.push(`Tag scan checked ${tagOnlyCommits.length} commit(s) reachable from local tags but not remote refs.`);
