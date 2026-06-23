@@ -12,6 +12,12 @@ import { getGeminiApiKeyFromSecureStore, readSettingsWithMigration } from './mai
 import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
 import { PlanningApiServerHandle, startPlanningApiServer } from './main-process/planningApiServer';
+import {
+  PlanningApiTokenLifetime,
+  clearSavedPlanningApiAuthToken,
+  generateSavedPlanningApiAuthToken,
+  getPlanningApiAuthState,
+} from './main-process/planningApiAuth';
 
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
@@ -42,11 +48,16 @@ const buildDiagnosticsReport = buildDiagnosticsReportFactory({
   getCommitStatsDiagnostics: () => commitStatsService.getDiagnostics(),
 });
 
-ipcMain.handle('planning-api:getInfo', async () => {
+const isPlanningApiTokenLifetime = (value: unknown): value is PlanningApiTokenLifetime => (
+  value === 'day' || value === 'month' || value === 'year' || value === 'forever'
+);
+
+const buildPlanningApiInfo = () => {
   const disabled = process.env.OPEN_GIT_CONTROL_API_DISABLED === 'true';
   const serverUrl = planningApiServer?.url || null;
   const parsedUrl = serverUrl ? new URL(serverUrl) : null;
   const normalizedBaseUrl = serverUrl ? `${serverUrl}/api/` : null;
+  const authState = getPlanningApiAuthState();
 
   return {
     enabled: !disabled,
@@ -61,9 +72,32 @@ ipcMain.handle('planning-api:getInfo', async () => {
     openApiUrl: serverUrl ? `${serverUrl}/api/openapi.json` : null,
     authRequired: true,
     authHeaderName: planningApiServer?.authHeaderName || 'x-open-git-control-token',
-    authToken: planningApiServer?.authToken || null,
+    authToken: authState.token,
+    authTokenSource: authState.source,
+    authTokenCreatedAt: authState.createdAt,
+    authTokenExpiresAt: authState.expiresAt,
+    authTokenPersistent: authState.persistent,
+    authTokenManageable: authState.manageable,
+    authTokenStorageAvailable: authState.storageAvailable,
     ...(planningApiError ? { error: planningApiError } : {}),
   };
+};
+
+ipcMain.handle('planning-api:getInfo', async () => {
+  return buildPlanningApiInfo();
+});
+
+ipcMain.handle('planning-api:generateToken', async (_event, lifetime: unknown) => {
+  if (!isPlanningApiTokenLifetime(lifetime)) {
+    throw new Error('Invalid Planning API token lifetime.');
+  }
+  generateSavedPlanningApiAuthToken(lifetime);
+  return buildPlanningApiInfo();
+});
+
+ipcMain.handle('planning-api:clearSavedToken', async () => {
+  clearSavedPlanningApiAuthToken();
+  return buildPlanningApiInfo();
 });
 
 app.whenReady().then(() => {
@@ -88,7 +122,10 @@ app.whenReady().then(() => {
   createMainWindow(isDev, APP_DISPLAY_NAME, __dirname);
   updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
-    void startPlanningApiServer({ gitService })
+    void startPlanningApiServer({
+      gitService,
+      authTokenProvider: () => getPlanningApiAuthState().token,
+    })
       .then((server) => {
         planningApiServer = server;
         planningApiError = null;

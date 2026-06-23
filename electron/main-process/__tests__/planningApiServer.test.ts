@@ -93,6 +93,36 @@ describe('planningApiServer', () => {
     expect(publicHealth.status).toBe(200);
   });
 
+  it('uses the current auth token provider value for protected routes', async () => {
+    await server!.close();
+    let activeToken = 'provider-token-before-rotation';
+    server = await startPlanningApiServer({
+      preferredPort: 0,
+      maxPortSearch: 0,
+      gitService: new GitService(),
+      authTokenProvider: () => activeToken,
+    });
+
+    const beforeRotation = await fetch(`${server!.url}/api/projects`, {
+      headers: { [server!.authHeaderName]: activeToken },
+    });
+    expect(beforeRotation.status).toBe(200);
+
+    const oldToken = activeToken;
+    activeToken = 'provider-token-after-rotation';
+
+    const staleTokenResponse = await fetch(`${server!.url}/api/projects`, {
+      headers: { [server!.authHeaderName]: oldToken },
+    });
+    expect(staleTokenResponse.status).toBe(401);
+
+    const rotatedTokenResponse = await fetch(`${server!.url}/api/projects`, {
+      headers: { [server!.authHeaderName]: activeToken },
+    });
+    expect(rotatedTokenResponse.status).toBe(200);
+    expect(server!.authToken).toBe(activeToken);
+  });
+
   it('creates todos, sorts open work by urgency, and moves todos through the working alias', async () => {
     const projectResult = await requestJson('/api/projects', {
       method: 'POST',

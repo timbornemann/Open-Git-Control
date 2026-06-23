@@ -144,6 +144,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),
   clearGeminiApiKey: () => ipcRenderer.invoke('settings:clearGeminiApiKey'),
   getPlanningApiInfo: () => ipcRenderer.invoke('planning-api:getInfo'),
+  generatePlanningApiToken: (lifetime: string) => ipcRenderer.invoke('planning-api:generateToken', lifetime),
+  clearPlanningApiToken: () => ipcRenderer.invoke('planning-api:clearSavedToken'),
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getUpdaterStatus: () => ipcRenderer.invoke('updater:getStatus'),
   checkForAppUpdates: () => ipcRenderer.invoke('updater:check'),

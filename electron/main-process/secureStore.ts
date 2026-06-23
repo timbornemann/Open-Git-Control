@@ -4,12 +4,20 @@ import * as path from 'path';
 
 const GITHUB_TOKEN_STORE_FILE = 'github-token.bin';
 const GEMINI_API_KEY_STORE_FILE = 'gemini-api-key.bin';
+const PLANNING_API_TOKEN_STORE_FILE = 'planning-api-token.bin';
 const MAX_GEMINI_KEY_LENGTH = 500;
 const GITHUB_TOKEN_PAYLOAD_VERSION = 1;
+const PLANNING_API_TOKEN_PAYLOAD_VERSION = 1;
 
 export type SavedGithubToken = {
   token: string;
   host: string | null;
+};
+
+export type SavedPlanningApiToken = {
+  token: string;
+  createdAt: number;
+  expiresAt: number | null;
 };
 
 export function normalizeGeminiApiKey(value: unknown): string {
@@ -46,6 +54,14 @@ function getGithubTokenStorePath(): string {
 
 function getGeminiApiKeyStorePath(): string {
   return path.join(app.getPath('userData'), GEMINI_API_KEY_STORE_FILE);
+}
+
+function getPlanningApiTokenStorePath(): string {
+  return path.join(app.getPath('userData'), PLANNING_API_TOKEN_STORE_FILE);
+}
+
+export function isSecureStorageAvailable(): boolean {
+  return safeStorage.isEncryptionAvailable();
 }
 
 export function parseSavedGithubTokenPayload(raw: string): SavedGithubToken | null {
@@ -153,4 +169,92 @@ export function readSavedGeminiApiKey(): string | null {
 
 export function clearSavedGeminiApiKeySecurely(): void {
   overwriteAndDeleteFile(getGeminiApiKeyStorePath());
+}
+
+function normalizeEpochMillis(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  return Math.floor(value);
+}
+
+export function isPlanningApiTokenExpired(token: Pick<SavedPlanningApiToken, 'expiresAt'>, now = Date.now()): boolean {
+  return typeof token.expiresAt === 'number' && token.expiresAt <= now;
+}
+
+export function parseSavedPlanningApiTokenPayload(raw: string): SavedPlanningApiToken | null {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<SavedPlanningApiToken> & { version?: unknown };
+    const createdAt = normalizeEpochMillis(parsed.createdAt);
+    const expiresAt = parsed.expiresAt === null ? null : normalizeEpochMillis(parsed.expiresAt);
+    if (
+      parsed
+      && parsed.version === PLANNING_API_TOKEN_PAYLOAD_VERSION
+      && typeof parsed.token === 'string'
+      && parsed.token.trim().length >= 16
+      && createdAt
+      && (parsed.expiresAt === null || expiresAt)
+    ) {
+      return {
+        token: parsed.token.trim(),
+        createdAt,
+        expiresAt,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function serializePlanningApiTokenPayload(token: SavedPlanningApiToken): string {
+  const normalizedToken = String(token.token || '').trim();
+  const createdAt = normalizeEpochMillis(token.createdAt);
+  const expiresAt = token.expiresAt === null ? null : normalizeEpochMillis(token.expiresAt);
+  if (normalizedToken.length < 16) {
+    throw new Error('Planning API token must contain at least 16 characters.');
+  }
+  if (!createdAt) {
+    throw new Error('Planning API token creation date is required.');
+  }
+  if (token.expiresAt !== null && !expiresAt) {
+    throw new Error('Planning API token expiry date is invalid.');
+  }
+
+  return JSON.stringify({
+    version: PLANNING_API_TOKEN_PAYLOAD_VERSION,
+    token: normalizedToken,
+    createdAt,
+    expiresAt,
+  });
+}
+
+export function savePlanningApiTokenSecurely(token: SavedPlanningApiToken): boolean {
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('OS-backed encryption is not available. Planning API token will not be persisted.');
+    return false;
+  }
+
+  const encrypted = safeStorage.encryptString(serializePlanningApiTokenPayload(token));
+  fs.writeFileSync(getPlanningApiTokenStorePath(), encrypted, { mode: 0o600 });
+  return true;
+}
+
+export function readSavedPlanningApiToken(): SavedPlanningApiToken | null {
+  const tokenPath = getPlanningApiTokenStorePath();
+  if (!fs.existsSync(tokenPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) return null;
+
+  try {
+    const encrypted = fs.readFileSync(tokenPath);
+    return parseSavedPlanningApiTokenPayload(safeStorage.decryptString(encrypted));
+  } catch {
+    return null;
+  }
+}
+
+export function clearSavedPlanningApiTokenSecurely(): void {
+  overwriteAndDeleteFile(getPlanningApiTokenStorePath());
 }

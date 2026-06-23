@@ -93,6 +93,7 @@ type PlanningApiServerOptions = {
   maxPortSearch?: number;
   gitService?: GitService;
   authToken?: string;
+  authTokenProvider?: () => string;
 };
 
 export type PlanningApiServerHandle = {
@@ -1719,7 +1720,7 @@ const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> => (
   })
 );
 
-const createPlanningApiRequestHandler = (deps: { gitService: GitService; authToken: string }) => async (
+const createPlanningApiRequestHandler = (deps: { gitService: GitService; getAuthToken: () => string }) => async (
   request: http.IncomingMessage,
   response: http.ServerResponse,
 ): Promise<void> => {
@@ -1737,7 +1738,7 @@ const createPlanningApiRequestHandler = (deps: { gitService: GitService; authTok
     }
 
     const url = new URL(request.url || '/', `http://${request.headers.host || `${DEFAULT_HOST}:${DEFAULT_PORT}`}`);
-    requireAuthorizedRequest(request, url, method, deps.authToken);
+    requireAuthorizedRequest(request, url, method, deps.getAuthToken());
     if (url.pathname === '/') {
       redirect(response, '/api/');
       return;
@@ -1795,10 +1796,11 @@ export async function startPlanningApiServer(
   const host = options.host || DEFAULT_HOST;
   const preferredPort = normalizePreferredPort(options.preferredPort ?? getConfiguredPort());
   const maxPortSearch = options.maxPortSearch ?? PORT_SEARCH_LIMIT;
-  const authToken = createAuthToken(options.authToken);
+  const staticAuthToken = createAuthToken(options.authToken);
+  const getAuthToken = options.authTokenProvider || (() => staticAuthToken);
   const handler = createPlanningApiRequestHandler({
     gitService: options.gitService || defaultGitService,
-    authToken,
+    getAuthToken,
   });
 
   for (let offset = 0; offset <= maxPortSearch; offset += 1) {
@@ -1811,7 +1813,9 @@ export async function startPlanningApiServer(
         host,
         port: actualPort,
         url: `http://${host}:${actualPort}`,
-        authToken,
+        get authToken() {
+          return getAuthToken();
+        },
         authHeaderName: AUTH_HEADER_NAME,
         close: () => new Promise((resolve, reject) => {
           server.close((error) => (error ? reject(error) : resolve()));
