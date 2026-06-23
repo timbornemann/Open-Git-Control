@@ -682,7 +682,8 @@
 }
 
 .branch-search-wrap,
-.tag-search-wrap {
+.tag-search-wrap,
+.workflow-search-wrap {
   flex: 1;
   min-width: 0;
   width: 100%;
