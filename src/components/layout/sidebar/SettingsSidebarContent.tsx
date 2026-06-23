@@ -39,6 +39,65 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     loadModels,
     handleRunOneClickUpdate,
   } = useSettingsAiUpdater({ settings, onUpdateSettings, tr });
+  const [diagnosticsState, setDiagnosticsState] = React.useState<{
+    loading: boolean;
+    message: string | null;
+    isError: boolean;
+  }>({ loading: false, message: null, isError: false });
+
+  const copyDiagnosticsReport = React.useCallback(async () => {
+    const api = window.electronAPI;
+    if (!api?.getDiagnosticsReport) {
+      setDiagnosticsState({
+        loading: false,
+        message: tr('Diagnose-Report ist in diesem Build nicht verfuegbar.', 'Diagnostics report is not available in this build.'),
+        isError: true,
+      });
+      return;
+    }
+    if (!navigator.clipboard?.writeText) {
+      setDiagnosticsState({
+        loading: false,
+        message: tr('Zwischenablage ist nicht verfuegbar.', 'Clipboard is not available.'),
+        isError: true,
+      });
+      return;
+    }
+
+    setDiagnosticsState({ loading: true, message: null, isError: false });
+    try {
+      const result = await api.getDiagnosticsReport();
+      if (!result.success) {
+        setDiagnosticsState({
+          loading: false,
+          message: result.error,
+          isError: true,
+        });
+        return;
+      }
+      if (!result.data.report) {
+        setDiagnosticsState({
+          loading: false,
+          message: tr('Diagnose-Report konnte nicht erstellt werden.', 'Could not create diagnostics report.'),
+          isError: true,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(result.data.report);
+      setDiagnosticsState({
+        loading: false,
+        message: tr('Diagnose-Report kopiert.', 'Diagnostics report copied.'),
+        isError: false,
+      });
+    } catch (error: any) {
+      setDiagnosticsState({
+        loading: false,
+        message: error?.message || tr('Diagnose-Report konnte nicht kopiert werden.', 'Could not copy diagnostics report.'),
+        isError: true,
+      });
+    }
+  }, [tr]);
 
   return (
     <div className="ssc-root">
@@ -325,6 +384,25 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             {oneClickUpdateLabel}
           </button>
         </div>
+      </div>
+
+      <div className="ssc-section">
+        <div className="ssc-section-title">{tr('Diagnose', 'Diagnostics')}</div>
+        <div className="ssc-row">
+          <button className="staging-tool-btn" onClick={copyDiagnosticsReport} disabled={diagnosticsState.loading}>
+            {diagnosticsState.loading
+              ? tr('Kopiere...', 'Copying...')
+              : tr('Diagnose-Report kopieren', 'Copy diagnostics report')}
+          </button>
+        </div>
+        {diagnosticsState.message && (
+          <div
+            className="ssc-hint"
+            style={{ color: diagnosticsState.isError ? 'var(--status-danger)' : undefined }}
+          >
+            {diagnosticsState.message}
+          </div>
+        )}
       </div>
 
       {/* ── Job Center ──────────────────────────────────────── */}
