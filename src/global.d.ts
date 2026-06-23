@@ -119,6 +119,8 @@ export type AiProviderDto = 'ollama' | 'gemini';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
 export type SecretScanSourceDto = 'staged' | 'to-push' | 'tag';
+export type PlanningApiTokenLifetimeDto = 'day' | 'month' | 'year' | 'forever';
+export type PlanningApiTokenSourceDto = 'environment' | 'saved' | 'session';
 
 export interface AppSettingsDto {
   theme: AppThemeDto;
@@ -157,6 +159,12 @@ export interface PlanningApiInfoDto {
   authRequired: boolean;
   authHeaderName: string;
   authToken: string | null;
+  authTokenSource: PlanningApiTokenSourceDto;
+  authTokenCreatedAt: number | null;
+  authTokenExpiresAt: number | null;
+  authTokenPersistent: boolean;
+  authTokenManageable: boolean;
+  authTokenStorageAvailable: boolean;
   error?: string;
 }
 
@@ -472,6 +480,8 @@ export interface ElectronAPI {
   setGeminiApiKey: (apiKey: string) => Promise<AppSettingsDto>;
   clearGeminiApiKey: () => Promise<AppSettingsDto>;
   getPlanningApiInfo: () => Promise<PlanningApiInfoDto>;
+  generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => Promise<PlanningApiInfoDto>;
+  clearPlanningApiToken: () => Promise<PlanningApiInfoDto>;
   getAppVersion: () => Promise<string>;
   getUpdaterStatus: () => Promise<UpdaterStatusDto>;
   checkForAppUpdates: () => Promise<{ success: boolean; error?: string }>;
