@@ -30,18 +30,88 @@ const parseNumstat = (raw: string) => {
   return stats;
 };
 
+const decodeQuotedGitPath = (rawToken: string): string | null => {
+  if (!(rawToken.startsWith('"') && rawToken.endsWith('"'))) return rawToken;
+
+  const escaped = rawToken.slice(1, -1);
+  let output = '';
+  let octets: number[] = [];
+
+  const flushOctets = () => {
+    if (octets.length === 0) return;
+    output += Buffer.from(octets).toString('utf8');
+    octets = [];
+  };
+
+  for (let i = 0; i < escaped.length; i += 1) {
+    const char = escaped[i];
+    if (char !== '\\') {
+      flushOctets();
+      output += char;
+      continue;
+    }
+
+    const next = escaped[i + 1];
+    if (!next) {
+      flushOctets();
+      output += '\\';
+      continue;
+    }
+
+    if (/[0-7]/.test(next)) {
+      let octal = next;
+      let consumedDigits = 1;
+      while (
+        consumedDigits < 3
+        && i + 1 + consumedDigits < escaped.length
+        && /[0-7]/.test(escaped[i + 1 + consumedDigits])
+      ) {
+        octal += escaped[i + 1 + consumedDigits];
+        consumedDigits += 1;
+      }
+      octets.push(parseInt(octal, 8));
+      i += consumedDigits;
+      continue;
+    }
+
+    flushOctets();
+    const unescapedMap: Record<string, string> = {
+      a: '\x07',
+      b: '\b',
+      f: '\f',
+      n: '\n',
+      r: '\r',
+      t: '\t',
+      v: '\v',
+      '\\': '\\',
+      '"': '"',
+    };
+    output += unescapedMap[next] ?? next;
+    i += 1;
+  }
+
+  flushOctets();
+  return output;
+};
+
 const parseStatusPath = (line: string): string | null => {
   if (line.length < 3) return null;
   const payload = line.slice(3).trim();
   if (!payload) return null;
   const renameSeparator = payload.lastIndexOf(' -> ');
   const rawPath = renameSeparator >= 0 ? payload.slice(renameSeparator + 4) : payload;
-  if (!rawPath.startsWith('"')) return rawPath;
-  try {
-    return JSON.parse(rawPath) as string;
-  } catch {
-    return null;
+  return decodeQuotedGitPath(rawPath);
+};
+
+const hasStagedChanges = (statusRaw: string): boolean => {
+  for (const line of statusRaw.split(/\r?\n/)) {
+    if (!line || line.length < 2) continue;
+    const indexStatus = line[0];
+    if (indexStatus !== ' ' && indexStatus !== '?' && indexStatus !== '!') {
+      return true;
+    }
   }
+  return false;
 };
 
 export class WorkingTreeService {
@@ -152,6 +222,15 @@ export class WorkingTreeService {
     }
 
     const hash = createHash('sha1');
+    if (hasStagedChanges(statusRaw)) {
+      const stagedNumstat = await this.gitService.runPollingCommandAtPath(
+        repoPath,
+        ['diff', '--numstat', '--cached'],
+        'working-tree-snapshot:staged-numstat',
+      );
+      hash.update('staged-numstat').update('\0').update(stagedNumstat).update('\0');
+    }
+
     const sortedPaths = [...paths].sort();
     const batchSize = 64;
     for (let offset = 0; offset < sortedPaths.length; offset += batchSize) {

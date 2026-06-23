@@ -35,7 +35,7 @@ describe('WorkingTreeService', () => {
       service.getStats(firstSnapshot.snapshotId),
     ]);
     expect(firstStats).toEqual(secondStats);
-    expect(runPollingCommandAtPath).toHaveBeenCalledTimes(2);
+    expect(runPollingCommandAtPath).toHaveBeenCalledTimes(3);
     expect(runPollingCommandAtPath).toHaveBeenCalledWith(
       'C:/repo',
       ['diff', '--numstat', '--cached'],
@@ -68,7 +68,59 @@ describe('WorkingTreeService', () => {
       expect(secondSnapshot.snapshotId).not.toBe(firstSnapshot.snapshotId);
       expect(firstStats.staged.additions).toBe(1);
       expect(secondStats.staged.additions).toBe(8);
-      expect(runPollingCommandAtPath).toHaveBeenCalledTimes(4);
+      expect(runPollingCommandAtPath).toHaveBeenCalledTimes(6);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it('recomputes line stats when staged numstat changes without changing file metadata', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-tree-index-snapshot-'));
+    const filePath = path.join(repoPath, 'a.ts');
+    fs.writeFileSync(filePath, 'unchanged worktree\n', 'utf8');
+    const getStatusPorcelainAtPath = vi.fn(async () => 'MM a.ts');
+    let stagedRaw = '1\t0\ta.ts';
+    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) =>
+      args.includes('--cached') ? stagedRaw : '4\t0\ta.ts');
+    const service = new WorkingTreeService({
+      getRepoPath: () => repoPath,
+      getStatusPorcelainAtPath,
+      runPollingCommandAtPath,
+    } as any);
+
+    try {
+      const firstSnapshot = await service.getSnapshot();
+      const firstStats = await service.getStats(firstSnapshot.snapshotId);
+      stagedRaw = '2\t0\ta.ts';
+      const secondSnapshot = await service.getSnapshot();
+      const secondStats = await service.getStats(secondSnapshot.snapshotId);
+
+      expect(secondSnapshot.snapshotId).not.toBe(firstSnapshot.snapshotId);
+      expect(firstStats.staged.additions).toBe(1);
+      expect(secondStats.staged.additions).toBe(2);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it('decodes git C-quoted UTF-8 paths without falling back to volatile snapshots', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-tree-quoted-path-'));
+    const nestedDir = path.join(repoPath, 'src');
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.writeFileSync(path.join(nestedDir, 'äöü.txt'), 'content\n', 'utf8');
+    const statusRaw = ' M "src/\\303\\244\\303\\266\\303\\274.txt"';
+    const service = new WorkingTreeService({
+      getRepoPath: () => repoPath,
+      getStatusPorcelainAtPath: vi.fn(async () => statusRaw),
+      runPollingCommandAtPath: vi.fn(async () => ''),
+    } as any);
+
+    try {
+      const firstSnapshot = await service.getSnapshot();
+      const secondSnapshot = await service.getSnapshot();
+
+      expect(secondSnapshot.snapshotId).toBe(firstSnapshot.snapshotId);
+      expect(firstSnapshot.changeCount).toBe(1);
     } finally {
       fs.rmSync(repoPath, { recursive: true, force: true });
     }
