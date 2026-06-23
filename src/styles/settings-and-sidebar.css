@@ -240,6 +240,36 @@
   background: var(--bg-hover);
 }
 
+.settings-api-token-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.settings-api-token-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-api-token-controls label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 30px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.settings-api-token-controls select {
+  min-width: 128px;
+  max-width: 180px;
+}
+
 .settings-api-command-block {
   display: flex;
   flex-direction: column;
@@ -310,6 +340,10 @@
 
 .settings-danger {
   color: var(--status-danger) !important;
+}
+
+.settings-success {
+  color: var(--status-success) !important;
 }
 
 .settings-release-notes {
