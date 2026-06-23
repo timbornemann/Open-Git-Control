@@ -1156,6 +1156,7 @@ export const useAppState = () => {
       command === 'push'
       && settings.secretScanBeforePushEnabled
       && !options?.skipSecretScan;
+    const shouldScanTagRefs = command === 'push' && args.some((arg) => arg === '--tags');
 
     if (await maybeHandlePushWithoutOrigin()) {
       return false;
@@ -1263,7 +1264,7 @@ export const useAppState = () => {
         });
         let scanResult: Awaited<ReturnType<typeof window.electronAPI.scanPushSecrets>>;
         try {
-          scanResult = await Promise.race([window.electronAPI.scanPushSecrets(), timeoutPromise]);
+          scanResult = await Promise.race([window.electronAPI.scanPushSecrets({ includeTags: shouldScanTagRefs }), timeoutPromise]);
         } catch (timeoutErr: any) {
           if (timeoutErr?.message === '__timeout__') {
             await window.electronAPI.cancelSecretScan();
@@ -1310,8 +1311,8 @@ export const useAppState = () => {
             variant: 'danger',
             title: tr('Moegliche Secrets vor Push erkannt', 'Potential secrets detected before push'),
             message: tr(
-              `${findings.length} moegliche Secret-Treffer wurden im staged/zu-pushenden Diff gefunden.`,
-              `${findings.length} potential secret hit(s) were found in staged/to-push diffs.`,
+              `${findings.length} moegliche Secret-Treffer wurden in den zu veroeffentlichenden Aenderungen gefunden.`,
+              `${findings.length} potential secret hit(s) were found in changes that would be published.`,
             ),
             contextItems,
             irreversible: true,

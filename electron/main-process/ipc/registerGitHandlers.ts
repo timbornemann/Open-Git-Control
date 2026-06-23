@@ -324,7 +324,7 @@ export function registerGitHandlers({
     }
   });
 
-  ipcMain.handle('git:scanPushSecrets', async (event: any) => {
+  ipcMain.handle('git:scanPushSecrets', async (event: any, params: { includeTags?: unknown } = {}) => {
     activeSecretScanController?.abort();
     const controller = new AbortController();
     activeSecretScanController = controller;
@@ -343,6 +343,7 @@ export function registerGitHandlers({
       const result = await secretScanService.scanPushDiffs({
         strictness: settings.secretScanStrictness,
         allowlistText: settings.secretScanAllowlist,
+        includeTags: params?.includeTags === true,
         signal: controller.signal,
         onProgress: (checkedLines) => {
           emitJobEvent(event.sender, {
@@ -372,6 +373,7 @@ export function registerGitHandlers({
           checkedLines: result.stats.checkedLines,
           stagedLines: result.stats.stagedLines,
           toPushLines: result.stats.toPushLines,
+          tagLines: result.stats.tagLines,
           notes: result.notes,
         },
         timestamp: Date.now(),

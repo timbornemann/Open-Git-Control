@@ -90,7 +90,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
   gitPull: () => invokeGitCommand('pull'),
   gitPush: () => invokeGitCommand('push'),
-  scanPushSecrets: () => ipcRenderer.invoke('git:scanPushSecrets'),
+  scanPushSecrets: (params?: { includeTags?: boolean }) => ipcRenderer.invoke('git:scanPushSecrets', params || {}),
   cancelSecretScan: () => ipcRenderer.invoke('git:cancelSecretScan'),
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir, targetName),
   gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),

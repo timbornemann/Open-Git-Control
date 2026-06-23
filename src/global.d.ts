@@ -118,7 +118,7 @@ export interface UpdaterOneClickResultDto {
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
-export type SecretScanSourceDto = 'staged' | 'to-push';
+export type SecretScanSourceDto = 'staged' | 'to-push' | 'tag';
 
 export interface AppSettingsDto {
   theme: AppThemeDto;
@@ -348,6 +348,7 @@ export interface SecretScanResultDto {
     checkedLines: number;
     stagedLines: number;
     toPushLines: number;
+    tagLines: number;
   };
 }
 
@@ -428,7 +429,7 @@ export interface ElectronAPI {
   gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
   gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
-  scanPushSecrets: () => Promise<IpcResult<SecretScanResultDto>>;
+  scanPushSecrets: (params?: { includeTags?: boolean }) => Promise<IpcResult<SecretScanResultDto>>;
   cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;

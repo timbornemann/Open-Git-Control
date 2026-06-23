@@ -1,7 +1,7 @@
 import type { GitService } from './GitService';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
-export type SecretScanSource = 'staged' | 'to-push';
+export type SecretScanSource = 'staged' | 'to-push' | 'tag';
 type SecretSeverity = 'medium' | 'high' | 'critical';
 
 type PatternDefinition = {
@@ -42,6 +42,7 @@ export interface SecretScanResult {
     checkedLines: number;
     stagedLines: number;
     toPushLines: number;
+    tagLines: number;
   };
 }
 
@@ -215,6 +216,7 @@ export class SecretScanService {
     allowlistText: string;
     signal?: AbortSignal;
     onProgress?: (checkedLines: number) => void;
+    includeTags?: boolean;
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -222,12 +224,14 @@ export class SecretScanService {
     const findings: SecretScanFinding[] = [];
     let stagedLines = 0;
     let toPushLines = 0;
+    let tagLines = 0;
     let findingLimitNoted = false;
 
     const scanCandidate = (candidate: DiffCandidateLine) => {
       if (candidate.source === 'staged') stagedLines += 1;
+      else if (candidate.source === 'tag') tagLines += 1;
       else toPushLines += 1;
-      const checkedLines = stagedLines + toPushLines;
+      const checkedLines = stagedLines + toPushLines + tagLines;
       if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
       if (shouldIgnorePath(candidate.filePath)) return;
 
@@ -302,7 +306,34 @@ export class SecretScanService {
       if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
       notes.push('No upstream tracking branch available, to-push scan skipped.');
     }
-    options.onProgress?.(stagedLines + toPushLines);
+
+    if (options.includeTags) {
+      try {
+        const tagOnlyCommitsRaw = await this.gitService.runCommand(['rev-list', '--reverse', '--topo-order', '--tags', '--not', '--remotes']);
+        const tagOnlyCommits = tagOnlyCommitsRaw
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => /^[0-9a-f]{40}$/i.test(line));
+
+        for (const commitHash of tagOnlyCommits) {
+          if (options.signal?.aborted) {
+            const aborted = new Error('Secret scan was aborted.');
+            aborted.name = 'AbortError';
+            throw aborted;
+          }
+          await streamDiff(['show', '--format=', '--no-color', '--unified=0', '--find-renames', '--find-copies', commitHash], 'tag');
+        }
+
+        if (tagOnlyCommits.length > 0) {
+          notes.push(`Tag scan checked ${tagOnlyCommits.length} commit(s) reachable from local tags but not remote refs.`);
+        }
+      } catch (error) {
+        if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
+        notes.push('Could not scan tag-only commits before pushing tags.');
+      }
+    }
+
+    options.onProgress?.(stagedLines + toPushLines + tagLines);
 
     return {
       scanned: true,
@@ -310,9 +341,10 @@ export class SecretScanService {
       findings,
       notes,
       stats: {
-        checkedLines: stagedLines + toPushLines,
+        checkedLines: stagedLines + toPushLines + tagLines,
         stagedLines,
         toPushLines,
+        tagLines,
       },
     };
   }

@@ -66,4 +66,32 @@ describe('SecretScanService', () => {
 
     expect(result.findings).toHaveLength(0);
   });
+
+  it('scans commits that would only be published by push --tags', async () => {
+    const tagCommit = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const tagDiff = [
+      'diff --git a/release.env b/release.env',
+      '+++ b/release.env',
+      '@@ -0,0 +1 @@',
+      '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF',
+    ].join('\n');
+
+    const service = new SecretScanService(createGitServiceMock({
+      'diff --cached --no-color --unified=0': '',
+      'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+      'diff --no-color --unified=0 origin/main..HEAD': '',
+      'rev-list --reverse --topo-order --tags --not --remotes': tagCommit,
+      [`show --format= --no-color --unified=0 --find-renames --find-copies ${tagCommit}`]: tagDiff,
+    }));
+
+    const result = await service.scanPushDiffs({
+      strictness: 'low',
+      allowlistText: '',
+      includeTags: true,
+    });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].source).toBe('tag');
+    expect(result.stats.tagLines).toBe(1);
+  });
 });

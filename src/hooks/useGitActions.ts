@@ -33,7 +33,9 @@ export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuc
 
     const shouldScanPush = command === 'push' && settings?.secretScanBeforePushEnabled && !skipSecretScan;
     if (shouldScanPush) {
-      const scanResult = await window.electronAPI.scanPushSecrets();
+      const scanResult = await window.electronAPI.scanPushSecrets({
+        includeTags: args.some((arg) => arg === '--tags'),
+      });
       if (!scanResult.success) {
         onError?.(scanResult.error || 'Secret-Scan vor Push fehlgeschlagen.');
         return false;
