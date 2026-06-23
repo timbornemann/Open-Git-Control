@@ -23,6 +23,14 @@ const MIN_MAIN_VIEW_WIDTH = 608;
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
 const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
 const SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.sidebar-manually-collapsed';
+const REPO_SWITCH_EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"], select';
+
+const isRepoSwitchEditableTarget = (target: EventTarget | null): boolean => {
+  const element = target instanceof HTMLElement ? target : document.activeElement;
+  return Boolean(element?.closest(REPO_SWITCH_EDITABLE_SELECTOR));
+};
+
+const getRepoDisplayName = (repoPath: string) => repoPath.split(/[\\/]/).filter(Boolean).pop() || repoPath;
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -38,7 +46,9 @@ const App: React.FC = () => {
     return window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH || sidebarManuallyCollapsedRef.current;
   });
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const [repoSwitcherIndex, setRepoSwitcherIndex] = useState<number | null>(null);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const repoSwitcherIndexRef = useRef<number | null>(null);
 
   const getSidebarMaxWidth = useCallback(() => {
     if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
@@ -169,6 +179,84 @@ const App: React.FC = () => {
     window.addEventListener('resize', clampToViewport);
     return () => window.removeEventListener('resize', clampToViewport);
   }, [getSidebarMaxWidth]);
+
+  useEffect(() => {
+    repoSwitcherIndexRef.current = repoSwitcherIndex;
+  }, [repoSwitcherIndex]);
+
+  const closeRepoSwitcher = useCallback(() => {
+    repoSwitcherIndexRef.current = null;
+    setRepoSwitcherIndex(null);
+  }, []);
+
+  const moveRepoSwitcherSelection = useCallback((delta: number) => {
+    const repos = state.openRepos;
+    if (repos.length === 0) return;
+
+    setRepoSwitcherIndex((previous) => {
+      const activeIndex = state.activeRepo ? repos.indexOf(state.activeRepo) : -1;
+      const fallbackIndex = activeIndex >= 0 ? activeIndex : (delta > 0 ? -1 : 0);
+      const baseIndex = previous ?? fallbackIndex;
+      const nextIndex = repos.length <= 1
+        ? 0
+        : (baseIndex + delta + repos.length) % repos.length;
+
+      repoSwitcherIndexRef.current = nextIndex;
+      return nextIndex;
+    });
+  }, [state.activeRepo, state.openRepos]);
+
+  const commitRepoSwitcherSelection = useCallback(() => {
+    const selectedIndex = repoSwitcherIndexRef.current;
+    if (selectedIndex === null) return;
+
+    const targetRepo = state.openRepos[selectedIndex];
+    closeRepoSwitcher();
+
+    if (!targetRepo) return;
+    void state.handleSwitchRepo(targetRepo);
+    state.setActiveTab('repo');
+  }, [closeRepoSwitcher, state]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && repoSwitcherIndexRef.current !== null) {
+        event.preventDefault();
+        closeRepoSwitcher();
+        return;
+      }
+
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.altKey || event.shiftKey) return;
+      if (isRepoSwitchEditableTarget(event.target)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      moveRepoSwitcherSelection(event.key === 'ArrowDown' ? 1 : -1);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (repoSwitcherIndexRef.current === null) return;
+
+      const isModifierRelease = event.key === 'Control' || event.key === 'Meta';
+      const isArrowReleaseWithoutModifier = (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.ctrlKey && !event.metaKey;
+      if (!isModifierRelease && !isArrowReleaseWithoutModifier) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      commitRepoSwitcherSelection();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('blur', closeRepoSwitcher);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      window.removeEventListener('blur', closeRepoSwitcher);
+    };
+  }, [closeRepoSwitcher, commitRepoSwitcherSelection, moveRepoSwitcherSelection]);
 
   const paletteCommands: PaletteCommand[] = [
     // Navigation
@@ -436,6 +524,36 @@ const App: React.FC = () => {
           )}
 
           <MainView />
+
+          {repoSwitcherIndex !== null && state.openRepos.length > 0 && (
+            <div className="repo-switcher-backdrop">
+              <div className="repo-switcher-modal" role="dialog" aria-label={tr('Repository wechseln', 'Switch repository')}>
+                <div className="repo-switcher-title">{tr('Repository wechseln', 'Switch repository')}</div>
+                <div className="repo-switcher-list" role="listbox" aria-activedescendant={`repo-switcher-item-${repoSwitcherIndex}`}>
+                  {state.openRepos.map((repoPath, index) => {
+                    const isSelected = index === repoSwitcherIndex;
+                    const isActive = repoPath === state.activeRepo;
+
+                    return (
+                      <div
+                        key={repoPath}
+                        id={`repo-switcher-item-${index}`}
+                        className={`repo-switcher-item${isSelected ? ' selected' : ''}`}
+                        role="option"
+                        aria-selected={isSelected}
+                      >
+                        <div className="repo-switcher-copy">
+                          <span className="repo-switcher-name">{getRepoDisplayName(repoPath)}</span>
+                          <span className="repo-switcher-path">{repoPath}</span>
+                        </div>
+                        {isActive && <span className="repo-switcher-active">{tr('Aktiv', 'Active')}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {state.gitActionToasts.length > 0 && (
             <div className="toast-container">
