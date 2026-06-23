@@ -57,6 +57,13 @@ export type CommitMessageInput = {
 };
 
 const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
+const statusPorcelainArgs = (): string[] => [
+  '-c',
+  'core.quotepath=false',
+  'status',
+  '--porcelain=v1',
+  '--untracked-files=all',
+];
 
 export class GitService {
   private repoPath: string | null = null;
@@ -132,7 +139,8 @@ export class GitService {
   }
 
   private shouldSuppressBareWorkTreeCommand(args: string[]): boolean {
-    const primary = String(args?.[0] || '').trim().toLowerCase();
+    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
+    const primary = String(commandArgs?.[0] || '').trim().toLowerCase();
     if (!primary) return false;
 
     if (primary === 'status') {
@@ -140,11 +148,11 @@ export class GitService {
     }
 
     if (primary === 'diff') {
-      return args.some((arg) => String(arg || '').trim().toLowerCase() === '--numstat');
+      return commandArgs.some((arg) => String(arg || '').trim().toLowerCase() === '--numstat');
     }
 
     if (primary === 'submodule') {
-      const secondary = String(args?.[1] || '').trim().toLowerCase();
+      const secondary = String(commandArgs?.[1] || '').trim().toLowerCase();
       return secondary === 'status';
     }
 
@@ -239,18 +247,20 @@ export class GitService {
   }
 
   private shouldSerializeCommand(args: string[]): boolean {
-    const firstToken = String(args?.[0] || '').trim().toLowerCase();
+    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
+    const firstToken = String(commandArgs?.[0] || '').trim().toLowerCase();
     if (!firstToken) return false;
     return SERIALIZED_GIT_COMMANDS.has(firstToken);
   }
 
   private classifyCommand(args: string[], requestedKind?: GitJobKind): GitJobKind {
     if (requestedKind) return requestedKind;
-    const primary = String(args[0] || '').trim().toLowerCase();
-    const secondary = String(args[1] || '').trim().toLowerCase();
+    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
+    const primary = String(commandArgs[0] || '').trim().toLowerCase();
+    const secondary = String(commandArgs[1] || '').trim().toLowerCase();
     if (primary === 'branch') {
       return ['-d', '-D', '-m', '-M', '-c', '-C', '--delete', '--move', '--copy', '--edit-description']
-        .some((flag) => args.slice(1).includes(flag))
+        .some((flag) => commandArgs.slice(1).includes(flag))
         ? 'write'
         : 'polling';
     }
@@ -261,14 +271,14 @@ export class GitService {
         : 'polling';
     }
     if (primary === 'tag') {
-      const isList = args.length === 1 || ['-l', '--list', '--contains', '--points-at'].includes(secondary);
+      const isList = commandArgs.length === 1 || ['-l', '--list', '--contains', '--points-at'].includes(secondary);
       return isList ? 'polling' : 'write';
     }
     if (primary === 'submodule' && secondary === 'status') return 'polling';
-    if (this.shouldSerializeCommand(args)) return 'write';
+    if (this.shouldSerializeCommand(commandArgs)) return 'write';
     if (primary === 'status') return 'polling';
     if (['rev-parse', 'for-each-ref', 'symbolic-ref'].includes(primary)) return 'polling';
-    if (primary === 'diff' && args.includes('--numstat')) return 'background';
+    if (primary === 'diff' && commandArgs.includes('--numstat')) return 'background';
     return 'interactive';
   }
 
@@ -442,11 +452,11 @@ export class GitService {
    */
   async getStatusPorcelain(): Promise<string> {
     // -uall lists each untracked file individually instead of collapsing directories.
-    return this.runCommand(['status', '--porcelain=v1', '--untracked-files=all']);
+    return this.runCommand(statusPorcelainArgs());
   }
 
   async getStatusPorcelainAtPath(repoPath: string): Promise<string> {
-    return this.runCommandAtPath(repoPath, ['status', '--porcelain=v1', '--untracked-files=all']);
+    return this.runCommandAtPath(repoPath, statusPorcelainArgs());
   }
 
   /**
@@ -732,6 +742,20 @@ export class GitService {
   async getStashes(limit: number = 200): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
     return this.runCommand(['stash', 'list', `--max-count=${safeLimit}`]);
+  }
+
+  async createBranchFromStash(stashName: string, branchName: string): Promise<string> {
+    const normalizedStashName = String(stashName || '').trim();
+    const normalizedBranchName = String(branchName || '').trim();
+    if (!normalizedStashName) {
+      throw new Error('Stash name is required.');
+    }
+    if (!normalizedBranchName) {
+      throw new Error('Branch name is required.');
+    }
+
+    await this.runCommand(['check-ref-format', '--branch', normalizedBranchName]);
+    return this.runCommand(['stash', 'branch', normalizedBranchName, normalizedStashName]);
   }
 
   async getSubmoduleStatus(): Promise<string> {

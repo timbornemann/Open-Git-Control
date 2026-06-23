@@ -263,6 +263,60 @@ describe('GitService commitWithMessage', () => {
   });
 });
 
+describe('GitService status and stash helpers', () => {
+  it('requests porcelain status with path quoting disabled', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-status-quotepath-'));
+    const runner = vi.fn(async () => ({ stdout: ' M ä.txt\n', stderr: '' }));
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.getStatusPorcelain()).resolves.toBe(' M ä.txt');
+
+      expect(runner).toHaveBeenCalledWith('git', [
+        '-c',
+        'core.quotepath=false',
+        'status',
+        '--porcelain=v1',
+        '--untracked-files=all',
+      ], expect.any(Object));
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('creates a branch from a stash after validating the branch name', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-stash-branch-'));
+    const runner = vi.fn(async (_file: string, args: string[]) => {
+      if (args[0] === 'check-ref-format') return { stdout: 'feature/stashed\n', stderr: '' };
+      return { stdout: 'Switched to a new branch feature/stashed\n', stderr: '' };
+    });
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.createBranchFromStash('stash@{0}', 'feature/stashed'))
+        .resolves.toBe('Switched to a new branch feature/stashed');
+
+      expect(runner).toHaveBeenNthCalledWith(1, 'git', [
+        'check-ref-format',
+        '--branch',
+        'feature/stashed',
+      ], expect.any(Object));
+      expect(runner).toHaveBeenNthCalledWith(2, 'git', [
+        'stash',
+        'branch',
+        'feature/stashed',
+        'stash@{0}',
+      ], expect.any(Object));
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('GitService command queue', () => {
   it('serializes concurrent mutating runCommand calls per repository', async () => {
     let inFlight = 0;
@@ -404,6 +458,7 @@ describe('GitService bare repository handling', () => {
 
     await expect(service.runCommand(['status', '--short'])).resolves.toBe('');
     await expect(service.runCommand(['status', '--porcelain=v1', '--untracked-files=all'])).resolves.toBe('');
+    await expect(service.getStatusPorcelain()).resolves.toBe('');
     await expect(service.runCommand(['diff', '--numstat'])).resolves.toBe('');
     await expect(service.runCommand(['diff', '--numstat', '--cached'])).resolves.toBe('');
     await expect(service.runCommand(['submodule', 'status', '--recursive'])).resolves.toBe('');

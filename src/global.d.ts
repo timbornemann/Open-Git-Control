@@ -431,6 +431,7 @@ export interface ElectronAPI {
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<{ success: boolean; data?: any; error?: string }>;
   getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
+  gitStashBranch: (stashName: string, branchName: string) => Promise<IpcResult<string>>;
   getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;
   addIgnoreRule: (pattern: string) => Promise<{ success: boolean; added?: boolean; pattern?: string; error?: string }>;
   gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;

@@ -98,6 +98,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke('git:interactiveRebase', baseHash, todoLines),
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke('git:applyPatch', patch, options || {}),
   getStashes: () => ipcRenderer.invoke('git:stashes'),
+  gitStashBranch: (stashName: string, branchName: string) =>
+    invokeGitMutation('git:stashBranch', 'stash branch', { stashName, branchName }),
   getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke('git:repoOriginUrl', repoPath),
   addIgnoreRule: (pattern: string) => ipcRenderer.invoke('git:addIgnoreRule', pattern),
   gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),

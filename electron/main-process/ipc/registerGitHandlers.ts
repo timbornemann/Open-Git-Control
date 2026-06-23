@@ -496,6 +496,39 @@ export function registerGitHandlers({
     }
   });
 
+  ipcMain.handle('git:stashBranch', async (event: any, params: { stashName?: unknown; branchName?: unknown } = {}) => {
+    const jobId = createJobId('git-stash-branch');
+    emitJobEvent(event.sender, {
+      id: jobId,
+      operation: 'git:stash-branch',
+      status: 'start',
+      timestamp: Date.now(),
+    });
+
+    try {
+      const data = await gitService.createBranchFromStash(
+        String(params.stashName || ''),
+        String(params.branchName || ''),
+      );
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:stash-branch',
+        status: 'done',
+        timestamp: Date.now(),
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:stash-branch',
+        status: 'failed',
+        message: error.message,
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('git:repoOriginUrl', async (_event: any, repoPath: string) => {
     try {
       const normalizedPath = String(repoPath || '').trim();
