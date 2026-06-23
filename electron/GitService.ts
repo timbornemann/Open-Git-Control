@@ -1013,50 +1013,61 @@ export class GitService {
   }
 
   async getFileTimelineData(limit: number = 2000): Promise<any[]> {
-    const args = ['log', `-${limit}`, '--name-status', '--pretty=format:COMMIT:%H|%an|%ad|%s', '--date=iso'];
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 5000)) : 2000;
+    const recordSeparator = '\x1e';
+    const fieldSeparator = '\x1f';
+    const format = `%x1e%H%x1f%an%x1f%ad%x1f%s%x00`;
+    const args = ['log', `-${safeLimit}`, '-z', '--name-status', `--pretty=format:${format}`, '--date=iso'];
     const output = await this.runCommand(args);
-    
     const commits: any[] = [];
-    const lines = output.split('\n');
-    let currentCommit: any = null;
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    for (const record of output.split(recordSeparator)) {
+      const tokens = record
+        .split('\x00')
+        .map((token) => token.replace(/^\r?\n/, ''))
+        .filter((token) => token.length > 0);
+      if (tokens.length === 0) continue;
 
-      if (trimmed.startsWith('COMMIT:')) {
-        const parts = trimmed.substring(7).split('|');
-        currentCommit = {
-          hash: parts[0],
-          author: parts[1],
-          date: parts[2],
-          subject: parts[3],
-          changes: []
-        };
-        commits.push(currentCommit);
-      } else if (currentCommit) {
-        const parts = trimmed.split(/\s+/);
-        if (parts.length >= 2) {
-          const statusChar = parts[0][0]; // A, M, D, R
-          let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
-          if (statusChar === 'A') status = 'added';
-          else if (statusChar === 'D') status = 'deleted';
-          else if (statusChar === 'R') status = 'renamed';
+      const [hash = '', author = '', date = '', subject = ''] = tokens[0].split(fieldSeparator);
+      if (!/^[0-9a-f]{7,40}$/i.test(hash)) continue;
 
-          if (status === 'renamed' && parts.length >= 3) {
-            currentCommit.changes.push({
-              status,
-              path: parts[2],
-              oldPath: parts[1]
-            });
-          } else {
-            currentCommit.changes.push({
-              status,
-              path: parts[1]
-            });
+      const currentCommit = {
+        hash,
+        author,
+        date,
+        subject,
+        changes: [] as Array<{ status: 'added' | 'modified' | 'deleted' | 'renamed'; path: string; oldPath?: string }>,
+      };
+
+      for (let i = 1; i < tokens.length;) {
+        const statusToken = tokens[i].trim();
+        i += 1;
+        if (!statusToken) continue;
+
+        const statusChar = statusToken[0];
+        let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
+        if (statusChar === 'A') status = 'added';
+        else if (statusChar === 'D') status = 'deleted';
+        else if (statusChar === 'R') status = 'renamed';
+
+        if (status === 'renamed') {
+          const oldPath = tokens[i] || '';
+          const newPath = tokens[i + 1] || '';
+          i += 2;
+          if (newPath) {
+            currentCommit.changes.push({ status, path: newPath, oldPath });
           }
+          continue;
+        }
+
+        const path = tokens[i] || '';
+        i += 1;
+        if (path) {
+          currentCommit.changes.push({ status, path });
         }
       }
+
+      commits.push(currentCommit);
     }
 
     return commits;

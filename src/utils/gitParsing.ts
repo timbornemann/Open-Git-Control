@@ -230,7 +230,7 @@ function splitRenamePayload(pathPayload: string): [string, string] | null {
   return null;
 }
 
-function parsePorcelainPath(line: string): string {
+export function parsePorcelainPath(line: string): string {
   if (line.length < 3) return '';
 
   const payload = line.slice(3).trim();

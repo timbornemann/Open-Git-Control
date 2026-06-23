@@ -1,4 +1,5 @@
 import type { ConflictBlock, ConflictEntry, ConflictResolutionChoice, DiffStats } from './types';
+import { parsePorcelainPath } from '../../utils/gitParsing';
 
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
@@ -37,7 +38,9 @@ export const parseConflictEntries = (statusOutput: string): ConflictEntry[] => {
     const y = line[1];
     const code = `${x}${y}`;
     if (!CONFLICT_CODES.has(code)) continue;
-    conflicts.push({ path: line.substring(3).trim(), x, y, code });
+    const path = parsePorcelainPath(line);
+    if (!path) continue;
+    conflicts.push({ path, x, y, code });
   }
 
   return conflicts;

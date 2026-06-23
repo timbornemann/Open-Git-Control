@@ -83,6 +83,41 @@ describe('GitService commit statistics', () => {
   });
 });
 
+describe('GitService file timeline data', () => {
+  it('parses structured timeline output without splitting subjects or paths on separators', async () => {
+    const service = new GitService();
+    const recordSeparator = '\x1e';
+    const fieldSeparator = '\x1f';
+    const nullSeparator = '\x00';
+    const hash = 'a'.repeat(40);
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue([
+      `${recordSeparator}${hash}${fieldSeparator}Alice${fieldSeparator}2026-01-01 12:00:00 +0000${fieldSeparator}feat: keep | pipe`,
+      'M',
+      'src/with spaces/file name.ts',
+      'R100',
+      'src/old name.ts',
+      'src/new name.ts',
+    ].join(nullSeparator));
+
+    const timeline = await service.getFileTimelineData(50);
+
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
+      '-z',
+      '--name-status',
+    ]));
+    expect(timeline).toEqual([{
+      hash,
+      author: 'Alice',
+      date: '2026-01-01 12:00:00 +0000',
+      subject: 'feat: keep | pipe',
+      changes: [
+        { status: 'modified', path: 'src/with spaces/file name.ts' },
+        { status: 'renamed', oldPath: 'src/old name.ts', path: 'src/new name.ts' },
+      ],
+    }]);
+  });
+});
+
 
 describe('GitService forensic history commands', () => {
   it('builds -S search command with path separator', async () => {
