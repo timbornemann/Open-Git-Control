@@ -884,7 +884,7 @@ const stageGitPaths = async (gitService: GitService, body: JsonObject) => {
   const repoPath = await resolveGitRepoPath(gitService, body);
   const paths = parseStringArray(body.paths, 'paths', 500);
   if (paths.length === 0) throw new ApiError(400, 'PATHS_REQUIRED', 'paths must contain at least one path.');
-  const output = await gitService.runCommandAtPath(repoPath, ['add', '--', ...paths]);
+  const output = await gitService.stagePathsAtPath(repoPath, paths);
   return { repoPath, paths, output };
 };
 
@@ -893,7 +893,7 @@ const unstageGitPaths = async (gitService: GitService, body: JsonObject) => {
   const repoPath = await resolveGitRepoPath(gitService, body);
   const paths = parseStringArray(body.paths, 'paths', 500);
   if (paths.length === 0) throw new ApiError(400, 'PATHS_REQUIRED', 'paths must contain at least one path.');
-  const output = await gitService.runCommandAtPath(repoPath, ['reset', '--', ...paths]);
+  const output = await gitService.unstagePathsAtPath(repoPath, paths);
   return { repoPath, paths, output };
 };
 

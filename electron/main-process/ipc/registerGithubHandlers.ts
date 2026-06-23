@@ -5,7 +5,7 @@ import { AppSettings } from '../../settings';
 import { parseReleaseCommits } from '../parsing';
 import {
   clearSavedGithubTokenSecurely,
-  readSavedGithubToken,
+  readSavedGithubTokenWithHost,
   saveGithubTokenSecurely,
 } from '../secureStore';
 import { runGithubCliOneClickLogin } from '../githubCliAuth';
@@ -26,16 +26,17 @@ export function registerGithubHandlers({
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
     const success = await githubService.authenticate(token, normalizedHost);
     if (success) {
-      saveGithubTokenSecurely(token);
+      saveGithubTokenSecurely(token, normalizedHost);
     }
     return success;
   });
 
   ipcMain.handle('github:getSavedAuthStatus', async () => {
-    const savedToken = readSavedGithubToken();
+    const savedToken = readSavedGithubTokenWithHost();
     const settings = readSettingsWithMigration();
+    const normalizedHost = githubService.normalizeHost(settings.githubHost);
     return {
-      hasSavedToken: Boolean(savedToken),
+      hasSavedToken: Boolean(savedToken?.token && (savedToken.host ? savedToken.host === normalizedHost : normalizedHost === 'github.com')),
       authenticated: githubService.isAuthenticated(),
       username: githubService.getUsername(),
       oauthConfigured: githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost),
@@ -43,18 +44,40 @@ export function registerGithubHandlers({
   });
 
   ipcMain.handle('github:loginWithSavedToken', async () => {
-    const savedToken = readSavedGithubToken();
-    if (!savedToken) {
+    const savedToken = readSavedGithubTokenWithHost();
+    if (!savedToken?.token) {
       githubService.logout();
       return { success: false, authenticated: false, username: null };
     }
 
     const settings = readSettingsWithMigration();
-    const success = await githubService.authenticate(savedToken, settings.githubHost);
+    const normalizedHost = githubService.normalizeHost(settings.githubHost);
+    if (savedToken.host && savedToken.host !== normalizedHost) {
+      githubService.logout();
+      return {
+        success: false,
+        authenticated: false,
+        username: null,
+        error: 'Saved GitHub token belongs to a different host.',
+      };
+    }
+    if (!savedToken.host && normalizedHost !== 'github.com') {
+      clearSavedGithubTokenSecurely();
+      githubService.logout();
+      return {
+        success: false,
+        authenticated: false,
+        username: null,
+        error: 'Saved legacy GitHub token is not host-bound. Please sign in again for this host.',
+      };
+    }
+
+    const success = await githubService.authenticate(savedToken.token, normalizedHost);
     if (!success) {
       clearSavedGithubTokenSecurely();
       return { success: false, authenticated: false, username: null };
     }
+    saveGithubTokenSecurely(savedToken.token, normalizedHost);
 
     return {
       success: true,
@@ -82,10 +105,11 @@ export function registerGithubHandlers({
       }
 
       const settings = readSettingsWithMigration();
+      const normalizedHost = githubService.normalizeHost(settings.githubHost);
       const result = await githubService.pollDeviceFlow(
         normalizedDeviceCode,
         settings.githubOauthClientId,
-        settings.githubHost,
+        normalizedHost,
       );
       if (result.status === 'pending') {
         return { success: true, data: { status: 'pending', interval: result.interval || null } };
@@ -102,12 +126,12 @@ export function registerGithubHandlers({
         };
       }
 
-      const authenticated = await githubService.authenticate(result.accessToken, settings.githubHost);
+      const authenticated = await githubService.authenticate(result.accessToken, normalizedHost);
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
       }
 
-      saveGithubTokenSecurely(result.accessToken);
+      saveGithubTokenSecurely(result.accessToken, normalizedHost);
       return {
         success: true,
         data: {
@@ -124,14 +148,15 @@ export function registerGithubHandlers({
   ipcMain.handle('github:webLogin', async () => {
     try {
       const settings = readSettingsWithMigration();
-      const tokenResult = await runGithubCliOneClickLogin(settings.githubHost);
+      const normalizedHost = githubService.normalizeHost(settings.githubHost);
+      const tokenResult = await runGithubCliOneClickLogin(normalizedHost);
 
-      const authenticated = await githubService.authenticate(tokenResult.accessToken, settings.githubHost);
+      const authenticated = await githubService.authenticate(tokenResult.accessToken, normalizedHost);
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
       }
 
-      saveGithubTokenSecurely(tokenResult.accessToken);
+      saveGithubTokenSecurely(tokenResult.accessToken, normalizedHost);
       return {
         success: true,
         data: {

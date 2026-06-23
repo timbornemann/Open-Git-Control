@@ -4,6 +4,7 @@ import { AppSettings, normalizeSettings } from '../../settings';
 import { StoredData, readStoreData, writeStoreData } from '../repoStore';
 import {
   clearSavedGeminiApiKeySecurely,
+  clearSavedGithubTokenSecurely,
   normalizeGeminiApiKey,
   saveGeminiApiKeySecurely,
 } from '../secureStore';
@@ -50,6 +51,9 @@ export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSet
     });
 
     writeSettings(next);
+    if (next.githubHost !== current.githubHost) {
+      clearSavedGithubTokenSecurely();
+    }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
       updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);
     }
