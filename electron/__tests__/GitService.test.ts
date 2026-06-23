@@ -261,6 +261,44 @@ describe('GitService commitWithMessage', () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it('can limit a commit to explicit pathspec entries', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-commit-pathspec-'));
+    let messageFilePath = '';
+    let pathspecFilePath = '';
+    const runner = vi.fn(async (_file: string, args: string[]) => {
+      const fileFlagIndex = args.indexOf('-F');
+      expect(fileFlagIndex).toBeGreaterThan(0);
+      messageFilePath = args[fileFlagIndex + 1];
+      const pathspecArg = args.find((arg) => arg.startsWith('--pathspec-from-file='));
+      expect(pathspecArg).toBeTruthy();
+      pathspecFilePath = String(pathspecArg).slice('--pathspec-from-file='.length);
+      expect(fs.readFileSync(messageFilePath, 'utf8')).toBe('Batch commit');
+      expect(fs.readFileSync(pathspecFilePath, 'utf8')).toBe('src/app.ts\0docs/read me.md\0');
+      return { stdout: 'committed\n', stderr: '' };
+    });
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.commitWithMessageForPaths(
+        { title: 'Batch commit' },
+        ['src/app.ts', 'docs/read me.md'],
+      )).resolves.toBe('committed');
+
+      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining([
+        'commit',
+        '-F',
+        messageFilePath,
+        '--pathspec-file-nul',
+      ]), expect.any(Object));
+      expect(fs.existsSync(messageFilePath)).toBe(false);
+      expect(fs.existsSync(pathspecFilePath)).toBe(false);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('GitService status and stash helpers', () => {

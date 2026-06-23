@@ -94,6 +94,30 @@ export class GitService {
     }
   }
 
+  private normalizePathspecEntries(paths: string[]): string[] {
+    const normalized = [...new Set(
+      paths
+        .map((filePath) => String(filePath || '').trim())
+        .filter(Boolean),
+    )];
+    if (normalized.some((filePath) => /[\0\r\n]/.test(filePath))) {
+      throw new Error('Pathspec entries must not contain control characters.');
+    }
+    return normalized;
+  }
+
+  private createPathspecFile(tempPrefix: string, paths: string[]): { tempDir: string; pathspecFile: string; entries: string[] } {
+    const entries = this.normalizePathspecEntries(paths);
+    if (entries.length === 0) {
+      throw new Error('At least one path is required.');
+    }
+
+    const tempDir = this.createPrivateTempDir(tempPrefix);
+    const pathspecFile = path.join(tempDir, 'paths.nul');
+    this.writePrivateTempFile(pathspecFile, `${entries.join('\0')}\0`);
+    return { tempDir, pathspecFile, entries };
+  }
+
   private cleanupPrivateTempDir(tempDir: string | null): void {
     if (!tempDir) return;
     try {
@@ -651,7 +675,11 @@ export class GitService {
     return this.commitWithMessageAtPath(this.ensureRepoPath(), input);
   }
 
-  async commitWithMessageAtPath(repoPath: string, input: CommitMessageInput): Promise<string> {
+  async commitWithMessageForPaths(input: CommitMessageInput, paths: string[]): Promise<string> {
+    return this.commitWithMessageAtPath(this.ensureRepoPath(), input, paths);
+  }
+
+  async commitWithMessageAtPath(repoPath: string, input: CommitMessageInput, paths?: string[]): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
@@ -671,17 +699,24 @@ export class GitService {
     const tempDir = this.createPrivateTempDir('ogc-commit-message-');
     const messageFile = path.join(tempDir, 'message.txt');
     this.writePrivateTempFile(messageFile, message);
+    let pathspecTempDir: string | null = null;
 
     const args = ['commit'];
     if (input.amend) args.push('--amend');
     if (input.signoff) args.push('--signoff');
     if (input.allowEmpty) args.push('--allow-empty');
     args.push('-F', messageFile);
+    if (paths) {
+      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', paths);
+      pathspecTempDir = pathspec.tempDir;
+      args.push(`--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul');
+    }
 
     try {
       return await this.execGit(normalizedPath, args);
     } finally {
       this.cleanupPrivateTempDir(tempDir);
+      this.cleanupPrivateTempDir(pathspecTempDir);
     }
   }
 
@@ -961,34 +996,41 @@ export class GitService {
   }
 
   async stagePaths(paths: string[]): Promise<string> {
-    const repoPath = this.ensureRepoPath();
-    const normalized = [...new Set(
-      paths
-        .map((filePath) => String(filePath || '').trim())
-        .filter(Boolean),
-    )];
+    return this.stagePathsAtPath(this.ensureRepoPath(), paths);
+  }
+
+  async stagePathsAtPath(repoPath: string, paths: string[]): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+
+    const normalized = this.normalizePathspecEntries(paths);
     if (normalized.length === 0) return '';
 
-    return this.scheduler.schedule(repoPath, 'write', 'add --pathspec-from-file=-', () => new Promise<string>((resolve, reject) => {
-      const proc = spawn(
-        'git',
-        ['add', '--pathspec-from-file=-', '--pathspec-file-nul'],
-        { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] },
-      );
-      let stdout = '';
-      let stderr = '';
-      proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-      proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-      proc.on('error', reject);
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve(stdout.trimEnd());
-          return;
-        }
-        reject(new Error((stderr || stdout || `git add exited with code ${code}`).trim()));
-      });
-      proc.stdin.end(`${normalized.join('\0')}\0`);
-    }));
+    const pathspec = this.createPathspecFile('ogc-add-pathspec-', normalized);
+    try {
+      return await this.execGit(normalizedPath, ['add', `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
+    } finally {
+      this.cleanupPrivateTempDir(pathspec.tempDir);
+    }
+  }
+
+  async unstagePathsAtPath(repoPath: string, paths: string[]): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+
+    const normalized = this.normalizePathspecEntries(paths);
+    if (normalized.length === 0) return '';
+
+    const pathspec = this.createPathspecFile('ogc-reset-pathspec-', normalized);
+    try {
+      return await this.execGit(normalizedPath, ['reset', `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
+    } finally {
+      this.cleanupPrivateTempDir(pathspec.tempDir);
+    }
   }
 
   async getDiffPreview(
