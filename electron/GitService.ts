@@ -74,6 +74,35 @@ export class GitService {
     private readonly scheduler: GitScheduler = new GitScheduler(),
   ) {}
 
+  private createPrivateTempDir(prefix: string): string {
+    const safePrefix = String(prefix || 'ogc-temp-').replace(/[^a-z0-9_-]/gi, '-') || 'ogc-temp-';
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), safePrefix.endsWith('-') ? safePrefix : `${safePrefix}-`));
+    try {
+      fs.chmodSync(tempDir, 0o700);
+    } catch {
+      // Some platforms ignore chmod for temp directories.
+    }
+    return tempDir;
+  }
+
+  private writePrivateTempFile(filePath: string, content: string): void {
+    fs.writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
+    try {
+      fs.chmodSync(filePath, 0o600);
+    } catch {
+      // Some platforms ignore chmod for temp files.
+    }
+  }
+
+  private cleanupPrivateTempDir(tempDir: string | null): void {
+    if (!tempDir) return;
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup: the directory is private and will be retried by the OS temp cleaner.
+    }
+  }
+
   setRepoPath(newPath: string) {
     const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
     const resolvedRepoPath = this.resolveRepoRoot(normalizedPath);
@@ -579,7 +608,8 @@ export class GitService {
     }
 
     const todoText = normalizedLines.join('\n') + '\n';
-    const helperPath = path.join(os.tmpdir(), `ogc-rebase-editor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.js`);
+    const tempDir = this.createPrivateTempDir('ogc-rebase-editor-');
+    const helperPath = path.join(tempDir, 'editor.js');
     const helperScript = [
       "const fs = require('fs');",
       "const target = process.argv[2];",
@@ -589,7 +619,7 @@ export class GitService {
       "fs.writeFileSync(target, content, 'utf8');",
     ].join('\n');
 
-    fs.writeFileSync(helperPath, helperScript, 'utf8');
+    this.writePrivateTempFile(helperPath, helperScript);
 
     const quotedNode = `\"${process.execPath.replace(/\"/g, '\\\"')}\"`;
     const quotedHelper = `\"${helperPath.replace(/\"/g, '\\\"')}\"`;
@@ -613,11 +643,7 @@ export class GitService {
     } catch (error: any) {
       throw this.normalizeGitError(error, ['rebase', '-i', normalizedBase]);
     } finally {
-      try {
-        fs.rmSync(helperPath, { force: true });
-      } catch {
-        // ignore temp cleanup errors
-      }
+      this.cleanupPrivateTempDir(tempDir);
     }
   }
 
@@ -642,11 +668,9 @@ export class GitService {
       throw new Error('Commit message is too long.');
     }
 
-    const messageFile = path.join(
-      os.tmpdir(),
-      `ogc-commit-message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
-    );
-    fs.writeFileSync(messageFile, message, { encoding: 'utf8', mode: 0o600 });
+    const tempDir = this.createPrivateTempDir('ogc-commit-message-');
+    const messageFile = path.join(tempDir, 'message.txt');
+    this.writePrivateTempFile(messageFile, message);
 
     const args = ['commit'];
     if (input.amend) args.push('--amend');
@@ -657,11 +681,7 @@ export class GitService {
     try {
       return await this.execGit(normalizedPath, args);
     } finally {
-      try {
-        fs.rmSync(messageFile, { force: true });
-      } catch {
-        // ignore temp cleanup errors
-      }
+      this.cleanupPrivateTempDir(tempDir);
     }
   }
 
@@ -1096,6 +1116,34 @@ export class GitService {
     return this.sanitizeCloneTargetName(lastSegment);
   }
 
+  private resolveCloneTargetPath(cloneSource: string, targetDir: string, targetName?: string): string {
+    const rawTargetDir = String(targetDir || '').trim();
+    if (!rawTargetDir) {
+      throw new Error('Clone target directory is required.');
+    }
+
+    const resolvedTargetDir = path.resolve(rawTargetDir);
+    let targetDirStats: fs.Stats;
+    try {
+      targetDirStats = fs.statSync(resolvedTargetDir);
+    } catch {
+      throw new Error(`Clone target directory does not exist: ${resolvedTargetDir}`);
+    }
+    if (!targetDirStats.isDirectory()) {
+      throw new Error(`Clone target is not a directory: ${resolvedTargetDir}`);
+    }
+
+    const repoName = targetName
+      ? this.sanitizeCloneTargetName(targetName)
+      : this.deriveCloneRepoName(cloneSource);
+    const repoPath = path.resolve(resolvedTargetDir, repoName);
+    const relative = path.relative(resolvedTargetDir, repoPath);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('Clone target name resolves outside of the selected directory.');
+    }
+    return repoPath;
+  }
+
   async getFileTimelineData(limit: number = 2000): Promise<any[]> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 5000)) : 2000;
     const recordSeparator = '\x1e';
@@ -1167,10 +1215,18 @@ export class GitService {
     targetName?: string,
   ): Promise<{ success: boolean; repoPath: string; error?: string }> {
     return new Promise((resolve) => {
-      const repoName = targetName
-        ? this.sanitizeCloneTargetName(targetName)
-        : this.deriveCloneRepoName(cloneUrl);
-      const repoPath = path.join(targetDir, repoName);
+      let repoPath = '';
+      try {
+        repoPath = this.resolveCloneTargetPath(cloneUrl, targetDir, targetName);
+      } catch (error: any) {
+        resolve({
+          success: false,
+          repoPath: targetDir ? path.resolve(String(targetDir)) : '',
+          error: error?.message || 'Invalid clone target.',
+        });
+        return;
+      }
+
       if (fs.existsSync(repoPath)) {
         resolve({
           success: false,
