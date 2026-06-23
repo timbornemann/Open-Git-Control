@@ -321,6 +321,18 @@ describe('parseGitSubmoduleStatus', () => {
     ]);
   });
 
+  it('parses submodule paths that contain spaces', () => {
+    const output = [
+      ' 1234567890abcdef1234567890abcdef12345678 libs/shared package (heads/main)',
+      '+fedcbafedcbafedcbafedcbafedcbafedcbafedc modules/dirty package (v1.2.0-3-gfedcba)',
+    ].join('\n');
+
+    expect(parseGitSubmoduleStatus(output)).toEqual([
+      { path: 'libs/shared package', commit: '1234567890abcdef1234567890abcdef12345678', stateCode: 'clean', isDirty: false, summary: 'heads/main' },
+      { path: 'modules/dirty package', commit: 'fedcbafedcbafedcbafedcbafedcbafedcbafedc', stateCode: 'dirty', isDirty: true, summary: 'v1.2.0-3-gfedcba' },
+    ]);
+  });
+
   it('returns empty for non-matching input', () => {
     expect(parseGitSubmoduleStatus('nonsense line')).toEqual([]);
   });

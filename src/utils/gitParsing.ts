@@ -378,10 +378,15 @@ export function parseGitSubmoduleStatus(statusOutput: string): GitSubmoduleStatu
     .map((line) => line.replace(/\r$/, ''))
     .filter((line) => line.trim().length > 0)
     .map((line): GitSubmoduleStatusEntry | null => {
-      const match = line.match(/^([-+U ])([0-9a-f]+)\s+([^\s]+)(?:\s+\((.+)\))?$/i);
+      const match = line.match(/^([-+U ])([0-9a-f]+)\s+(.+)$/i);
       if (!match) return null;
 
       const flag = match[1];
+      const pathAndSummary = (match[3] || '').trim();
+      const summaryMatch = pathAndSummary.match(/^(.*?)\s+\((.+)\)$/);
+      const submodulePath = (summaryMatch?.[1] || pathAndSummary).trim();
+      if (!submodulePath) return null;
+
       const stateCode = flag === ' '
         ? 'clean'
         : flag === '-'
@@ -393,11 +398,11 @@ export function parseGitSubmoduleStatus(statusOutput: string): GitSubmoduleStatu
               : 'unknown';
 
       return {
-        path: match[3],
+        path: submodulePath,
         commit: match[2],
         stateCode,
         isDirty: flag === '+' || flag === 'U',
-        summary: match[4] || null,
+        summary: summaryMatch?.[2] || null,
       };
     })
     .filter((entry): entry is GitSubmoduleStatusEntry => entry !== null);
