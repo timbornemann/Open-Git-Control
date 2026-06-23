@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Copy, RefreshCw } from 'lucide-react';
-import type { PlanningApiInfoDto } from '../../global';
+import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
+import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '../../global';
 import { useI18n } from '../../i18n';
 
 type EndpointInfo = {
@@ -15,6 +15,11 @@ type CopyButtonProps = {
 };
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:2990';
+
+const formatDateTime = (value: number | null): string | null => {
+  if (!value) return null;
+  return new Date(value).toLocaleString();
+};
 
 const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
   const { tr } = useI18n();
@@ -73,6 +78,10 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const { tr } = useI18n();
   const [apiInfo, setApiInfo] = useState<PlanningApiInfoDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [tokenLifetime, setTokenLifetime] = useState<PlanningApiTokenLifetimeDto>('month');
+  const [tokenActionError, setTokenActionError] = useState<string | null>(null);
+  const [tokenActionMessage, setTokenActionMessage] = useState<string | null>(null);
+  const [isTokenActionRunning, setIsTokenActionRunning] = useState(false);
 
   const loadApiInfo = async () => {
     if (!window.electronAPI?.getPlanningApiInfo) {
@@ -92,6 +101,27 @@ export const ApiMcpSettingsPanel: React.FC = () => {
     void loadApiInfo();
   }, []);
 
+  const runTokenAction = async (action: 'generate' | 'clear') => {
+    if (!window.electronAPI) return;
+    setIsTokenActionRunning(true);
+    setTokenActionError(null);
+    setTokenActionMessage(null);
+    try {
+      const result = action === 'generate'
+        ? await window.electronAPI.generatePlanningApiToken(tokenLifetime)
+        : await window.electronAPI.clearPlanningApiToken();
+      setApiInfo(result);
+      setLoadError(null);
+      setTokenActionMessage(action === 'generate'
+        ? tr('Neuer API-Token ist aktiv.', 'New API token is active.')
+        : tr('Gespeicherter API-Token wurde entfernt.', 'Saved API token was removed.'));
+    } catch (error) {
+      setTokenActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsTokenActionRunning(false);
+    }
+  };
+
   const baseUrl = apiInfo?.baseUrl || DEFAULT_BASE_URL;
   const apiUrl = apiInfo?.apiUrl || `${baseUrl}/api/`;
   const mcpUrl = apiInfo?.mcpUrl || `${baseUrl}/mcp`;
@@ -102,6 +132,19 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const authHeaderName = apiInfo?.authHeaderName || 'x-open-git-control-token';
   const authToken = apiInfo?.authToken || null;
   const authHeader = `-H "${authHeaderName}: ${authToken || '<TOKEN>'}"`;
+  const authTokenSource = apiInfo?.authTokenSource || 'session';
+  const authTokenSourceLabel = authTokenSource === 'environment'
+    ? tr('Umgebungsvariable', 'Environment variable')
+    : authTokenSource === 'saved'
+      ? tr('Gespeichert', 'Saved')
+      : tr('Temporär', 'Temporary');
+  const authTokenExpiryLabel = authTokenSource === 'session'
+    ? tr('Bis zum App-Neustart', 'Until app restart')
+    : apiInfo?.authTokenExpiresAt
+      ? formatDateTime(apiInfo.authTokenExpiresAt) || '-'
+      : tr('Dauerhaft', 'Persistent');
+  const tokenManagerDisabled = !apiInfo?.authTokenManageable || isTokenActionRunning;
+  const clearTokenDisabled = tokenManagerDisabled || !apiInfo?.authTokenPersistent;
 
   const planningEndpoints = useMemo<EndpointInfo[]>(() => [
     { method: 'GET', path: '/api/health', description: tr('Status, Port und MCP-Adresse pruefen.', 'Check status, port, and MCP URL.') },
@@ -180,6 +223,56 @@ export const ApiMcpSettingsPanel: React.FC = () => {
           <CopyValueRow label="MCP" value={mcpUrl} />
           <CopyValueRow label={tr('Token-Header', 'Token header')} value={authHeaderName} />
           <CopyValueRow label={tr('API-Token', 'API token')} value={authToken || tr('Noch nicht verfuegbar', 'Not available yet')} />
+          <CopyValueRow label={tr('Token-Quelle', 'Token source')} value={authTokenSourceLabel} />
+          <CopyValueRow label={tr('Token gueltig', 'Token valid')} value={authTokenExpiryLabel} />
+        </div>
+        <div className="settings-api-token-manager">
+          <div className="settings-api-token-controls">
+            <label htmlFor="planning-api-token-lifetime">{tr('Gueltigkeit', 'Validity')}</label>
+            <select
+              id="planning-api-token-lifetime"
+              value={tokenLifetime}
+              onChange={(event) => setTokenLifetime(event.target.value as PlanningApiTokenLifetimeDto)}
+              disabled={tokenManagerDisabled}
+            >
+              <option value="day">{tr('1 Tag', '1 day')}</option>
+              <option value="month">{tr('1 Monat', '1 month')}</option>
+              <option value="year">{tr('1 Jahr', '1 year')}</option>
+              <option value="forever">{tr('Immer', 'Forever')}</option>
+            </select>
+            <button
+              className="staging-tool-btn"
+              type="button"
+              onClick={() => void runTokenAction('generate')}
+              disabled={tokenManagerDisabled}
+            >
+              <KeyRound size={13} />
+              {isTokenActionRunning ? tr('Speichere...', 'Saving...') : tr('Token generieren', 'Generate token')}
+            </button>
+            <button
+              className="staging-tool-btn"
+              type="button"
+              onClick={() => void runTokenAction('clear')}
+              disabled={clearTokenDisabled}
+            >
+              <Trash2 size={13} />
+              {tr('Gespeicherten Token loeschen', 'Delete saved token')}
+            </button>
+          </div>
+          {!apiInfo?.authTokenStorageAvailable && (
+            <p className="settings-danger">{tr(
+              'OS-Verschluesselung ist nicht verfuegbar; persistente API-Token koennen nicht gespeichert werden.',
+              'OS encryption is not available; persistent API tokens cannot be saved.',
+            )}</p>
+          )}
+          {authTokenSource === 'environment' && (
+            <p>{tr(
+              'OPEN_GIT_CONTROL_API_TOKEN ist gesetzt und ueberschreibt gespeicherte API-Token.',
+              'OPEN_GIT_CONTROL_API_TOKEN is set and overrides saved API tokens.',
+            )}</p>
+          )}
+          {tokenActionError && <p className="settings-danger">{tokenActionError}</p>}
+          {tokenActionMessage && <p className="settings-success">{tokenActionMessage}</p>}
         </div>
       </section>
 
