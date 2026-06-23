@@ -126,7 +126,7 @@ export function validateCommandArgs(commandName: GitCommandName, args: string[])
     remote: 4,
     tag: 6,
     checkout: 5,
-    commit: 4,
+    commit: 6,
     reset: 4,
     clean: 4,
     stash: 6,

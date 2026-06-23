@@ -26,6 +26,17 @@ describe('gitCommandPolicy', () => {
     expect(() => validateCommandArgs('log', ['50', 'invalid-scope', '0'])).toThrow('Invalid log scope.');
   });
 
+  it('allows commit args produced by amend/signoff/title/body UI combinations', () => {
+    expect(() => validateCommandArgs('commit', [
+      '--amend',
+      '--signoff',
+      '-m',
+      'Title',
+      '-m',
+      'Body',
+    ])).not.toThrow();
+  });
+
   it('validates forensic line range queries', () => {
     expect(() => validateCommandArgs('forensicHistory', ['line', 'src/App.tsx', '', '10', '20', '100'])).not.toThrow();
     expect(() => validateCommandArgs('forensicHistory', ['line', 'src/App.tsx', '', '20', '10', '100'])).toThrow('Invalid forensic end line.');

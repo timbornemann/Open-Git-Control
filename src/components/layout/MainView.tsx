@@ -34,7 +34,9 @@ const linkStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-const openExternal = (url: string) => window.open(url, '_blank');
+const openExternal = (url: string) => {
+  void window.electronAPI?.openExternalUrl(url);
+};
 
 type CopyableValueRowProps = {
   label: string;

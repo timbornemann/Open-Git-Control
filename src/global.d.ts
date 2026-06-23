@@ -401,6 +401,7 @@ export interface ElectronAPI {
   selectProjectParentDirectory: () => Promise<string | null>;
   setRepoPath: (repoPath: string) => Promise<boolean>;
   clearRepoPath: () => Promise<boolean>;
+  openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (

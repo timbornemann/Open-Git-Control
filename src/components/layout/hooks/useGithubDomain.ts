@@ -320,7 +320,7 @@ export const useGithubDomain = ({
     setDeviceFlow(flow);
     setIsDeviceFlowRunning(true);
 
-    window.open(flow.verificationUri, '_blank');
+    await window.electronAPI.openExternalUrl(flow.verificationUri);
     schedulePoll(flow.deviceCode, flow.interval);
   };
 

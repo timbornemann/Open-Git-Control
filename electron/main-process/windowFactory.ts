@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { installExternalWindowHandler } from './externalLinks';
 
 function resolveExistingFile(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -42,6 +43,7 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
   });
   win.setMenuBarVisibility(false);
   win.removeMenu();
+  installExternalWindowHandler(win);
 
   if (isDev) {
     win.loadURL('http://localhost:5173');

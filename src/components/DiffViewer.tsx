@@ -17,6 +17,7 @@ type ParsedLine = {
 type ParsedHunk = {
   id: string;
   header: string;
+  rawLines: string[];
   rows: ParsedLine[];
 };
 
@@ -62,7 +63,7 @@ const parseHunkHeader = (line: string): { leftStart: number; rightStart: number 
   };
 };
 
-const parseDiff = (diffText: string): ParsedDiff => {
+export const parseDiff = (diffText: string): ParsedDiff => {
   const lines = diffText.split('\n');
   const fileHeader: string[] = [];
   const hunks: ParsedHunk[] = [];
@@ -81,6 +82,7 @@ const parseDiff = (diffText: string): ParsedDiff => {
       currentHunk = {
         id: `hunk-${hunks.length + 1}`,
         header: line,
+        rawLines: [],
         rows: [],
       };
       hunks.push(currentHunk);
@@ -93,6 +95,8 @@ const parseDiff = (diffText: string): ParsedDiff => {
       fileHeader.push(line);
       continue;
     }
+
+    currentHunk.rawLines.push(line);
 
     if (line.startsWith('+') && !line.startsWith('+++')) {
       currentHunk.rows.push({
@@ -184,26 +188,15 @@ const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
 
 
 /** Reconstruct a minimal unified-diff patch for a single hunk */
-const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
-  // Use the file header lines that contain the --- / +++ paths
-  const diffHeader = fileHeader.filter(l => l.startsWith('diff ') || l.startsWith('index ') || l.startsWith('--- ') || l.startsWith('+++ '));
-  // Count lines so we can build the @@ header
-  let addCount = 0, delCount = 0, ctxCount = 0;
-  for (const row of hunk.rows) {
-    if (row.type === 'add') addCount++;
-    else if (row.type === 'del') delCount++;
-    else ctxCount++;
-  }
-  const leftStart = hunk.rows.find(r => r.leftNo != null)?.leftNo ?? 1;
-  const rightStart = hunk.rows.find(r => r.rightNo != null)?.rightNo ?? 1;
-  const leftLen = delCount + ctxCount;
-  const rightLen = addCount + ctxCount;
-  const hunkHeader = `@@ -${leftStart},${leftLen} +${rightStart},${rightLen} @@`;
-  const hunkLines = hunk.rows.map(row => {
-    const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
-    return prefix + row.text;
-  });
-  return [...diffHeader, hunkHeader, ...hunkLines, ''].join('\n');
+export const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
+  const header = fileHeader.filter((line, index) => line || index < fileHeader.length - 1);
+  const rawHunkLines = hunk.rawLines.length
+    ? hunk.rawLines
+    : hunk.rows.map((row) => {
+      const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
+      return prefix + row.text;
+    });
+  return [...header, hunk.header, ...rawHunkLines, ''].join('\n');
 };
 
 const highlightLine = (text: string | null | undefined): React.ReactNode[] => {
@@ -724,7 +717,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
 
           {parsed.hunks.map((hunk, hunkIndex) => {
             const rows = viewMode === 'side-by-side' ? sideBySideRows(hunk.rows) : hunk.rows;
-            const canStageHunks = !!onRepoChanged && (request.source === 'staged' || request.source === 'unstaged');
+            const canStageHunks = !!onRepoChanged && !isTooLarge && (request.source === 'staged' || request.source === 'unstaged');
             return (
               <div
                 key={hunk.id}

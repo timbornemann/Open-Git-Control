@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectProjectParentDirectory: () => ipcRenderer.invoke('dialog:selectProjectParentDirectory'),
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   clearRepoPath: () => ipcRenderer.invoke('git:clearRepo'),
+  openExternalUrl: (url: string) => ipcRenderer.invoke('external:open', url),
   runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>
     ipcRenderer.invoke('git:commitLogPage', params),

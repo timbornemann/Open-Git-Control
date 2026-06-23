@@ -369,13 +369,7 @@ export class GitHubService {
     const safePerPage = Number.isFinite(perPage) ? Math.max(10, Math.min(Math.floor(perPage), 100)) : 50;
     const normalizedSearch = (search || '').trim().toLowerCase();
 
-    const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
-      sort: 'updated',
-      per_page: safePerPage,
-      page: safePage,
-    });
-
-    const mapped = data.map((repo: any) => ({
+    const mapRepository = (repo: any) => ({
       id: repo.id,
       name: repo.name,
       fullName: repo.full_name,
@@ -384,19 +378,60 @@ export class GitHubService {
       htmlUrl: repo.html_url,
       description: repo.description,
       updatedAt: repo.updated_at,
-    }));
+    });
 
-    const filtered = normalizedSearch
-      ? mapped.filter((repo: any) => {
-        const haystack = `${repo.name} ${repo.fullName} ${repo.description || ''}`.toLowerCase();
-        return haystack.includes(normalizedSearch);
-      })
-      : mapped;
+    const matchesSearch = (repo: any) => {
+      if (!normalizedSearch) return true;
+      const haystack = `${repo.name} ${repo.fullName} ${repo.description || ''}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    };
 
+    if (!normalizedSearch) {
+      const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
+        sort: 'updated',
+        per_page: safePerPage,
+        page: safePage,
+      });
+
+      return {
+        repos: data.map(mapRepository),
+        nextPage: data.length === safePerPage ? safePage + 1 : null,
+        hasMore: data.length === safePerPage,
+        totalCount: null,
+      };
+    }
+
+    const requiredMatches = safePage * safePerPage;
+    const matchedRepos: any[] = [];
+    let sourcePage = 1;
+    let sourceHasMore = false;
+
+    while (matchedRepos.length <= requiredMatches) {
+      const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
+        sort: 'updated',
+        per_page: 100,
+        page: sourcePage,
+      });
+
+      const mapped = data.map(mapRepository);
+      matchedRepos.push(...mapped.filter(matchesSearch));
+
+      if (data.length < 100) {
+        sourceHasMore = false;
+        break;
+      }
+
+      sourceHasMore = true;
+      sourcePage += 1;
+    }
+
+    const startIndex = (safePage - 1) * safePerPage;
+    const repos = matchedRepos.slice(startIndex, startIndex + safePerPage);
+    const hasMore = matchedRepos.length > startIndex + safePerPage || sourceHasMore;
     return {
-      repos: filtered,
-      nextPage: data.length === safePerPage ? safePage + 1 : null,
-      hasMore: data.length === safePerPage,
+      repos,
+      nextPage: hasMore ? safePage + 1 : null,
+      hasMore,
       totalCount: null,
     };
   }
@@ -465,16 +500,29 @@ export class GitHubService {
   async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {
     if (!this.octokit) throw new Error('Not authenticated');
 
-    const { data } = await this.octokit.rest.pulls.list({
-      owner,
-      repo,
-      state,
-      per_page: 30,
-      sort: 'updated',
-      direction: 'desc',
-    });
+    const normalizedState = state === 'closed' || state === 'all' ? state : 'open';
+    const allPullRequests: any[] = [];
+    let page = 1;
 
-    return data.map((pr: any) => ({
+    while (true) {
+      const { data } = await this.octokit.rest.pulls.list({
+        owner,
+        repo,
+        state: normalizedState,
+        per_page: 100,
+        page,
+        sort: 'updated',
+        direction: 'desc',
+      });
+
+      allPullRequests.push(...data);
+      if (data.length < 100) {
+        break;
+      }
+      page += 1;
+    }
+
+    return allPullRequests.map((pr: any) => ({
       number: pr.number,
       title: pr.title,
       state: pr.state,

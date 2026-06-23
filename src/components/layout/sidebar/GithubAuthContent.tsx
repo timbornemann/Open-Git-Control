@@ -98,7 +98,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
           onClick={(e) => {
             e.preventDefault();
             onSelectGithubAuthHelpMethod('pat');
-            window.open('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control');
+            void window.electronAPI?.openExternalUrl('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control');
           }}
           style={{
             fontSize: '0.8rem',

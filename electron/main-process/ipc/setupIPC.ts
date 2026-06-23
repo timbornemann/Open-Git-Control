@@ -14,6 +14,7 @@ import { registerGithubHandlers } from './registerGithubHandlers';
 import { registerRepoSettingsHandlers } from './registerRepoSettingsHandlers';
 import { registerProjectPlannerHandlers } from './registerProjectPlannerHandlers';
 import { registerUpdaterHandlers } from './registerUpdaterHandlers';
+import { registerExternalLinkHandlers } from '../externalLinks';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -60,4 +61,5 @@ export function setupIPC({
   registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore });
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
+  registerExternalLinkHandlers();
 }

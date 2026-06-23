@@ -578,6 +578,68 @@ export const useAppState = () => {
     return false;
   }, [recoverBareRepoForPush, setGitActionToast, tr, workspace]);
 
+  const requestInitialCommitConfirmationIfNeeded = useCallback(async (
+    params: {
+      commandLabel: string;
+      confirmLabel: string;
+      onConfirm: () => Promise<void>;
+    },
+  ): Promise<boolean> => {
+    if (!window.electronAPI) return false;
+
+    let changedFiles: number | null = null;
+    try {
+      const statusResult = await window.electronAPI.runGitCommand('statusPorcelain');
+      if (statusResult.success) {
+        changedFiles = String(statusResult.data || '')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .length;
+      }
+    } catch {
+      changedFiles = null;
+    }
+
+    if (changedFiles === 0) {
+      return false;
+    }
+
+    workspace.setActiveTab('repo');
+    setConfirmDialog({
+      variant: 'danger',
+      title: tr('Initial-Commit mit allen lokalen Aenderungen?', 'Initial commit with all local changes?'),
+      message: tr(
+        'Dieses Repository hat noch keinen lokalen Commit. Zum Pushen muessten jetzt alle lokalen Aenderungen inklusive untracked Dateien gestaged und als Initial-Commit gespeichert werden.',
+        'This repository has no local commit yet. To push it now, all local changes including untracked files would be staged and saved as the initial commit.',
+      ),
+      contextItems: [
+        { label: tr('Befehl', 'Command'), value: params.commandLabel },
+        {
+          label: tr('Lokale Aenderungen', 'Local changes'),
+          value: changedFiles === null
+            ? tr('Status konnte nicht gelesen werden', 'Status could not be read')
+            : tr(
+              `${changedFiles} Datei${changedFiles === 1 ? '' : 'en'} betroffen`,
+              `${changedFiles} file${changedFiles === 1 ? '' : 's'} affected`,
+            ),
+        },
+        {
+          label: tr('Automatischer Schritt', 'Automatic step'),
+          value: 'git add -A && git commit -m "Initial commit"',
+        },
+      ],
+      irreversible: false,
+      consequences: tr(
+        'Bitte pruefe vorher, ob keine lokalen Artefakte, Secrets oder versehentlich erzeugten Dateien im Working Tree liegen.',
+        'Please check first that the working tree does not contain local artifacts, secrets, or accidentally generated files.',
+      ),
+      confirmLabel: params.confirmLabel,
+      onConfirm: params.onConfirm,
+    });
+    return true;
+  }, [setConfirmDialog, tr, workspace]);
+
   const openGithubRepoCreationRecovery = useCallback((failureMessage: unknown) => {
     const activeRepoPath = workspace.activeRepo || '';
     const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';
@@ -598,11 +660,12 @@ export const useAppState = () => {
     options: {
       replaceOriginIfExists?: boolean;
       pushAfterConnect?: boolean;
+      confirmedAutoInitialCommit?: boolean;
     } = {},
   ): Promise<boolean> => {
     if (!window.electronAPI || !workspace.activeRepo) return false;
 
-    const { replaceOriginIfExists = true, pushAfterConnect = true } = options;
+    const { replaceOriginIfExists = true, pushAfterConnect = true, confirmedAutoInitialCommit = false } = options;
     const folderName = stripGitSuffix(workspace.activeRepo.split(/[\\/]/).pop() || '') || 'repository';
     const name = (newRepoName || folderName).trim();
     const description = newRepoDescription.trim();
@@ -658,6 +721,45 @@ export const useAppState = () => {
         if (!pushResult.success) {
           const errorMessage = String(pushResult.error || '');
           if (isNoLocalCommitPushError(errorMessage)) {
+            if (!confirmedAutoInitialCommit) {
+              const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
+                commandLabel: 'git push -u origin HEAD',
+                confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+                onConfirm: async () => {
+                  if (!window.electronAPI) return;
+                  setIsConnectingGithubRepo(true);
+                  try {
+                    const prepared = await ensureInitialCommitForPush();
+                    if (!prepared) {
+                      return;
+                    }
+                    const retryPushResult = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
+                    if (!retryPushResult.success) {
+                      throw new Error(retryPushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
+                    }
+                    setGitActionToast({
+                      msg: tr(
+                        'GitHub-Repository erstellt, Initial-Commit erstellt und gepusht.',
+                        'GitHub repository created, initial commit created, and pushed.',
+                      ),
+                      isError: false,
+                    });
+                    setForceGithubRepoCreationPrompt(false);
+                    setConnectError(null);
+                    triggerRefresh();
+                  } catch (confirmError: any) {
+                    const message = confirmError?.message || tr('Push konnte nicht vorbereitet werden.', 'Could not prepare push.');
+                    setConnectError(message);
+                    setGitActionToast({ msg: message, isError: true });
+                  } finally {
+                    setIsConnectingGithubRepo(false);
+                  }
+                },
+              });
+              if (confirmationOpened) {
+                return false;
+              }
+            }
             const prepared = await ensureInitialCommitForPush();
             if (!prepared) {
               throw new Error(tr('Push konnte nicht automatisch vorbereitet werden.', 'Could not auto-prepare push.'));
@@ -668,8 +770,8 @@ export const useAppState = () => {
             }
             setGitActionToast({
               msg: tr(
-                'GitHub-Repository erstellt, Initial-Commit automatisch erstellt und gepusht.',
-                'GitHub repository created, initial commit auto-created, and pushed.',
+                'GitHub-Repository erstellt, Initial-Commit erstellt und gepusht.',
+                'GitHub repository created, initial commit created, and pushed.',
               ),
               isError: false,
             });
@@ -700,7 +802,7 @@ export const useAppState = () => {
     } finally {
       setIsConnectingGithubRepo(false);
     }
-  }, [ensureInitialCommitForPush, newRepoDescription, newRepoName, newRepoPrivate, setGitActionToast, tr, triggerRefresh, workspace.activeRepo]);
+  }, [ensureInitialCommitForPush, newRepoDescription, newRepoName, newRepoPrivate, requestInitialCommitConfirmationIfNeeded, setGitActionToast, tr, triggerRefresh, workspace.activeRepo]);
 
   const runGitCommand = useCallback(async (
     args: string[],
@@ -1260,6 +1362,22 @@ export const useAppState = () => {
           return false;
         }
 
+        if (!options?.confirmedAutoInitialCommit) {
+          const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
+            commandLabel: `git ${args.join(' ')}`,
+            confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+            onConfirm: async () => {
+              await runGitCommand(args, successMsg, actionLabel, {
+                ...options,
+                confirmedAutoInitialCommit: true,
+              });
+            },
+          });
+          if (confirmationOpened) {
+            return false;
+          }
+        }
+
         const prepared = await ensureInitialCommitForPush();
         if (!prepared) {
           return false;
@@ -1271,10 +1389,11 @@ export const useAppState = () => {
 
         return runGitCommand(
           argsWithUpstream,
-          tr('Initial-Commit automatisch erstellt und gepusht.', 'Initial commit auto-created and pushed.'),
+          tr('Initial-Commit erstellt und gepusht.', 'Initial commit created and pushed.'),
           tr('Initial-Commit wird gepusht...', 'Pushing initial commit...'),
           {
             ...options,
+            confirmedAutoInitialCommit: true,
             skipAutoInitialCommitOnPushFailure: true,
             skipAutoSetUpstreamOnPushFailure: true,
           },
@@ -1346,6 +1465,22 @@ export const useAppState = () => {
           return false;
         }
 
+        if (!options?.confirmedAutoInitialCommit) {
+          const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
+            commandLabel: `git ${args.join(' ')}`,
+            confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+            onConfirm: async () => {
+              await runGitCommand(args, successMsg, actionLabel, {
+                ...options,
+                confirmedAutoInitialCommit: true,
+              });
+            },
+          });
+          if (confirmationOpened) {
+            return false;
+          }
+        }
+
         const prepared = await ensureInitialCommitForPush();
         if (!prepared) {
           return false;
@@ -1357,10 +1492,11 @@ export const useAppState = () => {
 
         return runGitCommand(
           argsWithUpstream,
-          tr('Initial-Commit automatisch erstellt und gepusht.', 'Initial commit auto-created and pushed.'),
+          tr('Initial-Commit erstellt und gepusht.', 'Initial commit created and pushed.'),
           tr('Initial-Commit wird gepusht...', 'Pushing initial commit...'),
           {
             ...options,
+            confirmedAutoInitialCommit: true,
             skipAutoInitialCommitOnPushFailure: true,
             skipAutoSetUpstreamOnPushFailure: true,
           },
@@ -1422,7 +1558,7 @@ export const useAppState = () => {
       setIsGitActionRunning(false);
       setActiveGitActionLabel(null);
     }
-  }, [ensureInitialCommitForPush, forceGithubRepoCreationPrompt, openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
+  }, [ensureInitialCommitForPush, forceGithubRepoCreationPrompt, openGithubRepoCreationRecovery, requestInitialCommitConfirmationIfNeeded, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
 
   useEffect(() => {
     if (!window.electronAPI?.onRepoUnavailable) return;
@@ -2045,7 +2181,7 @@ export const useAppState = () => {
   }, [showReleaseCreator, refreshReleaseContext]);
 
   const handleOpenPR = (url: string) => {
-    window.open(url, '_blank');
+    void window.electronAPI?.openExternalUrl(url);
   };
 
   const handleCopyPRUrl = async (url: string) => {

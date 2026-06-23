@@ -30,6 +30,7 @@ export type RunGitCommandOptions = {
   skipAutoSetUpstreamOnPushFailure?: boolean;
   skipGithubRecoveryOnPushFailure?: boolean;
   skipAutoInitialCommitOnPushFailure?: boolean;
+  confirmedAutoInitialCommit?: boolean;
 };
 
 export const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
