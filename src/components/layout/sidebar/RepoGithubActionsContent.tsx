@@ -277,7 +277,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
         {!isWorkflowCollapsed && (
           <>
             <RepoCardToolbar>
-              <div className="sidebar-search-wrap">
+              <div className="sidebar-search-wrap workflow-search-wrap">
                 <Search size={12} className="sidebar-search-icon" />
                 <input className="repo-filter-input sidebar-filter-input" value={workflowQuery} onChange={(event) => setWorkflowQuery(event.target.value)} placeholder={tr('Workflows filtern...', 'Filter workflows...')} />
               </div>
