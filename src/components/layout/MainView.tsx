@@ -16,7 +16,6 @@ import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDT
 import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useAppContext } from '../../contexts/AppStateContext';
 import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
-import appLogo from '../../../logo.png';
 import { ProjectPlannerView } from '../ProjectPlannerView';
 
 const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
@@ -401,11 +400,22 @@ export const MainView: React.FC = () => {
     <div className="main-view">
       <div className="topbar">
         <div className="topbar-left">
-          <img
-            src={appLogo}
-            alt="Open-Git-Control"
-            style={{ width: '22px', height: '22px', objectFit: 'contain', borderRadius: '4px' }}
-          />
+          <div
+            aria-hidden="true"
+            style={{
+              width: '22px',
+              height: '22px',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--accent-primary-soft)',
+              color: 'var(--text-accent)',
+              border: '1px solid var(--accent-primary-border)',
+            }}
+          >
+            <GitBranch size={14} />
+          </div>
           <span className="topbar-repo-title">
             {isPlannerView
               ? tr('Projektplanung', 'Project planning')

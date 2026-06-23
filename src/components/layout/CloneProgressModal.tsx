@@ -21,7 +21,7 @@ export const CloneProgressModal: React.FC<Props> = ({
 }) => {
   const { tr } = useI18n();
 
-  if (!isCloning) return null;
+  if (!isCloning && !cloneFinished && !cloneError) return null;
 
   return (
     <div
