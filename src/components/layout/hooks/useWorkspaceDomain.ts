@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RepoSortByDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState } from '../layoutTypes';
@@ -108,6 +108,7 @@ export const useWorkspaceDomain = ({
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
   const [repoSortBy, setRepoSortBy] = useState<RepoSortByDto>(DEFAULT_REPO_SORT_BY);
   const [reposLoaded, setReposLoaded] = useState(false);
+  const repoOperationSequenceRef = useRef(0);
 
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
@@ -130,8 +131,13 @@ export const useWorkspaceDomain = ({
   useEffect(() => {
     const loadStored = async () => {
       if (!window.electronAPI) return;
+      const operationId = ++repoOperationSequenceRef.current;
       try {
         const data = await window.electronAPI.getStoredRepos();
+        if (repoOperationSequenceRef.current !== operationId) {
+          setReposLoaded(true);
+          return;
+        }
         setRepoSortBy(data.sortBy || DEFAULT_REPO_SORT_BY);
 
         if (data.repos.length > 0) {
@@ -151,11 +157,15 @@ export const useWorkspaceDomain = ({
 
           const active = data.activeRepo && paths.includes(data.activeRepo) ? data.activeRepo : paths[0];
           await window.electronAPI.setRepoPath(active);
-          setActiveRepo(active);
+          if (repoOperationSequenceRef.current === operationId) {
+            setActiveRepo(active);
+          }
         } else {
           await window.electronAPI.clearRepoPath();
-          setActiveRepo(null);
-          onNoActiveRepo();
+          if (repoOperationSequenceRef.current === operationId) {
+            setActiveRepo(null);
+            onNoActiveRepo();
+          }
         }
       } catch (e) {
         console.error(e);
@@ -185,7 +195,9 @@ export const useWorkspaceDomain = ({
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!window.electronAPI || repoPath === activeRepo) return;
+    const operationId = ++repoOperationSequenceRef.current;
     await window.electronAPI.setRepoPath(repoPath);
+    if (repoOperationSequenceRef.current !== operationId) return;
     setActiveRepo(repoPath);
     touchRepo(repoPath);
     onRepoActivated();
@@ -193,6 +205,7 @@ export const useWorkspaceDomain = ({
   };
 
   const handleCloseRepo = async (repoPath: string) => {
+    const operationId = ++repoOperationSequenceRef.current;
     const next = openRepos.filter((r) => r !== repoPath);
     const nextMeta = { ...repoMeta };
     delete nextMeta[repoPath];
@@ -207,6 +220,7 @@ export const useWorkspaceDomain = ({
         if (window.electronAPI) {
           await window.electronAPI.setRepoPath(newActive);
         }
+        if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(newActive);
         touchRepo(newActive);
         onRepoActivated();
@@ -215,6 +229,7 @@ export const useWorkspaceDomain = ({
         if (window.electronAPI) {
           await window.electronAPI.clearRepoPath();
         }
+        if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(null);
         onNoActiveRepo();
       }
@@ -239,8 +254,10 @@ export const useWorkspaceDomain = ({
     try {
       const result = await window.electronAPI.openDirectory();
       if (result && result.isRepo) {
+        const operationId = ++repoOperationSequenceRef.current;
         ensureRepoPresent(result.path);
         await window.electronAPI.setRepoPath(result.path);
+        if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(result.path);
         onRepoActivated();
         triggerRefresh();
@@ -259,8 +276,10 @@ export const useWorkspaceDomain = ({
           onConfirm: async () => {
             const initResult = await window.electronAPI.gitInit(result.path);
             if (initResult.success) {
+              const operationId = ++repoOperationSequenceRef.current;
               ensureRepoPresent(result.path);
               await window.electronAPI.setRepoPath(result.path);
+              if (repoOperationSequenceRef.current !== operationId) return;
               setActiveRepo(result.path);
               onRepoActivated();
               setGitActionToast({ msg: tr('Neues Git-Repository initialisiert.', 'Initialized new Git repository.'), isError: false });
@@ -278,8 +297,10 @@ export const useWorkspaceDomain = ({
 
   const addOpenRepo = async (repoPath: string) => {
     if (!window.electronAPI) return;
+    const operationId = ++repoOperationSequenceRef.current;
     ensureRepoPresent(repoPath);
     await window.electronAPI.setRepoPath(repoPath);
+    if (repoOperationSequenceRef.current !== operationId) return;
     setActiveRepo(repoPath);
     onRepoActivated();
     triggerRefresh();
