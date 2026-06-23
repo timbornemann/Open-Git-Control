@@ -38,6 +38,7 @@ import {
 import {
   DEFAULT_SETTINGS,
   GUARDED_COMMANDS,
+  isForcePushCommand,
   type RunGitCommandOptions,
 } from './state/appStateShared';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
@@ -1146,8 +1147,9 @@ export const useAppState = () => {
 
       return false;
     };
+    const isForcePushLike = isForcePushCommand(args);
     const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
-    const isForcePushLike = command === 'push' && args.some((arg) => arg === '-f' || arg === '--force' || arg === '--force-with-lease');
+    const shouldGuardForcePush = settings.confirmDangerousOps && !options?.skipDirtyGuard && isForcePushLike;
     const shouldGuardRemoteAheadWithDirtyState = (
       !options?.skipRemoteAheadDirtyGuard
       && (command === 'pull' || (command === 'push' && !isForcePushLike))
@@ -1159,6 +1161,37 @@ export const useAppState = () => {
     const shouldScanTagRefs = command === 'push' && args.some((arg) => arg === '--tags');
 
     if (await maybeHandlePushWithoutOrigin()) {
+      return false;
+    }
+
+    if (shouldGuardForcePush) {
+      setConfirmDialog({
+        variant: 'danger',
+        title: tr('Force-Push bestaetigen', 'Confirm force push'),
+        message: tr(
+          'Dieser Push verwendet Force-Optionen und kann Commits auf dem Remote ueberschreiben.',
+          'This push uses force options and can overwrite commits on the remote.',
+        ),
+        contextItems: [
+          { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+          {
+            label: tr('Schutz', 'Guard'),
+            value: tr('confirmDangerousOps ist aktiv', 'confirmDangerousOps is enabled'),
+          },
+        ],
+        irreversible: true,
+        consequences: tr(
+          'Andere Branches und lokale Aenderungen bleiben unveraendert, aber Remote-Historie kann ersetzt werden.',
+          'Other branches and local changes stay unchanged, but remote history can be replaced.',
+        ),
+        confirmLabel: tr('Force-Push ausfuehren', 'Run force push'),
+        onConfirm: async () => {
+          await runGitCommand(args, successMsg, actionLabel, {
+            ...options,
+            skipDirtyGuard: true,
+          });
+        },
+      });
       return false;
     }
 
