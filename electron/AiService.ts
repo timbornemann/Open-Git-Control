@@ -1509,7 +1509,22 @@ export class AiService {
             }
           }
 
-          if (typeof (this.gitService as any).commitWithMessage === 'function') {
+          const batchPaths = batchFiles.map((file) => file.path);
+          if (typeof (this.gitService as any).commitWithMessageForPaths === 'function') {
+            await this.gitService.commitWithMessageForPaths({
+              title: message.title,
+              description: message.description,
+            }, batchPaths);
+          } else if (typeof (this.gitService as any).commitWithMessageAtPath === 'function' && typeof this.gitService.getRepoPath === 'function') {
+            const repoPath = this.gitService.getRepoPath();
+            if (!repoPath) {
+              throw new Error('Repository path is required.');
+            }
+            await this.gitService.commitWithMessageAtPath(repoPath, {
+              title: message.title,
+              description: message.description,
+            }, batchPaths);
+          } else if (typeof (this.gitService as any).commitWithMessage === 'function' && batchPaths.length === 0) {
             await this.gitService.commitWithMessage({
               title: message.title,
               description: message.description,
@@ -1519,6 +1534,7 @@ export class AiService {
             if (message.description.trim()) {
               commitArgs.push('-m', message.description.trim());
             }
+            commitArgs.push('--', ...batchPaths);
             await this.gitService.runCommand(commitArgs);
           }
           ensureNotCancelled();

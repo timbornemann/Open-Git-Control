@@ -338,6 +338,48 @@ describe('AiService context extraction and prompts', () => {
     expect(commitUserPrompt).toContain('key_change:');
   });
 
+  it('commits only the selected batch paths when the git service supports pathscoped commits', async () => {
+    const runCommand = vi.fn(async (args: string[]) => {
+      const key = args.join(' ');
+      if (key === 'diff --numstat HEAD -- src/app.ts') return '5\t2\tsrc/app.ts';
+      if (key === 'diff --no-color --unified=3 HEAD -- src/app.ts') {
+        return ['diff --git a/src/app.ts b/src/app.ts', '@@ -1 +1 @@', '-old', '+new'].join('\n');
+      }
+      if (key === 'rev-parse --short HEAD') return 'abc1234';
+      if (key === 'show -s --format=%s HEAD') return 'chore(src): adjust app behavior';
+      throw new Error(`Unexpected command: ${key}`);
+    });
+    const stagePaths = vi.fn(async () => '');
+    const commitWithMessageForPaths = vi.fn(async () => '');
+
+    const service = new AiService({
+      getRepoPath: () => '/tmp/repo',
+      getStatusPorcelain: vi.fn()
+        .mockResolvedValueOnce(' M src/app.ts\n')
+        .mockResolvedValueOnce(''),
+      runCommand,
+      stagePaths,
+      commitWithMessageForPaths,
+    } as any);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"selectedPaths":["src/app.ts"]}' } }))
+      .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"title":"chore(src): adjust app behavior","description":""}' } }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await service.runAutoCommit(
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+      () => '',
+    );
+
+    expect(stagePaths).toHaveBeenCalledWith(['src/app.ts']);
+    expect(commitWithMessageForPaths).toHaveBeenCalledWith({
+      title: expect.any(String),
+      description: '',
+    }, ['src/app.ts']);
+    expect(runCommand.mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] === 'commit')).toBe(false);
+  });
+
   it('uses batch-level fallback message without first-file bias', () => {
     const message = buildFallbackCommitMessage([
       { path: 'docs/readme.md', changeType: 'modified', additions: 1, deletions: 0 },
