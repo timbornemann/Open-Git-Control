@@ -903,11 +903,12 @@ const createGitCommit = async (gitService: GitService, body: JsonObject) => {
   const title = cleanString(body.title || body.message);
   if (!title) throw new ApiError(400, 'COMMIT_TITLE_REQUIRED', 'title is required.');
   const description = cleanString(body.description);
-  const args = ['commit', '-m', title];
-  if (description) args.push('-m', description);
-  if (parseBoolean(body.amend) === true) args.push('--amend');
-  if (parseBoolean(body.signoff) === true) args.push('--signoff');
-  const output = await gitService.runCommandAtPath(repoPath, args);
+  const output = await gitService.commitWithMessageAtPath(repoPath, {
+    title,
+    description,
+    amend: parseBoolean(body.amend) === true,
+    signoff: parseBoolean(body.signoff) === true,
+  });
   const hash = await gitService.runCommandAtPath(repoPath, ['rev-parse', 'HEAD']);
   return { repoPath, hash: hash.trim(), output };
 };

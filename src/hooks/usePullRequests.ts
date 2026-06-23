@@ -295,7 +295,7 @@ export const loadPullRequestCi = async (
 
   try {
     const [workflowResult, checksResult] = await Promise.all([
-      electronAPI.githubGetWorkflowRuns({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, headSha: pr.headSha, branch: pr.head, perPage: 10 }),
+      electronAPI.githubGetWorkflowRuns({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, headSha: pr.headSha, perPage: 50 }),
       electronAPI.githubGetStatusChecks({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, ref: pr.headSha }),
     ]);
 

@@ -548,7 +548,8 @@ export class GitHubService {
     const { data } = await this.octokit.rest.actions.listWorkflowRunsForRepo({
       owner,
       repo,
-      ...(params.branch ? { branch: params.branch } : {}),
+      ...(params.headSha ? { head_sha: params.headSha } : {}),
+      ...(!params.headSha && params.branch ? { branch: params.branch } : {}),
       per_page: safePerPage,
     });
 

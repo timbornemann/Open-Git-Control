@@ -48,6 +48,15 @@ export type DiffPreviewResult = {
   bytes: number;
   lines: number;
 };
+export type CommitMessageInput = {
+  title: string;
+  description?: string;
+  amend?: boolean;
+  signoff?: boolean;
+  allowEmpty?: boolean;
+};
+
+const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
 
 export class GitService {
   private repoPath: string | null = null;
@@ -602,6 +611,50 @@ export class GitService {
     }
   }
 
+  async commitWithMessage(input: CommitMessageInput): Promise<string> {
+    return this.commitWithMessageAtPath(this.ensureRepoPath(), input);
+  }
+
+  async commitWithMessageAtPath(repoPath: string, input: CommitMessageInput): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+
+    const title = String(input.title || '').trim();
+    const description = String(input.description || '').trim();
+    if (!title) {
+      throw new Error('Commit title is required.');
+    }
+
+    const message = description ? `${title}\n\n${description}` : title;
+    if (message.length > MAX_COMMIT_MESSAGE_FILE_LENGTH) {
+      throw new Error('Commit message is too long.');
+    }
+
+    const messageFile = path.join(
+      os.tmpdir(),
+      `ogc-commit-message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
+    );
+    fs.writeFileSync(messageFile, message, { encoding: 'utf8', mode: 0o600 });
+
+    const args = ['commit'];
+    if (input.amend) args.push('--amend');
+    if (input.signoff) args.push('--signoff');
+    if (input.allowEmpty) args.push('--allow-empty');
+    args.push('-F', messageFile);
+
+    try {
+      return await this.execGit(normalizedPath, args);
+    } finally {
+      try {
+        fs.rmSync(messageFile, { force: true });
+      } catch {
+        // ignore temp cleanup errors
+      }
+    }
+  }
+
   /**
    * Wendet ein Patch auf Working Tree oder Index an.
    */
@@ -620,10 +673,11 @@ export class GitService {
       args.push('-R');
     }
 
-    return await new Promise<string>((resolve, reject) => {
+    return this.scheduler.schedule(repoPath, 'write', 'apply', (signal) => new Promise<string>((resolve, reject) => {
       const proc = spawn('git', args, { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] });
       let stdout = '';
       let stderr = '';
+      signal.addEventListener('abort', () => proc.kill(), { once: true });
 
       proc.stdout.on('data', (chunk: Buffer) => {
         stdout += chunk.toString();
@@ -638,6 +692,12 @@ export class GitService {
       });
 
       proc.on('close', (code) => {
+        if (signal.aborted) {
+          const error = new Error('Git apply was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
         if (code === 0) {
           resolve(stdout.trimEnd());
           return;
@@ -649,7 +709,7 @@ export class GitService {
 
       proc.stdin.write(patch);
       proc.stdin.end();
-    });
+    }));
   }
 
   async getRepoOriginUrl(repoPath: string): Promise<string | null> {

@@ -1509,12 +1509,18 @@ export class AiService {
             }
           }
 
-          const commitArgs = ['commit', '-m', message.title];
-          if (message.description.trim()) {
-            commitArgs.push('-m', message.description.trim());
+          if (typeof (this.gitService as any).commitWithMessage === 'function') {
+            await this.gitService.commitWithMessage({
+              title: message.title,
+              description: message.description,
+            });
+          } else {
+            const commitArgs = ['commit', '-m', message.title];
+            if (message.description.trim()) {
+              commitArgs.push('-m', message.description.trim());
+            }
+            await this.gitService.runCommand(commitArgs);
           }
-
-          await this.gitService.runCommand(commitArgs);
           ensureNotCancelled();
 
           const hash = (await this.gitService.runCommand(['rev-parse', '--short', 'HEAD'])).trim();

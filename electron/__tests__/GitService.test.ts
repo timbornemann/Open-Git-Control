@@ -225,6 +225,44 @@ describe('GitService stale index.lock recovery', () => {
   });
 });
 
+describe('GitService commitWithMessage', () => {
+  it('passes long commit messages through a temporary message file', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-commit-message-file-'));
+    let messageFilePath = '';
+    const longDescription = 'body '.repeat(2000).trim();
+    const runner = vi.fn(async (_file: string, args: string[]) => {
+      const fileFlagIndex = args.indexOf('-F');
+      expect(fileFlagIndex).toBeGreaterThan(0);
+      messageFilePath = args[fileFlagIndex + 1];
+      expect(fs.readFileSync(messageFilePath, 'utf8')).toBe(`Long commit title\n\n${longDescription}`);
+      return { stdout: 'committed\n', stderr: '' };
+    });
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.commitWithMessage({
+        title: 'Long commit title',
+        description: longDescription,
+        amend: true,
+        signoff: true,
+      })).resolves.toBe('committed');
+
+      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining([
+        'commit',
+        '--amend',
+        '--signoff',
+        '-F',
+        messageFilePath,
+      ]), expect.any(Object));
+      expect(fs.existsSync(messageFilePath)).toBe(false);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('GitService command queue', () => {
   it('serializes concurrent mutating runCommand calls per repository', async () => {
     let inFlight = 0;

@@ -50,6 +50,17 @@ const invokeGitCommand = async (commandName: string, ...args: any[]) => {
   return result;
 };
 
+const invokeGitMutation = async (ipcChannel: string, commandName: string, payload: any) => {
+  const result = await ipcRenderer.invoke(ipcChannel, payload);
+  if (result && !result.success && isRepoUnavailableError(result.error)) {
+    notifyRepoUnavailable({
+      command: commandName,
+      error: String(result.error || ''),
+    });
+  }
+  return result;
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
@@ -58,6 +69,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearRepoPath: () => ipcRenderer.invoke('git:clearRepo'),
   openExternalUrl: (url: string) => ipcRenderer.invoke('external:open', url),
   runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
+  createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
+    invokeGitMutation('git:createCommit', 'commit', params),
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>
     ipcRenderer.invoke('git:commitLogPage', params),
   requestCommitStats: (

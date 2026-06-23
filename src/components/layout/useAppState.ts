@@ -2200,26 +2200,54 @@ export const useAppState = () => {
   ) => {
     if (!window.electronAPI || !pullRequestDomain.prOwnerRepo) return;
 
-    try {
-      const result = await window.electronAPI.githubMergePR({
-        owner: pullRequestDomain.prOwnerRepo.owner,
-        repo: pullRequestDomain.prOwnerRepo.repo,
-        pullNumber: prNumber,
-        mergeMethod,
-      });
+    const ownerRepo = pullRequestDomain.prOwnerRepo;
+    const executeMerge = async () => {
+      try {
+        const result = await window.electronAPI.githubMergePR({
+          owner: ownerRepo.owner,
+          repo: ownerRepo.repo,
+          pullNumber: prNumber,
+          mergeMethod,
+        });
 
-      if (!result.success) {
-        setGitActionToast({ msg: result.error || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
-        return;
+        if (!result.success) {
+          setGitActionToast({ msg: result.error || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
+          return;
+        }
+
+        setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
+        // Fetch remote state so local graph reflects the merge
+        repository.refreshRemoteState(true);
+        triggerRefresh();
+      } catch (error: any) {
+        setGitActionToast({ msg: error?.message || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
       }
+    };
 
-      setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
-      // Fetch remote state so local graph reflects the merge
-      repository.refreshRemoteState(true);
-      triggerRefresh();
-    } catch (error: any) {
-      setGitActionToast({ msg: error?.message || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
+    if (settings.confirmDangerousOps) {
+      setConfirmDialog({
+        variant: 'danger',
+        title: tr(`Pull Request #${prNumber} mergen?`, `Merge pull request #${prNumber}?`),
+        message: tr(
+          `Dieser Vorgang merged PR #${prNumber} per ${mergeMethod} in ${ownerRepo.owner}/${ownerRepo.repo}.`,
+          `This will merge PR #${prNumber} with ${mergeMethod} into ${ownerRepo.owner}/${ownerRepo.repo}.`,
+        ),
+        contextItems: [
+          { label: tr('Repository', 'Repository'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
+          { label: tr('Methode', 'Method'), value: mergeMethod },
+        ],
+        irreversible: true,
+        consequences: tr(
+          'Der Remote-PR wird auf GitHub abgeschlossen und der Ziel-Branch verändert.',
+          'The remote PR will be completed on GitHub and the target branch will change.',
+        ),
+        confirmLabel: tr('PR mergen', 'Merge PR'),
+        onConfirm: executeMerge,
+      });
+      return;
     }
+
+    await executeMerge();
   };
 
   const handleCheckoutPR = async (prNumber: number, headRef: string) => {

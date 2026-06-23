@@ -72,3 +72,63 @@ describe('GitHubService pagination', () => {
     expect(list).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 2, per_page: 100 }));
   });
 });
+
+describe('GitHubService workflow runs', () => {
+  it('uses head_sha instead of branch filtering for PR-specific workflow lookups', async () => {
+    const listWorkflowRunsForRepo = vi.fn().mockResolvedValue({
+      data: {
+        workflow_runs: [
+          {
+            id: 1,
+            name: 'CI',
+            display_title: 'CI',
+            status: 'completed',
+            conclusion: 'success',
+            event: 'pull_request',
+            html_url: 'https://github.com/octo/repo/actions/runs/1',
+            head_branch: 'feature',
+            head_sha: 'abc1234',
+            created_at: '2026-01-01T00:00:00Z',
+            run_started_at: '2026-01-01T00:00:01Z',
+            updated_at: '2026-01-01T00:01:00Z',
+          },
+          {
+            id: 2,
+            name: 'Other',
+            status: 'completed',
+            conclusion: 'failure',
+            event: 'push',
+            html_url: 'https://github.com/octo/repo/actions/runs/2',
+            head_branch: 'feature',
+            head_sha: 'def5678',
+            created_at: '2026-01-01T00:00:00Z',
+            run_started_at: '2026-01-01T00:00:01Z',
+            updated_at: '2026-01-01T00:01:00Z',
+          },
+        ],
+      },
+    });
+    const service = new GitHubService();
+    (service as any).octokit = {
+      rest: {
+        actions: { listWorkflowRunsForRepo },
+      },
+    };
+
+    const runs = await service.getWorkflowRuns('octo', 'repo', {
+      branch: 'feature',
+      headSha: 'abc1234',
+      perPage: 50,
+    });
+
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledWith(expect.objectContaining({
+      owner: 'octo',
+      repo: 'repo',
+      head_sha: 'abc1234',
+      per_page: 50,
+    }));
+    expect(listWorkflowRunsForRepo.mock.calls[0][0]).not.toHaveProperty('branch');
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ id: 1, headSha: 'abc1234' });
+  });
+});

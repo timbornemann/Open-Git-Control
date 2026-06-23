@@ -12,6 +12,7 @@ import {
   normalizeArgs,
   validateCommandArgs,
 } from '../gitCommandPolicy';
+import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../parsing';
 import { emitJobEvent } from './jobEvents';
 
@@ -245,6 +246,48 @@ export function registerGitHandlers({
     }
   });
 
+  ipcMain.handle('git:createCommit', async (event: any, params: {
+    title?: unknown;
+    description?: unknown;
+    amend?: unknown;
+    signoff?: unknown;
+    allowEmpty?: unknown;
+  } = {}) => {
+    const jobId = createJobId('git-commit');
+    emitJobEvent(event.sender, {
+      id: jobId,
+      operation: 'git:commit',
+      status: 'start',
+      timestamp: Date.now(),
+    });
+
+    try {
+      const data = await gitService.commitWithMessage({
+        title: String(params.title || ''),
+        description: String(params.description || ''),
+        amend: params.amend === true,
+        signoff: params.signoff === true,
+        allowEmpty: params.allowEmpty === true,
+      });
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:commit',
+        status: 'done',
+        timestamp: Date.now(),
+      });
+      return { success: true, data };
+    } catch (error: any) {
+      emitJobEvent(event.sender, {
+        id: jobId,
+        operation: 'git:commit',
+        status: 'failed',
+        message: error.message,
+        timestamp: Date.now(),
+      });
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('git:stagePaths', async (event: any, paths: unknown) => {
     const jobId = createJobId('git-stage-paths');
     emitJobEvent(event.sender, {
@@ -286,11 +329,7 @@ export function registerGitHandlers({
   ) => {
     try {
       commitStatsService.interruptBackgroundWork();
-      if (!Array.isArray(args)) throw new Error('Diff arguments are required.');
-      const normalizedArgs = args.map((arg) => String(arg || '')).slice(0, 100);
-      if (!['diff', 'show'].includes(normalizedArgs[0])) {
-        throw new Error('Unsupported diff preview command.');
-      }
+      const normalizedArgs = normalizeDiffPreviewArgs(args);
       const data = await gitService.getDiffPreview(normalizedArgs, {
         maxBytes: Number(limits.maxBytes) || undefined,
         maxLines: Number(limits.maxLines) || undefined,

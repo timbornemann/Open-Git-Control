@@ -4,6 +4,8 @@ import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
 import type { GitStatusWithConflicts } from './types';
 
+const LEGACY_COMMIT_ARG_LIMIT = 512;
+
 type Params = {
   repoPath: string | null;
   status: GitStatusWithConflicts | null;
@@ -60,14 +62,33 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     isCommittingRef.current = true;
     setIsCommitting(true);
     try {
-      const commitArgs: string[] = ['commit'];
-      if (amendCommit) commitArgs.push('--amend');
-      if (signoffCommit) commitArgs.push('--signoff');
-      commitArgs.push('-m', commitMsg.trim());
-      if (commitDescription.trim()) {
-        commitArgs.push('-m', commitDescription.trim());
-      }
-      const r = await window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
+      const title = commitMsg.trim();
+      const description = commitDescription.trim();
+      const r = typeof window.electronAPI.createCommit === 'function'
+        ? await window.electronAPI.createCommit({
+          title,
+          description,
+          amend: amendCommit,
+          signoff: signoffCommit,
+        })
+        : await (async () => {
+          if (title.length > LEGACY_COMMIT_ARG_LIMIT || description.length > LEGACY_COMMIT_ARG_LIMIT) {
+            return {
+              success: false,
+              error: tr(
+                'Commit-Nachricht ist fuer die aktuell geladene App-Version zu lang. Bitte App neu laden oder neu starten.',
+                'Commit message is too long for the currently loaded app version. Please reload or restart the app.',
+              ),
+            };
+          }
+
+          const commitArgs: string[] = ['commit'];
+          if (amendCommit) commitArgs.push('--amend');
+          if (signoffCommit) commitArgs.push('--signoff');
+          commitArgs.push('-m', title);
+          if (description) commitArgs.push('-m', description);
+          return window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
+        })();
       if (r.success) {
         setCommitMsg('');
         setCommitDescription('');

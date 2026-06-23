@@ -404,6 +404,13 @@ export interface ElectronAPI {
   clearRepoPath: () => Promise<boolean>;
   openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
   runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  createCommit: (params: {
+    title: string;
+    description?: string;
+    amend?: boolean;
+    signoff?: boolean;
+    allowEmpty?: boolean;
+  }) => Promise<IpcResult<string>>;
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (
     hashes: string[],
