@@ -213,6 +213,7 @@ export const MainView: React.FC = () => {
     remoteStatus,
     isGitActionRunning,
     activeGitActionLabel,
+    runGitCommand,
     selectedCommit,
     setSelectedCommit,
     commitNavigationRequest,
@@ -618,6 +619,7 @@ export const MainView: React.FC = () => {
                     currentBranch={currentBranch}
                     branches={branches}
                     onMergeBranch={onMergeBranch}
+                    onRunGitCommand={runGitCommand}
                     onOpenConflictResolverForPath={onOpenConflictResolverForPath}
                     workingTreeStatus={workingTree.status}
                     onRefreshWorkingTree={workingTree.refresh}

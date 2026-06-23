@@ -37,7 +37,8 @@ interface CommitGraphProps {
   currentBranch?: string;
   branches?: BranchInfo[];
   onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
-  /** Wenn ein Git-Befehl hier direkt fehlschlaegt (nicht ueber runGitCommand), Konflikt-Resolver oeffnen */
+  onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  /** Wenn ein Git-Befehl hier direkt fehlschlaegt (Fallback ohne zentralen Runner), Konflikt-Resolver oeffnen */
   onOpenConflictResolverForPath?: (path: string) => void;
   workingTreeStatus?: GitStatusDetailed | null;
   onRefreshWorkingTree?: () => Promise<void>;
@@ -284,6 +285,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   currentBranch = '',
   branches = [],
   onMergeBranch,
+  onRunGitCommand,
   onOpenConflictResolverForPath,
   workingTreeStatus: externalWorkingTreeStatus,
   onRefreshWorkingTree,
@@ -728,6 +730,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, tr]);
   const runGitAction = async (args: string[], successMsg: string) => {
     if (!window.electronAPI) return;
+    if (onRunGitCommand) {
+      const success = await onRunGitCommand(args, successMsg);
+      if (success) {
+        refreshCommits();
+        refreshWorkingTreeStatus();
+      }
+      return;
+    }
+
     try {
       const result = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
       if (result.success) {

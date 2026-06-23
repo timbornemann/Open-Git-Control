@@ -443,6 +443,7 @@ const App: React.FC = () => {
     onResetLayout: resetLayout,
 
     activeGitActionLabel: state.activeGitActionLabel,
+    runGitCommand: state.runGitCommand,
 
     selectedCommit: state.selectedCommit,
     setSelectedCommit: state.setSelectedCommit,

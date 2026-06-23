@@ -4,6 +4,7 @@ import { GitHubReleaseContextDto } from '../global';
 import { ReleaseNotesOptions } from '../types/releaseNotes';
 import { ReleaseVersionBump } from '../utils/releaseTagSuggestion';
 import { GitMergeMode } from '../types/git';
+import type { RunGitCommandOptions } from '../components/layout/state/appStateShared';
 
 export type CommitNavigationRequest = {
   hash: string;
@@ -17,6 +18,12 @@ export type AppContextValue = AppSidebarProps & {
 
   // Git action status
   activeGitActionLabel: string | null;
+  runGitCommand: (
+    args: string[],
+    successMsg: string,
+    actionLabel?: string,
+    options?: RunGitCommandOptions,
+  ) => Promise<boolean>;
 
   // Commit graph
   selectedCommit: string | null;
