@@ -129,6 +129,7 @@ export interface AppSettingsDto {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  autoUpdateEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictnessDto;
   secretScanAllowlist: string;

@@ -14,6 +14,7 @@ const baseSettings: AppSettings = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  autoUpdateEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',
   secretScanAllowlist: '',

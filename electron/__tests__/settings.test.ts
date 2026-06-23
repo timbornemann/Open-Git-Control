@@ -62,6 +62,7 @@ describe('normalizeSettings', () => {
       confirmDangerousOps: undefined,
       showSecondaryHistory: undefined,
       commitSignoffByDefault: true,
+      autoUpdateEnabled: false,
       aiAutoCommitEnabled: true,
       commitTemplate: oversized,
     });
@@ -69,6 +70,7 @@ describe('normalizeSettings', () => {
     expect(normalized.confirmDangerousOps).toBe(true);
     expect(normalized.showSecondaryHistory).toBe(true);
     expect(normalized.commitSignoffByDefault).toBe(true);
+    expect(normalized.autoUpdateEnabled).toBe(false);
     expect(normalized.aiAutoCommitEnabled).toBe(true);
     expect(normalized.commitTemplate.length).toBe(8_000);
     expect(normalizeSettings({ commitTemplate: 42 as never }).commitTemplate).toBe('');

@@ -241,6 +241,22 @@ code, pre {
   cursor: not-allowed;
 }
 
+.activity-update-btn {
+  color: var(--status-success);
+  background: var(--status-success-soft);
+  border: 1px solid var(--status-success-border);
+}
+
+.activity-update-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--status-success-soft);
+  border-color: var(--status-success);
+}
+
+.activity-update-btn:disabled {
+  opacity: 0.55;
+}
+
 .spin {
   animation: icon-spin 0.9s linear infinite;
 }

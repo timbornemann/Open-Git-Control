@@ -26,7 +26,6 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     setGeminiApiKeyInput,
     updaterStatus,
     updaterMessage,
-    isInstallingUpdate,
     selectedModel,
     mergedModelOptions,
     updaterStatusLabel,
@@ -39,7 +38,6 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     testConnection,
     loadModels,
     handleRunOneClickUpdate,
-    handleInstallUpdate,
   } = useSettingsAiUpdater({ settings, onUpdateSettings, tr });
 
   return (
@@ -309,13 +307,22 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         {updaterStatus?.error && <div className="ssc-hint" style={{ color: 'var(--status-danger)' }}>{updaterStatus.error}</div>}
         {updaterMessage && <div className="ssc-hint" style={{ whiteSpace: 'pre-wrap' }}>{updaterMessage}</div>}
         {!updaterSupported && <div className="ssc-hint">{tr('Nur in installierten Builds verfügbar.', 'Only available in installed builds.')}</div>}
+        <label className="settings-switch-row settings-switch-row--compact">
+          <input
+            className="settings-switch-input"
+            type="checkbox"
+            checked={settings.autoUpdateEnabled}
+            onChange={(e) => onUpdateSettings({ autoUpdateEnabled: e.target.checked })}
+          />
+          <span className="settings-switch-track" aria-hidden="true">
+            <span className="settings-switch-thumb" />
+          </span>
+          <span className="settings-switch-label">{tr('Updates automatisch suchen und herunterladen', 'Automatically check and download updates')}</span>
+        </label>
 
         <div className="ssc-row">
           <button className="staging-tool-btn" onClick={handleRunOneClickUpdate} disabled={oneClickUpdateDisabled}>
             {oneClickUpdateLabel}
-          </button>
-          <button className="staging-tool-btn" onClick={handleInstallUpdate} disabled={!updaterSupported || updaterStatus?.state !== 'downloaded' || isInstallingUpdate}>
-            {isInstallingUpdate ? tr('Installiere...', 'Installing...') : tr('Update installieren', 'Install update')}
           </button>
         </div>
       </div>

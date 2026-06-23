@@ -8,8 +8,13 @@ import {
   saveGeminiApiKeySecurely,
 } from '../secureStore';
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
+import { UpdaterManager } from '../updaterManager';
 
-export function registerRepoSettingsHandlers(): void {
+type RegisterRepoSettingsHandlersDeps = {
+  updaterManager: UpdaterManager;
+};
+
+export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle('repos:getStored', async () => {
     const data = readStoreData();
     data.repos = data.repos.filter((r) => fs.existsSync(r.path));
@@ -45,6 +50,9 @@ export function registerRepoSettingsHandlers(): void {
     });
 
     writeSettings(next);
+    if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
+      updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);
+    }
     return next;
   });
 

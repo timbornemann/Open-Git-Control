@@ -11,6 +11,7 @@ export interface AppSettings {
   commitTemplate: string;
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
+  autoUpdateEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictness;
   secretScanAllowlist: string;
@@ -33,6 +34,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   commitTemplate: '',
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
+  autoUpdateEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',
   secretScanAllowlist: '',
@@ -196,6 +198,7 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     commitTemplate: normalizeCommitTemplate(value.commitTemplate),
     showSecondaryHistory: normalizeBoolean(value.showSecondaryHistory, DEFAULT_SETTINGS.showSecondaryHistory),
     commitSignoffByDefault: normalizeBoolean(value.commitSignoffByDefault, DEFAULT_SETTINGS.commitSignoffByDefault),
+    autoUpdateEnabled: normalizeBoolean(value.autoUpdateEnabled, DEFAULT_SETTINGS.autoUpdateEnabled),
     secretScanBeforePushEnabled: normalizeBoolean(value.secretScanBeforePushEnabled, DEFAULT_SETTINGS.secretScanBeforePushEnabled),
     secretScanStrictness: normalizeSecretScanStrictness(value.secretScanStrictness),
     secretScanAllowlist: normalizeSecretScanAllowlist(value.secretScanAllowlist),

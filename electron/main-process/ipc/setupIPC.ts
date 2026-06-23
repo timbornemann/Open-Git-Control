@@ -54,7 +54,7 @@ export function setupIPC({
     workingTreeService,
     readSettingsWithMigration,
   });
-  registerRepoSettingsHandlers();
+  registerRepoSettingsHandlers({ updaterManager });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
   registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore });

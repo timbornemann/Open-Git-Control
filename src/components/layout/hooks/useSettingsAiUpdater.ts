@@ -54,20 +54,20 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   const installedVersion = appVersion || updaterStatus?.currentVersion || tr('unbekannt', 'unknown');
 
   const oneClickUpdateLabel = useMemo(() => {
-    if (isRunningUpdate || updaterStatus?.state === 'checking') return tr('1/2 Suche nach Update...', '1/2 Checking for update...');
-    if (updaterStatus?.state === 'downloading') return tr('1/2 Lade Update herunter...', '1/2 Downloading update...');
-    if (updaterStatus?.state === 'downloaded') return tr('1/2 Download abgeschlossen', '1/2 Download complete');
-    if (updaterStatus?.state === 'update-available') return tr('1/2 Update jetzt herunterladen', '1/2 Download update now');
-    return tr('1/2 Nach Update suchen', '1/2 Check for update');
-  }, [isRunningUpdate, updaterStatus?.state, tr]);
+    if (isInstallingUpdate) return tr('Installiere Update...', 'Installing update...');
+    if (isRunningUpdate || updaterStatus?.state === 'checking') return tr('Suche nach Updates...', 'Checking for updates...');
+    if (updaterStatus?.state === 'downloading') return tr('Update wird heruntergeladen...', 'Downloading update...');
+    if (updaterStatus?.state === 'downloaded') return tr('Update installieren', 'Install update');
+    if (updaterStatus?.state === 'update-available') return tr('Update herunterladen', 'Download update');
+    return tr('Nach Updates suchen', 'Check for updates');
+  }, [isInstallingUpdate, isRunningUpdate, updaterStatus?.state, tr]);
 
   const oneClickUpdateDisabled =
     !updaterSupported
     || isRunningUpdate
     || isInstallingUpdate
     || updaterStatus?.state === 'checking'
-    || updaterStatus?.state === 'downloading'
-    || updaterStatus?.state === 'downloaded';
+    || updaterStatus?.state === 'downloading';
 
   const setSelectedModel = async (model: string) => {
     if (settings.aiProvider === 'gemini') {
@@ -131,6 +131,25 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
 
   const handleRunOneClickUpdate = async () => {
     if (!window.electronAPI) return;
+
+    if (updaterStatus?.state === 'downloaded') {
+      setIsInstallingUpdate(true);
+      setUpdaterMessage(null);
+      try {
+        const result = await window.electronAPI.installAppUpdate();
+        if (!result.success) {
+          setUpdaterMessage(result.error || tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+          return;
+        }
+        setUpdaterMessage(tr('App wird fuer das Update neu gestartet...', 'Restarting app to install update...'));
+      } catch (error: unknown) {
+        setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+      } finally {
+        setIsInstallingUpdate(false);
+      }
+      return;
+    }
+
     setIsRunningUpdate(true);
     setUpdaterMessage(null);
     try {
@@ -140,7 +159,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
         return;
       }
       if (result.action === 'downloaded') {
-        setUpdaterMessage(tr('Update heruntergeladen. Bitte installieren.', 'Update downloaded. Please install.'));
+        setUpdaterMessage(tr('Update heruntergeladen und bereit zur Installation.', 'Update downloaded and ready to install.'));
         return;
       }
       if (result.action === 'no-update') {
@@ -152,24 +171,6 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
       setUpdaterMessage(error instanceof Error ? error.message : tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
     } finally {
       setIsRunningUpdate(false);
-    }
-  };
-
-  const handleInstallUpdate = async () => {
-    if (!window.electronAPI) return;
-    setIsInstallingUpdate(true);
-    setUpdaterMessage(null);
-    try {
-      const result = await window.electronAPI.installAppUpdate();
-      if (!result.success) {
-        setUpdaterMessage(result.error || tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
-        return;
-      }
-      setUpdaterMessage(tr('App wird fuer das Update neu gestartet...', 'Restarting app to install update...'));
-    } catch (error: unknown) {
-      setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
-    } finally {
-      setIsInstallingUpdate(false);
     }
   };
 
@@ -221,7 +222,6 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
     updaterStatus,
     updaterMessage,
     isRunningUpdate,
-    isInstallingUpdate,
     selectedModel,
     mergedModelOptions,
     updaterStatusLabel,
@@ -234,7 +234,5 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
     testConnection,
     loadModels,
     handleRunOneClickUpdate,
-    handleInstallUpdate,
   };
 };
-

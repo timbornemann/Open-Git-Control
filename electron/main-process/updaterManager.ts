@@ -86,6 +86,8 @@ function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage
 export class UpdaterManager {
   private autoUpdateInterval: NodeJS.Timeout | null = null;
 
+  private autoUpdatesEnabled = true;
+
   private updaterStatus: UpdaterStatusPayload;
 
   constructor(private readonly isDev: boolean) {
@@ -124,6 +126,20 @@ export class UpdaterManager {
       ...patch,
     };
     this.emitUpdaterEvent();
+  }
+
+  private clearAutoUpdateInterval(): void {
+    if (this.autoUpdateInterval) {
+      clearInterval(this.autoUpdateInterval);
+      this.autoUpdateInterval = null;
+    }
+  }
+
+  private maybeDownloadAvailableUpdate(): void {
+    if (!this.autoUpdatesEnabled || !this.updaterStatus.isSupported) return;
+    if (this.updaterStatus.state !== 'update-available') return;
+
+    void this.downloadAvailableUpdate();
   }
 
   private waitForUpdaterState(targetStates: UpdaterState[], timeoutMs: number): Promise<UpdaterStatusPayload> {
@@ -165,6 +181,10 @@ export class UpdaterManager {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
 
+    if (this.updaterStatus.state === 'checking' || this.updaterStatus.state === 'downloading' || this.updaterStatus.state === 'downloaded') {
+      return { success: true };
+    }
+
     this.setUpdaterStatus({
       state: 'checking',
       currentVersion: app.getVersion(),
@@ -198,6 +218,10 @@ export class UpdaterManager {
   async downloadAvailableUpdate(): Promise<{ success: boolean; error?: string }> {
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
+    }
+
+    if (this.updaterStatus.state === 'downloaded' || this.updaterStatus.state === 'downloading') {
+      return { success: true };
     }
 
     if (this.updaterStatus.state !== 'update-available') {
@@ -317,7 +341,38 @@ export class UpdaterManager {
     return { success: false, error: stateAfterDownload.error || 'Update konnte nicht heruntergeladen werden.' };
   }
 
-  configureAutoUpdates(): void {
+  setAutoUpdatesEnabled(enabled: boolean): void {
+    this.autoUpdatesEnabled = enabled;
+
+    if (!this.updaterStatus.isSupported) {
+      return;
+    }
+
+    if (!enabled) {
+      this.clearAutoUpdateInterval();
+      return;
+    }
+
+    if (!this.autoUpdateInterval) {
+      this.autoUpdateInterval = setInterval(() => {
+        void this.checkForAppUpdates();
+      }, AUTO_UPDATE_CHECK_INTERVAL_MS);
+      this.autoUpdateInterval.unref();
+    }
+
+    if (this.updaterStatus.state === 'update-available') {
+      this.maybeDownloadAvailableUpdate();
+      return;
+    }
+
+    if (this.updaterStatus.state === 'idle' || this.updaterStatus.state === 'no-update' || this.updaterStatus.state === 'error') {
+      void this.checkForAppUpdates();
+    }
+  }
+
+  configureAutoUpdates(autoUpdatesEnabled = true): void {
+    this.autoUpdatesEnabled = autoUpdatesEnabled;
+
     if (this.isDev) {
       this.setUpdaterStatus({
         isSupported: false,
@@ -353,6 +408,7 @@ export class UpdaterManager {
         error: null,
         downloaded: false,
       });
+      this.maybeDownloadAvailableUpdate();
     });
 
     autoUpdater.on('update-not-available', () => {
@@ -400,23 +456,10 @@ export class UpdaterManager {
       });
     });
 
-    void this.checkForAppUpdates();
-
-    if (this.autoUpdateInterval) {
-      clearInterval(this.autoUpdateInterval);
-    }
-
-    this.autoUpdateInterval = setInterval(() => {
-      void this.checkForAppUpdates();
-    }, AUTO_UPDATE_CHECK_INTERVAL_MS);
-
-    this.autoUpdateInterval.unref();
+    this.setAutoUpdatesEnabled(autoUpdatesEnabled);
   }
 
   dispose(): void {
-    if (this.autoUpdateInterval) {
-      clearInterval(this.autoUpdateInterval);
-      this.autoUpdateInterval = null;
-    }
+    this.clearAutoUpdateInterval();
   }
 }

@@ -83,7 +83,7 @@ app.whenReady().then(() => {
   });
 
   createMainWindow(isDev, APP_DISPLAY_NAME, __dirname);
-  updaterManager.configureAutoUpdates();
+  updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
     void startPlanningApiServer({ gitService })
       .then((server) => {
