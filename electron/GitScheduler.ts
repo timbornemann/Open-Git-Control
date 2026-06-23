@@ -122,6 +122,13 @@ export class GitScheduler {
     for (const entry of state.activeReads) {
       if (entry.kind === 'background') entry.controller.abort();
     }
+    state.queue = state.queue.filter((entry) => {
+      if (entry.kind !== 'background') return true;
+      entry.controller.abort();
+      this.finishCoalesced(state, entry);
+      entry.reject(abortError());
+      return false;
+    });
   }
 
   private pump(repoPath: string, state: RepoState): void {

@@ -57,6 +57,7 @@ export class CommitStatsService {
   private queue: QueueEntry[] = [];
   private queuedKeys = new Set<string>();
   private active = new Map<string, ActiveEntry>();
+  private interruptedActiveKeys = new Set<string>();
   private listeners = new Set<(update: CommitStatsUpdate) => void>();
   private diagnostics: DiagnosticEntry[] = [];
   private objectFormats = new Map<string, string>();
@@ -79,7 +80,10 @@ export class CommitStatsService {
   }
 
   interruptBackgroundWork(): void {
-    for (const active of this.active.values()) active.controller.abort();
+    for (const active of this.active.values()) {
+      this.interruptedActiveKeys.add(active.entry.key);
+      active.controller.abort();
+    }
   }
 
   setActiveRepo(repoPath: string): void {
@@ -258,15 +262,20 @@ export class CommitStatsService {
       const aborted = controller.signal.aborted || error?.name === 'AbortError';
       this.recordDiagnostic(Date.now() - startedAt, false, aborted);
       if (aborted) {
-        if (this.gitService.getRepoPath()?.toLowerCase() === entry.repoPath.toLowerCase()) {
+        const wasInterrupted = this.interruptedActiveKeys.delete(entry.key);
+        const isStillActiveRepo = this.gitService.getRepoPath()?.toLowerCase() === entry.repoPath.toLowerCase();
+        if (!wasInterrupted && isStillActiveRepo) {
           this.queue.push(entry);
           this.queuedKeys.add(entry.key);
           this.sortQueue();
+        } else if (isStillActiveRepo) {
+          this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'error' });
         }
       } else {
         this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'error' });
       }
     } finally {
+      this.interruptedActiveKeys.delete(entry.key);
       this.active.delete(entry.key);
       this.pumpProcessing();
     }
