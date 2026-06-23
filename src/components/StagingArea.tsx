@@ -342,6 +342,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         <StashPanel
           repoPath={repoPath}
           onRepoChanged={onRepoChanged}
+          setInputDialog={setInputDialog}
           refreshTrigger={stashRefreshTrigger}
         />
       )}

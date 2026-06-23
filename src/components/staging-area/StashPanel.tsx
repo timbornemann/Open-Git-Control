@@ -3,11 +3,13 @@ import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import { GitStashEntryDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { EmptyState } from '../EmptyState';
+import type { InputDialogState } from './types';
 
 type Props = {
   repoPath: string | null;
   onRepoChanged?: () => void;
   onShowDiff?: (stashName: string) => void;
+  setInputDialog?: (dialog: InputDialogState | null) => void;
   /** Used to trigger a stash list refresh after operations outside this panel */
   refreshTrigger?: number;
 };
@@ -19,7 +21,12 @@ type StashFileState = {
   error: string | null;
 };
 
-export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTrigger }) => {
+export const StashPanel: React.FC<Props> = ({
+  repoPath,
+  onRepoChanged,
+  setInputDialog,
+  refreshTrigger,
+}) => {
   const { tr } = useI18n();
   const [collapsed, setCollapsed] = useState(true);
   const [stashes, setStashes] = useState<GitStashEntryDto[]>([]);
@@ -124,6 +131,63 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
     }
     void runStashOp(stash.name, op);
   };
+
+  const branchFromStash = useCallback((stash: GitStashEntryDto) => {
+    const api = window.electronAPI;
+    if (!api) return;
+    if (!setInputDialog) {
+      setError(tr('Branch-Dialog ist nicht verfuegbar.', 'Branch dialog is not available.'));
+      return;
+    }
+
+    const defaultBranchName = `stash-${stash.index}`;
+    setInputDialog({
+      title: tr('Branch aus Stash erstellen', 'Create branch from stash'),
+      message: tr(
+        'Git erstellt einen neuen Branch vom urspruenglichen Stash-Base-Commit und wendet den Stash darauf an.',
+        'Git creates a new branch from the original stash base commit and applies the stash onto it.',
+      ),
+      fields: [{
+        id: 'branchName',
+        label: tr('Branch-Name', 'Branch name'),
+        placeholder: defaultBranchName,
+        defaultValue: defaultBranchName,
+        required: true,
+        validate: (value) => {
+          if (!value.trim()) {
+            return tr('Bitte einen Branch-Namen eingeben.', 'Please enter a branch name.');
+          }
+          return null;
+        },
+      }],
+      contextItems: [
+        { label: tr('Stash', 'Stash'), value: stash.name },
+        { label: tr('Beschreibung', 'Description'), value: stash.subject },
+      ],
+      irreversible: false,
+      consequences: tr(
+        'Wenn das Anwenden erfolgreich ist, entfernt Git den Stash automatisch aus der Liste.',
+        'If applying succeeds, Git automatically removes the stash from the list.',
+      ),
+      confirmLabel: tr('Branch erstellen', 'Create branch'),
+      onSubmit: async (values) => {
+        const branchName = String(values.branchName || '').trim();
+        setError(null);
+        const result = typeof api.gitStashBranch === 'function'
+          ? await api.gitStashBranch(stash.name, branchName)
+          : await api.runGitCommand('stash', 'branch', branchName, stash.name);
+
+        if (result.success) {
+          setExpandedFiles(new Set());
+          setStashFiles({});
+          await load();
+          onRepoChanged?.();
+          return;
+        }
+        setError(result.error || tr('Branch konnte nicht aus dem Stash erstellt werden.', 'Failed to create branch from stash.'));
+      },
+    });
+  }, [load, onRepoChanged, setInputDialog, tr]);
 
   const toggleFiles = (stash: GitStashEntryDto) => {
     setExpandedFiles((current) => {
@@ -248,6 +312,13 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, refreshTr
                         title={tr('Stash anwenden und loeschen', 'Apply and delete stash')}
                       >
                         {tr('Pop', 'Pop')}
+                      </button>
+                      <button
+                        className="staging-btn-sm"
+                        onClick={() => branchFromStash(stash)}
+                        title={tr('Branch aus diesem Stash erstellen', 'Create a branch from this stash')}
+                      >
+                        {tr('Branch', 'Branch')}
                       </button>
                       <button
                         className="staging-btn-sm staging-btn-danger"
