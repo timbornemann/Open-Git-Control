@@ -30,6 +30,7 @@ export type RunGitCommandOptions = {
   skipAutoSetUpstreamOnPushFailure?: boolean;
   skipGithubRecoveryOnPushFailure?: boolean;
   skipAutoInitialCommitOnPushFailure?: boolean;
+  skipSyncMismatchRecovery?: boolean;
   confirmedAutoInitialCommit?: boolean;
 };
 

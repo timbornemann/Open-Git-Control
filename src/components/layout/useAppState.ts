@@ -975,6 +975,7 @@ export const useAppState = () => {
         skipDirtyGuard: true,
         skipRemoteAheadDirtyGuard: true,
         skipSecretScan: true,
+        skipSyncMismatchRecovery: true,
       };
       const quickFixStashMessage = 'Open Git Control quick sync fix';
 
@@ -1045,6 +1046,7 @@ export const useAppState = () => {
         skipDirtyGuard: true,
         skipRemoteAheadDirtyGuard: true,
         skipSecretScan: true,
+        skipSyncMismatchRecovery: true,
       };
       const stashMessage = `Open Git Control autostash before pull: git ${originalArgs.join(' ')}`;
 
@@ -1101,6 +1103,10 @@ export const useAppState = () => {
       });
     };
     const maybeHandleSyncMismatchFailure = (failureMessage: unknown): boolean => {
+      if (options?.skipSyncMismatchRecovery) {
+        return false;
+      }
+
       if (command === 'push' && isNonFastForwardPushError(failureMessage)) {
         workspace.setActiveTab('repo');
         setGitActionToast({
@@ -1278,7 +1284,7 @@ export const useAppState = () => {
             consequences: tr('Je nach Operation können unstaged oder staged Änderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
             confirmLabel: tr('Trotzdem ausführen', 'Run anyway'),
             onConfirm: async () => {
-              await runGitCommand(args, successMsg, actionLabel, { skipDirtyGuard: true });
+              await runGitCommand(args, successMsg, actionLabel, { ...options, skipDirtyGuard: true });
             },
           });
           return false;
