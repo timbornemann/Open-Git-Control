@@ -30,10 +30,10 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   }, [settings.commitSignoffByDefault]);
 
   useEffect(() => {
-    if (settings.commitTemplate && !commitMsg.trim()) {
-      setCommitMsg(settings.commitTemplate);
+    if (settings.commitTemplate) {
+      setCommitMsg((current) => (current.trim() ? current : settings.commitTemplate));
     }
-  }, [settings.commitTemplate, commitMsg]);
+  }, [settings.commitTemplate]);
 
   useEffect(() => {
     if (!amendCommit || !repoPath || !window.electronAPI) return;
@@ -90,7 +90,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
           return window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
         })();
       if (r.success) {
-        setCommitMsg('');
+        setCommitMsg(settings.commitTemplate || '');
         setCommitDescription('');
         setToast({ msg: tr('Commit erfolgreich!', 'Commit successful!'), isError: false });
         if (onCommitsCreated) onCommitsCreated();
@@ -105,7 +105,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       isCommittingRef.current = false;
       setIsCommitting(false);
     }
-  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
+  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, settings.commitTemplate, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
 
   return {
     commitMsg, setCommitMsg,
