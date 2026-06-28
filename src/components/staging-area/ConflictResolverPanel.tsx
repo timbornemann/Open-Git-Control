@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
 import { ConflictManualEditor, ConflictSidePreview } from './ConflictEditorParts';
-import { CONFLICT_LABELS } from './utils';
+import { CONFLICT_LABELS, basename } from './utils';
 import type {
   ConflictBlock,
   ConflictEditorState,
@@ -166,7 +166,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                 style={{ width: '100%', height: 36 }}
               >
                 <span className="conflict-file-code">{file.code}</span>
-                <span className="conflict-file-path">{file.path}</span>
+                <span className="conflict-file-path">{basename(file.path)}</span>
                 <span className="conflict-file-label">{conflictLabelForCode(file.code)}</span>
               </button>
             )}
@@ -211,7 +211,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   title={file.path}
                 >
                   <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{file.code}</span>
-                  <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{file.path}</span>
+                  <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{basename(file.path)}</span>
                   <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>
                     {conflictLabelForCode(file.code)}
                     {blocksForFile > 0
@@ -237,7 +237,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}>
                 <div className="conflict-editor-toolbar" style={{ padding: '16px 20px', background: 'var(--bg-dark)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }} title={conflictEditor.filePath}>{conflictEditor.filePath}</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }} title={conflictEditor.filePath}>{basename(conflictEditor.filePath)}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span
                         style={{

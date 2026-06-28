@@ -14,6 +14,10 @@ interface CommitDetailsProps {
   onOpenDiff?: (request: DiffRequest) => void;
 }
 
+const fileNameFromPath = (filePath: string): string => (
+  filePath.split(/[\\/]/).pop() || filePath
+);
+
 export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectCommit, onOpenDiff }) => {
   const normalizedHash = useMemo(() => {
     const match = String(hash || '').match(/[0-9a-f]{7,40}/i);
@@ -305,10 +309,11 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
               renderItem={(file) => (
               <button
                 onClick={() => { setSelectedFilePath(file.path); setSelectedFileCommitHash(normalizedHash); }}
+                title={file.path}
                 style={{ width: '100%', height: 38, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}
               >
                 {getIconForStatus(file.status)}
-                <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.path}</span>
+                <span style={{ fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileNameFromPath(file.path)}</span>
               </button>
               )}
             />
@@ -322,8 +327,11 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{tr('Datei', 'File')}</div>
-          <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-            {selectedFile.path}
+          <div
+            title={selectedFile.path}
+            style={{ fontFamily: 'monospace', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '7px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {fileNameFromPath(selectedFile.path)}
           </div>
 
           <div style={{ display: 'flex', gap: '6px' }}>

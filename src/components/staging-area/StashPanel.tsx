@@ -4,6 +4,7 @@ import { GitStashEntryDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { EmptyState } from '../EmptyState';
 import type { InputDialogState } from './types';
+import { basename } from './utils';
 
 type Props = {
   repoPath: string | null;
@@ -341,7 +342,7 @@ export const StashPanel: React.FC<Props> = ({
                         )}
                         {!fileState?.loading && !fileState?.error && (fileState?.files || []).map((filePath) => (
                           <div key={`${stash.name}:${filePath}`} className="stash-file-row">
-                            <span className="stash-file-path" title={filePath}>{filePath}</span>
+                            <span className="stash-file-path" title={filePath}>{basename(filePath)}</span>
                             <button
                               className="staging-btn-sm"
                               disabled={pendingFileOp !== null}

@@ -17,6 +17,7 @@ import type {
   StagingAreaProps,
 } from './staging-area/types';
 import {
+  basename,
   dirname,
   extensionPattern,
   formatDiffStats,
@@ -184,7 +185,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         onContextMenu={(e) => fileOps.openFileContextMenu(e, entry, section)}
       >
         <span className="staging-status" style={{ color: info.color }}>{statusCode}</span>
-        <span className="staging-path" title={entry.path}>{entry.path}</span>
+        <span className="staging-path" title={entry.path}>{basename(entry.path)}</span>
         <div className="staging-actions">
           {section === 'staged' && (
             <button className="staging-btn" disabled={fileOps.isMutating} onClick={(e) => { e.stopPropagation(); fileOps.unstageFile(entry.path); }} title={tr('Aus Stage entfernen', 'Unstage')}>-</button>
