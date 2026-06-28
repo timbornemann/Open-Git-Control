@@ -165,24 +165,6 @@ export const ApiMcpSettingsPanel: React.FC = () => {
     { method: 'GET', path: '/api/agent/next', description: tr('Agenten-Shortcut fuer offene Arbeit in Projekt X.', 'Agent shortcut for open work in project X.') },
   ], [tr]);
 
-  const gitEndpoints = useMemo<EndpointInfo[]>(() => [
-    { method: 'GET', path: '/api/git/status', description: tr('Branch-Sync, staged, unstaged, untracked und conflicts.', 'Branch sync, staged, unstaged, untracked, and conflicts.') },
-    { method: 'GET', path: '/api/git/working-tree', description: tr('Working-Tree-Status plus Diff-Statistiken.', 'Working tree status plus diff statistics.') },
-    { method: 'GET', path: '/api/git/diff', description: tr('Diff-Text fuer unstaged, staged oder commit scope.', 'Diff text for unstaged, staged, or commit scope.') },
-    { method: 'GET/POST', path: '/api/git/branches', description: tr('Branches listen oder Branch erstellen.', 'List branches or create a branch.') },
-    { method: 'POST', path: '/api/git/branches/checkout', description: tr('Branch auschecken oder erstellen und auschecken.', 'Checkout a branch or create and checkout it.') },
-    { method: 'POST', path: '/api/git/branches/rename', description: tr('Lokalen Branch umbenennen.', 'Rename local branch.') },
-    { method: 'POST', path: '/api/git/branches/delete', description: tr('Lokalen Branch loeschen.', 'Delete local branch.') },
-    { method: 'GET', path: '/api/git/commits', description: tr('Commit-Historie lesen.', 'Read commit history.') },
-    { method: 'POST', path: '/api/git/stage', description: tr('Pfade stagen. Benoetigt confirm:true.', 'Stage paths. Requires confirm:true.') },
-    { method: 'POST', path: '/api/git/unstage', description: tr('Pfade unstagen. Benoetigt confirm:true.', 'Unstage paths. Requires confirm:true.') },
-    { method: 'POST', path: '/api/git/commit', description: tr('Commit aus staged changes erstellen. Benoetigt confirm:true.', 'Create commit from staged changes. Requires confirm:true.') },
-    { method: 'GET', path: '/api/git/remotes', description: tr('Remotes listen.', 'List remotes.') },
-    { method: 'POST', path: '/api/git/remotes/fetch', description: tr('Fetch ausfuehren. Benoetigt confirm:true.', 'Run fetch. Requires confirm:true.') },
-    { method: 'POST', path: '/api/git/remotes/pull', description: tr('Pull ausfuehren. Benoetigt confirm:true.', 'Run pull. Requires confirm:true.') },
-    { method: 'POST', path: '/api/git/remotes/push', description: tr('Push ausfuehren. Benoetigt confirm:true.', 'Run push. Requires confirm:true.') },
-  ], [tr]);
-
   const mcpEndpoints = useMemo<EndpointInfo[]>(() => [
     { method: 'POST', path: '/mcp', description: tr('MCP-aehnlicher JSON-RPC-Endpunkt fuer initialize, tools/list und tools/call.', 'MCP-style JSON-RPC endpoint for initialize, tools/list, and tools/call.') },
     { method: 'GET', path: '/api/mcp/tools', description: tr('Tool-Katalog ueber REST lesen.', 'Read the tool catalog through REST.') },
@@ -280,8 +262,8 @@ export const ApiMcpSettingsPanel: React.FC = () => {
         <h3>{tr('KI-Agent verbinden', 'Connect an AI agent')}</h3>
         <p>
           {tr(
-            'Wenn dein Agent HTTP-MCP oder JSON-RPC ueber HTTP unterstuetzt, verwende die MCP-URL direkt. Fuer reine REST-Agenten reichen die /api-Endpunkte. Sende bei allen Daten- und Tool-Aufrufen den Token-Header mit.',
-            'If your agent supports HTTP MCP or JSON-RPC over HTTP, use the MCP URL directly. For REST-only agents, use the /api endpoints. Send the token header with all data and tool calls.',
+            'Wenn dein Agent HTTP-MCP oder JSON-RPC ueber HTTP unterstuetzt, verwende die MCP-URL direkt. Fuer reine REST-Agenten reichen die /api-Endpunkte. Die lokale API stellt nur Planning-Funktionen bereit; Git- und GitHub-Operationen werden nicht exportiert. Sende bei allen Daten- und Tool-Aufrufen den Token-Header mit.',
+            'If your agent supports HTTP MCP or JSON-RPC over HTTP, use the MCP URL directly. For REST-only agents, use the /api endpoints. The local API only exposes planning features; Git and GitHub operations are not exported. Send the token header with all data and tool calls.',
           )}
         </p>
         <div className="settings-api-command-block">
@@ -302,12 +284,6 @@ export const ApiMcpSettingsPanel: React.FC = () => {
       <section className="settings-card">
         <h3>{tr('Planning-Endpunkte', 'Planning endpoints')}</h3>
         <EndpointTable endpoints={planningEndpoints} />
-      </section>
-
-      <section className="settings-card">
-        <h3>{tr('Git-Endpunkte', 'Git endpoints')}</h3>
-        <p>{tr('Schreibende Git-Endpunkte erwarten immer confirm:true im JSON-Body.', 'Write-capable Git endpoints always require confirm:true in the JSON body.')}</p>
-        <EndpointTable endpoints={gitEndpoints} />
       </section>
 
       <section className="settings-card">

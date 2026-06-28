@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { execFileSync } from 'child_process';
-import { GitService } from '../../GitService';
 import { createPlannerItem } from '../projectPlannerStore';
 
 const { getPathMock } = vi.hoisted(() => ({
@@ -42,7 +40,6 @@ describe('planningApiServer', () => {
     server = await startPlanningApiServer({
       preferredPort: 0,
       maxPortSearch: 0,
-      gitService: new GitService(),
       authToken: 'test-planning-api-token',
     });
   });
@@ -69,10 +66,13 @@ describe('planningApiServer', () => {
 
     const docsResponse = await fetch(`${server!.url}/api/`);
     expect(docsResponse.headers.get('content-type')).toContain('text/html');
-    expect(await docsResponse.text()).toContain('Open-Git-Control Planning API');
+    const docsHtml = await docsResponse.text();
+    expect(docsHtml).toContain('Open-Git-Control Planning API');
+    expect(docsHtml).not.toContain('/api/git/');
 
     const openApi = await requestJson('/api/openapi.json');
     expect(openApi.data.paths['/todos/{todoId}/move']).toBeTruthy();
+    expect(openApi.data.paths['/git/status']).toBeUndefined();
     expect(openApi.data.components.securitySchemes.openGitControlToken.name).toBe(server!.authHeaderName);
   });
 
@@ -99,7 +99,6 @@ describe('planningApiServer', () => {
     server = await startPlanningApiServer({
       preferredPort: 0,
       maxPortSearch: 0,
-      gitService: new GitService(),
       authTokenProvider: () => activeToken,
     });
 
@@ -220,85 +219,38 @@ describe('planningApiServer', () => {
     ]);
   });
 
-  it('exposes Git status, branch, staging, commit, and MCP Git tools', async () => {
-    const repoPath = path.join(tempDirectory, 'repo');
-    fs.mkdirSync(repoPath);
-    const git = (args: string[]) => execFileSync('git', args, {
-      cwd: repoPath,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+  it('does not expose Git routes or MCP Git tools', async () => {
+    const gitRouteResponse = await fetch(`${server!.url}/api/git/status?repoPath=${encodeURIComponent(tempDirectory)}`, {
+      headers: { [server!.authHeaderName]: server!.authToken },
     });
+    expect(gitRouteResponse.status).toBe(404);
+    const gitRouteBody = await gitRouteResponse.json();
+    expect(gitRouteBody.error.code).toBe('NOT_FOUND');
 
-    git(['init']);
-    git(['config', 'user.email', 'agent@example.test']);
-    git(['config', 'user.name', 'Agent Test']);
-    fs.writeFileSync(path.join(repoPath, 'README.md'), '# Test\n', 'utf8');
-    git(['add', 'README.md']);
-    git(['commit', '-m', 'Initial commit']);
-    fs.writeFileSync(path.join(repoPath, 'feature.txt'), 'agent work\n', 'utf8');
-
-    const status = await requestJson('/api/git/status?repoPath=' + encodeURIComponent(repoPath));
-    expect(status.data.untracked).toEqual([
-      expect.objectContaining({ path: 'feature.txt' }),
-    ]);
-
-    const branch = await requestJson('/api/git/branches', {
+    const toolsList = await requestJson('/mcp', {
       method: 'POST',
-      body: JSON.stringify({
-        repoPath,
-        name: 'agent/api-test',
-        checkout: true,
-        confirm: true,
-      }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' }),
     });
-    expect(branch.data).toMatchObject({
-      name: 'agent/api-test',
-      checkedOut: true,
-    });
-
-    const branches = await requestJson('/api/git/branches?repoPath=' + encodeURIComponent(repoPath));
-    expect(branches.data.local).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'agent/api-test', current: true }),
-      ]),
-    );
-
-    const stage = await requestJson('/api/git/stage', {
-      method: 'POST',
-      body: JSON.stringify({ repoPath, paths: ['feature.txt'], confirm: true }),
-    });
-    expect(stage.data.paths).toEqual(['feature.txt']);
-
-    const commit = await requestJson('/api/git/commit', {
-      method: 'POST',
-      body: JSON.stringify({ repoPath, title: 'Add agent feature file', confirm: true }),
-    });
-    expect(commit.data.hash).toMatch(/^[0-9a-f]{40}$/i);
-
-    const commits = await requestJson('/api/git/commits?repoPath=' + encodeURIComponent(repoPath) + '&scope=head&limit=2');
-    expect(commits.data.commits).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ subject: 'Add agent feature file' }),
-      ]),
-    );
+    const toolNames = toolsList.result.tools.map((tool: any) => tool.name);
+    expect(toolNames).not.toContain('get_git_status');
+    expect(toolNames).not.toContain('create_commit');
+    expect(toolNames).not.toContain('push_remote');
 
     const mcpStatus = await requestJson('/mcp', {
       method: 'POST',
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 3,
+        id: 4,
         method: 'tools/call',
         params: {
           name: 'get_git_status',
-          arguments: { repoPath },
+          arguments: { repoPath: tempDirectory },
         },
       }),
     });
     expect(mcpStatus.result).toMatchObject({
-      isError: false,
-      structuredContent: {
-        changeCount: 0,
-      },
+      isError: true,
     });
+    expect(mcpStatus.result.content[0].text).toContain('Unknown tool: get_git_status');
   });
 });

@@ -123,7 +123,6 @@ app.whenReady().then(() => {
   updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
     void startPlanningApiServer({
-      gitService,
       authTokenProvider: () => getPlanningApiAuthState().token,
     })
       .then((server) => {
