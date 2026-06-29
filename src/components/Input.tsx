@@ -11,6 +11,7 @@ export interface InputDialogField {
   required?: boolean;
   helperText?: string;
   multiline?: boolean;
+  rows?: number;
   type?: 'text' | 'url';
   validate?: (value: string, values: Record<string, string>) => string | null;
 }
@@ -111,7 +112,7 @@ export const Input: React.FC<InputProps> = ({
                 placeholder={field.placeholder}
                 value={values[field.id] ?? ''}
                 onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
-                rows={3}
+                rows={field.rows ?? 3}
               />
             ) : (
               <input

@@ -1,5 +1,5 @@
 import { GitService, gitService } from './GitService';
-import { AppSettings, AiProvider } from './settings';
+import { AiCommitMessageStyle, AppSettings, AiProvider } from './settings';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -24,7 +24,7 @@ type SnapshotFile = {
   hydrated: boolean;
 };
 
-type CommitMessage = {
+export type CommitMessage = {
   title: string;
   description: string;
 };
@@ -75,6 +75,8 @@ export type ReleaseVersionBump = 'major' | 'minor' | 'patch';
 
 const CHAT_TIMEOUT_MS = 90_000;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
+const MAX_USER_COMMIT_NOTES_CHARS = 8_000;
+const MAX_COMMIT_DESCRIPTION_CHARS = 2_000;
 const MAX_PREVIEW_CHARS = 220;
 const MAX_CONTEXT_LINE_CHARS = 140;
 const MAX_CONTEXT_ITEMS_PER_HUNK = 3;
@@ -826,6 +828,59 @@ async function generateCommitMessageWithAi(
   }
 }
 
+function normalizeUserCommitNotes(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, MAX_USER_COMMIT_NOTES_CHARS);
+}
+
+function normalizeCommitDescription(value: unknown): string {
+  return safeString(value, '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trim()
+    .slice(0, MAX_COMMIT_DESCRIPTION_CHARS);
+}
+
+function buildCommitMessageStyleInstruction(style: AiCommitMessageStyle): string {
+  if (style === 'plain') {
+    return 'Style: plain. Use a short imperative title without a Conventional Commits prefix. Keep the description empty unless it adds important context.';
+  }
+
+  if (style === 'detailed') {
+    return 'Style: detailed. Use a concise imperative title and a useful description with 1-4 short lines when the notes contain multiple concrete details. Do not pad the description.';
+  }
+
+  return [
+    'Style: Conventional Commits.',
+    'Use "type(scope): summary" when the scope is clear, otherwise "type: summary".',
+    'Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore.',
+  ].join(' ');
+}
+
+function buildFallbackCommitMessageFromNotes(notes: string, style: AiCommitMessageStyle): CommitMessage {
+  const firstUsefulLine = notes
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*]\s+/, '').trim())
+    .find(Boolean);
+
+  const summary = (firstUsefulLine || 'update changes')
+    .replace(/[.!?]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const lowerSummary = summary ? summary.charAt(0).toLowerCase() + summary.slice(1) : 'update changes';
+  const title = style === 'conventional'
+    ? clipCommitTitle(`chore: ${lowerSummary}`)
+    : clipCommitTitle(lowerSummary);
+
+  const description = normalizeCommitDescription(notes);
+  return {
+    title,
+    description: description === firstUsefulLine ? '' : description,
+  };
+}
+
 export class AiService {
   constructor(private readonly gitService: GitService) {}
 
@@ -899,6 +954,57 @@ export class AiService {
         .map(model => safeString(model.name || model.model).trim())
         .filter(Boolean),
     );
+  }
+
+  async generateCommitMessageFromUserNotes(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    params: { notes: string },
+  ): Promise<CommitMessage> {
+    const notes = normalizeUserCommitNotes(params?.notes);
+    if (!notes) {
+      throw new Error('Bitte beschreibe die Aenderungen fuer die Commit-Message.');
+    }
+
+    const model = getSelectedModel(settings);
+    if (!model) {
+      throw new Error('Kein KI-Modell konfiguriert.');
+    }
+
+    if (settings.aiProvider === 'gemini') {
+      const apiKey = getGeminiApiKey().trim();
+      if (!apiKey) {
+        throw new Error('Gemini API key fehlt.');
+      }
+    }
+
+    const systemPrompt = [
+      'You write git commit messages from user-supplied change notes only.',
+      'Do not infer repository state, file names, diffs, implementation details, or unstated intent.',
+      'Return strict JSON only: {"title": string, "description": string}.',
+      'Title must be imperative, <=72 chars, and have no trailing period.',
+      'Description may be empty. When present, keep it factual and concise.',
+      'Preserve the language of the user notes unless the notes are mixed; then prefer English.',
+      buildCommitMessageStyleInstruction(settings.aiCommitMessageStyle),
+    ].join(' ');
+
+    const userPrompt = [
+      'User change notes:',
+      notes,
+      'Return JSON only.',
+    ].join('\n');
+
+    const raw = await runProviderText(settings, systemPrompt, userPrompt, getGeminiApiKey);
+    const parsed = parseJsonFromText(raw) || {};
+    const titleRaw = safeString(parsed.title, '').trim();
+    if (!titleRaw) {
+      return buildFallbackCommitMessageFromNotes(notes, settings.aiCommitMessageStyle);
+    }
+
+    return {
+      title: clipCommitTitle(titleRaw),
+      description: normalizeCommitDescription(parsed.description),
+    };
   }
 
   async generateReleaseNotes(

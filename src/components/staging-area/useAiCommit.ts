@@ -25,6 +25,11 @@ type AiJobEvent = {
   timestamp?: unknown;
 };
 
+type GeneratedCommitMessage = {
+  title: string;
+  description: string;
+};
+
 const asNumber = (value: unknown): number | null => (
   typeof value === 'number' && Number.isFinite(value) ? value : null
 );
@@ -46,6 +51,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   const [aiGroupId, setAiGroupId] = useState<number | null>(null);
   const [aiGroupSize, setAiGroupSize] = useState<number | null>(null);
   const [aiTotalCommits, setAiTotalCommits] = useState<number | null>(null);
+  const [isAiMessageGenerating, setIsAiMessageGenerating] = useState(false);
 
   const aiStartLockRef = useRef(false);
   const cancelRequestedRef = useRef(false);
@@ -342,9 +348,42 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     }
   }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, tr]);
 
+  const generateCommitMessageFromNotes = useCallback(async (notes: string): Promise<GeneratedCommitMessage | null> => {
+    if (!window.electronAPI) return null;
+
+    const normalizedNotes = notes.trim();
+    if (!normalizedNotes) {
+      setToast({ msg: tr('Bitte beschreibe die Aenderungen fuer die Commit-Message.', 'Please describe the changes for the commit message.'), isError: true });
+      return null;
+    }
+
+    setIsAiMessageGenerating(true);
+    try {
+      const result = await window.electronAPI.aiGenerateCommitMessage({ notes: normalizedNotes });
+      if (!result.success) {
+        setToast({ msg: result.error || tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'), isError: true });
+        return null;
+      }
+
+      setToast({ msg: tr('KI Commit-Message eingefuegt.', 'AI commit message inserted.'), isError: false });
+      return result.data;
+    } catch (error: unknown) {
+      setToast({
+        msg: error instanceof Error
+          ? error.message
+          : tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'),
+        isError: true,
+      });
+      return null;
+    } finally {
+      setIsAiMessageGenerating(false);
+    }
+  }, [setToast, tr]);
+
   return {
     isAiCommitting,
     isAiJobRunning,
+    isAiMessageGenerating,
     aiProgressMessage,
     aiPhase,
     aiMode,
@@ -356,5 +395,6 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     aiTotalCommits,
     handleAiAutoCommit,
     handleCancelAiAutoCommit,
+    generateCommitMessageFromNotes,
   };
 };

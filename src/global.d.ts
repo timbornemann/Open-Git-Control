@@ -116,6 +116,7 @@ export interface UpdaterOneClickResultDto {
 }
 
 export type AiProviderDto = 'ollama' | 'gemini';
+export type AiCommitMessageStyleDto = 'conventional' | 'plain' | 'detailed';
 export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
 export type SecretScanSourceDto = 'staged' | 'to-push' | 'tag';
@@ -137,6 +138,7 @@ export interface AppSettingsDto {
   secretScanAllowlist: string;
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProviderDto;
+  aiCommitMessageStyle: AiCommitMessageStyleDto;
   ollamaBaseUrl: string;
   ollamaModel: string;
   geminiModel: string;
@@ -360,6 +362,11 @@ export interface SecretScanResultDto {
   };
 }
 
+export interface AiGeneratedCommitMessageDto {
+  title: string;
+  description: string;
+}
+
 export type CommitStatsStateDto = 'missing' | 'queued' | 'loading' | 'ready' | 'error';
 
 export interface CommitStatsDto {
@@ -496,6 +503,7 @@ export interface ElectronAPI {
   runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
   cancelAiAutoCommit: () => Promise<{ success: boolean; canceled: boolean }>;
   getAiAutoCommitState: () => Promise<IpcResult<GitJobEventDto | null>>;
+  aiGenerateCommitMessage: (params: { notes: string }) => Promise<IpcResult<AiGeneratedCommitMessageDto>>;
   githubAuth: (token: string, host?: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;

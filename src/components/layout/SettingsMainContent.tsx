@@ -126,14 +126,14 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
         {activeTab === 'integrations' && (
           <div className="settings-grid">
             <section className="settings-card">
-              <h3>{tr('KI Auto-Commit', 'AI auto-commit')}</h3>
+              <h3>{tr('KI', 'AI')}</h3>
               <label className="settings-checkbox">
                 <input
                   type="checkbox"
                   checked={settings.aiAutoCommitEnabled}
                   onChange={(e) => void onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
                 />
-                {tr('Feature aktivieren', 'Enable feature')}
+                {tr('KI Auto-Commit aktivieren', 'Enable AI auto-commit')}
               </label>
               <label>
                 {tr('Provider', 'Provider')}
@@ -207,6 +207,18 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 <datalist id="ai-model-list-settings">
                   {mergedModelOptions.map((model) => <option key={model} value={model} />)}
                 </datalist>
+              </label>
+
+              <label>
+                {tr('Commit-Message Stil', 'Commit message style')}
+                <select
+                  value={settings.aiCommitMessageStyle}
+                  onChange={(e) => void onUpdateSettings({ aiCommitMessageStyle: e.target.value as AppSettingsDto['aiCommitMessageStyle'] })}
+                >
+                  <option value="conventional">Conventional Commits</option>
+                  <option value="plain">{tr('Plain', 'Plain')}</option>
+                  <option value="detailed">{tr('Detailliert', 'Detailed')}</option>
+                </select>
               </label>
 
               <div className="settings-inline-actions">

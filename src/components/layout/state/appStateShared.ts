@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
   secretScanAllowlist: '',
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
+  aiCommitMessageStyle: 'conventional',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',

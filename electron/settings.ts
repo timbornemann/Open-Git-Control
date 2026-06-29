@@ -1,4 +1,5 @@
 export type AiProvider = 'ollama' | 'gemini';
+export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
 export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
@@ -17,6 +18,7 @@ export interface AppSettings {
   secretScanAllowlist: string;
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProvider;
+  aiCommitMessageStyle: AiCommitMessageStyle;
   ollamaBaseUrl: string;
   ollamaModel: string;
   geminiModel: string;
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   secretScanAllowlist: '',
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
+  aiCommitMessageStyle: 'conventional',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
@@ -112,6 +115,13 @@ function normalizeCommitTemplate(value: unknown): string {
 
 function normalizeAiProvider(value: unknown): AiProvider {
   return value === 'gemini' ? 'gemini' : 'ollama';
+}
+
+function normalizeAiCommitMessageStyle(value: unknown): AiCommitMessageStyle {
+  if (value === 'plain' || value === 'detailed') {
+    return value;
+  }
+  return 'conventional';
 }
 
 function normalizeSecretScanStrictness(value: unknown): SecretScanStrictness {
@@ -204,6 +214,7 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     secretScanAllowlist: normalizeSecretScanAllowlist(value.secretScanAllowlist),
     aiAutoCommitEnabled: normalizeBoolean(value.aiAutoCommitEnabled, DEFAULT_SETTINGS.aiAutoCommitEnabled),
     aiProvider: normalizeAiProvider(value.aiProvider),
+    aiCommitMessageStyle: normalizeAiCommitMessageStyle(value.aiCommitMessageStyle),
     ollamaBaseUrl: normalizeOllamaBaseUrl(value.ollamaBaseUrl),
     ollamaModel: normalizeModel(value.ollamaModel),
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),

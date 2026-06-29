@@ -252,7 +252,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
       {/* ── KI Auto-Commit ──────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('KI Auto-Commit', 'AI Auto-Commit')}</div>
+        <div className="ssc-section-title">{tr('KI', 'AI')}</div>
 
         <label className="ssc-label-inline">
           <input
@@ -260,7 +260,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.aiAutoCommitEnabled}
             onChange={(e) => onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
           />
-          {tr('Feature aktivieren', 'Enable feature')}
+          {tr('KI Auto-Commit aktivieren', 'Enable AI auto-commit')}
         </label>
 
         <label className="ssc-label">
@@ -325,6 +325,19 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           <datalist id="ai-model-list-sc">
             {mergedModelOptions.map((m) => <option key={m} value={m} />)}
           </datalist>
+        </label>
+
+        <label className="ssc-label">
+          {tr('Commit-Message Stil', 'Commit message style')}
+          <select
+            className="ssc-input"
+            value={settings.aiCommitMessageStyle}
+            onChange={(e) => onUpdateSettings({ aiCommitMessageStyle: e.target.value as SettingsSidebarContentProps['settings']['aiCommitMessageStyle'] })}
+          >
+            <option value="conventional">Conventional Commits</option>
+            <option value="plain">{tr('Plain', 'Plain')}</option>
+            <option value="detailed">{tr('Detailliert', 'Detailed')}</option>
+          </select>
         </label>
 
         <div className="ssc-row">

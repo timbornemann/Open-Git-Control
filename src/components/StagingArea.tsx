@@ -119,6 +119,46 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     enabled: Boolean(settings.aiAutoCommitEnabled),
   };
 
+  const aiCommitMessageStyleLabel = useMemo(() => {
+    switch (settings.aiCommitMessageStyle) {
+      case 'plain':
+        return tr('Plain', 'Plain');
+      case 'detailed':
+        return tr('Detailliert', 'Detailed');
+      case 'conventional':
+      default:
+        return tr('Conventional Commits', 'Conventional Commits');
+    }
+  }, [settings.aiCommitMessageStyle, tr]);
+
+  const openAiCommitMessageDialog = useCallback(() => {
+    setInputDialog({
+      title: tr('KI Commit-Message aus Notizen', 'AI commit message from notes'),
+      message: tr('Gib Stichpunkte oder eine kurze Beschreibung der Aenderungen ein.', 'Enter bullet points or a short description of the changes.'),
+      fields: [
+        {
+          id: 'notes',
+          label: tr('Aenderungen', 'Changes'),
+          placeholder: tr('z.B. Login-Fehler behoben, Settings validiert, Tests ergaenzt...', 'e.g. fixed login error, validated settings, added tests...'),
+          required: true,
+          multiline: true,
+          rows: 8,
+          helperText: tr(`Stil: ${aiCommitMessageStyleLabel}`, `Style: ${aiCommitMessageStyleLabel}`),
+        },
+      ],
+      contextItems: [],
+      irreversible: false,
+      consequences: tr('Fuellt nur Commit-Titel und Beschreibung aus.', 'Only fills the commit title and description.'),
+      confirmLabel: tr('Generieren', 'Generate'),
+      onSubmit: async (values) => {
+        const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '');
+        if (!message) return;
+        commitForm.setCommitMsg(message.title);
+        commitForm.setCommitDescription(message.description || '');
+      },
+    });
+  }, [aiCommit, aiCommitMessageStyleLabel, commitForm, tr]);
+
   const visibleFiles = useMemo(() => {
     const status = fileOps.status;
     if (!status) {
@@ -142,7 +182,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const status = fileOps.status;
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
-  const isCommitInputDisabled = hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning;
+  const isCommitInputDisabled = hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || aiCommit.isAiMessageGenerating;
 
   const visibleStaged = visibleFiles.staged;
   const visibleUnstaged = visibleFiles.unstaged;
@@ -434,6 +474,15 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
                 {tr('Abbrechen', 'Cancel')}
               </button>
             )}
+            <button
+              className="staging-tool-btn"
+              type="button"
+              onClick={openAiCommitMessageDialog}
+              disabled={fileOps.isMutating || hasOpenConflicts || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || aiCommit.isAiMessageGenerating || !status}
+              title={tr(`Commit-Message aus Notizen generieren (${aiCommitMessageStyleLabel})`, `Generate commit message from notes (${aiCommitMessageStyleLabel})`)}
+            >
+              {aiCommit.isAiMessageGenerating ? tr('KI generiert...', 'AI generating...') : tr('KI Message', 'AI message')}
+            </button>
             <button
               className="staging-tool-btn"
               type="button"

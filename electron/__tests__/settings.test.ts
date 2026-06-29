@@ -94,6 +94,9 @@ describe('normalizeSettings', () => {
   it('normalizes AI provider and ollama base URL', () => {
     expect(normalizeSettings({ aiProvider: 'gemini' })).toMatchObject({ aiProvider: 'gemini' });
     expect(normalizeSettings({ aiProvider: 'invalid' as never })).toMatchObject({ aiProvider: 'ollama' });
+    expect(normalizeSettings({ aiCommitMessageStyle: 'plain' }).aiCommitMessageStyle).toBe('plain');
+    expect(normalizeSettings({ aiCommitMessageStyle: 'detailed' }).aiCommitMessageStyle).toBe('detailed');
+    expect(normalizeSettings({ aiCommitMessageStyle: 'invalid' as never }).aiCommitMessageStyle).toBe('conventional');
 
     expect(normalizeSettings({ ollamaBaseUrl: '  http://localhost:11434/  ' }).ollamaBaseUrl).toBe('http://localhost:11434');
     expect(normalizeSettings({ ollamaBaseUrl: '   ' }).ollamaBaseUrl).toBe(DEFAULT_SETTINGS.ollamaBaseUrl);

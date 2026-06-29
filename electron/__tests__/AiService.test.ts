@@ -20,6 +20,7 @@ const baseSettings: AppSettings = {
   secretScanAllowlist: '',
   aiAutoCommitEnabled: true,
   aiProvider: 'gemini',
+  aiCommitMessageStyle: 'conventional',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-1.5-flash',
@@ -126,6 +127,63 @@ describe('AiService release notes', () => {
     });
 
     expect(markdown).toContain('Dieses Minor Release');
+  });
+});
+
+describe('AiService commit message from user notes', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('generates a commit message from notes without adding file context', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
+      message: {
+        content: JSON.stringify({
+          title: 'feat(settings): add commit message styles',
+          description: 'Adds selectable styles for AI-generated commit messages.',
+        }),
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const service = new AiService(fakeGitService);
+    const result = await service.generateCommitMessageFromUserNotes(
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model', aiCommitMessageStyle: 'conventional' },
+      () => '',
+      { notes: 'Nutzer kann Commit-Message-Stile in den Settings auswaehlen.' },
+    );
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    const systemPrompt = String(requestBody.messages[0].content);
+    const userPrompt = String(requestBody.messages[1].content);
+
+    expect(systemPrompt).toContain('Conventional Commits');
+    expect(systemPrompt).toContain('user-supplied change notes only');
+    expect(userPrompt).toContain('Nutzer kann Commit-Message-Stile');
+    expect(userPrompt).not.toContain('Files in this commit');
+    expect(userPrompt).not.toContain('key_change');
+    expect(result).toEqual({
+      title: 'feat(settings): add commit message styles',
+      description: 'Adds selectable styles for AI-generated commit messages.',
+    });
+  });
+
+  it('uses the configured plain style instruction', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
+      message: { content: '{"title":"update commit message generator","description":""}' },
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const service = new AiService(fakeGitService);
+    await service.generateCommitMessageFromUserNotes(
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model', aiCommitMessageStyle: 'plain' },
+      () => '',
+      { notes: 'Commit message generator button opens a notes dialog.' },
+    );
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(String(requestBody.messages[0].content)).toContain('Style: plain');
   });
 });
 

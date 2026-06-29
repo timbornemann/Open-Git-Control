@@ -45,6 +45,27 @@ export function registerAiHandlers({
     }
   });
 
+  ipcMain.handle('ai:generateCommitMessage', async (_event, params: { notes?: string }) => {
+    try {
+      const notes = String(params?.notes || '').trim();
+      if (!notes) {
+        return { success: false, error: 'Bitte beschreibe die Aenderungen fuer die Commit-Message.' };
+      }
+
+      const settings = readSettingsWithMigration();
+      const message = await aiService.generateCommitMessageFromUserNotes(
+        settings,
+        getGeminiApiKeyFromSecureStore,
+        { notes },
+      );
+
+      return { success: true, data: message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'KI Commit-Message konnte nicht erstellt werden.';
+      return { success: false, error: message };
+    }
+  });
+
   ipcMain.handle('git:aiAutoCommit', async (event: any) => {
     const webContents = event.sender;
     if (currentAiAutoCommitJob) {
