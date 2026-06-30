@@ -193,7 +193,10 @@ export const buildGraphHighlightData = (
     ? highlightedBranchRef
     : null;
   const activeHighlightedBranch = manualHighlightedBranch;
-  const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
+  const requestedSelectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
+  const selectedNode = requestedSelectedNode?.commit.hash === headNode?.commit.hash
+    ? undefined
+    : requestedSelectedNode;
   const hasSelectedCommitFocus = Boolean(selectedNode);
   const currentPathStartNode = activeHighlightedBranch
     ? branchTipByRef.get(activeHighlightedBranch)
@@ -1866,6 +1869,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
           const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
           const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
+          const resetsToDefaultFocus = node.commit.hash === headNode.commit.hash;
           const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
           const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
           const sortedRefs = sortRefs(node.commit.refs);
@@ -1882,7 +1886,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             <div
               key={node.commit.hash}
               className={`commit-row ${isSelected ? 'selected commit-click-focus' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''} ${isOnCurrentPath ? 'path-highlighted' : ''} ${isOnSelectedPath ? 'selected-branch-path' : ''} ${isLatestCommitFocus ? 'latest-focus' : ''} ${isMutedByPathFocus ? 'path-muted' : ''} ${isHeadCommit && isOnCurrentPath ? 'head-current' : ''}`}
-              onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
+              onClick={() => {
+                if (!onSelectCommit) return;
+                if (resetsToDefaultFocus) {
+                  setHighlightedBranchRef(null);
+                  onSelectCommit(null);
+                  return;
+                }
+                onSelectCommit(node.commit.hash);
+              }}
               onContextMenu={(e) => handleContextMenu(e, node)}
               style={rowStyle}
               data-commit-hash={node.commit.hash}

@@ -22,7 +22,8 @@ function commit(hash: string, parentHashes: string[] = [], refs: string[] = []):
 
 describe('buildGraphHighlightData', () => {
   const commits = [
-    commit('merge02', ['main001', 'feature2'], ['HEAD -> main']),
+    commit('tip9999', ['merge02'], ['HEAD -> main']),
+    commit('merge02', ['main001', 'feature2']),
     commit('main001', ['base000']),
     commit('feature2', ['feature1'], ['feature/demo']),
     commit('feature1', ['base000']),
@@ -64,10 +65,20 @@ describe('buildGraphHighlightData', () => {
     ]));
   });
 
+  it('does not expand the selected path when the selected commit is the head commit', () => {
+    const layout = computeGraphLayout(commits);
+    const highlight = buildGraphHighlightData(layout, 'main', 'tip9999', null);
+
+    expect(highlight.currentPathHashes.size).toBe(0);
+    expect(highlight.selectedPathHashes.size).toBe(0);
+    expect(highlight.hasAnyPathHighlight).toBe(false);
+  });
+
   it('marks merge edges as part of the selected ancestry highlight', () => {
     const layout = computeGraphLayout(commits);
     const highlight = buildGraphHighlightData(layout, 'main', 'merge02', null);
-    const mergeEdge = layout.edges.find((edge) => edge.kind === 'merge' && edge.fromRow === 0);
+    const mergeNode = layout.nodes.find((node) => node.commit.hash === 'merge02');
+    const mergeEdge = layout.edges.find((edge) => edge.kind === 'merge' && edge.fromRow === mergeNode?.row);
 
     expect(mergeEdge).toBeDefined();
     expect(highlight.selectedPathEdgeKeys.has(`${mergeEdge!.fromRow}:${mergeEdge!.fromLane}->${mergeEdge!.toRow}:${mergeEdge!.toLane}:${mergeEdge!.kind}`)).toBe(true);
