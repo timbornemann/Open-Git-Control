@@ -1891,8 +1891,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                 if (!onSelectCommit) return;
                 if (resetsToDefaultFocus) {
                   setHighlightedBranchRef(null);
-                  onSelectCommit(null);
-                  return;
                 }
                 onSelectCommit(node.commit.hash);
               }}
