@@ -4,6 +4,7 @@ import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input } from './Input';
+import { ActionToastViewport } from './ActionToastViewport';
 import { ConflictResolverPanel } from './staging-area/ConflictResolverPanel';
 import { StashPanel } from './staging-area/StashPanel';
 import { useFileOperations } from './staging-area/useFileOperations';
@@ -46,7 +47,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   onRefreshWorkingTree,
 }) => {
   const { tr } = useI18n();
-  const { toast, setToast } = useToastQueue(3000);
+  const { toasts, setToast, dismiss } = useToastQueue(3000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
   const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
@@ -545,11 +546,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         </div>
       )}
 
-      {toast && (
-        <div className={`action-toast ${toast.isError ? 'error' : 'success'}`}>
-          {toast.isError ? 'x' : 'ok'} {toast.msg}
-        </div>
-      )}
+      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
 
       {confirmDialog && confirmDialog.variant === 'confirm' && (
         <Confirm

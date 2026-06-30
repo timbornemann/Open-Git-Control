@@ -16,6 +16,7 @@ import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm, DialogContextItem } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
 import { Input, InputDialogField } from './Input';
+import { ActionToastViewport } from './ActionToastViewport';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
@@ -277,7 +278,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
-  const { toast, setToast } = useToastQueue(4000);
+  const { toasts, setToast, dismiss } = useToastQueue(4000);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -2140,11 +2141,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         );
       })()}
 
-      {toast && (
-        <div className={`action-toast ${toast.isError ? 'error' : 'success'}`}>
-          {toast.isError ? 'x' : 'ok'} {toast.msg}
-        </div>
-      )}
+      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
 
       {confirmDialog && confirmDialog.variant === 'confirm' && (
         <Confirm

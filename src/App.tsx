@@ -12,6 +12,7 @@ import { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
 import { I18nProvider } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { CommandPalette, PaletteCommand } from './components/CommandPalette';
+import { ActionToastViewport } from './components/ActionToastViewport';
 import { AppStateContext, AppContextValue } from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import './index.css';
@@ -78,35 +79,6 @@ const App: React.FC = () => {
       window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, String(next));
       return next;
     });
-  }, []);
-
-  const copyToastMessage = useCallback(async (message: string) => {
-    const text = String(message || '');
-    if (!text) return;
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-      }
-    } catch {
-      // fallback below
-    }
-
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    document.body.appendChild(area);
-    area.focus();
-    area.select();
-    try {
-      document.execCommand('copy');
-    } catch {
-      // ignore fallback copy errors
-    } finally {
-      document.body.removeChild(area);
-    }
   }, []);
 
   const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -590,42 +562,10 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {state.gitActionToasts.length > 0 && (
-            <div className="toast-container">
-              {state.gitActionToasts.map((t) => (
-                <div
-                  key={t.id}
-                  className={`action-toast ${t.isError ? 'error' : 'success'}`}
-                  role="status"
-                >
-                  <div className="toast-main">
-                    <span className="toast-icon">{t.isError ? 'x' : 'ok'}</span>
-                    <span className="toast-msg">{t.msg}</span>
-                  </div>
-                  <div className="toast-actions">
-                    {t.isError && (
-                      <button
-                        type="button"
-                        className="toast-action-btn"
-                        onClick={() => { void copyToastMessage(t.msg); }}
-                        title={tr('Fehlermeldung kopieren', 'Copy error message')}
-                      >
-                        {tr('Kopieren', 'Copy')}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="toast-action-btn toast-action-btn-close"
-                      onClick={() => state.dismissToast(t.id)}
-                      title={tr('Meldung schliessen', 'Close message')}
-                    >
-                      {tr('Schliessen', 'Close')}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <ActionToastViewport
+            toasts={state.gitActionToasts}
+            onDismiss={state.dismissToast}
+          />
 
           <BranchContextMenu
             branchContextMenu={state.branchContextMenu}
