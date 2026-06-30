@@ -13,4 +13,6 @@ export const THEME_OPTIONS: Array<{
   { value: 'arctic-mint', label: 'Arctic Mint' },
   { value: 'mono-dark-red', label: 'Mono Dark Red' },
   { value: 'mono-light-red', label: 'Mono Light Red' },
+  { value: 'mono-dark-green', label: 'Mono Dark Green' },
+  { value: 'mono-light-green', label: 'Mono Light Green' },
 ];

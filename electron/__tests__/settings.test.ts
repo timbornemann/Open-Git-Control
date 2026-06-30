@@ -38,6 +38,16 @@ describe('normalizeSettings', () => {
       language: 'en',
     });
 
+    expect(normalizeSettings({ theme: 'mono-dark-green', language: 'de' })).toMatchObject({
+      theme: 'mono-dark-green',
+      language: 'de',
+    });
+
+    expect(normalizeSettings({ theme: 'mono-light-green', language: 'en' })).toMatchObject({
+      theme: 'mono-light-green',
+      language: 'en',
+    });
+
     expect(normalizeSettings({ theme: 'dark' as never, language: 'en' })).toMatchObject({
       theme: 'midnight-teal',
       language: 'en',

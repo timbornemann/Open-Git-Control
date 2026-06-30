@@ -1,7 +1,7 @@
 export type AiProvider = 'ollama' | 'gemini';
 export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguage = 'auto' | 'de' | 'en';
-export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint' | 'mono-dark-red' | 'mono-light-red';
+export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint' | 'mono-dark-red' | 'mono-light-red' | 'mono-dark-green' | 'mono-light-green';
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
 export interface AppSettings {
@@ -74,6 +74,8 @@ function normalizeTheme(value: unknown): AppSettings['theme'] {
     case 'arctic-mint':
     case 'mono-dark-red':
     case 'mono-light-red':
+    case 'mono-dark-green':
+    case 'mono-light-green':
       return value;
     case 'dark':
       return 'midnight-teal';
