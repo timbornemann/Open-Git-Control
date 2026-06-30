@@ -603,6 +603,7 @@ export const MainView: React.FC = () => {
                     display: activeDiffRequest ? 'none' : 'block',
                     height: '100%',
                     overflow: 'auto',
+                    overflowAnchor: 'none',
                   }}
                 >
                   <CommitGraph

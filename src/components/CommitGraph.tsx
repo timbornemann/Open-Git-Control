@@ -296,6 +296,11 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const didRunInitialBranchEffectRef = useRef(false);
   const navigationAttemptRef = useRef<{ requestId: number; attempts: number } | null>(null);
   const completedNavigationRequestIdRef = useRef<number | null>(null);
+  const topResetLockRef = useRef<{
+    repoPath: string | null;
+    activeUntil: number;
+    userReleased: boolean;
+  }>({ repoPath: null, activeUntil: 0, userReleased: false });
 
   const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
     all: tr('Alles', 'All'),
@@ -361,6 +366,14 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
   }, []);
 
+  const maybeKeepCommitListAtTop = useCallback(() => {
+    if (!repoPath || navigationRequest) return;
+    const lock = topResetLockRef.current;
+    if (lock.repoPath !== repoPath || lock.userReleased) return;
+    if (Date.now() > lock.activeUntil) return;
+    resetCommitListScroll();
+  }, [navigationRequest, repoPath, resetCommitListScroll]);
+
   useLayoutEffect(() => {
     if (!layout) return;
     const container = logContainerRef.current?.parentElement;
@@ -398,20 +411,69 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   }, [layout, repoPath, syncViewportMetrics]);
 
   useLayoutEffect(() => {
+    if (navigationRequest) return;
+    topResetLockRef.current = {
+      repoPath,
+      activeUntil: Date.now() + 4000,
+      userReleased: false,
+    };
     resetCommitListScroll();
     let secondFrameId: number | null = null;
     const firstFrameId = window.requestAnimationFrame(() => {
       resetCommitListScroll();
       secondFrameId = window.requestAnimationFrame(resetCommitListScroll);
     });
+    const settleIntervalId = window.setInterval(() => {
+      maybeKeepCommitListAtTop();
+    }, 120);
+    const releaseTimerId = window.setTimeout(() => {
+      if (topResetLockRef.current.repoPath === repoPath) {
+        topResetLockRef.current.activeUntil = 0;
+      }
+    }, 4200);
 
     return () => {
       window.cancelAnimationFrame(firstFrameId);
+      window.clearInterval(settleIntervalId);
+      window.clearTimeout(releaseTimerId);
       if (secondFrameId !== null) {
         window.cancelAnimationFrame(secondFrameId);
       }
     };
-  }, [repoPath, resetCommitListScroll]);
+  }, [maybeKeepCommitListAtTop, navigationRequest, repoPath, resetCommitListScroll]);
+
+  useLayoutEffect(() => {
+    maybeKeepCommitListAtTop();
+  }, [layout, loading, workingTreeStatus, maybeKeepCommitListAtTop]);
+
+  useEffect(() => {
+    const container = logContainerRef.current?.parentElement;
+    if (!container) return;
+
+    const releaseTopLock = () => {
+      const lock = topResetLockRef.current;
+      if (lock.repoPath === repoPath) {
+        lock.userReleased = true;
+        lock.activeUntil = 0;
+      }
+    };
+    const releaseTopLockOnKey = (event: KeyboardEvent) => {
+      if (!['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) return;
+      releaseTopLock();
+    };
+
+    container.addEventListener('wheel', releaseTopLock, { passive: true });
+    container.addEventListener('touchstart', releaseTopLock, { passive: true });
+    container.addEventListener('pointerdown', releaseTopLock);
+    window.addEventListener('keydown', releaseTopLockOnKey);
+
+    return () => {
+      container.removeEventListener('wheel', releaseTopLock);
+      container.removeEventListener('touchstart', releaseTopLock);
+      container.removeEventListener('pointerdown', releaseTopLock);
+      window.removeEventListener('keydown', releaseTopLockOnKey);
+    };
+  }, [repoPath]);
 
   useEffect(() => {
     if (!selectedHash) return;
