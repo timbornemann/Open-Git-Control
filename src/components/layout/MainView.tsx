@@ -589,6 +589,7 @@ export const MainView: React.FC = () => {
                 onRepoChanged={triggerRefresh}
                 onCommitsCreated={triggerCommitRefresh}
                 onOpenDiff={handleOpenDiff}
+                onCloseConflictResolver={() => setActiveConflictPath(null)}
                 viewMode="conflictOnly"
                 initialConflictPath={activeConflictPath}
                 settings={settings}

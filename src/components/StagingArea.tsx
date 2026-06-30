@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileEntry } from '../utils/gitParsing';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm } from './Confirm';
@@ -38,6 +38,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   onOpenDiff,
   onSelectFileInspect,
   onOpenConflictResolver,
+  onCloseConflictResolver,
   viewMode = 'default',
   initialConflictPath = null,
   settings,
@@ -171,6 +172,12 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       conflicts: bySearch(status.conflicts),
     };
   }, [fileOps.searchQuery, fileOps.status]);
+
+  useEffect(() => {
+    if (!isConflictOnly || !fileOps.status) return;
+    if (fileOps.status.conflicts.length > 0) return;
+    onCloseConflictResolver?.();
+  }, [fileOps.status, isConflictOnly, onCloseConflictResolver]);
 
   if (!repoPath) return null;
   if (!fileOps.status) return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{tr('Lade Status...', 'Loading status...')}</div>;

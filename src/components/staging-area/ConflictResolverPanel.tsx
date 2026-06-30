@@ -1,4 +1,5 @@
 import React from 'react';
+import { GitMerge } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { ConflictManualEditor, ConflictSidePreview } from './ConflictEditorParts';
 import { CONFLICT_LABELS, basename } from './utils';
@@ -97,8 +98,10 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
     return CONFLICT_LABELS[code] || tr('Konflikt', 'Conflict');
   };
 
+  const isCompactConflictSummary = Boolean(onOpenConflictResolver);
+
   return (
-    <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}`}>
+    <div className={`staging-section conflict-section${isConflictOnly ? ' conflict-section--resolve' : ''}${isCompactConflictSummary ? ' conflict-section--compact' : ''}`}>
       {!onOpenConflictResolver ? (
         <div className="conflict-resolver-header-shell">
           <div className="conflict-global-nav conflict-global-nav--header" role="group" aria-label={tr('Konflikt-Navigation ueber alle Dateien', 'Conflict navigation across all files')}>
@@ -141,7 +144,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
           </div>
         </div>
       ) : (
-        <div className="staging-section-header">
+        <div className="staging-section-header conflict-summary-header">
           <span style={{ color: 'var(--status-danger)' }}>{tr('Konflikte', 'Conflicts')}</span>
           <span className="staging-count" title={conflictCountTitle}>
             {isConflictBlockCountPending && visibleConflicts.length > 0 ? '...' : totalConflictBlocksInView}
@@ -152,25 +155,30 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
       )}
 
       {onOpenConflictResolver && (
-        <div className="conflict-sidebar-list">
-          <VirtualList
-            items={visibleConflicts}
-            rowHeight={38}
-            maxHeight={342}
-            getKey={(file) => `sidebar-c-${file.path}`}
-            renderItem={(file) => (
+        <div className="conflict-summary-list">
+          {visibleConflicts.map((file) => {
+            const blocksForFile = blockCountForPath(file.path);
+            return (
               <button
-                className="conflict-sidebar-file"
+                key={`summary-c-${file.path}`}
+                className="conflict-summary-file"
                 onClick={() => onOpenConflictResolver(file.path)}
-                title={file.path}
-                style={{ width: '100%', height: 36 }}
+                title={`${file.path} - ${conflictLabelForCode(file.code)} (${file.code})`}
               >
-                <span className="conflict-file-code">{file.code}</span>
+                <span className="conflict-file-icon" title={`Git status: ${file.code}`} aria-hidden="true">
+                  <GitMerge size={15} strokeWidth={2.2} />
+                </span>
                 <span className="conflict-file-path">{basename(file.path)}</span>
-                <span className="conflict-file-label">{conflictLabelForCode(file.code)}</span>
+                <span className="conflict-file-label">
+                  {conflictLabelForCode(file.code)}
+                  {blocksForFile > 0
+                    ? tr(` - ${blocksForFile} Block${blocksForFile !== 1 ? 'e' : ''}`, ` - ${blocksForFile} block${blocksForFile !== 1 ? 's' : ''}`)
+                    : (isConflictBlockCountPending ? ' - ...' : '')}
+                </span>
+                <span className="conflict-summary-action">{tr('Aufloesen', 'Resolve')}</span>
               </button>
-            )}
-          />
+            );
+          })}
         </div>
       )}
 
@@ -210,7 +218,9 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                   onClick={() => { void openConflictEditor(file.path); }}
                   title={file.path}
                 >
-                  <span className="conflict-file-code" style={{ gridRow: '1 / span 2', fontSize: '0.8rem' }}>{file.code}</span>
+                  <span className="conflict-file-icon" title={`Git status: ${file.code}`} aria-hidden="true">
+                    <GitMerge size={15} strokeWidth={2.2} />
+                  </span>
                   <span className="conflict-file-path" style={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>{basename(file.path)}</span>
                   <span className="conflict-file-label" style={{ fontSize: '0.7rem' }}>
                     {conflictLabelForCode(file.code)}
