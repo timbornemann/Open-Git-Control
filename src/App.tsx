@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [repoSwitcherIndex, setRepoSwitcherIndex] = useState<number | null>(null);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const repoSwitcherIndexRef = useRef<number | null>(null);
+  const repoSwitcherListRef = useRef<HTMLDivElement | null>(null);
 
   const getSidebarMaxWidth = useCallback(() => {
     if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
@@ -184,6 +185,14 @@ const App: React.FC = () => {
   useEffect(() => {
     repoSwitcherIndexRef.current = repoSwitcherIndex;
   }, [repoSwitcherIndex]);
+
+  useEffect(() => {
+    if (repoSwitcherIndex === null) return;
+
+    const listElement = repoSwitcherListRef.current;
+    const selectedElement = listElement?.querySelector<HTMLElement>(`#repo-switcher-item-${repoSwitcherIndex}`);
+    selectedElement?.scrollIntoView({ block: 'nearest' });
+  }, [repoSwitcherIndex, state.openRepos.length]);
 
   const closeRepoSwitcher = useCallback(() => {
     repoSwitcherIndexRef.current = null;
@@ -550,7 +559,12 @@ const App: React.FC = () => {
             <div className="repo-switcher-backdrop">
               <div className="repo-switcher-modal" role="dialog" aria-label={tr('Repository wechseln', 'Switch repository')}>
                 <div className="repo-switcher-title">{tr('Repository wechseln', 'Switch repository')}</div>
-                <div className="repo-switcher-list" role="listbox" aria-activedescendant={`repo-switcher-item-${repoSwitcherIndex}`}>
+                <div
+                  ref={repoSwitcherListRef}
+                  className="repo-switcher-list"
+                  role="listbox"
+                  aria-activedescendant={`repo-switcher-item-${repoSwitcherIndex}`}
+                >
                   {state.openRepos.map((repoPath, index) => {
                     const isSelected = index === repoSwitcherIndex;
                     const isActive = repoPath === state.activeRepo;
