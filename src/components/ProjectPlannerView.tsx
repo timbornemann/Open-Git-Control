@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   AlertTriangle,
-  Archive,
   Bug,
   CheckCircle2,
   CircleDot,
@@ -63,6 +62,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [editingProject, setEditingProject] = React.useState(false);
   const [itemDialogOpen, setItemDialogOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<PlannerItem | null>(null);
+  const [newItemStatus, setNewItemStatus] = React.useState<PlannerStatus>('idea');
   const [materializeParent, setMaterializeParent] = React.useState<string | null>(null);
   const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
 
@@ -102,8 +102,9 @@ export const ProjectPlannerView: React.FC = () => {
     });
   }, [itemsForSelectedProject, priorityFilter, search, statusFilter, tagFilter]);
 
-  const openNewItem = () => {
+  const openNewItem = (status: PlannerStatus = 'idea') => {
     setEditingItem(null);
+    setNewItemStatus(status);
     setItemDialogOpen(true);
   };
 
@@ -167,13 +168,6 @@ export const ProjectPlannerView: React.FC = () => {
         <div className="planner-hero-actions">
           <button
             className="planner-btn planner-btn-secondary"
-            onClick={requestCreateProject}
-            disabled={busy}
-          >
-            <Plus size={14} /> {tr('Neues Projekt', 'New project')}
-          </button>
-          <button
-            className="planner-btn planner-btn-secondary"
             onClick={() => {
               setEditingProject(true);
               setProjectDialogOpen(true);
@@ -186,7 +180,7 @@ export const ProjectPlannerView: React.FC = () => {
               <Rocket size={14} /> {tr('Repository starten', 'Start repository')}
             </button>
           )}
-          <button className="planner-btn planner-btn-primary" onClick={openNewItem} disabled={busy}>
+          <button className="planner-btn planner-btn-primary" onClick={() => openNewItem()} disabled={busy}>
             <Plus size={15} /> {tr('Neuer Eintrag', 'New item')}
           </button>
         </div>
@@ -231,7 +225,18 @@ export const ProjectPlannerView: React.FC = () => {
             <section key={status} className={`planner-column planner-column-${status}`}>
               <div className="planner-column-header">
                 <span>{statusIcons[status]} {labels.status[status]}</span>
-                <strong>{statusItems.length}</strong>
+                <div className="planner-column-header-actions">
+                  <strong>{statusItems.length}</strong>
+                  <button
+                    className="planner-column-add"
+                    onClick={() => openNewItem(status)}
+                    disabled={busy}
+                    title={tr(`Eintrag in "${labels.status[status]}" anlegen`, `Create item in "${labels.status[status]}"`)}
+                    aria-label={tr(`Eintrag in "${labels.status[status]}" anlegen`, `Create item in "${labels.status[status]}"`)}
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
               </div>
               <div className="planner-column-list">
                 {statusItems.map((item) => (
@@ -281,7 +286,7 @@ export const ProjectPlannerView: React.FC = () => {
                   </article>
                 ))}
                 {statusItems.length === 0 && (
-                  <button className="planner-column-empty" onClick={openNewItem}>
+                  <button className="planner-column-empty" onClick={() => openNewItem(status)}>
                     <Plus size={13} /> {tr('Eintrag hinzufuegen', 'Add item')}
                   </button>
                 )}
@@ -291,28 +296,17 @@ export const ProjectPlannerView: React.FC = () => {
         })}
       </div>
 
-      <footer className="planner-footer">
-        <button
-          className="planner-danger-link"
-          onClick={() => requestDeleteProject(selectedProject.id)}
-          disabled={busy}
-        >
-          <Archive size={13} />
-          {tr('Planungsdaten dieses Projekts loeschen', 'Delete this project planning data')}
-        </button>
-        <button
-          className="planner-link"
-          onClick={requestCreateProject}
-        >
-          <Plus size={13} /> {tr('Zukuenftiges Projekt anlegen', 'Create future project')}
-        </button>
-      </footer>
-
       <ProjectDialog
         open={projectDialogOpen}
         project={editingProject ? selectedProject : null}
         busy={busy}
         onClose={() => setProjectDialogOpen(false)}
+        onDelete={editingProject
+          ? () => {
+            setProjectDialogOpen(false);
+            requestDeleteProject(selectedProject.id);
+          }
+          : undefined}
         onSubmit={async (input) => {
           const ok = editingProject
             ? await updateProject(selectedProject.id, input)
@@ -324,6 +318,7 @@ export const ProjectPlannerView: React.FC = () => {
       <ItemDialog
         open={itemDialogOpen}
         item={editingItem}
+        defaultStatus={newItemStatus}
         busy={busy}
         onClose={() => setItemDialogOpen(false)}
         onSubmit={async (input) => {

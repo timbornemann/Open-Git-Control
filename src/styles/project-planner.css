@@ -5,19 +5,6 @@
   min-width: 0;
 }
 
-.planner-sidebar-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--accent-primary-border);
-  border-radius: 8px;
-  background: var(--accent-primary-soft);
-  color: var(--text-accent);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
 .planner-sidebar-section {
   display: flex;
   flex-direction: column;
@@ -398,6 +385,37 @@
   text-align: center;
 }
 
+.planner-column-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.planner-column-add {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-dark);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.planner-column-add:hover:not(:disabled) {
+  border-color: var(--accent-primary-border);
+  background: var(--accent-primary-soft);
+  color: var(--text-primary);
+}
+
+.planner-column-add:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 .planner-column-idea .planner-column-header span { color: var(--text-accent); }
 .planner-column-bug .planner-column-header span { color: var(--status-warning); }
 .planner-column-planned .planner-column-header span { color: var(--status-info); }
@@ -565,37 +583,6 @@
   color: var(--text-primary);
 }
 
-.planner-footer {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 16px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-dark);
-}
-
-.planner-link,
-.planner-danger-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  cursor: pointer;
-}
-
-.planner-link:hover {
-  color: var(--text-accent);
-}
-
-.planner-danger-link:hover {
-  color: var(--status-danger);
-}
-
 .planner-dialog-form {
   min-width: min(520px, 70vw);
   display: flex;
@@ -700,11 +687,6 @@
 
   .planner-result-count {
     display: none;
-  }
-
-  .planner-footer {
-    align-items: flex-start;
-    flex-direction: column-reverse;
   }
 
   .planner-dialog-form {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderGit2, Lightbulb, ListTodo, Plus, Trash2 } from 'lucide-react';
+import { FolderGit2, Lightbulb, Plus, Trash2 } from 'lucide-react';
 import { useProjectPlanner } from '../../contexts/ProjectPlannerContext';
 import { useI18n } from '../../i18n';
 
@@ -67,11 +67,6 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
 
   return (
     <div className="planner-sidebar-content">
-      <div className="planner-sidebar-summary">
-        <ListTodo size={16} />
-        <span>{data.items.length} {tr('Eintraege gesamt', 'items total')}</span>
-      </div>
-
       <section className="planner-sidebar-section">
         <div className="planner-sidebar-section-heading">
           <div className="planner-sidebar-section-title">{tr('Zukuenftige Projekte', 'Future projects')}</div>
