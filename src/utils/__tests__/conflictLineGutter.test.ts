@@ -24,12 +24,12 @@ describe('getConflictLineGutterKinds', () => {
 
     expect(getConflictLineGutterKinds(lines)).toEqual([
       'neutral',
-      'marker',
+      'marker-start',
       'ours',
       'ours',
-      'marker',
+      'marker-separator',
       'theirs',
-      'marker',
+      'marker-end',
       'neutral',
     ]);
   });
@@ -46,13 +46,13 @@ describe('getConflictLineGutterKinds', () => {
     ];
 
     expect(getConflictLineGutterKinds(lines)).toEqual([
-      'marker',
+      'marker-start',
       'neutral',
-      'marker',
+      'marker-start',
       'ours',
-      'marker',
+      'marker-separator',
       'theirs',
-      'marker',
+      'marker-end',
     ]);
   });
 
@@ -70,15 +70,15 @@ describe('getConflictLineGutterKinds', () => {
     ];
 
     expect(getConflictLineGutterKinds(lines)).toEqual([
-      'marker',
+      'marker-start',
       'neutral',
-      'marker',
+      'marker-separator',
       'neutral',
-      'marker',
+      'marker-start',
       'ours',
-      'marker',
+      'marker-separator',
       'theirs',
-      'marker',
+      'marker-end',
     ]);
   });
 });

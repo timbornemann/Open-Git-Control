@@ -1,5 +1,5 @@
 /** Per-line gutter style for merge conflict files (<<<<<<< / ======= / >>>>>>>). */
-export type ConflictGutterKind = 'neutral' | 'ours' | 'theirs' | 'marker';
+export type ConflictGutterKind = 'neutral' | 'ours' | 'theirs' | 'marker-start' | 'marker-separator' | 'marker-end' | 'marker';
 
 /**
  * Classify each line of a conflicted file for gutter coloring.
@@ -36,7 +36,7 @@ export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[
     }
 
     if (separatorIndex < 0) {
-      kinds[i] = 'marker';
+      kinds[i] = 'marker-start';
       i = nestedStartBeforeSeparator >= 0 ? nestedStartBeforeSeparator : i + 1;
       continue;
     }
@@ -57,21 +57,21 @@ export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[
     }
 
     if (endIndex < 0) {
-      kinds[i] = 'marker';
-      kinds[separatorIndex] = 'marker';
+      kinds[i] = 'marker-start';
+      kinds[separatorIndex] = 'marker-separator';
       i = nestedStartBeforeEnd >= 0 ? nestedStartBeforeEnd : i + 1;
       continue;
     }
 
-    kinds[i] = 'marker';
+    kinds[i] = 'marker-start';
     for (let j = i + 1; j < separatorIndex; j += 1) {
       kinds[j] = 'ours';
     }
-    kinds[separatorIndex] = 'marker';
+    kinds[separatorIndex] = 'marker-separator';
     for (let j = separatorIndex + 1; j < endIndex; j += 1) {
       kinds[j] = 'theirs';
     }
-    kinds[endIndex] = 'marker';
+    kinds[endIndex] = 'marker-end';
     i = endIndex + 1;
   }
 

@@ -9,6 +9,12 @@ const gutterClassForKind = (kind: ConflictGutterKind): string => {
       return 'conflict-gutter-num conflict-gutter-num--theirs';
     case 'marker':
       return 'conflict-gutter-num conflict-gutter-num--marker';
+    case 'marker-start':
+      return 'conflict-gutter-num conflict-gutter-num--marker-start';
+    case 'marker-separator':
+      return 'conflict-gutter-num conflict-gutter-num--marker-separator';
+    case 'marker-end':
+      return 'conflict-gutter-num conflict-gutter-num--marker-end';
     default:
       return 'conflict-gutter-num conflict-gutter-num--neutral';
   }

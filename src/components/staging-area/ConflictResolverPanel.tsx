@@ -241,9 +241,9 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span
                         style={{
-                          color: conflictBlocks.length > 0 ? 'var(--status-warning)' : 'var(--status-success)',
-                          background: conflictBlocks.length > 0 ? 'var(--status-warning-soft)' : 'var(--status-success-soft)',
-                          border: `1px solid ${conflictBlocks.length > 0 ? 'var(--status-warning-border)' : 'var(--status-success-border)'}`,
+                          color: conflictBlocks.length > 0 ? 'var(--conflict-code-current-text)' : 'var(--conflict-code-incoming-text)',
+                          background: conflictBlocks.length > 0 ? 'var(--conflict-code-current-surface)' : 'var(--conflict-code-incoming-surface)',
+                          border: `1px solid ${conflictBlocks.length > 0 ? 'var(--conflict-code-current-border)' : 'var(--conflict-code-incoming-border)'}`,
                           padding: '2px 8px',
                           fontSize: '0.7rem',
                           fontWeight: 600,
@@ -336,13 +336,13 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: 'var(--border-color)', gap: '1px', minHeight: 0 }}>
                         <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
-                          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-warning-soft)', flexShrink: 0 }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-warning)' }}>
+                          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--conflict-version-current-surface)', flexShrink: 0 }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--conflict-version-current-text)' }}>
                               {tr('Aktueller Stand', 'Current version')} {selectedConflictBlock.oursLabel ? `(${selectedConflictBlock.oursLabel})` : ''}
                             </span>
                             <button
                               className="staging-btn-sm"
-                              style={{ padding: '4px 12px', background: 'var(--status-warning)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }}
+                              style={{ padding: '4px 12px', background: 'var(--conflict-version-current-surface-strong)', color: 'var(--conflict-version-current-text)', border: '1px solid var(--conflict-version-current-border)', fontWeight: 600 }}
                               onClick={() => applyConflictChoiceToSelected('ours')}
                               disabled={conflictEditor.isSaving}
                             >
@@ -355,13 +355,13 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
                         </div>
 
                         <div style={{ background: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 }}>
-                          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--status-success-soft)', flexShrink: 0 }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--status-success)' }}>
+                          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--line-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--conflict-version-incoming-surface)', flexShrink: 0 }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--conflict-version-incoming-text)' }}>
                               {tr('Eingehender Stand', 'Incoming version')} {selectedConflictBlock.theirsLabel ? `(${selectedConflictBlock.theirsLabel})` : ''}
                             </span>
                             <button
                               className="staging-btn-sm"
-                              style={{ padding: '4px 12px', background: 'var(--status-success)', color: 'var(--on-accent)', border: 'none', fontWeight: 600 }}
+                              style={{ padding: '4px 12px', background: 'var(--conflict-version-incoming-surface-strong)', color: 'var(--conflict-version-incoming-text)', border: '1px solid var(--conflict-version-incoming-border)', fontWeight: 600 }}
                               onClick={() => applyConflictChoiceToSelected('theirs')}
                               disabled={conflictEditor.isSaving}
                             >

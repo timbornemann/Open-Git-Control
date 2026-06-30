@@ -273,6 +273,46 @@
 }
 
 .conflict-section {
+  --conflict-version-current-color: color-mix(in srgb, var(--status-info) 78%, var(--accent-secondary));
+  --conflict-version-incoming-color: color-mix(in srgb, var(--status-warning) 78%, var(--accent-complement));
+  --conflict-code-current-color: color-mix(in srgb, var(--status-info) 64%, var(--accent-secondary));
+  --conflict-code-incoming-color: color-mix(in srgb, var(--status-warning) 68%, var(--accent-complement));
+  --conflict-marker-color: color-mix(in srgb, var(--status-danger) 78%, var(--accent-hover));
+  --conflict-marker-start-color: color-mix(in srgb, var(--conflict-marker-color) 82%, var(--conflict-version-current-color));
+  --conflict-marker-separator-color: var(--conflict-marker-color);
+  --conflict-marker-end-color: color-mix(in srgb, var(--conflict-marker-color) 82%, var(--conflict-version-incoming-color));
+  --conflict-version-current-surface: color-mix(in srgb, var(--conflict-version-current-color) 14%, var(--bg-dark));
+  --conflict-version-incoming-surface: color-mix(in srgb, var(--conflict-version-incoming-color) 14%, var(--bg-dark));
+  --conflict-code-current-surface: color-mix(in srgb, var(--conflict-code-current-color) 12%, var(--bg-dark));
+  --conflict-code-incoming-surface: color-mix(in srgb, var(--conflict-code-incoming-color) 12%, var(--bg-dark));
+  --conflict-marker-surface: color-mix(in srgb, var(--conflict-marker-color) 10%, var(--bg-dark));
+  --conflict-marker-start-surface: color-mix(in srgb, var(--conflict-marker-start-color) 12%, var(--bg-dark));
+  --conflict-marker-separator-surface: color-mix(in srgb, var(--conflict-marker-separator-color) 11%, var(--bg-dark));
+  --conflict-marker-end-surface: color-mix(in srgb, var(--conflict-marker-end-color) 11%, var(--bg-dark));
+  --conflict-version-current-surface-strong: color-mix(in srgb, var(--conflict-version-current-color) 22%, var(--bg-panel));
+  --conflict-version-incoming-surface-strong: color-mix(in srgb, var(--conflict-version-incoming-color) 22%, var(--bg-panel));
+  --conflict-code-current-surface-strong: color-mix(in srgb, var(--conflict-code-current-color) 17%, var(--bg-panel));
+  --conflict-code-incoming-surface-strong: color-mix(in srgb, var(--conflict-code-incoming-color) 17%, var(--bg-panel));
+  --conflict-marker-surface-strong: color-mix(in srgb, var(--conflict-marker-color) 16%, var(--bg-panel));
+  --conflict-marker-start-surface-strong: color-mix(in srgb, var(--conflict-marker-start-color) 17%, var(--bg-panel));
+  --conflict-marker-separator-surface-strong: color-mix(in srgb, var(--conflict-marker-separator-color) 16%, var(--bg-panel));
+  --conflict-marker-end-surface-strong: color-mix(in srgb, var(--conflict-marker-end-color) 16%, var(--bg-panel));
+  --conflict-version-current-border: color-mix(in srgb, var(--conflict-version-current-color) 44%, var(--border-color));
+  --conflict-version-incoming-border: color-mix(in srgb, var(--conflict-version-incoming-color) 44%, var(--border-color));
+  --conflict-code-current-border: color-mix(in srgb, var(--conflict-code-current-color) 38%, var(--border-color));
+  --conflict-code-incoming-border: color-mix(in srgb, var(--conflict-code-incoming-color) 38%, var(--border-color));
+  --conflict-marker-border: color-mix(in srgb, var(--conflict-marker-color) 38%, var(--border-color));
+  --conflict-marker-start-border: color-mix(in srgb, var(--conflict-marker-start-color) 40%, var(--border-color));
+  --conflict-marker-separator-border: color-mix(in srgb, var(--conflict-marker-separator-color) 38%, var(--border-color));
+  --conflict-marker-end-border: color-mix(in srgb, var(--conflict-marker-end-color) 40%, var(--border-color));
+  --conflict-version-current-text: color-mix(in srgb, var(--conflict-version-current-color) 74%, var(--text-primary));
+  --conflict-version-incoming-text: color-mix(in srgb, var(--conflict-version-incoming-color) 74%, var(--text-primary));
+  --conflict-code-current-text: color-mix(in srgb, var(--conflict-code-current-color) 70%, var(--text-primary));
+  --conflict-code-incoming-text: color-mix(in srgb, var(--conflict-code-incoming-color) 70%, var(--text-primary));
+  --conflict-marker-text: color-mix(in srgb, var(--conflict-marker-color) 70%, var(--text-primary));
+  --conflict-marker-start-text: color-mix(in srgb, var(--conflict-marker-start-color) 72%, var(--text-primary));
+  --conflict-marker-separator-text: color-mix(in srgb, var(--conflict-marker-separator-color) 70%, var(--text-primary));
+  --conflict-marker-end-text: color-mix(in srgb, var(--conflict-marker-end-color) 72%, var(--text-primary));
   background: linear-gradient(180deg, var(--status-danger-soft) 0%, transparent 220px);
 }
 
@@ -765,28 +805,49 @@
   user-select: none;
   flex-shrink: 0;
   color: var(--text-secondary);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .conflict-gutter-num--ours {
-  color: var(--status-warning);
+  color: var(--conflict-code-current-text);
   font-weight: 700;
-  background: var(--status-warning-soft);
-  box-shadow: inset 4px 0 0 0 var(--status-warning);
+  background: transparent;
+  box-shadow: none;
 }
 
 .conflict-gutter-num--theirs {
-  color: var(--status-success);
+  color: var(--conflict-code-incoming-text);
   font-weight: 700;
-  background: var(--status-success-soft);
-  box-shadow: inset 4px 0 0 0 var(--status-success);
+  background: transparent;
+  box-shadow: none;
 }
 
 .conflict-gutter-num--marker {
-  color: var(--status-info);
+  color: var(--conflict-marker-text);
   font-weight: 700;
-  background: var(--status-info-soft);
-  box-shadow: inset 4px 0 0 0 var(--status-info);
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-gutter-num--marker-start {
+  color: var(--conflict-marker-start-text);
+  font-weight: 700;
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-gutter-num--marker-separator {
+  color: var(--conflict-marker-separator-text);
+  font-weight: 700;
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-gutter-num--marker-end {
+  color: var(--conflict-marker-end-text);
+  font-weight: 700;
+  background: transparent;
+  box-shadow: none;
 }
 
 .conflict-gutter-num--neutral {
@@ -803,27 +864,29 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.72rem;
   line-height: 1.5;
-  padding: 1px 0 1px 4px;
-  margin: 0 -4px 0 -4px;
-  border-radius: 4px;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
 }
 
-.conflict-preview-line--ours {
-  background: var(--status-warning-soft);
-  box-shadow: inset 5px 0 0 0 var(--status-warning);
+.conflict-preview-line--ours .conflict-preview-code {
+  background: var(--conflict-code-current-surface-strong);
+  box-shadow: inset 3px 0 0 0 var(--conflict-code-current-color);
 }
 
-.conflict-preview-line--theirs {
-  background: var(--status-success-soft);
-  box-shadow: inset 5px 0 0 0 var(--status-success);
+.conflict-preview-line--theirs .conflict-preview-code {
+  background: var(--conflict-code-incoming-surface-strong);
+  box-shadow: inset 3px 0 0 0 var(--conflict-code-incoming-color);
 }
 
 .conflict-preview-code {
+  display: block;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-primary);
   flex: 1;
   min-width: 0;
+  padding: 1px 8px 1px 6px;
 }
 
 .conflict-side-preview-scroll {
@@ -895,9 +958,9 @@
 }
 
 .conflict-manual-action-btn--success {
-  background: var(--status-success);
-  border-color: var(--status-success-border);
-  color: var(--on-accent);
+  background: var(--conflict-code-incoming-surface-strong);
+  border-color: var(--conflict-code-incoming-border);
+  color: var(--conflict-code-incoming-text);
 }
 
 .conflict-manual-action-btn--success:hover:not(:disabled) {
@@ -933,10 +996,10 @@
   font-size: var(--conflict-editor-font-size);
   line-height: var(--conflict-editor-line-height);
   margin: 0;
-  padding-left: 8px;
+  padding-left: 0;
   padding-right: 0;
-  border-left: 3px solid transparent;
-  border-radius: 999px 0 0 999px;
+  border-left: none;
+  border-radius: 0;
   overflow: hidden;
   transition: background-color 120ms ease, border-color 120ms ease;
 }
@@ -944,7 +1007,7 @@
 .conflict-manual-gutter-line .conflict-gutter-num {
   min-width: 3.5ch;
   padding: 0 9px 0 8px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: var(--conflict-editor-font-size);
   line-height: var(--conflict-editor-line-height);
   font-weight: 700;
@@ -956,18 +1019,21 @@
 }
 
 .conflict-manual-gutter-line--ours {
-  border-left-color: var(--status-warning);
-  background: var(--status-warning-soft);
+  background: transparent;
 }
 
 .conflict-manual-gutter-line--theirs {
-  border-left-color: var(--status-success);
-  background: var(--status-success-soft);
+  background: transparent;
 }
 
 .conflict-manual-gutter-line--marker {
-  border-left-color: var(--status-info);
-  background: var(--status-info-soft);
+  background: transparent;
+}
+
+.conflict-manual-gutter-line--marker-start,
+.conflict-manual-gutter-line--marker-separator,
+.conflict-manual-gutter-line--marker-end {
+  background: transparent;
 }
 
 .conflict-manual-gutter-line--neutral {
@@ -975,21 +1041,33 @@
 }
 
 .conflict-manual-gutter-line--ours .conflict-gutter-num {
-  color: var(--on-accent);
-  background: var(--status-warning);
-  box-shadow: inset 0 0 0 1px var(--status-warning-border);
+  color: var(--conflict-code-current-text);
+  background: transparent;
+  box-shadow: none;
 }
 
 .conflict-manual-gutter-line--theirs .conflict-gutter-num {
-  color: var(--on-accent);
-  background: var(--status-success);
-  box-shadow: inset 0 0 0 1px var(--status-success-border);
+  color: var(--conflict-code-incoming-text);
+  background: transparent;
+  box-shadow: none;
 }
 
 .conflict-manual-gutter-line--marker .conflict-gutter-num {
-  color: var(--on-accent);
-  background: var(--status-info);
-  box-shadow: inset 0 0 0 1px var(--status-info-border);
+  color: var(--conflict-marker-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-manual-gutter-line--marker-start .conflict-gutter-num {
+  color: var(--conflict-marker-start-text);
+}
+
+.conflict-manual-gutter-line--marker-separator .conflict-gutter-num {
+  color: var(--conflict-marker-separator-text);
+}
+
+.conflict-manual-gutter-line--marker-end .conflict-gutter-num {
+  color: var(--conflict-marker-end-text);
 }
 
 .conflict-manual-gutter-line--neutral .conflict-gutter-num {
@@ -1009,29 +1087,44 @@
 .conflict-manual-code-bg {
   position: absolute;
   inset: 0;
-  padding: 12px 14px 12px 0;
+  padding: 12px 14px 12px 10px;
   pointer-events: none;
 }
 
 .conflict-manual-code-bg-line {
   height: var(--conflict-editor-line-height);
-  border-radius: 0 999px 999px 0;
+  border-radius: 0;
   background: transparent;
 }
 
 .conflict-manual-code-bg-line--ours {
-  background: linear-gradient(90deg, var(--status-warning-soft) 0%, transparent 96%);
-  box-shadow: inset 0 0 0 1px var(--status-warning-border);
+  background: var(--conflict-code-current-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-code-current-border);
 }
 
 .conflict-manual-code-bg-line--theirs {
-  background: linear-gradient(90deg, var(--status-success-soft) 0%, transparent 96%);
-  box-shadow: inset 0 0 0 1px var(--status-success-border);
+  background: var(--conflict-code-incoming-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-code-incoming-border);
 }
 
 .conflict-manual-code-bg-line--marker {
-  background: linear-gradient(90deg, var(--status-info-soft) 0%, transparent 96%);
-  box-shadow: inset 0 0 0 1px var(--status-info-border);
+  background: var(--conflict-marker-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-marker-border);
+}
+
+.conflict-manual-code-bg-line--marker-start {
+  background: var(--conflict-marker-start-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-marker-start-border);
+}
+
+.conflict-manual-code-bg-line--marker-separator {
+  background: var(--conflict-marker-separator-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-marker-separator-border);
+}
+
+.conflict-manual-code-bg-line--marker-end {
+  background: var(--conflict-marker-end-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--conflict-marker-end-border);
 }
 
 .conflict-manual-code-bg-line--neutral {
@@ -1174,13 +1267,13 @@
 }
 
 .conflict-block-preview.ours {
-  background: var(--status-warning-soft);
-  border-color: var(--status-warning-border);
+  background: var(--conflict-code-current-surface);
+  border-color: var(--conflict-code-current-border);
 }
 
 .conflict-block-preview.theirs {
-  background: var(--status-success-soft);
-  border-color: var(--status-success-border);
+  background: var(--conflict-code-incoming-surface);
+  border-color: var(--conflict-code-incoming-border);
 }
 
 .conflict-block-preview-title {
