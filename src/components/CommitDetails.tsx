@@ -18,6 +18,14 @@ const fileNameFromPath = (filePath: string): string => (
   filePath.split(/[\\/]/).pop() || filePath
 );
 
+export const extractCommitDescription = (message: string): string => {
+  const lines = String(message || '').replace(/\r\n/g, '\n').split('\n');
+  const bodyLines = lines.slice(1);
+  while (bodyLines.length > 0 && bodyLines[0].trim() === '') bodyLines.shift();
+  while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1].trim() === '') bodyLines.pop();
+  return bodyLines.join('\n');
+};
+
 export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectCommit, onOpenDiff }) => {
   const normalizedHash = useMemo(() => {
     const match = String(hash || '').match(/[0-9a-f]{7,40}/i);
@@ -29,6 +37,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const [filesSourceHint, setFilesSourceHint] = useState<string | null>(null);
   const [isMergeCommit, setIsMergeCommit] = useState(false);
   const [files, setFiles] = useState<CommitFileDetail[]>([]);
+  const [commitDescription, setCommitDescription] = useState('');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileCommitHash, setSelectedFileCommitHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
@@ -63,6 +72,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setFilesError(null);
       setFilesSourceHint(null);
       setIsMergeCommit(false);
+      setCommitDescription('');
 
       try {
         const parentsResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%P', normalizedHash);
@@ -71,6 +81,11 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           : [];
         const mergeCommit = parents.length > 1;
         setIsMergeCommit(mergeCommit);
+
+        const messageResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%B', normalizedHash);
+        if (messageResult.success) {
+          setCommitDescription(extractCommitDescription(String(messageResult.data || '')));
+        }
 
         const detailResult = await window.electronAPI.runGitCommand('commitDetails', normalizedHash);
         if (!detailResult.success) {
@@ -281,6 +296,17 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           </button>
         )}
       </div>
+
+      {normalizedHash && commitDescription && !loadingFiles && (
+        <div style={{ marginBottom: '10px', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '9px 10px', backgroundColor: 'var(--bg-panel)' }}>
+          <div style={{ marginBottom: '5px', fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            {tr('Beschreibung', 'Description')}
+          </div>
+          <div style={{ color: 'var(--text-primary)', fontSize: '0.84rem', lineHeight: 1.45, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+            {commitDescription}
+          </div>
+        </div>
+      )}
 
       {!normalizedHash ? (
         <div style={{ color: 'var(--status-danger)', fontSize: '0.84rem', border: '1px solid var(--status-danger-border)', borderRadius: 6, padding: '8px 10px' }}>
