@@ -998,33 +998,48 @@
 
 .branch-row {
   min-height: 28px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 76%, transparent);
   color: var(--text-primary);
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
 .branch-row-local:not(.branch-row-current) {
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));
   cursor: pointer;
 }
 
 .branch-row-remote {
-  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--status-info) 7%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--status-info) 20%, var(--border-color));
+  color: color-mix(in srgb, var(--status-info) 34%, var(--text-primary));
 }
 
 .branch-row-local:not(.branch-row-current):hover,
 .branch-row-remote:hover {
-  border-color: var(--line-subtle);
+  border-color: color-mix(in srgb, var(--accent-primary) 44%, var(--border-color));
+  background: color-mix(in srgb, var(--accent-primary) 13%, var(--bg-hover));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 14%, transparent);
 }
 
 .branch-row-current {
-  color: var(--text-accent);
-  background: var(--accent-primary-soft);
-  border-color: var(--accent-primary-border);
+  color: color-mix(in srgb, var(--accent-primary) 82%, var(--text-primary));
+  background: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--accent-primary) 58%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 18%, transparent),
+    0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
 .branch-row-icon {
   flex-shrink: 0;
-  opacity: 0.62;
+  color: var(--accent-primary);
+  opacity: 0.82;
+}
+
+.branch-row-remote .branch-row-icon {
+  color: var(--status-info);
 }
 
 .branch-row-current .branch-row-icon {
@@ -1043,7 +1058,11 @@
 
 .branch-head-badge {
   flex-shrink: 0;
-  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--accent-primary) 72%, var(--text-primary));
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-dark));
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 42%, var(--border-color));
+  border-radius: 4px;
+  padding: 1px 4px;
   font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -1063,12 +1082,12 @@
   min-width: 0;
   min-height: 34px;
   padding: 6px 7px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 34%, var(--border-color));
   border-radius: 6px;
-  background: var(--bg-panel);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--status-warning) 11%, var(--bg-panel));
+  color: color-mix(in srgb, var(--status-warning) 36%, var(--text-primary));
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
 .repo-cockpit .tag-card {
@@ -1077,20 +1096,20 @@
 
 .tag-card:hover,
 .tag-card:focus-visible {
-  border-color: var(--line-subtle);
-  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--status-warning) 58%, var(--border-color));
+  background: color-mix(in srgb, var(--status-warning) 17%, var(--bg-hover));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-warning) 16%, transparent);
   outline: none;
 }
 
 .tag-card-icon {
   flex-shrink: 0;
-  color: var(--text-secondary);
-  opacity: 0.76;
+  color: var(--status-warning);
+  opacity: 0.9;
 }
 
 .tag-card:hover .tag-card-icon,
 .tag-card:focus-visible .tag-card-icon {
-  color: var(--text-accent);
   opacity: 1;
 }
 
