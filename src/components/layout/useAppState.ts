@@ -2059,7 +2059,7 @@ export const useAppState = () => {
     tr,
   ]);
 
-  const handleCreateRelease = useCallback(async () => {
+  const handleCreateRelease = useCallback(async (confirmedEmptyReleaseNotes = false) => {
     if (!window.electronAPI || !github.isAuthenticated || !pullRequestDomain.prOwnerRepo) {
       setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
       return;
@@ -2091,6 +2091,39 @@ export const useAppState = () => {
 
     if (normalizedTag && existingTags.has(normalizedTag)) {
       setReleaseError(tr('Dieser Tag existiert bereits. Waehle einen anderen Tag.', 'This tag already exists. Choose a different tag.'));
+      return;
+    }
+
+    const releaseNotes = (releaseForm.body || '').trim();
+    if (!releaseNotes && !confirmedEmptyReleaseNotes) {
+      const releaseMode = releaseForm.draft
+        ? tr('Entwurf', 'Draft')
+        : tr('Veroeffentlicht', 'Published');
+
+      setConfirmDialog({
+        variant: 'confirm',
+        title: releaseForm.draft
+          ? tr('Release-Entwurf ohne Notes erstellen?', 'Create draft release without notes?')
+          : tr('Release ohne Notes veroeffentlichen?', 'Publish release without notes?'),
+        message: releaseForm.draft
+          ? tr('Der Release-Entwurf enthaelt keine Release Notes. Moechtest du ihn trotzdem erstellen?', 'This draft release has no release notes. Do you still want to create it?')
+          : tr('Dieser Release enthaelt keine Release Notes. Moechtest du ihn wirklich veroeffentlichen?', 'This release has no release notes. Do you really want to publish it?'),
+        contextItems: [
+          { label: tr('Repository', 'Repository'), value: `${pullRequestDomain.prOwnerRepo.owner}/${pullRequestDomain.prOwnerRepo.repo}` },
+          { label: tr('Tag', 'Tag'), value: releaseForm.tagName.trim() },
+          { label: tr('Name', 'Name'), value: releaseForm.releaseName.trim() },
+          { label: tr('Status', 'Status'), value: releaseMode },
+        ],
+        irreversible: false,
+        consequences: tr(
+          'Der GitHub-Release wird ohne Beschreibung angelegt. Du kannst die Notes spaeter auf GitHub nachtragen.',
+          'The GitHub release will be created without a description. You can add notes later on GitHub.',
+        ),
+        confirmLabel: releaseForm.draft
+          ? tr('Ohne Notes erstellen', 'Create without notes')
+          : tr('Ohne Notes veroeffentlichen', 'Publish without notes'),
+        onConfirm: async () => { await handleCreateRelease(true); },
+      });
       return;
     }
 
@@ -2154,6 +2187,7 @@ export const useAppState = () => {
     releaseForm,
     repository.currentBranch,
     resetReleaseDraft,
+    setConfirmDialog,
     setGitActionToast,
     tr,
     triggerRefresh,
