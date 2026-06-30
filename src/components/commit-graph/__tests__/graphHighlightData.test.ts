@@ -29,12 +29,24 @@ describe('buildGraphHighlightData', () => {
     commit('base000', []),
   ];
 
-  it('keeps the default branch highlight on the first-parent path only', () => {
+  it('does not highlight a branch path by default', () => {
     const layout = computeGraphLayout(commits);
     const highlight = buildGraphHighlightData(layout, 'main', undefined, null);
 
-    expect([...highlight.currentPathHashes]).toEqual(['merge02', 'main001', 'base000']);
-    expect(highlight.currentPathHashes.has('feature2')).toBe(false);
+    expect(highlight.currentPathHashes.size).toBe(0);
+    expect(highlight.selectedPathHashes.size).toBe(0);
+    expect(highlight.hasAnyPathHighlight).toBe(false);
+  });
+
+  it('highlights a manually selected branch path with its visible ancestry', () => {
+    const layout = computeGraphLayout(commits);
+    const highlight = buildGraphHighlightData(layout, 'main', undefined, 'feature/demo');
+
+    expect(highlight.currentPathHashes).toEqual(new Set([
+      'feature2',
+      'feature1',
+      'base000',
+    ]));
     expect(highlight.selectedPathHashes.size).toBe(0);
   });
 

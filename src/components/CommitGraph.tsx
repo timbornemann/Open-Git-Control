@@ -136,7 +136,7 @@ const graphEdgeKey = (edge: GraphEdge) => (
 
 export const buildGraphHighlightData = (
   layout: ReturnType<typeof useCommitGraphData>['layout'],
-  currentBranch: string,
+  _currentBranch: string,
   selectedHash: string | null | undefined,
   highlightedBranchRef: string | null,
 ) => {
@@ -172,20 +172,6 @@ export const buildGraphHighlightData = (
     }
   }
 
-  const headArrow = headNode?.commit.refs.find((ref) => ref.startsWith('HEAD ->'));
-  const headBranchFromGraph = headArrow ? resolveHighlightableBranchRef(headArrow) || '' : '';
-  const normalizedCurrentBranch = normalizeBranchRefForMerge((headBranchFromGraph || currentBranch).trim());
-  const buildFirstParentPath = (startNode: GraphNode | undefined) => {
-    const path = new Set<string>();
-    let cursor = startNode;
-    while (cursor && !path.has(cursor.commit.hash)) {
-      path.add(cursor.commit.hash);
-      const firstParent = cursor.commit.parentHashes[0];
-      if (!firstParent) break;
-      cursor = nodeByHash.get(firstParent);
-    }
-    return path;
-  };
   const buildAncestorPath = (startNode: GraphNode | undefined) => {
     const path = new Set<string>();
     const stack = startNode ? [startNode] : [];
@@ -206,20 +192,14 @@ export const buildGraphHighlightData = (
   const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
     ? highlightedBranchRef
     : null;
-  const defaultHighlightedBranch = normalizedCurrentBranch && branchTipByRef.has(normalizedCurrentBranch)
-    ? normalizedCurrentBranch
-    : null;
-  const activeHighlightedBranch = manualHighlightedBranch ?? defaultHighlightedBranch;
+  const activeHighlightedBranch = manualHighlightedBranch;
   const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
   const hasSelectedCommitFocus = Boolean(selectedNode);
   const currentPathStartNode = activeHighlightedBranch
     ? branchTipByRef.get(activeHighlightedBranch)
     : undefined;
-  const currentPathUsesAncestry = Boolean(manualHighlightedBranch);
-  const currentPathHashes = !hasSelectedCommitFocus && currentPathStartNode
-    ? (currentPathUsesAncestry
-      ? buildAncestorPath(currentPathStartNode)
-      : buildFirstParentPath(currentPathStartNode))
+  const currentPathHashes = !hasSelectedCommitFocus && manualHighlightedBranch && currentPathStartNode
+    ? buildAncestorPath(currentPathStartNode)
     : new Set<string>();
   const selectedBranchTarget = selectedNode
     ? sortRefs(selectedNode.commit.refs)
@@ -236,7 +216,7 @@ export const buildGraphHighlightData = (
   const selectedPathColor = hasSelectedPathHighlight
     ? (selectedPathStartNode?.color ?? currentPathColor)
     : currentPathColor;
-  const buildPathEdgeKeys = (pathHashes: Set<string>, mode: 'first-parent' | 'ancestry') => {
+  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
     const keys = new Set<string>();
     if (!layout || pathHashes.size === 0) return keys;
     for (const edge of layout.edges) {
@@ -245,10 +225,7 @@ export const buildGraphHighlightData = (
       const toNode = nodes[edge.toRow];
       if (!fromNode || !toNode) continue;
       if (!pathHashes.has(fromNode.commit.hash) || !pathHashes.has(toNode.commit.hash)) continue;
-      const parentHashes = mode === 'first-parent'
-        ? fromNode.commit.parentHashes.slice(0, 1)
-        : fromNode.commit.parentHashes;
-      if (!parentHashes.includes(toNode.commit.hash)) continue;
+      if (!fromNode.commit.parentHashes.includes(toNode.commit.hash)) continue;
       keys.add(graphEdgeKey(edge));
     }
     return keys;
@@ -269,11 +246,8 @@ export const buildGraphHighlightData = (
     hasAnyPathHighlight: hasCurrentPathHighlight || hasSelectedPathHighlight,
     currentPathColor,
     selectedPathColor,
-    currentPathEdgeKeys: buildPathEdgeKeys(
-      currentPathHashes,
-      currentPathUsesAncestry ? 'ancestry' : 'first-parent',
-    ),
-    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes, 'ancestry'),
+    currentPathEdgeKeys: buildPathEdgeKeys(currentPathHashes),
+    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes),
   };
 };
 
@@ -1394,6 +1368,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const workingTreeCount = !workingTreeStatus ? 0
     : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
+  const hasPassiveHeadFocus = !hasWorkingTreeChanges && !selectedHash && !hasAnyPathHighlight;
 
   const buildEdgePath = (edge: GraphEdge): string => {
     const x1 = laneX(edge.fromLane);
@@ -1689,9 +1664,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
             const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
             const isOnAnyFocusedPath = isOnCurrentPath || isOnSelectedPath;
-            const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
+            const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
             const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
             const fillColor = node.color;
+            const focusColor = isSelected ? selectedPathColor : fillColor;
             const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.72 : 1;
             const pathStroke = isOnSelectedPath
               ? selectedPathColor
@@ -1705,31 +1681,31 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={r + 8}
-                    fill={fillColor}
-                    opacity={0.16}
+                    r={r + 10}
+                    fill={focusColor}
+                    opacity={0.22}
                   />
                 )}
                 {isSelected && (
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={r + 5}
+                    r={r + 6}
                     fill="none"
-                    stroke={fillColor}
-                    strokeWidth={2.2}
-                    opacity={0.75}
+                    stroke={focusColor}
+                    strokeWidth={2.7}
+                    opacity={0.9}
                   />
                 )}
-                {isHeadCommit && (
+                {isLatestCommitFocus && (
                   <circle
                     cx={cx}
                     cy={cy}
                     r={r + 5}
                     fill="none"
-                    stroke={currentPathColor}
+                    stroke={fillColor}
                     strokeWidth={1.8}
-                    opacity={0.72}
+                    opacity={0.68}
                   />
                 )}
                 {isOnAnyFocusedPath && !isSelected && (
@@ -1782,7 +1758,11 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           <div
             className={`commit-row working-tree-row ${isWorkingTreeSelected ? 'selected' : ''}`}
             onClick={() => onSelectCommit && onSelectCommit(null)}
-            style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
+            style={{
+              height: ROW_HEIGHT,
+              paddingLeft: graphWidth,
+              ...(isWorkingTreeSelected ? ({ ['--commit-focus-color' as any]: 'var(--status-warning)' } as React.CSSProperties) : {}),
+            }}
           >
             <div className="commit-info">
               <span className="commit-hash">WORKDIR</span>
@@ -1824,6 +1804,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
           const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
           const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
+          const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
           const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
           const sortedRefs = sortRefs(node.commit.refs);
           const rowStyle: React.CSSProperties = {
@@ -1832,11 +1813,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px var(--accent-primary-strong)' } : {}),
             ...(isOnCurrentPath ? ({ ['--path-highlight-color' as any]: currentPathColor } as React.CSSProperties) : {}),
             ...(isOnSelectedPath ? ({ ['--selected-path-color' as any]: selectedPathColor } as React.CSSProperties) : {}),
+            ...(isSelected ? ({ ['--commit-focus-color' as any]: selectedPathColor } as React.CSSProperties) : {}),
+            ...(isLatestCommitFocus ? ({ ['--latest-focus-color' as any]: node.color } as React.CSSProperties) : {}),
           };
           return (
             <div
               key={node.commit.hash}
-              className={`commit-row ${isSelected ? 'selected' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''} ${isOnCurrentPath ? 'path-highlighted' : ''} ${isOnSelectedPath ? 'selected-branch-path' : ''} ${isMutedByPathFocus ? 'path-muted' : ''} ${isHeadCommit ? 'head-current' : ''}`}
+              className={`commit-row ${isSelected ? 'selected commit-click-focus' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''} ${isOnCurrentPath ? 'path-highlighted' : ''} ${isOnSelectedPath ? 'selected-branch-path' : ''} ${isLatestCommitFocus ? 'latest-focus' : ''} ${isMutedByPathFocus ? 'path-muted' : ''} ${isHeadCommit && isOnCurrentPath ? 'head-current' : ''}`}
               onClick={() => onSelectCommit && onSelectCommit(node.commit.hash)}
               onContextMenu={(e) => handleContextMenu(e, node)}
               style={rowStyle}
