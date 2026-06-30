@@ -27,4 +27,6 @@ coverage
 
 # Codex local metadata
 .codex/
+.claude/
+NVIDIA Corporation/
 release/
