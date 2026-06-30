@@ -494,6 +494,7 @@ const App: React.FC = () => {
       <AppStateContext.Provider value={ctxValue}>
         <ProjectPlannerProvider
           activeRepo={state.activeRepo}
+          refreshSignal={state.plannerRefreshSignal}
           onRepositorySelected={state.addOpenRepo}
           onRepositoryMaterialized={async (repoPath) => {
             await state.addOpenRepo(repoPath);

@@ -46,6 +46,7 @@ type ProjectPlannerContextValue = {
 
 type ProjectPlannerProviderProps = {
   activeRepo: string | null;
+  refreshSignal?: number;
   onRepositorySelected: (repoPath: string) => Promise<void>;
   onRepositoryMaterialized: (repoPath: string) => Promise<void>;
   onToast: (message: string, isError: boolean) => void;
@@ -63,6 +64,7 @@ const repoKey = (repoPath: string): string => {
 
 export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   activeRepo,
+  refreshSignal = 0,
   onRepositorySelected,
   onRepositoryMaterialized,
   onToast,
@@ -111,6 +113,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     };
     void load();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!refreshSignal) return;
+    void refresh().catch(() => {
+      // The visible error state explains how to recover.
+    });
+  }, [refresh, refreshSignal]);
 
   useEffect(() => {
     if (!activeRepo || !window.electronAPI?.plannerEnsureRepositoryProject) return;

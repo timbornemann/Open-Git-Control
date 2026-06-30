@@ -202,6 +202,7 @@ export const useAppState = () => {
 
   const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
   const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
+  const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
 
   const {
     showCreatePR,
@@ -1654,19 +1655,43 @@ export const useAppState = () => {
         ],
         irreversible: false,
         consequences: tr(
-          'Es werden keine Git-Daten geloescht. Nur der gespeicherte Eintrag in Open-Git-Control wird entfernt.',
-          'No Git data will be deleted. Only the saved Open-Git-Control entry will be removed.',
+          'Es werden keine Git-Dateien geloescht. Der gespeicherte Repo-Eintrag und zugehoerige Planungsdaten werden aus Open-Git-Control entfernt.',
+          'No Git files will be deleted. The saved repo entry and related planning data will be removed from Open-Git-Control.',
         ),
         confirmLabel: tr('Entfernen und wechseln', 'Remove and switch'),
         onConfirm: async () => {
+          let deletedPlanningItems = 0;
+          let plannerCleanupError = '';
           try {
+            if (window.electronAPI?.plannerDeleteRepositoryProjectByPath) {
+              const plannerResult = await window.electronAPI.plannerDeleteRepositoryProjectByPath(repoPath);
+              if (plannerResult.success) {
+                deletedPlanningItems = plannerResult.data.deletedItemCount;
+                if (plannerResult.data.deletedProjectCount > 0) {
+                  setPlannerRefreshSignal((current) => current + 1);
+                }
+              } else {
+                plannerCleanupError = plannerResult.error;
+              }
+            }
+
             await workspace.handleCloseRepo(repoPath);
             setGitActionToast({
-              msg: tr(
-                `Repository nicht mehr verfuegbar und geschlossen: ${repoName}`,
-                `Repository is no longer available and was closed: ${repoName}`,
-              ),
-              isError: true,
+              msg: plannerCleanupError
+                ? tr(
+                  `Repository entfernt, aber Planungsdaten konnten nicht geloescht werden: ${plannerCleanupError}`,
+                  `Repository was removed, but planning data could not be deleted: ${plannerCleanupError}`,
+                )
+                : deletedPlanningItems > 0
+                  ? tr(
+                    `Repository und ${deletedPlanningItems} Planungseintrag${deletedPlanningItems === 1 ? '' : 'e'} entfernt: ${repoName}`,
+                    `Repository and ${deletedPlanningItems} planning item${deletedPlanningItems === 1 ? '' : 's'} removed: ${repoName}`,
+                  )
+                  : tr(
+                    `Repository nicht mehr verfuegbar und entfernt: ${repoName}`,
+                    `Repository is no longer available and was removed: ${repoName}`,
+                  ),
+              isError: Boolean(plannerCleanupError),
             });
           } finally {
             window.setTimeout(() => {
@@ -2602,6 +2627,7 @@ export const useAppState = () => {
 
     settings,
     handleUpdateSettings,
+    plannerRefreshSignal,
     jobs,
     clearJobs,
 

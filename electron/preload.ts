@@ -134,6 +134,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   plannerCreateProject: (input: any) => ipcRenderer.invoke('planner:createProject', input),
   plannerUpdateProject: (projectId: string, input: any) => ipcRenderer.invoke('planner:updateProject', projectId, input),
   plannerDeleteProject: (projectId: string) => ipcRenderer.invoke('planner:deleteProject', projectId),
+  plannerDeleteRepositoryProjectByPath: (repoPath: string) => ipcRenderer.invoke('planner:deleteRepositoryProjectByPath', repoPath),
   plannerCreateItem: (projectId: string, input: any) => ipcRenderer.invoke('planner:createItem', projectId, input),
   plannerUpdateItem: (itemId: string, input: any) => ipcRenderer.invoke('planner:updateItem', itemId, input),
   plannerDeleteItem: (itemId: string) => ipcRenderer.invoke('planner:deleteItem', itemId),

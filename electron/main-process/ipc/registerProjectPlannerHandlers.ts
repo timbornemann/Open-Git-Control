@@ -7,6 +7,7 @@ import {
   convertProjectToRepository,
   createPlannedProject,
   createPlannerItem,
+  deleteRepositoryPlannerProjectByPath,
   deletePlannerItem,
   deletePlannerProject,
   ensureRepositoryProject,
@@ -65,6 +66,14 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     try {
       deletePlannerProject(projectId);
       return success(true);
+    } catch (error) {
+      return failure(error);
+    }
+  });
+
+  ipcMain.handle('planner:deleteRepositoryProjectByPath', async (_event: unknown, repoPath: string) => {
+    try {
+      return success(deleteRepositoryPlannerProjectByPath(repoPath));
     } catch (error) {
       return failure(error);
     }

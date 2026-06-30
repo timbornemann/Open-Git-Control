@@ -254,6 +254,34 @@ export function deletePlannerProject(projectId: string): void {
   });
 }
 
+export function deleteRepositoryPlannerProjectByPath(
+  repoPath: string,
+): { deletedProjectCount: number; deletedItemCount: number } {
+  const resolvedPath = normalizeRepoPath(repoPath);
+  if (!resolvedPath) throw new Error('Repository path is required.');
+
+  const data = readProjectPlannerData();
+  const repoKey = getRepositoryProjectKey(resolvedPath);
+  const projectIds = new Set(
+    data.projects
+      .filter((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey)
+      .map((project) => project.id),
+  );
+
+  if (projectIds.size === 0) {
+    return { deletedProjectCount: 0, deletedItemCount: 0 };
+  }
+
+  const deletedItemCount = data.items.filter((item) => projectIds.has(item.projectId)).length;
+  writeProjectPlannerData({
+    ...data,
+    projects: data.projects.filter((project) => !projectIds.has(project.id)),
+    items: data.items.filter((item) => !projectIds.has(item.projectId)),
+  });
+
+  return { deletedProjectCount: projectIds.size, deletedItemCount };
+}
+
 export function createPlannerItem(projectId: string, input: PlannerItemInput): PlannerItem {
   const data = readProjectPlannerData();
   if (!data.projects.some((project) => project.id === projectId)) {

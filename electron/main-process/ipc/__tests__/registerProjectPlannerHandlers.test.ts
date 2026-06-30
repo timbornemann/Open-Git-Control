@@ -17,6 +17,7 @@ import { registerProjectPlannerHandlers } from '../registerProjectPlannerHandler
 import {
   createPlannedProject,
   createPlannerItem,
+  ensureRepositoryProject,
   readProjectPlannerData,
 } from '../../projectPlannerStore';
 import { readStoreData } from '../../repoStore';
@@ -107,6 +108,47 @@ describe('registerProjectPlannerHandlers', () => {
         items: [],
       },
     });
+  });
+
+  it('deletes a repository planning project and its items by repository path through IPC', async () => {
+    const repoPath = path.join(tempDirectory, 'deleted-repo');
+    const project = ensureRepositoryProject(repoPath);
+    createPlannerItem(project.id, {
+      title: 'Remove me with the missing repo',
+      priority: 'high',
+      status: 'planned',
+      tags: ['Cleanup'],
+    });
+    const otherProject = createPlannedProject({ name: 'Keep this idea' });
+    createPlannerItem(otherProject.id, {
+      title: 'Keep me',
+      priority: 'medium',
+      status: 'idea',
+      tags: ['Idea'],
+    });
+
+    const gitService = {
+      runCommandAtPath: vi.fn(),
+    } as any;
+    registerProjectPlannerHandlers({ gitService });
+
+    const deleteByPathHandler = handlers.get('planner:deleteRepositoryProjectByPath');
+    expect(deleteByPathHandler).toBeTruthy();
+
+    const result = await deleteByPathHandler!({}, repoPath);
+    expect(result).toEqual({
+      success: true,
+      data: {
+        deletedProjectCount: 1,
+        deletedItemCount: 1,
+      },
+    });
+
+    const plannerData = readProjectPlannerData();
+    expect(plannerData.projects).toHaveLength(1);
+    expect(plannerData.projects[0]).toMatchObject({ id: otherProject.id, name: 'Keep this idea' });
+    expect(plannerData.items).toHaveLength(1);
+    expect(plannerData.items[0]).toMatchObject({ projectId: otherProject.id, title: 'Keep me' });
   });
 
   it('creates and initializes a project folder while preserving its planning items', async () => {

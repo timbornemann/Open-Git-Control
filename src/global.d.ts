@@ -478,6 +478,9 @@ export interface ElectronAPI {
     input: Partial<PlannerProjectInput>,
   ) => Promise<IpcResult<PlannerProject>>;
   plannerDeleteProject: (projectId: string) => Promise<IpcResult<boolean>>;
+  plannerDeleteRepositoryProjectByPath: (
+    repoPath: string,
+  ) => Promise<IpcResult<{ deletedProjectCount: number; deletedItemCount: number }>>;
   plannerCreateItem: (projectId: string, input: PlannerItemInput) => Promise<IpcResult<PlannerItem>>;
   plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => Promise<IpcResult<PlannerItem>>;
   plannerDeleteItem: (itemId: string) => Promise<IpcResult<boolean>>;
