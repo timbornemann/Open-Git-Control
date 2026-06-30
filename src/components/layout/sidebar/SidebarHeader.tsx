@@ -1,14 +1,12 @@
 ﻿import React from 'react';
-import { DownloadCloud, PanelLeftClose, Plus, RefreshCw } from 'lucide-react';
+import { DownloadCloud, Plus, RefreshCw } from 'lucide-react';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 
 type SidebarHeaderProps = Pick<
   AppSidebarProps,
   'activeTab' | 'activeRepo' | 'onOpenFolder' | 'onCloneByUrl' | 'onRefreshRemoteQuick' | 'remoteSync' | 'isGitActionRunning'
-> & {
-  onCollapse: () => void;
-};
+>;
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   activeTab,
@@ -18,7 +16,6 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   onRefreshRemoteQuick,
   remoteSync,
   isGitActionRunning,
-  onCollapse,
 }) => {
   const { tr } = useI18n();
 
@@ -70,15 +67,6 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             <RefreshCw size={14} />
           </button>
         )}
-        <button
-          className="icon-btn"
-          style={{ padding: '4px' }}
-          onClick={onCollapse}
-          title={tr('Sidebar schließen', 'Close sidebar')}
-          aria-label={tr('Sidebar schließen', 'Close sidebar')}
-        >
-          <PanelLeftClose size={16} />
-        </button>
       </div>
     </div>
   );

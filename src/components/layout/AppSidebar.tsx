@@ -44,7 +44,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, onToggleCol
             onRefreshRemoteQuick={props.onRefreshRemoteQuick}
             remoteSync={props.remoteSync}
             isGitActionRunning={props.isGitActionRunning}
-            onCollapse={onToggleCollapsed}
           />
 
           <div className="pane-content" style={{ padding: '8px' }}>
