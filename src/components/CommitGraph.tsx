@@ -134,7 +134,7 @@ const graphEdgeKey = (edge: GraphEdge) => (
   `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`
 );
 
-const buildGraphHighlightData = (
+export const buildGraphHighlightData = (
   layout: ReturnType<typeof useCommitGraphData>['layout'],
   currentBranch: string,
   selectedHash: string | null | undefined,
@@ -186,6 +186,22 @@ const buildGraphHighlightData = (
     }
     return path;
   };
+  const buildAncestorPath = (startNode: GraphNode | undefined) => {
+    const path = new Set<string>();
+    const stack = startNode ? [startNode] : [];
+    while (stack.length > 0) {
+      const cursor = stack.pop();
+      if (!cursor || path.has(cursor.commit.hash)) continue;
+      path.add(cursor.commit.hash);
+      for (const parentHash of cursor.commit.parentHashes) {
+        const parent = nodeByHash.get(parentHash);
+        if (parent && !path.has(parent.commit.hash)) {
+          stack.push(parent);
+        }
+      }
+    }
+    return path;
+  };
 
   const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
     ? highlightedBranchRef
@@ -194,42 +210,24 @@ const buildGraphHighlightData = (
     ? normalizedCurrentBranch
     : null;
   const activeHighlightedBranch = manualHighlightedBranch ?? defaultHighlightedBranch;
-  const currentPathHashes = activeHighlightedBranch
-    ? buildFirstParentPath(branchTipByRef.get(activeHighlightedBranch))
-    : new Set<string>();
   const selectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
+  const hasSelectedCommitFocus = Boolean(selectedNode);
+  const currentPathStartNode = activeHighlightedBranch
+    ? branchTipByRef.get(activeHighlightedBranch)
+    : undefined;
+  const currentPathUsesAncestry = Boolean(manualHighlightedBranch);
+  const currentPathHashes = !hasSelectedCommitFocus && currentPathStartNode
+    ? (currentPathUsesAncestry
+      ? buildAncestorPath(currentPathStartNode)
+      : buildFirstParentPath(currentPathStartNode))
+    : new Set<string>();
   const selectedBranchTarget = selectedNode
     ? sortRefs(selectedNode.commit.refs)
       .map(resolveHighlightableBranchRef)
       .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
     : undefined;
-
-  const inferTipForSelectedCommit = (hash: string) => {
-    let best: { tip: GraphNode; distance: number } | null = null;
-    for (const tip of branchTipByRef.values()) {
-      let cursor: GraphNode | undefined = tip;
-      let distance = 0;
-      const visited = new Set<string>();
-      while (cursor && !visited.has(cursor.commit.hash)) {
-        visited.add(cursor.commit.hash);
-        if (cursor.commit.hash === hash) {
-          if (!best || distance < best.distance) best = { tip, distance };
-          break;
-        }
-        const firstParent = cursor.commit.parentHashes[0];
-        if (!firstParent) break;
-        cursor = nodeByHash.get(firstParent);
-        distance += 1;
-      }
-    }
-    return best?.tip;
-  };
-  const selectedPathStartNode = selectedBranchTarget
-    ? branchTipByRef.get(selectedBranchTarget)
-    : selectedNode
-      ? (inferTipForSelectedCommit(selectedNode.commit.hash) ?? selectedNode)
-      : undefined;
-  const selectedPathHashes = buildFirstParentPath(selectedPathStartNode);
+  const selectedPathStartNode = selectedNode;
+  const selectedPathHashes = buildAncestorPath(selectedPathStartNode);
   const hasCurrentPathHighlight = currentPathHashes.size > 0;
   const hasSelectedPathHighlight = selectedPathHashes.size > 0;
   const currentPathColor = headNode && hasCurrentPathHighlight
@@ -238,7 +236,7 @@ const buildGraphHighlightData = (
   const selectedPathColor = hasSelectedPathHighlight
     ? (selectedPathStartNode?.color ?? currentPathColor)
     : currentPathColor;
-  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
+  const buildPathEdgeKeys = (pathHashes: Set<string>, mode: 'first-parent' | 'ancestry') => {
     const keys = new Set<string>();
     if (!layout || pathHashes.size === 0) return keys;
     for (const edge of layout.edges) {
@@ -247,7 +245,10 @@ const buildGraphHighlightData = (
       const toNode = nodes[edge.toRow];
       if (!fromNode || !toNode) continue;
       if (!pathHashes.has(fromNode.commit.hash) || !pathHashes.has(toNode.commit.hash)) continue;
-      if (fromNode.commit.parentHashes[0] !== toNode.commit.hash) continue;
+      const parentHashes = mode === 'first-parent'
+        ? fromNode.commit.parentHashes.slice(0, 1)
+        : fromNode.commit.parentHashes;
+      if (!parentHashes.includes(toNode.commit.hash)) continue;
       keys.add(graphEdgeKey(edge));
     }
     return keys;
@@ -259,6 +260,8 @@ const buildGraphHighlightData = (
     reachableFromHead,
     branchTipByRef,
     activeHighlightedBranch,
+    selectedBranchTarget,
+    hasSelectedCommitFocus,
     currentPathHashes,
     selectedPathHashes,
     hasCurrentPathHighlight,
@@ -266,8 +269,11 @@ const buildGraphHighlightData = (
     hasAnyPathHighlight: hasCurrentPathHighlight || hasSelectedPathHighlight,
     currentPathColor,
     selectedPathColor,
-    currentPathEdgeKeys: buildPathEdgeKeys(currentPathHashes),
-    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes),
+    currentPathEdgeKeys: buildPathEdgeKeys(
+      currentPathHashes,
+      currentPathUsesAncestry ? 'ancestry' : 'first-parent',
+    ),
+    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes, 'ancestry'),
   };
 };
 
@@ -1325,6 +1331,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     reachableFromHead,
     branchTipByRef,
     activeHighlightedBranch,
+    selectedBranchTarget,
+    hasSelectedCommitFocus,
     currentPathHashes,
     selectedPathHashes,
     hasAnyPathHighlight,
@@ -1827,7 +1835,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                     <div className="commit-refs">
                       {sortedRefs.map((ref, ri) => {
                         const branchTarget = resolveHighlightableBranchRef(ref);
-                        const isActiveBranchRef = Boolean(branchTarget && activeHighlightedBranch === branchTarget);
+                        const isActiveBranchRef = Boolean(
+                          branchTarget && (
+                            hasSelectedCommitFocus
+                              ? selectedBranchTarget === branchTarget
+                              : activeHighlightedBranch === branchTarget
+                          ),
+                        );
                         const branchFocusColor = branchTarget ? (branchTipByRef.get(branchTarget)?.color ?? 'var(--text-accent)') : 'var(--text-accent)';
 
                         if (!branchTarget) {
