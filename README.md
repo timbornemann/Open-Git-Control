@@ -1,11 +1,69 @@
 # Open-Git-Control
 
-Open-Git-Control is a modern desktop Git client (Electron + React) for fast local Git workflows with visual history, GitHub integration, security checks, and optional AI support.
+Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux.
+
+It brings a visual commit graph, staging, diff tools, conflict resolution, GitHub PR and release workflows, secret scanning, recovery tools, and optional AI-assisted commits/release notes into one local-first app - without putting core Git workflows behind a subscription.
 
 Language: **English (main)** | Deutsche Version: [README.de.md](README.de.md)
 
+![Open-Git-Control App Overview](Docs/App%20Overview.png)
+
+## Why Open-Git-Control?
+
+Try it if you want more than a minimal Git GUI, but still want a local-first, open-source alternative to commercial desktop clients.
+
+- Free and open source
+- Local-first desktop app for everyday Git work
+- Visual commit graph with branch, tag, merge, and recovery actions
+- Integrated staging, hunk-based diff viewer, stash tools, and conflict resolver
+- GitHub authentication, repositories, pull requests, CI status, workflows, and releases
+- Secret scanning before pushes and safety prompts for destructive operations
+- Optional AI support through Ollama or Gemini
+- Local Planning API and MCP-style tools for agent-assisted project work
+
+## Install
+
+Download the latest release:
+
+[github.com/timbornemann/Open-Git-Control/releases/latest](https://github.com/timbornemann/Open-Git-Control/releases/latest)
+
+Git must be installed and available in your `PATH`. See [Install Git](#install-git-where-and-how) if you need setup instructions.
+
+For development from source:
+
+```bash
+npm install
+npm run dev
+```
+
+## Screenshots
+
+### Diff Viewer
+![Open-Git-Control Diff View](Docs/View%20diff.png)
+
+### Conflict Resolver
+![Open-Git-Control Conflict Resolver](Docs/Conflict%20Resolver.png)
+
+## Quick Overview
+
+Open-Git-Control helps you:
+
+- open, initialize, and switch local repositories quickly
+- manage branches, remotes, tags, and submodules from one sidebar
+- understand history through a visual commit graph with searchable refs, authors, hashes, and subjects
+- inspect changes with staged/unstaged/commit diffs and hunk actions
+- resolve merge and rebase conflicts without leaving the app
+- recover from mistakes through reflog-based tools and guarded destructive actions
+- clone, fork, connect, and publish GitHub repositories
+- create and merge GitHub PRs, inspect CI status, and publish releases
+- generate optional AI commit messages and release notes with Ollama or Gemini
+- run automatic secret scans before pushing
+- expose local planning data to agents through a local API and MCP-style tools
+
 ## Table of Contents
 
+- [Why Open-Git-Control?](#why-open-git-control)
+- [Install](#install)
 - [Screenshots](#screenshots)
 - [Quick Overview](#quick-overview)
 - [Features in Detail](#features-in-detail)
@@ -25,41 +83,12 @@ Language: **English (main)** | Deutsche Version: [README.de.md](README.de.md)
   - [14) Shortcuts and Productivity](#14-shortcuts-and-productivity)
   - [15) Local Planning API and MCP Tools](#15-local-planning-api-and-mcp-tools)
 - [Install Git (where and how)](#install-git-where-and-how)
-- [Install the App](#install-the-app)
+- [Development and Local Builds](#development-and-local-builds)
 - [Typical Workflows](#typical-workflows)
 - [Settings (Overview)](#settings-overview)
 - [Data Storage and Security](#data-storage-and-security)
 - [Available npm Scripts](#available-npm-scripts)
 - [Troubleshooting](#troubleshooting)
-
-## Screenshots
-
-### App Overview
-![Open-Git-Control App Overview](Docs/App%20Overview.png)
-
-### Diff Viewer
-![Open-Git-Control Diff View](Docs/View%20diff.png)
-
-### Conflict Resolver
-![Open-Git-Control Conflict Resolver](Docs/Conflict%20Resolver.png)
-
-## Quick Overview
-
-With the app, you can:
-
-- open, manage, and quickly switch local repositories
-- initialize new repositories directly from a folder (`git init`)
-- plan repository work and future project ideas with statuses, priorities, descriptions, and free-form tags
-- expose planning data to local agents through a REST API and MCP-style JSON-RPC tools
-- manage branches, remotes, tags, and submodules in a sidebar
-- browse and operate on commits in a visual commit graph
-- run forensic history searches (`-S`, `-G`, `-L`) from the UI
-- perform reflog-based recovery directly in the app
-- work with staged/unstaged/untracked changes, including stash and hunk actions
-- resolve merge/rebase conflicts in an integrated conflict resolver
-- clone repositories via HTTP/SSH URL, fork GitHub repositories by URL, create/merge PRs, view CI status, and create releases
-- use AI Auto-Commit and AI Release Notes with Ollama or Gemini
-- run automatic secret scans before pushes
 
 ## Features in Detail
 
@@ -384,15 +413,9 @@ git config --global user.name "Your Name"
 git config --global user.email "your@email.com"
 ```
 
-## Install the App
+## Development and Local Builds
 
-### Option 1: Prebuilt Releases
-
-1. Open [GitHub Releases](https://github.com/timbornemann/Open-Git-Control/releases).
-2. Download the package for your operating system.
-3. Install and start.
-
-### Option 2: Run from Source (Development)
+### Run from Source
 
 Prerequisites:
 
@@ -405,7 +428,7 @@ npm install
 npm run dev
 ```
 
-### Option 3: Create Local Build Artifacts
+### Create Local Build Artifacts
 
 ```bash
 npm run build

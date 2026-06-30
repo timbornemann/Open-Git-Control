@@ -5,7 +5,16 @@ export const useDialogControllers = () => {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
 
-  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
+  const closeConfirmDialog = useCallback(() => {
+    if (!confirmDialog) {
+      setConfirmDialog(null);
+      return;
+    }
+
+    const action = confirmDialog.onCancel;
+    setConfirmDialog(null);
+    void action?.();
+  }, [confirmDialog]);
 
   const executeConfirmDialog = useCallback(async () => {
     if (!confirmDialog) return;

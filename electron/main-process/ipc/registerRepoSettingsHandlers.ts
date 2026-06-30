@@ -1,5 +1,4 @@
 import { app, ipcMain } from 'electron';
-import * as fs from 'fs';
 import { AppSettings, normalizeSettings } from '../../settings';
 import { StoredData, readStoreData, writeStoreData } from '../repoStore';
 import {
@@ -17,13 +16,7 @@ type RegisterRepoSettingsHandlersDeps = {
 
 export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle('repos:getStored', async () => {
-    const data = readStoreData();
-    data.repos = data.repos.filter((r) => fs.existsSync(r.path));
-    if (data.activeRepo && !data.repos.some((r) => r.path === data.activeRepo)) {
-      data.activeRepo = data.repos.length > 0 ? data.repos[0].path : null;
-    }
-    writeStoreData(data);
-    return data;
+    return readStoreData();
   });
 
   ipcMain.handle('repos:setStored', async (_event: any, data: StoredData) => {

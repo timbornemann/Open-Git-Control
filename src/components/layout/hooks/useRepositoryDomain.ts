@@ -7,6 +7,15 @@ import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { formatTime } from '../../../utils/dateTime';
 
+const EMPTY_REMOTE_SYNC_STATE: RemoteSyncState = {
+  isFetching: false,
+  lastFetchedAt: null,
+  lastFetchError: null,
+  ahead: 0,
+  behind: 0,
+  hasUpstream: false,
+};
+
 type Params = {
   activeRepo: string | null;
   refreshTrigger: number;
@@ -49,12 +58,7 @@ export const useRepositoryDomain = ({
   const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
 
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({
-    isFetching: false,
-    lastFetchedAt: null,
-    lastFetchError: null,
-    ahead: 0,
-    behind: 0,
-    hasUpstream: false,
+    ...EMPTY_REMOTE_SYNC_STATE,
   });
 
   const isRemoteFetchRunningRef = useRef(false);
@@ -83,6 +87,16 @@ export const useRepositoryDomain = ({
       second: '2-digit',
     });
   }, [language]);
+
+  useEffect(() => {
+    setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
+    setHasRemoteOrigin(null);
+    setRemotes([]);
+    setBranches([]);
+    setCurrentBranch('');
+    setTags([]);
+    setSubmodules([]);
+  }, [activeRepo]);
 
   useEffect(() => {
     if (!activeRepo || !window.electronAPI) {
@@ -300,14 +314,7 @@ export const useRepositoryDomain = ({
 
   useEffect(() => {
     if (!activeRepo) {
-      setRemoteSync({
-        isFetching: false,
-        lastFetchedAt: null,
-        lastFetchError: null,
-        ahead: 0,
-        behind: 0,
-        hasUpstream: false,
-      });
+      setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
       return;
     }
 

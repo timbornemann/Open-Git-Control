@@ -1639,26 +1639,49 @@ export const useAppState = () => {
       if (repoUnavailableHandlingRef.current === repoPath) return;
 
       repoUnavailableHandlingRef.current = repoPath;
+      const repoName = repoPath.split(/[\\/]/).pop() || repoPath;
 
-      void (async () => {
-        try {
-          await workspace.handleCloseRepo(repoPath);
-          const repoName = repoPath.split(/[\\/]/).pop() || repoPath;
-          setGitActionToast({
-            msg: tr(
-              `Repository nicht mehr verfuegbar und geschlossen: ${repoName}`,
-              `Repository is no longer available and was closed: ${repoName}`,
-            ),
-            isError: true,
-          });
-        } finally {
-          window.setTimeout(() => {
-            if (repoUnavailableHandlingRef.current === repoPath) {
-              repoUnavailableHandlingRef.current = null;
-            }
-          }, 800);
-        }
-      })();
+      setConfirmDialog({
+        variant: 'confirm',
+        title: tr('Repository nicht mehr verfuegbar', 'Repository no longer available'),
+        message: tr(
+          'Dieses lokale Repository wurde verschoben, geloescht oder ist nicht mehr erreichbar. Open-Git-Control entfernt es aus der lokalen Liste und wechselt erst danach zu einem anderen Repository.',
+          'This local repository was moved, deleted, or is no longer reachable. Open-Git-Control will remove it from the local list and only then switch to another repository.',
+        ),
+        contextItems: [
+          { label: tr('Repository', 'Repository'), value: repoName },
+          { label: tr('Pfad', 'Path'), value: repoPath },
+        ],
+        irreversible: false,
+        consequences: tr(
+          'Es werden keine Git-Daten geloescht. Nur der gespeicherte Eintrag in Open-Git-Control wird entfernt.',
+          'No Git data will be deleted. Only the saved Open-Git-Control entry will be removed.',
+        ),
+        confirmLabel: tr('Entfernen und wechseln', 'Remove and switch'),
+        onConfirm: async () => {
+          try {
+            await workspace.handleCloseRepo(repoPath);
+            setGitActionToast({
+              msg: tr(
+                `Repository nicht mehr verfuegbar und geschlossen: ${repoName}`,
+                `Repository is no longer available and was closed: ${repoName}`,
+              ),
+              isError: true,
+            });
+          } finally {
+            window.setTimeout(() => {
+              if (repoUnavailableHandlingRef.current === repoPath) {
+                repoUnavailableHandlingRef.current = null;
+              }
+            }, 800);
+          }
+        },
+        onCancel: () => {
+          if (repoUnavailableHandlingRef.current === repoPath) {
+            repoUnavailableHandlingRef.current = null;
+          }
+        },
+      });
     });
 
     return unsubscribe;
