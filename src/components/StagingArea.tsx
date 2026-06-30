@@ -11,9 +11,6 @@ import { useCommitForm } from './staging-area/useCommitForm';
 import { useAiCommit } from './staging-area/useAiCommit';
 import { useConflictResolver } from './staging-area/useConflictResolver';
 import {
-  formatCommitMessageStyleExample,
-  getCommitMessageLanguageLabel,
-  getCommitMessageLanguageOptions,
   getCommitMessageStyleLabel,
 } from '../utils/commitMessagePreferences';
 import type {
@@ -128,12 +125,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const aiCommitMessageStyleLabel = useMemo(() => {
     return getCommitMessageStyleLabel(settings.aiCommitMessageStyle, tr);
   }, [settings.aiCommitMessageStyle, tr]);
-  const aiCommitMessageLanguageLabel = useMemo(() => {
-    return getCommitMessageLanguageLabel(settings.aiCommitMessageLanguage, tr);
-  }, [settings.aiCommitMessageLanguage, tr]);
-  const aiCommitMessageExample = useMemo(() => {
-    return formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr);
-  }, [settings.aiCommitMessageLanguage, settings.aiCommitMessageStyle, tr]);
 
   const openAiCommitMessageDialog = useCallback(() => {
     setInputDialog({
@@ -147,38 +138,21 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           required: true,
           multiline: true,
           rows: 8,
-          helperText: tr(
-            `Stil: ${aiCommitMessageStyleLabel} | Sprache: ${aiCommitMessageLanguageLabel}`,
-            `Style: ${aiCommitMessageStyleLabel} | Language: ${aiCommitMessageLanguageLabel}`,
-          ),
-        },
-        {
-          id: 'language',
-          label: tr('Commit-Message Sprache', 'Commit message language'),
-          type: 'select',
-          defaultValue: settings.aiCommitMessageLanguage,
-          options: getCommitMessageLanguageOptions(tr),
-          helperText: tr('Ueberschreibt die Standardsprache nur fuer diese Generierung.', 'Overrides the default language for this generation only.'),
+          helperText: tr('Verwendet die zentralen KI-Commit-Message-Einstellungen.', 'Uses the central AI commit message settings.'),
         },
       ],
-      contextItems: [
-        { label: tr('Stil', 'Style'), value: aiCommitMessageStyleLabel },
-        { label: tr('Beispiel', 'Example'), value: aiCommitMessageExample },
-      ],
+      contextItems: [],
       irreversible: false,
       consequences: tr('Fuellt nur Commit-Titel und Beschreibung aus.', 'Only fills the commit title and description.'),
       confirmLabel: tr('Generieren', 'Generate'),
       onSubmit: async (values) => {
-        const language = values.language === 'de' || values.language === 'en' || values.language === 'auto'
-          ? values.language
-          : settings.aiCommitMessageLanguage;
-        const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '', language);
+        const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '');
         if (!message) return;
         commitForm.setCommitMsg(message.title);
         commitForm.setCommitDescription(message.description || '');
       },
     });
-  }, [aiCommit, aiCommitMessageExample, aiCommitMessageLanguageLabel, aiCommitMessageStyleLabel, commitForm, settings.aiCommitMessageLanguage, tr]);
+  }, [aiCommit, commitForm, tr]);
 
   const visibleFiles = useMemo(() => {
     const status = fileOps.status;

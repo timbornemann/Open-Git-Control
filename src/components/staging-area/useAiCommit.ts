@@ -348,7 +348,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     }
   }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, tr]);
 
-  const generateCommitMessageFromNotes = useCallback(async (notes: string, language?: 'auto' | 'de' | 'en'): Promise<GeneratedCommitMessage | null> => {
+  const generateCommitMessageFromNotes = useCallback(async (notes: string): Promise<GeneratedCommitMessage | null> => {
     if (!window.electronAPI) return null;
 
     const normalizedNotes = notes.trim();
@@ -359,7 +359,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
 
     setIsAiMessageGenerating(true);
     try {
-      const result = await window.electronAPI.aiGenerateCommitMessage({ notes: normalizedNotes, language });
+      const result = await window.electronAPI.aiGenerateCommitMessage({ notes: normalizedNotes });
       if (!result.success) {
         setToast({ msg: result.error || tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'), isError: true });
         return null;

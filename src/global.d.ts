@@ -505,7 +505,7 @@ export interface ElectronAPI {
   runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
   cancelAiAutoCommit: () => Promise<{ success: boolean; canceled: boolean }>;
   getAiAutoCommitState: () => Promise<IpcResult<GitJobEventDto | null>>;
-  aiGenerateCommitMessage: (params: { notes: string; language?: AiCommitMessageLanguageDto }) => Promise<IpcResult<AiGeneratedCommitMessageDto>>;
+  aiGenerateCommitMessage: (params: { notes: string }) => Promise<IpcResult<AiGeneratedCommitMessageDto>>;
   githubAuth: (token: string, host?: string) => Promise<boolean>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;

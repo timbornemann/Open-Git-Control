@@ -992,7 +992,7 @@ export class AiService {
   async generateCommitMessageFromUserNotes(
     settings: AppSettings,
     getGeminiApiKey: () => string,
-    params: { notes: string; language?: AiCommitMessageLanguage },
+    params: { notes: string },
   ): Promise<CommitMessage> {
     const notes = normalizeUserCommitNotes(params?.notes);
     if (!notes) {
@@ -1011,7 +1011,7 @@ export class AiService {
       }
     }
 
-    const commitLanguage = params.language || settings.aiCommitMessageLanguage;
+    const commitLanguage = settings.aiCommitMessageLanguage;
     const systemPrompt = [
       'You write git commit messages from user-supplied change notes only.',
       'Do not infer repository state, file names, diffs, implementation details, or unstated intent.',

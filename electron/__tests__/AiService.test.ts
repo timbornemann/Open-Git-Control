@@ -199,7 +199,7 @@ describe('AiService commit message from user notes', () => {
     await service.generateCommitMessageFromUserNotes(
       { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model', aiCommitMessageLanguage: 'en' },
       () => '',
-      { notes: 'Commit-Sprache soll konstant bleiben.', language: 'en' },
+      { notes: 'Commit-Sprache soll konstant bleiben.' },
     );
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));

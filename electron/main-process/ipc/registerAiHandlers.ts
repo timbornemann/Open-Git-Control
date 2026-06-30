@@ -45,7 +45,7 @@ export function registerAiHandlers({
     }
   });
 
-  ipcMain.handle('ai:generateCommitMessage', async (_event, params: { notes?: string; language?: AppSettings['aiCommitMessageLanguage'] }) => {
+  ipcMain.handle('ai:generateCommitMessage', async (_event, params: { notes?: string }) => {
     try {
       const notes = String(params?.notes || '').trim();
       if (!notes) {
@@ -53,13 +53,10 @@ export function registerAiHandlers({
       }
 
       const settings = readSettingsWithMigration();
-      const language = params?.language === 'de' || params?.language === 'en' || params?.language === 'auto'
-        ? params.language
-        : settings.aiCommitMessageLanguage;
       const message = await aiService.generateCommitMessageFromUserNotes(
         settings,
         getGeminiApiKeyFromSecureStore,
-        { notes, language },
+        { notes },
       );
 
       return { success: true, data: message };
