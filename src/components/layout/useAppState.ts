@@ -43,6 +43,7 @@ import {
 } from './state/appStateShared';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
 import { usePrAndReleaseState } from './state/usePrAndReleaseState';
+import { parseGitTransferProgressLine } from '../../utils/gitTransferProgress';
 
 const stripGitSuffix = (name: string): string => {
   const normalized = String(name || '').trim();
@@ -113,6 +114,32 @@ const isCloneSourceLikelyRemote = (cloneSource: string): boolean => {
   return /^(https?:\/\/|ssh:\/\/|git@[^:]+:)/i.test(normalizedSource);
 };
 
+const isTransferProgressOperation = (operation: string): boolean => (
+  operation === 'git:clone'
+  || operation === 'git:fetch'
+  || operation === 'git:pull'
+);
+
+const compactTransferProgressJobs = (jobs: GitJobEventDto[], event: GitJobEventDto): GitJobEventDto[] => {
+  if (event.status !== 'progress' || !isTransferProgressOperation(event.operation)) {
+    return [event, ...jobs].slice(0, 200);
+  }
+
+  const parsedEvent = parseGitTransferProgressLine(event.message || '');
+  if (!parsedEvent) {
+    return [event, ...jobs].slice(0, 200);
+  }
+
+  return [
+    event,
+    ...jobs.filter((existing) => {
+      if (existing.id !== event.id || existing.status !== 'progress') return true;
+      const parsedExisting = parseGitTransferProgressLine(existing.message || '');
+      return parsedExisting?.key !== parsedEvent.key;
+    }),
+  ].slice(0, 200);
+};
+
 const parseGithubRepoReference = (cloneSource: string): ParsedGithubRepoReference | null => {
   const normalizedSource = String(cloneSource || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
   if (!normalizedSource) return null;
@@ -162,6 +189,7 @@ export const useAppState = () => {
   const [commitRefreshTrigger, setCommitRefreshTrigger] = useState(0);
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
+  const [activeGitCommand, setActiveGitCommand] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
   const repoUnavailableHandlingRef = useRef<string | null>(null);
 
@@ -307,7 +335,7 @@ export const useAppState = () => {
     if (!window.electronAPI) return;
 
     const unsubscribe = window.electronAPI.onJobEvent((event) => {
-      setJobs(prev => [event, ...prev].slice(0, 200));
+      setJobs(prev => compactTransferProgressJobs(prev, event));
     });
 
     return unsubscribe;
@@ -1376,6 +1404,7 @@ export const useAppState = () => {
     }
 
     setIsGitActionRunning(true);
+    setActiveGitCommand(command);
     setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
     try {
@@ -1596,6 +1625,7 @@ export const useAppState = () => {
       return false;
     } finally {
       setIsGitActionRunning(false);
+      setActiveGitCommand(null);
       setActiveGitActionLabel(null);
     }
   }, [ensureInitialCommitForPush, forceGithubRepoCreationPrompt, openGithubRepoCreationRecovery, requestInitialCommitConfirmationIfNeeded, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, triggerRefresh, workspace, tr]);
@@ -2378,6 +2408,7 @@ export const useAppState = () => {
     openConflictResolverForPath,
 
     isGitActionRunning,
+    activeGitCommand,
     activeGitActionLabel,
     runGitCommand,
     gitActionToast,
@@ -2461,6 +2492,7 @@ export const useAppState = () => {
 
     isCloning: github.isCloning,
     setIsCloning: github.setIsCloning,
+    closeCloneProgress: github.closeCloneProgress,
     cloneLog: github.cloneLog,
     cloneRepoName: github.cloneRepoName,
     cloneFinished: github.cloneFinished,

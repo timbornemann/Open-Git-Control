@@ -230,6 +230,7 @@ export class GitService {
 
   private isExpectedNonFatalGitError(args: string[], errorText: string): boolean {
     const primary = String(args?.[0] || '').trim().toLowerCase();
+    const secondary = String(args?.[1] || '').trim().toLowerCase();
     const expectsUpstreamRef = args.some((arg) => String(arg || '').trim() === '@{upstream}');
     if (primary === 'rev-parse' && expectsUpstreamRef) {
       return (
@@ -237,6 +238,9 @@ export class GitService {
         || /upstream branch .* not stored as a remote-tracking branch/i.test(errorText)
         || /fatal: no such branch/i.test(errorText)
       );
+    }
+    if (primary === 'submodule' && secondary === 'status') {
+      return /no submodule mapping found in \.gitmodules for path/i.test(errorText);
     }
     return false;
   }
@@ -814,7 +818,14 @@ export class GitService {
   }
 
   async getSubmoduleStatus(): Promise<string> {
-    return this.runCommand(['submodule', 'status', '--recursive']);
+    try {
+      return await this.runCommand(['submodule', 'status', '--recursive']);
+    } catch (error: any) {
+      if (/no submodule mapping found in \.gitmodules for path/i.test(String(error?.message || ''))) {
+        return '';
+      }
+      throw error;
+    }
   }
 
   async updateSubmodulesInitRecursive(): Promise<string> {
@@ -1134,6 +1145,70 @@ export class GitService {
         }
         if (pending) onLine(pending.replace(/\r$/, ''));
         resolve();
+      });
+    }), { signal });
+  }
+
+  async streamCommandOutput(
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const repoPath = this.ensureRepoPath();
+    this.assertRepoPathAvailable(repoPath);
+
+    const emitLines = (chunk: Buffer, pendingRef: { value: string }, capture: (text: string) => void) => {
+      const text = chunk.toString('utf8');
+      capture(text);
+
+      const parts = `${pendingRef.value}${text}`.split(/\r\n|\n|\r/);
+      pendingRef.value = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (line) onLine(line);
+      }
+    };
+
+    const kind = this.classifyCommand(args);
+    return this.scheduler.schedule(repoPath, kind, args[0] || 'stream', (schedulerSignal) => new Promise<string>((resolve, reject) => {
+      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const stdoutPending = { value: '' };
+      const stderrPending = { value: '' };
+      let stdout = '';
+      let stderr = '';
+      const abort = () => proc.kill();
+      schedulerSignal.addEventListener('abort', abort, { once: true });
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        emitLines(chunk, stdoutPending, (text) => {
+          stdout += text;
+        });
+      });
+      proc.stderr.on('data', (chunk: Buffer) => {
+        emitLines(chunk, stderrPending, (text) => {
+          if (stderr.length < 256 * 1024) stderr += text;
+        });
+      });
+      proc.on('error', reject);
+      proc.on('close', (code, closeSignal) => {
+        schedulerSignal.removeEventListener('abort', abort);
+        if (schedulerSignal.aborted || closeSignal) {
+          const error = new Error('Git stream was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
+
+        const stdoutTail = stdoutPending.value.trim();
+        const stderrTail = stderrPending.value.trim();
+        if (stdoutTail) onLine(stdoutTail);
+        if (stderrTail) onLine(stderrTail);
+
+        if (code !== 0) {
+          reject(new Error((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          return;
+        }
+        resolve(stdout.trimEnd());
       });
     }), { signal });
   }

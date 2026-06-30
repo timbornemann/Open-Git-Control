@@ -353,6 +353,28 @@ describe('GitService status and stash helpers', () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it('treats missing .gitmodules mappings as empty submodule status', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-submodule-status-'));
+    const error: any = new Error('Command failed');
+    error.stderr = "fatal: no submodule mapping found in .gitmodules for path '.claude/worktrees/bold-mendeleev'";
+    const runner = vi.fn(async () => {
+      throw error;
+    });
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.getSubmoduleStatus()).resolves.toBe('');
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(runner).toHaveBeenCalledWith('git', ['submodule', 'status', '--recursive'], expect.any(Object));
+    } finally {
+      consoleErrorSpy.mockRestore();
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('GitService command queue', () => {

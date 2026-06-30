@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { BranchContextMenu } from './components/layout/BranchContextMenu';
 import { CloneProgressModal } from './components/layout/CloneProgressModal';
+import { GitTransferProgressOverlay } from './components/layout/GitTransferProgressOverlay';
 import { Confirm } from './components/Confirm';
 import { DangerConfirm } from './components/DangerConfirm';
 import { Input } from './components/Input';
@@ -293,6 +294,25 @@ const App: React.FC = () => {
     onFetch: () => state.refreshRemoteState(true),
     onOpenCommandPalette: () => setIsPaletteOpen(true),
   });
+
+  const activeTransferCommand = state.activeGitCommand === 'pull' || state.activeGitCommand === 'fetch'
+    ? state.activeGitCommand
+    : null;
+  const activeTransferEvents = useMemo(() => {
+    if (!activeTransferCommand) return [];
+
+    const operation = `git:${activeTransferCommand}`;
+    const latestEvent = state.jobs.find((event) => event.operation === operation);
+    if (!latestEvent || latestEvent.status === 'done' || latestEvent.status === 'failed' || latestEvent.status === 'cancelled') {
+      return [];
+    }
+
+    return state.jobs
+      .filter((event) => event.id === latestEvent.id)
+      .slice()
+      .reverse();
+  }, [activeTransferCommand, state.jobs]);
+  const showGitTransferProgress = Boolean(activeTransferCommand && state.isGitActionRunning && !state.isCloning);
 
   const ctxValue: AppContextValue = {
     // ── AppSidebarProps ────────────────────────────────────────────────────
@@ -661,6 +681,12 @@ const App: React.FC = () => {
             />
           )}
 
+          <GitTransferProgressOverlay
+            open={showGitTransferProgress}
+            title={state.activeGitActionLabel}
+            events={activeTransferEvents}
+          />
+
           <CloneProgressModal
             isCloning={state.isCloning}
             cloneRepoName={state.cloneRepoName}
@@ -668,7 +694,7 @@ const App: React.FC = () => {
             cloneError={state.cloneError}
             cloneLog={state.cloneLog}
             onClose={() => {
-              state.setIsCloning(false);
+              state.closeCloneProgress();
               state.triggerRefresh();
             }}
           />

@@ -120,4 +120,70 @@ describe('registerGitHandlers', () => {
     expect(gitService.runCommand).toHaveBeenCalledWith(['status', '--porcelain=v2', '--branch']);
     expect(gitService.getStatus).not.toHaveBeenCalled();
   });
+
+  it('streams pull progress through job events', async () => {
+    const send = vi.fn();
+    const gitService = {
+      runCommand: vi.fn(),
+      streamCommandOutput: vi.fn(async (_args: string[], onLine: (line: string) => void) => {
+        onLine('Receiving objects: 50% (5/10), 1.00 MiB | 2.00 MiB/s');
+        onLine('Resolving deltas: 25% (2/8)');
+        return 'pull ok';
+      }),
+      getStatus: vi.fn(),
+      getStatusPorcelain: vi.fn(),
+      getLog: vi.fn(),
+      getBranches: vi.fn(),
+      getCommitDetails: vi.fn(),
+      checkoutConflictVersion: vi.fn(),
+      addFile: vi.fn(),
+      continueMerge: vi.fn(),
+      abortMerge: vi.fn(),
+      continueRebase: vi.fn(),
+      abortRebase: vi.fn(),
+      getSubmoduleStatus: vi.fn(),
+      updateSubmodulesInitRecursive: vi.fn(),
+      syncSubmodulesRecursive: vi.fn(),
+      getReflog: vi.fn(),
+      getForensicHistoryByString: vi.fn(),
+      getForensicHistoryByRegex: vi.fn(),
+      getForensicHistoryByLineRange: vi.fn(),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs: vi.fn() } as any,
+      commitStatsService: {
+        onUpdate: vi.fn(() => vi.fn()),
+        interruptBackgroundWork: vi.fn(),
+      } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const commandHandler = handlers.get('git:command');
+    expect(commandHandler).toBeTruthy();
+
+    const result = await commandHandler!({ sender: { send } }, 'pull', '--rebase');
+    expect(result).toEqual({ success: true, data: 'pull ok' });
+    expect(gitService.streamCommandOutput).toHaveBeenCalledWith(
+      ['pull', '--progress', '--rebase'],
+      expect.any(Function),
+    );
+
+    const jobEvents = send.mock.calls
+      .filter((call) => call[0] === 'job:event')
+      .map((call) => call[1]);
+
+    expect(jobEvents.map((event) => event.status)).toEqual(['start', 'progress', 'progress', 'done']);
+    expect(jobEvents[1]).toEqual(expect.objectContaining({
+      operation: 'git:pull',
+      message: 'Receiving objects: 50% (5/10), 1.00 MiB | 2.00 MiB/s',
+    }));
+    expect(jobEvents[2]).toEqual(expect.objectContaining({
+      operation: 'git:pull',
+      message: 'Resolving deltas: 25% (2/8)',
+    }));
+    expect(new Set(jobEvents.map((event) => event.id)).size).toBe(1);
+  });
 });

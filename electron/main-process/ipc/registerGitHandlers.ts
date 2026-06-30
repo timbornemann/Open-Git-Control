@@ -10,6 +10,7 @@ import {
   assertAllowedGitCommand,
   createJobId,
   normalizeArgs,
+  type GitCommandName,
   validateCommandArgs,
 } from '../gitCommandPolicy';
 import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
@@ -22,6 +23,17 @@ type RegisterGitHandlersDeps = {
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
   readSettingsWithMigration: () => AppSettings;
+};
+
+const STREAMING_PROGRESS_COMMANDS = new Set<GitCommandName>(['fetch', 'pull']);
+
+const withProgressFlag = (commandName: GitCommandName, args: string[]): string[] => {
+  const baseArgs = [commandName, ...args];
+  if (!STREAMING_PROGRESS_COMMANDS.has(commandName)) return baseArgs;
+  if (args.some((arg) => arg === '--progress' || arg === '--no-progress' || arg === '--quiet' || arg === '-q')) {
+    return baseArgs;
+  }
+  return [commandName, '--progress', ...args];
 };
 
 export function registerGitHandlers({
@@ -130,6 +142,17 @@ export function registerGitHandlers({
         } else {
           data = await gitService.getForensicHistoryByLineRange(targetPath, startLine, endLine, limit);
         }
+      } else if (STREAMING_PROGRESS_COMMANDS.has(commandName)) {
+        data = await gitService.streamCommandOutput(withProgressFlag(commandName, normalizedArgs), (line: string) => {
+          if (!jobId) return;
+          emitJobEvent(event.sender, {
+            id: jobId,
+            operation: `git:${commandName}`,
+            status: 'progress',
+            message: line,
+            timestamp: Date.now(),
+          });
+        });
       } else {
         data = await gitService.runCommand([commandName, ...normalizedArgs]);
       }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { DownloadCloud } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { GitTransferProgressPanel } from './GitTransferProgressPanel';
 
 type Props = {
   isCloning: boolean;
@@ -23,75 +24,33 @@ export const CloneProgressModal: React.FC<Props> = ({
 
   if (!isCloning && !cloneFinished && !cloneError) return null;
 
+  const isRunning = isCloning && !cloneFinished && !cloneError;
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: 'var(--bg-panel)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '10px',
-          width: '520px',
-          maxHeight: '400px',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        }}
-      >
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <DownloadCloud size={18} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{tr('Klone', 'Cloning')}: {cloneRepoName || tr('Repository', 'Repository')}</span>
-          <div style={{ flex: 1 }} />
-          {!cloneFinished && !cloneError && <div className="clone-spinner" />}
-          {cloneFinished && <span style={{ color: 'var(--status-success)', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fertig', 'Done')}</span>}
-          {cloneError && <span style={{ color: 'var(--status-danger)', fontSize: '0.85rem', fontWeight: 600 }}>{tr('Fehler', 'Error')}</span>}
+    <div className="git-transfer-backdrop">
+      <div className="git-transfer-modal" role="dialog" aria-modal="true" aria-label={tr('Repository klonen', 'Clone repository')}>
+        <div className="git-transfer-modal-header">
+          <DownloadCloud size={18} className="git-transfer-header-icon" aria-hidden="true" />
+          <span className="git-transfer-modal-title">
+            {tr('Klone', 'Cloning')}: {cloneRepoName || tr('Repository', 'Repository')}
+          </span>
+          <div className="git-transfer-header-spacer" />
+          {isRunning && <div className="clone-spinner" />}
+          {cloneFinished && <span className="git-transfer-header-state complete">{tr('Fertig', 'Done')}</span>}
+          {cloneError && <span className="git-transfer-header-state error">{tr('Fehler', 'Error')}</span>}
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: '12px 16px',
-            fontFamily: 'monospace',
-            fontSize: '0.78rem',
-            lineHeight: '1.6',
-            color: 'var(--text-secondary)',
-            maxHeight: '260px',
-          }}
-        >
-          {cloneLog.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>{tr('Starte Clone-Prozess...', 'Starting clone process...')}</span>}
-          {cloneLog.map((line, i) => (
-            <div key={i} style={{ color: line.startsWith('ERROR:') ? 'var(--status-danger)' : line.startsWith('SUCCESS:') ? 'var(--status-success)' : 'var(--text-secondary)' }}>
-              {line}
-            </div>
-          ))}
-        </div>
+        <GitTransferProgressPanel
+          lines={cloneLog}
+          isRunning={isRunning}
+          isComplete={cloneFinished}
+          error={cloneError}
+          emptyText={tr('Starte Clone-Prozess...', 'Starting clone process...')}
+        />
 
         {(cloneFinished || cloneError) && (
-          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '6px 16px',
-                backgroundColor: 'var(--accent-primary)',
-                color: 'var(--on-accent)',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-              }}
-            >
+          <div className="git-transfer-modal-footer">
+            <button type="button" className="git-transfer-close-button" onClick={onClose}>
               {tr('Schliessen', 'Close')}
             </button>
           </div>

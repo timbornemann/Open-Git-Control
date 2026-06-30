@@ -445,6 +445,14 @@ export const useGithubDomain = ({
     await cloneRepository(cloneUrl, { repoName });
   }, [cloneRepository]);
 
+  const closeCloneProgress = useCallback(() => {
+    setIsCloning(false);
+    setCloneFinished(false);
+    setCloneError(null);
+    setCloneLog([]);
+    setCloneRepoName(null);
+  }, []);
+
   return {
     isAuthenticated,
     setIsAuthenticated,
@@ -478,6 +486,7 @@ export const useGithubDomain = ({
 
     isCloning,
     setIsCloning,
+    closeCloneProgress,
     cloneLog,
     cloneRepoName,
     cloneFinished,

@@ -39,6 +39,7 @@ type ProjectDialogProps = {
   busy: boolean;
   onClose: () => void;
   onSubmit: (input: PlannerProjectInput) => Promise<void>;
+  onDelete?: () => void;
 };
 
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({
@@ -47,6 +48,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   busy,
   onClose,
   onSubmit,
+  onDelete,
 }) => {
   const { tr } = useI18n();
   const [name, setName] = React.useState('');
@@ -72,6 +74,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
       onEnter={submit}
       confirmLabel={project ? tr('Speichern', 'Save') : tr('Projekt anlegen', 'Create project')}
       confirmDisabled={!name.trim() || busy}
+      onSecondaryAction={project && onDelete ? onDelete : undefined}
+      secondaryActionLabel={project?.kind === 'planned'
+        ? tr('Projektidee loeschen', 'Delete project idea')
+        : tr('Planungsdaten loeschen', 'Delete planning data')}
+      secondaryActionVariant="danger"
     >
       <div className="planner-dialog-form">
         <label>
@@ -101,6 +108,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
 type ItemDialogProps = {
   open: boolean;
   item?: PlannerItem | null;
+  defaultStatus?: PlannerStatus;
   busy: boolean;
   onClose: () => void;
   onSubmit: (input: PlannerItemInput) => Promise<void>;
@@ -109,6 +117,7 @@ type ItemDialogProps = {
 export const ItemDialog: React.FC<ItemDialogProps> = ({
   open,
   item,
+  defaultStatus = 'idea',
   busy,
   onClose,
   onSubmit,
@@ -126,9 +135,9 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
     setTitle(item?.title || '');
     setDescription(item?.description || '');
     setPriority(item?.priority || 'medium');
-    setStatus(item?.status || 'idea');
+    setStatus(item?.status || defaultStatus);
     setTags(item?.tags.join(', ') || '');
-  }, [item, open]);
+  }, [defaultStatus, item, open]);
 
   const submit = () => {
     if (!title.trim() || busy) return;
