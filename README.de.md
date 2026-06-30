@@ -1,385 +1,695 @@
-﻿# Open-Git-Control
+# Open-Git-Control
 
-Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux.
+[![CI](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
+[![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Die App kombiniert visuellen Commit-Graph, Staging, Diff-Tools, Konfliktloesung, GitHub-PRs und Releases, Secret-Scanning, Recovery-Werkzeuge und optionale KI-Unterstuetzung fuer Commits/Release Notes in einer lokalen Desktop-App - ohne zentrale Git-Workflows hinter ein Abo zu legen.
+Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, Diff-Ansicht, Konfliktloesung, GitHub Pull Requests, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge und optionale KI-Unterstuetzung in einer lokalen Anwendung.
 
-Sprache: **Deutsch** | English main version: [README.md](README.md)
+Sprache: **Deutsch** | English version: [README.md](README.md)
 
-![Open-Git-Control App Overview](Docs/App%20Overview.png)
+![Open-Git-Control App-Uebersicht](Docs/App%20Overview.png)
 
 ## Warum Open-Git-Control?
 
-Open-Git-Control ist fuer dich interessant, wenn dir ein minimaler Git-Client nicht reicht, du aber trotzdem eine lokale, offene Alternative zu kommerziellen Desktop-Clients suchst.
+Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client nicht reicht, du aber trotzdem eine transparente, lokale Alternative zu kommerziellen Desktop-Clients suchst.
 
-- Frei und open source
-- Lokale Desktop-App fuer taegliche Git-Arbeit
-- Visueller Commit-Graph mit Branch-, Tag-, Merge- und Recovery-Aktionen
-- Integriertes Staging, Hunk-Diff-Viewer, Stash-Werkzeuge und Conflict Resolver
-- GitHub-Login, Repositories, Pull Requests, CI-Status, Workflows und Releases
-- Secret-Scanning vor Pushes und Sicherheitsabfragen fuer destruktive Aktionen
-- Optionale KI-Unterstuetzung ueber Ollama oder Gemini
-- Lokale Planning API und MCP-aehnliche Tools fuer agentengestuetzte Projektarbeit
+- Frei und open source unter der GNU-GPL-Lizenz
+- Git-Operationen laufen lokal gegen deine Repositories
+- Visueller Commit-Graph mit Branch-, Tag-, Merge-, Reset-, Rebase-, Cherry-Pick-, Revert- und Recovery-Aktionen
+- Staging, Stash, Hunk-Diffs, Datei-Historie, Blame und Konfliktloesung in einem Workflow
+- GitHub-Login, Repository-Klonen/Forken, Pull Requests, CI-Status, Workflows und Release-Publishing
+- Projektplanung mit lokaler REST- und MCP-aehnlicher API fuer agentengestuetzte Arbeit
+- Optionale KI-Unterstuetzung ueber Ollama oder Google Gemini fuer Commit Messages, Auto-Commits und Release Notes
+- Secret-Scanning vor Pushes, Allowlist, Sicherheitsabfragen fuer gefaehrliche Aktionen und lokale verschluesselte Token-Speicherung, wenn vom OS unterstuetzt
 
-## Installation
+## Downloads
 
-Aktuelles Release herunterladen:
+Aktuelle Release-Seite:
 
 [github.com/timbornemann/Open-Git-Control/releases/latest](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 
-Git muss installiert und im `PATH` verfuegbar sein. Siehe [Git installieren](#git-installieren-wie-und-wo), falls du Setup-Hilfe brauchst.
+Hier dokumentiertes aktuelles GitHub-Release: [v1.2.5](https://github.com/timbornemann/Open-Git-Control/releases/tag/v1.2.5)
 
-Fuer Entwicklung aus dem Quellcode:
+| Plattform | Paket | Direkter GitHub-Download |
+| --- | --- | --- |
+| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-1.2.5-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-win-x64.exe) |
+| Linux x64 | AppImage | [Open-Git-Control-1.2.5-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-linux-x86_64.AppImage) |
+| Linux amd64 | Debian-Paket `.deb` | [Open-Git-Control-1.2.5-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-linux-amd64.deb) |
+| macOS x64 | Disk Image `.dmg` | [Open-Git-Control-1.2.5-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-mac-x64.dmg) |
+| macOS x64 | Zip-Archiv | [Open-Git-Control-1.2.5-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-mac-x64.zip) |
 
-```bash
-npm install
-npm run dev
-```
+Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
+
+## Voraussetzungen
+
+- Git muss installiert und im `PATH` verfuegbar sein.
+- GitHub CLI (`gh`) ist optional und nur fuer die One-click-GitHub-Login-Methode erforderlich.
+- Ollama oder ein Gemini API Key ist optional und nur fuer KI-Funktionen erforderlich.
+- Entwicklung aus dem Quellcode benoetigt Node.js und npm. CI nutzt aktuell Node.js 20.
 
 ## Screenshots
 
-### Diff Viewer
-![Open-Git-Control Diff View](Docs/View%20diff.png)
+### Repository Cockpit und Commit Graph
+
+![Repository Cockpit und Commit Graph](Docs/App%20Overview.png)
+
+### Diff Viewer mit Hunk-Aktionen, Blame und Datei-Inspector
+
+![Diff Viewer](Docs/View%20diff.png)
 
 ### Conflict Resolver
-![Open-Git-Control Conflict Resolver](Docs/Conflict%20Resolver.png)
 
-## Kurzueberblick
+![Conflict Resolver](Docs/Conflict%20Resolver.png)
 
-Mit Open-Git-Control kannst du:
+### Codebase Timeline
 
-- lokale Repositories schnell oeffnen, initialisieren und wechseln
-- Branches, Remotes, Tags und Submodule in einer Sidebar verwalten
-- Historie ueber einen visuellen Commit-Graph mit Suche nach Refs, Autor, Hash und Subject verstehen
-- Aenderungen ueber staged/unstaged/commit-spezifische Diffs und Hunk-Aktionen pruefen
-- Merge- und Rebase-Konflikte direkt in der App loesen
-- Fehler ueber Reflog-basierte Werkzeuge und geschuetzte destruktive Aktionen beheben
-- GitHub-Repositories klonen, forken, verbinden und veroeffentlichen
-- GitHub-PRs erstellen/mergen, CI-Status pruefen und Releases veroeffentlichen
-- optionale KI-Commit-Messages und Release Notes mit Ollama oder Gemini erstellen
-- vor Pushes automatisch Secret-Scans ausfuehren
-- Planungsdaten ueber eine lokale API und MCP-aehnliche Tools fuer Agenten bereitstellen
+![Codebase Timeline](Docs/Timeline.png)
+
+### Project Planning Board
+
+![Project Planning Board](Docs/Project%20Planning.png)
+
+### Release Creator
+
+![Release Creator](Docs/Release.png)
+
+### Settings
+
+![Settings](Docs/Settings.png)
 
 ## Inhaltsverzeichnis
 
 - [Warum Open-Git-Control?](#warum-open-git-control)
-- [Installation](#installation)
+- [Downloads](#downloads)
+- [Voraussetzungen](#voraussetzungen)
 - [Screenshots](#screenshots)
-- [Kurzueberblick](#kurzueberblick)
-- [Features im Detail](#features-im-detail)
-  - [1) Repository- und Arbeitsbereich-Management](#1-repository--und-arbeitsbereich-management)
-  - [2) Branches, Remotes, Tags, Submodule](#2-branches-remotes-tags-submodule)
-  - [3) Commit Graph und Historie](#3-commit-graph-und-historie)
-  - [4) Forensische Suche und Recovery](#4-forensische-suche-und-recovery)
-  - [5) Staging Area, Stash, Commits](#5-staging-area-stash-commits)
-  - [6) Conflict Resolver](#6-conflict-resolver)
-  - [7) Diff Viewer](#7-diff-viewer)
-  - [8) GitHub Integration](#8-github-integration)
-  - [9) Pull Requests, CI und Workflows](#9-pull-requests-ci-und-workflows)
-  - [10) Releases](#10-releases)
-  - [11) KI (Ollama / Gemini)](#11-ki-ollama--gemini)
-  - [12) Security und Safety](#12-security-und-safety)
-  - [13) System, Updates, Job Center](#13-system-updates-job-center)
-  - [14) Shortcuts und Produktivitaet](#14-shortcuts-und-produktivitaet)
-  - [15) Lokale Planning API und MCP-Tools](#15-lokale-planning-api-und-mcp-tools)
-- [Git installieren (wie und wo)](#git-installieren-wie-und-wo)
-- [Entwicklung und lokale Builds](#entwicklung-und-lokale-builds)
-- [Typische Ablaeufe](#typische-ablaeufe)
-- [Einstellungen (Uebersicht)](#einstellungen-uebersicht)
+- [Feature-Referenz](#feature-referenz)
+- [Typische Workflows](#typische-workflows)
+- [Lokale Planning API und MCP](#lokale-planning-api-und-mcp)
+- [Git installieren](#git-installieren)
+- [Entwicklung](#entwicklung)
+- [Release Builds](#release-builds)
 - [Datenhaltung und Sicherheit](#datenhaltung-und-sicherheit)
-- [Verfuegbare npm-Skripte](#verfuegbare-npm-skripte)
 - [Troubleshooting](#troubleshooting)
+- [Lizenz](#lizenz)
 
-## Features im Detail
+## Feature-Referenz
 
-### 1) Repository- und Arbeitsbereich-Management
+### Repository- und Workspace-Management
 
-- Lokale Repositories oeffnen und als aktive Working Session setzen
-- Wenn ein Ordner noch kein Repo ist: direktes `git init` aus der App
-- Repo-Liste mit:
-  - Suche
-  - Sortierung (zuletzt geoeffnet, Name, Erstellzeit)
-  - Favoriten (Pin)
-  - Repo schliessen
-- Persistenter Workspace:
-  - zuletzt aktive Repositories
-  - Sortierung
-  - Favoriten
-- Projektplanung:
-  - repositorybezogene Todos, Bugs, Features und Notizen
-  - Status, Dringlichkeit, Beschreibung und frei definierbare Tags
-  - eigene Tabs/Status: idea, bug, planned, in-progress, blocked, done
-  - zukuenftige Projekte, die noch kein Git-Repository besitzen
-  - Projektordner erstellen, `git init` ausfuehren und alle Planungseintraege automatisch zugeordnet behalten
-- Resizable Layout:
-  - Sidebar-Breite
-  - Breite zwischen Graph und Inspector
-  - Collapse-Status pro Repo fuer Branch/Tag/Remote/Submodule-Panels
+- Lokale Repositories oeffnen und als aktive Working Session setzen.
+- Ordner, die noch kein Git-Repository sind, mit `git init` initialisieren.
+- Persistenter Repository-Workspace mit zuletzt genutzten Repositories, Favoriten, aktivem Repo und Sortierung.
+- Lokale Repositories suchen und nach zuletzt geoeffnet, Name, Erstellzeit, aufsteigend oder absteigend sortieren.
+- Repositories anpinnen, schliessen und schnell zwischen bekannten Repositories wechseln.
+- Nicht verfuegbare Repositories erkennen und fehlende Pfade sauber behandeln.
+- Gespeicherte Layout-Groessen in den Settings zuruecksetzen.
+- Haupt-Sidebar und Graph/Inspector-Split vergroessern oder verkleinern.
+- Eingeklappte Sidebar-Panels pro Repository fuer Remotes, Branches, Tags und Submodule merken.
 
-### 2) Branches, Remotes, Tags, Submodule
+### Branches, Remotes, Tags und Submodule
 
-- Branches:
-  - lokale + remote Branch-Liste
-  - Branch erstellen
-  - Checkout
-  - Kontextmenu mit Merge-Optionen
-  - Umbenennen
-  - Loeschen (inkl. Force-Delete-Fallback)
-- Remotes:
-  - Remote hinzufuegen, entfernen, umbenennen, URL aendern
-  - upstream setzen fuer aktuellen Branch
-  - Remote-only Branches erkennen, direkt auschecken oder mergen
-  - Remote-Gesundheitsanzeige (ahead/behind/diverged/no-upstream/error)
-  - Auto-Fetch in einstellbarem Intervall
-- Tags:
-  - lightweight oder annotated Tags erstellen
-  - Tags loeschen
+- Lokale und Remote-Branches mit Suche/Filter anzeigen.
+- Branches erstellen, lokale Branches auschecken, umbenennen und loeschen.
+- Unmerged Branches nur nach expliziter Bestaetigung force-loeschen.
+- Branches aus dem Graphen und von ausgewaehlten Commits erstellen.
+- Branches aus Topbar oder Kontextmenu mergen mit:
+  - Standard-Merge
+  - No-fast-forward-Merge
+  - Squash-Merge
+  - Fast-forward-only-Merge
+- Alle Remotes mit Pruning und Tags fetchen.
+- Auto-Fetch in konfigurierbarem Intervall und Refresh, wenn die App wieder sichtbar wird.
+- Remote-Zustaende anzeigen:
+  - kein Remote konfiguriert
+  - kein Tracking-Branch
+  - lokal voraus
+  - Remote voraus
+  - diverged
+  - aktuell
+  - Fetch-Fehler
+- Remotes hinzufuegen, entfernen, umbenennen und URLs aktualisieren.
+- Upstream fuer den aktuellen Branch setzen.
+- Fehlende GitHub-Remotes behandeln, indem ungueltige `origin`-Mappings entfernt und Repositories wieder lokal/offline genutzt werden.
+- Lightweight oder annotated Tags erstellen.
+- Tags suchen, auswaehlen, loeschen und pushen.
+- Rekursiven Submodule-Status anzeigen.
+- `git submodule update --init --recursive` ausfuehren.
+- `git submodule sync --recursive` ausfuehren.
+- Submodule im Dateisystem oeffnen.
+
+### Topbar-Git-Aktionen
+
+- Fetch.
+- Ausgewaehlten Branch mit waehlbarem Merge-Modus mergen.
+- Pull mit:
+  - Standard-Pull
+  - Pull mit Rebase
+  - No-fast-forward-Pull
+  - Fast-forward-only-Pull
+- Push mit:
+  - Standard-Push
+  - Upstream setzen (`-u`)
+  - Force-with-lease
   - Tags pushen
-  - Tag-Suche
-- Submodule:
-  - rekursive Statusanzeige
-  - `submodule update --init --recursive`
-  - `submodule sync --recursive`
-  - Submodule im Dateisystem oeffnen
+- Codebase Timeline oeffnen.
+- Release Creator oeffnen.
+- Staging/Commit-Panel oeffnen.
+- Kompakte "More actions"-Varianten bei schmalen Fenstern.
 
-### 3) Commit Graph und Historie
+### Commit Graph und Historie
 
-- Visueller Commit-Graph mit Branch-/Merge-Topologie
-- Suchmodus fuer Commits:
-  - alles
-  - subject
-  - author
-  - hash
-  - refs
-- Treffer-Navigation (vor/zurueck)
-- Working-Tree-Zeile direkt ueber der Historie (staged/unstaged/untracked)
-- Commit-Kontextmenu mit erweiterten Aktionen:
+- Visueller Commit-Graph mit Branch- und Merge-Topologie.
+- Paged Commit Loading fuer groessere Historien.
+- Working-Tree-Zeile ueber der Historie mit staged, unstaged und untracked Counts.
+- Asynchrone Commit-Statistiken fuer Dateien, Additions und Deletions.
+- Commits suchen nach:
+  - allen Feldern
+  - Subject
+  - Autor
+  - Hash
+  - Refs
+- Suchtreffer vor/zurueck navigieren.
+- Commits auswaehlen und geaenderte Dateien, Commit-Body, Datei-Historie, Blame und Patch inspizieren.
+- Commit-Kontextmenu mit:
   - Checkout als neuer Branch
   - Detached Checkout
   - Branch erstellen
   - Tag erstellen
   - Cherry-Pick
-  - Revert (bei Merge-Commit auch `revert -m 1`)
-  - Reset `--soft`, `--mixed`, `--hard`
-  - Interaktiver Rebase (Todo-Liste editierbar)
+  - Revert
+  - Merge-Commit mit `-m 1` reverten
+  - Reset `--soft`
+  - Reset `--mixed`
+  - Reset `--hard`
+  - interaktiver Rebase mit editierbarer Todo-Liste
+  - ausgewaehlte Ref in aktuellen Branch mergen
   - Commit-Hash kopieren
-- Merge-Panel direkt im Commit-Kontextmenu:
-  - Commit/Ref/Branch in aktuellen Branch mergen
+- Tag-Auswahl springt zum getaggten Commit.
 
-### 4) Forensische Suche und Recovery
+### Codebase Timeline
 
-- Forensische Historie direkt im Graph:
-  - String-Suche (`git log -S`)
-  - Regex-Suche (`git log -G`)
-  - Zeilenbereich (`git log -L`)
-- Pfad-Suggestions aus Working Tree + Historie
-- Treffer als Commitliste mit Direkt-Sprung in Diff
-- Recovery Center (Reflog-basiert):
-  - Reflog filtern und inspizieren
+- Timeline-Ansicht rekonstruiert Datei-Aenderungen ueber die Commit-Historie.
+- Canvas-basierte File-Tree-Visualisierung.
+- Markiert hinzugefuegte, geaenderte, geloeschte und umbenannte Dateien.
+- Playback-Steuerung:
+  - Play/Pause
+  - Reset zum Anfang
+  - Sprung ans Ende
+  - Timeline-Slider
+  - Geschwindigkeitsauswahl von sehr langsam bis sehr schnell
+- Zeigt aktiven Commit-Hash, Autor, Datum, Subject und Position in der Historie.
+
+### Forensische Suche und Recovery
+
+- Forensische Historie direkt aus dem Graphen:
+  - String-Suche mit `git log -S`
+  - Regex-Suche mit `git log -G`
+  - Zeilenbereich-Suche mit `git log -L`
+- Pfad-Vorschlaege aus Working Tree und Repository-Historie.
+- Ergebnis-Commits inspizieren und direkt in Diffs springen.
+- Recovery Center auf Basis von Reflog:
+  - Reflog-Eintraege filtern
+  - verlorene oder verschobene Commits untersuchen
   - Recovery-Branch aus Reflog-Eintrag erstellen
   - Detached Checkout
-  - Hard Reset mit Sicherheitsbestaetigung
+  - Hard Reset mit ausdruecklicher Danger-Bestaetigung
 
-### 5) Staging Area, Stash, Commits
+### Staging Area, Stash und Commits
 
-- Bereiche fuer:
+- Working Directory Panel mit Bereichen fuer:
   - Konflikte
-  - Staged
-  - Unstaged
-  - Untracked
-- Dateiaktionen:
-  - stage/unstage
-  - stage all/unstage all
-  - discard file/all
-  - delete untracked
-  - stage all untracked
-- Diff-Statistiken fuer staged/unstaged
-- Stash-Funktionen:
-  - Stash mit optionaler Nachricht
-  - Apply / Pop / Drop
-- Commit-Form:
-  - Titel + Beschreibung
-  - `--amend`
-  - `--signoff`
-  - `Ctrl+Enter` fuer Commit
+  - staged files
+  - unstaged files
+  - untracked files
+- Geaenderte Dateien suchen.
+- Staged- und unstaged-Dateistatistiken anzeigen.
+- Einzelne Dateien stagen und unstagen.
+- Stage all und unstage all.
+- Alle untracked Dateien stagen.
+- Einzelne Dateien oder alle Aenderungen verwerfen.
+- Untracked Dateien loeschen.
+- Dateien, Ordner, Top-Level-Ordner oder Dateityp-Pattern zu `.gitignore` hinzufuegen.
+- Stash mit optionaler Nachricht.
+- Stashes anwenden, poppen und droppen.
+- Branch aus Stash erstellen.
+- Commit mit Titel und optionaler Beschreibung.
+- Commit mit `--amend`.
+- Commit mit `--signoff`.
+- Commit-Signoff standardmaessig in den Settings aktivieren.
+- Konfigurierbares Commit Template.
+- Commit mit `Ctrl+Enter` in Commit-Feldern ausfuehren.
 
-### 6) Conflict Resolver
+### Diff Viewer und Datei-Inspector
 
-- Eigene Conflict-Ansicht mit Datei- und Blocknavigation
-- Blockbasierte Konfliktauflosung:
-  - Current/Incoming side-by-side
-  - pro Block: ours/theirs/both uebernehmen
-  - fuer alle Bloecke: ours/theirs uebernehmen
-- Manueller Conflict-Editor mit Marker-/Line-Gutter-Feedback
-- Save, Save+Resolved, Reload, Discard
-- `merge --continue` / `merge --abort`
-- `rebase --continue` / `rebase --abort`
-- Automatisches Oeffnen bei erkannten Merge-/Rebase-Konflikten
+- Staged, unstaged und commit-spezifische Diffs oeffnen.
+- Unified- und Side-by-side-Diff-Modus.
+- Syntax-aehnliches Highlighting fuer haeufige Code-Tokens.
+- Hunk-Navigation mit aktuellem Hunk-Counter.
+- Hunk-Aktionen:
+  - Hunk stagen
+  - Hunk unstagen
+  - Hunk verwerfen
+- Blame-Overlay im Diff Viewer.
+- Blame-Eintraege anklicken und zum verantwortlichen Commit springen.
+- Datei-Inspector-Tabs:
+  - History
+  - Blame
+  - Patch
+- Datei-Historie zeigt vorherige Commits der ausgewaehlten Datei.
+- Blame laedt in Chunks und kann weitere 500-Zeilen-Seiten laden.
+- Patch-Tab oeffnet den Diff im Hauptbereich.
+- Schutz bei grossen Diffs:
+  - Byte- und Zeilenlimits
+  - gekuerztes Rendering
+  - Vollkopie-Aktion, wenn verfuegbar
+- Binary-Erkennung fuer haeufige Binaer-Dateiendungen und Git Binary Patches.
 
-### 7) Diff Viewer
+### Conflict Resolver
 
-- Quellen:
-  - staged
-  - unstaged
-  - commit-spezifisch
-- Ansichten:
-  - Unified
-  - Side-by-Side
-- Hunk-Navigation
-- Hunk-Operationen:
-  - Stage Hunk
-  - Unstage Hunk
-  - Discard Hunk
-- Schutz bei grossen Diffs (Truncation + Full-Copy)
-- Binary-File-Erkennung
+- Eigene Conflict-Resolver-Ansicht fuer Merge- und Rebase-Konflikte.
+- Oeffnet automatisch, wenn Konflikte erkannt werden.
+- Konfliktdateiliste und Konfliktblock-Navigation.
+- Side-by-side-Darstellung fuer current/incoming Konfliktbloecke.
+- Einzelne Bloecke loesen mit:
+  - current uebernehmen
+  - incoming uebernehmen
+  - beide Versionen uebernehmen
+- Alle Bloecke loesen mit:
+  - alle current uebernehmen
+  - alle incoming uebernehmen
+- Manueller Editor mit Konfliktmarkern und Line-Gutter-Feedback.
+- Datei von Disk neu laden.
+- Aenderungen speichern.
+- Speichern und als resolved markieren.
+- Aenderungen verwerfen.
+- Merge fortsetzen oder abbrechen.
+- Rebase fortsetzen oder abbrechen.
+- Commits verhindern, solange ungeloeste Konflikte vorhanden sind.
 
-### 8) GitHub Integration
+### GitHub Integration
 
-- Auth-Methoden:
-  - PAT
+- Authentifizierung mit:
+  - Personal Access Token
   - OAuth Device Flow
   - One-click Login ueber GitHub CLI (`gh`)
-- Gespeicherte Login-Session mit Auto-Reconnect
-- GitHub-Repoliste mit Suche, Pagination und Refresh
-- Clone-Workflow mit Progress-Modal
-- Beliebige Remote-Repositories per HTTP/HTTPS/SSH URL klonen
-- Beliebige GitHub-Repositories per URL forken (und den Fork lokal klonen)
-- Erkennung, ob ein GitHub-Repo lokal bereits vorhanden ist
-- Lokales Repo ohne `origin` direkt als neues GitHub-Repo erstellen und verbinden
+- Reconnect aus gespeicherter GitHub Session.
+- Logout und gespeicherte Auth entfernen.
+- GitHub OAuth Client ID fuer Device Flow konfigurieren.
+- GitHub Host fuer GitHub-Enterprise-aehnliche Hosts konfigurieren.
+- GitHub-Repositories mit Suche, Pagination und Refresh listen.
+- Erkennen, ob GitHub-Repositories lokal bereits geklont sind.
+- GitHub-Repositories mit Progress Modal klonen.
+- Beliebige HTTP-, HTTPS- oder SSH-Git-Remote-URL klonen.
+- GitHub-Repository per URL forken und Fork lokal klonen.
+- Neues GitHub-Repository aus lokalem Repo ohne `origin` erstellen.
+- Erstelltes GitHub-Repo als `origin` verbinden.
+- Ungueltiges Remote Mapping ersetzen, wenn das Upstream-Repository nicht mehr existiert.
 
-### 9) Pull Requests, CI und Workflows
+### Pull Requests, CI und Workflows
 
-- PR-Liste fuer das aktive Repo (open/closed/all)
-- PR erstellen (title/body/head/base)
-- PR-Aktionen:
-  - im Browser oeffnen
-  - URL kopieren
-  - PR-Branch lokal auschecken
-  - Merge mit Methoden: merge, squash, rebase
-- CI-/Check-Auswertung pro PR:
-  - badge success/failure/pending/unknown
-  - Workflow Runs + Status Checks
-- Actions-Workflow-Panel mit Filter und Direktlink
+- Pull-Request-Liste fuer das aktive GitHub-Repository.
+- PRs nach open, closed oder all filtern.
+- Pull Requests mit Titel, Body, Head Branch und Base Branch erstellen.
+- PRs im Browser oeffnen.
+- PR-URLs kopieren.
+- PR-Branches lokal auschecken.
+- PRs mergen mit:
+  - Merge Commit
+  - Squash
+  - Rebase
+- CI-Auswertung pro PR:
+  - success
+  - failure
+  - pending
+  - neutral
+  - unknown
+- Workflow Runs und Status Checks anzeigen.
+- Aktuelle GitHub Actions Workflow Runs fuer den aktuellen Branch anzeigen.
+- Workflow Runs filtern und im Browser oeffnen.
 
-### 10) Releases
+### Release Creator
 
-- Release Creator mit eigenem View
-- Release Context:
+- Eigene Release-Ansicht aus der Topbar.
+- GitHub Release Context lesen:
+  - Repository URL
   - bestehende Tags
   - letzter Release-Tag
   - Commits seit letztem Release
-- Tag-Vorschlag fuer naechste Version
-- Release erstellen mit:
-  - Tag
-  - Name
-  - target commitish
-  - body
-  - draft/prerelease
-- AI-generierte Release Notes (Deutsch/Englisch)
+  - Ziel-Branch oder Commit
+- Naechstes SemVer-Tag vorschlagen.
+- Version bump waehlen:
+  - major
+  - minor
+  - patch
+- Konfigurieren:
+  - Tag-Name
+  - Release-Name
+  - Target commitish
+  - Release Body in Markdown
+  - Draft-Flag
+  - Prerelease-Flag
+- Release Notes mit KI generieren.
+- KI-Notes anpassen:
+  - Sprache Englisch/Deutsch
+  - Merge Commits ausschliessen
+  - in Sektionen gruppieren
+  - mehr technische Details
+  - Breaking-Changes-Sektion
+  - automatische Commit-Liste anhaengen
+  - Commit Hashes anzeigen
+- Release direkt auf GitHub veroeffentlichen.
 
-### 11) KI (Ollama / Gemini)
+### Projektplanung
 
-- AI Auto-Commit:
-  - Aenderungen analysieren
-  - Dateien logisch gruppieren
-  - Commit-Messages erzeugen
-  - Fortschritt in Phasen (snapshot/grouping/committing/retry/fallback)
-  - laufenden Job abbrechen
-- AI Release Notes aus Commit-Historie
-- In Settings:
-  - Provider umschalten
-  - Modelle laden
-  - Verbindung testen
-  - Gemini API Key sicher speichern/loeschen
+- Planning View fuer repositorygebundene Projekte und zukuenftige Projekte.
+- Board-Spalten:
+  - Idea
+  - Bug
+  - Planned
+  - In progress
+  - Blocked
+  - Done
+- Planungseintraege unterstuetzen:
+  - Titel
+  - Beschreibung
+  - Prioritaet
+  - Status
+  - Tags
+- Planungseintraege nach Suche, Prioritaet, Status und Tag filtern.
+- Eintraege erstellen, bearbeiten, verschieben und loeschen.
+- Zukuenftige Projekte ohne Git-Repository erstellen.
+- Projekte bearbeiten oder loeschen.
+- Zukuenftiges Projekt materialisieren: Parent-Verzeichnis waehlen, Projektordner erstellen, `git init` ausfuehren und Planning-Projekt verknuepft halten.
+- Beim Entfernen eines Repositories koennen verknuepfte Planungseintraege nach Bestaetigung mit entfernt werden.
 
-### 12) Security und Safety
+### Lokale Planning API und MCP
 
-- Optionale Bestaetigungen fuer gefaehrliche Git-Operationen
+- Lokaler HTTP-Server, gebunden an `127.0.0.1`.
+- Bevorzugter Port: `2990`; wenn belegt, nutzt die App den naechsten freien lokalen Port.
+- API-Dokumentation: `http://127.0.0.1:2990/api/`
+- OpenAPI JSON: `/api/openapi.json`
+- MCP JSON-RPC-Endpunkt: `/mcp`
+- REST-Wrapper fuer MCP-aehnliche Tools:
+  - `GET /api/mcp/tools`
+  - `POST /api/mcp/tools/call`
+- Alle Daten- und MCP-Endpunkte benoetigen einen Token.
+- Public Health und Docs-Endpunkte liefern keine geschuetzten Daten.
+- Token kann gesendet werden als:
+  - `x-open-git-control-token: <TOKEN>`
+  - `Authorization: Bearer <TOKEN>`
+- Settings zeigen:
+  - API-Status
+  - Host
+  - Port
+  - Base URL
+  - API-Doku-URL
+  - OpenAPI-URL
+  - MCP-URL
+  - Token-Header
+  - aktueller Token
+  - Token-Quelle
+  - Token-Ablauf
+- Persistente API-Token generieren fuer:
+  - 1 Tag
+  - 1 Monat
+  - 1 Jahr
+  - dauerhaft
+- Persistente API-Token werden mit Electron `safeStorage` gespeichert, wenn OS-Verschluesselung verfuegbar ist.
+- Ohne persistenten Token nutzt die App temporaere Session-Tokens.
+- Environment-Steuerung:
+  - `OPEN_GIT_CONTROL_API_PORT=2990`
+  - `OPEN_GIT_CONTROL_API_DISABLED=true`
+  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>`
+- REST-Planning-Endpunkte:
+  - `GET /api/health`
+  - `GET /api/projects`
+  - `POST /api/projects`
+  - `GET/PATCH/DELETE /api/projects/:projectId`
+  - `GET/POST /api/projects/:projectId/todos`
+  - `GET /api/repositories`
+  - `POST /api/repositories/ensure`
+  - `GET /api/repositories/todos`
+  - `GET/POST /api/todos`
+  - `GET /api/todos/next`
+  - `GET/PATCH/DELETE /api/todos/:todoId`
+  - `POST /api/todos/:todoId/move`
+  - `GET /api/tabs`
+  - `GET/POST /api/tabs/:tab/todos`
+  - `GET /api/agent/next`
+- MCP-aehnliche Tools:
+  - `list_tabs`
+  - `list_projects`
+  - `list_repositories`
+  - `list_todos`
+  - `get_next_todos`
+  - `create_project`
+  - `ensure_repository_project`
+  - `create_todo`
+  - `update_todo`
+  - `move_todo`
+  - `delete_todo`
+- Git- und GitHub-Operationen werden bewusst nicht ueber die lokale API oder MCP-Oberflaeche exportiert.
+
+### KI-Unterstuetzung
+
+- Provider:
+  - Ollama
+  - Google Gemini
+- Ollama Base URL konfigurieren.
+- Gemini API Key sicher speichern, ersetzen und entfernen, wenn OS-Verschluesselung verfuegbar ist.
+- Provider-Verbindung testen.
+- Verfuegbare Modelle laden.
+- Modell auswaehlen oder manuell eintragen.
+- Commit-Message-Stil konfigurieren:
+  - Conventional Commits
+  - Plain
+  - Detailed
+- Commit-Message-Sprache konfigurieren:
+  - Auto
+  - Deutsch
+  - Englisch
+- KI-Commit-Message aus Nutzerhinweisen generieren.
+- KI Auto-Commit:
+  - analysiert den Working Tree
+  - gruppiert geaenderte Dateien logisch
+  - erzeugt Commit Messages
+  - erstellt Commits automatisch
+  - meldet Phasen wie snapshot, grouping, committing, retry, fallback, done, failed und cancelled
+  - kann abgebrochen werden
+- KI-Release-Notes aus Commit-Historie und Release Context.
+
+### Security und Safety
+
+- Optionale Bestaetigungsdialoge fuer gefaehrliche Git-Operationen.
+- Explizite Danger-Bestaetigungen fuer destruktive Reset-, Discard-, Delete-, Force-Delete- und aehnliche Aktionen.
+- Git Command Policy begrenzt, welche Befehle der Renderer beim Main Process anfordern kann.
+- External-Link-Policy oeffnet erlaubte URLs ueber den Main Process.
+- Diff-Preview-Policy normalisiert sichere Diff-Befehle.
 - Secret-Scan vor Push:
-  - scannt staged + to-push Diffs
-  - Strengegrad low/medium/high
-  - Allowlist per Text/Path/Regex
-  - Warn-/Bestaetigungsdialog bei Treffern
-- Kontextmenu-Aktionen fuer `.gitignore`:
-  - Datei
-  - Ordner
-  - Top-Level-Ordner
-  - Dateityp-Muster
+  - scannt staged Diffs
+  - scannt to-push Diffs
+  - kann Tags einbeziehen
+  - unterstuetzt Abbruch
+  - meldet Treffer mit Rule, Severity, Datei, Zeile und bereinigtem Kontext
+- Secret-Scan-Strengegrad:
+  - low
+  - medium
+  - high
+- Secret-Scan-Allowlist-Formate:
+  - `path:...`
+  - `regex:...`
+  - freier Text
+  - Kommentarzeilen mit `#`
+- GitHub Token, Gemini Key und persistenter Planning-API-Token werden OS-verschluesselt ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
+- Wenn OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
 
-### 13) System, Updates, Job Center
+### Settings, Updates und Job Center
 
-- App-Updater (nur in installierten Production Builds):
-  - Check
-  - One-click Check+Download
-  - Installation heruntergeladener Updates
-  - Release Notes Anzeige
-- Job Center mit Verlauf fuer laufende/abgeschlossene Jobs:
+- General Settings:
+  - Theme
+  - Sprache
+  - Default Branch
+  - Layout zuruecksetzen
+  - Secondary History
+  - Commit Signoff Default
+  - Commit Template
+  - Auto-Fetch Intervall
+- Themes:
+  - Copper Night
+  - Midnight Teal
+  - Graphite Blue
+  - Forest Copper
+  - Porcelain Light
+  - Ember Slate
+  - Arctic Mint
+  - Mono Dark Red
+  - Mono Light Red
+  - Mono Dark Green
+  - Mono Light Green
+- Integrations Settings:
+  - AI Provider
+  - AI Model
+  - AI Message Style/Language
+  - Ollama URL
+  - Gemini API Key
+  - GitHub OAuth Client ID
+- API & MCP Settings:
+  - Runtime API Status
+  - kopierbare URLs und Token-Werte
+  - Token generieren und loeschen
+  - Beispiel-cURL-Befehle
+  - Beispiel-MCP-Server-Config
+- Security Settings:
+  - Bestaetigungen fuer gefaehrliche Operationen
+  - Secret-Scan vor Push
+  - Strictness
+  - Allowlist
+- System Settings:
+  - installierte App-Version
+  - Updater-Status
+  - verfuegbare Version
+  - Download-Fortschritt
+  - Background-Update-Toggle
+  - One-click Update
+  - Release Notes
+  - Job Center
+- Job Center verfolgt aktuelle Operationen wie:
   - clone
-  - fetch/pull/push
+  - fetch
+  - pull
+  - push
+  - stage
+  - commit
+  - stash branch
   - secret scan
   - AI auto-commit
 
-### 14) Shortcuts und Produktivitaet
+### Shortcuts und Produktivitaet
 
-- `Ctrl+1..4`: Tabs wechseln (Local Repos, Repo, GitHub, Settings)
+- `Ctrl+1..4`: Haupt-Sidebar-Tabs wechseln
 - `Ctrl+Shift+F`: Fetch
 - `Ctrl+Shift+P`: Command Palette
-- `Ctrl+Enter`: Commit ausfuehren (in Commit-Feldern)
+- `Ctrl+Enter`: Commit aus Commit-Feldern ausfuehren
+- Command Palette mit Tastaturnavigation, Suche, `Enter` zum Ausfuehren und `Esc` zum Schliessen
+- Copy-Buttons fuer Hashes, URLs, Tokens, API-Beispiele und PR-Links
+- Virtualisierte Listen fuer groessere Datei- und Commit-Detailansichten
 
-### 15) Lokale Planning API und MCP-Tools
+## Typische Workflows
 
-- Lokale HTTP-API fuer die Projektplanung, gebunden an `127.0.0.1`
-- Bevorzugter Port: `2990`; wenn er belegt ist, versucht die App den naechsten freien lokalen Port
-- API-Dokumentation unter `http://127.0.0.1:2990/api/`
-- Maschinenlesbare API-Beschreibung unter `/api/openapi.json`
-- Alle Daten- und MCP-Endpunkte erfordern einen API-Token
-  - Token und Headername stehen in den Einstellungen unter `API/MCP`
-  - Token als `x-open-git-control-token: <TOKEN>` oder `Authorization: Bearer <TOKEN>` senden
-  - Nutzer koennen einen persistenten Token fuer 1 Tag, 1 Monat, 1 Jahr oder dauerhaft generieren
-  - Persistente API-Token werden ueber Electron `safeStorage` OS-verschluesselt gespeichert; abgelaufene Tokens werden automatisch entfernt
-  - Ohne persistenten Token nutzt die App einen temporaeren Token fuer den aktuellen App-Prozess
-- Planner-Endpunkte fuer:
-  - Projekte, Repositories, Tabs und Todos abfragen
-  - naechste offene Todos nach Dringlichkeit abrufen
-  - flachen Projektkontext an jedem Todo liefern (`projectName`, `projectKind`, `projectRepoPath`), damit Agenten Todos direkt zuordnen koennen
-  - Todos erstellen, aktualisieren, verschieben und loeschen
-  - geplante Projekte erstellen
-  - Planner-Projekt fuer einen Repository-Pfad sicherstellen
-- Git- und GitHub-Operationen werden bewusst nicht ueber die lokale API oder MCP-Tools bereitgestellt
-- Tab-spezifische Endpunkte wie `/api/tabs/bug/todos` und `/api/tabs/working/todos`
-  - `working` wird als Alias fuer `in-progress` akzeptiert
-- Agenten-Shortcuts:
-  - `GET /api/agent/next`
-  - `GET /api/mcp/tools`
-  - `POST /api/mcp/tools/call`
-- MCP-aehnlicher JSON-RPC-Endpunkt unter `/mcp`
-  - unterstuetzt `initialize`, `tools/list` und `tools/call`
-  - stellt Planning-Tools wie `get_next_todos`, `list_todos`, `create_todo`, `move_todo` und `delete_todo` bereit
-- Runtime-Steuerung:
-  - `OPEN_GIT_CONTROL_API_PORT=2990` fuer den bevorzugten Port
-  - `OPEN_GIT_CONTROL_API_DISABLED=true` zum Deaktivieren des lokalen API-Servers
-  - `OPEN_GIT_CONTROL_API_TOKEN=<TOKEN>` fuer ein fest vorgegebenes API-Token, das gespeicherte/generierte Tokens ueberschreibt
+### Repository oeffnen oder initialisieren
 
-## Git installieren (wie und wo)
+1. Tab "Local Repositories" oeffnen.
+2. Ordner auswaehlen.
+3. Falls es noch kein Git-Repository ist, Initialisierung bestaetigen.
+4. In den Repository-Tab wechseln und arbeiten.
+
+### Standard-Lokalworkflow
+
+1. Fetch oder Pull aus der Topbar.
+2. Branch erstellen oder wechseln.
+3. Geaenderte Dateien im Working Directory pruefen.
+4. Diffs oeffnen, Dateien oder Hunks stagen und bei Bedarf stashen.
+5. Commit mit Titel und Beschreibung erstellen.
+6. Push, Upstream setzen, Tags pushen oder Force-with-lease nutzen, wenn noetig.
+
+### Konflikte loesen
+
+1. Merge, Pull, Rebase, Cherry-Pick oder eine andere Operation starten, die Konflikte erzeugt.
+2. Conflict Resolver oeffnen, wenn er erscheint.
+3. Jeden Block mit current, incoming oder both loesen.
+4. Manuellen Editor nutzen, wenn das Ergebnis Feinschliff braucht.
+5. Speichern und Dateien als resolved markieren.
+6. Merge/Rebase im Resolver fortsetzen oder abbrechen.
+
+### GitHub Pull Request Flow
+
+1. Per PAT, Device Flow oder GitHub CLI One-click Login anmelden.
+2. Sicherstellen, dass `origin` auf ein GitHub-Repository zeigt.
+3. Pull Request aus der Repo-Sidebar erstellen.
+4. PR-CI und Workflow-Status pruefen.
+5. PR oeffnen, kopieren, auschecken, mergen, squashen oder rebasen.
+
+### Release Flow
+
+1. Release aus der Topbar oeffnen.
+2. Release Context aktualisieren.
+3. Major, Minor oder Patch waehlen.
+4. Tag, Release-Name, Target und Markdown Body anpassen.
+5. Optional KI-Release-Notes generieren.
+6. Als normales Release, Draft oder Prerelease veroeffentlichen.
+
+### Recovery Flow
+
+1. Recovery Center im Graph-Bereich oeffnen.
+2. Reflog-Eintraege filtern.
+3. Recovery-Branch aus relevantem Eintrag erstellen.
+4. Detached Checkout oder Hard Reset nur verwenden, wenn du sicher bist.
+
+### Agenten-Planning-Workflow
+
+1. Open-Git-Control starten.
+2. Settings -> API & MCP oeffnen und MCP-URL plus Token kopieren.
+3. Externen Agenten mit MCP-URL oder REST-Endpunkten konfigurieren.
+4. Agent nach `get_next_todos` oder `GET /api/agent/next` fragen.
+5. Agent Planungseintraege erstellen oder verschieben lassen.
+6. Git- und GitHub-Arbeit in der Desktop-App behalten.
+
+## Lokale Planning API und MCP
+
+Beispiel: naechste Todos fuer ein Repository abrufen.
+
+```bash
+curl "http://127.0.0.1:2990/api/agent/next?repoPath=<REPO_PATH_URL_ENCODED>&limit=10" \
+  -H "x-open-git-control-token: <TOKEN>"
+```
+
+Beispiel: MCP-aehnliche Tools per JSON-RPC listen.
+
+```bash
+curl -X POST "http://127.0.0.1:2990/mcp" \
+  -H "x-open-git-control-token: <TOKEN>" \
+  -H "content-type: application/json" \
+  -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"
+```
+
+Beispiel-MCP-Server-Config:
+
+```json
+{
+  "mcpServers": {
+    "open-git-control": {
+      "type": "http",
+      "url": "http://127.0.0.1:2990/mcp",
+      "headers": {
+        "x-open-git-control-token": "<TOKEN>"
+      }
+    }
+  }
+}
+```
+
+## Git installieren
 
 Git muss installiert und im `PATH` verfuegbar sein.
 
 ### Windows
 
-1. Offizielle Download-Seite: [git-scm.com/downloads](https://git-scm.com/downloads)
-2. Windows Installer herunterladen und ausfuehren.
-3. Standardoptionen sind in der Regel passend (inkl. "Git from the command line").
-4. Terminal neu starten.
+1. Git von [git-scm.com/downloads](https://git-scm.com/downloads) herunterladen.
+2. Windows Installer ausfuehren.
+3. "Git from the command line" aktiviert lassen.
+4. Terminal oder PC neu starten, falls `git` nicht sofort gefunden wird.
 
 ### macOS
 
-Option A (empfohlen mit Homebrew):
+Homebrew:
 
 ```bash
 brew install git
 ```
 
-Option B (Apple Command Line Tools):
+Apple Command Line Tools:
 
 ```bash
 xcode-select --install
@@ -405,7 +715,7 @@ Arch:
 sudo pacman -S git
 ```
 
-### Installation pruefen
+### Git pruefen
 
 ```bash
 git --version
@@ -413,149 +723,137 @@ git config --global user.name "Dein Name"
 git config --global user.email "dein@email.de"
 ```
 
-## Entwicklung und lokale Builds
+## Entwicklung
 
-### Start aus Source
-
-Voraussetzungen:
-
-- Node.js (aktuelles LTS)
-- npm
-- Git
+Dependencies installieren:
 
 ```bash
 npm install
+```
+
+Vite und Electron im Development-Modus starten:
+
+```bash
 npm run dev
 ```
 
-### Lokale Build-Artefakte erstellen
+App bauen:
 
 ```bash
 npm run build
-npm run dist
 ```
 
-Plattform-spezifisch:
+Tests ausfuehren:
 
 ```bash
+npm run test
+npm run test:coverage
+npm run test:ci
+```
+
+Verfuegbare Skripte:
+
+| Skript | Zweck |
+| --- | --- |
+| `npm run dev` | Vite und Electron zusammen starten |
+| `npm run electron:dev` | Electron-Prozess bauen und Electron gegen Vite starten |
+| `npm run build` | TypeScript, Vite Build und Electron-Prozess bauen |
+| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren |
+| `npm run dist` | Paketierte App fuer aktuelle Plattform bauen |
+| `npm run dist:win` | Windows NSIS x64 Paket bauen |
+| `npm run dist:linux` | Linux AppImage und deb Pakete bauen |
+| `npm run dist:mac` | macOS dmg und zip Pakete bauen |
+| `npm run release:win` | Windows Release Assets bauen und publishen |
+| `npm run release:linux` | Linux Release Assets bauen und publishen |
+| `npm run release:mac` | macOS Release Assets bauen und publishen |
+| `npm run preview` | Vite Build previewen |
+| `npm run electron:start` | Electron nach gebautem Electron-Prozess starten |
+| `npm run test` | Unit Tests ausfuehren |
+| `npm run test:coverage` | Tests mit Coverage ausfuehren |
+| `npm run test:ci` | Kompilieren, Tests mit Coverage und Build ausfuehren |
+
+## Release Builds
+
+Lokale Paket-Artefakte landen in `release/`.
+
+```bash
+npm run dist
 npm run dist:win
 npm run dist:linux
 npm run dist:mac
 ```
 
-Output liegt in `release/`.
+GitHub Publishing laeuft ueber [.github/workflows/release.yml](.github/workflows/release.yml). Ein veroeffentlichtes GitHub Release mit Tag wie `v1.2.5` startet Plattform-Builds fuer Windows, Linux und macOS, leitet die Paketversion aus dem Tag ab, validiert erwartete Artefaktnamen und haengt Assets an das Release.
 
-## Typische Ablaeufe
+Erwartete Release Assets:
 
-### 1) Erstes Repo oeffnen oder neu initialisieren
-
-1. `Lokale Repositories` -> `Repository oeffnen`.
-2. Ordner auswaehlen.
-3. Wenn noch kein Repo: Initialisierung bestaetigen.
-4. Danach in den `Repository`-Tab wechseln.
-
-### 2) Standard-Workflow (lokal)
-
-1. Fetch/Pull aus der Topbar.
-2. Branch erstellen oder wechseln.
-3. Dateien in der Staging Area bearbeiten (stage/unstage/discard).
-4. Commit erstellen (optional amend/signoff).
-5. Push (optional Upstream setzen oder force-with-lease).
-
-### 3) Konflikte loesen
-
-1. Bei Merge-/Rebase-Konflikten oeffnet sich der Conflict Resolver.
-2. Pro Block `Current`, `Incoming` oder `Both` waehlen.
-3. Speichern + als geloest markieren.
-4. Merge/Rebase fortsetzen.
-
-### 4) GitHub-PR-Flow
-
-1. GitHub verbinden (PAT/Device/One-click).
-2. PR im Repo-Panel erstellen.
-3. CI-Status im PR-Eintrag pruefen.
-4. PR mergen (merge/squash/rebase) oder lokal auschecken.
-
-### 5) Release-Flow
-
-1. Topbar `Release` oeffnen.
-2. Release Context aktualisieren.
-3. Tag und Release-Name setzen.
-4. Optional AI Release Notes generieren.
-5. Release erstellen.
-
-### 6) Recovery-Flow
-
-1. Im Commit-Graph auf `Recovery Center` wechseln.
-2. Reflog-Eintrag auswaehlen.
-3. Recovery-Branch erstellen oder (vorsichtig) hard reset.
-
-### 7) Agenten-Planning-API-Flow
-
-1. Open-Git-Control starten.
-2. `http://127.0.0.1:2990/api/` fuer die lokale API-Dokumentation oeffnen.
-3. Einen externen Agenten `GET /api/agent/next?repoPath=...` aufrufen lassen, um offene Arbeit fuer ein Repository zu finden.
-4. Der Agent kann Planungseintraege ueber `/api/todos` oder `/mcp`-Toolaufrufe erstellen oder verschieben.
-5. Git- und GitHub-Arbeit bleibt in der Desktop-App und ist nicht ueber die lokale API oder MCP-Oberflaeche verfuegbar.
-
-## Einstellungen (Uebersicht)
-
-- `General`:
-  - Theme
-  - Sprache (DE/EN)
-  - Default Branch
-  - Secondary History
-  - Commit Template
-  - Auto-Fetch Intervall
-- `Integrations`:
-  - AI Provider/Modelle
-  - Gemini API Key
-  - GitHub OAuth Client ID
-- `Security`:
-  - Confirm dangerous ops
-  - Secret-Scan before push
-  - Secret-Scan strictness + allowlist
-- `System`:
-  - Update-Status
-  - One-click Update
-  - Install Update
-  - Job Center
+- `Open-Git-Control-<version>-win-x64.exe`
+- `Open-Git-Control-<version>-linux-x86_64.AppImage`
+- `Open-Git-Control-<version>-linux-amd64.deb`
+- `Open-Git-Control-<version>-mac-x64.dmg`
+- `Open-Git-Control-<version>-mac-x64.zip`
+- Updater-Metadaten wie `latest.yml`, `latest-linux.yml`, `latest-mac.yml` und Blockmaps
 
 ## Datenhaltung und Sicherheit
 
-- Git-Operationen laufen lokal gegen dein ausgewaehltes Repo.
-- Repositories/Settings werden im User-Data-Verzeichnis der App gespeichert.
-- Planungsprojekte und Todos werden lokal im User-Data-Verzeichnis der App gespeichert.
-- Die lokale Planning API bindet an `127.0.0.1` und stellt Planungsdaten lokalen Prozessen auf deinem Rechner bereit.
-- GitHub-Token, Gemini-Key und persistente Planning-API-Token werden ueber Electron `safeStorage` OS-verschluesselt gespeichert, wenn verfuegbar.
-- Falls OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
-
-## Verfuegbare npm-Skripte
-
-- `npm run dev` - Vite + Electron Development
-- `npm run build` - Frontend + Electron Build
-- `npm run dist` - Packaging fuer aktuelle Plattform
-- `npm run dist:win` - Windows Paket
-- `npm run dist:linux` - Linux Paket
-- `npm run dist:mac` - macOS Paket
-- `npm run test` - Tests starten
-- `npm run test:coverage` - Tests mit Coverage
-- `npm run test:ci` - CI-geeignete Test/Build-Kette
+- Git-Befehle laufen gegen das ausgewaehlte lokale Repository.
+- Repository-Workspace-State wird im Electron-User-Data-Verzeichnis gespeichert.
+- Settings werden lokal gespeichert.
+- Planning-Projekte und Planning-Items werden lokal gespeichert.
+- Die Planning API bindet an `127.0.0.1`.
+- Token-geschuetzte Planning-API-Endpunkte sind fuer lokale Prozesse auf derselben Maschine gedacht.
+- GitHub Token, Gemini Key und persistenter Planning-API-Token werden mit OS-gestuetzter Verschluesselung ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
+- Wenn OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
+- Die lokale API stellt nur Planungsdaten bereit; sie exportiert keine Git- oder GitHub-Aktionen.
 
 ## Troubleshooting
 
-- `git not found`
-  - Git installieren und Terminal/PC neu starten.
-  - Pruefen mit `git --version`.
-- One-click GitHub Login funktioniert nicht
-  - GitHub CLI installieren und `gh --version` pruefen.
-- Device Flow geht nicht
-  - GitHub OAuth Client ID in Settings setzen (oder `GITHUB_OAUTH_CLIENT_ID`).
-- Keine PRs sichtbar
-  - `origin` muss auf GitHub zeigen und Auth muss aktiv sein.
-- Auto-Update nicht verfuegbar
-  - Update-Funktionen sind nur in installierten Production Builds aktiv, nicht in `npm run dev`.
-- Planning API ist nicht auf Port `2990` erreichbar
-  - Eventuell nutzt ein anderer Prozess den Port; im App-Log steht die tatsaechliche lokale API-URL.
-  - `OPEN_GIT_CONTROL_API_PORT` vor dem App-Start setzen, um einen anderen bevorzugten Port zu waehlen.
+### `git` nicht gefunden
 
+- Git installieren.
+- Terminal oder PC neu starten.
+- Mit `git --version` pruefen.
+
+### GitHub One-click Login funktioniert nicht
+
+- GitHub CLI von [cli.github.com](https://cli.github.com/) installieren.
+- Mit `gh --version` pruefen.
+- PAT oder Device Flow nutzen, wenn GitHub CLI nicht verwendet werden soll.
+
+### Device Flow funktioniert nicht
+
+- GitHub OAuth Client ID in Settings -> Integrations setzen.
+- Alternativ `GITHUB_OAUTH_CLIENT_ID` vor dem App-Start setzen.
+
+### Keine Pull Requests sichtbar
+
+- Sicherstellen, dass `origin` auf ein GitHub-Repository zeigt.
+- Im GitHub-Tab anmelden.
+- Repository und PR-Panel aktualisieren.
+
+### Push wird vom Secret-Scan blockiert
+
+- Gemeldete Datei und Zeile pruefen.
+- Secret entfernen oder rotieren, falls es versehentlich committed wurde.
+- Allowlist nur eng fuer absichtliche Dummy-/Beispielwerte setzen.
+
+### Auto-Update nicht verfuegbar
+
+- Auto-Update funktioniert nur in installierten Production Builds.
+- `npm run dev` und lokale unverpackte Builds nutzen den Updater nicht.
+
+### Planning API laeuft nicht auf Port `2990`
+
+- Eventuell nutzt ein anderer lokaler Prozess den Port.
+- In Settings -> API & MCP steht der tatsaechliche Port.
+- `OPEN_GIT_CONTROL_API_PORT=<PORT>` vor dem App-Start setzen, wenn ein anderer bevorzugter Port gewuenscht ist.
+
+### KI-Funktionen reagieren nicht
+
+- Fuer Ollama Server-URL und Modellnamen pruefen.
+- Fuer Gemini gueltigen API Key speichern und passendes Modell auswaehlen.
+- "Test connection" und "Load models" in Settings -> Integrations nutzen.
+
+## Lizenz
+
+Open-Git-Control ist unter der [GNU General Public License](LICENSE) lizenziert.
