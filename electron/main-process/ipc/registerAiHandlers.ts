@@ -177,6 +177,15 @@ export function registerAiHandlers({
   });
 
   ipcMain.handle('git:getAiAutoCommitState', async () => {
+    if (
+      !currentAiAutoCommitJob
+      || latestAiAutoCommitEvent?.id !== currentAiAutoCommitJob.id
+      || latestAiAutoCommitEvent.status === 'done'
+      || latestAiAutoCommitEvent.status === 'failed'
+      || latestAiAutoCommitEvent.status === 'cancelled'
+    ) {
+      return { success: true, data: null };
+    }
     return { success: true, data: latestAiAutoCommitEvent };
   });
 
