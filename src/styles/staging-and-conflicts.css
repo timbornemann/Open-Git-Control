@@ -1802,20 +1802,20 @@ body[data-theme='mono-light-green'] {
 
 /* Theme-scoped git graph palettes */
 body[data-theme='copper-night'] {
-  --commit-red: #d35d69;
-  --commit-green: #4fae94;
-  --commit-purple: #9a79c8;
-  --commit-orange: #c58b5c;
-  --graph-lane-1: #bf7b5a;
-  --graph-lane-2: #9a79c8;
-  --graph-lane-3: #4fa8a4;
-  --graph-lane-4: #c58b5c;
-  --graph-lane-5: #b48be0;
-  --graph-lane-6: #5f9ec2;
-  --graph-lane-7: #d35d69;
-  --graph-lane-8: #98889a;
-  --graph-lane-9: #cf8d6c;
-  --graph-lane-10: #7d8ab8;
+  --commit-red: #c96568;
+  --commit-green: #5aa08d;
+  --commit-purple: #7890a1;
+  --commit-orange: #bc8a5d;
+  --graph-lane-1: #b87555;
+  --graph-lane-2: #7890a1;
+  --graph-lane-3: #579891;
+  --graph-lane-4: #bc8a5d;
+  --graph-lane-5: #d09a72;
+  --graph-lane-6: #6f9ab2;
+  --graph-lane-7: #c96568;
+  --graph-lane-8: #908a84;
+  --graph-lane-9: #c98a68;
+  --graph-lane-10: #6e7f8c;
 }
 
 body[data-theme='midnight-teal'] {
