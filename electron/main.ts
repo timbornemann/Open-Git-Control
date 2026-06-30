@@ -12,6 +12,7 @@ import { getGeminiApiKeyFromSecureStore, readSettingsWithMigration } from './mai
 import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
 import { PlanningApiServerHandle, startPlanningApiServer } from './main-process/planningApiServer';
+import { enforceProductionCommandLineSecurity, installAppSecurity } from './main-process/security';
 import {
   PlanningApiTokenLifetime,
   clearSavedPlanningApiAuthToken,
@@ -25,6 +26,8 @@ console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 const isDev = process.env.NODE_ENV === 'development';
 const APP_DISPLAY_NAME = 'Open-Git-Control';
 const WINDOWS_APP_ID = 'com.opengitcontrol.app';
+
+enforceProductionCommandLineSecurity(isDev);
 
 const updaterManager = new UpdaterManager(isDev);
 let planningApiServer: PlanningApiServerHandle | null = null;
@@ -119,6 +122,7 @@ app.whenReady().then(() => {
     buildDiagnosticsReport,
   });
 
+  installAppSecurity({ isDev, mainProcessDir: __dirname });
   createMainWindow(isDev, APP_DISPLAY_NAME, __dirname);
   updaterManager.configureAutoUpdates(readSettingsWithMigration().autoUpdateEnabled);
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {

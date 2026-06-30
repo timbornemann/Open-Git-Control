@@ -39,6 +39,11 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
       preload: path.join(mainProcessDir, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
+      devTools: isDev,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
     },
   });
   win.setMenuBarVisibility(false);
