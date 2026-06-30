@@ -172,7 +172,7 @@ export const useCommitGraphData = ({
 
     const shouldShowLoadingState = !layoutRef.current;
     const scrollContainer = logContainerRef.current?.parentElement ?? null;
-    const forceTopOnReset = !isAppend && !isSync && forceScrollToTopOnNextResetRef.current;
+    const forceTopOnRefresh = !isAppend && forceScrollToTopOnNextResetRef.current;
     const requestedLimitRaw = isAppend
       ? LOG_PAGE_SIZE
       : isQuick
@@ -182,18 +182,21 @@ export const useCommitGraphData = ({
     const requestGeneration = ++requestGenerationRef.current;
 
     if ((isAppend || isSync || isQuick) && scrollContainer) {
-      pendingScrollTopRef.current = isQuick ? 0 : scrollContainer.scrollTop;
-      pendingScrollHeightRef.current = isSync ? scrollContainer.scrollHeight : null;
-      pendingScrollModeRef.current = isAppend ? 'append' : isQuick ? 'quick' : 'sync';
+      pendingScrollTopRef.current = (forceTopOnRefresh || isQuick) ? 0 : scrollContainer.scrollTop;
+      pendingScrollHeightRef.current = isSync && !forceTopOnRefresh ? scrollContainer.scrollHeight : null;
+      pendingScrollModeRef.current = forceTopOnRefresh ? 'reset' : isAppend ? 'append' : isQuick ? 'quick' : 'sync';
+      if (forceTopOnRefresh) {
+        forceScrollToTopOnNextResetRef.current = false;
+      }
       if (isAppend) {
         appendInFlightRef.current = true;
         setLoadingMore(true);
       }
     } else {
-      pendingScrollTopRef.current = forceTopOnReset ? 0 : (scrollContainer ? scrollContainer.scrollTop : null);
+      pendingScrollTopRef.current = forceTopOnRefresh ? 0 : (scrollContainer ? scrollContainer.scrollTop : null);
       pendingScrollHeightRef.current = null;
       pendingScrollModeRef.current = 'reset';
-      if (forceTopOnReset) {
+      if (forceTopOnRefresh) {
         forceScrollToTopOnNextResetRef.current = false;
       }
       if (shouldShowLoadingState) {

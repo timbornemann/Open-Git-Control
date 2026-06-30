@@ -375,6 +375,18 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
   }, []);
 
+  const resetCommitListScroll = useCallback(() => {
+    const container = logContainerRef.current?.parentElement;
+    if (!container) return;
+
+    container.scrollTop = 0;
+    setScrollTop(0);
+    const nextHeight = container.clientHeight;
+    if (nextHeight > 0) {
+      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
+    }
+  }, []);
+
   useLayoutEffect(() => {
     if (!layout) return;
     const container = logContainerRef.current?.parentElement;
@@ -412,18 +424,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   }, [layout, repoPath, syncViewportMetrics]);
 
   useLayoutEffect(() => {
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
+    resetCommitListScroll();
+    let secondFrameId: number | null = null;
+    const firstFrameId = window.requestAnimationFrame(() => {
+      resetCommitListScroll();
+      secondFrameId = window.requestAnimationFrame(resetCommitListScroll);
+    });
 
-    // Hard reset viewport metrics on repository switch so virtualization always
-    // starts from the newest commit row at the top.
-    container.scrollTop = 0;
-    setScrollTop(0);
-    const nextHeight = container.clientHeight;
-    if (nextHeight > 0) {
-      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-    }
-  }, [repoPath]);
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      if (secondFrameId !== null) {
+        window.cancelAnimationFrame(secondFrameId);
+      }
+    };
+  }, [repoPath, resetCommitListScroll]);
 
   useEffect(() => {
     if (!selectedHash) return;
