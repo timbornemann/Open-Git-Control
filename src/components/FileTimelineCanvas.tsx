@@ -416,7 +416,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     ctx.fill();
 
     // Dog-ear fold highlight
-    ctx.fillStyle = '#241d2c';
+    ctx.fillStyle = '#222421';
     ctx.beginPath();
     ctx.moveTo(left + w * 0.6, top);
     ctx.lineTo(left + w * 0.6, top + h * 0.3);
@@ -534,7 +534,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         // Core node circle background (using hex colors so they are opaque and hide connection lines)
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-        ctx.fillStyle = isFolder ? '#241d2c' : '#1a1520';
+        ctx.fillStyle = isFolder ? '#222421' : '#171b1d';
         ctx.fill();
 
         // Core node border (using hex colors)
@@ -547,10 +547,10 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           ctx.strokeStyle = '#5f9ec2';
           ctx.lineWidth = 3.5;
         } else if (node.status === 'renamed') {
-          ctx.strokeStyle = '#9a79c8';
+          ctx.strokeStyle = '#7890a1';
           ctx.lineWidth = 3.5;
         } else {
-          ctx.strokeStyle = isFolder ? '#b48be0' : '#b7a8b4';
+          ctx.strokeStyle = isFolder ? '#d09a72' : '#b3aaa2';
           ctx.lineWidth = 2.5;
         }
         ctx.stroke();
@@ -558,8 +558,8 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         // Render Folder / File Icon (using hex colors)
         const iconColor = node.status === 'added' ? '#4fae94' :
                           node.status === 'modified' ? '#5f9ec2' :
-                          node.status === 'renamed' ? '#9a79c8' :
-                          isFolder ? '#b48be0' : '#b7a8b4';
+                          node.status === 'renamed' ? '#7890a1' :
+                          isFolder ? '#d09a72' : '#b3aaa2';
 
         if (isFolder) {
           drawFolderIcon(ctx, node.x, node.y, 20, iconColor);
@@ -574,13 +574,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           
           ctx.beginPath();
           ctx.arc(badgeX, badgeY, 6, 0, Math.PI * 2);
-          ctx.fillStyle = '#120f15'; // var(--bg-darker)
+          ctx.fillStyle = '#0f1214'; // var(--bg-darker)
           ctx.fill();
-          ctx.strokeStyle = '#b48be0'; // var(--text-accent)
+          ctx.strokeStyle = '#d09a72'; // var(--text-accent)
           ctx.lineWidth = 1.2;
           ctx.stroke();
 
-          ctx.fillStyle = '#e9e0e6'; // var(--text-primary)
+          ctx.fillStyle = '#e8e1d9'; // var(--text-primary)
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -591,12 +591,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         // Always draw text if scale is large enough, otherwise only draw for top-level or folders to reduce clutter if zoomed out massively
         if (scale >= 0.15 || isFolder) {
           ctx.font = isFolder ? 'bold 15px Inter, sans-serif' : 'bold 13px Inter, sans-serif'; // Larger, bolder font
-          ctx.fillStyle = isFolder ? '#e9e0e6' : '#b7a8b4'; // Solid colors: folders are brighter, files are muted lavender-gray
+          ctx.fillStyle = isFolder ? '#e8e1d9' : '#b3aaa2'; // Solid colors: folders are brighter, files are muted warm-gray
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
 
           // Stronger Backdrop shadow for crisp readability
-          ctx.strokeStyle = 'rgba(18, 15, 21, 1.0)';
+          ctx.strokeStyle = 'rgba(15, 18, 20, 1.0)';
           ctx.lineWidth = 5;
           
           const textOffsetX = node.x + radius + 12;
