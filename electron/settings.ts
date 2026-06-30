@@ -1,5 +1,6 @@
 export type AiProvider = 'ollama' | 'gemini';
 export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
+export type AiCommitMessageLanguage = 'auto' | 'de' | 'en';
 export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
@@ -19,6 +20,7 @@ export interface AppSettings {
   aiAutoCommitEnabled: boolean;
   aiProvider: AiProvider;
   aiCommitMessageStyle: AiCommitMessageStyle;
+  aiCommitMessageLanguage: AiCommitMessageLanguage;
   ollamaBaseUrl: string;
   ollamaModel: string;
   geminiModel: string;
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
   aiCommitMessageStyle: 'conventional',
+  aiCommitMessageLanguage: 'auto',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
@@ -122,6 +125,13 @@ function normalizeAiCommitMessageStyle(value: unknown): AiCommitMessageStyle {
     return value;
   }
   return 'conventional';
+}
+
+function normalizeAiCommitMessageLanguage(value: unknown): AiCommitMessageLanguage {
+  if (value === 'de' || value === 'en') {
+    return value;
+  }
+  return 'auto';
 }
 
 function normalizeSecretScanStrictness(value: unknown): SecretScanStrictness {
@@ -215,6 +225,7 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     aiAutoCommitEnabled: normalizeBoolean(value.aiAutoCommitEnabled, DEFAULT_SETTINGS.aiAutoCommitEnabled),
     aiProvider: normalizeAiProvider(value.aiProvider),
     aiCommitMessageStyle: normalizeAiCommitMessageStyle(value.aiCommitMessageStyle),
+    aiCommitMessageLanguage: normalizeAiCommitMessageLanguage(value.aiCommitMessageLanguage),
     ollamaBaseUrl: normalizeOllamaBaseUrl(value.ollamaBaseUrl),
     ollamaModel: normalizeModel(value.ollamaModel),
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),

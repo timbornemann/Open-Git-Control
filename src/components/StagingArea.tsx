@@ -10,6 +10,12 @@ import { useFileOperations } from './staging-area/useFileOperations';
 import { useCommitForm } from './staging-area/useCommitForm';
 import { useAiCommit } from './staging-area/useAiCommit';
 import { useConflictResolver } from './staging-area/useConflictResolver';
+import {
+  formatCommitMessageStyleExample,
+  getCommitMessageLanguageLabel,
+  getCommitMessageLanguageOptions,
+  getCommitMessageStyleLabel,
+} from '../utils/commitMessagePreferences';
 import type {
   ConfirmDialogState,
   FileSection,
@@ -120,16 +126,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   };
 
   const aiCommitMessageStyleLabel = useMemo(() => {
-    switch (settings.aiCommitMessageStyle) {
-      case 'plain':
-        return tr('Plain', 'Plain');
-      case 'detailed':
-        return tr('Detailliert', 'Detailed');
-      case 'conventional':
-      default:
-        return tr('Conventional Commits', 'Conventional Commits');
-    }
+    return getCommitMessageStyleLabel(settings.aiCommitMessageStyle, tr);
   }, [settings.aiCommitMessageStyle, tr]);
+  const aiCommitMessageLanguageLabel = useMemo(() => {
+    return getCommitMessageLanguageLabel(settings.aiCommitMessageLanguage, tr);
+  }, [settings.aiCommitMessageLanguage, tr]);
+  const aiCommitMessageExample = useMemo(() => {
+    return formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr);
+  }, [settings.aiCommitMessageLanguage, settings.aiCommitMessageStyle, tr]);
 
   const openAiCommitMessageDialog = useCallback(() => {
     setInputDialog({
@@ -143,21 +147,38 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           required: true,
           multiline: true,
           rows: 8,
-          helperText: tr(`Stil: ${aiCommitMessageStyleLabel}`, `Style: ${aiCommitMessageStyleLabel}`),
+          helperText: tr(
+            `Stil: ${aiCommitMessageStyleLabel} | Sprache: ${aiCommitMessageLanguageLabel}`,
+            `Style: ${aiCommitMessageStyleLabel} | Language: ${aiCommitMessageLanguageLabel}`,
+          ),
+        },
+        {
+          id: 'language',
+          label: tr('Commit-Message Sprache', 'Commit message language'),
+          type: 'select',
+          defaultValue: settings.aiCommitMessageLanguage,
+          options: getCommitMessageLanguageOptions(tr),
+          helperText: tr('Ueberschreibt die Standardsprache nur fuer diese Generierung.', 'Overrides the default language for this generation only.'),
         },
       ],
-      contextItems: [],
+      contextItems: [
+        { label: tr('Stil', 'Style'), value: aiCommitMessageStyleLabel },
+        { label: tr('Beispiel', 'Example'), value: aiCommitMessageExample },
+      ],
       irreversible: false,
       consequences: tr('Fuellt nur Commit-Titel und Beschreibung aus.', 'Only fills the commit title and description.'),
       confirmLabel: tr('Generieren', 'Generate'),
       onSubmit: async (values) => {
-        const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '');
+        const language = values.language === 'de' || values.language === 'en' || values.language === 'auto'
+          ? values.language
+          : settings.aiCommitMessageLanguage;
+        const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '', language);
         if (!message) return;
         commitForm.setCommitMsg(message.title);
         commitForm.setCommitDescription(message.description || '');
       },
     });
-  }, [aiCommit, aiCommitMessageStyleLabel, commitForm, tr]);
+  }, [aiCommit, aiCommitMessageExample, aiCommitMessageLanguageLabel, aiCommitMessageStyleLabel, commitForm, settings.aiCommitMessageLanguage, tr]);
 
   const visibleFiles = useMemo(() => {
     const status = fileOps.status;

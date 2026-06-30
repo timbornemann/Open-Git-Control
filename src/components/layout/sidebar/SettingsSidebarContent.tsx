@@ -4,6 +4,11 @@ import { useI18n } from '../../../i18n';
 import { THEME_OPTIONS } from '../settingsShared';
 import { useSettingsAiUpdater } from '../hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from '../ReleaseNotesContent';
+import {
+  formatCommitMessageStyleExample,
+  getCommitMessageLanguageOptions,
+  getCommitMessageStyleOptions,
+} from '../../../utils/commitMessagePreferences';
 
 type SettingsSidebarContentProps = Pick<
   AppSidebarProps,
@@ -334,11 +339,29 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             value={settings.aiCommitMessageStyle}
             onChange={(e) => onUpdateSettings({ aiCommitMessageStyle: e.target.value as SettingsSidebarContentProps['settings']['aiCommitMessageStyle'] })}
           >
-            <option value="conventional">Conventional Commits</option>
-            <option value="plain">{tr('Plain', 'Plain')}</option>
-            <option value="detailed">{tr('Detailliert', 'Detailed')}</option>
+            {getCommitMessageStyleOptions(tr).map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
         </label>
+
+        <label className="ssc-label">
+          {tr('Commit-Message Sprache', 'Commit message language')}
+          <select
+            className="ssc-input"
+            value={settings.aiCommitMessageLanguage}
+            onChange={(e) => onUpdateSettings({ aiCommitMessageLanguage: e.target.value as SettingsSidebarContentProps['settings']['aiCommitMessageLanguage'] })}
+          >
+            {getCommitMessageLanguageOptions(tr).map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="ssc-example-block">
+          <span>{tr('Beispiel', 'Example')}</span>
+          <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr)}</pre>
+        </div>
 
         <div className="ssc-row">
           <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>

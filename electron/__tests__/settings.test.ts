@@ -97,6 +97,9 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ aiCommitMessageStyle: 'plain' }).aiCommitMessageStyle).toBe('plain');
     expect(normalizeSettings({ aiCommitMessageStyle: 'detailed' }).aiCommitMessageStyle).toBe('detailed');
     expect(normalizeSettings({ aiCommitMessageStyle: 'invalid' as never }).aiCommitMessageStyle).toBe('conventional');
+    expect(normalizeSettings({ aiCommitMessageLanguage: 'de' }).aiCommitMessageLanguage).toBe('de');
+    expect(normalizeSettings({ aiCommitMessageLanguage: 'en' }).aiCommitMessageLanguage).toBe('en');
+    expect(normalizeSettings({ aiCommitMessageLanguage: 'invalid' as never }).aiCommitMessageLanguage).toBe('auto');
 
     expect(normalizeSettings({ ollamaBaseUrl: '  http://localhost:11434/  ' }).ollamaBaseUrl).toBe('http://localhost:11434');
     expect(normalizeSettings({ ollamaBaseUrl: '   ' }).ollamaBaseUrl).toBe(DEFAULT_SETTINGS.ollamaBaseUrl);

@@ -21,6 +21,7 @@ const baseSettings: AppSettings = {
   aiAutoCommitEnabled: true,
   aiProvider: 'gemini',
   aiCommitMessageStyle: 'conventional',
+  aiCommitMessageLanguage: 'auto',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-1.5-flash',
@@ -159,6 +160,8 @@ describe('AiService commit message from user notes', () => {
     const userPrompt = String(requestBody.messages[1].content);
 
     expect(systemPrompt).toContain('Conventional Commits');
+    expect(systemPrompt).toContain('Examples: "feat(git): show transfer progress phases"');
+    expect(systemPrompt).toContain('Language: auto');
     expect(systemPrompt).toContain('user-supplied change notes only');
     expect(userPrompt).toContain('Nutzer kann Commit-Message-Stile');
     expect(userPrompt).not.toContain('Files in this commit');
@@ -184,6 +187,23 @@ describe('AiService commit message from user notes', () => {
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
     expect(String(requestBody.messages[0].content)).toContain('Style: plain');
+  });
+
+  it('uses the selected commit message language for notes generation', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
+      message: { content: '{"title":"fix(settings): preserve commit language","description":""}' },
+    }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const service = new AiService(fakeGitService);
+    await service.generateCommitMessageFromUserNotes(
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model', aiCommitMessageLanguage: 'en' },
+      () => '',
+      { notes: 'Commit-Sprache soll konstant bleiben.', language: 'en' },
+    );
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0][1].body));
+    expect(String(requestBody.messages[0].content)).toContain('Language: English');
   });
 });
 

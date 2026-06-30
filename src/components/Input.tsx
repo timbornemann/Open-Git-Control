@@ -12,7 +12,8 @@ export interface InputDialogField {
   helperText?: string;
   multiline?: boolean;
   rows?: number;
-  type?: 'text' | 'url';
+  type?: 'text' | 'url' | 'select';
+  options?: Array<{ value: string; label: string }>;
   validate?: (value: string, values: Record<string, string>) => string | null;
 }
 
@@ -44,7 +45,7 @@ export const Input: React.FC<InputProps> = ({
   onCancel,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
-  const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
   const { tr } = useI18n();
 
   const initialValues = useMemo(() => {
@@ -114,6 +115,16 @@ export const Input: React.FC<InputProps> = ({
                 onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
                 rows={field.rows ?? 3}
               />
+            ) : field.type === 'select' ? (
+              <select
+                ref={index === 0 ? firstInputRef as React.RefObject<HTMLSelectElement> : undefined}
+                value={values[field.id] ?? ''}
+                onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
+              >
+                {(field.options || []).map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             ) : (
               <input
                 ref={index === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}

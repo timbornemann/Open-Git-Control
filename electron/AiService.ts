@@ -1,5 +1,5 @@
 import { GitService, gitService } from './GitService';
-import { AiCommitMessageStyle, AppSettings, AiProvider } from './settings';
+import { AiCommitMessageLanguage, AiCommitMessageStyle, AppSettings, AiProvider } from './settings';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -798,6 +798,8 @@ async function generateCommitMessageWithAi(
     'Only use single-file specific wording when the batch has exactly one file.',
     'If uncertain, use a safer and broader summary instead of inventing details.',
     'Description should be short and only included when it adds essential context.',
+    buildCommitMessageLanguageInstruction(settings.aiCommitMessageLanguage),
+    buildCommitMessageStyleInstruction(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage),
   ].join(' ');
 
   const userPrompt = [
@@ -843,20 +845,51 @@ function normalizeCommitDescription(value: unknown): string {
     .slice(0, MAX_COMMIT_DESCRIPTION_CHARS);
 }
 
-function buildCommitMessageStyleInstruction(style: AiCommitMessageStyle): string {
+function buildCommitMessageStyleInstruction(style: AiCommitMessageStyle, language: AiCommitMessageLanguage = 'auto'): string {
+  const useGermanExamples = language === 'de';
   if (style === 'plain') {
-    return 'Style: plain. Use a short imperative title without a Conventional Commits prefix. Keep the description empty unless it adds important context.';
+    return [
+      'Style: plain.',
+      'Use a short imperative title without a Conventional Commits prefix.',
+      'Keep the description empty unless it adds important context.',
+      useGermanExamples
+        ? 'Examples: "verbessere Clone-Fortschritt"; "behebe Projektloeschung".'
+        : 'Examples: "update clone progress display"; "fix project deletion flow".',
+    ].join(' ');
   }
 
   if (style === 'detailed') {
-    return 'Style: detailed. Use a concise imperative title and a useful description with 1-4 short lines when the notes contain multiple concrete details. Do not pad the description.';
+    return [
+      'Style: detailed.',
+      'Use a concise imperative title and a useful description with 1-4 short lines when the notes contain multiple concrete details.',
+      'Do not pad the description.',
+      useGermanExamples
+        ? 'Example title: "verbessere Fortschritt fuer Clone und Pull".'
+        : 'Example title: "improve clone and pull progress feedback".',
+      useGermanExamples
+        ? 'Example description: "Zeigt Receiving und Resolving als getrennte Ladezustaende. Reduziert die rohe Git-Ausgabe auf relevante Statusdetails."'
+        : 'Example description: "Shows Receiving and Resolving as separate progress states. Keeps the latest git transfer details visible without a scrolling log."',
+    ].join(' ');
   }
 
   return [
     'Style: Conventional Commits.',
     'Use "type(scope): summary" when the scope is clear, otherwise "type: summary".',
     'Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore.',
+    useGermanExamples
+      ? 'Examples: "feat(git): zeige Transfer-Fortschritt"; "fix(settings): erhalte Commit-Sprache".'
+      : 'Examples: "feat(git): show transfer progress phases"; "fix(settings): preserve commit message language".',
   ].join(' ');
+}
+
+function buildCommitMessageLanguageInstruction(language: AiCommitMessageLanguage): string {
+  if (language === 'de') {
+    return 'Language: German. Write title and description in German. Keep Conventional Commit type tokens in English when using Conventional Commits.';
+  }
+  if (language === 'en') {
+    return 'Language: English. Write title and description in English.';
+  }
+  return 'Language: auto. Preserve the language of the user notes unless the notes are mixed; then prefer English.';
 }
 
 function buildFallbackCommitMessageFromNotes(notes: string, style: AiCommitMessageStyle): CommitMessage {
@@ -959,7 +992,7 @@ export class AiService {
   async generateCommitMessageFromUserNotes(
     settings: AppSettings,
     getGeminiApiKey: () => string,
-    params: { notes: string },
+    params: { notes: string; language?: AiCommitMessageLanguage },
   ): Promise<CommitMessage> {
     const notes = normalizeUserCommitNotes(params?.notes);
     if (!notes) {
@@ -978,14 +1011,15 @@ export class AiService {
       }
     }
 
+    const commitLanguage = params.language || settings.aiCommitMessageLanguage;
     const systemPrompt = [
       'You write git commit messages from user-supplied change notes only.',
       'Do not infer repository state, file names, diffs, implementation details, or unstated intent.',
       'Return strict JSON only: {"title": string, "description": string}.',
       'Title must be imperative, <=72 chars, and have no trailing period.',
       'Description may be empty. When present, keep it factual and concise.',
-      'Preserve the language of the user notes unless the notes are mixed; then prefer English.',
-      buildCommitMessageStyleInstruction(settings.aiCommitMessageStyle),
+      buildCommitMessageLanguageInstruction(commitLanguage),
+      buildCommitMessageStyleInstruction(settings.aiCommitMessageStyle, commitLanguage),
     ].join(' ');
 
     const userPrompt = [

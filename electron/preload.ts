@@ -164,7 +164,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
   cancelAiAutoCommit: () => ipcRenderer.invoke('git:cancelAiAutoCommit'),
   getAiAutoCommitState: () => ipcRenderer.invoke('git:getAiAutoCommitState'),
-  aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke('ai:generateCommitMessage', params),
+  aiGenerateCommitMessage: (params: { notes: string; language?: 'auto' | 'de' | 'en' }) => ipcRenderer.invoke('ai:generateCommitMessage', params),
   githubAuth: (token: string, host?: string) => ipcRenderer.invoke('github:auth', token, host),
   githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
   githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),

@@ -94,7 +94,8 @@
 }
 
 .dialog-field input,
-.dialog-field textarea {
+.dialog-field textarea,
+.dialog-field select {
   border: 1px solid var(--border-color);
   background: var(--bg-dark);
   color: var(--text-primary);
@@ -110,7 +111,8 @@
 }
 
 .dialog-field input:focus,
-.dialog-field textarea:focus {
+.dialog-field textarea:focus,
+.dialog-field select:focus {
   outline: none;
   border-color: var(--accent-primary);
 }

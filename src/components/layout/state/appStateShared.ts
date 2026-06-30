@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
   aiAutoCommitEnabled: false,
   aiProvider: 'ollama',
   aiCommitMessageStyle: 'conventional',
+  aiCommitMessageLanguage: 'auto',
   ollamaBaseUrl: 'http://127.0.0.1:11434',
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',

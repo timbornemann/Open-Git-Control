@@ -6,6 +6,11 @@ import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';
 import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
+import {
+  formatCommitMessageStyleExample,
+  getCommitMessageLanguageOptions,
+  getCommitMessageStyleOptions,
+} from '../../utils/commitMessagePreferences';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
@@ -215,11 +220,28 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   value={settings.aiCommitMessageStyle}
                   onChange={(e) => void onUpdateSettings({ aiCommitMessageStyle: e.target.value as AppSettingsDto['aiCommitMessageStyle'] })}
                 >
-                  <option value="conventional">Conventional Commits</option>
-                  <option value="plain">{tr('Plain', 'Plain')}</option>
-                  <option value="detailed">{tr('Detailliert', 'Detailed')}</option>
+                  {getCommitMessageStyleOptions(tr).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </label>
+
+              <label>
+                {tr('Commit-Message Sprache', 'Commit message language')}
+                <select
+                  value={settings.aiCommitMessageLanguage}
+                  onChange={(e) => void onUpdateSettings({ aiCommitMessageLanguage: e.target.value as AppSettingsDto['aiCommitMessageLanguage'] })}
+                >
+                  {getCommitMessageLanguageOptions(tr).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="settings-example-block">
+                <span>{tr('Beispiel fuer diesen Stil', 'Example for this style')}</span>
+                <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr)}</pre>
+              </div>
 
               <div className="settings-inline-actions">
                 <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>

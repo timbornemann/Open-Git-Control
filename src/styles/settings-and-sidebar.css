@@ -98,6 +98,34 @@
   resize: vertical;
 }
 
+.settings-example-block,
+.ssc-example-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+}
+
+.settings-example-block span,
+.ssc-example-block span {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.settings-example-block pre,
+.ssc-example-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
 .settings-checkbox {
   flex-direction: row !important;
   align-items: center;
