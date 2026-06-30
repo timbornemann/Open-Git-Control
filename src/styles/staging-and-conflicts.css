@@ -1800,6 +1800,195 @@ body[data-theme='mono-light-green'] {
   --glass-bg: rgba(255, 255, 255, 0.88);
 }
 
+/* Theme-scoped git graph palettes */
+body[data-theme='copper-night'] {
+  --commit-red: #d35d69;
+  --commit-green: #4fae94;
+  --commit-purple: #9a79c8;
+  --commit-orange: #c58b5c;
+  --graph-lane-1: #bf7b5a;
+  --graph-lane-2: #9a79c8;
+  --graph-lane-3: #4fa8a4;
+  --graph-lane-4: #c58b5c;
+  --graph-lane-5: #b48be0;
+  --graph-lane-6: #5f9ec2;
+  --graph-lane-7: #d35d69;
+  --graph-lane-8: #98889a;
+  --graph-lane-9: #cf8d6c;
+  --graph-lane-10: #7d8ab8;
+}
+
+body[data-theme='midnight-teal'] {
+  --commit-red: #d46a74;
+  --commit-green: #4fae94;
+  --commit-purple: #7d8ab8;
+  --commit-orange: #c58b5c;
+  --graph-lane-1: #4fa8a4;
+  --graph-lane-2: #7d8ab8;
+  --graph-lane-3: #c58b5c;
+  --graph-lane-4: #63a8c7;
+  --graph-lane-5: #78c9c4;
+  --graph-lane-6: #d46a74;
+  --graph-lane-7: #92a26f;
+  --graph-lane-8: #8b9aa1;
+  --graph-lane-9: #62bbb7;
+  --graph-lane-10: #a88fc2;
+}
+
+body[data-theme='graphite-blue'] {
+  --commit-red: #cf6978;
+  --commit-green: #58ad96;
+  --commit-purple: #93a7ce;
+  --commit-orange: #c99a68;
+  --graph-lane-1: #6b86b3;
+  --graph-lane-2: #4fa8a4;
+  --graph-lane-3: #bf7b5a;
+  --graph-lane-4: #93a7ce;
+  --graph-lane-5: #6fa9ca;
+  --graph-lane-6: #cf6978;
+  --graph-lane-7: #58ad96;
+  --graph-lane-8: #8f99a7;
+  --graph-lane-9: #7b98c8;
+  --graph-lane-10: #a087c2;
+}
+
+body[data-theme='forest-copper'] {
+  --commit-red: #d46f79;
+  --commit-green: #69b28e;
+  --commit-purple: #a083be;
+  --commit-orange: #c59a62;
+  --graph-lane-1: #5f9673;
+  --graph-lane-2: #bf7b5a;
+  --graph-lane-3: #7ea9c9;
+  --graph-lane-4: #c59a62;
+  --graph-lane-5: #9ecba9;
+  --graph-lane-6: #a083be;
+  --graph-lane-7: #d46f79;
+  --graph-lane-8: #97a394;
+  --graph-lane-9: #71a886;
+  --graph-lane-10: #6aa9c8;
+}
+
+body[data-theme='ember-slate'] {
+  --commit-red: #d97480;
+  --commit-green: #64b394;
+  --commit-purple: #9d90cd;
+  --commit-orange: #d39a64;
+  --graph-lane-1: #cf8b5b;
+  --graph-lane-2: #8aa6d1;
+  --graph-lane-3: #67b39a;
+  --graph-lane-4: #d97480;
+  --graph-lane-5: #e6b07e;
+  --graph-lane-6: #9d90cd;
+  --graph-lane-7: #78a9d8;
+  --graph-lane-8: #a8948d;
+  --graph-lane-9: #dda171;
+  --graph-lane-10: #64b394;
+}
+
+body[data-theme='arctic-mint'] {
+  --commit-red: #c75a68;
+  --commit-green: #2f8f6f;
+  --commit-purple: #6f63aa;
+  --commit-orange: #a97440;
+  --graph-lane-1: #2f8f83;
+  --graph-lane-2: #4d78b8;
+  --graph-lane-3: #ba6f52;
+  --graph-lane-4: #3d82ac;
+  --graph-lane-5: #2d7f75;
+  --graph-lane-6: #c75a68;
+  --graph-lane-7: #6f63aa;
+  --graph-lane-8: #6f837d;
+  --graph-lane-9: #24776d;
+  --graph-lane-10: #8a6a9f;
+}
+
+body[data-theme='porcelain-light'],
+body[data-theme='light'] {
+  --commit-red: #be5461;
+  --commit-green: #3f8f74;
+  --commit-purple: #7c6aa6;
+  --commit-orange: #a46f3f;
+  --graph-lane-1: #a96647;
+  --graph-lane-2: #5f88a4;
+  --graph-lane-3: #3d8e8b;
+  --graph-lane-4: #a46f3f;
+  --graph-lane-5: #8c654f;
+  --graph-lane-6: #4a86a6;
+  --graph-lane-7: #be5461;
+  --graph-lane-8: #857a78;
+  --graph-lane-9: #95583d;
+  --graph-lane-10: #7c6aa6;
+}
+
+body[data-theme='mono-dark-red'] {
+  --commit-red: #f02d3d;
+  --commit-green: #9a9aa0;
+  --commit-purple: #8a8a92;
+  --commit-orange: #c0c0c6;
+  --graph-lane-1: #e11d2e;
+  --graph-lane-2: #cfcfd6;
+  --graph-lane-3: #8f8f99;
+  --graph-lane-4: #ff5a66;
+  --graph-lane-5: #b4b4bc;
+  --graph-lane-6: #74747c;
+  --graph-lane-7: #f02d3d;
+  --graph-lane-8: #9f9fa8;
+  --graph-lane-9: #d85b65;
+  --graph-lane-10: #e8e8ec;
+}
+
+body[data-theme='mono-light-red'] {
+  --commit-red: #d61228;
+  --commit-green: #5f5f66;
+  --commit-purple: #4e4e55;
+  --commit-orange: #7b7b84;
+  --graph-lane-1: #d61228;
+  --graph-lane-2: #242428;
+  --graph-lane-3: #6f6f77;
+  --graph-lane-4: #a80f20;
+  --graph-lane-5: #4d4d54;
+  --graph-lane-6: #898991;
+  --graph-lane-7: #c43a48;
+  --graph-lane-8: #5f5f66;
+  --graph-lane-9: #e11d2e;
+  --graph-lane-10: #111113;
+}
+
+body[data-theme='mono-dark-green'] {
+  --commit-red: #a0a0a6;
+  --commit-green: #22c55e;
+  --commit-purple: #8a928c;
+  --commit-orange: #bdbfc0;
+  --graph-lane-1: #16a34a;
+  --graph-lane-2: #d7dcd8;
+  --graph-lane-3: #8f9890;
+  --graph-lane-4: #4ade80;
+  --graph-lane-5: #b4bbb5;
+  --graph-lane-6: #747c76;
+  --graph-lane-7: #22c55e;
+  --graph-lane-8: #9fa8a0;
+  --graph-lane-9: #55b978;
+  --graph-lane-10: #e8eee9;
+}
+
+body[data-theme='mono-light-green'] {
+  --commit-red: #626862;
+  --commit-green: #16a34a;
+  --commit-purple: #4e554f;
+  --commit-orange: #7b847d;
+  --graph-lane-1: #16a34a;
+  --graph-lane-2: #1f231f;
+  --graph-lane-3: #6f776f;
+  --graph-lane-4: #0f7434;
+  --graph-lane-5: #4e564f;
+  --graph-lane-6: #89918a;
+  --graph-lane-7: #12823b;
+  --graph-lane-8: #606a61;
+  --graph-lane-9: #2d9f55;
+  --graph-lane-10: #111312;
+}
+
 
 
 /* Stash Panel */
