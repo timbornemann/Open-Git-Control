@@ -3,57 +3,57 @@
 
 :root {
   /* Core Colors */
-  --bg-darker: #120f15;
-  --bg-dark: #1a1520;
-  --bg-panel: #241d2c;
-  --bg-hover: #31263a;
+  --bg-darker: #0f1214;
+  --bg-dark: #171b1d;
+  --bg-panel: #222421;
+  --bg-hover: #2d302b;
 
-  --text-primary: #e9e0e6;
-  --text-secondary: #b7a8b4;
-  --text-accent: #b48be0;
+  --text-primary: #e8e1d9;
+  --text-secondary: #b3aaa2;
+  --text-accent: #d09a72;
 
-  --border-color: #3c3046;
+  --border-color: #3a3934;
   --border-radius: 8px;
 
   /* Brand Accents */
-  --accent-primary: #bf7b5a;
-  --accent-hover: #cf8d6c;
-  --accent-secondary: #8b68b8;
-  --accent-complement: #4fa8a4;
+  --accent-primary: #b87555;
+  --accent-hover: #c98a68;
+  --accent-secondary: #6f8794;
+  --accent-complement: #579891;
   --on-accent: #ffffff;
 
   /* Semantic Colors */
-  --status-success: #4fae94;
-  --status-warning: #c58b5c;
-  --status-danger: #d35d69;
-  --status-info: #5f9ec2;
-  --status-merged: #9a79c8;
-  --status-untracked: #98889a;
+  --status-success: #5aa08d;
+  --status-warning: #bc8a5d;
+  --status-danger: #c96568;
+  --status-info: #6f9ab2;
+  --status-merged: #7890a1;
+  --status-untracked: #908a84;
   --danger: var(--status-danger);
 
   /* Semantic Tints */
-  --status-success-soft: rgba(79, 174, 148, 0.15);
-  --status-success-border: rgba(79, 174, 148, 0.32);
-  --status-warning-soft: rgba(197, 139, 92, 0.14);
-  --status-warning-border: rgba(197, 139, 92, 0.30);
-  --status-danger-soft: rgba(211, 93, 105, 0.14);
-  --status-danger-border: rgba(211, 93, 105, 0.32);
-  --status-info-soft: rgba(95, 158, 194, 0.14);
-  --status-info-border: rgba(95, 158, 194, 0.30);
-  --status-merged-soft: rgba(154, 121, 200, 0.14);
-  --status-merged-border: rgba(154, 121, 200, 0.30);
-  --status-untracked-soft: rgba(152, 136, 154, 0.14);
-  --status-untracked-border: rgba(152, 136, 154, 0.30);
+  --status-success-soft: rgba(90, 160, 141, 0.15);
+  --status-success-border: rgba(90, 160, 141, 0.32);
+  --status-warning-soft: rgba(188, 138, 93, 0.14);
+  --status-warning-border: rgba(188, 138, 93, 0.30);
+  --status-danger-soft: rgba(201, 101, 104, 0.14);
+  --status-danger-border: rgba(201, 101, 104, 0.32);
+  --status-info-soft: rgba(111, 154, 178, 0.14);
+  --status-info-border: rgba(111, 154, 178, 0.30);
+  --status-merged-soft: rgba(120, 144, 161, 0.14);
+  --status-merged-border: rgba(120, 144, 161, 0.30);
+  --status-untracked-soft: rgba(144, 138, 132, 0.14);
+  --status-untracked-border: rgba(144, 138, 132, 0.30);
 
   /* Accent Tints */
-  --accent-primary-soft: rgba(191, 123, 90, 0.14);
-  --accent-primary-softer: rgba(191, 123, 90, 0.08);
-  --accent-primary-border: rgba(191, 123, 90, 0.30);
-  --accent-primary-strong: rgba(191, 123, 90, 0.45);
-  --accent-secondary-soft: rgba(139, 104, 184, 0.14);
-  --accent-secondary-border: rgba(139, 104, 184, 0.30);
-  --accent-complement-soft: rgba(79, 168, 164, 0.14);
-  --accent-complement-border: rgba(79, 168, 164, 0.32);
+  --accent-primary-soft: rgba(184, 117, 85, 0.14);
+  --accent-primary-softer: rgba(184, 117, 85, 0.08);
+  --accent-primary-border: rgba(184, 117, 85, 0.30);
+  --accent-primary-strong: rgba(184, 117, 85, 0.45);
+  --accent-secondary-soft: rgba(111, 135, 148, 0.14);
+  --accent-secondary-border: rgba(111, 135, 148, 0.30);
+  --accent-complement-soft: rgba(87, 152, 145, 0.14);
+  --accent-complement-border: rgba(87, 152, 145, 0.32);
 
   /* Git Graph Colors */
   --commit-red: var(--status-danger);
@@ -80,9 +80,9 @@
   /* Shadows & Effects */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.5);
-  --glass-bg: rgba(26, 21, 32, 0.72);
+  --glass-bg: rgba(23, 27, 29, 0.74);
   --line-subtle: rgba(255, 255, 255, 0.04);
-  --scrollbar-thumb-hover: rgba(183, 168, 180, 0.5);
+  --scrollbar-thumb-hover: rgba(179, 170, 162, 0.5);
 }
 
 * {
