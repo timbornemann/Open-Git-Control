@@ -223,7 +223,7 @@ export class GitService {
       : detailedMessage;
 
     if (!isRepoUnavailable && !isExpectedNonFatal) {
-      console.error(`Git Error executing "git ${args.join(' ')}":`, finalMessage);
+      console.error(`Git Error executing "git ${args.join(' ')}":\n${finalMessage}`);
     }
     return new Error(finalMessage);
   }
@@ -238,6 +238,9 @@ export class GitService {
         || /upstream branch .* not stored as a remote-tracking branch/i.test(errorText)
         || /fatal: no such branch/i.test(errorText)
       );
+    }
+    if (primary === 'rev-parse' && args.includes('--verify') && args.includes('--quiet')) {
+      return true;
     }
     if (primary === 'submodule' && secondary === 'status') {
       return /no submodule mapping found in \.gitmodules for path/i.test(errorText);

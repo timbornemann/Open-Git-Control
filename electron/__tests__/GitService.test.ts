@@ -579,6 +579,59 @@ describe('GitService expected non-fatal git errors', () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it('does not log quiet rev-parse verification probes as console errors', async () => {
+    const error: any = new Error('Command failed');
+    error.stderr = 'fatal: Needed a single revision';
+
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-nonfatal-verify-test-'));
+    (service as any).repoPath = repoDir;
+
+    try {
+      await expect(
+        service.runCommand(['rev-parse', '--verify', '--quiet', 'v1.2.5^{commit}']),
+      ).rejects.toThrow(/Needed a single revision/i);
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('logs git format strings without treating %s as console placeholders', async () => {
+    const error: any = new Error('Command failed');
+    error.stderr = 'fatal: bad revision';
+
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-format-log-test-'));
+    (service as any).repoPath = repoDir;
+
+    try {
+      await expect(
+        service.runCommand(['log', 'missing..main', '--pretty=format:%H%x1f%h%x1f%s']),
+      ).rejects.toThrow(/bad revision/i);
+
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      const [message] = consoleErrorSpy.mock.calls[0];
+      expect(String(message)).toContain('--pretty=format:%H%x1f%h%x1f%s');
+      expect(String(message)).toContain('fatal: bad revision');
+      consoleErrorSpy.mockRestore();
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('GitService clone target naming', () => {

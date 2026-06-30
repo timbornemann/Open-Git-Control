@@ -20,6 +20,18 @@ function buildGithubRepositoryUrl(host: string, owner: string, repo: string): st
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 }
 
+async function localCommitishExists(gitService: GitService, commitish: string): Promise<boolean> {
+  const trimmed = String(commitish || '').trim();
+  if (!trimmed) return false;
+
+  try {
+    await gitService.runCommand(['rev-parse', '--verify', '--quiet', `${trimmed}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function registerGithubHandlers({
   gitService,
   githubService,
@@ -359,7 +371,11 @@ export function registerGithubHandlers({
       let commitsRaw = '';
 
       try {
-        if (lastReleaseTag) {
+        const canUseLastReleaseTag = lastReleaseTag
+          ? await localCommitishExists(gitService, lastReleaseTag)
+          : false;
+
+        if (lastReleaseTag && canUseLastReleaseTag) {
           commitsRaw = await gitService.runCommand([
             'log',
             `${lastReleaseTag}..${targetCommitish}`,
@@ -368,6 +384,7 @@ export function registerGithubHandlers({
             '--max-count=400',
           ]);
         } else {
+          fallbackUsed = Boolean(lastReleaseTag);
           commitsRaw = await gitService.runCommand([
             'log',
             targetCommitish,
