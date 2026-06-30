@@ -95,4 +95,36 @@ describe('registerGithubHandlers fork flow', () => {
       defaultBranchOnly: undefined,
     });
   });
+
+  it('adds real repository and commit urls to release context', async () => {
+    const gitService = {
+      runCommand: vi.fn().mockResolvedValue('abc123\x1fabc123\x1ffeat: release links\x1fTim\x1f2026-06-30'),
+    } as any;
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      listRepositoryTags: vi.fn().mockResolvedValue(['v1.0.0']),
+      getLatestReleaseTag: vi.fn().mockResolvedValue('v1.0.0'),
+      normalizeHost: vi.fn((host: string) => host),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue('tim'),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.internal', githubOauthClientId: '' }),
+    });
+
+    const handler = handlers.get('github:getReleaseContext');
+    expect(handler).toBeTruthy();
+
+    const result = await handler!({}, { owner: 'acme', repo: 'project', targetCommitish: 'main' });
+
+    expect(result.success).toBe(true);
+    expect(result.data.repositoryHtmlUrl).toBe('https://github.internal/acme/project');
+    expect(result.data.commitsSinceLastRelease[0].htmlUrl).toBe('https://github.internal/acme/project/commit/abc123');
+    expect(result.data.commitsSinceLastRelease[0].htmlUrl).not.toContain('example');
+  });
 });

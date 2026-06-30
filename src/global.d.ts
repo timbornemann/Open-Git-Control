@@ -201,11 +201,13 @@ export interface ReleaseCommitDto {
   subject: string;
   author: string;
   date: string;
+  htmlUrl?: string | null;
 }
 
 export interface GitHubReleaseContextDto {
   existingTags: string[];
   lastReleaseTag: string | null;
+  repositoryHtmlUrl?: string | null;
   commitsSinceLastRelease: ReleaseCommitDto[];
   commitsTarget: string;
   fallbackUsed: boolean;
@@ -541,6 +543,7 @@ export interface ElectronAPI {
     releaseName: string;
     lastReleaseTag?: string | null;
     commits: ReleaseCommitDto[];
+    repositoryHtmlUrl?: string | null;
     language: 'de' | 'en';
     versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];

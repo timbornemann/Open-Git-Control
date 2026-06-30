@@ -30,12 +30,14 @@ const commit = (
   subject: string,
   author = 'Tim',
   date = '2026-03-26',
+  htmlUrl?: string | null,
 ): ReleaseCommitDto => ({
   hash: `${shortHash}-full`,
   shortHash,
   subject,
   author,
   date,
+  htmlUrl,
 });
 
 describe('releaseNotes utilities', () => {
@@ -154,7 +156,7 @@ describe('releaseNotes utilities', () => {
     it('creates german markdown and includes hashes when requested', () => {
       const markdown = buildAlgorithmicChangeListMarkdown(
         [
-          commit('e1', 'new settings dialog'),
+          commit('e1', 'new settings dialog', 'Tim', '2026-03-26', 'https://github.com/acme/project/commit/e1-full'),
           commit('e2', 'patch: improve fallback'),
           commit('e3', 'style: align switches'),
         ],
@@ -166,9 +168,10 @@ describe('releaseNotes utilities', () => {
       expect(markdown).toContain('### Neu');
       expect(markdown).toContain('### Behoben');
       expect(markdown).toContain('### Wartung');
-      expect(markdown).toContain('- new settings dialog (e1)');
+      expect(markdown).toContain('- new settings dialog ([e1](https://github.com/acme/project/commit/e1-full))');
       expect(markdown).toContain('- patch: improve fallback (e2)');
       expect(markdown).toContain('- style: align switches (e3)');
+      expect(markdown).not.toContain('example.com');
     });
   });
 });

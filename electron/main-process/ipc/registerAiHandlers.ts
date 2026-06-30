@@ -194,6 +194,7 @@ export function registerAiHandlers({
     releaseName: string;
     lastReleaseTag?: string | null;
     commits: ReleaseCommitInput[];
+    repositoryHtmlUrl?: string | null;
     language: 'de' | 'en';
     versionBump?: 'major' | 'minor' | 'patch';
     hints?: string[];
@@ -223,6 +224,7 @@ export function registerAiHandlers({
         releaseName,
         lastReleaseTag: params?.lastReleaseTag || null,
         commits,
+        repositoryHtmlUrl: typeof params?.repositoryHtmlUrl === 'string' ? params.repositoryHtmlUrl : null,
         language,
         versionBump,
         hints,

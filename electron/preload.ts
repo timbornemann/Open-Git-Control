@@ -190,7 +190,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     tagName: string;
     releaseName: string;
     lastReleaseTag?: string | null;
-    commits: Array<{ hash: string; shortHash: string; subject: string; author: string; date: string }>;
+    commits: Array<{ hash: string; shortHash: string; subject: string; author: string; date: string; htmlUrl?: string | null }>;
+    repositoryHtmlUrl?: string | null;
     language: 'de' | 'en';
     versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];

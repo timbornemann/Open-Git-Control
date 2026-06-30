@@ -16,6 +16,10 @@ type RegisterGithubHandlersDeps = {
   readSettingsWithMigration: () => AppSettings;
 };
 
+function buildGithubRepositoryUrl(host: string, owner: string, repo: string): string {
+  return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+}
+
 export function registerGithubHandlers({
   gitService,
   githubService,
@@ -383,12 +387,20 @@ export function registerGithubHandlers({
         ]);
       }
 
-      const commitsSinceLastRelease = parseReleaseCommits(commitsRaw);
+      const settings = readSettingsWithMigration();
+      const githubHost = githubService.normalizeHost(settings.githubHost);
+      const repositoryHtmlUrl = buildGithubRepositoryUrl(githubHost, owner, repo);
+      const commitsSinceLastRelease = parseReleaseCommits(commitsRaw).map((commit) => ({
+        ...commit,
+        htmlUrl: commit.hash ? `${repositoryHtmlUrl}/commit/${commit.hash}` : null,
+      }));
+
       return {
         success: true,
         data: {
           existingTags,
           lastReleaseTag: lastReleaseTag || null,
+          repositoryHtmlUrl,
           commitsSinceLastRelease,
           commitsTarget: targetCommitish,
           fallbackUsed,

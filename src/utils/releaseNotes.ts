@@ -26,6 +26,17 @@ function sectionLabel(bucket: CommitBucket, language: 'de' | 'en'): string {
   return 'Maintenance';
 }
 
+function safeHttpUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return /^https?:\/\/\S+$/i.test(trimmed) ? trimmed : '';
+}
+
+function formatHashReference(commit: ReleaseCommitDto): string {
+  const commitUrl = safeHttpUrl(commit.htmlUrl);
+  return commitUrl ? `[${commit.shortHash}](${commitUrl})` : commit.shortHash;
+}
+
 export function isLikelyMergeCommit(subject: string): boolean {
   return MERGE_COMMIT_PATTERN.test((subject || '').trim());
 }
@@ -108,7 +119,7 @@ export function buildAlgorithmicChangeListMarkdown(
     lines.push('');
     lines.push(`### ${sectionLabel(bucket, language)}`);
     for (const commit of items) {
-      const hashPart = includeHashes ? ` (${commit.shortHash})` : '';
+      const hashPart = includeHashes ? ` (${formatHashReference(commit)})` : '';
       lines.push(`- ${commit.subject}${hashPart}`);
     }
   }

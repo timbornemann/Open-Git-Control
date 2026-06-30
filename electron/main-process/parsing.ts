@@ -30,6 +30,7 @@ export type ReleaseCommit = {
   subject: string;
   author: string;
   date: string;
+  htmlUrl?: string | null;
 };
 
 export function parseFileHistory(logOutput: string): FileHistoryEntry[] {

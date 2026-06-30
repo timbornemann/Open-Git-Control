@@ -2190,6 +2190,7 @@ export const useAppState = () => {
         releaseName,
         lastReleaseTag: releaseContext?.lastReleaseTag || null,
         commits,
+        repositoryHtmlUrl: releaseContext?.repositoryHtmlUrl || null,
         language: releaseNotesLanguage,
         versionBump,
         hints: promptHints,
