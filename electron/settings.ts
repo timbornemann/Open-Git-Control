@@ -30,7 +30,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'midnight-teal',
+  theme: 'copper-night',
   language: 'de',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
@@ -78,7 +78,7 @@ function normalizeTheme(value: unknown): AppSettings['theme'] {
     case 'mono-light-green':
       return value;
     case 'dark':
-      return 'midnight-teal';
+      return 'copper-night';
     case 'light':
       return 'porcelain-light';
     default:

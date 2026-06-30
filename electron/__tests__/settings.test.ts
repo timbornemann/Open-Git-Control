@@ -49,12 +49,12 @@ describe('normalizeSettings', () => {
     });
 
     expect(normalizeSettings({ theme: 'dark' as never, language: 'en' })).toMatchObject({
-      theme: 'midnight-teal',
+      theme: 'copper-night',
       language: 'en',
     });
 
     expect(normalizeSettings({ theme: 'invalid' as never, language: 'fr' as never })).toMatchObject({
-      theme: 'midnight-teal',
+      theme: 'copper-night',
       language: 'de',
     });
   });
