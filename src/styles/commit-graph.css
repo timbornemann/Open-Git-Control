@@ -238,14 +238,18 @@
 }
 
 .branch-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 1px 6px;
-  line-height: 1.05;
-  border-radius: 999px;
-  background-color: var(--accent-secondary-soft);
-  color: var(--text-accent);
-  border: 1px solid var(--accent-secondary-border);
+  --ref-chip-color: var(--accent-secondary);
+  font-size: 0.71rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  line-height: 1.08;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ref-chip-color) 20%, var(--bg-panel));
+  color: color-mix(in srgb, var(--ref-chip-color) 76%, var(--text-primary));
+  border: 1px solid color-mix(in srgb, var(--ref-chip-color) 52%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 16%, transparent),
+    0 1px 0 rgba(0, 0, 0, 0.12);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -259,12 +263,17 @@
 }
 
 .branch-label.branch-toggle:hover {
-  border-color: var(--accent-primary-border);
-  box-shadow: 0 0 0 1px var(--accent-primary-soft);
+  background: color-mix(in srgb, var(--ref-chip-color) 26%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--ref-chip-color) 66%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 20%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 26%, transparent);
 }
 
 .branch-label.branch-toggle.active {
   border-color: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 58%, var(--border-color));
+  background: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 24%, var(--bg-panel));
+  color: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 82%, var(--text-primary));
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 40%, transparent),
     0 0 10px color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 30%, transparent);
@@ -272,39 +281,27 @@
 }
 
 .branch-label.head {
-  background-color: var(--status-success-soft);
-  color: var(--status-success);
-  border-color: var(--status-success-border);
+  --ref-chip-color: var(--status-success);
 }
 
 .branch-label.local {
-  background-color: var(--accent-primary-soft);
-  color: var(--text-accent);
-  border-color: var(--accent-primary-border);
+  --ref-chip-color: var(--accent-primary);
 }
 
 .branch-label.remote {
-  background-color: var(--status-untracked-soft);
-  color: var(--status-untracked);
-  border-color: var(--status-untracked-border);
+  --ref-chip-color: var(--status-info);
 }
 
 .branch-label.tag {
-  background-color: var(--status-warning-soft);
-  color: var(--status-warning);
-  border-color: var(--status-warning-border);
+  --ref-chip-color: var(--status-warning);
 }
 
 .branch-label.head-pointer {
-  background-color: var(--status-merged-soft);
-  color: var(--status-merged);
-  border-color: var(--status-merged-border);
+  --ref-chip-color: var(--status-merged);
 }
 
 .branch-label.working-tree {
-  background-color: var(--status-warning-soft);
-  color: var(--status-warning);
-  border-color: var(--status-warning-border);
+  --ref-chip-color: var(--status-warning);
 }
 
 .working-tree-row .commit-hash {
