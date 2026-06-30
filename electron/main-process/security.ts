@@ -83,9 +83,9 @@ export function buildContentSecurityPolicy(isDev: boolean): string {
   if (isDev) {
     return [
       "default-src 'self' http://localhost:5173 http://127.0.0.1:5173",
-      "script-src 'self' 'unsafe-eval' http://localhost:5173 http://127.0.0.1:5173",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173",
       "style-src 'self' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173",
-      "img-src 'self' data: blob: file:",
+      "img-src 'self' data: blob: file: https: http:",
       "font-src 'self' data:",
       "connect-src 'self' http://localhost:5173 http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173",
       "worker-src 'self' blob:",
@@ -100,7 +100,7 @@ export function buildContentSecurityPolicy(isDev: boolean): string {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: file:",
+    "img-src 'self' data: blob: file: https: http:",
     "font-src 'self' data:",
     "connect-src 'self' http://127.0.0.1:* http://localhost:*",
     "worker-src 'self' blob:",

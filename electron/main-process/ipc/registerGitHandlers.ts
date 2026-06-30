@@ -2,7 +2,7 @@ import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CommitStatsPriority, CommitStatsService } from '../../CommitStatsService';
-import { GitService } from '../../GitService';
+import { GitService, RepositoryFileSource } from '../../GitService';
 import { SecretScanService } from '../../SecretScanService';
 import { WorkingTreeService } from '../../WorkingTreeService';
 import { AppSettings } from '../../settings';
@@ -26,6 +26,15 @@ type RegisterGitHandlersDeps = {
 };
 
 const STREAMING_PROGRESS_COMMANDS = new Set<GitCommandName>(['fetch', 'pull']);
+const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
+
+const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => {
+  const source = String(value || '').trim();
+  if (!REPOSITORY_FILE_SOURCES.has(source as RepositoryFileSource)) {
+    throw new Error('Invalid repository file source.');
+  }
+  return source as RepositoryFileSource;
+};
 
 const withProgressFlag = (commandName: GitCommandName, args: string[]): string[] => {
   const baseArgs = [commandName, ...args];
@@ -602,6 +611,44 @@ export function registerGitHandlers({
       }
 
       const data = await gitService.readRepoFile(normalizedPath);
+      return { success: true, data };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:markdownPreviewFile', async (_event: any, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
+    try {
+      const source = normalizeRepositoryFileSource(params.source);
+      const filePath = String(params.path || '').trim();
+      if (!filePath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const text = await gitService.readRepositoryFileTextAtSource(
+        source,
+        filePath,
+        typeof params.commitHash === 'string' ? params.commitHash : undefined,
+      );
+      return { success: true, data: { text } };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('git:repoFileDataUrl', async (_event: any, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
+    try {
+      const source = normalizeRepositoryFileSource(params.source);
+      const filePath = String(params.path || '').trim();
+      if (!filePath) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const data = await gitService.readRepositoryImageDataUrlAtSource(
+        source,
+        filePath,
+        typeof params.commitHash === 'string' ? params.commitHash : undefined,
+      );
       return { success: true, data };
     } catch (error: any) {
       return { success: false, error: error.message };

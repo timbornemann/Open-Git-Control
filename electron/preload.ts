@@ -115,6 +115,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
   getFileTimelineData: (limit?: number) => ipcRenderer.invoke('git:getFileTimelineData', limit),
   readRepoFile: (filePath: string) => ipcRenderer.invoke('git:readRepoFile', filePath),
+  getMarkdownPreviewFile: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
+    ipcRenderer.invoke('git:markdownPreviewFile', params),
+  getRepoFileDataUrl: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
+    ipcRenderer.invoke('git:repoFileDataUrl', params),
   writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke('git:writeRepoFile', filePath, content),
   openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),
   onCloneProgress: (callback: (line: string) => void) => {

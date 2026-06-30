@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Columns, Eye, FileWarning, LayoutList, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Columns, Eye, FileText, FileWarning, LayoutList, X } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { GitFileBlameLineDto } from '../types/git';
+import {
+  applyMarkdownPreviewImageDataUrls,
+  collectMarkdownPreviewImageSources,
+  isExternalMarkdownUrl,
+  isMarkdownFilePath,
+  renderMarkdownToSanitizedHtml,
+  resolveMarkdownPreviewAssetPath,
+} from '../utils/markdownPreview';
 
-type DiffViewMode = 'unified' | 'side-by-side';
+type DiffViewMode = 'unified' | 'side-by-side' | 'preview';
 type ParsedLineType = 'context' | 'add' | 'del';
 
 type ParsedLine = {
@@ -24,6 +32,12 @@ type ParsedHunk = {
 type ParsedDiff = {
   fileHeader: string[];
   hunks: ParsedHunk[];
+};
+
+type MarkdownPreviewState = {
+  loading: boolean;
+  error: string | null;
+  html: string;
 };
 
 interface DiffViewerProps {
@@ -294,11 +308,26 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const [showBlame, setShowBlame] = useState(false);
   const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);
   const [isBlameLoading, setIsBlameLoading] = useState(false);
+  const [markdownPreview, setMarkdownPreview] = useState<MarkdownPreviewState>({
+    loading: false,
+    error: null,
+    html: '',
+  });
+
+  const isMarkdownFile = useMemo(() => isMarkdownFilePath(request.path), [request.path]);
+  const isMarkdownPreviewMode = viewMode === 'preview' && isMarkdownFile;
 
   useEffect(() => {
     setShowBlame(false);
     setBlameData([]);
+    setMarkdownPreview({ loading: false, error: null, html: '' });
   }, [request]);
+
+  useEffect(() => {
+    if (!isMarkdownFile && viewMode === 'preview') {
+      setViewMode('unified');
+    }
+  }, [isMarkdownFile, viewMode]);
 
   useEffect(() => {
     const fetchBlame = async () => {
@@ -405,6 +434,77 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     fetchDiff();
   }, [repoPath, request, tr]);
 
+  useEffect(() => {
+    if (!repoPath || !window.electronAPI || !isMarkdownPreviewMode) return;
+
+    let cancelled = false;
+    const loadPreview = async () => {
+      setMarkdownPreview({ loading: true, error: null, html: '' });
+
+      try {
+        const markdownResult = await window.electronAPI.getMarkdownPreviewFile({
+          source: request.source,
+          path: request.path,
+          commitHash: request.commitHash,
+        });
+
+        if (!markdownResult.success) {
+          if (!cancelled) {
+            setMarkdownPreview({
+              loading: false,
+              error: markdownResult.error || tr('Markdown-Vorschau konnte nicht geladen werden.', 'Could not load Markdown preview.'),
+              html: '',
+            });
+          }
+          return;
+        }
+
+        const initialHtml = renderMarkdownToSanitizedHtml(markdownResult.data.text);
+        const imageSources = collectMarkdownPreviewImageSources(initialHtml);
+        const dataUrlsBySource: Record<string, string> = {};
+
+        await Promise.all(imageSources.map(async (imageSource) => {
+          const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
+          if (!assetPath || !window.electronAPI) return;
+
+          let assetResult = await window.electronAPI.getRepoFileDataUrl({
+            source: request.source,
+            path: assetPath,
+            commitHash: request.commitHash,
+          });
+
+          if (!assetResult.success && request.source === 'staged') {
+            assetResult = await window.electronAPI.getRepoFileDataUrl({
+              source: 'unstaged',
+              path: assetPath,
+            });
+          }
+
+          if (assetResult.success) {
+            dataUrlsBySource[imageSource] = assetResult.data.dataUrl;
+          }
+        }));
+
+        const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource);
+        if (!cancelled) {
+          setMarkdownPreview({ loading: false, error: null, html });
+        }
+      } catch (previewError: unknown) {
+        if (!cancelled) {
+          const message = previewError instanceof Error
+            ? previewError.message
+            : tr('Markdown-Vorschau konnte nicht geladen werden.', 'Could not load Markdown preview.');
+          setMarkdownPreview({ loading: false, error: message, html: '' });
+        }
+      }
+    };
+
+    void loadPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [isMarkdownPreviewMode, repoPath, request, tr]);
+
   const extension = useMemo(() => getExtension(request.path), [request.path]);
   const looksBinaryByExt = useMemo(() => BINARY_EXTENSIONS.has(extension), [extension]);
 
@@ -438,6 +538,27 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     const next = Math.max(0, Math.min(index, hunkCount - 1));
     setActiveHunkIndex(next);
     hunkRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleMarkdownPreviewClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    const href = anchor.getAttribute('href') || '';
+    if (href.startsWith('#')) {
+      event.preventDefault();
+      const targetId = href.slice(1);
+      if (targetId) {
+        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+
+    event.preventDefault();
+    if (isExternalMarkdownUrl(href) && /^https:/i.test(href) && window.electronAPI?.openExternalUrl) {
+      void window.electronAPI.openExternalUrl(href);
+    }
   };
 
   const renderBlameCell = (line: ParsedLine, prevLine: ParsedLine | undefined, side: 'left' | 'right' = 'right') => {
@@ -612,28 +733,38 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
             >
               <Columns size={14} /> {tr('Side-by-Side', 'Side-by-side')}
             </button>
+            <button
+              className={`diff-toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
+              onClick={() => setViewMode('preview')}
+              title={tr('Markdown-Vorschau', 'Markdown preview')}
+              disabled={!isMarkdownFile}
+            >
+              <FileText size={14} /> {tr('Vorschau', 'Preview')}
+            </button>
           </div>
 
           <button
             className={`diff-toggle-btn ${showBlame ? 'active' : ''}`}
             onClick={() => setShowBlame(!showBlame)}
             title={tr('Git Blame einblenden', 'Show Git Blame')}
-            disabled={!canRenderText}
+            disabled={!canRenderText || isMarkdownPreviewMode}
             style={{ borderRadius: '6px', border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
           >
             {isBlameLoading ? <span className="spinner-mini" /> : <Eye size={14} />}
             {tr('Blame', 'Blame')}
           </button>
 
-          <div className="diff-nav-group">
-            <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
-              <ChevronLeft size={14} />
-            </button>
-            <span className="diff-nav-label">{tr('Hunk', 'Hunk')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}</span>
-            <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex + 1)} disabled={hunkCount === 0}>
-              <ChevronRight size={14} />
-            </button>
-          </div>
+          {!isMarkdownPreviewMode && (
+            <div className="diff-nav-group">
+              <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
+                <ChevronLeft size={14} />
+              </button>
+              <span className="diff-nav-label">{tr('Hunk', 'Hunk')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}</span>
+              <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex + 1)} disabled={hunkCount === 0}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
 
           <button className="diff-close-btn" onClick={onClose} title={tr('Diff schließen', 'Close diff')}>
             <X size={14} />
@@ -641,7 +772,40 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         </div>
       </div>
 
-      {isLoading && (
+      {isMarkdownPreviewMode && (
+        <div className="markdown-preview-scroll">
+          {markdownPreview.loading && (
+            <div className="markdown-preview-loading">
+              {Array.from({ length: 9 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="skeleton-line"
+                  style={{
+                    width: index % 3 === 0 ? '58%' : `${74 - (index % 4) * 8}%`,
+                    height: index === 0 ? 18 : 11,
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {!markdownPreview.loading && markdownPreview.error && (
+            <div className="diff-empty-state error">{markdownPreview.error}</div>
+          )}
+          {!markdownPreview.loading && !markdownPreview.error && markdownPreview.html && (
+            <article
+              className="markdown-preview-content"
+              onClick={handleMarkdownPreviewClick}
+              dangerouslySetInnerHTML={{ __html: markdownPreview.html }}
+            />
+          )}
+          {!markdownPreview.loading && !markdownPreview.error && !markdownPreview.html && (
+            <div className="diff-empty-state">{tr('Markdown-Datei ist leer.', 'Markdown file is empty.')}</div>
+          )}
+        </div>
+      )}
+
+      {!isMarkdownPreviewMode && isLoading && (
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {Array.from({ length: 10 }).map((_, i) => {
             const isAdd = i % 5 === 1;
@@ -663,10 +827,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
           })}
         </div>
       )}
-      {error && !isLoading && <div className="diff-empty-state error">{error}</div>}
-      {!isLoading && !error && !diffText.trim() && <div className="diff-empty-state">{tr('Keine Unterschiede vorhanden.', 'No differences found.')}</div>}
+      {!isMarkdownPreviewMode && error && !isLoading && <div className="diff-empty-state error">{error}</div>}
+      {!isMarkdownPreviewMode && !isLoading && !error && !diffText.trim() && <div className="diff-empty-state">{tr('Keine Unterschiede vorhanden.', 'No differences found.')}</div>}
 
-      {!isLoading && !error && diffText.trim() && !canRenderText && (
+      {!isMarkdownPreviewMode && !isLoading && !error && diffText.trim() && !canRenderText && (
         <div className="diff-empty-state warning">
           <FileWarning size={18} />
           <span>
@@ -677,7 +841,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
         </div>
       )}
 
-      {!isLoading && !error && diffText.trim() && canRenderText && (
+      {!isMarkdownPreviewMode && !isLoading && !error && diffText.trim() && canRenderText && (
         <div className="diff-content-scroll">
           {isTooLarge && (
             <div className="diff-large-warning">

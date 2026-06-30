@@ -415,6 +415,18 @@ export interface DiffPreviewDto {
   lines: number;
 }
 
+export type RepositoryFileSourceDto = 'unstaged' | 'staged' | 'commit';
+
+export interface MarkdownPreviewFileDto {
+  text: string;
+}
+
+export interface RepoFileDataUrlDto {
+  dataUrl: string;
+  mimeType: string;
+  bytes: number;
+}
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
@@ -464,6 +476,16 @@ export interface ElectronAPI {
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   getFileTimelineData: (limit?: number) => Promise<{ success: boolean; data: any[]; error?: string }>;
   readRepoFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
+  getMarkdownPreviewFile: (params: {
+    source: RepositoryFileSourceDto;
+    path: string;
+    commitHash?: string;
+  }) => Promise<IpcResult<MarkdownPreviewFileDto>>;
+  getRepoFileDataUrl: (params: {
+    source: RepositoryFileSourceDto;
+    path: string;
+    commitHash?: string;
+  }) => Promise<IpcResult<RepoFileDataUrlDto>>;
   writeRepoFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   openSubmodule: (submodulePath: string) => Promise<{ success: boolean; error?: string }>;
   onCloneProgress: (callback: (line: string) => void) => () => void;

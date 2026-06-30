@@ -33,8 +33,10 @@
     "test:ci": "npm run build:electron && npm run test:coverage && npm run build"
   },
   "dependencies": {
+    "dompurify": "^3.4.11",
     "electron-updater": "^6.6.2",
     "lucide-react": "^0.300.0",
+    "marked": "^18.0.5",
     "octokit": "^5.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

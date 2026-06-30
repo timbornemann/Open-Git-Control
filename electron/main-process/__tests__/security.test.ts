@@ -90,6 +90,12 @@ describe('Electron security guards', () => {
     expect(policy).not.toContain('font.gstatic.com');
   });
 
+  it('allows Vite React refresh inline scripts only in development CSP', () => {
+    expect(buildContentSecurityPolicy(true)).toContain("script-src 'self' 'unsafe-eval' 'unsafe-inline'");
+    expect(buildContentSecurityPolicy(false)).toContain("script-src 'self'");
+    expect(buildContentSecurityPolicy(false)).not.toContain("script-src 'self' 'unsafe-eval' 'unsafe-inline'");
+  });
+
   it('exits production when debug switches are present', () => {
     enforceProductionCommandLineSecurity(false, ['app.exe', '--remote-debugging-port=9222']);
 

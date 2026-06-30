@@ -48,6 +48,12 @@ export type DiffPreviewResult = {
   bytes: number;
   lines: number;
 };
+export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
+export type RepositoryFileDataUrl = {
+  dataUrl: string;
+  mimeType: string;
+  bytes: number;
+};
 export type CommitMessageInput = {
   title: string;
   description?: string;
@@ -57,6 +63,21 @@ export type CommitMessageInput = {
 };
 
 const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
+const MAX_MARKDOWN_PREVIEW_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_MARKDOWN_PREVIEW_ASSET_BYTES = 10 * 1024 * 1024;
+const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
+const IMAGE_MIME_TYPES = new Map<string, string>([
+  ['apng', 'image/apng'],
+  ['avif', 'image/avif'],
+  ['bmp', 'image/bmp'],
+  ['gif', 'image/gif'],
+  ['ico', 'image/x-icon'],
+  ['jpeg', 'image/jpeg'],
+  ['jpg', 'image/jpeg'],
+  ['png', 'image/png'],
+  ['svg', 'image/svg+xml'],
+  ['webp', 'image/webp'],
+]);
 const statusPorcelainArgs = (): string[] => [
   '-c',
   'core.quotepath=false',
@@ -298,6 +319,120 @@ export class GitService {
   private isPathInsideRepo(repoPath: string, filePath: string): boolean {
     const relative = path.relative(repoPath, filePath);
     return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+  }
+
+  private normalizeRepoRelativePath(relativePath: string): string {
+    const rawPath = String(relativePath || '').trim();
+    if (!rawPath) {
+      throw new Error('File path is required.');
+    }
+
+    const normalizedForCheck = rawPath.replace(/\\/g, '/');
+    const segments = normalizedForCheck.split('/');
+    if (
+      path.isAbsolute(rawPath)
+      || path.win32.isAbsolute(rawPath)
+      || normalizedForCheck.startsWith('/')
+      || normalizedForCheck.startsWith(':(')
+      || segments.includes('..')
+      || /[\0\r\n]/.test(rawPath)
+    ) {
+      throw new Error('File path must be repository-relative.');
+    }
+
+    return normalizedForCheck;
+  }
+
+  private getImageMimeType(relativePath: string): string {
+    const fileName = relativePath.split('/').pop() || relativePath;
+    const lastDot = fileName.lastIndexOf('.');
+    const extension = lastDot >= 0 ? fileName.slice(lastDot + 1).toLowerCase() : '';
+    const mimeType = IMAGE_MIME_TYPES.get(extension);
+    if (!mimeType) {
+      throw new Error('Only image assets can be loaded for Markdown preview.');
+    }
+    return mimeType;
+  }
+
+  private buildRevisionFileSpec(source: RepositoryFileSource, relativePath: string, commitHash?: string): string {
+    if (source === 'staged') {
+      return `:${relativePath}`;
+    }
+
+    if (source === 'commit') {
+      const normalizedHash = String(commitHash || '').trim();
+      if (!COMMIT_HASH_RE.test(normalizedHash)) {
+        throw new Error('Invalid commit hash.');
+      }
+      return `${normalizedHash}:${relativePath}`;
+    }
+
+    throw new Error('Working tree files are not addressed by a Git revision spec.');
+  }
+
+  private readWorkingTreeFileBuffer(relativePath: string, maxBytes: number): Buffer {
+    const repoPath = this.ensureRepoPath();
+    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
+    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
+    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
+      throw new Error('File path is outside the current repository.');
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile()) {
+      throw new Error('Target path is not a file.');
+    }
+    if (stat.size > maxBytes) {
+      throw new Error('File is too large for Markdown preview.');
+    }
+
+    return fs.readFileSync(resolvedPath);
+  }
+
+  private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
+    const repoPath = this.ensureRepoPath();
+    return this.scheduler.schedule(repoPath, 'interactive', 'show', (signal) => new Promise<Buffer>((resolve, reject) => {
+      const proc = spawn('git', ['show', revisionSpec], { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const chunks: Buffer[] = [];
+      let capturedBytes = 0;
+      let stderr = '';
+      let tooLarge = false;
+
+      const abort = () => proc.kill();
+      signal.addEventListener('abort', abort, { once: true });
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        capturedBytes += chunk.length;
+        if (capturedBytes > maxBytes) {
+          tooLarge = true;
+          proc.kill();
+          return;
+        }
+        chunks.push(chunk);
+      });
+      proc.stderr.on('data', (chunk: Buffer) => {
+        if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
+      });
+      proc.on('error', reject);
+      proc.on('close', (code, closeSignal) => {
+        signal.removeEventListener('abort', abort);
+        if (tooLarge) {
+          reject(new Error('File is too large for Markdown preview.'));
+          return;
+        }
+        if (signal.aborted || closeSignal) {
+          const error = new Error('Git file read was aborted.');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
+        if (code !== 0) {
+          reject(new Error((stderr || `git show ${revisionSpec} exited with code ${code}`).trim()));
+          return;
+        }
+        resolve(Buffer.concat(chunks));
+      });
+    }));
   }
 
   private sleep(ms: number): Promise<void> {
@@ -557,6 +692,41 @@ export class GitService {
     }
 
     return fs.readFileSync(resolvedPath, 'utf8');
+  }
+
+  async readRepositoryFileTextAtSource(
+    source: RepositoryFileSource,
+    relativePath: string,
+    commitHash?: string,
+  ): Promise<string> {
+    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
+    if (source === 'unstaged') {
+      return this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES).toString('utf8');
+    }
+
+    const revisionSpec = this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash);
+    return (await this.readGitFileBuffer(revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).toString('utf8');
+  }
+
+  async readRepositoryImageDataUrlAtSource(
+    source: RepositoryFileSource,
+    relativePath: string,
+    commitHash?: string,
+  ): Promise<RepositoryFileDataUrl> {
+    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
+    const mimeType = this.getImageMimeType(normalizedRelativePath);
+    const buffer = source === 'unstaged'
+      ? this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
+      : await this.readGitFileBuffer(
+        this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash),
+        MAX_MARKDOWN_PREVIEW_ASSET_BYTES,
+      );
+
+    return {
+      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+      mimeType,
+      bytes: buffer.length,
+    };
   }
 
   /**

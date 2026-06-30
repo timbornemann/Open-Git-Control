@@ -193,6 +193,47 @@ describe('GitService repo path normalization', () => {
   });
 });
 
+describe('GitService Markdown preview reads', () => {
+  it('reads Markdown text and linked image assets from working tree, index, and commit', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-markdown-preview-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
+      fs.mkdirSync(path.join(repoDir, 'docs', 'images'), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, 'docs', 'README.md'), '# Preview\n\n![Logo](images/logo.png)\n', 'utf8');
+      fs.writeFileSync(
+        path.join(repoDir, 'docs', 'images', 'logo.png'),
+        Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=', 'base64'),
+      );
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+
+      await expect(service.readRepositoryFileTextAtSource('unstaged', 'docs/README.md'))
+        .resolves.toContain('# Preview');
+      await expect(service.readRepositoryImageDataUrlAtSource('unstaged', 'docs/images/logo.png'))
+        .resolves.toMatchObject({ mimeType: 'image/png' });
+
+      execFileSync('git', ['add', 'docs/README.md', 'docs/images/logo.png'], { cwd: repoDir, stdio: 'ignore' });
+      await expect(service.readRepositoryFileTextAtSource('staged', 'docs/README.md'))
+        .resolves.toContain('![Logo]');
+
+      execFileSync(
+        'git',
+        ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs'],
+        { cwd: repoDir, stdio: 'ignore' },
+      );
+      const commitHash = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, encoding: 'utf8' }).trim();
+
+      await expect(service.readRepositoryFileTextAtSource('commit', 'docs/README.md', commitHash))
+        .resolves.toContain('# Preview');
+      const image = await service.readRepositoryImageDataUrlAtSource('commit', 'docs/images/logo.png', commitHash);
+      expect(image.dataUrl).toMatch(/^data:image\/png;base64,/);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('GitService stale index.lock recovery', () => {
   it('removes stale lock files and retries git command once', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-index-lock-'));
