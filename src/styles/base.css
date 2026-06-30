@@ -364,9 +364,11 @@ code, pre {
 }
 
 .topbar-chip-branch {
-  background-color: var(--status-success-soft);
-  color: var(--status-success);
-  border-color: var(--status-success-border);
+  background: color-mix(in srgb, var(--status-success) 18%, var(--bg-panel));
+  color: color-mix(in srgb, var(--status-success) 78%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--status-success) 50%, var(--border-color));
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-success) 14%, transparent);
 }
 
 .topbar-chip-remote {
