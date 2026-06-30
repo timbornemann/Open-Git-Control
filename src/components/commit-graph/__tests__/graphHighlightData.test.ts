@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraphHighlightData } from '../../CommitGraph';
+import { buildGraphHighlightData, findCommitIndexByNavigationTarget } from '../../CommitGraph';
 import { computeGraphLayout } from '../../../utils/graphLayout';
 import type { GitCommit } from '../../../utils/gitParsing';
 
@@ -82,5 +82,27 @@ describe('buildGraphHighlightData', () => {
 
     expect(mergeEdge).toBeDefined();
     expect(highlight.selectedPathEdgeKeys.has(`${mergeEdge!.fromRow}:${mergeEdge!.fromLane}->${mergeEdge!.toRow}:${mergeEdge!.toLane}:${mergeEdge!.kind}`)).toBe(true);
+  });
+});
+
+describe('findCommitIndexByNavigationTarget', () => {
+  it('finds commits by full or unique abbreviated hash', () => {
+    const layout = computeGraphLayout([
+      commit('abcdef1234567890'),
+      commit('1234567890abcdef'),
+    ]);
+
+    expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1234567890')).toBe(0);
+    expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1')).toBe(0);
+  });
+
+  it('does not navigate abbreviated hashes when the target is ambiguous', () => {
+    const layout = computeGraphLayout([
+      commit('abcdef1234567890'),
+      commit('abcdef1987654320'),
+    ]);
+
+    expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1')).toBe(-1);
+    expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef12')).toBe(0);
   });
 });

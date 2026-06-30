@@ -50,6 +50,7 @@ const LANE_WIDTH = 28;
 const GRAPH_PADDING = 16;
 const NODE_RADIUS = 4;
 const MERGE_NODE_RADIUS = 6;
+const NAVIGATION_MAX_LOAD_ATTEMPTS = 50;
 const SECONDARY_GRAPH_ACCENT = 'var(--status-untracked-border)';
 const FORENSIC_PATH_HISTORY_STORAGE_KEY = 'open-git-control:forensic-path-history:v1';
 
@@ -134,6 +135,32 @@ const resolveHighlightableBranchRef = (ref: string): string | null => {
 const graphEdgeKey = (edge: GraphEdge) => (
   `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`
 );
+
+export const findCommitIndexByNavigationTarget = (
+  nodes: GraphNode[],
+  targetHash: string,
+): number => {
+  const normalizedTarget = String(targetHash || '').trim().toLowerCase();
+  if (!normalizedTarget) return -1;
+
+  const exactIndex = nodes.findIndex((node) => (
+    node.commit.hash.toLowerCase() === normalizedTarget
+  ));
+  if (exactIndex >= 0) return exactIndex;
+
+  if (normalizedTarget.length < 7) return -1;
+
+  const matchingIndexes: number[] = [];
+  nodes.forEach((node, index) => {
+    const fullHash = node.commit.hash.toLowerCase();
+    const abbrevHash = node.commit.abbrevHash.toLowerCase();
+    if (fullHash.startsWith(normalizedTarget) || abbrevHash === normalizedTarget) {
+      matchingIndexes.push(index);
+    }
+  });
+
+  return matchingIndexes.length === 1 ? matchingIndexes[0] : -1;
+};
 
 export const buildGraphHighlightData = (
   layout: ReturnType<typeof useCommitGraphData>['layout'],
@@ -300,6 +327,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const didRunInitialBranchEffectRef = useRef(false);
   const navigationAttemptRef = useRef<{ requestId: number; attempts: number } | null>(null);
   const completedNavigationRequestIdRef = useRef<number | null>(null);
+  const navigationRetryFrameRef = useRef<number | null>(null);
+  const [navigationRetryTick, setNavigationRetryTick] = useState(0);
   const topResetLockRef = useRef<{
     repoPath: string | null;
     activeUntil: number;
@@ -319,6 +348,22 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     regex: tr('-G Regex', '-G regex'),
     line: tr('-L Zeilenbereich', '-L line range'),
   }), [tr]);
+
+  const requestNavigationRetry = useCallback(() => {
+    if (navigationRetryFrameRef.current !== null) return;
+    navigationRetryFrameRef.current = window.requestAnimationFrame(() => {
+      navigationRetryFrameRef.current = null;
+      setNavigationRetryTick((current) => current + 1);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (navigationRetryFrameRef.current !== null) {
+      window.cancelAnimationFrame(navigationRetryFrameRef.current);
+      navigationRetryFrameRef.current = null;
+    }
+  }, []);
+
   const handleRepoCleared = useCallback(() => {
     setForensicResults([]);
     setForensicError(null);
@@ -506,10 +551,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       navigationAttemptRef.current = { requestId: navigationRequest.requestId, attempts: 0 };
     }
 
-    const nodeIndex = layout.nodes.findIndex((node) => node.commit.hash === navigationRequest.hash);
+    const nodeIndex = findCommitIndexByNavigationTarget(layout.nodes, navigationRequest.hash);
     if (nodeIndex >= 0) {
       const container = logContainerRef.current?.parentElement;
-      if (!container) return;
+      if (!container || container.clientHeight <= 0 || container.scrollHeight <= 0) {
+        requestNavigationRetry();
+        return;
+      }
 
       const workingTreeRowOffset = workingTreeStatus && (
         workingTreeStatus.staged.length > 0
@@ -532,7 +580,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     if (loadingMore || loading) return;
 
     const attempts = navigationAttemptRef.current?.attempts ?? 0;
-    if (attempts >= 25) {
+    if (attempts >= NAVIGATION_MAX_LOAD_ATTEMPTS) {
       navigationAttemptRef.current = null;
       completedNavigationRequestIdRef.current = navigationRequest.requestId;
       return;
@@ -549,7 +597,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     loadMoreCommits,
     loading,
     loadingMore,
+    navigationRetryTick,
     navigationRequest,
+    requestNavigationRetry,
     workingTreeStatus,
   ]);
 

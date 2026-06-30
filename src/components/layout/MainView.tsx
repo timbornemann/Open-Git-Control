@@ -217,6 +217,7 @@ export const MainView: React.FC = () => {
     selectedCommit,
     setSelectedCommit,
     commitNavigationRequest,
+    onNavigateToCommit,
     refreshTrigger,
     triggerRefresh,
     commitRefreshTrigger,
@@ -303,6 +304,7 @@ export const MainView: React.FC = () => {
     onOpenRepoWorkspace,
     onCloseReleaseCreator,
     commitNavigationRequest,
+    onNavigateToCommit,
   });
 
   const [showTimeline, setShowTimeline] = React.useState(false);
@@ -633,7 +635,7 @@ export const MainView: React.FC = () => {
                     onClose={closeInspector}
                     onRepoChanged={triggerRefresh}
                     onNavigateToCommit={(hash) => {
-                      handleSelectCommitDirect(hash);
+                      onNavigateToCommit(hash);
                       closeInspector();
                     }}
                   />

@@ -29,6 +29,7 @@ export type AppContextValue = AppSidebarProps & {
   selectedCommit: string | null;
   setSelectedCommit: (hash: string | null) => void;
   commitNavigationRequest: CommitNavigationRequest | null;
+  onNavigateToCommit: (hash: string) => void;
   refreshTrigger: number;
   triggerRefresh: () => void;
   commitRefreshTrigger: number;

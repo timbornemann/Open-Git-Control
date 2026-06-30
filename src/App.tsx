@@ -449,6 +449,7 @@ const App: React.FC = () => {
     selectedCommit: state.selectedCommit,
     setSelectedCommit: state.setSelectedCommit,
     commitNavigationRequest: state.commitNavigationRequest,
+    onNavigateToCommit: state.onNavigateToCommit,
     refreshTrigger: state.refreshTrigger,
     triggerRefresh: state.triggerRefresh,
     commitRefreshTrigger: state.commitRefreshTrigger,

@@ -1730,7 +1730,7 @@ export const useAppState = () => {
 
   const navigateToCommit = useCallback((hash: string) => {
     const normalizedHash = String(hash || '').trim();
-    if (!/^[0-9a-f]{40}$/i.test(normalizedHash)) return;
+    if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
 
     workspace.setActiveTab('repo');
     setShowReleaseCreator(false);
@@ -2486,6 +2486,7 @@ export const useAppState = () => {
     selectedCommit,
     setSelectedCommit,
     commitNavigationRequest,
+    onNavigateToCommit: navigateToCommit,
     autoOpenConflictResolverPath,
     clearAutoOpenConflictResolverPath,
     openConflictResolverForPath,
