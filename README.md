@@ -25,19 +25,21 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 
 ## Downloads
 
-Latest release page:
+Always-current release page:
 
 [github.com/timbornemann/Open-Git-Control/releases/latest](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 
-Current published release documented here: [v1.2.5](https://github.com/timbornemann/Open-Git-Control/releases/tag/v1.2.5)
+Current latest release: [v1.3.0](https://github.com/timbornemann/Open-Git-Control/releases/tag/v1.3.0), published 2026-06-30.
+
+The badge and latest release page stay current automatically. The direct binary links below are versioned by GitHub asset name and are refreshed by the release workflow after a new stable release is published.
 
 | Platform | Package | Direct GitHub download |
 | --- | --- | --- |
-| Windows x64 | NSIS installer `.exe` | [Open-Git-Control-1.2.5-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-win-x64.exe) |
-| Linux x64 | AppImage | [Open-Git-Control-1.2.5-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-linux-x86_64.AppImage) |
-| Linux amd64 | Debian package `.deb` | [Open-Git-Control-1.2.5-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-linux-amd64.deb) |
-| macOS x64 | Disk image `.dmg` | [Open-Git-Control-1.2.5-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-mac-x64.dmg) |
-| macOS x64 | Zip archive | [Open-Git-Control-1.2.5-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.2.5/Open-Git-Control-1.2.5-mac-x64.zip) |
+| Windows x64 | NSIS installer `.exe` | [Open-Git-Control-1.3.0-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-win-x64.exe) |
+| Linux x64 | AppImage | [Open-Git-Control-1.3.0-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-x86_64.AppImage) |
+| Linux amd64 | Debian package `.deb` | [Open-Git-Control-1.3.0-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-amd64.deb) |
+| macOS x64 | Disk image `.dmg` | [Open-Git-Control-1.3.0-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.dmg) |
+| macOS x64 | Zip archive | [Open-Git-Control-1.3.0-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.zip) |
 
 The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata for the auto-updater. Most users should download one of the installers above.
 
@@ -783,7 +785,7 @@ npm run dist:linux
 npm run dist:mac
 ```
 
-GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Publishing a GitHub Release with a tag such as `v1.2.5` triggers platform builds for Windows, Linux, and macOS, derives the package version from the tag, validates expected artifact names, and attaches assets to the release.
+GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Publishing a GitHub Release with a tag such as `vX.Y.Z` triggers platform builds for Windows, Linux, and macOS, derives the package version from the tag, validates expected artifact names, attaches assets to the release, and refreshes the README download links.
 
 Expected release assets:
 
