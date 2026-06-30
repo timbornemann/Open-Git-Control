@@ -27,6 +27,24 @@ const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
 const SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.sidebar-manually-collapsed';
 const REPO_SWITCH_EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"], select';
 
+const getSidebarMaxWidthForViewport = (viewportWidth: number): number => {
+  if (viewportWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
+    return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, viewportWidth - 44));
+  }
+  const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, viewportWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
+  return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
+};
+
+const clampSidebarWidthForViewport = (width: number, viewportWidth: number): number => (
+  Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidthForViewport(viewportWidth), width))
+);
+
+const readInitialSidebarWidth = (): number => {
+  const storedWidthValue = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+  const width = Number.isFinite(storedWidthValue) ? Math.round(storedWidthValue) : SIDEBAR_DEFAULT_WIDTH;
+  return clampSidebarWidthForViewport(width, window.innerWidth);
+};
+
 const isRepoSwitchEditableTarget = (target: EventTarget | null): boolean => {
   const element = target instanceof HTMLElement ? target : document.activeElement;
   return Boolean(element?.closest(REPO_SWITCH_EDITABLE_SELECTOR));
@@ -40,7 +58,7 @@ const App: React.FC = () => {
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
   const sidebarManuallyCollapsedRef = useRef(
     window.localStorage.getItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
   );
@@ -54,11 +72,7 @@ const App: React.FC = () => {
   const repoSwitcherListRef = useRef<HTMLDivElement | null>(null);
 
   const getSidebarMaxWidth = useCallback(() => {
-    if (window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
-      return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - 44));
-    }
-    const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
-    return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
+    return getSidebarMaxWidthForViewport(window.innerWidth);
   }, []);
 
   const clampSidebarWidth = useCallback((width: number) => {
@@ -120,13 +134,6 @@ const App: React.FC = () => {
       document.body.style.userSelect = '';
     };
   }, [getSidebarMaxWidth]);
-
-  useEffect(() => {
-    const storedWidthRaw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-    const storedWidthValue = Number(storedWidthRaw);
-    const normalizedWidth = Number.isFinite(storedWidthValue) ? storedWidthValue : SIDEBAR_DEFAULT_WIDTH;
-    setSidebarWidth(clampSidebarWidth(Math.round(normalizedWidth)));
-  }, [clampSidebarWidth]);
 
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));

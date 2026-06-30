@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { installExternalWindowHandler } from './externalLinks';
+import { installMainWindowStatePersistence, readMainWindowState } from './windowState';
 
 function resolveExistingFile(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -28,10 +29,10 @@ function getWindowIconPath(mainProcessDir: string): string | undefined {
 
 export function createMainWindow(isDev: boolean, appDisplayName: string, mainProcessDir: string): void {
   const windowIconPath = getWindowIconPath(mainProcessDir);
+  const savedWindowState = readMainWindowState();
 
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...savedWindowState.bounds,
     title: appDisplayName,
     autoHideMenuBar: true,
     ...(windowIconPath ? { icon: windowIconPath } : {}),
@@ -46,6 +47,11 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
       webviewTag: false,
     },
   });
+  installMainWindowStatePersistence(win);
+  if (savedWindowState.isMaximized) {
+    win.maximize();
+  }
+
   win.setMenuBarVisibility(false);
   win.removeMenu();
   installExternalWindowHandler(win);
