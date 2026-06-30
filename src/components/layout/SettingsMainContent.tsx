@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { RotateCcw } from 'lucide-react';
 import type { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useI18n } from '../../i18n';
 import { SettingsTabId } from './sidebar/AppSidebar.types';
@@ -36,6 +37,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
     isTestingAi,
     isLoadingModels,
     aiStatus,
+    modelOptions,
     geminiApiKeyInput,
     setGeminiApiKeyInput,
     updaterStatus,
@@ -58,72 +60,93 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
     <div className="settings-main">
       <div className="settings-content">
         {activeTab === 'general' && (
-          <div className="settings-grid">
-            <section className="settings-card">
-              <h3>{tr('Darstellung', 'Appearance')}</h3>
-              <label>
-                {tr('Theme', 'Theme')}
-                <select value={settings.theme} onChange={(e) => void onUpdateSettings({ theme: e.target.value as AppSettingsDto['theme'] })}>
-                  {THEME_OPTIONS.map((themeOption) => <option key={themeOption.value} value={themeOption.value}>{themeOption.label}</option>)}
-                </select>
-              </label>
-              <label>
-                {tr('Sprache', 'Language')}
-                <select value={settings.language} onChange={(e) => void onUpdateSettings({ language: e.target.value as 'de' | 'en' })}>
-                  <option value="de">Deutsch</option>
-                  <option value="en">English</option>
-                </select>
-              </label>
-              <div className="settings-inline-actions">
-                <button className="staging-tool-btn" onClick={onResetLayout}>
-                  {tr('Layout zuruecksetzen', 'Reset layout')}
-                </button>
+          <div className="settings-general-page">
+            <section className="settings-general-section">
+              <div className="settings-general-heading">
+                <h3>{tr('Darstellung', 'Appearance')}</h3>
+              </div>
+              <div className="settings-general-controls">
+                <label className="settings-field">
+                  {tr('Theme', 'Theme')}
+                  <select value={settings.theme} onChange={(e) => void onUpdateSettings({ theme: e.target.value as AppSettingsDto['theme'] })}>
+                    {THEME_OPTIONS.map((themeOption) => <option key={themeOption.value} value={themeOption.value}>{themeOption.label}</option>)}
+                  </select>
+                </label>
+                <label className="settings-field">
+                  {tr('Sprache', 'Language')}
+                  <select value={settings.language} onChange={(e) => void onUpdateSettings({ language: e.target.value as 'de' | 'en' })}>
+                    <option value="de">Deutsch</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+                <div className="settings-general-actions settings-field--full">
+                  <button className="staging-tool-btn settings-reset-layout-btn" onClick={onResetLayout}>
+                    <RotateCcw size={14} />
+                    <span>{tr('Layout zuruecksetzen', 'Reset layout')}</span>
+                  </button>
+                </div>
               </div>
             </section>
 
-            <section className="settings-card">
-              <h3>{tr('Workflow', 'Workflow')}</h3>
-              <label>
-                {tr('Default Branch', 'Default branch')}
-                <input type="text" value={settings.defaultBranch} onChange={(e) => void onUpdateSettings({ defaultBranch: e.target.value })} />
-              </label>
-              <label className="settings-checkbox">
-                <input
-                  type="checkbox"
-                  checked={settings.showSecondaryHistory}
-                  onChange={(e) => void onUpdateSettings({ showSecondaryHistory: e.target.checked })}
-                />
-                {tr('Sekundaere Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}
-              </label>
-              <label className="settings-checkbox">
-                <input
-                  type="checkbox"
-                  checked={settings.commitSignoffByDefault}
-                  onChange={(e) => void onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
-                />
-                {tr('Commit Signoff standardmaessig aktiv', 'Enable commit signoff by default')}
-              </label>
-              <label>
-                {tr('Commit Template', 'Commit template')}
-                <textarea rows={5} value={settings.commitTemplate} onChange={(e) => void onUpdateSettings({ commitTemplate: e.target.value })} />
-              </label>
+            <section className="settings-general-section">
+              <div className="settings-general-heading">
+                <h3>{tr('Workflow', 'Workflow')}</h3>
+              </div>
+              <div className="settings-general-controls">
+                <label className="settings-field">
+                  {tr('Default Branch', 'Default branch')}
+                  <input type="text" value={settings.defaultBranch} onChange={(e) => void onUpdateSettings({ defaultBranch: e.target.value })} />
+                </label>
+                <label className="settings-switch-row settings-general-switch settings-field--full">
+                  <input
+                    className="settings-switch-input"
+                    type="checkbox"
+                    checked={settings.showSecondaryHistory}
+                    onChange={(e) => void onUpdateSettings({ showSecondaryHistory: e.target.checked })}
+                  />
+                  <span className="settings-switch-track" aria-hidden="true">
+                    <span className="settings-switch-thumb" />
+                  </span>
+                  <span className="settings-switch-label">{tr('Sekundaere Historie anzeigen (alle Branches)', 'Show secondary history (all branches)')}</span>
+                </label>
+                <label className="settings-switch-row settings-general-switch settings-field--full">
+                  <input
+                    className="settings-switch-input"
+                    type="checkbox"
+                    checked={settings.commitSignoffByDefault}
+                    onChange={(e) => void onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
+                  />
+                  <span className="settings-switch-track" aria-hidden="true">
+                    <span className="settings-switch-thumb" />
+                  </span>
+                  <span className="settings-switch-label">{tr('Commit Signoff standardmaessig aktiv', 'Enable commit signoff by default')}</span>
+                </label>
+                <label className="settings-field settings-field--full">
+                  {tr('Commit Template', 'Commit template')}
+                  <textarea rows={5} value={settings.commitTemplate} onChange={(e) => void onUpdateSettings({ commitTemplate: e.target.value })} />
+                </label>
+              </div>
             </section>
 
-            <section className="settings-card">
-              <h3>{tr('Synchronisation', 'Synchronization')}</h3>
-              <label>
-                {tr('Auto-Fetch Intervall (Sekunden)', 'Auto-fetch interval (seconds)')}
-                <input
-                  type="number"
-                  min={10}
-                  max={300}
-                  value={Math.floor(settings.autoFetchIntervalMs / 1000)}
-                  onChange={(e) => {
-                    const seconds = Math.max(10, Math.min(300, Number(e.target.value) || 60));
-                    void onUpdateSettings({ autoFetchIntervalMs: seconds * 1000 });
-                  }}
-                />
-              </label>
+            <section className="settings-general-section">
+              <div className="settings-general-heading">
+                <h3>{tr('Synchronisation', 'Synchronization')}</h3>
+              </div>
+              <div className="settings-general-controls settings-general-controls--single">
+                <label className="settings-field">
+                  {tr('Auto-Fetch Intervall (Sekunden)', 'Auto-fetch interval (seconds)')}
+                  <input
+                    type="number"
+                    min={10}
+                    max={300}
+                    value={Math.floor(settings.autoFetchIntervalMs / 1000)}
+                    onChange={(e) => {
+                      const seconds = Math.max(10, Math.min(300, Number(e.target.value) || 60));
+                      void onUpdateSettings({ autoFetchIntervalMs: seconds * 1000 });
+                    }}
+                  />
+                </label>
+              </div>
             </section>
           </div>
         )}
@@ -132,13 +155,17 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           <div className="settings-grid">
             <section className="settings-card">
               <h3>{tr('KI', 'AI')}</h3>
-              <label className="settings-checkbox">
+              <label className="settings-switch-row">
                 <input
+                  className="settings-switch-input"
                   type="checkbox"
                   checked={settings.aiAutoCommitEnabled}
                   onChange={(e) => void onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
                 />
-                {tr('KI Auto-Commit aktivieren', 'Enable AI auto-commit')}
+                <span className="settings-switch-track" aria-hidden="true">
+                  <span className="settings-switch-thumb" />
+                </span>
+                <span className="settings-switch-label">{tr('KI Auto-Commit aktivieren', 'Enable AI auto-commit')}</span>
               </label>
               <label>
                 {tr('Provider', 'Provider')}
@@ -200,18 +227,40 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 </>
               )}
 
+              <div className="settings-inline-actions">
+                <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
+                  {isTestingAi ? tr('Teste...', 'Testing...') : tr('Verbindung testen', 'Test connection')}
+                </button>
+                <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
+                  {isLoadingModels ? tr('Lade Modelle...', 'Loading models...') : tr('Modelle laden', 'Load models')}
+                </button>
+              </div>
+              {aiStatus && <p>{aiStatus}</p>}
+
               <label>
                 {tr('Modell', 'Model')}
-                <input
-                  list="ai-model-list-settings"
-                  type="text"
-                  value={selectedModel}
-                  onChange={(e) => void setSelectedModel(e.target.value)}
-                  placeholder={settings.aiProvider === 'gemini' ? tr('z.B. gemini-3-flash-preview', 'e.g. gemini-3-flash-preview') : tr('z.B. llama3.1:8b', 'e.g. llama3.1:8b')}
-                />
-                <datalist id="ai-model-list-settings">
-                  {mergedModelOptions.map((model) => <option key={model} value={model} />)}
-                </datalist>
+                {modelOptions.length > 0 ? (
+                  <select
+                    value={selectedModel || ''}
+                    onChange={(e) => void setSelectedModel(e.target.value)}
+                  >
+                    {!selectedModel && <option value="" disabled>{tr('Modell auswaehlen', 'Select a model')}</option>}
+                    {mergedModelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      list="ai-model-list-settings"
+                      type="text"
+                      value={selectedModel}
+                      onChange={(e) => void setSelectedModel(e.target.value)}
+                      placeholder={settings.aiProvider === 'gemini' ? tr('z.B. gemini-3-flash-preview', 'e.g. gemini-3-flash-preview') : tr('z.B. llama3.1:8b', 'e.g. llama3.1:8b')}
+                    />
+                    <datalist id="ai-model-list-settings">
+                      {mergedModelOptions.map((model) => <option key={model} value={model} />)}
+                    </datalist>
+                  </>
+                )}
               </label>
 
               <label>
@@ -242,16 +291,6 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 <span>{tr('Beispiel fuer diesen Stil', 'Example for this style')}</span>
                 <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr)}</pre>
               </div>
-
-              <div className="settings-inline-actions">
-                <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
-                  {isTestingAi ? tr('Teste...', 'Testing...') : tr('Verbindung testen', 'Test connection')}
-                </button>
-                <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
-                  {isLoadingModels ? tr('Lade Modelle...', 'Loading models...') : tr('Modelle laden', 'Load models')}
-                </button>
-              </div>
-              {aiStatus && <p>{aiStatus}</p>}
             </section>
 
             <section className="settings-card">
@@ -276,21 +315,29 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           <div className="settings-grid">
             <section className="settings-card">
               <h3>{tr('Sicherheits-Checks', 'Security checks')}</h3>
-              <label className="settings-checkbox">
+              <label className="settings-switch-row">
                 <input
+                  className="settings-switch-input"
                   type="checkbox"
                   checked={settings.confirmDangerousOps}
                   onChange={(e) => void onUpdateSettings({ confirmDangerousOps: e.target.checked })}
                 />
-                {tr('Gefaehrliche Git-Operationen bestaetigen', 'Confirm dangerous Git operations')}
+                <span className="settings-switch-track" aria-hidden="true">
+                  <span className="settings-switch-thumb" />
+                </span>
+                <span className="settings-switch-label">{tr('Gefaehrliche Git-Operationen bestaetigen', 'Confirm dangerous Git operations')}</span>
               </label>
-              <label className="settings-checkbox">
+              <label className="settings-switch-row">
                 <input
+                  className="settings-switch-input"
                   type="checkbox"
                   checked={settings.secretScanBeforePushEnabled}
                   onChange={(e) => void onUpdateSettings({ secretScanBeforePushEnabled: e.target.checked })}
                 />
-                {tr('Secret-Scan vor Push aktivieren', 'Enable secret scan before push')}
+                <span className="settings-switch-track" aria-hidden="true">
+                  <span className="settings-switch-thumb" />
+                </span>
+                <span className="settings-switch-label">{tr('Secret-Scan vor Push aktivieren', 'Enable secret scan before push')}</span>
               </label>
               <label>
                 {tr('Secret-Scan Strengegrad', 'Secret scan strictness')}
