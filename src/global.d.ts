@@ -118,7 +118,7 @@ export interface UpdaterOneClickResultDto {
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AiCommitMessageStyleDto = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguageDto = 'auto' | 'de' | 'en';
-export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
+export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint' | 'mono-dark-red' | 'mono-light-red';
 export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
 export type SecretScanSourceDto = 'staged' | 'to-push' | 'tag';
 export type PlanningApiTokenLifetimeDto = 'day' | 'month' | 'year' | 'forever';

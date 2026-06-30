@@ -1,7 +1,7 @@
 import type { AppSettingsDto } from '../../../global';
 
 export const DEFAULT_SETTINGS: AppSettingsDto = {
-  theme: 'copper-night',
+  theme: 'midnight-teal',
   language: 'de',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',

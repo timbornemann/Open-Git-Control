@@ -1,7 +1,7 @@
 export type AiProvider = 'ollama' | 'gemini';
 export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguage = 'auto' | 'de' | 'en';
-export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint';
+export type AppTheme = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint' | 'mono-dark-red' | 'mono-light-red';
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 
 export interface AppSettings {
@@ -30,7 +30,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'copper-night',
+  theme: 'midnight-teal',
   language: 'de',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
@@ -72,9 +72,11 @@ function normalizeTheme(value: unknown): AppSettings['theme'] {
     case 'porcelain-light':
     case 'ember-slate':
     case 'arctic-mint':
+    case 'mono-dark-red':
+    case 'mono-light-red':
       return value;
     case 'dark':
-      return 'copper-night';
+      return 'midnight-teal';
     case 'light':
       return 'porcelain-light';
     default:

@@ -28,13 +28,23 @@ describe('normalizeSettings', () => {
       language: 'en',
     });
 
+    expect(normalizeSettings({ theme: 'mono-dark-red', language: 'de' })).toMatchObject({
+      theme: 'mono-dark-red',
+      language: 'de',
+    });
+
+    expect(normalizeSettings({ theme: 'mono-light-red', language: 'en' })).toMatchObject({
+      theme: 'mono-light-red',
+      language: 'en',
+    });
+
     expect(normalizeSettings({ theme: 'dark' as never, language: 'en' })).toMatchObject({
-      theme: 'copper-night',
+      theme: 'midnight-teal',
       language: 'en',
     });
 
     expect(normalizeSettings({ theme: 'invalid' as never, language: 'fr' as never })).toMatchObject({
-      theme: 'copper-night',
+      theme: 'midnight-teal',
       language: 'de',
     });
   });

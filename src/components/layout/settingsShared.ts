@@ -11,5 +11,6 @@ export const THEME_OPTIONS: Array<{
   { value: 'porcelain-light', label: 'Porcelain Light' },
   { value: 'ember-slate', label: 'Ember Slate' },
   { value: 'arctic-mint', label: 'Arctic Mint' },
+  { value: 'mono-dark-red', label: 'Mono Dark Red' },
+  { value: 'mono-light-red', label: 'Mono Light Red' },
 ];
-
