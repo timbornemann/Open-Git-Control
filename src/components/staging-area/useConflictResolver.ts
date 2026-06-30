@@ -269,11 +269,13 @@ export const useConflictResolver = ({
   const markConflictResolved = useCallback((filePath: string) => git(['conflictMarkResolved', filePath], tr(`${basename(filePath)} als geloest markiert`, `Marked ${basename(filePath)} as resolved`)), [git, tr]);
 
   const markConflictResolvedAndSync = useCallback(async (filePath: string) => {
-    await markConflictResolved(filePath);
+    const didResolve = await markConflictResolved(filePath);
+    if (!didResolve) return;
     if (conflictEditor?.filePath === filePath) {
-      await openConflictEditor(filePath);
+      setConflictEditor(null);
+      setSelectedConflictBlockIndex(0);
     }
-  }, [conflictEditor, openConflictEditor, markConflictResolved]);
+  }, [conflictEditor, markConflictResolved]);
 
   const resetConflictEditorDraft = useCallback(() => {
     if (!conflictEditor) return;

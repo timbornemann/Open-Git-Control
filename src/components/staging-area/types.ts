@@ -11,6 +11,7 @@ export interface StagingAreaProps {
   onOpenDiff?: (request: DiffRequest) => void;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
   onOpenConflictResolver?: (filePath: string) => void;
+  onCloseConflictResolver?: () => void;
   viewMode?: 'default' | 'conflictOnly';
   initialConflictPath?: string | null;
   settings: AppSettingsDto;
