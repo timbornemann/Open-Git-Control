@@ -1,16 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
-  isMergeInProgressError,
-  mergeTargetFromDecoratedRef,
   mergeableDecoratedRefs,
   normalizeBranchRefForMerge,
-  parseRemoteBranchRef,
-  parseGitLog,
-  resolveConflictPathAfterGitFailure,
   type GitStatusDetailed,
 } from '../utils/gitParsing';
-import { validateBranchName } from '../utils/gitRefValidation';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { Confirm } from './Confirm';
@@ -21,15 +14,36 @@ import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
 import { BranchInfo, GitMergeMode } from '../types/git';
-import type { GitCommandNameDto } from '../global';
-import { useOptionalUIContext } from '../contexts/AppStateContext';
-import { gitClient } from '../services/gitClient';
 import { useCommitGraphData } from './commit-graph/useCommitGraphData';
-import { CommitGraphSvg, graphEdgeKey } from './commit-graph/CommitGraphSvg';
-import { ForensicSearchPanel, type ForensicSearchType, type SearchPanel } from './commit-graph/ForensicSearchPanel';
+import { CommitGraphSvg } from './commit-graph/CommitGraphSvg';
+import { ForensicSearchPanel, type ForensicSearchType } from './commit-graph/ForensicSearchPanel';
 import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commit-graph/commitGraphConstants';
 import { EmptyState } from './EmptyState';
-import type { ConfirmDialogState, InputDialogState } from './layout/layoutTypes';
+import {
+  buildGraphHighlightData,
+  getRefKind,
+  resolveHighlightableBranchRef,
+  sortRefs,
+} from './commit-graph/commitGraphRefs';
+import { useCommitGraphDialogs } from './commit-graph/useCommitGraphDialogs';
+import { useCommitGraphSearch } from './commit-graph/useCommitGraphSearch';
+import { useForensicSearch } from './commit-graph/useForensicSearch';
+import { CommitSearchToolbar } from './commit-graph/CommitSearchToolbar';
+import {
+  CommitContextMenu,
+  type ContextMenuPlacement,
+  type ContextMenuState,
+  type MenuAction,
+  type MergeContextPayload,
+} from './commit-graph/CommitContextMenu';
+import { useCommitGraphViewport } from './commit-graph/useCommitGraphViewport';
+import { buildCommitMenuActions } from './commit-graph/commitGraphMenuActions';
+import { useCommitGraphGitActions } from './commit-graph/useCommitGraphGitActions';
+
+export {
+  buildGraphHighlightData,
+  findCommitIndexByNavigationTarget,
+} from './commit-graph/commitGraphRefs';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -51,209 +65,6 @@ interface CommitGraphProps {
   workingTreeStatus?: GitStatusDetailed | null;
   onRefreshWorkingTree?: () => Promise<void>;
 }
-
-const NAVIGATION_MAX_LOAD_ATTEMPTS = 50;
-const FORENSIC_PATH_HISTORY_STORAGE_KEY = 'open-git-control:forensic-path-history:v1';
-
-interface ContextMenuState {
-  x: number;
-  y: number;
-  node: GraphNode;
-}
-
-type ContextMenuPlacement = {
-  left: number;
-  top: number;
-  maxHeight: number;
-  ready: boolean;
-};
-
-interface MenuAction {
-  label: string;
-  icon: string;
-  danger?: boolean;
-  separator?: boolean;
-  action: () => void;
-}
-
-type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
-type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
-
-const getRefKind = (ref: string): RefKind => {
-  if (ref.startsWith('tag:')) return 'tag';
-  if (ref.startsWith('HEAD ->')) return 'head';
-  if (ref === 'HEAD') return 'head-pointer';
-  if (ref.includes('/')) return 'remote';
-  return 'local';
-};
-
-const getRefPriority = (ref: string) => {
-  const kind = getRefKind(ref);
-  if (kind === 'head') return 0;
-  if (kind === 'local') return 1;
-  if (kind === 'remote') return 2;
-  if (kind === 'tag') return 3;
-  return 4;
-};
-
-const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
-  const prioDiff = getRefPriority(a) - getRefPriority(b);
-  return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
-});
-
-const resolveHighlightableBranchRef = (ref: string): string | null => {
-  const target = mergeTargetFromDecoratedRef(ref);
-  if (!target) return null;
-  const normalized = normalizeBranchRefForMerge(target.trim());
-  if (!normalized || normalized.endsWith('/HEAD')) return null;
-  return normalized;
-};
-
-export const findCommitIndexByNavigationTarget = (
-  nodes: GraphNode[],
-  targetHash: string,
-): number => {
-  const normalizedTarget = String(targetHash || '').trim().toLowerCase();
-  if (!normalizedTarget) return -1;
-
-  const exactIndex = nodes.findIndex((node) => (
-    node.commit.hash.toLowerCase() === normalizedTarget
-  ));
-  if (exactIndex >= 0) return exactIndex;
-
-  if (normalizedTarget.length < 7) return -1;
-
-  const matchingIndexes: number[] = [];
-  nodes.forEach((node, index) => {
-    const fullHash = node.commit.hash.toLowerCase();
-    const abbrevHash = node.commit.abbrevHash.toLowerCase();
-    if (fullHash.startsWith(normalizedTarget) || abbrevHash === normalizedTarget) {
-      matchingIndexes.push(index);
-    }
-  });
-
-  return matchingIndexes.length === 1 ? matchingIndexes[0] : -1;
-};
-
-export const buildGraphHighlightData = (
-  layout: ReturnType<typeof useCommitGraphData>['layout'],
-  _currentBranch: string,
-  selectedHash: string | null | undefined,
-  highlightedBranchRef: string | null,
-) => {
-  const nodes = layout?.nodes || [];
-  const nodeByHash = new Map(nodes.map((node) => [node.commit.hash, node]));
-  const headNode = nodes.find((node) => (
-    node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')
-  )) ?? nodes[0];
-  const reachableFromHead = new Set<string>();
-
-  if (headNode) {
-    const stack = [headNode.commit.hash];
-    while (stack.length > 0) {
-      const hash = stack.pop();
-      if (!hash || reachableFromHead.has(hash)) continue;
-      reachableFromHead.add(hash);
-      const currentNode = nodeByHash.get(hash);
-      if (!currentNode) continue;
-      currentNode.commit.parentHashes.forEach((parentHash) => {
-        if (nodeByHash.has(parentHash) && !reachableFromHead.has(parentHash)) {
-          stack.push(parentHash);
-        }
-      });
-    }
-  }
-
-  const branchTipByRef = new Map<string, GraphNode>();
-  for (const node of nodes) {
-    for (const ref of node.commit.refs) {
-      const target = resolveHighlightableBranchRef(ref);
-      if (!target || branchTipByRef.has(target)) continue;
-      branchTipByRef.set(target, node);
-    }
-  }
-
-  const buildAncestorPath = (startNode: GraphNode | undefined) => {
-    const path = new Set<string>();
-    const stack = startNode ? [startNode] : [];
-    while (stack.length > 0) {
-      const cursor = stack.pop();
-      if (!cursor || path.has(cursor.commit.hash)) continue;
-      path.add(cursor.commit.hash);
-      for (const parentHash of cursor.commit.parentHashes) {
-        const parent = nodeByHash.get(parentHash);
-        if (parent && !path.has(parent.commit.hash)) {
-          stack.push(parent);
-        }
-      }
-    }
-    return path;
-  };
-
-  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
-    ? highlightedBranchRef
-    : null;
-  const activeHighlightedBranch = manualHighlightedBranch;
-  const requestedSelectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
-  const selectedNode = requestedSelectedNode?.commit.hash === headNode?.commit.hash
-    ? undefined
-    : requestedSelectedNode;
-  const hasSelectedCommitFocus = Boolean(selectedNode);
-  const currentPathStartNode = activeHighlightedBranch
-    ? branchTipByRef.get(activeHighlightedBranch)
-    : undefined;
-  const currentPathHashes = !hasSelectedCommitFocus && manualHighlightedBranch && currentPathStartNode
-    ? buildAncestorPath(currentPathStartNode)
-    : new Set<string>();
-  const selectedBranchTarget = selectedNode
-    ? sortRefs(selectedNode.commit.refs)
-      .map(resolveHighlightableBranchRef)
-      .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
-    : undefined;
-  const selectedPathStartNode = selectedNode;
-  const selectedPathHashes = buildAncestorPath(selectedPathStartNode);
-  const hasCurrentPathHighlight = currentPathHashes.size > 0;
-  const hasSelectedPathHighlight = selectedPathHashes.size > 0;
-  const currentPathColor = headNode && hasCurrentPathHighlight
-    ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
-    : headNode?.color ?? 'var(--accent-primary)';
-  const selectedPathColor = hasSelectedPathHighlight
-    ? (selectedPathStartNode?.color ?? currentPathColor)
-    : currentPathColor;
-  const buildPathEdgeKeys = (pathHashes: Set<string>) => {
-    const keys = new Set<string>();
-    if (!layout || pathHashes.size === 0) return keys;
-    for (const edge of layout.edges) {
-      if (edge.toRow < 0 || edge.toRow >= nodes.length) continue;
-      const fromNode = nodes[edge.fromRow];
-      const toNode = nodes[edge.toRow];
-      if (!fromNode || !toNode) continue;
-      if (!pathHashes.has(fromNode.commit.hash) || !pathHashes.has(toNode.commit.hash)) continue;
-      if (!fromNode.commit.parentHashes.includes(toNode.commit.hash)) continue;
-      keys.add(graphEdgeKey(edge));
-    }
-    return keys;
-  };
-
-  return {
-    nodeByHash,
-    headNode,
-    reachableFromHead,
-    branchTipByRef,
-    activeHighlightedBranch,
-    selectedBranchTarget,
-    hasSelectedCommitFocus,
-    currentPathHashes,
-    selectedPathHashes,
-    hasCurrentPathHighlight,
-    hasSelectedPathHighlight,
-    hasAnyPathHighlight: hasCurrentPathHighlight || hasSelectedPathHighlight,
-    currentPathColor,
-    selectedPathColor,
-    currentPathEdgeKeys: buildPathEdgeKeys(currentPathHashes),
-    selectedPathEdgeKeys: buildPathEdgeKeys(selectedPathHashes),
-  };
-};
 
 export const CommitGraph: React.FC<CommitGraphProps> = ({
   repoPath,
@@ -279,47 +90,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toasts, setToast, dismiss } = useToastQueue(4000);
-  const uiContext = useOptionalUIContext();
-  const [localConfirmDialog, setLocalConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [localInputDialog, setLocalInputDialog] = useState<InputDialogState | null>(null);
-  const setConfirmDialog = uiContext?.setConfirmDialog ?? setLocalConfirmDialog;
-  const setInputDialog = uiContext?.setInputDialog ?? setLocalInputDialog;
-  const confirmDialog = uiContext ? null : localConfirmDialog;
-  const inputDialog = uiContext ? null : localInputDialog;
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchScope, setSearchScope] = useState<SearchScope>('all');
-  const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
-  const [matchCursor, setMatchCursor] = useState(0);
+  const {
+    confirmDialog,
+    inputDialog,
+    setConfirmDialog,
+    setInputDialog,
+    closeConfirmDialog,
+    executeConfirmDialog,
+    closeInputDialog,
+    executeInputDialog,
+  } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
-  const [forensicPath, setForensicPath] = useState('');
-  const [forensicValue, setForensicValue] = useState('');
-  const [forensicStartLine, setForensicStartLine] = useState('1');
-  const [forensicEndLine, setForensicEndLine] = useState('1');
-  const [forensicLoading, setForensicLoading] = useState(false);
-  const [forensicError, setForensicError] = useState<string | null>(null);
-  const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
-  const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
   const didRunInitialBranchEffectRef = useRef(false);
-  const navigationAttemptRef = useRef<{ requestId: number; attempts: number } | null>(null);
-  const completedNavigationRequestIdRef = useRef<number | null>(null);
-  const navigationRetryFrameRef = useRef<number | null>(null);
-  const [navigationRetryTick, setNavigationRetryTick] = useState(0);
-  const topResetLockRef = useRef<{
-    repoPath: string | null;
-    activeUntil: number;
-    userReleased: boolean;
-  }>({ repoPath: null, activeUntil: 0, userReleased: false });
-
-  const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
-    all: tr('Alles', 'All'),
-    subject: tr('Nachricht', 'Message'),
-    author: tr('Autor', 'Author'),
-    hash: tr('Hash', 'Hash'),
-    refs: tr('Refs', 'Refs'),
-  }), [tr]);
+  const resetForensicStateRef = useRef<() => void>(() => {});
 
   const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(() => ({
     string: tr('-S String', '-S string'),
@@ -327,29 +111,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     line: tr('-L Zeilenbereich', '-L line range'),
   }), [tr]);
 
-  const requestNavigationRetry = useCallback(() => {
-    if (navigationRetryFrameRef.current !== null) return;
-    navigationRetryFrameRef.current = window.requestAnimationFrame(() => {
-      navigationRetryFrameRef.current = null;
-      setNavigationRetryTick((current) => current + 1);
-    });
-  }, []);
-
-  useEffect(() => () => {
-    if (navigationRetryFrameRef.current !== null) {
-      window.cancelAnimationFrame(navigationRetryFrameRef.current);
-      navigationRetryFrameRef.current = null;
-    }
-  }, []);
-
   const handleRepoCleared = useCallback(() => {
-    setForensicResults([]);
-    setForensicError(null);
-    setForensicLoading(false);
+    resetForensicStateRef.current();
   }, []);
   const logContainerRef = useRef<HTMLDivElement>(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(800);
   const {
     layout,
     workingTreeStatus,
@@ -370,137 +135,71 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     externalWorkingTreeStatus,
     onRefreshWorkingTree,
   });
+  const {
+    scrollTop,
+    containerHeight,
+  } = useCommitGraphViewport({
+    logContainerRef,
+    layout,
+    repoPath,
+    navigationRequest,
+    workingTreeStatus,
+    hasMoreCommits,
+    loadingMore,
+    loading,
+    loadMoreCommits,
+  });
 
-  const syncViewportMetrics = useCallback((container: HTMLElement) => {
-    const nextTop = container.scrollTop;
-    const nextHeight = container.clientHeight;
-    setScrollTop((previous) => (previous === nextTop ? previous : nextTop));
-    // Guard against transient zero-heights during mount/layout transitions.
-    if (nextHeight > 0) {
-      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-    }
-  }, []);
-
-  const resetCommitListScroll = useCallback(() => {
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
-
-    container.scrollTop = 0;
-    setScrollTop(0);
-    const nextHeight = container.clientHeight;
-    if (nextHeight > 0) {
-      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-    }
-  }, []);
-
-  const maybeKeepCommitListAtTop = useCallback(() => {
-    if (!repoPath || navigationRequest) return;
-    const lock = topResetLockRef.current;
-    if (lock.repoPath !== repoPath || lock.userReleased) return;
-    if (Date.now() > lock.activeUntil) return;
-    resetCommitListScroll();
-  }, [navigationRequest, repoPath, resetCommitListScroll]);
-
-  useLayoutEffect(() => {
-    if (!layout) return;
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
-
-    const onScroll = () => {
-      syncViewportMetrics(container);
-    };
-    const onWindowResize = () => {
-      syncViewportMetrics(container);
-    };
-
-    syncViewportMetrics(container);
-    const rafId = window.requestAnimationFrame(() => {
-      syncViewportMetrics(container);
-    });
-
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
-        syncViewportMetrics(container);
-      });
-      resizeObserver.observe(container);
-    }
-
-    container.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onWindowResize);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      container.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onWindowResize);
-      resizeObserver?.disconnect();
-    };
-  }, [layout, repoPath, syncViewportMetrics]);
-
-  useLayoutEffect(() => {
-    if (navigationRequest) return;
-    topResetLockRef.current = {
-      repoPath,
-      activeUntil: Date.now() + 4000,
-      userReleased: false,
-    };
-    resetCommitListScroll();
-    let secondFrameId: number | null = null;
-    const firstFrameId = window.requestAnimationFrame(() => {
-      resetCommitListScroll();
-      secondFrameId = window.requestAnimationFrame(resetCommitListScroll);
-    });
-    const settleIntervalId = window.setInterval(() => {
-      maybeKeepCommitListAtTop();
-    }, 120);
-    const releaseTimerId = window.setTimeout(() => {
-      if (topResetLockRef.current.repoPath === repoPath) {
-        topResetLockRef.current.activeUntil = 0;
-      }
-    }, 4200);
-
-    return () => {
-      window.cancelAnimationFrame(firstFrameId);
-      window.clearInterval(settleIntervalId);
-      window.clearTimeout(releaseTimerId);
-      if (secondFrameId !== null) {
-        window.cancelAnimationFrame(secondFrameId);
-      }
-    };
-  }, [maybeKeepCommitListAtTop, navigationRequest, repoPath, resetCommitListScroll]);
-
-  useLayoutEffect(() => {
-    maybeKeepCommitListAtTop();
-  }, [layout, loading, workingTreeStatus, maybeKeepCommitListAtTop]);
-
-  useEffect(() => {
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
-
-    const releaseTopLock = () => {
-      const lock = topResetLockRef.current;
-      if (lock.repoPath === repoPath) {
-        lock.userReleased = true;
-        lock.activeUntil = 0;
-      }
-    };
-    const releaseTopLockOnKey = (event: KeyboardEvent) => {
-      if (!['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) return;
-      releaseTopLock();
-    };
-
-    container.addEventListener('wheel', releaseTopLock, { passive: true });
-    container.addEventListener('touchstart', releaseTopLock, { passive: true });
-    container.addEventListener('pointerdown', releaseTopLock);
-    window.addEventListener('keydown', releaseTopLockOnKey);
-
-    return () => {
-      container.removeEventListener('wheel', releaseTopLock);
-      container.removeEventListener('touchstart', releaseTopLock);
-      container.removeEventListener('pointerdown', releaseTopLock);
-      window.removeEventListener('keydown', releaseTopLockOnKey);
-    };
-  }, [repoPath]);
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchScope,
+    setSearchScope,
+    activeSearchPanel,
+    setActiveSearchPanel,
+    searchScopeLabels,
+    normalizedSearch,
+    matchedNodes,
+    matchedHashSet,
+    jumpToMatch,
+  } = useCommitGraphSearch({
+    layout,
+    selectedHash,
+    onSelectCommit,
+    tr,
+  });
+  const {
+    forensicType,
+    setForensicType,
+    forensicPath,
+    setForensicPath,
+    forensicValue,
+    setForensicValue,
+    forensicStartLine,
+    setForensicStartLine,
+    forensicEndLine,
+    setForensicEndLine,
+    forensicLoading,
+    forensicError,
+    setForensicError,
+    forensicResults,
+    forensicPathSuggestions,
+    runForensicSearch,
+    resetForensicState,
+  } = useForensicSearch({
+    repoPath,
+    workingTreeStatus,
+    tr,
+  });
+  resetForensicStateRef.current = resetForensicState;
+  const runGitAction = useCommitGraphGitActions({
+    onRunGitCommand,
+    onOpenConflictResolverForPath,
+    refreshCommits,
+    refreshWorkingTreeStatus,
+    setToast,
+    tr,
+  });
 
   useEffect(() => {
     if (!selectedHash) return;
@@ -520,93 +219,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       .map((node) => node.commit.hash);
     if (hashes.length > 0) void requestCommitStats(hashes, 'visible');
   }, [containerHeight, layout, requestCommitStats, scrollTop]);
-
-  useEffect(() => {
-    if (!navigationRequest || !layout) return;
-    if (completedNavigationRequestIdRef.current === navigationRequest.requestId) return;
-
-    if (navigationAttemptRef.current?.requestId !== navigationRequest.requestId) {
-      navigationAttemptRef.current = { requestId: navigationRequest.requestId, attempts: 0 };
-    }
-
-    const nodeIndex = findCommitIndexByNavigationTarget(layout.nodes, navigationRequest.hash);
-    if (nodeIndex >= 0) {
-      const container = logContainerRef.current?.parentElement;
-      if (!container || container.clientHeight <= 0 || container.scrollHeight <= 0) {
-        requestNavigationRetry();
-        return;
-      }
-
-      const workingTreeRowOffset = workingTreeStatus && (
-        workingTreeStatus.staged.length > 0
-        || workingTreeStatus.unstaged.length > 0
-        || workingTreeStatus.untracked.length > 0
-      ) ? 1 : 0;
-      const rowTop = (nodeIndex + workingTreeRowOffset) * ROW_HEIGHT;
-      const targetTop = Math.max(0, rowTop - Math.max(0, (container.clientHeight - ROW_HEIGHT) / 2));
-      container.scrollTo({ top: targetTop, behavior: 'smooth' });
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
-      return;
-    }
-
-    if (!hasMoreCommits) {
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
-      return;
-    }
-    if (loadingMore || loading) return;
-
-    const attempts = navigationAttemptRef.current?.attempts ?? 0;
-    if (attempts >= NAVIGATION_MAX_LOAD_ATTEMPTS) {
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
-      return;
-    }
-
-    navigationAttemptRef.current = {
-      requestId: navigationRequest.requestId,
-      attempts: attempts + 1,
-    };
-    void loadMoreCommits();
-  }, [
-    hasMoreCommits,
-    layout,
-    loadMoreCommits,
-    loading,
-    loadingMore,
-    navigationRetryTick,
-    navigationRequest,
-    requestNavigationRetry,
-    workingTreeStatus,
-  ]);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(FORENSIC_PATH_HISTORY_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return;
-      const sanitized = parsed
-        .map((entry) => String(entry || '').trim())
-        .filter(Boolean)
-        .slice(0, 30);
-      setForensicPathHistory(sanitized);
-    } catch {
-      // ignore malformed local storage values
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        FORENSIC_PATH_HISTORY_STORAGE_KEY,
-        JSON.stringify(forensicPathHistory.slice(0, 30)),
-      );
-    } catch {
-      // ignore write errors
-    }
-  }, [forensicPathHistory]);
 
   useEffect(() => {
     setHighlightedBranchRef(null);
@@ -684,229 +296,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     return () => window.removeEventListener('resize', updateContextMenuPlacement);
   }, [contextMenu, updateContextMenuPlacement]);
 
-
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-
-  const matchedNodes = useMemo(() => {
-    if (!layout || !normalizedSearch) return [];
-
-    return layout.nodes.filter(node => {
-      const { abbrevHash, hash, author, subject, refs } = node.commit;
-      const inHash = abbrevHash.toLowerCase().includes(normalizedSearch) || hash.toLowerCase().includes(normalizedSearch);
-      const inAuthor = author.toLowerCase().includes(normalizedSearch);
-      const inSubject = subject.toLowerCase().includes(normalizedSearch);
-      const inRefs = refs.some(ref => ref.toLowerCase().includes(normalizedSearch));
-
-      if (searchScope === 'hash') return inHash;
-      if (searchScope === 'author') return inAuthor;
-      if (searchScope === 'subject') return inSubject;
-      if (searchScope === 'refs') return inRefs;
-
-      return inHash || inAuthor || inSubject || inRefs;
-    });
-  }, [layout, normalizedSearch, searchScope]);
-
-  const matchedHashSet = useMemo(() => new Set(matchedNodes.map(node => node.commit.hash)), [matchedNodes]);
-
-  useEffect(() => {
-    setMatchCursor(0);
-  }, [normalizedSearch, searchScope]);
-
-  useEffect(() => {
-    if (!selectedHash || matchedNodes.length === 0) return;
-    const idx = matchedNodes.findIndex(node => node.commit.hash === selectedHash);
-    if (idx >= 0) {
-      setMatchCursor(idx);
-    }
-  }, [selectedHash, matchedNodes]);
-
-  const jumpToMatch = useCallback((step: 1 | -1) => {
-    if (matchedNodes.length === 0) return;
-
-    const nextIndex = (matchCursor + step + matchedNodes.length) % matchedNodes.length;
-    setMatchCursor(nextIndex);
-
-    const hash = matchedNodes[nextIndex].commit.hash;
-    onSelectCommit?.(hash);
-
-    requestAnimationFrame(() => {
-      const row = document.querySelector('[data-commit-hash="' + hash + '"]') as HTMLElement | null;
-      row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }, [matchCursor, matchedNodes, onSelectCommit]);
-
-  const forensicPathSuggestions = useMemo(() => {
-    const query = forensicPath.trim().toLowerCase();
-    const workingTreePaths = [
-      ...(workingTreeStatus?.staged || []).map((entry) => entry.path),
-      ...(workingTreeStatus?.unstaged || []).map((entry) => entry.path),
-      ...(workingTreeStatus?.untracked || []).map((entry) => entry.path),
-    ];
-
-    const unique = Array.from(new Set([...forensicPathHistory, ...workingTreePaths].map((value) => value.trim()).filter(Boolean)));
-    if (!query) {
-      return unique.slice(0, 20);
-    }
-
-    const startsWith = unique.filter((value) => value.toLowerCase().startsWith(query));
-    const includes = unique.filter((value) => !value.toLowerCase().startsWith(query) && value.toLowerCase().includes(query));
-    return [...startsWith, ...includes].slice(0, 20);
-  }, [forensicPath, forensicPathHistory, workingTreeStatus]);
-
-
-  const runForensicSearch = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
-
-    const normalizedPath = forensicPath.trim();
-    if (!normalizedPath) {
-      setForensicError(tr('Bitte einen Pfad fuer die forensische Suche angeben.', 'Please provide a path for the forensic search.'));
-      setForensicResults([]);
-      return;
-    }
-
-    setForensicPathHistory((prev) => {
-      const next = [normalizedPath, ...prev.filter((entry) => entry !== normalizedPath)];
-      return next.slice(0, 30);
-    });
-
-    const args: string[] = ['forensicHistory', forensicType, normalizedPath];
-
-    if (forensicType === 'line') {
-      const start = Number(forensicStartLine);
-      const end = Number(forensicEndLine);
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
-        setForensicError(tr('Ungueltiger Zeilenbereich. Bitte Start/Ende pruefen.', 'Invalid line range. Please check start/end.'));
-        setForensicResults([]);
-        return;
-      }
-      args.push('line-range', String(start), String(end), '200');
-    } else {
-      const searchTerm = forensicValue.trim();
-      if (!searchTerm) {
-        setForensicError(forensicType === 'regex' ? tr('Bitte Regex angeben.', 'Please provide a regex.') : tr('Bitte Suchstring angeben.', 'Please provide a search string.'));
-        setForensicResults([]);
-        return;
-      }
-      args.push(searchTerm, '0', '0', '200');
-    }
-
-    setForensicLoading(true);
-    setForensicError(null);
-
-    try {
-      const { success, data, error } = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
-      if (!success) {
-        const message = String(error || tr('Forensische Suche fehlgeschlagen.', 'Forensic search failed.'));
-        const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
-        setForensicError(invalidPattern ? tr('Ungueltiges Regex-Muster. Bitte Ausdruck korrigieren.', 'Invalid regex pattern. Please fix the expression.') : message);
-        setForensicResults([]);
-        return;
-      }
-
-      const commits = parseGitLog(String(data || ''));
-      const nodes = commits.map(commit => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
-      setForensicResults(nodes);
-      if (commits.length === 0) {
-        setForensicError(tr('Keine Treffer gefunden.', 'No matches found.'));
-      }
-    } catch (e: any) {
-      setForensicResults([]);
-      setForensicError(String(e?.message || tr('Forensische Suche fehlgeschlagen.', 'Forensic search failed.')));
-    } finally {
-      setForensicLoading(false);
-    }
-  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, tr]);
-  const runGitAction = async (args: string[], successMsg: string) => {
-    if (!gitClient.isAvailable() || args.length === 0) return;
-    if (onRunGitCommand) {
-      const success = await onRunGitCommand(args, successMsg);
-      if (success) {
-        refreshCommits();
-        refreshWorkingTreeStatus();
-      }
-      return;
-    }
-
-    try {
-      const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
-      if (result.success) {
-        setToast({ msg: successMsg, isError: false });
-        refreshCommits();
-        refreshWorkingTreeStatus();
-      } else {
-        const mergeInProgress = isMergeInProgressError(result.error);
-        refreshCommits();
-        void refreshWorkingTreeStatus();
-        try {
-          const statusAfter = await gitClient.getStatusPorcelain();
-          const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
-          const conflictPath = resolveConflictPathAfterGitFailure(porcelain, result.error);
-          if (conflictPath && onOpenConflictResolverForPath) {
-            onOpenConflictResolverForPath(conflictPath);
-            return;
-          }
-        } catch {
-          // fall through to error toast
-        }
-        if (mergeInProgress) {
-          setToast({
-            msg: tr(
-              'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
-              'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-            ),
-            isError: true,
-          });
-          return;
-        }
-        setToast({ msg: result.error || 'Unbekannter Fehler', isError: true });
-      }
-    } catch (e: any) {
-      const mergeInProgress = isMergeInProgressError(e?.message);
-      refreshCommits();
-      void refreshWorkingTreeStatus();
-      try {
-        const statusAfter = await gitClient.getStatusPorcelain();
-        const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
-        const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
-        if (conflictPath && onOpenConflictResolverForPath) {
-          onOpenConflictResolverForPath(conflictPath);
-          return;
-        }
-      } catch {
-        // ignore
-      }
-      if (mergeInProgress) {
-        setToast({
-          msg: tr(
-            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
-            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-          ),
-          isError: true,
-        });
-        return;
-      }
-      setToast({ msg: e.message, isError: true });
-    }
-  };
-
-  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
-
-  const executeConfirmDialog = useCallback(async () => {
-    if (!confirmDialog) return;
-    const action = confirmDialog.onConfirm;
-    setConfirmDialog(null);
-    await action();
-  }, [confirmDialog]);
-
-  const closeInputDialog = useCallback(() => setInputDialog(null), []);
-
-  const executeInputDialog = useCallback(async (values: Record<string, string>) => {
-    if (!inputDialog) return;
-    const action = inputDialog.onSubmit;
-    setInputDialog(null);
-    await action(values);
-  }, [inputDialog]);
-
   const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
     e.preventDefault();
     e.stopPropagation();
@@ -920,7 +309,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     setContextMenu({ x: e.clientX, y: e.clientY, node });
   };
 
-  const mergeContextPayload = useMemo(() => {
+  const mergeContextPayload = useMemo<MergeContextPayload | null>(() => {
     if (!contextMenu || !currentBranch || !onMergeBranch) return null;
     const node = contextMenu.node;
     const refsHere = mergeableDecoratedRefs(node.commit.refs, currentBranch);
@@ -937,409 +326,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       branchExtras,
     };
   }, [branches, contextMenu, currentBranch, onMergeBranch]);
-
-  const branchNameValidationMessage = useCallback((value: string) => {
-    const errorCode = validateBranchName(value);
-    if (!errorCode) return null;
-
-    if (errorCode === 'contains-space') {
-      return tr(
-        'Branch-Name darf keine Leerzeichen enthalten.',
-        'Branch name must not contain spaces.',
-      );
-    }
-
-    return tr(
-      'Ungueltiger Branch-Name. Vermeide Sonderzeichen wie ~ ^ : ? * [ \\ sowie .. und @{.',
-      'Invalid branch name. Avoid special characters like ~ ^ : ? * [ \\ and patterns like .. or @{.',
-    );
-  }, [tr]);
-
-  const getMenuActions = (node: GraphNode): MenuAction[] => {
-    const hash = node.commit.hash;
-    const shortHash = node.commit.abbrevHash;
-    const isMerge = node.isMerge;
-    const localBranchNames = new Set(
-      branches
-        .filter(branch => branch.scope === 'local')
-        .map(branch => branch.name),
-    );
-    const checkoutCandidates: { label: string; args: string[]; successMessage: string }[] = [];
-    const seenCheckoutTargets = new Set<string>();
-
-    for (const ref of sortRefs(node.commit.refs)) {
-      const mergeTarget = mergeTargetFromDecoratedRef(ref);
-      if (!mergeTarget) continue;
-      const normalizedTarget = mergeTarget.trim();
-      if (!normalizedTarget) continue;
-      if (normalizedTarget === currentBranch) continue;
-      if (normalizedTarget.endsWith('/HEAD')) continue;
-
-      const parsedRemote = parseRemoteBranchRef(normalizedTarget);
-      if (parsedRemote) {
-        if (localBranchNames.has(parsedRemote.localBranchName)) {
-          const localKey = `local:${parsedRemote.localBranchName}`;
-          if (!seenCheckoutTargets.has(localKey)) {
-            seenCheckoutTargets.add(localKey);
-            checkoutCandidates.push({
-              label: parsedRemote.localBranchName,
-              args: ['checkout', parsedRemote.localBranchName],
-              successMessage: `Branch "${parsedRemote.localBranchName}" ausgecheckt.`,
-            });
-          }
-          continue;
-        }
-
-        const remoteKey = `remote:${parsedRemote.remoteRef}`;
-        if (seenCheckoutTargets.has(remoteKey)) continue;
-        seenCheckoutTargets.add(remoteKey);
-        checkoutCandidates.push({
-          label: parsedRemote.remoteRef,
-          args: ['checkout', '--track', parsedRemote.remoteRef],
-          successMessage: `Tracking-Branch "${parsedRemote.localBranchName}" aus "${parsedRemote.remoteRef}" ausgecheckt.`,
-        });
-        continue;
-      }
-
-      const localKey = `local:${normalizedTarget}`;
-      if (seenCheckoutTargets.has(localKey)) continue;
-      seenCheckoutTargets.add(localKey);
-      checkoutCandidates.push({
-        label: normalizedTarget,
-        args: ['checkout', normalizedTarget],
-        successMessage: `Branch "${normalizedTarget}" ausgecheckt.`,
-      });
-    }
-
-    const checkoutRefActions: MenuAction[] = checkoutCandidates.map(candidate => ({
-      label: `Branch auschecken: ${candidate.label}`,
-      icon: 'CB',
-      action: () => {
-        void runGitAction(candidate.args, candidate.successMessage);
-      },
-    }));
-
-    const actions: MenuAction[] = [
-      ...checkoutRefActions,
-      {
-        label: `Neuen Branch von ${shortHash} erstellen...`,
-        icon: 'NB',
-        action: () => {
-          const suggested = `checkout-${shortHash}`;
-          setInputDialog({
-            title: 'Branch aus Commit auschecken',
-            message: 'Es wird ein neuer Branch auf Basis dieses Commits erstellt und ausgecheckt.',
-            fields: [
-              {
-                id: 'name',
-                label: 'Neuer Branch-Name',
-                defaultValue: suggested,
-                required: true,
-                validate: (value) => branchNameValidationMessage(value.trim()),
-              },
-            ],
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-              { label: 'Aktion', value: 'checkout -b <name> <commit>' },
-            ],
-            irreversible: false,
-            consequences: 'Du wechselst auf den neuen Branch. Der aktuelle Branch bleibt unveraendert.',
-            confirmLabel: 'Branch erstellen',
-            onSubmit: async (values) => {
-              const name = (values.name || '').trim();
-              if (!name) return;
-              await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" aus ${shortHash} ausgecheckt.`);
-            },
-          });
-        },
-      },
-      {
-        label: 'Nur Commit (detached HEAD) auschecken...',
-        icon: '!',
-        action: () => {
-          setConfirmDialog({
-            variant: 'confirm',
-            title: 'Detached HEAD aktivieren?',
-            message: 'Du checkst direkt auf den Commit aus und arbeitest temporaer ohne Branch.',
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-              { label: 'Modus', value: 'Detached HEAD' },
-            ],
-            irreversible: false,
-            consequences: 'Neue Commits sind spaeter schwerer auffindbar, bis du einen Branch erstellst.',
-            confirmLabel: 'Trotzdem auschecken',
-            onConfirm: async () => {
-              await runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
-            },
-          });
-        },
-      },
-      {
-        label: 'Neuen Branch erstellen...',
-        icon: 'B',
-        action: () => {
-          setInputDialog({
-            title: 'Neuen Branch erstellen',
-            message: 'Der neue Branch zeigt auf den ausgewaehlten Commit.',
-            fields: [
-              {
-                id: 'name',
-                label: 'Branch-Name',
-                required: true,
-                validate: (value) => branchNameValidationMessage(value.trim()),
-              },
-            ],
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-            ],
-            irreversible: false,
-            consequences: 'Der Branch wird erstellt und direkt ausgecheckt.',
-            confirmLabel: 'Branch erstellen',
-            onSubmit: async (values) => {
-              const name = (values.name || '').trim();
-              if (!name) return;
-              await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" erstellt.`);
-            },
-          });
-        },
-      },
-      {
-        label: 'Tag erstellen...',
-        icon: 'T',
-        action: () => {
-          setInputDialog({
-            title: 'Tag auf Commit erstellen',
-            message: 'Lege einen lightweight oder annotierten Tag an.',
-            fields: [
-              {
-                id: 'name',
-                label: 'Tag-Name',
-                required: true,
-                placeholder: 'v1.2.3',
-              },
-              {
-                id: 'message',
-                label: 'Tag-Nachricht (optional)',
-                placeholder: 'Leer lassen fuer lightweight Tag',
-              },
-            ],
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-            ],
-            irreversible: false,
-            consequences: 'Der Tag markiert diesen Commit lokal. Push auf Remote erfolgt separat.',
-            confirmLabel: 'Tag erstellen',
-            onSubmit: async (values) => {
-              const name = (values.name || '').trim();
-              if (!name) return;
-              const msg = (values.message || '').trim();
-              if (msg) {
-                await runGitAction(['tag', '-a', name, '-m', msg, hash], `Tag "${name}" erstellt.`);
-              } else {
-                await runGitAction(['tag', name, hash], `Tag "${name}" erstellt.`);
-              }
-            },
-          });
-        },
-      },
-      {
-        label: '', icon: '', separator: true, action: () => {},
-      },
-      {
-        label: `Cherry-Pick ${shortHash}`,
-        icon: 'CP',
-        action: () => runGitAction(['cherry-pick', hash], `Cherry-Pick von ${shortHash} erfolgreich.`),
-      },
-      {
-        label: `Revert ${shortHash}`,
-        icon: 'RV',
-        action: () => runGitAction(['revert', '--no-edit', hash], `Revert von ${shortHash} erfolgreich.`),
-      },
-      {
-        label: '', icon: '', separator: true, action: () => {},
-      },
-      {
-        label: `Reset --soft auf ${shortHash}`,
-        icon: 'RS',
-        action: () => {
-          setConfirmDialog({
-            variant: 'confirm',
-            title: 'Soft Reset ausfuehren?',
-            message: 'HEAD wird auf den Commit gesetzt, Aenderungen bleiben staged.',
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-              { label: 'Reset-Modus', value: '--soft' },
-            ],
-            irreversible: false,
-            consequences: 'Die Commit-Historie wird lokal verschoben.',
-            confirmLabel: 'Soft Reset',
-            onConfirm: async () => {
-              await runGitAction(['reset', '--soft', hash], `Soft-Reset auf ${shortHash} erfolgreich.`);
-            },
-          });
-        },
-      },
-      {
-        label: `Reset --mixed auf ${shortHash}`,
-        icon: 'RM',
-        action: () => {
-          setConfirmDialog({
-            variant: 'confirm',
-            title: 'Mixed Reset ausfuehren?',
-            message: 'HEAD wird verschoben, Aenderungen bleiben unstaged im Working Tree.',
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-              { label: 'Reset-Modus', value: '--mixed' },
-            ],
-            irreversible: false,
-            consequences: 'Index wird zurueckgesetzt. Commit-Historie aendert sich lokal.',
-            confirmLabel: 'Mixed Reset',
-            onConfirm: async () => {
-              await runGitAction(['reset', '--mixed', hash], `Mixed-Reset auf ${shortHash} erfolgreich.`);
-            },
-          });
-        },
-      },
-      {
-        label: `Reset --hard auf ${shortHash}`,
-        icon: 'RH',
-        danger: true,
-        action: () => {
-          setConfirmDialog({
-            variant: 'danger',
-            title: 'Hard Reset ausfuehren?',
-            message: 'HEAD, Index und Working Tree werden auf den Commit zurueckgesetzt.',
-            contextItems: [
-              { label: 'Commit', value: shortHash },
-              { label: 'Reset-Modus', value: '--hard' },
-            ],
-            irreversible: true,
-            consequences: 'Lokale nicht-gesicherte Aenderungen gehen verloren.',
-            confirmLabel: 'Hard Reset',
-            onConfirm: async () => {
-              await runGitAction(['reset', '--hard', hash], `Hard-Reset auf ${shortHash} erfolgreich.`);
-            },
-          });
-        },
-      },
-      {
-        label: `Interaktiver Rebase bis ${shortHash}`,
-        icon: 'IR',
-        action: () => {
-          const currentLayout = layout;
-          if (!currentLayout) return;
-
-          const selectedNode = currentLayout.nodes.find(candidate => candidate.commit.hash === hash);
-          if (!selectedNode) {
-            setToast({ msg: 'Ausgewaehlter Commit wurde nicht gefunden.', isError: true });
-            return;
-          }
-
-          if (selectedNode.commit.parentHashes.length === 0) {
-            setToast({ msg: 'Root-Commit kann nicht interaktiv gerebased werden.', isError: true });
-            return;
-          }
-
-          const headPath = currentLayout.nodes.filter(candidate => reachableFromHead.has(candidate.commit.hash));
-          const selectedIndex = headPath.findIndex(candidate => candidate.commit.hash === hash);
-          if (selectedIndex < 0) {
-            setToast({ msg: 'Commit liegt nicht auf dem aktuellen HEAD-Pfad.', isError: true });
-            return;
-          }
-
-          const rangeNewestFirst = headPath.slice(0, selectedIndex + 1);
-          if (rangeNewestFirst.some(candidate => candidate.isMerge)) {
-            setToast({ msg: 'Interaktiver Rebase mit Merge-Commits wird hier nicht unterstuetzt.', isError: true });
-            return;
-          }
-
-          const rangeOldestFirst = [...rangeNewestFirst].reverse();
-          const defaultTodo = rangeOldestFirst
-            .map(candidate => `pick ${candidate.commit.hash} ${candidate.commit.subject}`)
-            .join('\n');
-
-          const baseHash = selectedNode.commit.parentHashes[0];
-
-          setInputDialog({
-            title: 'Interaktiven Rebase starten',
-            message: 'Bearbeite die Rebase-Todo-Liste (pick/reword/edit/squash/fixup/drop).',
-            fields: [
-              {
-                id: 'todo',
-                label: 'Rebase Todo',
-                defaultValue: defaultTodo,
-                required: true,
-                multiline: true,
-                helperText: 'Eine Zeile pro Commit, z.B. "pick <hash> <message>"',
-              },
-            ],
-            contextItems: [
-              { label: 'Basis', value: baseHash.slice(0, 8) },
-              { label: 'Commit-Anzahl', value: String(rangeOldestFirst.length) },
-            ],
-            irreversible: false,
-            consequences: 'Commits werden lokal umgeschrieben. Bei Konflikten Rebase continue/abort im Working Directory nutzen.',
-            confirmLabel: 'Rebase starten',
-            onSubmit: async (values) => {
-              const lines = (values.todo || '')
-                .split(/\r?\n/)
-                .map(line => line.trim())
-                .filter(Boolean);
-
-              if (lines.length === 0 || !window.electronAPI) return;
-
-              const result = await window.electronAPI.startInteractiveRebase(baseHash, lines);
-              if (!result.success) {
-                setToast({ msg: result.error || 'Interaktiver Rebase fehlgeschlagen.', isError: true });
-                return;
-              }
-
-              setToast({ msg: 'Interaktiver Rebase gestartet.', isError: false });
-              refreshCommits();
-              refreshWorkingTreeStatus();
-            },
-          });
-        },
-      },
-      {
-        label: '', icon: '', separator: true, action: () => {},
-      },
-      {
-        label: 'Commit-Hash kopieren',
-        icon: 'ID',
-        action: () => {
-          navigator.clipboard.writeText(hash);
-          setToast({ msg: 'Hash kopiert!', isError: false });
-        },
-      },
-    ];
-
-    if (isMerge) {
-      actions.splice(5, 0, {
-        label: `Revert Merge ${shortHash}`,
-        icon: 'MR',
-        action: () => {
-          setConfirmDialog({
-            variant: 'confirm',
-            title: 'Merge-Revert ausfuehren?',
-            message: 'Der Merge-Commit wird mit Parent 1 als Hauptlinie reverted.',
-            contextItems: [
-              { label: 'Merge-Commit', value: shortHash },
-              { label: 'Parent', value: '1' },
-            ],
-            irreversible: false,
-            consequences: 'Es entsteht ein neuer Revert-Commit und moegliche Konflikte muessen geloest werden.',
-            confirmLabel: 'Merge-Revert',
-            onConfirm: async () => {
-              await runGitAction(['revert', '-m', '1', '--no-edit', hash], `Merge-Revert von ${shortHash} erfolgreich.`);
-            },
-          });
-        },
-      });
-    }
-
-    return actions;
-  };
 
   const formatCommitDate = (dateStr: string) => {
     try {
@@ -1423,6 +409,32 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     currentPathEdgeKeys,
     selectedPathEdgeKeys,
   } = highlightData;
+  const getMenuActions = useCallback((node: GraphNode): MenuAction[] => buildCommitMenuActions({
+    node,
+    branches,
+    currentBranch,
+    layout,
+    reachableFromHead,
+    runGitAction,
+    setConfirmDialog,
+    setInputDialog,
+    setToast,
+    refreshCommits,
+    refreshWorkingTreeStatus,
+    tr,
+  }), [
+    branches,
+    currentBranch,
+    layout,
+    reachableFromHead,
+    refreshCommits,
+    refreshWorkingTreeStatus,
+    runGitAction,
+    setConfirmDialog,
+    setInputDialog,
+    setToast,
+    tr,
+  ]);
 
   if (!repoPath) {
     return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
@@ -1467,62 +479,25 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
 
   return (
     <>
-      <div className="commit-search-toolbar" style={{ position: 'sticky', top: 0, zIndex: 3, background: 'var(--bg-darker)', borderBottom: '1px solid var(--border-color)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {activeSearchPanel === 'commits' && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {tr('Suchmodus:', 'Search mode:')}
-                <select
-                  value={activeSearchPanel}
-                  onChange={(e) => {
-                    const mode = e.target.value as SearchPanel;
-                    setActiveSearchPanel(mode);
-                    if (mode === 'forensic') setForensicError(null);
-                  }}
-                  style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
-                >
-                  <option value="commits">{tr('Commit-Suche', 'Commit search')}</option>
-                  <option value="forensic">{tr('Forensische Historie', 'Forensic history')}</option>
-                </select>
-              </label>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {tr('Feld:', 'Field:')}
-                <select
-                  value={searchScope}
-                  onChange={(e) => setSearchScope(e.target.value as SearchScope)}
-                  style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
-                >
-                  {(Object.keys(searchScopeLabels) as SearchScope[]).map((scope) => (
-                    <option key={scope} value={scope}>{searchScopeLabels[scope]}</option>
-                  ))}
-                </select>
-              </label>
-              <input
-                className="commit-search-input" style={{ flex: 1, minWidth: '240px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.82rem' }}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={tr('Commits durchsuchen (Hash, Autor, Nachricht, Ref)', 'Search commits (hash, author, message, ref)')}
-              />
-              <button
-                className="commit-search-nav"
-                style={{ border: '1px solid var(--border-color)', backgroundColor: showRecoveryCenter ? 'var(--accent-primary-soft)' : 'var(--bg-panel)', color: showRecoveryCenter ? 'var(--text-accent)' : 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
-                onClick={onToggleRecoveryCenter}
-              >
-                {showRecoveryCenter ? tr('Verlauf', 'History') : tr('Recovery Center', 'Recovery Center')}
-              </button>
-              {normalizedSearch && (
-                <div className="commit-search-meta" style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                  <span>{matchedNodes.length} {tr('Treffer', 'matches')}</span>
-                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(-1)} disabled={matchedNodes.length === 0}>{tr('Zurueck', 'Prev')}</button>
-                  <button className="commit-search-nav" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem' }} onClick={() => jumpToMatch(1)} disabled={matchedNodes.length === 0}>{tr('Weiter', 'Next')}</button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+      <CommitSearchToolbar
+        activeSearchPanel={activeSearchPanel}
+        onActiveSearchPanelChange={(mode) => {
+          setActiveSearchPanel(mode);
+          if (mode === 'forensic') setForensicError(null);
+        }}
+        searchScope={searchScope}
+        onSearchScopeChange={setSearchScope}
+        searchScopeLabels={searchScopeLabels}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        showRecoveryCenter={showRecoveryCenter}
+        onToggleRecoveryCenter={onToggleRecoveryCenter}
+        normalizedSearch={normalizedSearch}
+        matchCount={matchedNodes.length}
+        onJumpToPreviousMatch={() => jumpToMatch(-1)}
+        onJumpToNextMatch={() => jumpToMatch(1)}
+        tr={tr}
+      />
 
 
       <ForensicSearchPanel
@@ -1745,158 +720,55 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         )}
       </div>
 
-      {contextMenu && (() => {
-        const menuActions = getMenuActions(contextMenu.node);
-        const primaryMenu = menuActions.slice(0, 4);
-        const tailMenu = menuActions.slice(4);
-        const showMergePanel = Boolean(mergeContextPayload && onMergeBranch && currentBranch);
-
-        const renderMenuRow = (item: MenuAction, idx: number) => {
-          if (item.separator) {
-            return <div key={`sep-${idx}`} className="ctx-menu-sep" />;
-          }
-          return (
-            <button
-              key={`act-${idx}`}
-              type="button"
-              className={`ctx-menu-item ${item.danger ? 'danger' : ''}`}
-              onClick={() => { setContextMenu(null); item.action(); }}
-            >
-              <span className="ctx-menu-icon">{item.icon}</span>
-              {item.label}
-            </button>
-          );
-        };
-
-        return (
-          <div
-            className="ctx-menu-backdrop"
-            onClick={(e) => { e.stopPropagation(); setContextMenu(null); }}
-          >
-            <div
-              ref={contextMenuRef}
-              className="ctx-menu"
-              style={{
-                left: contextMenuPlacement?.left ?? contextMenu.x,
-                top: contextMenuPlacement?.top ?? contextMenu.y,
-                maxHeight: contextMenuPlacement?.maxHeight,
-                overflowY: 'auto',
-                visibility: contextMenuPlacement?.ready ? 'visible' : 'hidden',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="ctx-menu-header">
-                {contextMenu.node.commit.abbrevHash} - {contextMenu.node.commit.subject.slice(0, 30)}{contextMenu.node.commit.subject.length > 30 ? '...' : ''}
-              </div>
-              {primaryMenu.map(renderMenuRow)}
-              {showMergePanel && mergeContextPayload && (
-                <div className="ctx-menu-merge-wrap">
-                  <button
-                    type="button"
-                    className="ctx-menu-merge-toggle"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMergeCtxExpanded(v => !v);
-                    }}
-                  >
-                    {mergeCtxExpanded
-                      ? <ChevronDown size={14} className="ctx-menu-merge-chevron" />
-                      : <ChevronRight size={14} className="ctx-menu-merge-chevron" />}
-                    {tr('In aktuellen Branch mergen', 'Merge into current branch')}
-                  </button>
-                  {mergeCtxExpanded && (
-                    <div className="ctx-menu-merge-body">
-                      <div className="ctx-menu-merge-group">
-                        <div className="ctx-menu-merge-group-label">{tr('Dieser Commit', 'This commit')}</div>
-                        <button
-                          type="button"
-                          className="ctx-menu-merge-item"
-                          onClick={() => {
-                            setContextMenu(null);
-                            const { hash, shortHash } = mergeContextPayload;
-                            setConfirmDialog({
-                              variant: 'confirm',
-                              title: tr('Commit mergen?', 'Merge commit?'),
-                              message: tr(
-                                'git merge fuegt diesen Commit-Stand in den aktuellen Branch ein (ggf. Merge-Commit).',
-                                'git merge merges this commit into the current branch (may create a merge commit).',
-                              ),
-                              contextItems: [
-                                { label: tr('Commit', 'Commit'), value: shortHash },
-                                { label: tr('Befehl', 'Command'), value: `git merge ${hash}` },
-                              ],
-                              irreversible: false,
-                              consequences: tr(
-                                'Bei Konflikten loest du sie im Working Directory und setzt den Merge fort.',
-                                'If conflicts occur, resolve them in the working tree and continue the merge.',
-                              ),
-                              confirmLabel: tr('Merge starten', 'Start merge'),
-                              onConfirm: async () => {
-                                await runGitAction(
-                                  ['merge', hash],
-                                  tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`),
-                                );
-                              },
-                            });
-                          }}
-                        >
-                          {tr('Merge', 'Merge')} {mergeContextPayload.shortHash}
-                          <span className="ctx-menu-merge-item-hint">
-                            {tr('git merge (Commit-Hash)', 'git merge (commit hash)')}
-                          </span>
-                        </button>
-                      </div>
-                      {mergeContextPayload.refsHere.length > 0 && (
-                        <div className="ctx-menu-merge-group">
-                          <div className="ctx-menu-merge-group-label">{tr('Refs auf diesem Commit', 'Refs at this commit')}</div>
-                          {mergeContextPayload.refsHere.map(ref => (
-                            <button
-                              key={ref}
-                              type="button"
-                              className="ctx-menu-merge-item"
-                              onClick={() => {
-                                setContextMenu(null);
-                                if (onMergeBranch) onMergeBranch(ref, 'default');
-                              }}
-                            >
-                              {ref}
-                              <span className="ctx-menu-merge-item-hint">
-                                {tr('Branch-Ref mergen', 'Merge branch ref')}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {mergeContextPayload.branchExtras.length > 0 && (
-                        <div className="ctx-menu-merge-group">
-                          <div className="ctx-menu-merge-group-label">{tr('Weitere Branches', 'More branches')}</div>
-                          {mergeContextPayload.branchExtras.map(row => (
-                            <button
-                              key={row.raw}
-                              type="button"
-                              className="ctx-menu-merge-item"
-                              onClick={() => {
-                                setContextMenu(null);
-                                if (onMergeBranch) onMergeBranch(row.raw, 'default');
-                              }}
-                            >
-                              {row.label}
-                              <span className="ctx-menu-merge-item-hint">
-                                {row.scope === 'remote' ? tr('Remote-Tracking', 'Remote-tracking') : tr('Lokal', 'Local')}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-              {tailMenu.map(renderMenuRow)}
-            </div>
-          </div>
-        );
-      })()}
+      {contextMenu && (
+        <CommitContextMenu
+          contextMenu={contextMenu}
+          contextMenuRef={contextMenuRef}
+          contextMenuPlacement={contextMenuPlacement}
+          menuActions={getMenuActions(contextMenu.node)}
+          mergeContextPayload={mergeContextPayload}
+          canMergeBranches={Boolean(onMergeBranch && currentBranch)}
+          mergeCtxExpanded={mergeCtxExpanded}
+          onToggleMergeExpanded={() => setMergeCtxExpanded(v => !v)}
+          onClose={() => setContextMenu(null)}
+          onRunMenuAction={(item) => {
+            setContextMenu(null);
+            item.action();
+          }}
+          onMergeCommit={(hash, shortHash) => {
+            setContextMenu(null);
+            setConfirmDialog({
+              variant: 'confirm',
+              title: tr('Commit mergen?', 'Merge commit?'),
+              message: tr(
+                'git merge fuegt diesen Commit-Stand in den aktuellen Branch ein (ggf. Merge-Commit).',
+                'git merge merges this commit into the current branch (may create a merge commit).',
+              ),
+              contextItems: [
+                { label: tr('Commit', 'Commit'), value: shortHash },
+                { label: tr('Befehl', 'Command'), value: `git merge ${hash}` },
+              ],
+              irreversible: false,
+              consequences: tr(
+                'Bei Konflikten loest du sie im Working Directory und setzt den Merge fort.',
+                'If conflicts occur, resolve them in the working tree and continue the merge.',
+              ),
+              confirmLabel: tr('Merge starten', 'Start merge'),
+              onConfirm: async () => {
+                await runGitAction(
+                  ['merge', hash],
+                  tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`),
+                );
+              },
+            });
+          }}
+          onMergeBranchRef={(branchRef) => {
+            setContextMenu(null);
+            onMergeBranch?.(branchRef, 'default');
+          }}
+          tr={tr}
+        />
+      )}
 
       <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
 
