@@ -1,90 +1,24 @@
 import React from 'react';
 import { SidebarActivityBar } from './sidebar/SidebarActivityBar';
-import { SidebarHeader } from './sidebar/SidebarHeader';
-import { LocalReposSidebarContent } from './sidebar/LocalReposSidebarContent';
-import { RepoSidebarContent } from './sidebar/RepoSidebarContent';
-import { GithubAuthContent } from './sidebar/GithubAuthContent';
-import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
-import { useI18n } from '../../i18n';
-import {
-  useGithubContext,
-  useRepositoryContext,
-  useSettingsContext,
-  useUIContext,
-  useWorkflowContext,
-} from '../../contexts/AppStateContext';
-import { ProjectPlannerSidebarContent } from '../project-planner/ProjectPlannerSidebarContent';
+import { useUIContext } from '../../contexts/AppStateContext';
+import { SidebarContentRouter, SidebarHeaderContainer } from './sidebar/AppSidebarPanels';
 
 export const AppSidebar: React.FC = () => {
-  const ui = useUIContext();
-  const repository = useRepositoryContext();
-  const github = useGithubContext();
-  const settings = useSettingsContext();
-  const workflow = useWorkflowContext();
-  const props = {
-    ...ui,
-    ...repository,
-    ...github,
-    ...settings,
-    ...workflow,
-  };
-  const { tr } = useI18n();
-  const settingsTabs = [
-    { id: 'general' as const, label: tr('Allgemein', 'General') },
-    { id: 'integrations' as const, label: tr('Integrationen', 'Integrations') },
-    { id: 'api' as const, label: tr('API & MCP', 'API & MCP') },
-    { id: 'security' as const, label: tr('Sicherheit', 'Security') },
-    { id: 'system' as const, label: tr('System', 'System') },
-  ];
+  const { activeTab, setActiveTab, isSidebarCollapsed, onToggleSidebar } = useUIContext();
 
   return (
     <>
       <SidebarActivityBar
-        activeTab={props.activeTab}
-        setActiveTab={props.setActiveTab}
-        isSidebarCollapsed={ui.isSidebarCollapsed}
-        onToggleSidebar={ui.onToggleSidebar}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
       />
 
-      {!ui.isSidebarCollapsed && (
+      {!isSidebarCollapsed && (
         <div className="sidebar">
-          <SidebarHeader
-            activeTab={props.activeTab}
-            activeRepo={props.activeRepo}
-            onOpenFolder={props.onOpenFolder}
-            onCloneByUrl={props.onCloneByUrl}
-            onRefreshRemoteQuick={props.onRefreshRemoteQuick}
-            remoteSync={props.remoteSync}
-            isGitActionRunning={props.isGitActionRunning}
-          />
-
-          <div className="pane-content" style={{ padding: '8px' }}>
-            {props.activeTab === 'localRepos' && <LocalReposSidebarContent {...props} />}
-            {props.activeTab === 'repo' && <RepoSidebarContent {...props} />}
-            {props.activeTab === 'planner' && <ProjectPlannerSidebarContent />}
-            {props.activeTab === 'github' && !props.isAuthenticated && <GithubAuthContent {...props} />}
-            {props.activeTab === 'github' && props.isAuthenticated && (
-              <GithubConnectedContent
-                {...props}
-                prOwnerRepo={null}
-                pullRequests={[]}
-                prLoading={false}
-              />
-            )}
-            {props.activeTab === 'settings' && (
-              <div className="settings-sidebar-nav">
-                {settingsTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    className={`settings-sidebar-nav-btn ${props.settingsTab === tab.id ? 'active' : ''}`}
-                    onClick={() => props.onSelectSettingsTab(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <SidebarHeaderContainer />
+          <SidebarContentRouter />
         </div>
       )}
     </>
