@@ -3,6 +3,11 @@ import type { AppSettingsDto } from '../../global';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
 import type { GitStatusWithConflicts } from './types';
+import {
+  getCommitFormDraft,
+  resetCommitFormDraft,
+  updateCommitFormDraft,
+} from './commitFormDraft';
 
 const LEGACY_COMMIT_ARG_LIMIT = 512;
 
@@ -18,12 +23,32 @@ type Params = {
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings }: Params) => {
   const { tr } = useI18n();
-  const [commitMsg, setCommitMsg] = useState('');
-  const [commitDescription, setCommitDescription] = useState('');
+  const [commitMsg, setCommitMsgState] = useState(() => (
+    getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg
+  ));
+  const [commitDescription, setCommitDescriptionState] = useState(() => (
+    getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription
+  ));
   const [amendCommit, setAmendCommit] = useState(false);
   const [signoffCommit, setSignoffCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const isCommittingRef = useRef(false);
+
+  const setCommitMsg = useCallback((value: string) => {
+    setCommitMsgState(value);
+    updateCommitFormDraft(repoPath, { commitMsg: value }, settings.commitTemplate);
+  }, [repoPath, settings.commitTemplate]);
+
+  const setCommitDescription = useCallback((value: string) => {
+    setCommitDescriptionState(value);
+    updateCommitFormDraft(repoPath, { commitDescription: value }, settings.commitTemplate);
+  }, [repoPath, settings.commitTemplate]);
+
+  useEffect(() => {
+    const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
+    setCommitMsgState(draft.commitMsg);
+    setCommitDescriptionState(draft.commitDescription);
+  }, [repoPath, settings.commitTemplate]);
 
   useEffect(() => {
     setSignoffCommit(Boolean(settings.commitSignoffByDefault));
@@ -31,9 +56,13 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
 
   useEffect(() => {
     if (settings.commitTemplate) {
-      setCommitMsg((current) => (current.trim() ? current : settings.commitTemplate));
+      setCommitMsgState((current) => {
+        if (current.trim()) return current;
+        updateCommitFormDraft(repoPath, { commitMsg: settings.commitTemplate }, settings.commitTemplate);
+        return settings.commitTemplate;
+      });
     }
-  }, [settings.commitTemplate]);
+  }, [repoPath, settings.commitTemplate]);
 
   useEffect(() => {
     if (!amendCommit || !repoPath || !window.electronAPI) return;
@@ -44,7 +73,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
         setCommitDescription(lines.slice(2).join('\n'));
       }
     });
-  }, [amendCommit, repoPath]);
+  }, [amendCommit, repoPath, setCommitDescription, setCommitMsg]);
 
   const handleCommit = useCallback(async () => {
     if (isCommittingRef.current || !commitMsg.trim() || !window.electronAPI || !status) return;
@@ -90,8 +119,9 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
           return window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
         })();
       if (r.success) {
-        setCommitMsg(settings.commitTemplate || '');
-        setCommitDescription('');
+        const nextDraft = resetCommitFormDraft(repoPath, settings.commitTemplate || '');
+        setCommitMsgState(nextDraft.commitMsg);
+        setCommitDescriptionState(nextDraft.commitDescription);
         setToast({ msg: tr('Commit erfolgreich!', 'Commit successful!'), isError: false });
         if (onCommitsCreated) onCommitsCreated();
         else if (onRepoChanged) onRepoChanged();
@@ -105,7 +135,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       isCommittingRef.current = false;
       setIsCommitting(false);
     }
-  }, [commitMsg, commitDescription, amendCommit, signoffCommit, status, settings.commitTemplate, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
+  }, [repoPath, commitMsg, commitDescription, amendCommit, signoffCommit, status, settings.commitTemplate, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
 
   return {
     commitMsg, setCommitMsg,
