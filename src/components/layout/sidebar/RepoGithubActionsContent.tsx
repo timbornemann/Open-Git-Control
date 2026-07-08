@@ -14,6 +14,7 @@ import {
 import { AppSidebarProps } from './AppSidebar.types';
 import { GithubWorkflowRunDto } from '../../../global';
 import { useI18n } from '../../../i18n';
+import { githubClient } from '../../../services/githubClient';
 import { formatDateTime } from '../../../utils/dateTime';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '../../sidebar/RepoCard';
 import { formatDuration, getCiBadgeStyles } from './githubShared';
@@ -63,7 +64,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
 
   useEffect(() => {
     const ownerRepo = props.prOwnerRepo;
-    if (!ownerRepo || !window.electronAPI) {
+    if (!ownerRepo || !githubClient.isAvailable()) {
       workflowScopeRef.current = '';
       setWorkflowRuns([]);
       setWorkflowRunsError(null);
@@ -81,7 +82,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
       setIsLoadingWorkflowRuns(true);
       setWorkflowRunsError(null);
       try {
-        const result = await window.electronAPI.githubGetWorkflowRuns({
+        const result = await githubClient.getWorkflowRuns({
           owner: ownerRepo.owner,
           repo: ownerRepo.repo,
           branch: props.currentBranch || undefined,

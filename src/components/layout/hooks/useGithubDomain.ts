@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { appClient } from '../../../services/appClient';
+import { gitClient } from '../../../services/gitClient';
+import { githubClient } from '../../../services/githubClient';
 
 type Params = {
   onRepoCloned: (repoPath: string) => Promise<void>;
@@ -72,7 +75,7 @@ export const useGithubDomain = ({
   };
 
   const fetchReposPage = useCallback(async (mode: 'reset' | 'append', page: number, search: string) => {
-    if (!window.electronAPI || !isAuthenticated) return;
+    if (!githubClient.isAvailable() || !isAuthenticated) return;
 
     const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
 
@@ -83,7 +86,7 @@ export const useGithubDomain = ({
     }
 
     try {
-      const result = await window.electronAPI.githubGetRepos({
+      const result = await githubClient.getRepositories({
         page: safePage,
         perPage: 50,
         search,
@@ -137,11 +140,11 @@ export const useGithubDomain = ({
     initializedHostRef.current = normalizedHost;
 
     const loginWithSavedToken = async () => {
-      if (!window.electronAPI) return;
+      if (!githubClient.isAvailable()) return;
 
       setIsAuthenticating(true);
       try {
-        const status = await window.electronAPI.githubGetSavedAuthStatus();
+        const status = await githubClient.getSavedAuthStatus();
         setOauthConfigured(status.oauthConfigured);
 
         if (!status.hasSavedToken) {
@@ -150,7 +153,7 @@ export const useGithubDomain = ({
           return;
         }
 
-        const loginResult = await window.electronAPI.githubLoginWithSavedToken();
+        const loginResult = await githubClient.loginWithSavedToken();
         if (loginResult.success && loginResult.authenticated) {
           setIsAuthenticated(true);
           setGithubUser(loginResult.username);
@@ -187,13 +190,13 @@ export const useGithubDomain = ({
     }
 
     const refreshOauthStatus = async () => {
-      if (!window.electronAPI) {
+      if (!githubClient.isAvailable()) {
         setOauthConfigured(false);
         return;
       }
 
       try {
-        const status = await window.electronAPI.githubGetSavedAuthStatus();
+        const status = await githubClient.getSavedAuthStatus();
         setOauthConfigured(status.oauthConfigured);
       } catch {
         setOauthConfigured(false);
@@ -217,7 +220,7 @@ export const useGithubDomain = ({
   }, [isAuthenticated, refreshRepos]);
 
   const handleTokenLogin = async () => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable()) return;
     const token = tokenInput.trim();
     if (!token) return;
 
@@ -231,11 +234,11 @@ export const useGithubDomain = ({
     setAuthError(null);
 
     try {
-      const success = await window.electronAPI.githubAuth(token, githubHost);
+      const success = await githubClient.auth(token, githubHost);
       if (success) {
         setIsAuthenticated(true);
         setTokenInput('');
-        const status = await window.electronAPI.githubCheckAuthStatus();
+        const status = await githubClient.checkAuthStatus();
         setGithubUser(status.username);
         setNextRepoPage(1);
         setGithubReposHasMore(false);
@@ -252,10 +255,10 @@ export const useGithubDomain = ({
   const schedulePoll = (deviceCode: string, intervalSeconds: number) => {
     clearDevicePolling();
     pollingRef.current = window.setTimeout(async () => {
-      if (stoppedRef.current || !window.electronAPI) return;
+      if (stoppedRef.current || !githubClient.isAvailable()) return;
 
       try {
-        const pollResult = await window.electronAPI.githubDevicePoll(deviceCode);
+        const pollResult = await githubClient.devicePoll(deviceCode);
         if (!pollResult.success) {
           setIsDeviceFlowRunning(false);
           setDeviceFlowError(pollResult.error || tr('Device Flow Polling fehlgeschlagen.', 'Device flow polling failed.'));
@@ -289,14 +292,14 @@ export const useGithubDomain = ({
   };
 
   const handleStartDeviceFlowLogin = async () => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable() || !appClient.isAvailable()) return;
 
     clearDevicePolling();
     setDeviceFlowError(null);
     setAuthError(null);
     setWebFlowError(null);
 
-    const startResult = await window.electronAPI.githubDeviceStart();
+    const startResult = await githubClient.deviceStart();
     if (!startResult.success) {
       setDeviceFlowError(startResult.error || tr('Device Flow konnte nicht gestartet werden.', 'Could not start device flow.'));
       return;
@@ -306,12 +309,12 @@ export const useGithubDomain = ({
     setDeviceFlow(flow);
     setIsDeviceFlowRunning(true);
 
-    await window.electronAPI.openExternalUrl(flow.verificationUri);
+    await appClient.openExternalUrl(flow.verificationUri);
     schedulePoll(flow.deviceCode, flow.interval);
   };
 
   const handleStartWebFlowLogin = async () => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable()) return;
 
     clearDevicePolling();
     setIsDeviceFlowRunning(false);
@@ -322,7 +325,7 @@ export const useGithubDomain = ({
     setIsWebFlowRunning(true);
 
     try {
-      const loginResult = await window.electronAPI.githubWebLogin();
+      const loginResult = await githubClient.webLogin();
       if (!loginResult.success) {
         setWebFlowError(loginResult.error || tr('GitHub 1-Klick Login fehlgeschlagen.', 'GitHub one-click login failed.'));
         return;
@@ -354,8 +357,8 @@ export const useGithubDomain = ({
     setWebFlowError(null);
 
     try {
-      if (window.electronAPI) {
-        await window.electronAPI.githubLogout();
+      if (githubClient.isAvailable()) {
+        await githubClient.logout();
       }
     } catch (e) {
       console.error('GitHub logout failed:', e);
@@ -382,13 +385,13 @@ export const useGithubDomain = ({
       switchToRepoTab?: boolean;
     } = {},
   ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
+    if (!gitClient.isAvailable() || !appClient.isAvailable()) return false;
     const normalizedCloneUrl = String(cloneUrl || '').trim();
     if (!normalizedCloneUrl) {
       setCloneError(tr('Clone-URL fehlt.', 'Clone URL is required.'));
       return false;
     }
-    const targetDir = options.targetDir ?? await window.electronAPI.selectDirectory();
+    const targetDir = options.targetDir ?? await appClient.selectDirectory();
     if (!targetDir) return false;
 
     setIsCloning(true);
@@ -397,12 +400,12 @@ export const useGithubDomain = ({
     setCloneFinished(false);
     setCloneError(null);
 
-    const cleanup = window.electronAPI.onCloneProgress((line: string) => {
+    const cleanup = gitClient.onCloneProgress((line: string) => {
       setCloneLog(prev => [...prev, line]);
     });
 
     try {
-      const result = await window.electronAPI.gitClone(normalizedCloneUrl, targetDir, options.targetName);
+      const result = await gitClient.gitClone(normalizedCloneUrl, targetDir, options.targetName);
       if (result.success) {
         setCloneFinished(true);
         setCloneLog(prev => [...prev, `SUCCESS: ${tr('Repository erfolgreich geklont nach', 'Repository cloned successfully to')}: ${result.repoPath}`]);

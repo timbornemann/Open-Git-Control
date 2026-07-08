@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DiffRequest } from '../../types/diff';
+import { appClient } from '../../services/appClient';
+import { gitClient } from '../../services/gitClient';
 import {
   applyMarkdownPreviewImageDataUrls,
   collectMarkdownPreviewImageSources,
@@ -36,14 +38,14 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
   }, [request]);
 
   useEffect(() => {
-    if (!repoPath || !window.electronAPI || !isActive) return;
+    if (!repoPath || !gitClient.isAvailable() || !isActive) return;
 
     let cancelled = false;
     const loadPreview = async () => {
       setMarkdownPreview({ loading: true, error: null, html: '' });
 
       try {
-        const markdownResult = await window.electronAPI.getMarkdownPreviewFile({
+        const markdownResult = await gitClient.getMarkdownPreviewFile({
           source: request.source,
           path: request.path,
           commitHash: request.commitHash,
@@ -66,16 +68,16 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
 
         await Promise.all(imageSources.map(async (imageSource) => {
           const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
-          if (!assetPath || !window.electronAPI) return;
+          if (!assetPath || !gitClient.isAvailable()) return;
 
-          let assetResult = await window.electronAPI.getRepoFileDataUrl({
+          let assetResult = await gitClient.getRepoFileDataUrl({
             source: request.source,
             path: assetPath,
             commitHash: request.commitHash,
           });
 
           if (!assetResult.success && request.source === 'staged') {
-            assetResult = await window.electronAPI.getRepoFileDataUrl({
+            assetResult = await gitClient.getRepoFileDataUrl({
               source: 'unstaged',
               path: assetPath,
             });
@@ -122,8 +124,8 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
     }
 
     event.preventDefault();
-    if (isExternalMarkdownUrl(href) && /^https:/i.test(href) && window.electronAPI?.openExternalUrl) {
-      void window.electronAPI.openExternalUrl(href);
+    if (isExternalMarkdownUrl(href) && /^https:/i.test(href) && appClient.isAvailable()) {
+      void appClient.openExternalUrl(href);
     }
   }, []);
 

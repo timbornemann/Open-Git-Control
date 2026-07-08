@@ -1,9 +1,17 @@
 import type {
+  DeviceFlowPollDto,
+  DeviceFlowStartDto,
+  ElectronAPI,
   GitHubCreateReleaseParamsDto,
+  GitHubForkParamsDto,
   GitHubReleaseContextDto,
   GitHubReleaseDto,
+  GitHubRepositoryPageDto,
   GitHubRepositoryDto,
+  GithubStatusChecksDto,
+  GithubWorkflowRunDto,
   IpcResult,
+  PullRequestDto,
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
 } from '../global';
@@ -22,12 +30,64 @@ export const githubClient = {
     return requireElectronApi().githubCheckAuthStatus();
   },
 
+  async auth(token: string, host?: string): Promise<boolean> {
+    return requireElectronApi().githubAuth(token, host);
+  },
+
+  async deviceStart(): Promise<IpcResult<DeviceFlowStartDto>> {
+    return requireElectronApi().githubDeviceStart();
+  },
+
+  async devicePoll(deviceCode: string): Promise<IpcResult<DeviceFlowPollDto>> {
+    return requireElectronApi().githubDevicePoll(deviceCode);
+  },
+
+  async webLogin(): Promise<IpcResult<{ username: string | null }>> {
+    return requireElectronApi().githubWebLogin();
+  },
+
+  async getRepositories(params?: { page?: number; perPage?: number; search?: string }): Promise<IpcResult<GitHubRepositoryPageDto>> {
+    return requireElectronApi().githubGetRepos(params);
+  },
+
+  async getSavedAuthStatus(): ReturnType<ElectronAPI['githubGetSavedAuthStatus']> {
+    return requireElectronApi().githubGetSavedAuthStatus();
+  },
+
+  async loginWithSavedToken(): ReturnType<ElectronAPI['githubLoginWithSavedToken']> {
+    return requireElectronApi().githubLoginWithSavedToken();
+  },
+
+  async logout(): ReturnType<ElectronAPI['githubLogout']> {
+    return requireElectronApi().githubLogout();
+  },
+
   async createRepository(
     name: string,
     description: string,
     isPrivate: boolean,
   ): Promise<IpcResult<GitHubRepositoryDto>> {
     return requireElectronApi().githubCreateRepo(name, description, isPrivate);
+  },
+
+  async forkRepository(params: GitHubForkParamsDto): Promise<IpcResult<GitHubRepositoryDto>> {
+    return requireElectronApi().githubForkRepo(params);
+  },
+
+  async getPullRequests(owner: string, repo: string, state: string): Promise<IpcResult<PullRequestDto[]>> {
+    return requireElectronApi().githubGetPRs(owner, repo, state);
+  },
+
+  async createPullRequest(...args: Parameters<ElectronAPI['githubCreatePR']>): ReturnType<ElectronAPI['githubCreatePR']> {
+    return requireElectronApi().githubCreatePR(...args);
+  },
+
+  async getWorkflowRuns(params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }): Promise<IpcResult<GithubWorkflowRunDto[]>> {
+    return requireElectronApi().githubGetWorkflowRuns(params);
+  },
+
+  async getStatusChecks(params: { owner: string; repo: string; ref: string }): Promise<IpcResult<GithubStatusChecksDto>> {
+    return requireElectronApi().githubGetStatusChecks(params);
   },
 
   async mergePullRequest(params: {

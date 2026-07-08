@@ -135,7 +135,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   const isDeletedFile = selectedFile?.status.startsWith('D') ?? false;
 
   useEffect(() => {
-    if (!selectedFile || !window.electronAPI) return;
+    if (!selectedFile || !gitClient.isAvailable()) return;
 
     const fetchHistory = async () => {
       if (activeTab !== 'history') return;
@@ -143,7 +143,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await window.electronAPI.getFileHistory(selectedFile.path, normalizedHash, 80);
+        const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80);
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -163,7 +163,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   }, [activeTab, normalizedHash, selectedFile, tr]);
 
   useEffect(() => {
-    if (!selectedFile || !window.electronAPI) return;
+    if (!selectedFile || !gitClient.isAvailable()) return;
 
     const fetchBlame = async () => {
       if (activeTab !== 'blame') return;
@@ -177,7 +177,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await window.electronAPI.getFileBlameRange(selectedFile.path, normalizedHash, 1, 500);
+        const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, 500);
         if (result.success) {
           setBlameLines(result.data || []);
           setBlameHasMore((result.data || []).length === 500);
@@ -198,10 +198,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   }, [activeTab, normalizedHash, isDeletedFile, selectedFile, tr]);
 
   const loadMoreBlame = async () => {
-    if (!selectedFile || blameLoading || !blameHasMore) return;
+    if (!selectedFile || blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
     setBlameLoading(true);
     try {
-      const result = await window.electronAPI.getFileBlameRange(
+      const result = await gitClient.getFileBlameRange(
         selectedFile.path,
         normalizedHash,
         blameLines.length + 1,

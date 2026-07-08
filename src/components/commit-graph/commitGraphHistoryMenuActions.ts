@@ -1,6 +1,7 @@
 import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
 import type { ToastMessage } from '../../types/git';
 import type { GraphLayout, GraphNode } from '../../utils/graphLayout';
+import { gitClient } from '../../services/gitClient';
 import type { MenuAction } from './CommitContextMenu';
 
 type BuildCommitHistoryMenuActionsParams = {
@@ -172,9 +173,9 @@ export const buildCommitHistoryMenuActions = ({
               .map(line => line.trim())
               .filter(Boolean);
 
-            if (lines.length === 0 || !window.electronAPI) return;
+            if (lines.length === 0 || !gitClient.isAvailable()) return;
 
-            const result = await window.electronAPI.startInteractiveRebase(baseHash, lines);
+            const result = await gitClient.startInteractiveRebase(baseHash, lines);
             if (!result.success) {
               setToast({ msg: result.error || 'Interaktiver Rebase fehlgeschlagen.', isError: true });
               return;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DiffRequest } from '../../types/diff';
 import type { GitFileBlameLineDto } from '../../types/git';
+import { gitClient } from '../../services/gitClient';
 
 type UseDiffBlameParams = {
   repoPath: string | null;
@@ -19,7 +20,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
 
   useEffect(() => {
     const fetchBlame = async () => {
-      if (!showBlame || !repoPath || !window.electronAPI) return;
+      if (!showBlame || !repoPath || !gitClient.isAvailable()) return;
 
       setIsBlameLoading(true);
       try {
@@ -27,7 +28,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
           ? request.commitHash
           : undefined;
 
-        const result = await window.electronAPI.getFileBlame(request.path, commitHashForBlame);
+        const result = await gitClient.getFileBlame(request.path, commitHashForBlame);
         if (result.success) {
           setBlameData(result.data);
         } else {

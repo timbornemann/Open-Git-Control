@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastQueue } from '../hooks/useToastQueue';
 import { useI18n } from '../i18n';
+import { useUIContext } from '../contexts/AppStateContext';
 import {
   getCommitMessageStyleLabel,
 } from '../utils/commitMessagePreferences';
+import { ActionToastViewport } from './ActionToastViewport';
 import { ConflictResolverPanel } from './staging-area/ConflictResolverPanel';
 import { StagingCommitPanel } from './staging-area/StagingCommitPanel';
 import { StagingContextMenu } from './staging-area/StagingContextMenu';
-import { StagingDialogHost } from './staging-area/StagingDialogHost';
 import { StagingFileSections } from './staging-area/StagingFileSections';
 import { StagingToolbar } from './staging-area/StagingToolbar';
 import { StashPanel } from './staging-area/StashPanel';
@@ -17,7 +18,6 @@ import { useAiCommitMessageDialog } from './staging-area/useAiCommitMessageDialo
 import { useCommitForm } from './staging-area/useCommitForm';
 import { useConflictResolver } from './staging-area/useConflictResolver';
 import { useFileOperations } from './staging-area/useFileOperations';
-import { useStagingDialogs } from './staging-area/useStagingDialogs';
 import { useVisibleStagingFiles } from './staging-area/useVisibleStagingFiles';
 
 export const StagingArea: React.FC<StagingAreaProps> = ({
@@ -37,8 +37,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   onRefreshWorkingTree,
 }) => {
   const { tr } = useI18n();
+  const { setConfirmDialog, setInputDialog } = useUIContext();
   const { toasts, setToast, dismiss } = useToastQueue(3000);
-  const dialogs = useStagingDialogs();
   const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
 
   const isConflictOnly = viewMode === 'conflictOnly';
@@ -50,8 +50,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const fileOps = useFileOperations({
     repoPath,
     setToast,
-    setConfirmDialog: dialogs.setConfirmDialog,
-    setInputDialog: dialogs.setInputDialog,
+    setConfirmDialog,
+    setInputDialog,
     onRepoChanged,
     onStashChanged: triggerStashRefresh,
     onOpenDiff,
@@ -83,7 +83,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     repoPath,
     status: fileOps.status,
     setToast,
-    setConfirmDialog: dialogs.setConfirmDialog,
+    setConfirmDialog,
     git: fileOps.git,
     refresh: fileOps.refresh,
     onRepoChanged,
@@ -99,7 +99,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const openAiCommitMessageDialog = useAiCommitMessageDialog({
     aiCommit,
     commitForm,
-    setInputDialog: dialogs.setInputDialog,
+    setInputDialog,
   });
 
   const { visibleFiles, visibleTotal, maxListHeight } = useVisibleStagingFiles({
@@ -201,7 +201,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         <StashPanel
           repoPath={repoPath}
           onRepoChanged={onRepoChanged}
-          setInputDialog={dialogs.setInputDialog}
+          setInputDialog={setInputDialog}
           refreshTrigger={stashRefreshTrigger}
         />
       )}
@@ -225,17 +225,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         contextMenu={fileOps.contextMenu}
         fileOps={fileOps}
       />
-
-      <StagingDialogHost
-        toasts={toasts}
-        onDismissToast={dismiss}
-        confirmDialog={dialogs.confirmDialog}
-        inputDialog={dialogs.inputDialog}
-        executeConfirmDialog={dialogs.executeConfirmDialog}
-        closeConfirmDialog={dialogs.closeConfirmDialog}
-        executeInputDialog={dialogs.executeInputDialog}
-        closeInputDialog={dialogs.closeInputDialog}
-      />
+      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 };

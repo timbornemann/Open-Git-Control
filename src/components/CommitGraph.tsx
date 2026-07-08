@@ -6,9 +6,6 @@ import {
 } from '../utils/gitParsing';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
-import { Confirm } from './Confirm';
-import { DangerConfirm } from './DangerConfirm';
-import { Input } from './Input';
 import { ActionToastViewport } from './ActionToastViewport';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
@@ -91,14 +88,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toasts, setToast, dismiss } = useToastQueue(4000);
   const {
-    confirmDialog,
-    inputDialog,
     setConfirmDialog,
     setInputDialog,
-    closeConfirmDialog,
-    executeConfirmDialog,
-    closeInputDialog,
-    executeInputDialog,
   } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -771,49 +762,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       )}
 
       <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
-
-      {confirmDialog && confirmDialog.variant === 'confirm' && (
-        <Confirm
-          open={true}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          contextItems={confirmDialog.contextItems}
-          irreversible={confirmDialog.irreversible}
-          consequences={confirmDialog.consequences}
-          confirmLabel={confirmDialog.confirmLabel}
-          onConfirm={executeConfirmDialog}
-          onCancel={closeConfirmDialog}
-        />
-      )}
-
-      {confirmDialog && confirmDialog.variant === 'danger' && (
-        <DangerConfirm
-          open={true}
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          contextItems={confirmDialog.contextItems}
-          irreversible={confirmDialog.irreversible}
-          consequences={confirmDialog.consequences}
-          confirmLabel={confirmDialog.confirmLabel}
-          onConfirm={executeConfirmDialog}
-          onCancel={closeConfirmDialog}
-        />
-      )}
-
-      {inputDialog && (
-        <Input
-          open={true}
-          title={inputDialog.title}
-          message={inputDialog.message}
-          fields={inputDialog.fields}
-          contextItems={inputDialog.contextItems}
-          irreversible={inputDialog.irreversible}
-          consequences={inputDialog.consequences}
-          confirmLabel={inputDialog.confirmLabel}
-          onSubmit={executeInputDialog}
-          onCancel={closeInputDialog}
-        />
-      )}
     </>
   );
 };

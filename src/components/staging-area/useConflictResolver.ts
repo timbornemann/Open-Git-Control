@@ -57,10 +57,10 @@ export const useConflictResolver = ({
   const countedConflictPathsKeyRef = useRef<string>('');
 
   const openConflictEditor = useCallback(async (filePath: string, initialBlockIndex = 0) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     setIsConflictEditorLoading(true);
     try {
-      const result = await window.electronAPI.readRepoFile(filePath);
+      const result = await gitClient.readRepoFile(filePath);
       if (!result.success || typeof result.data !== 'string') {
         setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
         return;
@@ -110,7 +110,7 @@ export const useConflictResolver = ({
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
   useEffect(() => {
-    if (!repoPath || !window.electronAPI || !status?.conflicts?.length) {
+    if (!repoPath || !gitClient.isAvailable() || !status?.conflicts?.length) {
       setConflictBlockCountsByPath({});
       setIsConflictBlockCountPending(false);
       countedConflictPathsKeyRef.current = '';
@@ -129,7 +129,7 @@ export const useConflictResolver = ({
       const next: Record<string, number> = {};
       try {
         for (const path of paths) {
-          const r = await window.electronAPI.readRepoFile(path);
+          const r = await gitClient.readRepoFile(path);
           if (cancelled) return;
           next[path] = r.success && typeof r.data === 'string'
             ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length
@@ -288,7 +288,7 @@ export const useConflictResolver = ({
   }, [conflictEditor, setToast, tr]);
 
   const saveConflictEditor = useCallback(async (markResolvedAfterSave: boolean) => {
-    if (!window.electronAPI || !conflictEditor) return;
+    if (!gitClient.isAvailable() || !conflictEditor) return;
     const pendingBlocks = parseConflictBlocks(conflictEditor.content);
     if (markResolvedAfterSave && pendingBlocks.length > 0) {
       setToast({ msg: tr('Vor "Speichern + als geloest markieren" muessen alle Konfliktmarker entfernt sein.', 'Before "Save + mark as resolved", all conflict markers must be removed.'), isError: true });
@@ -301,7 +301,7 @@ export const useConflictResolver = ({
       return { ...prev, isSaving: true };
     });
     try {
-      const writeResult = await window.electronAPI.writeRepoFile(targetPath, targetContent);
+      const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
       if (!writeResult.success) throw new Error(writeResult.error || tr('Datei konnte nicht gespeichert werden.', 'Could not save file.'));
       if (markResolvedAfterSave) {
         const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
@@ -338,7 +338,9 @@ export const useConflictResolver = ({
       irreversible: true,
       consequences: tr('Alle noch nicht gesicherten Merge-Konfliktaufloesungen gehen verloren.', 'All unsaved merge conflict resolutions will be lost.'),
       confirmLabel: tr('Merge abbrechen', 'Abort merge'),
-      onConfirm: () => git(['mergeAbort'], tr('Merge abgebrochen', 'Merge aborted'), true),
+      onConfirm: async () => {
+        await git(['mergeAbort'], tr('Merge abgebrochen', 'Merge aborted'), true);
+      },
     });
   }, [setConfirmDialog, git, tr]);
 
@@ -352,7 +354,9 @@ export const useConflictResolver = ({
       irreversible: true,
       consequences: tr('Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.', 'All unsaved rebase resolutions will be lost.'),
       confirmLabel: tr('Rebase abbrechen', 'Abort rebase'),
-      onConfirm: () => git(['rebaseAbort'], tr('Rebase abgebrochen', 'Rebase aborted'), true),
+      onConfirm: async () => {
+        await git(['rebaseAbort'], tr('Rebase abgebrochen', 'Rebase aborted'), true);
+      },
     });
   }, [setConfirmDialog, git, tr]);
 

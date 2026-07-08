@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '../../global';
 import { useI18n } from '../../i18n';
+import { appClient } from '../../services/appClient';
 
 type EndpointInfo = {
   method: string;
@@ -84,12 +85,12 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const [isTokenActionRunning, setIsTokenActionRunning] = useState(false);
 
   const loadApiInfo = async () => {
-    if (!window.electronAPI?.getPlanningApiInfo) {
+    if (!appClient.isAvailable()) {
       setLoadError(tr('API-Status ist in diesem App-Prozess nicht verfuegbar.', 'API status is not available in this app process.'));
       return;
     }
     try {
-      const result = await window.electronAPI.getPlanningApiInfo();
+      const result = await appClient.getPlanningApiInfo();
       setApiInfo(result);
       setLoadError(null);
     } catch (error) {
@@ -102,14 +103,14 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   }, []);
 
   const runTokenAction = async (action: 'generate' | 'clear') => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
     setIsTokenActionRunning(true);
     setTokenActionError(null);
     setTokenActionMessage(null);
     try {
       const result = action === 'generate'
-        ? await window.electronAPI.generatePlanningApiToken(tokenLifetime)
-        : await window.electronAPI.clearPlanningApiToken();
+        ? await appClient.generatePlanningApiToken(tokenLifetime)
+        : await appClient.clearPlanningApiToken();
       setApiInfo(result);
       setLoadError(null);
       setTokenActionMessage(action === 'generate'

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FileTimelineCommitDto } from '../../../global';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
+import { gitClient } from '../../../services/gitClient';
 
 type UseMainViewTimelineParams = {
   activeRepo: string | null;
@@ -20,10 +21,10 @@ export const useMainViewTimeline = ({
   const [timelineCommits, setTimelineCommits] = useState<FileTimelineCommitDto[]>([]);
 
   const openTimeline = useCallback(async () => {
-    if (!activeRepo || !window.electronAPI) return;
+    if (!activeRepo || !gitClient.isAvailable()) return;
     setIsTimelineLoading(true);
     try {
-      const result = await window.electronAPI.getFileTimelineData(1500);
+      const result = await gitClient.getFileTimelineData(1500);
       if (result.success) {
         setTimelineCommits([...result.data].reverse());
         onCloseReleaseCreator();

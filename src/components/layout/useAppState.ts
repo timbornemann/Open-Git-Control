@@ -7,6 +7,9 @@ import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '../../hooks/usePullRequests';
+import { aiClient } from '../../services/aiClient';
+import { appClient } from '../../services/appClient';
+import { githubClient } from '../../services/githubClient';
 import { parseRemoteBranchRef } from '../../utils/gitParsing';
 import { DEFAULT_SETTINGS } from './state/appStateShared';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
@@ -166,10 +169,10 @@ export const useAppState = () => {
   });
 
   const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
 
     try {
-      const next = await window.electronAPI.setSettings(partial);
+      const next = await appClient.setSettings(partial);
       setSettings(next);
       setGitActionToast({ msg: tr('Einstellungen gespeichert.', 'Settings saved.'), isError: false });
     } catch (e: any) {
@@ -179,9 +182,9 @@ export const useAppState = () => {
 
   useEffect(() => {
     const loadSettings = async () => {
-      if (!window.electronAPI) return;
+      if (!appClient.isAvailable()) return;
       try {
-        const loaded = await window.electronAPI.getSettings();
+        const loaded = await appClient.getSettings();
         setSettings(loaded);
       } catch {
         setSettings(DEFAULT_SETTINGS);
@@ -196,9 +199,9 @@ export const useAppState = () => {
   }, [settings.theme]);
 
   useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
 
-    const unsubscribe = window.electronAPI.onJobEvent((event) => {
+    const unsubscribe = aiClient.onJobEvent((event) => {
       setJobs(prev => compactTransferProgressJobs(prev, event));
     });
 
@@ -334,7 +337,7 @@ export const useAppState = () => {
   }, [cloneFromRemoteSource, setGitActionToast, setInputDialog, tr]);
 
   const handleForkByUrl = useCallback(() => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable()) return;
     if (!github.isAuthenticated) {
       workspace.setActiveTab('github');
       setGitActionToast({
@@ -410,7 +413,7 @@ export const useAppState = () => {
         }
 
         const requestedForkName = String(values.forkName || '').trim();
-        const forkResult = await window.electronAPI.githubForkRepo({
+        const forkResult = await githubClient.forkRepository({
           owner: parsed.owner,
           repo: parsed.repo,
           name: requestedForkName || undefined,
@@ -467,7 +470,7 @@ export const useAppState = () => {
   });
 
   const handleCreateGithubRepoForCurrent = async () => {
-    if (!window.electronAPI || !workspace.activeRepo) return;
+    if (!githubClient.isAvailable() || !workspace.activeRepo) return;
     if (!github.isAuthenticated) {
       setConnectError(tr('Bitte zuerst GitHub verbinden (GitHub-Tab).', 'Please connect GitHub first (GitHub tab).'));
       return;
@@ -762,6 +765,5 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
 
 

@@ -4,6 +4,7 @@ import { useI18n } from '../../../i18n';
 import { THEME_OPTIONS } from '../settingsShared';
 import { useSettingsAiUpdater } from '../hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from '../ReleaseNotesContent';
+import { appClient } from '../../../services/appClient';
 import {
   formatCommitMessageStyleExample,
   getCommitMessageLanguageOptions,
@@ -51,8 +52,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   }>({ loading: false, message: null, isError: false });
 
   const copyDiagnosticsReport = React.useCallback(async () => {
-    const api = window.electronAPI;
-    if (!api?.getDiagnosticsReport) {
+    if (!appClient.isAvailable()) {
       setDiagnosticsState({
         loading: false,
         message: tr('Diagnose-Report ist in diesem Build nicht verfuegbar.', 'Diagnostics report is not available in this build.'),
@@ -71,7 +71,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
     setDiagnosticsState({ loading: true, message: null, isError: false });
     try {
-      const result = await api.getDiagnosticsReport();
+      const result = await appClient.getDiagnosticsReport();
       if (!result.success) {
         setDiagnosticsState({
           loading: false,
@@ -306,10 +306,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
               />
             </label>
             <div className="ssc-row">
-              <button className="staging-tool-btn" onClick={async () => { if (!window.electronAPI) return; await window.electronAPI.setGeminiApiKey(geminiApiKeyInput); setGeminiApiKeyInput(''); await onUpdateSettings({}); }}>
+              <button className="staging-tool-btn" onClick={async () => { if (!appClient.isAvailable()) return; await appClient.setGeminiApiKey(geminiApiKeyInput); setGeminiApiKeyInput(''); await onUpdateSettings({}); }}>
                 {tr('API Key speichern', 'Save API key')}
               </button>
-              <button className="staging-tool-btn" onClick={async () => { if (!window.electronAPI) return; await window.electronAPI.clearGeminiApiKey(); setGeminiApiKeyInput(''); await onUpdateSettings({}); }} disabled={!settings.hasGeminiApiKey}>
+              <button className="staging-tool-btn" onClick={async () => { if (!appClient.isAvailable()) return; await appClient.clearGeminiApiKey(); setGeminiApiKeyInput(''); await onUpdateSettings({}); }} disabled={!settings.hasGeminiApiKey}>
                 {tr('Entfernen', 'Remove')}
               </button>
             </div>

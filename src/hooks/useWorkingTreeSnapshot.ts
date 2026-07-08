@@ -26,38 +26,36 @@ export const useWorkingTreeSnapshot = (
   const statsRef = useRef<WorkingTreeStatsDto | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
     const generation = generationRef.current;
     if (inFlightRef.current?.generation === generation) return inFlightRef.current.promise;
     let request!: Promise<void>;
     request = (async () => {
       setLoading((current) => current || !snapshotRef.current);
       try {
-        if (typeof window.electronAPI.getWorkingTreeSnapshot === 'function') {
-          const result = await window.electronAPI.getWorkingTreeSnapshot();
-          if (generation !== generationRef.current) return;
-          if (
-            result.success
-            && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)
-          ) {
-            const nextSnapshot = result.data;
-            snapshotRef.current = nextSnapshot;
-            setSnapshot(nextSnapshot);
-            setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
-            if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
-              statsRef.current = null;
-              setStats(null);
-              const statsResult = await window.electronAPI.getWorkingTreeStats(nextSnapshot.snapshotId);
-              if (
-                generation !== generationRef.current
-                || !statsResult.success
-                || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId
-              ) return;
-              statsRef.current = statsResult.data;
-              setStats(statsResult.data);
-            }
-            return;
+        const result = await gitClient.getWorkingTreeSnapshot();
+        if (generation !== generationRef.current) return;
+        if (
+          result.success
+          && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)
+        ) {
+          const nextSnapshot = result.data;
+          snapshotRef.current = nextSnapshot;
+          setSnapshot(nextSnapshot);
+          setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
+          if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
+            statsRef.current = null;
+            setStats(null);
+            const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId);
+            if (
+              generation !== generationRef.current
+              || !statsResult.success
+              || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId
+            ) return;
+            statsRef.current = statsResult.data;
+            setStats(statsResult.data);
           }
+          return;
         }
 
         const fallback = await gitClient.getStatusPorcelain();

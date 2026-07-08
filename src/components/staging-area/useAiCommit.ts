@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { aiClient } from '../../services/aiClient';
 import type { GitStatusWithConflicts } from './types';
 
 const AI_STATE_POLL_INTERVAL_MS = 500;
@@ -169,9 +170,9 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, tr]);
 
   const pullLatestAiState = useCallback(async () => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
     try {
-      const result = await window.electronAPI.getAiAutoCommitState();
+      const result = await aiClient.getAutoCommitState();
       if (!result?.success || !result.data) return;
       applyAiJobEvent(result.data as AiJobEvent);
     } catch {
@@ -180,8 +181,8 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [applyAiJobEvent]);
 
   useEffect(() => {
-    if (!window.electronAPI) return;
-    const unsubscribe = window.electronAPI.onJobEvent((event) => applyAiJobEvent(event as AiJobEvent));
+    if (!aiClient.isAvailable()) return;
+    const unsubscribe = aiClient.onJobEvent((event) => applyAiJobEvent(event as AiJobEvent));
     return unsubscribe;
   }, [applyAiJobEvent]);
 
@@ -190,7 +191,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [pullLatestAiState]);
 
   useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
     if (!isAiCommitting && !isAiJobRunning) return;
 
     const intervalId = window.setInterval(() => {
@@ -207,7 +208,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [clearTerminalClearTimer]);
 
   const handleAiAutoCommit = useCallback(async () => {
-    if (!window.electronAPI || !status) return;
+    if (!aiClient.isAvailable() || !status) return;
     if (aiStartLockRef.current || isAiCommitting || isAiJobRunning) return;
 
     if (status.conflicts.length > 0) {
@@ -243,7 +244,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     maybeRefresh();
 
     try {
-      const result = await window.electronAPI.runAiAutoCommit();
+      const result = await aiClient.runAutoCommit();
       if (cancelRequestedRef.current) return;
 
       if (!result.success) {
@@ -314,7 +315,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [clearTerminalClearTimer, isAiCommitting, isAiJobRunning, maybeRefresh, onRepoChanged, onCommitsCreated, refresh, scheduleTerminalClear, setToast, status, tr]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
 
     if (!isAiCommitting && !isAiJobRunning) {
       setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
@@ -326,7 +327,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     setIsAiJobRunning(true);
 
     try {
-      const result = await window.electronAPI.cancelAiAutoCommit();
+      const result = await aiClient.cancelAutoCommit();
       if (!result.success || !result.canceled) {
         cancelRequestedRef.current = false;
         setIsAiCommitting(false);
@@ -349,7 +350,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, tr]);
 
   const generateCommitMessageFromNotes = useCallback(async (notes: string): Promise<GeneratedCommitMessage | null> => {
-    if (!window.electronAPI) return null;
+    if (!aiClient.isAvailable()) return null;
 
     const normalizedNotes = notes.trim();
     if (!normalizedNotes) {
@@ -359,7 +360,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
 
     setIsAiMessageGenerating(true);
     try {
-      const result = await window.electronAPI.aiGenerateCommitMessage({ notes: normalizedNotes });
+      const result = await aiClient.generateCommitMessage({ notes: normalizedNotes });
       if (!result.success) {
         setToast({ msg: result.error || tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'), isError: true });
         return null;

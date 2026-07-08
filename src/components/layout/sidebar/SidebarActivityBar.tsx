@@ -3,6 +3,7 @@ import { Download, Settings, FolderOpen, FolderGit2, Github, ListTodo, PanelLeft
 import type { UpdaterStatusDto } from '../../../global';
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
+import { appClient } from '../../../services/appClient';
 
 type SidebarActivityBarProps = Pick<AppSidebarProps, 'activeTab' | 'setActiveTab'> & {
   isSidebarCollapsed: boolean;
@@ -30,10 +31,10 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
   const updateReady = updaterStatus?.state === 'downloaded';
 
   React.useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
     let active = true;
 
-    void window.electronAPI.getUpdaterStatus()
+    void appClient.getUpdaterStatus()
       .then((status) => {
         if (active) setUpdaterStatus(status);
       })
@@ -41,7 +42,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
         if (active) setUpdaterStatus(null);
       });
 
-    const unsubscribe = window.electronAPI.onUpdaterEvent((status) => {
+    const unsubscribe = appClient.onUpdaterEvent((status) => {
       if (!active) return;
       setUpdaterStatus(status);
       if (status.state !== 'downloaded') setInstallError(null);
@@ -54,12 +55,12 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
   }, []);
 
   const installReadyUpdate = async () => {
-    if (!window.electronAPI || isInstallingUpdate) return;
+    if (!appClient.isAvailable() || isInstallingUpdate) return;
 
     setIsInstallingUpdate(true);
     setInstallError(null);
     try {
-      const result = await window.electronAPI.installAppUpdate();
+      const result = await appClient.installAppUpdate();
       if (!result.success) {
         setInstallError(result.error || t('updates.installFailed'));
       }

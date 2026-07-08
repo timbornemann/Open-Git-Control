@@ -16,6 +16,7 @@ import {
 } from '../types/projectPlanner';
 import { ConfirmDialogState } from '../components/layout/layoutTypes';
 import { useI18n } from '../i18n';
+import { plannerClient } from '../services/plannerClient';
 
 type ProjectPlannerContextValue = {
   data: ProjectPlannerData;
@@ -81,13 +82,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const ensuredRepoRef = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!window.electronAPI?.plannerGetData) {
+    if (!plannerClient.isAvailable()) {
       throw new Error(
         'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.',
       );
     }
     try {
-      const result = await window.electronAPI.plannerGetData();
+      const result = await plannerClient.getData();
       if (!result.success) {
         throw new Error(result.error);
       }
@@ -122,13 +123,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   }, [refresh, refreshSignal]);
 
   useEffect(() => {
-    if (!activeRepo || !window.electronAPI?.plannerEnsureRepositoryProject) return;
+    if (!activeRepo || !plannerClient.isAvailable()) return;
     const key = repoKey(activeRepo);
     if (ensuredRepoRef.current === key) return;
     ensuredRepoRef.current = key;
 
     const ensure = async () => {
-      const result = await window.electronAPI.plannerEnsureRepositoryProject(activeRepo);
+      const result = await plannerClient.ensureRepositoryProject(activeRepo);
       if (!result.success) {
         setError(result.error);
         return;
@@ -179,41 +180,41 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   }, [onToast, refresh]);
 
   const createProject = useCallback(async (input: PlannerProjectInput) => {
-    if (!window.electronAPI?.plannerCreateProject) {
+    if (!plannerClient.isAvailable()) {
       const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
       setError(message);
       onToast(message, true);
       return null;
     }
-    const project = await runMutation(() => window.electronAPI.plannerCreateProject(input));
+    const project = await runMutation(() => plannerClient.createProject(input));
     if (project) setSelectedProjectId(project.id);
     return project;
   }, [runMutation]);
 
   const updateProject = useCallback(async (projectId: string, input: Partial<PlannerProjectInput>) => {
-    if (!window.electronAPI) return false;
-    return Boolean(await runMutation(() => window.electronAPI.plannerUpdateProject(projectId, input)));
+    if (!plannerClient.isAvailable()) return false;
+    return Boolean(await runMutation(() => plannerClient.updateProject(projectId, input)));
   }, [runMutation]);
 
   const deleteProject = useCallback(async (projectId: string) => {
-    if (!window.electronAPI) return false;
-    const result = await runMutation(() => window.electronAPI.plannerDeleteProject(projectId));
+    if (!plannerClient.isAvailable()) return false;
+    const result = await runMutation(() => plannerClient.deleteProject(projectId));
     return Boolean(result);
   }, [runMutation]);
 
   const createItem = useCallback(async (projectId: string, input: PlannerItemInput) => {
-    if (!window.electronAPI) return false;
-    return Boolean(await runMutation(() => window.electronAPI.plannerCreateItem(projectId, input)));
+    if (!plannerClient.isAvailable()) return false;
+    return Boolean(await runMutation(() => plannerClient.createItem(projectId, input)));
   }, [runMutation]);
 
   const updateItem = useCallback(async (itemId: string, input: Partial<PlannerItemInput>) => {
-    if (!window.electronAPI) return false;
-    return Boolean(await runMutation(() => window.electronAPI.plannerUpdateItem(itemId, input)));
+    if (!plannerClient.isAvailable()) return false;
+    return Boolean(await runMutation(() => plannerClient.updateItem(itemId, input)));
   }, [runMutation]);
 
   const deleteItem = useCallback(async (itemId: string) => {
-    if (!window.electronAPI) return false;
-    return Boolean(await runMutation(() => window.electronAPI.plannerDeleteItem(itemId)));
+    if (!plannerClient.isAvailable()) return false;
+    return Boolean(await runMutation(() => plannerClient.deleteItem(itemId)));
   }, [runMutation]);
 
   const requestDeleteProject = useCallback((projectId: string) => {
@@ -287,9 +288,9 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     parentDirectory: string,
     folderName: string,
   ) => {
-    if (!window.electronAPI) return false;
+    if (!plannerClient.isAvailable()) return false;
     const result = await runMutation(() => (
-      window.electronAPI.plannerMaterializeProject(projectId, parentDirectory, folderName)
+      plannerClient.materializeProject(projectId, parentDirectory, folderName)
     ));
     if (!result) return false;
     setSelectedProjectId(result.project.id);

@@ -11,34 +11,34 @@ describe('usePullRequests helpers', () => {
   });
 
   it('laedt pull requests mit aktivem Filter', async () => {
-    const githubGetPRs = vi.fn().mockResolvedValue({
+    const getPullRequests = vi.fn().mockResolvedValue({
       success: true,
       data: [{ number: 1, title: 'PR', state: 'open', user: 'u', createdAt: '', updatedAt: '', head: 'a', headSha: 'abc', base: 'b', merged: false, htmlUrl: '', draft: false }],
     });
 
     const prs = await loadPullRequests(
-      { githubGetPRs } as any,
       { owner: 'octo', repo: 'my-repo' },
       true,
       'closed',
+      { github: { isAvailable: () => true, getPullRequests } as any },
     );
 
-    expect(githubGetPRs).toHaveBeenCalledWith('octo', 'my-repo', 'closed');
+    expect(getPullRequests).toHaveBeenCalledWith('octo', 'my-repo', 'closed');
     expect(prs).toHaveLength(1);
   });
 
   it('signalisiert fehlgeschlagene refreshes ohne eine leere liste vorzutäuschen', async () => {
     const failedResult = await loadPullRequests(
-      { githubGetPRs: vi.fn().mockResolvedValue({ success: false, error: 'temporary failure' }) } as any,
       { owner: 'octo', repo: 'my-repo' },
       true,
       'open',
+      { github: { isAvailable: () => true, getPullRequests: vi.fn().mockResolvedValue({ success: false, error: 'temporary failure' }) } as any },
     );
     const thrownResult = await loadPullRequests(
-      { githubGetPRs: vi.fn().mockRejectedValue(new Error('offline')) } as any,
       { owner: 'octo', repo: 'my-repo' },
       true,
       'open',
+      { github: { isAvailable: () => true, getPullRequests: vi.fn().mockRejectedValue(new Error('offline')) } as any },
     );
 
     expect(failedResult).toBeNull();
@@ -46,19 +46,19 @@ describe('usePullRequests helpers', () => {
   });
 
   it('erstellt pull request und nutzt fallback branch', async () => {
-    const githubCreatePR = vi.fn().mockResolvedValue({
+    const createPullRequest = vi.fn().mockResolvedValue({
       success: true,
       data: { number: 42, title: 'x', htmlUrl: '', state: 'open' },
     });
 
     const result = await submitPullRequest(
-      { githubCreatePR } as any,
       { owner: 'octo', repo: 'my-repo' },
       { title: ' Neuer PR ', body: ' Body ', head: '', base: '', currentBranch: 'feature/test' },
       'de',
+      { github: { isAvailable: () => true, createPullRequest } as any },
     );
 
-    expect(githubCreatePR).toHaveBeenCalledWith({
+    expect(createPullRequest).toHaveBeenCalledWith({
       owner: 'octo',
       repo: 'my-repo',
       title: 'Neuer PR',
@@ -71,10 +71,10 @@ describe('usePullRequests helpers', () => {
 
   it('liefert fehler beim fehlgeschlagenen create', async () => {
     const result = await submitPullRequest(
-      { githubCreatePR: vi.fn().mockResolvedValue({ success: false, error: 'kaputt' }) } as any,
       { owner: 'octo', repo: 'my-repo' },
       { title: 'PR', body: '', head: 'h', base: 'b', currentBranch: 'x' },
       'de',
+      { github: { isAvailable: () => true, createPullRequest: vi.fn().mockResolvedValue({ success: false, error: 'kaputt' }) } as any },
     );
 
     expect(result).toEqual({ success: false, error: 'kaputt' });
@@ -84,9 +84,10 @@ describe('usePullRequests helpers', () => {
     const getRepoOriginUrl = vi.fn().mockResolvedValue({ success: true, data: 'https://github.com/octo/my-repo.git' });
 
     const resolved = await resolvePrOwnerRepo(
-      { getRepoOriginUrl } as any,
       '/tmp/repo',
       true,
+      'github.com',
+      { git: { isAvailable: () => true, getRepoOriginUrl } },
     );
 
     expect(getRepoOriginUrl).toHaveBeenCalledWith('/tmp/repo');

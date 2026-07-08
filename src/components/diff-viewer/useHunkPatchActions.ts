@@ -3,6 +3,7 @@ import {
   buildHunkPatch,
   type ParsedHunk,
 } from '../../utils/diffParser';
+import { gitClient } from '../../services/gitClient';
 import type { TranslateFn } from './diffViewerLabels';
 
 export type HunkPatchOperation = 'stage' | 'unstage' | 'discard';
@@ -20,15 +21,15 @@ export const useHunkPatchActions = ({ onRepoChanged, tr }: UseHunkPatchActionsPa
     fileHeader: string[],
     op: HunkPatchOperation,
   ) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     setHunkOpError(null);
     try {
       const patch = buildHunkPatch(fileHeader, hunk);
       const result = op === 'stage'
-        ? await window.electronAPI.applyPatch(patch, { cached: true })
+        ? await gitClient.applyPatch(patch, { cached: true })
         : op === 'unstage'
-          ? await window.electronAPI.applyPatch(patch, { cached: true, reverse: true })
-          : await window.electronAPI.applyPatch(patch, { reverse: true });
+          ? await gitClient.applyPatch(patch, { cached: true, reverse: true })
+          : await gitClient.applyPatch(patch, { reverse: true });
 
       if (result.success) {
         onRepoChanged?.();

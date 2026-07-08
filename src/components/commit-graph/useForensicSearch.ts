@@ -81,7 +81,7 @@ export const useForensicSearch = ({
   }, [forensicPath, forensicPathHistory, workingTreeStatus]);
 
   const runForensicSearch = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
 
     const normalizedPath = forensicPath.trim();
     if (!normalizedPath) {

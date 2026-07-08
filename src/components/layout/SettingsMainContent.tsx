@@ -7,6 +7,7 @@ import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';
 import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
+import { appClient } from '../../services/appClient';
 import {
   formatCommitMessageStyleExample,
   getCommitMessageLanguageOptions,
@@ -202,8 +203,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                     <button
                       className="staging-tool-btn"
                       onClick={async () => {
-                        if (!window.electronAPI) return;
-                        await window.electronAPI.setGeminiApiKey(geminiApiKeyInput);
+                        if (!appClient.isAvailable()) return;
+                        await appClient.setGeminiApiKey(geminiApiKeyInput);
                         setGeminiApiKeyInput('');
                         await onUpdateSettings({});
                       }}
@@ -213,8 +214,8 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                     <button
                       className="staging-tool-btn"
                       onClick={async () => {
-                        if (!window.electronAPI) return;
-                        await window.electronAPI.clearGeminiApiKey();
+                        if (!appClient.isAvailable()) return;
+                        await appClient.clearGeminiApiKey();
                         setGeminiApiKeyInput('');
                         await onUpdateSettings({});
                       }}

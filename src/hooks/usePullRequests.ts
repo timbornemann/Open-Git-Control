@@ -1,7 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CiBadgeStateDto,
-  ElectronAPI,
   GithubStatusChecksDto,
   GithubWorkflowRunDto,
   PullRequestCiDto,
@@ -9,6 +8,8 @@ import {
 } from '../global';
 import { useRef } from 'react';
 import { trByLanguage, type AppLanguage } from '../i18n';
+import { gitClient } from '../services/gitClient';
+import { githubClient } from '../services/githubClient';
 import { RepoOwnerRef } from '../types/git';
 
 type CreatePRInput = {
@@ -29,6 +30,25 @@ type Params = {
   onError?: (message: string) => void;
 };
 
+type PullRequestGitClient = Pick<typeof gitClient, 'isAvailable' | 'getRepoOriginUrl'>;
+type PullRequestGithubClient = Pick<
+  typeof githubClient,
+  'isAvailable' | 'getPullRequests' | 'getWorkflowRuns' | 'getStatusChecks' | 'createPullRequest'
+>;
+
+type PullRequestClientDeps = {
+  git?: PullRequestGitClient;
+  github?: PullRequestGithubClient;
+};
+
+const getPullRequestClients = (deps?: PullRequestClientDeps): {
+  git: PullRequestGitClient;
+  github: PullRequestGithubClient;
+} => ({
+  git: deps?.git ?? gitClient,
+  github: deps?.github ?? githubClient,
+});
+
 const BASE_POLL_INTERVAL_MS = 60_000;
 const PENDING_POLL_INTERVAL_MS = 15_000;
 const MAX_BACKOFF_INTERVAL_MS = 5 * 60_000;
@@ -45,12 +65,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     let active = true;
 
     const parseOwnerRepo = async () => {
-      const resolution = await resolvePrOwnerRepoForRefresh(
-        window.electronAPI,
-        activeRepo,
-        isAuthenticated,
-        githubHost,
-      );
+      const resolution = await resolvePrOwnerRepoForRefresh(activeRepo, isAuthenticated, githubHost);
       if (!active || !resolution.resolved) return;
 
       const ownerRepo = resolution.ownerRepo;
@@ -88,7 +103,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       }
 
       setPrLoading(true);
-      const data = await loadPullRequests(window.electronAPI, prOwnerRepo, isAuthenticated, prFilter);
+      const data = await loadPullRequests(prOwnerRepo, isAuthenticated, prFilter);
       if (!active) return;
 
       if (data !== null) {
@@ -106,7 +121,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const openPrs = useMemo(() => pullRequests.filter(pr => pr.state === 'open'), [pullRequests]);
 
   useEffect(() => {
-    if (!window.electronAPI || !prOwnerRepo || !isAuthenticated || openPrs.length === 0) {
+    if (!githubClient.isAvailable() || !prOwnerRepo || !isAuthenticated || openPrs.length === 0) {
       return;
     }
 
@@ -118,7 +133,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       try {
         const ciEntries = await Promise.all(
           openPrs.map(async (pr) => {
-            const ci = await loadPullRequestCi(window.electronAPI, prOwnerRepo, pr);
+            const ci = await loadPullRequestCi(prOwnerRepo, pr);
             return [pr.number, ci] as const;
           }),
         );
@@ -157,7 +172,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const createPR = useCallback(async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
     if (!title.trim()) return false;
 
-    const result = await submitPullRequest(window.electronAPI, prOwnerRepo, {
+    const result = await submitPullRequest(prOwnerRepo, {
       title,
       body,
       head,
@@ -232,32 +247,33 @@ export const parsePrOwnerRepoFromRemote = (remoteUrl: string, githubHost: string
 };
 
 export const resolvePrOwnerRepo = async (
-  electronAPI: ElectronAPI | undefined,
   activeRepo: string | null,
   isAuthenticated: boolean,
   githubHost: string = 'github.com',
+  deps?: PullRequestClientDeps,
 ): Promise<RepoOwnerRef | null> => {
   const resolution = await resolvePrOwnerRepoForRefresh(
-    electronAPI,
     activeRepo,
     isAuthenticated,
     githubHost,
+    deps,
   );
   return resolution.resolved ? resolution.ownerRepo : null;
 };
 
 const resolvePrOwnerRepoForRefresh = async (
-  electronAPI: ElectronAPI | undefined,
   activeRepo: string | null,
   isAuthenticated: boolean,
   githubHost: string,
+  deps?: PullRequestClientDeps,
 ): Promise<{ resolved: true; ownerRepo: RepoOwnerRef | null } | { resolved: false }> => {
-  if (!activeRepo || !electronAPI || !isAuthenticated) {
+  const { git } = getPullRequestClients(deps);
+  if (!activeRepo || !git.isAvailable() || !isAuthenticated) {
     return { resolved: true, ownerRepo: null };
   }
 
   try {
-    const response = await electronAPI.getRepoOriginUrl(activeRepo);
+    const response = await git.getRepoOriginUrl(activeRepo);
     if (!response.success) return { resolved: false };
     if (!response.data) return { resolved: true, ownerRepo: null };
     return {
@@ -270,15 +286,16 @@ const resolvePrOwnerRepoForRefresh = async (
 };
 
 export const loadPullRequests = async (
-  electronAPI: ElectronAPI | undefined,
   prOwnerRepo: RepoOwnerRef | null,
   isAuthenticated: boolean,
   prFilter: 'open' | 'closed' | 'all',
+  deps?: PullRequestClientDeps,
 ): Promise<PullRequestDto[] | null> => {
-  if (!prOwnerRepo || !electronAPI || !isAuthenticated) return null;
+  const { github } = getPullRequestClients(deps);
+  if (!prOwnerRepo || !github.isAvailable() || !isAuthenticated) return null;
 
   try {
-    const result = await electronAPI.githubGetPRs(prOwnerRepo.owner, prOwnerRepo.repo, prFilter);
+    const result = await github.getPullRequests(prOwnerRepo.owner, prOwnerRepo.repo, prFilter);
     if (!result.success) return null;
     return result.data || [];
   } catch {
@@ -287,16 +304,17 @@ export const loadPullRequests = async (
 };
 
 export const loadPullRequestCi = async (
-  electronAPI: ElectronAPI | undefined,
   prOwnerRepo: RepoOwnerRef | null,
   pr: PullRequestDto,
+  deps?: PullRequestClientDeps,
 ): Promise<PullRequestCiDto | null> => {
-  if (!electronAPI || !prOwnerRepo || !pr.headSha) return null;
+  const { github } = getPullRequestClients(deps);
+  if (!github.isAvailable() || !prOwnerRepo || !pr.headSha) return null;
 
   try {
     const [workflowResult, checksResult] = await Promise.all([
-      electronAPI.githubGetWorkflowRuns({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, headSha: pr.headSha, perPage: 50 }),
-      electronAPI.githubGetStatusChecks({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, ref: pr.headSha }),
+      github.getWorkflowRuns({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, headSha: pr.headSha, perPage: 50 }),
+      github.getStatusChecks({ owner: prOwnerRepo.owner, repo: prOwnerRepo.repo, ref: pr.headSha }),
     ]);
 
     const workflowRuns = workflowResult.success ? workflowResult.data : [];
@@ -348,19 +366,20 @@ function buildCiSummary(
 }
 
 export const submitPullRequest = async (
-  electronAPI: ElectronAPI | undefined,
   prOwnerRepo: RepoOwnerRef | null,
   input: CreatePRInput,
   language: AppLanguage,
+  deps?: PullRequestClientDeps,
 ): Promise<{ success: true; number: number } | { success: false; error: string }> => {
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+  const { github } = getPullRequestClients(deps);
 
-  if (!electronAPI || !prOwnerRepo || !input.title.trim()) {
+  if (!github.isAvailable() || !prOwnerRepo || !input.title.trim()) {
     return { success: false, error: tr('Fehler beim Erstellen des PR.', 'Error creating PR.') };
   }
 
   try {
-    const result = await electronAPI.githubCreatePR({
+    const result = await github.createPullRequest({
       owner: prOwnerRepo.owner,
       repo: prOwnerRepo.repo,
       title: input.title.trim(),

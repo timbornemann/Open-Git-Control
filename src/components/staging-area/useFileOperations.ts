@@ -210,11 +210,11 @@ export const useFileOperations = ({
   }, []);
 
   const addIgnoreRule = useCallback(async (entry: FileEntry, section: FileSection, pattern: string) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     const normalizedPattern = pattern.trim();
     if (!normalizedPattern) return;
     try {
-      const result = await window.electronAPI.addIgnoreRule(normalizedPattern);
+      const result = await gitClient.addIgnoreRule(normalizedPattern);
       if (!result.success) {
         setToast({ msg: result.error || tr('Konnte .gitignore nicht aktualisieren.', 'Could not update .gitignore.'), isError: true });
         return;
@@ -241,12 +241,12 @@ export const useFileOperations = ({
   const unstageAll = useCallback(() => git(['reset', 'HEAD'], tr('Alle Dateien unstaged', 'Unstaged all files')), [git, tr]);
 
   const stageAllUntracked = useCallback(async () => {
-    if (!window.electronAPI || !status || status.untracked.length === 0) return;
+    if (!gitClient.isAvailable() || !status || status.untracked.length === 0) return;
     if (mutationInFlightRef.current) return;
     mutationInFlightRef.current = true;
     setMutationStartedAt(Date.now());
     try {
-      const result = await window.electronAPI.stagePaths(status.untracked.map((entry) => entry.path));
+      const result = await gitClient.stagePaths(status.untracked.map((entry) => entry.path));
       if (!result.success) throw new Error(result.error);
       const count = status.untracked.length;
       setToast({
@@ -274,7 +274,9 @@ export const useFileOperations = ({
       irreversible: true,
       consequences: tr('Die verworfenen Zeilen koennen nicht aus Git wiederhergestellt werden.', 'Discarded lines cannot be restored from Git.'),
       confirmLabel: tr('Aenderungen verwerfen', 'Discard changes'),
-      onConfirm: () => git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true),
+      onConfirm: async () => {
+        await git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true);
+      },
     });
   }, [setConfirmDialog, git, tr]);
 
@@ -287,7 +289,9 @@ export const useFileOperations = ({
       irreversible: true,
       consequences: tr('Nicht gespeicherte Aenderungen gehen unwiderruflich verloren.', 'Unsaved changes will be permanently lost.'),
       confirmLabel: tr('Alles verwerfen', 'Discard all'),
-      onConfirm: () => git(['checkout', '--', '.'], tr('Alle Aenderungen verworfen', 'Discarded all changes'), true),
+      onConfirm: async () => {
+        await git(['checkout', '--', '.'], tr('Alle Aenderungen verworfen', 'Discarded all changes'), true);
+      },
     });
   }, [setConfirmDialog, git, tr]);
 
@@ -300,7 +304,9 @@ export const useFileOperations = ({
       irreversible: true,
       consequences: tr('Die Datei ist danach ohne Backup nicht wiederherstellbar.', 'The file cannot be restored without backup afterwards.'),
       confirmLabel: tr('Datei loeschen', 'Delete file'),
-      onConfirm: () => git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true),
+      onConfirm: async () => {
+        await git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true);
+      },
     });
   }, [setConfirmDialog, git, tr]);
 

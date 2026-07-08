@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
 import { DiffRequest, DiffSource } from '../types/diff';
 import { useI18n } from '../i18n';
+import { gitClient } from '../services/gitClient';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -40,13 +41,13 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   }, [path, source]);
 
   useEffect(() => {
-    if (activeTab !== 'history' || !path || !window.electronAPI) return;
+    if (activeTab !== 'history' || !path || !gitClient.isAvailable()) return;
 
     const fetchHistory = async () => {
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await window.electronAPI.getFileHistory(path, 'HEAD', 80);
+        const result = await gitClient.getFileHistory(path, 'HEAD', 80);
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -66,13 +67,13 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   }, [activeTab, path, tr]);
 
   useEffect(() => {
-    if (activeTab !== 'blame' || !path || !window.electronAPI) return;
+    if (activeTab !== 'blame' || !path || !gitClient.isAvailable()) return;
 
     const fetchBlame = async () => {
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await window.electronAPI.getFileBlameRange(path, 'HEAD', 1, 500);
+        const result = await gitClient.getFileBlameRange(path, 'HEAD', 1, 500);
         if (result.success) {
           setBlameLines(result.data || []);
           setBlameHasMore((result.data || []).length === 500);
@@ -93,10 +94,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   }, [activeTab, path, tr]);
 
   const loadMoreBlame = async () => {
-    if (blameLoading || !blameHasMore) return;
+    if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
     setBlameLoading(true);
     try {
-      const result = await window.electronAPI.getFileBlameRange(path, 'HEAD', blameLines.length + 1, 500);
+      const result = await gitClient.getFileBlameRange(path, 'HEAD', blameLines.length + 1, 500);
       if (!result.success) {
         setBlameError(result.error);
         return;

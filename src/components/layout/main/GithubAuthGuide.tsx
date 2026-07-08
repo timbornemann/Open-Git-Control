@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useI18n } from '../../../i18n';
 import type { GithubAuthHelpMethod } from '../sidebar/AppSidebar.types';
+import { appClient } from '../../../services/appClient';
 
 const linkStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -17,7 +18,8 @@ const linkStyle: React.CSSProperties = {
 };
 
 const openExternal = (url: string) => {
-  void window.electronAPI?.openExternalUrl(url);
+  if (!appClient.isAvailable()) return;
+  void appClient.openExternalUrl(url);
 };
 
 type CopyableValueRowProps = {

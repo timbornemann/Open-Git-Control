@@ -25,6 +25,7 @@ import {
   STATUS_OPTIONS,
   usePlannerLabels,
 } from './project-planner/PlannerDialogs';
+import { appClient } from '../services/appClient';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,
@@ -109,8 +110,8 @@ export const ProjectPlannerView: React.FC = () => {
   };
 
   const handleSelectParent = async () => {
-    if (!selectedProject || !window.electronAPI) return;
-    const parentDirectory = await window.electronAPI.selectProjectParentDirectory();
+    if (!selectedProject || !appClient.isAvailable()) return;
+    const parentDirectory = await appClient.selectProjectParentDirectory();
     if (parentDirectory) setMaterializeParent(parentDirectory);
   };
 

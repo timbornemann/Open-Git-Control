@@ -1,4 +1,6 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
+import { githubClient } from '../services/githubClient';
+
 type Params = {
   onAuthChanged?: (authenticated: boolean) => void;
 };
@@ -22,11 +24,11 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
 
   useEffect(() => {
     const loginWithSavedToken = async () => {
-      if (!window.electronAPI) return;
+      if (!githubClient.isAvailable()) return;
 
       setIsAuthenticating(true);
       try {
-        const status = await window.electronAPI.githubGetSavedAuthStatus();
+        const status = await githubClient.getSavedAuthStatus();
         if (!status.hasSavedToken) {
           setIsAuthenticated(status.authenticated);
           setGithubUser(status.username);
@@ -34,12 +36,12 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
           return;
         }
 
-        const loginResult = await window.electronAPI.githubLoginWithSavedToken();
+        const loginResult = await githubClient.loginWithSavedToken();
         if (loginResult.success && loginResult.authenticated) {
           setIsAuthenticated(true);
           setGithubUser(loginResult.username);
           onAuthChanged?.(true);
-          const reposResult = await window.electronAPI.githubGetRepos();
+          const reposResult = await githubClient.getRepositories();
           if (reposResult.success) setGithubRepos(reposResult.data.repos || []);
         } else {
           setIsAuthenticated(false);
@@ -59,7 +61,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
   }, [onAuthChanged]);
 
   const handleTokenLogin = useCallback(async () => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable()) return;
     const token = tokenInput.trim();
     if (!token) return;
 
@@ -67,7 +69,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     setAuthError(null);
 
     try {
-      const success = await window.electronAPI.githubAuth(token);
+      const success = await githubClient.auth(token);
       if (!success) {
         setAuthError('Token ungültig. Bitte prüfe die Berechtigungen.');
         return;
@@ -76,9 +78,9 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
       setIsAuthenticated(true);
       onAuthChanged?.(true);
       setTokenInput('');
-      const status = await window.electronAPI.githubCheckAuthStatus();
+      const status = await githubClient.checkAuthStatus();
       setGithubUser(status.username);
-      const result = await window.electronAPI.githubGetRepos();
+      const result = await githubClient.getRepositories();
       if (result.success) setGithubRepos(result.data.repos || []);
     } catch {
       setAuthError('Fehler bei der Authentifizierung.');
@@ -89,8 +91,8 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
 
   const handleLogout = useCallback(async () => {
     try {
-      if (window.electronAPI) {
-        await window.electronAPI.githubLogout();
+      if (githubClient.isAvailable()) {
+        await githubClient.logout();
       }
     } catch (error) {
       console.error('GitHub logout failed:', error);

@@ -2,6 +2,7 @@ import React from 'react';
 import { Key, ExternalLink, Github, ShieldCheck, Copy, Info } from 'lucide-react';
 import { AppSidebarProps, GithubAuthHelpMethod } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
+import { appClient } from '../../../services/appClient';
 
 type GithubAuthContentProps = Pick<
   AppSidebarProps,
@@ -98,7 +99,9 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
           onClick={(e) => {
             e.preventDefault();
             onSelectGithubAuthHelpMethod('pat');
-            void window.electronAPI?.openExternalUrl('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control');
+            if (appClient.isAvailable()) {
+              void appClient.openExternalUrl('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control');
+            }
           }}
           style={{
             fontSize: '0.8rem',

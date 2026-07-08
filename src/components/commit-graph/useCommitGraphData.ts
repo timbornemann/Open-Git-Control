@@ -7,6 +7,7 @@ import {
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
 import { normalizeRepoPathKey } from '../../utils/repoPath';
+import { gitClient } from '../../services/gitClient';
 import {
   mergeCommitStatsUpdate,
   type CommitStatsUpdate,
@@ -84,7 +85,7 @@ export const useCommitGraphData = ({
   }, [onRepoCleared]);
 
   const refreshCommits = useCallback(async (mode: RefreshMode = 'reset') => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
 
     const isAppend = mode === 'append';
     const isSync = mode === 'sync';
@@ -134,7 +135,7 @@ export const useCommitGraphData = ({
     try {
       const scope = showSecondaryHistory ? 'all' : 'head';
       const offset = isAppend ? commitCountRef.current : 0;
-      const result = await window.electronAPI.getCommitLogPage({
+      const result = await gitClient.getCommitLogPage({
         limit: requestedLimit,
         offset,
         scope,
@@ -352,7 +353,7 @@ export const useCommitGraphData = ({
   ) => {
     if (!repoPath || hashes.length === 0) return;
     const unique = [...new Set(hashes)].slice(0, 500);
-    const result = await window.electronAPI.requestCommitStats(unique, priority);
+    const result = await gitClient.requestCommitStats(unique, priority);
     if (!result.success) return;
     const updates: Record<string, CommitStatsUpdate> = {};
     for (const [hash, value] of Object.entries(result.data)) {
@@ -366,7 +367,7 @@ export const useCommitGraphData = ({
 
   useEffect(() => {
     if (!repoPath) return;
-    return window.electronAPI.onCommitStats((update) => {
+    return gitClient.onCommitStats((update) => {
       if (normalizeRepoPathKey(update.repoPath) !== normalizeRepoPathKey(repoPath)) return;
       updateCommitStats({
         [update.hash]: {

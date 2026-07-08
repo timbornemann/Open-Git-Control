@@ -1,8 +1,12 @@
 import type { AppSettingsDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../../global';
 import type { FileEntry, GitStatusDetailed } from '../../utils/gitParsing';
-import type { DialogContextItem } from '../Confirm';
-import type { InputDialogField } from '../Input';
 import type { DiffRequest } from '../../types/diff';
+import type {
+  ConfirmDialogState,
+  InputDialogState,
+} from '../layout/layoutTypes';
+
+export type { ConfirmDialogState, InputDialogState };
 
 export interface StagingAreaProps {
   repoPath: string | null;
@@ -20,28 +24,6 @@ export interface StagingAreaProps {
   workingTreeStats?: WorkingTreeStatsDto | null;
   onRefreshWorkingTree?: () => Promise<void>;
 }
-
-export type ConfirmDialogState = {
-  variant: 'confirm' | 'danger';
-  title: string;
-  message: string;
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onConfirm: () => Promise<unknown> | unknown;
-};
-
-export type InputDialogState = {
-  title: string;
-  message: string;
-  fields: InputDialogField[];
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onSubmit: (values: Record<string, string>) => Promise<void> | void;
-};
 
 export type ConflictEntry = FileEntry & { code: string };
 export type GitStatusWithConflicts = GitStatusDetailed & { conflicts: ConflictEntry[] };

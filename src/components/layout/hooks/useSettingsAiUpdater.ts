@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppSettingsDto, UpdaterStatusDto } from '../../../global';
+import { aiClient } from '../../../services/aiClient';
+import { appClient } from '../../../services/appClient';
 
 type TranslateFn = (deText: string, enText: string) => string;
 
@@ -90,11 +92,11 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   };
 
   const testConnection = async () => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
     setIsTestingAi(true);
     setAiStatus(null);
     try {
-      const result = await window.electronAPI.aiTestConnection();
+      const result = await aiClient.testConnection();
       if (!result.success) {
         setAiStatus(tr(`Verbindung fehlgeschlagen: ${result.error}`, `Connection failed: ${result.error}`));
         return;
@@ -108,11 +110,11 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   };
 
   const loadModels = async () => {
-    if (!window.electronAPI) return;
+    if (!aiClient.isAvailable()) return;
     setIsLoadingModels(true);
     setAiStatus(null);
     try {
-      const result = await window.electronAPI.aiListModels();
+      const result = await aiClient.listModels();
       if (!result.success) {
         setAiStatus(tr(`Modelle konnten nicht geladen werden: ${result.error}`, `Could not load models: ${result.error}`));
         return;
@@ -130,13 +132,13 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   };
 
   const handleRunOneClickUpdate = async () => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
 
     if (updaterStatus?.state === 'downloaded') {
       setIsInstallingUpdate(true);
       setUpdaterMessage(null);
       try {
-        const result = await window.electronAPI.installAppUpdate();
+        const result = await appClient.installAppUpdate();
         if (!result.success) {
           setUpdaterMessage(result.error || tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
           return;
@@ -153,7 +155,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
     setIsRunningUpdate(true);
     setUpdaterMessage(null);
     try {
-      const result = await window.electronAPI.runOneClickAppUpdate();
+      const result = await appClient.runOneClickAppUpdate();
       if (!result.success) {
         setUpdaterMessage(result.error || tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
         return;
@@ -175,19 +177,19 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   };
 
   useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
     let active = true;
 
     const bootstrapUpdater = async () => {
       try {
-        const version = await window.electronAPI.getAppVersion();
+        const version = await appClient.getAppVersion();
         if (active) setAppVersion(version);
       } catch {
         if (active) setUpdaterMessage(tr('App-Version konnte nicht geladen werden.', 'Could not load app version.'));
       }
 
       try {
-        const status = await window.electronAPI.getUpdaterStatus();
+        const status = await appClient.getUpdaterStatus();
         if (!active) return;
         setUpdaterStatus(status);
         if (status.currentVersion) setAppVersion((current) => current || status.currentVersion);
@@ -199,7 +201,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
 
     void bootstrapUpdater();
 
-    const unsubscribe = window.electronAPI.onUpdaterEvent((status) => {
+    const unsubscribe = appClient.onUpdaterEvent((status) => {
       if (!active) return;
       setUpdaterStatus(status);
       if (status.currentVersion) setAppVersion((current) => current || status.currentVersion);

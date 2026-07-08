@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RepoSortByDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { appClient } from '../../../services/appClient';
+import { gitClient } from '../../../services/gitClient';
 import { ConfirmDialogState } from '../layoutTypes';
 import { AppTabId } from '../sidebar/AppSidebar.types';
 
@@ -130,10 +132,10 @@ export const useWorkspaceDomain = ({
 
   useEffect(() => {
     const loadStored = async () => {
-      if (!window.electronAPI) return;
+      if (!appClient.isAvailable()) return;
       const operationId = ++repoOperationSequenceRef.current;
       try {
-        const data = await window.electronAPI.getStoredRepos();
+        const data = await appClient.getStoredRepos();
         if (repoOperationSequenceRef.current !== operationId) {
           setReposLoaded(true);
           return;
@@ -156,12 +158,12 @@ export const useWorkspaceDomain = ({
           setOpenRepos(paths);
 
           const active = data.activeRepo && paths.includes(data.activeRepo) ? data.activeRepo : paths[0];
-          await window.electronAPI.setRepoPath(active);
+          await appClient.setRepoPath(active);
           if (repoOperationSequenceRef.current === operationId) {
             setActiveRepo(active);
           }
         } else {
-          await window.electronAPI.clearRepoPath();
+          await appClient.clearRepoPath();
           if (repoOperationSequenceRef.current === operationId) {
             setActiveRepo(null);
             onNoActiveRepo();
@@ -176,7 +178,7 @@ export const useWorkspaceDomain = ({
   }, []);
 
   useEffect(() => {
-    if (!reposLoaded || !window.electronAPI) return;
+    if (!reposLoaded || !appClient.isAvailable()) return;
 
     const now = Date.now();
     const repos = sortedOpenRepos.map((repoPath) => ({
@@ -186,7 +188,7 @@ export const useWorkspaceDomain = ({
       createdAt: normalizeTimestamp(repoMeta[repoPath]?.createdAt, now),
     }));
 
-    window.electronAPI.setStoredRepos({
+    void appClient.setStoredRepos({
       repos,
       activeRepo,
       sortBy: repoSortBy,
@@ -194,9 +196,9 @@ export const useWorkspaceDomain = ({
   }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded]);
 
   const handleSwitchRepo = async (repoPath: string) => {
-    if (!window.electronAPI || repoPath === activeRepo) return;
+    if (!appClient.isAvailable() || repoPath === activeRepo) return;
     const operationId = ++repoOperationSequenceRef.current;
-    await window.electronAPI.setRepoPath(repoPath);
+    await appClient.setRepoPath(repoPath);
     if (repoOperationSequenceRef.current !== operationId) return;
     setActiveRepo(repoPath);
     touchRepo(repoPath);
@@ -217,8 +219,8 @@ export const useWorkspaceDomain = ({
       if (next.length > 0) {
         const sortedNext = sortRepoPaths(next, nextMeta, repoSortBy);
         const newActive = sortedNext[0];
-        if (window.electronAPI) {
-          await window.electronAPI.setRepoPath(newActive);
+        if (appClient.isAvailable()) {
+          await appClient.setRepoPath(newActive);
         }
         if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(newActive);
@@ -226,8 +228,8 @@ export const useWorkspaceDomain = ({
         onRepoActivated();
         triggerRefresh();
       } else {
-        if (window.electronAPI) {
-          await window.electronAPI.clearRepoPath();
+        if (appClient.isAvailable()) {
+          await appClient.clearRepoPath();
         }
         if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(null);
@@ -250,13 +252,13 @@ export const useWorkspaceDomain = ({
   };
 
   const handleOpenFolder = async () => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
     try {
-      const result = await window.electronAPI.openDirectory();
+      const result = await appClient.openDirectory();
       if (result && result.isRepo) {
         const operationId = ++repoOperationSequenceRef.current;
         ensureRepoPresent(result.path);
-        await window.electronAPI.setRepoPath(result.path);
+        await appClient.setRepoPath(result.path);
         if (repoOperationSequenceRef.current !== operationId) return;
         setActiveRepo(result.path);
         onRepoActivated();
@@ -274,11 +276,11 @@ export const useWorkspaceDomain = ({
           consequences: tr('Es wird ein .git-Verzeichnis angelegt und das Verzeichnis als Repository vorbereitet.', 'A .git directory will be created and the folder prepared as repository.'),
           confirmLabel: tr('Repository initialisieren', 'Initialize repository'),
           onConfirm: async () => {
-            const initResult = await window.electronAPI.gitInit(result.path);
+            const initResult = await gitClient.gitInit(result.path);
             if (initResult.success) {
               const operationId = ++repoOperationSequenceRef.current;
               ensureRepoPresent(result.path);
-              await window.electronAPI.setRepoPath(result.path);
+              await appClient.setRepoPath(result.path);
               if (repoOperationSequenceRef.current !== operationId) return;
               setActiveRepo(result.path);
               onRepoActivated();
@@ -296,10 +298,10 @@ export const useWorkspaceDomain = ({
   };
 
   const addOpenRepo = async (repoPath: string) => {
-    if (!window.electronAPI) return;
+    if (!appClient.isAvailable()) return;
     const operationId = ++repoOperationSequenceRef.current;
     ensureRepoPresent(repoPath);
-    await window.electronAPI.setRepoPath(repoPath);
+    await appClient.setRepoPath(repoPath);
     if (repoOperationSequenceRef.current !== operationId) return;
     setActiveRepo(repoPath);
     onRepoActivated();

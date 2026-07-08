@@ -19,6 +19,7 @@ import {
 import { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '../../../i18n';
 import { EmptyState } from '../../EmptyState';
+import { gitClient } from '../../../services/gitClient';
 import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
 import { formatDuration, getCiBadgeStyles } from './githubShared';
 
@@ -168,7 +169,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
     let active = true;
 
     const loadOrigins = async () => {
-      if (!window.electronAPI || openRepos.length === 0) {
+      if (!gitClient.isAvailable() || openRepos.length === 0) {
         if (active) setRepoOriginByPath({});
         return;
       }
@@ -176,7 +177,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
       const entries = await Promise.all(
         openRepos.map(async (repoPath) => {
           try {
-            const result = await window.electronAPI.getRepoOriginUrl(repoPath);
+            const result = await gitClient.getRepoOriginUrl(repoPath);
             if (!result.success) return [repoPath, null] as const;
             return [repoPath, toRepoIdentity(result.data || '')] as const;
           } catch {

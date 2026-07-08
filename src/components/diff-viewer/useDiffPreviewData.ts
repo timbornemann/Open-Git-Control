@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DiffRequest } from '../../types/diff';
 import { parseDiff } from '../../utils/diffParser';
+import { gitClient } from '../../services/gitClient';
 import {
   MAX_RENDER_CHARS,
   MAX_RENDER_LINES,
@@ -32,7 +33,7 @@ export const useDiffPreviewData = ({ repoPath, request, tr }: UseDiffPreviewData
 
   useEffect(() => {
     const fetchDiff = async () => {
-      if (!repoPath || !window.electronAPI) return;
+      if (!repoPath || !gitClient.isAvailable()) return;
 
       setIsLoading(true);
       setError(null);
@@ -40,7 +41,7 @@ export const useDiffPreviewData = ({ repoPath, request, tr }: UseDiffPreviewData
       setSourceTruncated(false);
 
       try {
-        const result = await window.electronAPI.getDiffPreview(buildDiffPreviewArgs(request), {
+        const result = await gitClient.getDiffPreview(buildDiffPreviewArgs(request), {
           maxBytes: MAX_RENDER_CHARS,
           maxLines: MAX_RENDER_LINES,
         });

@@ -1,5 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
+import { plannerClient } from '../../../services/plannerClient';
 import type { ConfirmDialogState } from '../layoutTypes';
 
 type Toast = { msg: string; isError: boolean };
@@ -25,9 +27,9 @@ export const useRepoUnavailableWorkflow = ({
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
 
   useEffect(() => {
-    if (!window.electronAPI?.onRepoUnavailable) return;
+    if (!gitClient.isAvailable()) return;
 
-    const unsubscribe = window.electronAPI.onRepoUnavailable(() => {
+    const unsubscribe = gitClient.onRepoUnavailable(() => {
       const repoPath = activeRepo;
       if (!repoPath) return;
       if (handlingRef.current === repoPath) return;
@@ -56,8 +58,8 @@ export const useRepoUnavailableWorkflow = ({
           let deletedPlanningItems = 0;
           let plannerCleanupError = '';
           try {
-            if (window.electronAPI?.plannerDeleteRepositoryProjectByPath) {
-              const plannerResult = await window.electronAPI.plannerDeleteRepositoryProjectByPath(repoPath);
+            if (plannerClient.isAvailable()) {
+              const plannerResult = await plannerClient.deleteRepositoryProjectByPath(repoPath);
               if (plannerResult.success) {
                 deletedPlanningItems = plannerResult.data.deletedItemCount;
                 if (plannerResult.data.deletedProjectCount > 0) {

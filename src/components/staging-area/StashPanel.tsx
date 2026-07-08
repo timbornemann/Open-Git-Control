@@ -40,11 +40,11 @@ export const StashPanel: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await window.electronAPI.getStashes();
+      const result = await gitClient.getStashes();
       if (result.success) {
         setStashes((result as any).data ?? []);
       } else {
@@ -58,7 +58,7 @@ export const StashPanel: React.FC<Props> = ({
   }, [repoPath, tr]);
 
   const loadStashFiles = useCallback(async (stashName: string) => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
     setStashFiles((current) => ({
       ...current,
       [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
@@ -135,8 +135,7 @@ export const StashPanel: React.FC<Props> = ({
   };
 
   const branchFromStash = useCallback((stash: GitStashEntryDto) => {
-    const api = window.electronAPI;
-    if (!api) return;
+    if (!gitClient.isAvailable()) return;
     if (!setInputDialog) {
       setError(tr('Branch-Dialog ist nicht verfuegbar.', 'Branch dialog is not available.'));
       return;
@@ -175,9 +174,7 @@ export const StashPanel: React.FC<Props> = ({
       onSubmit: async (values) => {
         const branchName = String(values.branchName || '').trim();
         setError(null);
-        const result = typeof api.gitStashBranch === 'function'
-          ? await api.gitStashBranch(stash.name, branchName)
-          : await gitClient.runGitCommand('stash', 'branch', branchName, stash.name);
+        const result = await gitClient.gitStashBranch(stash.name, branchName);
 
         if (result.success) {
           setExpandedFiles(new Set());

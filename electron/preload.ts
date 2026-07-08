@@ -19,63 +19,16 @@ type RepoUnavailablePayload = {
   error: string;
 };
 
-const repoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
-let lastRepoUnavailableNotifyAt = 0;
-
-const REPO_UNAVAILABLE_ERROR_PATTERNS: RegExp[] = [
-  /\[REPO_UNAVAILABLE\]/i,
-  /not a git repository/i,
-  /no repository path set/i,
-  /cannot change to/i,
-  /no such file or directory/i,
-  /the system cannot find the path specified/i,
-  /\buv_cwd\b/i,
-];
-
-const isRepoUnavailableError = (errorText: unknown): boolean => {
-  const text = String(errorText || '');
-  if (!text.trim()) return false;
-  return REPO_UNAVAILABLE_ERROR_PATTERNS.some((pattern) => pattern.test(text));
-};
-
-const notifyRepoUnavailable = (payload: RepoUnavailablePayload) => {
-  const now = Date.now();
-  if (now - lastRepoUnavailableNotifyAt < 1200) {
-    return;
-  }
-  lastRepoUnavailableNotifyAt = now;
-  for (const listener of repoUnavailableListeners) {
-    try {
-      listener(payload);
-    } catch {
-      // ignore callback errors
-    }
-  }
-};
-
 const invokeGitCommand = async (
   commandName: GitCommandNameDto,
   ...args: string[]
 ): Promise<GitCommandResultDto> => {
-  const result = await ipcRenderer.invoke('git:command', commandName, ...args);
-  if (result && !result.success && isRepoUnavailableError(result.error)) {
-    notifyRepoUnavailable({
-      command: String(commandName || ''),
-      error: String(result.error || ''),
-    });
-  }
-  return result;
+  return ipcRenderer.invoke('git:command', commandName, ...args);
 };
 
 const invokeGitMutation = async (ipcChannel: string, commandName: string, payload: unknown) => {
-  const result = await ipcRenderer.invoke(ipcChannel, payload);
-  if (result && !result.success && isRepoUnavailableError(result.error)) {
-    notifyRepoUnavailable({
-      command: commandName,
-      error: String(result.error || ''),
-    });
-  }
-  return result;
+  void commandName;
+  return ipcRenderer.invoke(ipcChannel, payload);
 };
 
 const electronAPI: ElectronAPI = {
@@ -107,10 +60,8 @@ const electronAPI: ElectronAPI = {
   getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
     ipcRenderer.invoke('git:fileBlameRange', filePath, commitHash, startLine, lineCount),
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
-    repoUnavailableListeners.add(callback);
-    return () => {
-      repoUnavailableListeners.delete(callback);
-    };
+    void callback;
+    return () => undefined;
   },
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke('git:interactiveRebase', baseHash, todoLines),
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke('git:applyPatch', patch, options || {}),
