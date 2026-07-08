@@ -265,7 +265,7 @@ const App: React.FC = () => {
     { id: 'push', label: tr('Push', 'Push'), keywords: ['push', 'upload'], action: () => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.')) },
     { id: 'push-force', label: tr('Push --force-with-lease', 'Push --force-with-lease'), keywords: ['push', 'force'], action: () => state.runGitCommand(['push', '--force-with-lease'], tr('Force-Push abgeschlossen.', 'Force push completed.')) },
     // Branches
-    { id: 'branch-create', label: tr('Branch erstellen...', 'Create branch...'), keywords: ['branch', 'new', 'erstellen'], action: () => { state.setActiveTab('repo'); state.setIsCreatingBranch(true); state.setNewBranchName(''); setTimeout(() => state.newBranchInputRef.current?.focus(), 100); } },
+    { id: 'branch-create', label: tr('Branch erstellen...', 'Create branch...'), keywords: ['branch', 'new', 'erstellen'], action: () => { state.setActiveTab('repo'); state.setIsCreatingBranch(true); } },
     // Stash
     { id: 'stash-push', label: tr('Stash erstellen', 'Create stash'), keywords: ['stash', 'save', 'speichern'], action: () => state.runGitCommand(['stash', 'push', '-m', 'Quick stash'], tr('Stash erstellt.', 'Stash created.')) },
     { id: 'stash-pop', label: tr('Letzten Stash anwenden (pop)', 'Apply last stash (pop)'), keywords: ['stash', 'pop', 'apply', 'anwenden'], action: () => state.runGitCommand(['stash', 'pop'], tr('Stash angewendet.', 'Stash applied.')) },
@@ -330,10 +330,7 @@ const App: React.FC = () => {
 
     branches: state.branches,
     isCreatingBranch: state.isCreatingBranch,
-    newBranchName: state.newBranchName,
-    newBranchInputRef: state.newBranchInputRef,
     onSetCreatingBranch: state.setIsCreatingBranch,
-    onSetNewBranchName: state.setNewBranchName,
     onCreateBranch: state.handleCreateBranch,
     onCheckoutBranch: (name) => state.runGitCommand(['checkout', name], tr(`Ausgecheckt: ${name}`, `Checked out: ${name}`)),
     onSetBranchContextMenu: state.setBranchContextMenu,
@@ -399,8 +396,6 @@ const App: React.FC = () => {
 
     githubUser: state.githubUser,
     githubRepos: state.githubRepos,
-    githubRepoSearch: state.githubRepoSearch,
-    setGithubRepoSearch: state.setGithubRepoSearch,
     githubReposHasMore: state.githubReposHasMore,
     isLoadingGithubRepos: state.isLoadingGithubRepos,
     isLoadingMoreGithubRepos: state.isLoadingMoreGithubRepos,

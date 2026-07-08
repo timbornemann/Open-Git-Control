@@ -20,79 +20,32 @@ export type CommitNavigationRequest = {
   requestId: number;
 };
 
-export type AppContextValue = AppSidebarProps & {
-  // Navigation & UI (local App.tsx state)
+type BaseUIContextValue = Pick<AppSidebarProps,
+  | 'activeTab'
+  | 'setActiveTab'
+  | 'isRepoPanelCollapsed'
+  | 'onToggleRepoPanelCollapsed'
+  | 'isBranchPanelCollapsed'
+  | 'onToggleBranchPanelCollapsed'
+  | 'isTagPanelCollapsed'
+  | 'onToggleTagPanelCollapsed'
+  | 'isRemotePanelCollapsed'
+  | 'onToggleRemotePanelCollapsed'
+  | 'isSubmodulePanelCollapsed'
+  | 'onToggleSubmodulePanelCollapsed'
+> & {
   onClearGithubAuthHelpMethod: () => void;
   onResetLayout: () => void;
-
-  // Git action status
-  activeGitActionLabel: string | null;
-  runGitCommand: (
-    args: string[],
-    successMsg: string,
-    actionLabel?: string,
-    options?: RunGitCommandOptions,
-  ) => Promise<boolean>;
-
-  // Commit graph
-  selectedCommit: string | null;
-  setSelectedCommit: (hash: string | null) => void;
-  commitNavigationRequest: CommitNavigationRequest | null;
-  onNavigateToCommit: (hash: string) => void;
-  refreshTrigger: number;
-  triggerRefresh: () => void;
-  commitRefreshTrigger: number;
-  triggerCommitRefresh: () => void;
-  showSecondaryHistory: boolean;
-
-  // Branch merge (used by MainView/TopbarActions and CommitGraph)
-  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
-
-  // Remote sync actions
-  onFetch: () => void;
-  onPull: () => void;
-  onPullRebase: () => void;
-  onPullFfOnly: () => void;
-  onPullNoFf: () => void;
-  onPush: () => void;
-  onPushForceWithLease: () => void;
-  onPushTags: () => void;
-  onPushSetUpstream: () => void;
-  onOpenRepoWorkspace: () => void;
-
-  // Release creator
-  showReleaseCreator: boolean;
-  onOpenReleaseCreator: () => void;
-  onCloseReleaseCreator: () => void;
-  releaseContextLoading: boolean;
-  releaseContextError: string | null;
-  releaseContext: GitHubReleaseContextDto | null;
-  onRefreshReleaseContext: () => Promise<void>;
-  onGenerateReleaseNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
-  releaseNotesGenerating: boolean;
-  releaseNotesLanguage: 'de' | 'en';
-  setReleaseNotesLanguage: (value: 'de' | 'en') => void;
-  releaseNotesOptions: ReleaseNotesOptions;
-  setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
-
-  // Conflict resolver
-  autoOpenConflictResolverPath?: string | null;
-  onAutoOpenConflictResolverConsumed?: () => void;
-  onOpenConflictResolverForPath?: (path: string) => void;
-  onConflictMergeContinue: () => void;
-  onConflictMergeAbort: () => void;
-  onConflictRebaseContinue: () => void;
-  onConflictRebaseAbort: () => void;
 };
 
-export type SettingsContextValue = Pick<AppContextValue,
+export type SettingsContextValue = Pick<AppSidebarProps,
   | 'settings'
   | 'onUpdateSettings'
   | 'settingsTab'
   | 'onSelectSettingsTab'
 >;
 
-export type RepositoryContextValue = Pick<AppContextValue,
+export type RepositoryContextValue = Pick<AppSidebarProps,
   | 'activeRepo'
   | 'openRepos'
   | 'repoMeta'
@@ -108,10 +61,7 @@ export type RepositoryContextValue = Pick<AppContextValue,
   | 'branches'
   | 'currentBranch'
   | 'isCreatingBranch'
-  | 'newBranchName'
-  | 'newBranchInputRef'
   | 'onSetCreatingBranch'
-  | 'onSetNewBranchName'
   | 'onCreateBranch'
   | 'onCheckoutBranch'
   | 'onSetBranchContextMenu'
@@ -143,20 +93,21 @@ export type RepositoryContextValue = Pick<AppContextValue,
   | 'newRepoPrivate'
   | 'setNewRepoPrivate'
   | 'onCreateGithubRepoForCurrent'
-  | 'selectedCommit'
-  | 'setSelectedCommit'
-  | 'commitNavigationRequest'
-  | 'onNavigateToCommit'
-  | 'refreshTrigger'
-  | 'triggerRefresh'
-  | 'commitRefreshTrigger'
-  | 'triggerCommitRefresh'
-  | 'showSecondaryHistory'
-  | 'onMergeBranch'
-  | 'onOpenRepoWorkspace'
->;
+> & {
+  selectedCommit: string | null;
+  setSelectedCommit: (hash: string | null) => void;
+  commitNavigationRequest: CommitNavigationRequest | null;
+  onNavigateToCommit: (hash: string) => void;
+  refreshTrigger: number;
+  triggerRefresh: () => void;
+  commitRefreshTrigger: number;
+  triggerCommitRefresh: () => void;
+  showSecondaryHistory: boolean;
+  onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
+  onOpenRepoWorkspace: () => void;
+};
 
-export type GithubContextValue = Pick<AppContextValue,
+export type GithubContextValue = Pick<AppSidebarProps,
   | 'isAuthenticated'
   | 'tokenInput'
   | 'setTokenInput'
@@ -177,8 +128,6 @@ export type GithubContextValue = Pick<AppContextValue,
   | 'onSelectGithubAuthHelpMethod'
   | 'githubUser'
   | 'githubRepos'
-  | 'githubRepoSearch'
-  | 'setGithubRepoSearch'
   | 'githubReposHasMore'
   | 'isLoadingGithubRepos'
   | 'isLoadingMoreGithubRepos'
@@ -216,61 +165,53 @@ export type GithubContextValue = Pick<AppContextValue,
   | 'releaseError'
   | 'releaseSuccess'
   | 'onCreateRelease'
-  | 'showReleaseCreator'
-  | 'onOpenReleaseCreator'
-  | 'onCloseReleaseCreator'
-  | 'releaseContextLoading'
-  | 'releaseContextError'
-  | 'releaseContext'
-  | 'onRefreshReleaseContext'
-  | 'onGenerateReleaseNotes'
-  | 'releaseNotesGenerating'
-  | 'releaseNotesLanguage'
-  | 'setReleaseNotesLanguage'
-  | 'releaseNotesOptions'
-  | 'setReleaseNotesOptions'
->;
+> & {
+  showReleaseCreator: boolean;
+  onOpenReleaseCreator: () => void;
+  onCloseReleaseCreator: () => void;
+  releaseContextLoading: boolean;
+  releaseContextError: string | null;
+  releaseContext: GitHubReleaseContextDto | null;
+  onRefreshReleaseContext: () => Promise<void>;
+  onGenerateReleaseNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
+  releaseNotesGenerating: boolean;
+  releaseNotesLanguage: 'de' | 'en';
+  setReleaseNotesLanguage: (value: 'de' | 'en') => void;
+  releaseNotesOptions: ReleaseNotesOptions;
+  setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
+};
 
-export type WorkflowContextValue = Pick<AppContextValue,
+export type WorkflowContextValue = Pick<AppSidebarProps,
   | 'isGitActionRunning'
-  | 'activeGitActionLabel'
-  | 'runGitCommand'
-  | 'onFetch'
-  | 'onPull'
-  | 'onPullRebase'
-  | 'onPullFfOnly'
-  | 'onPullNoFf'
-  | 'onPush'
-  | 'onPushForceWithLease'
   | 'onPushTags'
-  | 'onPushSetUpstream'
   | 'jobs'
   | 'onClearJobs'
-  | 'autoOpenConflictResolverPath'
-  | 'onAutoOpenConflictResolverConsumed'
-  | 'onOpenConflictResolverForPath'
-  | 'onConflictMergeContinue'
-  | 'onConflictMergeAbort'
-  | 'onConflictRebaseContinue'
-  | 'onConflictRebaseAbort'
->;
-
-export type UIContextValue = Pick<AppContextValue,
-  | 'activeTab'
-  | 'setActiveTab'
-  | 'onClearGithubAuthHelpMethod'
-  | 'onResetLayout'
-  | 'isRepoPanelCollapsed'
-  | 'onToggleRepoPanelCollapsed'
-  | 'isBranchPanelCollapsed'
-  | 'onToggleBranchPanelCollapsed'
-  | 'isTagPanelCollapsed'
-  | 'onToggleTagPanelCollapsed'
-  | 'isRemotePanelCollapsed'
-  | 'onToggleRemotePanelCollapsed'
-  | 'isSubmodulePanelCollapsed'
-  | 'onToggleSubmodulePanelCollapsed'
 > & {
+  activeGitActionLabel: string | null;
+  runGitCommand: (
+    args: string[],
+    successMsg: string,
+    actionLabel?: string,
+    options?: RunGitCommandOptions,
+  ) => Promise<boolean>;
+  onFetch: () => void;
+  onPull: () => void;
+  onPullRebase: () => void;
+  onPullFfOnly: () => void;
+  onPullNoFf: () => void;
+  onPush: () => void;
+  onPushForceWithLease: () => void;
+  onPushSetUpstream: () => void;
+  autoOpenConflictResolverPath?: string | null;
+  onAutoOpenConflictResolverConsumed?: () => void;
+  onOpenConflictResolverForPath?: (path: string) => void;
+  onConflictMergeContinue: () => void;
+  onConflictMergeAbort: () => void;
+  onConflictRebaseContinue: () => void;
+  onConflictRebaseAbort: () => void;
+};
+
+export type UIContextValue = BaseUIContextValue & {
   sidebarWidth: number;
   isSidebarCollapsed: boolean;
   isSidebarResizing: boolean;
@@ -290,6 +231,13 @@ export type UIContextValue = Pick<AppContextValue,
   closeInputDialog: () => void;
   executeInputDialog: (values: Record<string, string>) => Promise<void>;
 };
+
+export type AppContextValue =
+  & SettingsContextValue
+  & RepositoryContextValue
+  & GithubContextValue
+  & WorkflowContextValue
+  & BaseUIContextValue;
 
 export type AppStateSlicesValue = {
   settings: SettingsContextValue;
@@ -383,10 +331,7 @@ export const createAppStateSlices = (
     branches: ctx.branches,
     currentBranch: ctx.currentBranch,
     isCreatingBranch: ctx.isCreatingBranch,
-    newBranchName: ctx.newBranchName,
-    newBranchInputRef: ctx.newBranchInputRef,
     onSetCreatingBranch: ctx.onSetCreatingBranch,
-    onSetNewBranchName: ctx.onSetNewBranchName,
     onCreateBranch: ctx.onCreateBranch,
     onCheckoutBranch: ctx.onCheckoutBranch,
     onSetBranchContextMenu: ctx.onSetBranchContextMenu,
@@ -451,8 +396,6 @@ export const createAppStateSlices = (
     onSelectGithubAuthHelpMethod: ctx.onSelectGithubAuthHelpMethod,
     githubUser: ctx.githubUser,
     githubRepos: ctx.githubRepos,
-    githubRepoSearch: ctx.githubRepoSearch,
-    setGithubRepoSearch: ctx.setGithubRepoSearch,
     githubReposHasMore: ctx.githubReposHasMore,
     isLoadingGithubRepos: ctx.isLoadingGithubRepos,
     isLoadingMoreGithubRepos: ctx.isLoadingMoreGithubRepos,

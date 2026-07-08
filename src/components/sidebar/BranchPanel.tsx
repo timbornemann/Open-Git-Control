@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GitBranch, Plus, Search } from 'lucide-react';
 import { BranchInfo } from '../../types/git';
 import { useI18n } from '../../i18n';
@@ -9,11 +9,8 @@ type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean 
 type Props = {
   branches: BranchInfo[];
   isCreatingBranch: boolean;
-  newBranchName: string;
-  newBranchInputRef: React.RefObject<HTMLInputElement>;
   onSetCreatingBranch: (value: boolean) => void;
-  onSetNewBranchName: (value: string) => void;
-  onCreateBranch: () => void;
+  onCreateBranch: (branchName: string) => void;
   onCheckoutBranch: (name: string) => void;
   onSetBranchContextMenu: (value: ContextMenuState) => void;
   collapsed: boolean;
@@ -23,10 +20,7 @@ type Props = {
 export const BranchPanel: React.FC<Props> = ({
   branches,
   isCreatingBranch,
-  newBranchName,
-  newBranchInputRef,
   onSetCreatingBranch,
-  onSetNewBranchName,
   onCreateBranch,
   onCheckoutBranch,
   onSetBranchContextMenu,
@@ -35,6 +29,14 @@ export const BranchPanel: React.FC<Props> = ({
 }) => {
   const { tr } = useI18n();
   const [query, setQuery] = useState('');
+  const [newBranchName, setNewBranchName] = useState('');
+  const newBranchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isCreatingBranch) return;
+    setNewBranchName('');
+    window.setTimeout(() => newBranchInputRef.current?.focus(), 0);
+  }, [isCreatingBranch]);
 
   const { localBranches, remoteBranches } = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -84,7 +86,6 @@ export const BranchPanel: React.FC<Props> = ({
             className="icon-btn sidebar-row-action-icon"
             onClick={() => {
               onSetCreatingBranch(true);
-              onSetNewBranchName('');
             }}
             title={tr('Neuen Branch erstellen', 'Create new branch')}
           >
@@ -114,12 +115,12 @@ export const BranchPanel: React.FC<Props> = ({
                 type="text"
                 placeholder="branch-name"
                 value={newBranchName}
-                onChange={event => onSetNewBranchName(event.target.value)}
+                onChange={event => setNewBranchName(event.target.value)}
                 onKeyDown={event => {
-                  if (event.key === 'Enter') onCreateBranch();
+                  if (event.key === 'Enter') onCreateBranch(newBranchName);
                   if (event.key === 'Escape') {
                     onSetCreatingBranch(false);
-                    onSetNewBranchName('');
+                    setNewBranchName('');
                   }
                 }}
                 onBlur={() => {

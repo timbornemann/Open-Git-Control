@@ -50,9 +50,7 @@ export const useRepositoryDomain = ({
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [currentBranch, setCurrentBranch] = useState('');
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
-  const [newBranchName, setNewBranchName] = useState('');
   const [branchContextMenu, setBranchContextMenu] = useState<BranchContextMenuState>(null);
-  const newBranchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tags, setTags] = useState<string[]>([]);
   const [remotes, setRemotes] = useState<{ name: string; url: string }[]>([]);
@@ -229,12 +227,6 @@ export const useRepositoryDomain = ({
   }, [activeRepo, refreshTrigger]);
 
   useEffect(() => {
-    if (isCreatingBranch && newBranchInputRef.current) {
-      newBranchInputRef.current.focus();
-    }
-  }, [isCreatingBranch]);
-
-  useEffect(() => {
     if (!branchContextMenu) return;
     const close = () => setBranchContextMenu(null);
     const onKey = (e: KeyboardEvent) => {
@@ -379,8 +371,8 @@ export const useRepositoryDomain = ({
     fetchSubmodules();
   }, [activeRepo, refreshTrigger]);
 
-  const handleCreateBranch = async () => {
-    const name = newBranchName.trim();
+  const handleCreateBranch = async (branchName: string) => {
+    const name = branchName.trim();
     if (!name) return;
     const branchNameError = validateBranchName(name);
     if (branchNameError) {
@@ -391,7 +383,6 @@ export const useRepositoryDomain = ({
       return;
     }
     setIsCreatingBranch(false);
-    setNewBranchName('');
     const created = await runGitCommand(['checkout', '-b', name], tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
     if (!created) return;
 
@@ -754,11 +745,8 @@ export const useRepositoryDomain = ({
     setCurrentBranch,
     isCreatingBranch,
     setIsCreatingBranch,
-    newBranchName,
-    setNewBranchName,
     branchContextMenu,
     setBranchContextMenu,
-    newBranchInputRef,
     tags,
     remotes,
     submodules,

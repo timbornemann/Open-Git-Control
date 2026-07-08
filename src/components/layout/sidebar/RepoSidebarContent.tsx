@@ -15,10 +15,7 @@ type RepoSidebarContentProps = Pick<
   | 'setActiveTab'
   | 'branches'
   | 'isCreatingBranch'
-  | 'newBranchName'
-  | 'newBranchInputRef'
   | 'onSetCreatingBranch'
-  | 'onSetNewBranchName'
   | 'onCreateBranch'
   | 'onCheckoutBranch'
   | 'onSetBranchContextMenu'
@@ -62,8 +59,6 @@ type RepoSidebarContentProps = Pick<
   | 'isAuthenticated'
   | 'githubUser'
   | 'githubRepos'
-  | 'githubRepoSearch'
-  | 'setGithubRepoSearch'
   | 'githubReposHasMore'
   | 'isLoadingGithubRepos'
   | 'isLoadingMoreGithubRepos'
@@ -151,10 +146,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
       <BranchPanel
         branches={props.branches}
         isCreatingBranch={props.isCreatingBranch}
-        newBranchName={props.newBranchName}
-        newBranchInputRef={props.newBranchInputRef}
         onSetCreatingBranch={props.onSetCreatingBranch}
-        onSetNewBranchName={props.onSetNewBranchName}
         onCreateBranch={props.onCreateBranch}
         onCheckoutBranch={props.onCheckoutBranch}
         onSetBranchContextMenu={props.onSetBranchContextMenu}

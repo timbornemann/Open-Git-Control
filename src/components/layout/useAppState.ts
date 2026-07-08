@@ -618,9 +618,6 @@ export const useAppState = () => {
     currentBranch: repository.currentBranch,
     isCreatingBranch: repository.isCreatingBranch,
     setIsCreatingBranch: repository.setIsCreatingBranch,
-    newBranchName: repository.newBranchName,
-    setNewBranchName: repository.setNewBranchName,
-    newBranchInputRef: repository.newBranchInputRef,
     branchContextMenu: repository.branchContextMenu,
     setBranchContextMenu: repository.setBranchContextMenu,
     isBranchPanelCollapsed: activeSidebarCollapseState.branchPanelCollapsed,
@@ -664,13 +661,11 @@ export const useAppState = () => {
     isAuthenticated: github.isAuthenticated,
     githubUser: github.githubUser,
     githubRepos: github.githubRepos,
-    githubRepoSearch: github.githubRepoSearch,
-    setGithubRepoSearch: github.setGithubRepoSearch,
     githubReposHasMore: github.githubReposHasMore,
     isLoadingGithubRepos: github.isLoadingRepos,
     isLoadingMoreGithubRepos: github.isLoadingMoreRepos,
     loadMoreGithubRepos: () => { void github.loadMoreRepos(); },
-    refreshGithubRepos: () => { void github.refreshRepos(); },
+    refreshGithubRepos: (search?: string) => { void github.refreshRepos(search); },
     tokenInput: github.tokenInput,
     setTokenInput: github.setTokenInput,
     isAuthenticating: github.isAuthenticating,
@@ -767,7 +762,6 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
 
 
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
 import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto, RepoSortByDto } from '../../../global';
 
@@ -40,11 +39,8 @@ export type AppSidebarProps = {
 
   branches: BranchInfo[];
   isCreatingBranch: boolean;
-  newBranchName: string;
-  newBranchInputRef: React.RefObject<HTMLInputElement>;
   onSetCreatingBranch: (value: boolean) => void;
-  onSetNewBranchName: (value: string) => void;
-  onCreateBranch: () => void;
+  onCreateBranch: (branchName: string) => void;
   onCheckoutBranch: (name: string) => void;
   onSetBranchContextMenu: (value: BranchContextMenuState) => void;
   isBranchPanelCollapsed: boolean;
@@ -109,13 +105,11 @@ export type AppSidebarProps = {
 
   githubUser: string | null;
   githubRepos: GitHubRepositoryDto[];
-  githubRepoSearch: string;
-  setGithubRepoSearch: (value: string) => void;
   githubReposHasMore: boolean;
   isLoadingGithubRepos: boolean;
   isLoadingMoreGithubRepos: boolean;
   loadMoreGithubRepos: () => void;
-  refreshGithubRepos: () => void;
+  refreshGithubRepos: (search?: string) => void;
   onLogout: () => void;
   onClone: (cloneUrl: string, repoName: string) => void;
   onForkByUrl: () => void;

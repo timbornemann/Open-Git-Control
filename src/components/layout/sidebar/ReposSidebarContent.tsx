@@ -24,10 +24,7 @@ type ReposSidebarContentProps = Pick<
   | 'onToggleRepoPanelCollapsed'
   | 'branches'
   | 'isCreatingBranch'
-  | 'newBranchName'
-  | 'newBranchInputRef'
   | 'onSetCreatingBranch'
-  | 'onSetNewBranchName'
   | 'onCreateBranch'
   | 'onCheckoutBranch'
   | 'onSetBranchContextMenu'
@@ -86,10 +83,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onToggleRepoPanelCollapsed,
   branches,
   isCreatingBranch,
-  newBranchName,
-  newBranchInputRef,
   onSetCreatingBranch,
-  onSetNewBranchName,
   onCreateBranch,
   onCheckoutBranch,
   onSetBranchContextMenu,
@@ -171,10 +165,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
         <BranchPanel
           branches={branches}
           isCreatingBranch={isCreatingBranch}
-          newBranchName={newBranchName}
-          newBranchInputRef={newBranchInputRef}
           onSetCreatingBranch={onSetCreatingBranch}
-          onSetNewBranchName={onSetNewBranchName}
           onCreateBranch={onCreateBranch}
           onCheckoutBranch={onCheckoutBranch}
           onSetBranchContextMenu={onSetBranchContextMenu}

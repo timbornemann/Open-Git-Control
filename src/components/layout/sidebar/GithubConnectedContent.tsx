@@ -26,8 +26,6 @@ type GithubConnectedContentProps = Pick<
   AppSidebarProps,
   | 'githubUser'
   | 'githubRepos'
-  | 'githubRepoSearch'
-  | 'setGithubRepoSearch'
   | 'githubReposHasMore'
   | 'isLoadingGithubRepos'
   | 'isLoadingMoreGithubRepos'
@@ -92,8 +90,6 @@ const toRepoIdentity = (remoteUrl: string): string | null => {
 export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   githubUser,
   githubRepos,
-  githubRepoSearch,
-  setGithubRepoSearch,
   githubReposHasMore,
   isLoadingGithubRepos,
   isLoadingMoreGithubRepos,
@@ -141,12 +137,32 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
   const [mergingPrNumber, setMergingPrNumber] = useState<number | null>(null);
+  const [repoSearch, setRepoSearch] = useState('');
+  const hasMountedSearchRef = React.useRef(false);
+  const refreshGithubReposRef = React.useRef(refreshGithubRepos);
 
   const releaseValidation = validateGithubReleaseInput({
     tagName: releaseForm.tagName || '',
     releaseName: releaseForm.releaseName || '',
   });
   const releaseSubmitDisabled = !prOwnerRepo || releaseSubmitting || !releaseValidation.valid;
+
+  useEffect(() => {
+    refreshGithubReposRef.current = refreshGithubRepos;
+  }, [refreshGithubRepos]);
+
+  useEffect(() => {
+    if (!hasMountedSearchRef.current) {
+      hasMountedSearchRef.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      refreshGithubReposRef.current(repoSearch);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [repoSearch]);
 
   useEffect(() => {
     let active = true;
@@ -219,8 +235,8 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
           <input
             type="text"
-            value={githubRepoSearch}
-            onChange={e => setGithubRepoSearch(e.target.value)}
+            value={repoSearch}
+            onChange={e => setRepoSearch(e.target.value)}
             placeholder={tr('GitHub-Repositories suchen...', 'Search GitHub repositories...')}
             style={{
               width: '100%',
@@ -234,7 +250,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             }}
           />
         </div>
-        <button className="icon-btn" style={{ padding: '6px' }} onClick={refreshGithubRepos} title={tr('Liste aktualisieren', 'Refresh list')}>
+        <button className="icon-btn" style={{ padding: '6px' }} onClick={() => refreshGithubRepos(repoSearch)} title={tr('Liste aktualisieren', 'Refresh list')}>
           <RefreshCw size={14} className={isLoadingGithubRepos ? 'spin' : ''} />
         </button>
       </div>

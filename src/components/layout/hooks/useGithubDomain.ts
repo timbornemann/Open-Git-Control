@@ -49,7 +49,7 @@ export const useGithubDomain = ({
   const stoppedRef = useRef(false);
   const initializedHostRef = useRef<string | null>(null);
   const hasLoadedReposOnceRef = useRef(false);
-  const lastSearchRef = useRef('');
+  const currentRepoSearchRef = useRef('');
 
   const [isCloning, setIsCloning] = useState(false);
   const [cloneLog, setCloneLog] = useState<string[]>([]);
@@ -57,7 +57,6 @@ export const useGithubDomain = ({
   const [cloneFinished, setCloneFinished] = useState(false);
   const [cloneError, setCloneError] = useState<string | null>(null);
 
-  const [githubRepoSearch, setGithubRepoSearch] = useState('');
   const [nextRepoPage, setNextRepoPage] = useState<number | null>(1);
   const [githubReposHasMore, setGithubReposHasMore] = useState(false);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -121,15 +120,16 @@ export const useGithubDomain = ({
   }, [isAuthenticated, tr]);
 
   const refreshRepos = useCallback(async (searchOverride?: string) => {
-    const search = typeof searchOverride === 'string' ? searchOverride : githubRepoSearch;
+    const search = typeof searchOverride === 'string' ? searchOverride : currentRepoSearchRef.current;
+    currentRepoSearchRef.current = search;
     setNextRepoPage(1);
     await fetchReposPage('reset', 1, search);
-  }, [fetchReposPage, githubRepoSearch]);
+  }, [fetchReposPage]);
 
   const loadMoreRepos = useCallback(async () => {
     if (isLoadingMoreRepos || !githubReposHasMore || !nextRepoPage) return;
-    await fetchReposPage('append', nextRepoPage, githubRepoSearch);
-  }, [fetchReposPage, githubRepoSearch, githubReposHasMore, isLoadingMoreRepos, nextRepoPage]);
+    await fetchReposPage('append', nextRepoPage, currentRepoSearchRef.current);
+  }, [fetchReposPage, githubReposHasMore, isLoadingMoreRepos, nextRepoPage]);
 
   useEffect(() => {
     const normalizedHost = (githubHost || '').trim().toLowerCase() || 'github.com';
@@ -206,29 +206,15 @@ export const useGithubDomain = ({
   useEffect(() => {
     if (!isAuthenticated) {
       hasLoadedReposOnceRef.current = false;
-      lastSearchRef.current = '';
+      currentRepoSearchRef.current = '';
       return;
     }
 
     if (hasLoadedReposOnceRef.current) return;
 
     hasLoadedReposOnceRef.current = true;
-    lastSearchRef.current = githubRepoSearch;
-    void refreshRepos(githubRepoSearch);
-  }, [githubRepoSearch, isAuthenticated, refreshRepos]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    if (!hasLoadedReposOnceRef.current) return;
-    if (githubRepoSearch === lastSearchRef.current) return;
-
-    const timeout = window.setTimeout(() => {
-      lastSearchRef.current = githubRepoSearch;
-      void refreshRepos(githubRepoSearch);
-    }, 300);
-
-    return () => window.clearTimeout(timeout);
-  }, [githubRepoSearch, isAuthenticated, refreshRepos]);
+    void refreshRepos('');
+  }, [isAuthenticated, refreshRepos]);
 
   const handleTokenLogin = async () => {
     if (!window.electronAPI) return;
@@ -383,7 +369,7 @@ export const useGithubDomain = ({
       setIsLoadingRepos(false);
       setIsLoadingMoreRepos(false);
       hasLoadedReposOnceRef.current = false;
-      lastSearchRef.current = '';
+      currentRepoSearchRef.current = '';
     }
   };
 
@@ -460,8 +446,6 @@ export const useGithubDomain = ({
     setGithubUser,
     githubRepos,
     setGithubRepos,
-    githubRepoSearch,
-    setGithubRepoSearch,
     githubReposHasMore,
     isLoadingRepos,
     isLoadingMoreRepos,
