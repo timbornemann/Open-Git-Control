@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/global';
-import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { createLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import type { RepoOwnerRef } from '@/types/git';
@@ -358,7 +358,7 @@ export const submitPullRequest = async (
   language: AppLanguage,
   deps?: PullRequestClientDeps,
 ): Promise<{ success: true; number: number } | { success: false; error: string }> => {
-  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
+  const { t } = createLanguageTranslations(language);
   const { github } = getPullRequestClients(deps);
 
   if (!github.isAvailable() || !prOwnerRepo || !input.title.trim()) {

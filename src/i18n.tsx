@@ -57,6 +57,19 @@ export const translateFromCatalog = (language: AppLanguage, key: string, variabl
   return interpolate(value, variables);
 };
 
+export const createLanguageTranslations = (language: AppLanguage): I18nContextValue => {
+  return {
+    language,
+    locale: getLocale(language),
+    tr: (deText, enText) => trByLanguage(language, deText, enText),
+    t: (key, variables) => translateFromCatalog(language, key, variables),
+  };
+};
+
+export const useLanguageTranslations = (language: AppLanguage): I18nContextValue => {
+  return useMemo(() => createLanguageTranslations(language), [language]);
+};
+
 const I18nContext = createContext<I18nContextValue>({
   language: DEFAULT_LANGUAGE,
   locale: getLocale(DEFAULT_LANGUAGE),
@@ -70,15 +83,7 @@ type I18nProviderProps = {
 };
 
 export const I18nProvider: React.FC<I18nProviderProps> = ({ language, children }) => {
-  const value = useMemo<I18nContextValue>(() => {
-    const locale = getLocale(language);
-    return {
-      language,
-      locale,
-      tr: (deText, enText) => trByLanguage(language, deText, enText),
-      t: (key, variables) => translateFromCatalog(language, key, variables),
-    };
-  }, [language]);
+  const value = useLanguageTranslations(language);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 };

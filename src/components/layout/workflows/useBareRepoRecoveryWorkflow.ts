@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getElectronApi } from '@/services/electronApi';
 import { gitClient } from '@/services/gitClient';
 import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
@@ -23,16 +23,7 @@ type Params = {
 };
 
 export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefresh, setGitActionToast }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(settings.language as AppLanguage, deText, enText);
-    },
-    [settings.language],
-  );
-  const t = useCallback(
-    (key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables),
-    [settings.language],
-  );
+  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
   const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
     const electronApi = getElectronApi();
     if (!electronApi || !gitClient.isAvailable() || !workspace.activeRepo) return false;

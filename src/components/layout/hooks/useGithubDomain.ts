@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
@@ -59,8 +59,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isLoadingMoreRepos, setIsLoadingMoreRepos] = useState(false);
 
-  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
-  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
+  const { t, tr } = useLanguageTranslations(language);
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {

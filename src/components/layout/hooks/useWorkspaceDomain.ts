@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RepoSortByDto } from '@/global';
-import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -99,7 +99,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
   const [reposLoaded, setReposLoaded] = useState(false);
   const repoOperationSequenceRef = useRef(0);
 
-  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
+  const { t } = useLanguageTranslations(language);
 
   const sortedOpenRepos = useMemo(() => {
     return sortRepoPaths(openRepos, repoMeta, repoSortBy);

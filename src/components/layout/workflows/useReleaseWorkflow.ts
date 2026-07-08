@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { githubClient } from '@/services/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { RepoOwnerRef } from '@/types/git';
@@ -61,13 +61,7 @@ export const useReleaseWorkflow = ({
   triggerRefresh,
   language,
 }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(language, deText, enText);
-    },
-    [language],
-  );
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
+  const { t, tr } = useLanguageTranslations(language);
 
   const setReleaseForm = useCallback(
     (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => {

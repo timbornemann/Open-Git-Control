@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
 
 type Toast = { msg: string; isError: boolean };
@@ -13,13 +13,7 @@ type Params = {
 };
 
 export const useConflictResolverWorkflow = ({ setActiveTab, setConflictResolverPath, setGitActionToast, triggerRefresh, language }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(language, deText, enText);
-    },
-    [language],
-  );
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
+  const { t } = useLanguageTranslations(language);
 
   const openConflictResolverForPath = useCallback(
     (path: string) => {
@@ -31,7 +25,7 @@ export const useConflictResolverWorkflow = ({ setActiveTab, setConflictResolverP
       });
       triggerRefresh();
     },
-    [setActiveTab, setConflictResolverPath, setGitActionToast, triggerRefresh, tr],
+    [setActiveTab, setConflictResolverPath, setGitActionToast, t, triggerRefresh],
   );
 
   return { openConflictResolverForPath };

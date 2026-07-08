@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import {
@@ -53,16 +53,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [newRepoPrivate, setNewRepoPrivate] = useState(true);
 
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(settings.language as AppLanguage, deText, enText);
-    },
-    [settings.language],
-  );
-  const t = useCallback(
-    (key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables),
-    [settings.language],
-  );
+  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
   useEffect(() => {
     setNewRepoName('');

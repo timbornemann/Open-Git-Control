@@ -1,6 +1,6 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { countChangedEntriesFromPorcelainV2, parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
 import { GUARDED_COMMANDS, isForcePushCommand, type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
@@ -26,16 +26,7 @@ type GuardParams = {
 };
 
 export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQuickFix, settings, setConfirmDialog, setGitActionToast }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(settings.language as AppLanguage, deText, enText);
-    },
-    [settings.language],
-  );
-  const t = useCallback(
-    (key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables),
-    [settings.language],
-  );
+  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
   const runWithOptions = useCallback(
     async (args: string[], successMsg: string, actionLabel: string | undefined, options: RunGitCommandOptions | undefined) => {

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto, GitCommandNameDto } from '@/global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { isMissingUpstreamPushError, isNoLocalCommitPushError } from '@/utils/gitPushRecovery';
@@ -36,16 +36,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const isGitActionRunningRef = useRef(false);
   const runGitCommandRef = useRef<GitCommandRunner | null>(null);
 
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(settings.language as AppLanguage, deText, enText);
-    },
-    [settings.language],
-  );
-  const t = useCallback(
-    (key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables),
-    [settings.language],
-  );
+  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
   const {
     connectError,

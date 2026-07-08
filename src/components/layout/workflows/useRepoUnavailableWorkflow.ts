@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { plannerClient } from '@/services/plannerClient';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -17,8 +17,7 @@ type Params = {
 
 export const useRepoUnavailableWorkflow = ({ activeRepo, handleCloseRepo, setPlannerRefreshSignal, setConfirmDialog, setGitActionToast, language }: Params) => {
   const handlingRef = useRef<string | null>(null);
-  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
-  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
+  const { t, tr } = useLanguageTranslations(language);
 
   useEffect(() => {
     if (!gitClient.isAvailable()) return;

@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import type { RepoOwnerRef } from '@/types/git';
@@ -45,13 +45,7 @@ export const usePullRequestWorkflow = ({
   triggerRefresh,
   language,
 }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(language, deText, enText);
-    },
-    [language],
-  );
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
+  const { t, tr } = useLanguageTranslations(language);
 
   const handleCreatePR = useCallback(async () => {
     await createPullRequest({

@@ -7,9 +7,10 @@ import type { SecretScanService } from '../../SecretScanService';
 import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import { IpcChannel } from '../../../src/types/ipcContract';
-import { assertAllowedGitCommand, createJobId, normalizeArgs, type GitCommandName, validateCommandArgs } from '../gitCommandPolicy';
+import { createJobId } from '../gitCommandPolicy';
 import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../parsing';
+import { handleGitCommand } from './gitCommandRouter';
 import { emitJobEvent } from './jobEvents';
 
 type RegisterGitHandlersDeps = {
@@ -20,7 +21,6 @@ type RegisterGitHandlersDeps = {
   readSettingsWithMigration: () => AppSettings;
 };
 
-const STREAMING_PROGRESS_COMMANDS = new Set<GitCommandName>(['fetch', 'pull']);
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
 
 const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => {
@@ -29,15 +29,6 @@ const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => 
     throw new Error('Invalid repository file source.');
   }
   return source as RepositoryFileSource;
-};
-
-const withProgressFlag = (commandName: GitCommandName, args: string[]): string[] => {
-  const baseArgs = [commandName, ...args];
-  if (!STREAMING_PROGRESS_COMMANDS.has(commandName)) return baseArgs;
-  if (args.some((arg) => arg === '--progress' || arg === '--no-progress' || arg === '--quiet' || arg === '-q')) {
-    return baseArgs;
-  }
-  return [commandName, '--progress', ...args];
 };
 
 export function registerGitHandlers({
@@ -73,111 +64,9 @@ export function registerGitHandlers({
     return true;
   });
 
-  ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
-    let jobId: string | null = null;
-    try {
-      assertAllowedGitCommand(commandName);
-      const normalizedArgs = normalizeArgs(rawArgs);
-      validateCommandArgs(commandName, normalizedArgs);
-
-      const isLongRunning = ['fetch', 'pull', 'push', 'add', 'commit', 'reset'].includes(commandName);
-      jobId = isLongRunning ? createJobId(`git-${commandName}`) : null;
-
-      if (jobId) {
-        emitJobEvent(event.sender, {
-          id: jobId,
-          operation: `git:${commandName}`,
-          status: 'start',
-          timestamp: Date.now(),
-        });
-      }
-
-      let data: string;
-      if (commandName === 'status') {
-        data = normalizedArgs.length > 0 ? await gitService.runCommand(['status', ...normalizedArgs]) : await gitService.getStatus();
-      } else if (commandName === 'statusPorcelain') {
-        data = await gitService.getStatusPorcelain();
-      } else if (commandName === 'log') {
-        data = await gitService.getLog(Number(normalizedArgs[0]) || 50, normalizedArgs[1] !== 'head', Number(normalizedArgs[2]) || 0);
-      } else if (commandName === 'branches') {
-        data = await gitService.getBranches();
-      } else if (commandName === 'commitDetails') {
-        data = await gitService.getCommitDetails(normalizedArgs[0]);
-      } else if (commandName === 'conflictTakeOurs') {
-        data = await gitService.checkoutConflictVersion(normalizedArgs[0], 'ours');
-      } else if (commandName === 'conflictTakeTheirs') {
-        data = await gitService.checkoutConflictVersion(normalizedArgs[0], 'theirs');
-      } else if (commandName === 'conflictMarkResolved') {
-        data = await gitService.addFile(normalizedArgs[0]);
-      } else if (commandName === 'mergeContinue') {
-        data = await gitService.continueMerge();
-      } else if (commandName === 'mergeAbort') {
-        data = await gitService.abortMerge();
-      } else if (commandName === 'rebaseContinue') {
-        data = await gitService.continueRebase();
-      } else if (commandName === 'rebaseAbort') {
-        data = await gitService.abortRebase();
-      } else if (commandName === 'submoduleStatus') {
-        data = await gitService.getSubmoduleStatus();
-      } else if (commandName === 'submoduleUpdateInitRecursive') {
-        data = await gitService.updateSubmodulesInitRecursive();
-      } else if (commandName === 'submoduleSyncRecursive') {
-        data = await gitService.syncSubmodulesRecursive();
-      } else if (commandName === 'reflog') {
-        data = await gitService.getReflog(Number(normalizedArgs[0]) || 300);
-      } else if (commandName === 'forensicHistory') {
-        const searchType = normalizedArgs[0];
-        const targetPath = normalizedArgs[1];
-        const searchTerm = normalizedArgs[2] || '';
-        const startLine = Number(normalizedArgs[3]);
-        const endLine = Number(normalizedArgs[4]);
-        const limit = Number(normalizedArgs[5]) || 200;
-
-        if (searchType === 'string') {
-          data = await gitService.getForensicHistoryByString(searchTerm, targetPath, limit);
-        } else if (searchType === 'regex') {
-          data = await gitService.getForensicHistoryByRegex(searchTerm, targetPath, limit);
-        } else {
-          data = await gitService.getForensicHistoryByLineRange(targetPath, startLine, endLine, limit);
-        }
-      } else if (STREAMING_PROGRESS_COMMANDS.has(commandName)) {
-        data = await gitService.streamCommandOutput(withProgressFlag(commandName, normalizedArgs), (line: string) => {
-          if (!jobId) return;
-          emitJobEvent(event.sender, {
-            id: jobId,
-            operation: `git:${commandName}`,
-            status: 'progress',
-            message: line,
-            timestamp: Date.now(),
-          });
-        });
-      } else {
-        data = await gitService.runCommand([commandName, ...normalizedArgs]);
-      }
-
-      if (jobId) {
-        emitJobEvent(event.sender, {
-          id: jobId,
-          operation: `git:${commandName}`,
-          status: 'done',
-          timestamp: Date.now(),
-        });
-      }
-
-      return { success: true, data };
-    } catch (error: any) {
-      if (jobId && typeof commandName === 'string') {
-        emitJobEvent(event.sender, {
-          id: jobId,
-          operation: `git:${commandName}`,
-          status: 'failed',
-          message: error.message,
-          timestamp: Date.now(),
-        });
-      }
-      return { success: false, error: error.message };
-    }
-  });
+  ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) =>
+    handleGitCommand(event, gitService, commandName, ...rawArgs),
+  );
 
   ipcMain.handle(IpcChannel.GitCommitLogPage, async (_event: any, params: { limit?: unknown; offset?: unknown; scope?: unknown } = {}) => {
     try {

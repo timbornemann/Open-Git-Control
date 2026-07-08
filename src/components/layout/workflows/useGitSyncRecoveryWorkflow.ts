@@ -1,5 +1,5 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { isNonFastForwardPushError, isPullBlockedByLocalChangesError } from '@/utils/gitPushRecovery';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -35,13 +35,7 @@ type SyncMismatchFailureParams = AutostashPullFlowParams & {
 };
 
 export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, setConfirmDialog, setGitActionToast, language }: Params) => {
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(language, deText, enText);
-    },
-    [language],
-  );
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
+  const { t, tr } = useLanguageTranslations(language);
 
   const runRemoteAheadQuickFix = useCallback(
     async ({ command, options }: RemoteAheadQuickFixParams): Promise<void> => {
