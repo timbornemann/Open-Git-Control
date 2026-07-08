@@ -1,70 +1,32 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type RefObject } from 'react';
-import { computeGraphLayout, type GraphLayout } from '../../utils/graphLayout';
+import type { GraphLayout } from '../../utils/graphLayout';
 import {
   isRepoUnavailableError,
   parseGitLog,
-  parseGitStatusDetailed,
-  type GitCommit,
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
 import { normalizeRepoPathKey } from '../../utils/repoPath';
-import { gitClient } from '../../services/gitClient';
 import {
   mergeCommitStatsUpdate,
   type CommitStatsUpdate,
 } from './mergeCommitStatsUpdate';
 import { mergeQuickRefreshCommits } from './mergeQuickRefreshCommits';
+import {
+  applyCachedStats,
+  getGraphCacheEntry,
+  getGraphCacheKey,
+  LOG_MAX_LIMIT,
+  LOG_PAGE_SIZE,
+  mergeUniqueCommits,
+  QUICK_REFRESH_LIMIT,
+  storeGraphCache,
+} from './commitGraphDataCache';
+import { useGraphLayoutEngine } from './useGraphLayoutEngine';
+import { useCommitGraphAutoLoad } from './useCommitGraphAutoLoad';
+import { useCommitGraphWorkingTreeStatus } from './useCommitGraphWorkingTreeStatus';
 
-const LOG_PAGE_SIZE = 100;
-const QUICK_REFRESH_LIMIT = 50;
-const LOG_MAX_LIMIT = 5000;
-const AUTO_LOAD_TRIGGER_PX = 220;
-const AUTO_LOAD_RESET_PX = 420;
 type RefreshMode = 'reset' | 'append' | 'sync' | 'quick';
-
-type GraphCacheEntry = {
-  commits: GitCommit[];
-  hasMore: boolean;
-  touchedAt: number;
-};
-
-const graphCache = new Map<string, GraphCacheEntry>();
-
-const getGraphCacheKey = (repoPath: string, showSecondaryHistory: boolean) =>
-  `${normalizeRepoPathKey(repoPath)}\0${showSecondaryHistory ? 'all' : 'head'}`;
-
-const storeGraphCache = (key: string, commits: GitCommit[], hasMore: boolean) => {
-  graphCache.set(key, {
-    commits: commits.slice(0, LOG_MAX_LIMIT),
-    hasMore,
-    touchedAt: Date.now(),
-  });
-  if (graphCache.size <= 8) return;
-  const oldest = [...graphCache.entries()].sort((a, b) => a[1].touchedAt - b[1].touchedAt)[0];
-  if (oldest) graphCache.delete(oldest[0]);
-};
-
-const applyCachedStats = (
-  commits: GitCommit[],
-  stats: Record<string, { files: number; additions: number; deletions: number }>,
-) => commits.map((commit) => {
-  const cached = stats[commit.hash];
-  return cached
-    ? { ...commit, stats: cached, statsState: 'ready' as const }
-    : commit;
-});
-
-const mergeUniqueCommits = (base: GitCommit[], incoming: GitCommit[]): GitCommit[] => {
-  const out: GitCommit[] = [];
-  const seen = new Set<string>();
-  for (const commit of [...base, ...incoming]) {
-    if (seen.has(commit.hash)) continue;
-    seen.add(commit.hash);
-    out.push(commit);
-  }
-  return out;
-};
 
 type Params = {
   repoPath: string | null;
@@ -89,7 +51,6 @@ export const useCommitGraphData = ({
 }: Params) => {
   const [layout, setLayout] = useState<GraphLayout | null>(null);
   const [commitCount, setCommitCount] = useState(0);
-  const [workingTreeStatus, setWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreCommits, setHasMoreCommits] = useState(true);
@@ -102,56 +63,21 @@ export const useCommitGraphData = ({
   const pendingScrollModeRef = useRef<RefreshMode | null>(null);
   const appendInFlightRef = useRef(false);
   const pendingRefreshAfterAppendRef = useRef<RefreshMode | null>(null);
-  const autoLoadArmedRef = useRef(true);
   const lastRepoPathRef = useRef<string | null>(null);
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
   const requestGenerationRef = useRef(0);
-  const layoutGenerationRef = useRef(0);
-  const layoutWorkerRef = useRef<Worker | null>(null);
-
-  const updateLayout = useCallback((commits: GitCommit[]) => {
-    const generation = ++layoutGenerationRef.current;
-    const worker = layoutWorkerRef.current;
-    if (worker) {
-      worker.postMessage({ generation, commits });
-      return;
-    }
-    setLayout(computeGraphLayout(commits));
-  }, []);
-
-  useEffect(() => {
-    if (typeof Worker === 'undefined') return;
-    const worker = new Worker(new URL('../../workers/graphLayout.worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (event: MessageEvent<{ generation: number; layout: GraphLayout }>) => {
-      if (event.data.generation !== layoutGenerationRef.current) return;
-      setLayout((current) => {
-        if (!current) return event.data.layout;
-        const currentByHash = new Map(
-          current.nodes.map((node) => [node.commit.hash, node.commit]),
-        );
-        let changed = false;
-        const nodes = event.data.layout.nodes.map((node) => {
-          const currentCommit = currentByHash.get(node.commit.hash);
-          if (!currentCommit) return node;
-          const commit = mergeCommitStatsUpdate(node.commit, {
-            stats: currentCommit.stats,
-            state: currentCommit.statsState,
-          });
-          if (commit === node.commit) return node;
-          changed = true;
-          return { ...node, commit };
-        });
-        return changed ? { ...event.data.layout, nodes } : event.data.layout;
-      });
-    };
-    layoutWorkerRef.current = worker;
-    return () => {
-      worker.terminate();
-      layoutWorkerRef.current = null;
-    };
-  }, []);
+  const updateLayout = useGraphLayoutEngine(setLayout);
+  const {
+    workingTreeStatus,
+    refreshWorkingTreeStatus,
+    clearWorkingTreeStatus,
+  } = useCommitGraphWorkingTreeStatus({
+    repoPath,
+    externalWorkingTreeStatus,
+    onRefreshWorkingTree,
+  });
 
   useEffect(() => {
     onRepoClearedRef.current = onRepoCleared;
@@ -282,30 +208,8 @@ export const useCommitGraphData = ({
 
   const loadMoreCommits = useCallback(async () => {
     if (loading || loadingMore || appendInFlightRef.current || !hasMoreCommits) return;
-    autoLoadArmedRef.current = false;
     await refreshCommits('append');
   }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
-
-  const refreshWorkingTreeStatus = useCallback(async () => {
-    if (onRefreshWorkingTree) {
-      await onRefreshWorkingTree();
-      return;
-    }
-    if (!repoPath || !gitClient.isAvailable()) return;
-    try {
-      const { success, data } = await gitClient.runGitCommand('status', '-s');
-      if (success) {
-        setWorkingTreeStatus(parseGitStatusDetailed(data || ''));
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error || '');
-      if (isRepoUnavailableError(message)) {
-        setWorkingTreeStatus(null);
-        return;
-      }
-      console.error(error);
-    }
-  }, [onRefreshWorkingTree, repoPath]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -313,13 +217,12 @@ export const useCommitGraphData = ({
       setCommitCount(0);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
-      setWorkingTreeStatus(null);
+      clearWorkingTreeStatus();
       layoutRef.current = null;
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
       appendInFlightRef.current = false;
       pendingRefreshAfterAppendRef.current = null;
-      autoLoadArmedRef.current = true;
       lastRepoPathRef.current = null;
       lastSecondaryHistoryRef.current = showSecondaryHistory;
       pendingScrollModeRef.current = null;
@@ -340,17 +243,15 @@ export const useCommitGraphData = ({
       setCommitCount(0);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
-      setWorkingTreeStatus(null);
+      clearWorkingTreeStatus();
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
       pendingScrollModeRef.current = null;
       appendInFlightRef.current = false;
       pendingRefreshAfterAppendRef.current = null;
-      autoLoadArmedRef.current = true;
       forceScrollToTopOnNextResetRef.current = repoChanged;
-      const cached = graphCache.get(getGraphCacheKey(repoPath, showSecondaryHistory));
+      const cached = getGraphCacheEntry(repoPath, showSecondaryHistory);
       if (cached) {
-        cached.touchedAt = Date.now();
         commitCountRef.current = cached.commits.length;
         setCommitCount(cached.commits.length);
         setHasMoreCommits(cached.hasMore);
@@ -407,55 +308,13 @@ export const useCommitGraphData = ({
     pendingScrollModeRef.current = null;
   }, [layout, logContainerRef]);
 
-  useEffect(() => {
-    if (onRefreshWorkingTree) return;
-    if (!repoPath) return;
-    const refreshIfVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        return;
-      }
-      void refreshWorkingTreeStatus();
-    };
-    const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        void refreshWorkingTreeStatus();
-      }
-    };
-
-    const intervalId = window.setInterval(refreshIfVisible, 3000);
-    window.addEventListener('focus', refreshIfVisible);
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', refreshIfVisible);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
-  }, [refreshWorkingTreeStatus, onRefreshWorkingTree, repoPath]);
-
-  useEffect(() => {
-    const scrollContainer = logContainerRef.current?.parentElement;
-    if (!scrollContainer) return;
-
-    const onScroll = () => {
-      const distanceToBottom = scrollContainer.scrollHeight - (scrollContainer.scrollTop + scrollContainer.clientHeight);
-      if (distanceToBottom > AUTO_LOAD_RESET_PX) {
-        autoLoadArmedRef.current = true;
-      }
-
-      if (loading || loadingMore || !hasMoreCommits) return;
-      if (!autoLoadArmedRef.current) return;
-      if (distanceToBottom <= AUTO_LOAD_TRIGGER_PX) {
-        void loadMoreCommits();
-      }
-    };
-
-    scrollContainer.addEventListener('scroll', onScroll);
-    return () => scrollContainer.removeEventListener('scroll', onScroll);
-  }, [hasMoreCommits, loadMoreCommits, loading, loadingMore, logContainerRef]);
+  useCommitGraphAutoLoad({
+    logContainerRef,
+    loading,
+    loadingMore,
+    hasMoreCommits,
+    loadMoreCommits,
+  });
 
   const updateCommitStats = useCallback((
     updates: Record<string, CommitStatsUpdate>,
@@ -536,9 +395,7 @@ export const useCommitGraphData = ({
   return {
     layout,
     commitCount,
-    workingTreeStatus: externalWorkingTreeStatus === undefined
-      ? workingTreeStatus
-      : externalWorkingTreeStatus,
+    workingTreeStatus,
     loading,
     loadingMore,
     hasMoreCommits,
