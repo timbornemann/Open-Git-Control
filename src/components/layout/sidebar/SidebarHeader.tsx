@@ -17,7 +17,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   remoteSync,
   isGitActionRunning,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div
@@ -26,14 +26,14 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
     >
       <span>
         {activeTab === 'localRepos'
-          ? tr('Lokale Repositories', 'Local repositories')
+          ? t('sidebar.localRepos')
           : activeTab === 'repo'
-            ? tr('Aktuelles Repository', 'Current repository')
+            ? t('sidebar.currentRepository')
             : activeTab === 'planner'
-              ? tr('Projektplanung', 'Project planning')
+              ? t('sidebar.planner')
             : activeTab === 'github'
               ? 'GitHub'
-              : tr('Einstellungen', 'Settings')}
+              : t('sidebar.settings')}
       </span>
       <div className="sidebar-header-actions">
         {activeTab === 'localRepos' && (
@@ -42,7 +42,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               className="icon-btn"
               style={{ padding: '4px' }}
               onClick={onOpenFolder}
-              title={tr('Repository hinzufügen', 'Add repository')}
+              title={t('sidebar.addRepository')}
             >
               <Plus size={16} />
             </button>
@@ -50,7 +50,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
               className="icon-btn"
               style={{ padding: '4px' }}
               onClick={onCloneByUrl}
-              title={tr('Repository per URL klonen', 'Clone repository from URL')}
+              title={t('sidebar.cloneRepository')}
             >
               <DownloadCloud size={16} />
             </button>
@@ -61,7 +61,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
             className="icon-btn"
             style={{ padding: '4px' }}
             onClick={onRefreshRemoteQuick}
-            title={tr('Remote aktualisieren', 'Refresh remote')}
+            title={t('sidebar.refreshRemote')}
             disabled={remoteSync.isFetching || isGitActionRunning}
           >
             <RefreshCw size={14} />

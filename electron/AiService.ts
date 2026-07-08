@@ -1,18 +1,26 @@
 import { GitService, gitService } from './GitService';
 import { AiCommitMessageLanguage, AiCommitMessageStyle, AppSettings, AiProvider } from './settings';
-import * as fs from 'fs';
-import * as path from 'path';
 import { AiProviderClient, getSelectedAiModel } from './ai/AiProviderClient';
 import { AutoCommitPlanner } from './ai/AutoCommitPlanner';
+import {
+  buildGroupKey,
+  detectChangeType,
+  FileChangeType,
+  getExtension,
+  getTopDirectory,
+  parseStatusPorcelain,
+} from './ai/gitStatusSnapshot';
+import {
+  buildStructuredDiffContext,
+  clipContextLine,
+  deriveStatsFromDiff,
+  parseNumstatLine,
+  parseNumstatReport,
+  readUntrackedSnippet,
+} from './ai/diffContext';
 
-type StatusEntry = {
-  path: string;
-  x: string;
-  y: string;
-  code: string;
-};
-
-type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked' | 'other';
+export { parseStatusPorcelain } from './ai/gitStatusSnapshot';
+export { buildStructuredDiffContext } from './ai/diffContext';
 
 type SnapshotFile = {
   path: string;
@@ -98,11 +106,6 @@ const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_USER_COMMIT_NOTES_CHARS = 8_000;
 const MAX_COMMIT_DESCRIPTION_CHARS = 2_000;
 const MAX_PREVIEW_CHARS = 220;
-const MAX_CONTEXT_LINE_CHARS = 140;
-const MAX_CONTEXT_ITEMS_PER_HUNK = 3;
-const MAX_CONTEXT_HUNKS = 3;
-const MAX_CONTEXT_ITEMS_TOTAL = 12;
-const MAX_UNTRACKED_SNIPPET_LINES = 12;
 const MAX_COMMIT_FILES_NORMAL = 5;
 const MAX_COMMIT_FILES_RETRY = 3;
 const MAX_COMMIT_FILES_FALLBACK = 2;
@@ -161,301 +164,8 @@ function safeHttpUrl(value: unknown): string {
   return /^https?:\/\/\S+$/i.test(trimmed) ? trimmed : '';
 }
 
-function decodePorcelainPath(rawPath: string): string {
-  const trimmed = rawPath.trim();
-  if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) {
-    return trimmed;
-  }
-
-  const body = trimmed.slice(1, -1);
-  const bytes: number[] = [];
-  const escapeToByte: Record<string, number> = {
-    a: 0x07,
-    b: 0x08,
-    f: 0x0c,
-    n: 0x0a,
-    r: 0x0d,
-    t: 0x09,
-    v: 0x0b,
-    '\\': 0x5c,
-    '"': 0x22,
-  };
-
-  for (let i = 0; i < body.length; i += 1) {
-    const char = body[i];
-    if (char !== '\\') {
-      bytes.push(...Buffer.from(char, 'utf8'));
-      continue;
-    }
-
-    const escaped = body[i + 1];
-    if (!escaped) {
-      bytes.push(0x5c);
-      break;
-    }
-
-    i += 1;
-    if (/[0-7]/.test(escaped)) {
-      let octal = escaped;
-      while (octal.length < 3 && i + 1 < body.length && /[0-7]/.test(body[i + 1])) {
-        i += 1;
-        octal += body[i];
-      }
-      bytes.push(parseInt(octal, 8));
-      continue;
-    }
-
-    const mapped = escapeToByte[escaped];
-    if (mapped !== undefined) {
-      bytes.push(mapped);
-      continue;
-    }
-
-    bytes.push(...Buffer.from(escaped, 'utf8'));
-  }
-
-  return Buffer.from(bytes).toString('utf8');
-}
-
-export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
-  if (!statusOutput.trim()) return [];
-
-  return statusOutput
-    .split('\n')
-    .map(line => line.trimEnd())
-    .filter(line => line.length >= 3)
-    .map(line => {
-      const x = line[0];
-      const y = line[1];
-      const rawPath = line.slice(3).trim();
-      const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
-      const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
-      const path = decodePorcelainPath(targetPath);
-      return { path, x, y, code: `${x}${y}` };
-    })
-    .filter(entry => entry.path.length > 0);
-}
-
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-function detectChangeType(entry: StatusEntry): FileChangeType {
-  if (entry.code === '??' || entry.x === '?' || entry.y === '?') return 'untracked';
-  const code = `${entry.x}${entry.y}`;
-  if (code.includes('R')) return 'renamed';
-  if (code.includes('A')) return 'added';
-  if (code.includes('D')) return 'deleted';
-  if (code.includes('M')) return 'modified';
-  return 'other';
-}
-
-function getExtension(pathValue: string): string {
-  const idx = pathValue.lastIndexOf('.');
-  if (idx < 0 || idx === pathValue.length - 1) return 'none';
-  return pathValue.slice(idx + 1).toLowerCase();
-}
-
-function getTopDirectory(pathValue: string): string {
-  const normalized = pathValue.replace(/\\/g, '/');
-  const first = normalized.split('/')[0];
-  return first || 'root';
-}
-
-function buildGroupKey(pathValue: string, changeType: FileChangeType): string {
-  const normalized = pathValue.replace(/\\/g, '/').toLowerCase();
-  const ext = getExtension(normalized);
-  const topDir = getTopDirectory(normalized);
-
-  if (/package-lock\.json$|yarn\.lock$|pnpm-lock\.ya?ml$|bun\.lockb$/.test(normalized)) {
-    return 'special:lockfiles';
-  }
-
-  if (/(^|\/)(migrations?|db\/migrate|prisma\/migrations)(\/|$)/.test(normalized)) {
-    return 'special:migrations';
-  }
-
-  if (/(^|\/)(dist|build|coverage|out|target|generated|.next)(\/|$)/.test(normalized) || /\.min\./.test(normalized)) {
-    return 'special:generated';
-  }
-
-  if (['md', 'mdx', 'txt', 'rst', 'adoc'].includes(ext)) {
-    return 'special:docs';
-  }
-
-  return `${topDir}:${ext}:${changeType}`;
-}
-
-function parseNumstatLine(raw: string): { additions: number; deletions: number; isBinary: boolean } {
-  const trimmed = (raw || '').trim();
-  const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
-  if (!match) {
-    return { additions: 0, deletions: 0, isBinary: false };
-  }
-
-  const isBinary = match[1] === '-' || match[2] === '-';
-  return {
-    additions: match[1] === '-' ? 0 : Number(match[1]),
-    deletions: match[2] === '-' ? 0 : Number(match[2]),
-    isBinary,
-  };
-}
-
-function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS): string {
-  const compact = String(line || '').replace(/\s+/g, ' ').trim();
-  if (!compact) return '';
-  return compact.length <= maxChars ? compact : `${compact.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
-}
-
-function parseNumstatReport(numstatOutput: string): Map<string, { additions: number; deletions: number; isBinary: boolean }> {
-  const byPath = new Map<string, { additions: number; deletions: number; isBinary: boolean }>();
-  const lines = (numstatOutput || '').split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const parsed = parseNumstatLine(trimmed);
-    const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
-    if (!match) continue;
-    const rawPath = match[3].trim();
-    const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
-    const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
-    const decodedPath = decodePorcelainPath(targetPath);
-    if (!decodedPath) continue;
-    byPath.set(decodedPath, parsed);
-  }
-  return byPath;
-}
-
-function pickRepresentativeIndices(length: number): number[] {
-  if (length <= 0) return [];
-  if (length === 1) return [0];
-  if (length === 2) return [0, 1];
-  const middle = Math.floor((length - 1) / 2);
-  return [...new Set([0, middle, length - 1])];
-}
-
-function pickRepresentativeItems<T>(values: T[], limit = 3): T[] {
-  if (values.length <= limit) return [...values];
-  return pickRepresentativeIndices(values.length)
-    .slice(0, limit)
-    .map((index) => values[index]);
-}
-
-function isDiffMetadataLine(line: string): boolean {
-  return (
-    /^diff --git /i.test(line)
-    || /^index /i.test(line)
-    || /^--- /i.test(line)
-    || /^\+\+\+ /i.test(line)
-    || /^new file mode /i.test(line)
-    || /^deleted file mode /i.test(line)
-    || /^similarity index /i.test(line)
-    || /^rename from /i.test(line)
-    || /^rename to /i.test(line)
-    || /^old mode /i.test(line)
-    || /^new mode /i.test(line)
-    || /^Binary files /i.test(line)
-    || /^GIT binary patch$/i.test(line)
-  );
-}
-
-function deriveStatsFromDiff(diffText: string): { additions: number; deletions: number } {
-  let additions = 0;
-  let deletions = 0;
-  const lines = (diffText || '').split(/\r?\n/);
-  for (const line of lines) {
-    if (line.startsWith('+++') || line.startsWith('---')) continue;
-    if (line.startsWith('+')) additions += 1;
-    if (line.startsWith('-')) deletions += 1;
-  }
-  return { additions, deletions };
-}
-
-export function buildStructuredDiffContext(diffText: string): string[] {
-  const lines = (diffText || '').split(/\r?\n/);
-  type Hunk = { header: string; changes: string[] };
-
-  const hunks: Hunk[] = [];
-  const metadataFallback: string[] = [];
-  let currentHunk: Hunk | null = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd();
-    if (!line) continue;
-
-    if (line.startsWith('@@')) {
-      currentHunk = {
-        header: clipContextLine(line),
-        changes: [],
-      };
-      hunks.push(currentHunk);
-      continue;
-    }
-
-    if (isDiffMetadataLine(line)) {
-      const metadata = clipContextLine(line);
-      if (metadata) metadataFallback.push(metadata);
-      continue;
-    }
-
-    if ((line.startsWith('+') || line.startsWith('-')) && !line.startsWith('+++') && !line.startsWith('---')) {
-      const normalized = clipContextLine(line);
-      if (!normalized) continue;
-      if (!currentHunk) {
-        currentHunk = { header: clipContextLine('@@ synthetic @@'), changes: [] };
-        hunks.push(currentHunk);
-      }
-      currentHunk.changes.push(normalized);
-      continue;
-    }
-  }
-
-  const result: string[] = [];
-  const chosenHunks = pickRepresentativeItems(hunks, MAX_CONTEXT_HUNKS);
-  for (const hunk of chosenHunks) {
-    if (hunk.header && hunk.header !== '@@ synthetic @@') {
-      result.push(`hunk ${hunk.header}`);
-    }
-    const chosenChanges = pickRepresentativeItems(hunk.changes, MAX_CONTEXT_ITEMS_PER_HUNK);
-    result.push(...chosenChanges);
-  }
-
-  if (result.length === 0) {
-    return pickRepresentativeItems(
-      metadataFallback.filter((line) => !/^index /i.test(line)),
-      MAX_CONTEXT_ITEMS_PER_HUNK,
-    );
-  }
-
-  return result.slice(0, MAX_CONTEXT_ITEMS_TOTAL);
-}
-
-export function buildFileSnippetContext(content: string): string[] {
-  const sourceLines = (content || '')
-    .split(/\r?\n/)
-    .map((line) => clipContextLine(line))
-    .filter(Boolean);
-  if (sourceLines.length === 0) return [];
-
-  const bounded = sourceLines.slice(0, MAX_UNTRACKED_SNIPPET_LINES);
-  return pickRepresentativeItems(bounded, MAX_CONTEXT_ITEMS_PER_HUNK).map((line) => `+ ${line}`);
-}
-
-async function readUntrackedSnippet(repoPath: string, relativePath: string): Promise<string[]> {
-  const absolutePath = path.resolve(repoPath, relativePath);
-  const relative = path.relative(repoPath, absolutePath);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return [];
-  }
-
-  try {
-    const stat = await fs.promises.stat(absolutePath);
-    if (!stat.isFile()) return [];
-    const raw = await fs.promises.readFile(absolutePath, 'utf8');
-    return buildFileSnippetContext(raw);
-  } catch {
-    return [];
-  }
 }
 
 function toContextPreview(keyChanges: string[]): string {

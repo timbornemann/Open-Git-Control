@@ -1,0 +1,17 @@
+{
+  "sidebar": {
+    "currentRepository": "Aktuelles Repository",
+    "localRepos": "Lokale Repositories",
+    "planner": "Projektplanung",
+    "settings": "Einstellungen",
+    "open": "Sidebar öffnen",
+    "close": "Sidebar schließen",
+    "addRepository": "Repository hinzufügen",
+    "cloneRepository": "Repository per URL klonen",
+    "refreshRemote": "Remote aktualisieren",
+    "installDownloadedUpdate": "Heruntergeladenes Update installieren"
+  },
+  "updates": {
+    "installFailed": "Update konnte nicht installiert werden."
+  }
+}

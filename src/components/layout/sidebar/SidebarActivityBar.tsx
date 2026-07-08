@@ -15,7 +15,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatusDto | null>(null);
   const [isInstallingUpdate, setIsInstallingUpdate] = React.useState(false);
   const [installError, setInstallError] = React.useState<string | null>(null);
@@ -61,10 +61,10 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
     try {
       const result = await window.electronAPI.installAppUpdate();
       if (!result.success) {
-        setInstallError(result.error || tr('Update konnte nicht installiert werden.', 'Could not install update.'));
+        setInstallError(result.error || t('updates.installFailed'));
       }
     } catch (error: unknown) {
-      setInstallError(error instanceof Error ? error.message : tr('Update konnte nicht installiert werden.', 'Could not install update.'));
+      setInstallError(error instanceof Error ? error.message : t('updates.installFailed'));
     } finally {
       setIsInstallingUpdate(false);
     }
@@ -75,29 +75,29 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
       <button
         className="icon-btn activity-bar-panel-toggle"
         onClick={onToggleSidebar}
-        title={isSidebarCollapsed ? tr('Sidebar öffnen', 'Open sidebar') : tr('Sidebar schließen', 'Close sidebar')}
-        aria-label={isSidebarCollapsed ? tr('Sidebar öffnen', 'Open sidebar') : tr('Sidebar schließen', 'Close sidebar')}
+        title={isSidebarCollapsed ? t('sidebar.open') : t('sidebar.close')}
+        aria-label={isSidebarCollapsed ? t('sidebar.open') : t('sidebar.close')}
       >
         {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
       </button>
       <button
         className={`icon-btn ${activeTab === 'repo' ? 'active' : ''}`}
         onClick={() => activateTab('repo')}
-        title={tr('Aktuelles Repository', 'Current repository')}
+        title={t('sidebar.currentRepository')}
       >
         <FolderGit2 size={22} />
       </button>
       <button
         className={`icon-btn ${activeTab === 'localRepos' ? 'active' : ''}`}
         onClick={() => activateTab('localRepos')}
-        title={tr('Lokale Repositories', 'Local repositories')}
+        title={t('sidebar.localRepos')}
       >
         <FolderOpen size={22} />
       </button>
       <button
         className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`}
         onClick={() => activateTab('planner')}
-        title={tr('Projektplanung', 'Project planning')}
+        title={t('sidebar.planner')}
       >
         <ListTodo size={22} />
       </button>
@@ -114,8 +114,8 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
           className="icon-btn activity-update-btn"
           onClick={installReadyUpdate}
           disabled={isInstallingUpdate}
-          title={installError || tr('Heruntergeladenes Update installieren', 'Install downloaded update')}
-          aria-label={installError || tr('Heruntergeladenes Update installieren', 'Install downloaded update')}
+          title={installError || t('sidebar.installDownloadedUpdate')}
+          aria-label={installError || t('sidebar.installDownloadedUpdate')}
         >
           <Download size={20} />
         </button>
@@ -123,7 +123,7 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({
       <button
         className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`}
         onClick={() => activateTab('settings')}
-        title={tr('Einstellungen', 'Settings')}
+        title={t('sidebar.settings')}
       >
         <Settings size={22} />
       </button>

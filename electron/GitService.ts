@@ -1,20 +1,14 @@
-import { execFileSync, spawn } from 'child_process';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { GitScheduler } from './GitScheduler';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
-import { GitRunner, defaultExecFileAsyncRunner, type ExecFileAsyncRunner } from './git/GitRunner';
+import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
 
 export type { CommitStats, FileTimelineCommit };
-export type DiffPreviewResult = {
-  text: string;
-  truncated: boolean;
-  bytes: number;
-  lines: number;
-};
+export type { DiffPreviewResult };
 export type { RepositoryFileDataUrl, RepositoryFileSource };
 const statusPorcelainArgs = (): string[] => [
   '-c',
@@ -107,32 +101,11 @@ export class GitService {
    * Das verhindert pathspec-Fehler bei Dateipfaden, wenn Nutzer Unterordner als Repo oeffnen.
    */
   private resolveRepoRoot(candidatePath: string): string {
-    try {
-      const rootPath = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-        cwd: candidatePath,
-        windowsHide: true,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
-
-      return rootPath || candidatePath;
-    } catch {
-      return candidatePath;
-    }
+    return this.gitRunner.resolveRepositoryRootSync(candidatePath);
   }
 
   private detectIsBareRepositorySync(candidatePath: string): boolean {
-    try {
-      const output = execFileSync('git', ['rev-parse', '--is-bare-repository'], {
-        cwd: candidatePath,
-        windowsHide: true,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim().toLowerCase();
-      return output === 'true';
-    } catch {
-      return false;
-    }
+    return this.gitRunner.detectIsBareRepositorySync(candidatePath);
   }
 
   private isCurrentRepositoryBare(repoPath: string): boolean {
@@ -166,48 +139,12 @@ export class GitService {
 
   private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
     const repoPath = this.ensureRepoPath();
-    return this.gitRunner.schedule(repoPath, 'interactive', 'show', (signal) => new Promise<Buffer>((resolve, reject) => {
-      const proc = spawn('git', ['show', revisionSpec], { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
-      const chunks: Buffer[] = [];
-      let capturedBytes = 0;
-      let stderr = '';
-      let tooLarge = false;
-
-      const abort = () => proc.kill();
-      signal.addEventListener('abort', abort, { once: true });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        capturedBytes += chunk.length;
-        if (capturedBytes > maxBytes) {
-          tooLarge = true;
-          proc.kill();
-          return;
-        }
-        chunks.push(chunk);
-      });
-      proc.stderr.on('data', (chunk: Buffer) => {
-        if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
-      });
-      proc.on('error', reject);
-      proc.on('close', (code, closeSignal) => {
-        signal.removeEventListener('abort', abort);
-        if (tooLarge) {
-          reject(new Error('File is too large for Markdown preview.'));
-          return;
-        }
-        if (signal.aborted || closeSignal) {
-          const error = new Error('Git file read was aborted.');
-          error.name = 'AbortError';
-          reject(error);
-          return;
-        }
-        if (code !== 0) {
-          reject(new Error((stderr || `git show ${revisionSpec} exited with code ${code}`).trim()));
-          return;
-        }
-        resolve(Buffer.concat(chunks));
-      });
-    }));
+    return this.gitRunner.runBuffer(repoPath, ['show', revisionSpec], {
+      maxBytes,
+      tooLargeMessage: 'File is too large for Markdown preview.',
+      requestedKind: 'interactive',
+      commandName: 'show',
+    });
   }
 
   /**
@@ -457,43 +394,10 @@ export class GitService {
       args.push('-R');
     }
 
-    return this.gitRunner.schedule(repoPath, 'write', 'apply', (signal) => new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] });
-      let stdout = '';
-      let stderr = '';
-      signal.addEventListener('abort', () => proc.kill(), { once: true });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        stdout += chunk.toString();
-      });
-
-      proc.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
-
-      proc.on('error', (error) => {
-        reject(error);
-      });
-
-      proc.on('close', (code) => {
-        if (signal.aborted) {
-          const error = new Error('Git apply was aborted.');
-          error.name = 'AbortError';
-          reject(error);
-          return;
-        }
-        if (code === 0) {
-          resolve(stdout.trimEnd());
-          return;
-        }
-
-        const message = (stderr || stdout || `git apply exited with code ${code}`).trim();
-        reject(new Error(message));
-      });
-
-      proc.stdin.write(patch);
-      proc.stdin.end();
-    }));
+    return this.gitRunner.runWithInput(repoPath, args, patch, {
+      requestedKind: 'write',
+      commandName: 'apply',
+    });
   }
 
   async getRepoOriginUrl(repoPath: string): Promise<string | null> {
@@ -629,60 +533,7 @@ export class GitService {
     limits: { maxBytes?: number; maxLines?: number } = {},
   ): Promise<DiffPreviewResult> {
     const repoPath = this.ensureRepoPath();
-    const maxBytes = Math.max(64 * 1024, Math.min(limits.maxBytes || 2 * 1024 * 1024, 8 * 1024 * 1024));
-    const maxLines = Math.max(100, Math.min(limits.maxLines || 5000, 20_000));
-
-    return this.gitRunner.schedule(repoPath, 'interactive', args[0] || 'diff', (signal) => new Promise<DiffPreviewResult>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
-      const chunks: Buffer[] = [];
-      let capturedBytes = 0;
-      let lineCount = 0;
-      let truncated = false;
-      let stderr = '';
-      signal.addEventListener('abort', () => proc.kill(), { once: true });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        if (truncated) return;
-        const remainingBytes = maxBytes - capturedBytes;
-        if (remainingBytes <= 0) {
-          truncated = true;
-          proc.kill();
-          return;
-        }
-        const accepted = chunk.length > remainingBytes ? chunk.subarray(0, remainingBytes) : chunk;
-        chunks.push(accepted);
-        capturedBytes += accepted.length;
-        lineCount += accepted.toString('utf8').split('\n').length - 1;
-        if (accepted.length < chunk.length || lineCount >= maxLines) {
-          truncated = true;
-          proc.kill();
-        }
-      });
-      proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-      proc.on('error', reject);
-      proc.on('close', (code, signal) => {
-        if (signal && !truncated) {
-          const error = new Error('Git diff preview was aborted.');
-          error.name = 'AbortError';
-          reject(error);
-          return;
-        }
-        if (code !== 0 && !truncated && signal == null) {
-          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
-          return;
-        }
-        let text = Buffer.concat(chunks).toString('utf8');
-        if (lineCount >= maxLines) {
-          text = text.split('\n').slice(0, maxLines).join('\n');
-        }
-        resolve({
-          text,
-          truncated,
-          bytes: Buffer.byteLength(text),
-          lines: text ? text.split('\n').length : 0,
-        });
-      });
-    }));
+    return this.gitRunner.getDiffPreview(repoPath, args, limits);
   }
 
   async streamCommandLines(
@@ -691,42 +542,7 @@ export class GitService {
     signal?: AbortSignal,
   ): Promise<void> {
     const repoPath = this.ensureRepoPath();
-    await this.gitRunner.schedule(repoPath, 'interactive', args[0] || 'stream', (schedulerSignal) => new Promise<void>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
-      let pending = '';
-      let stderr = '';
-      const abort = () => proc.kill();
-      schedulerSignal.addEventListener('abort', abort, { once: true });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        pending += chunk.toString('utf8');
-        let newlineIndex = pending.indexOf('\n');
-        while (newlineIndex >= 0) {
-          onLine(pending.slice(0, newlineIndex).replace(/\r$/, ''));
-          pending = pending.slice(newlineIndex + 1);
-          newlineIndex = pending.indexOf('\n');
-        }
-      });
-      proc.stderr.on('data', (chunk: Buffer) => {
-        if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
-      });
-      proc.on('error', reject);
-      proc.on('close', (code, closeSignal) => {
-        schedulerSignal.removeEventListener('abort', abort);
-        if (schedulerSignal.aborted || closeSignal) {
-          const error = new Error('Git stream was aborted.');
-          error.name = 'AbortError';
-          reject(error);
-          return;
-        }
-        if (code !== 0) {
-          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
-          return;
-        }
-        if (pending) onLine(pending.replace(/\r$/, ''));
-        resolve();
-      });
-    }), { signal });
+    await this.gitRunner.streamLines(repoPath, args, onLine, signal);
   }
 
   async streamCommandOutput(
@@ -735,62 +551,7 @@ export class GitService {
     signal?: AbortSignal,
   ): Promise<string> {
     const repoPath = this.ensureRepoPath();
-    this.gitRunner.assertRepoPathAvailable(repoPath);
-
-    const emitLines = (chunk: Buffer, pendingRef: { value: string }, capture: (text: string) => void) => {
-      const text = chunk.toString('utf8');
-      capture(text);
-
-      const parts = `${pendingRef.value}${text}`.split(/\r\n|\n|\r/);
-      pendingRef.value = parts.pop() ?? '';
-      for (const part of parts) {
-        const line = part.trim();
-        if (line) onLine(line);
-      }
-    };
-
-    const kind = this.gitRunner.classifyCommand(args);
-    return this.gitRunner.schedule(repoPath, kind, args[0] || 'stream', (schedulerSignal) => new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
-      const stdoutPending = { value: '' };
-      const stderrPending = { value: '' };
-      let stdout = '';
-      let stderr = '';
-      const abort = () => proc.kill();
-      schedulerSignal.addEventListener('abort', abort, { once: true });
-
-      proc.stdout.on('data', (chunk: Buffer) => {
-        emitLines(chunk, stdoutPending, (text) => {
-          stdout += text;
-        });
-      });
-      proc.stderr.on('data', (chunk: Buffer) => {
-        emitLines(chunk, stderrPending, (text) => {
-          if (stderr.length < 256 * 1024) stderr += text;
-        });
-      });
-      proc.on('error', reject);
-      proc.on('close', (code, closeSignal) => {
-        schedulerSignal.removeEventListener('abort', abort);
-        if (schedulerSignal.aborted || closeSignal) {
-          const error = new Error('Git stream was aborted.');
-          error.name = 'AbortError';
-          reject(error);
-          return;
-        }
-
-        const stdoutTail = stdoutPending.value.trim();
-        const stderrTail = stderrPending.value.trim();
-        if (stdoutTail) onLine(stdoutTail);
-        if (stderrTail) onLine(stderrTail);
-
-        if (code !== 0) {
-          reject(new Error((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim()));
-          return;
-        }
-        resolve(stdout.trimEnd());
-      });
-    }), { signal });
+    return this.gitRunner.streamOutput(repoPath, args, onLine, signal);
   }
 
   private sanitizeCloneTargetName(value: string): string {
@@ -876,43 +637,12 @@ export class GitService {
         return;
       }
 
-      const progressTail: string[] = [];
-      const collectProgress = (data: Buffer) => {
-        const lines = data.toString().split(/\r?\n|\r/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          progressTail.push(trimmed);
-          if (progressTail.length > 24) {
-            progressTail.splice(0, progressTail.length - 24);
-          }
-          onProgress(trimmed);
-        }
-      };
-
-      const proc = spawn('git', ['clone', '--progress', cloneUrl, repoPath], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-
-      // Git clone sends progress to stderr
-      proc.stderr.on('data', collectProgress);
-      proc.stdout.on('data', collectProgress);
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ success: true, repoPath });
-        } else {
-          const details = progressTail.slice(-4).join('\n').trim();
-          resolve({
-            success: false,
-            repoPath,
-            error: details || `Git clone exited with code ${code} (source: ${cloneUrl}, target: ${repoPath})`,
-          });
-        }
-      });
-
-      proc.on('error', (err) => {
-        resolve({ success: false, repoPath, error: err.message });
+      void this.gitRunner.cloneWithProgress(cloneUrl, repoPath, onProgress).then((result) => {
+        resolve({
+          success: result.success,
+          repoPath,
+          error: result.error,
+        });
       });
     });
   }
