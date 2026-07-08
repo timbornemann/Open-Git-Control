@@ -1,6 +1,6 @@
 # Support
 
-Sprache: **Deutsch** | English version: [SUPPORT.md](SUPPORT.md)
+Sprache: **Deutsch** | English version: [SUPPORT.md](../../../SUPPORT.md)
 
 Open-Git-Control nutzt strukturierte GitHub-Formulare, damit Meldungen und Ideen genug Kontext fuer die Bearbeitung enthalten.
 
@@ -10,7 +10,7 @@ Open-Git-Control nutzt strukturierte GitHub-Formulare, damit Meldungen und Ideen
 - Feature Request: Nutze das Feature-Request-Formular fuer Ideen, Workflow-Verbesserungen und neue Funktionen.
 - Question: Nutze das Question-Formular, wenn du Hilfe zum aktuellen Verhalten brauchst.
 - Documentation Report: Nutze das Documentation-Formular, wenn README, Screenshots, Setup-Schritte oder Release Notes unklar oder veraltet sind.
-- Sicherheitsproblem: Nutze keine oeffentlichen Issues. Folge [SECURITY.de.md](SECURITY.de.md).
+- Sicherheitsproblem: Nutze keine oeffentlichen Issues. Folge [sicherheit.md](sicherheit.md).
 
 Leere Issues sind deaktiviert, damit neue Issues strukturiert bleiben und leichter triagiert werden koennen.
 

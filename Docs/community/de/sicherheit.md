@@ -1,6 +1,6 @@
 # Sicherheitsrichtlinie
 
-Sprache: **Deutsch** | English version: [SECURITY.md](SECURITY.md)
+Sprache: **Deutsch** | English version: [SECURITY.md](../../../SECURITY.md)
 
 Open-Git-Control arbeitet mit lokalen Repositories, GitHub-Authentifizierung, optionalen KI-Provider-Keys, Release-Publishing-Ablaeufen und lokalen Planning-API-Tokens. Bitte melde Sicherheitsprobleme privat.
 

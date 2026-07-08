@@ -863,10 +863,10 @@ Open-Git-Control nutzt strukturierte GitHub-Formulare fuer Bug Reports, Feature 
 
 [Strukturiertes Issue oeffnen](https://github.com/timbornemann/Open-Git-Control/issues/new/choose)
 
-- Lies [CONTRIBUTING.de.md](CONTRIBUTING.de.md), bevor du einen Pull Request oeffnest.
-- Nutze [SUPPORT.de.md](SUPPORT.de.md), um den passenden Weg fuer Meldungen oder Fragen zu waehlen.
-- Melde Sicherheitsluecken privat ueber [SECURITY.de.md](SECURITY.de.md), nicht in oeffentlichen Issues.
-- Beachte den [Verhaltenskodex](CODE_OF_CONDUCT.de.md) bei Issues, Reviews und Pull Requests.
+- Lies [Beitraege](Docs/community/de/beitraege.md), bevor du einen Pull Request oeffnest.
+- Nutze [Support](Docs/community/de/support.md), um den passenden Weg fuer Meldungen oder Fragen zu waehlen.
+- Melde Sicherheitsluecken privat ueber [Sicherheit](Docs/community/de/sicherheit.md), nicht in oeffentlichen Issues.
+- Beachte den [Verhaltenskodex](Docs/community/de/verhaltenskodex.md) bei Issues, Reviews und Pull Requests.
 
 Leere Issues sind deaktiviert, damit neue Meldungen genug Kontext fuer die Triage enthalten.
 

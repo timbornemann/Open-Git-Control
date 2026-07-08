@@ -1,6 +1,6 @@
 # Support
 
-Language: **English** | Deutsche Version: [SUPPORT.de.md](SUPPORT.de.md)
+Language: **English** | Deutsche Version: [Docs/community/de/support.md](Docs/community/de/support.md)
 
 Open-Git-Control uses structured GitHub forms so reports and ideas contain enough context to act on.
 

@@ -1,6 +1,6 @@
 # Contributing to Open-Git-Control
 
-Language: **English** | Deutsche Version: [CONTRIBUTING.de.md](CONTRIBUTING.de.md)
+Language: **English** | Deutsche Version: [Docs/community/de/beitraege.md](Docs/community/de/beitraege.md)
 
 Thank you for helping improve Open-Git-Control. This project welcomes bug reports, feature requests, questions, documentation improvements, tests, and focused code changes.
 

@@ -1,6 +1,6 @@
 # Security Policy
 
-Language: **English** | Deutsche Version: [SECURITY.de.md](SECURITY.de.md)
+Language: **English** | Deutsche Version: [Docs/community/de/sicherheit.md](Docs/community/de/sicherheit.md)
 
 Open-Git-Control handles local repositories, GitHub authentication, optional AI provider keys, release publishing flows, and local planning API tokens. Please report security issues privately.
 

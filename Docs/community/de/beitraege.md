@@ -1,6 +1,6 @@
 # Zu Open-Git-Control beitragen
 
-Sprache: **Deutsch** | English version: [CONTRIBUTING.md](CONTRIBUTING.md)
+Sprache: **Deutsch** | English version: [CONTRIBUTING.md](../../../CONTRIBUTING.md)
 
 Danke, dass du Open-Git-Control verbessern moechtest. Das Projekt freut sich ueber Bug Reports, Feature Requests, Fragen, Dokumentationsverbesserungen, Tests und fokussierte Code-Aenderungen.
 
@@ -84,7 +84,7 @@ Commit Messages sollten zum bestehenden Stil im Repository passen, zum Beispiel:
 
 ## Sicherheit
 
-Oeffne keine oeffentlichen Issues fuer Sicherheitsluecken, geleakte Secrets oder Umgehungen sicherheitsrelevanter Ablaeufe. Nutze GitHub private vulnerability reporting wie in [SECURITY.de.md](SECURITY.de.md) beschrieben.
+Oeffne keine oeffentlichen Issues fuer Sicherheitsluecken, geleakte Secrets oder Umgehungen sicherheitsrelevanter Ablaeufe. Nutze GitHub private vulnerability reporting wie in [sicherheit.md](sicherheit.md) beschrieben.
 
 ## Lizenz
 

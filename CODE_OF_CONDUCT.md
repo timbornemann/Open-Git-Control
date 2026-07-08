@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Language: **English** | Deutsche Version: [CODE_OF_CONDUCT.de.md](CODE_OF_CONDUCT.de.md)
+Language: **English** | Deutsche Version: [Docs/community/de/verhaltenskodex.md](Docs/community/de/verhaltenskodex.md)
 
 Open-Git-Control should be a practical, respectful place for people to report problems, ask questions, suggest ideas, and contribute improvements.
 
