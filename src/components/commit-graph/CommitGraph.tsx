@@ -3,44 +3,44 @@ import {
   mergeableDecoratedRefs,
   normalizeBranchRefForMerge,
   type GitStatusDetailed,
-} from '../utils/gitParsing';
-import { GraphNode, GraphEdge } from '../utils/graphLayout';
-import { useToastQueue } from '../hooks/useToastQueue';
-import { ActionToastViewport } from './ActionToastViewport';
-import { DiffRequest } from '../types/diff';
-import { useI18n } from '../i18n';
-import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
-import { BranchInfo, GitMergeMode } from '../types/git';
-import { useCommitGraphData } from './commit-graph/useCommitGraphData';
-import { CommitGraphSvg } from './commit-graph/CommitGraphSvg';
-import { ForensicSearchPanel, type ForensicSearchType } from './commit-graph/ForensicSearchPanel';
-import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commit-graph/commitGraphConstants';
-import { EmptyState } from './EmptyState';
+} from '../../utils/gitParsing';
+import { GraphNode, GraphEdge } from '../../utils/graphLayout';
+import { useToastQueue } from '../../hooks/useToastQueue';
+import { ActionToastViewport } from '../ActionToastViewport';
+import { DiffRequest } from '../../types/diff';
+import { useI18n } from '../../i18n';
+import { formatDate, formatRelativeTime, formatTime } from '../../utils/dateTime';
+import { BranchInfo, GitMergeMode } from '../../types/git';
+import { useCommitGraphData } from './useCommitGraphData';
+import { CommitGraphSvg } from './CommitGraphSvg';
+import { ForensicSearchPanel, type ForensicSearchType } from './ForensicSearchPanel';
+import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commitGraphConstants';
+import { EmptyState } from '../EmptyState';
 import {
   buildGraphHighlightData,
   getRefKind,
   resolveHighlightableBranchRef,
   sortRefs,
-} from './commit-graph/commitGraphRefs';
-import { useCommitGraphDialogs } from './commit-graph/useCommitGraphDialogs';
-import { useCommitGraphSearch } from './commit-graph/useCommitGraphSearch';
-import { useForensicSearch } from './commit-graph/useForensicSearch';
-import { CommitSearchToolbar } from './commit-graph/CommitSearchToolbar';
+} from './commitGraphRefs';
+import { useCommitGraphDialogs } from './useCommitGraphDialogs';
+import { useCommitGraphSearch } from './useCommitGraphSearch';
+import { useForensicSearch } from './useForensicSearch';
+import { CommitSearchToolbar } from './CommitSearchToolbar';
 import {
   CommitContextMenu,
   type ContextMenuPlacement,
   type ContextMenuState,
   type MenuAction,
   type MergeContextPayload,
-} from './commit-graph/CommitContextMenu';
-import { useCommitGraphViewport } from './commit-graph/useCommitGraphViewport';
-import { buildCommitMenuActions } from './commit-graph/commitGraphMenuActions';
-import { useCommitGraphGitActions } from './commit-graph/useCommitGraphGitActions';
+} from './CommitContextMenu';
+import { useCommitGraphViewport } from './useCommitGraphViewport';
+import { buildCommitMenuActions } from './commitGraphMenuActions';
+import { useCommitGraphGitActions } from './useCommitGraphGitActions';
 
 export {
   buildGraphHighlightData,
   findCommitIndexByNavigationTarget,
-} from './commit-graph/commitGraphRefs';
+} from './commitGraphRefs';
 
 interface CommitGraphProps {
   repoPath: string | null;

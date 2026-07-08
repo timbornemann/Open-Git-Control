@@ -1,7 +1,7 @@
 import React from 'react';
 import { PanelRightClose } from 'lucide-react';
 import { CommitDetails } from '../../CommitDetails';
-import { StagingArea } from '../../StagingArea';
+import { StagingArea } from '../../staging-area';
 import { WorkingTreeFileDetails } from '../../WorkingTreeFileDetails';
 import {
   useRepositoryContext,

@@ -90,7 +90,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
         onChange={(e) => setForensicPath(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }}
         list="forensic-path-suggestions"
-        placeholder={tr('Dateipfad (z.B. src/components/CommitGraph.tsx)', 'File path (e.g. src/components/CommitGraph.tsx)')}
+        placeholder={tr('Dateipfad (z.B. src/components/commit-graph/CommitGraph.tsx)', 'File path (e.g. src/components/commit-graph/CommitGraph.tsx)')}
         style={{ flex: 1, minWidth: 260, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
       />
       <datalist id="forensic-path-suggestions">

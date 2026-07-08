@@ -13,10 +13,10 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
-import { EmptyState } from './EmptyState';
-import { useProjectPlanner } from '../contexts/ProjectPlannerContext';
-import { useI18n } from '../i18n';
-import { PlannerItem, PlannerPriority, PlannerStatus } from '../types/projectPlanner';
+import { EmptyState } from '../EmptyState';
+import { useProjectPlanner } from '../../contexts/ProjectPlannerContext';
+import { useI18n } from '../../i18n';
+import { PlannerItem, PlannerPriority, PlannerStatus } from '../../types/projectPlanner';
 import {
   ItemDialog,
   MaterializeDialog,
@@ -24,8 +24,8 @@ import {
   ProjectDialog,
   STATUS_OPTIONS,
   usePlannerLabels,
-} from './project-planner/PlannerDialogs';
-import { appClient } from '../services/appClient';
+} from './PlannerDialogs';
+import { appClient } from '../../services/appClient';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,

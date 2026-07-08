@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useI18n } from '../i18n';
-import type { DiffRequest } from '../types/diff';
-import { isMarkdownFilePath } from '../utils/markdownPreview';
-import type { DiffViewMode } from '../utils/diffParser';
-import { DiffContentPane } from './diff-viewer/DiffContentPane';
-import { DiffToolbar } from './diff-viewer/DiffToolbar';
-import { MarkdownPreviewPane } from './diff-viewer/MarkdownPreviewPane';
-import { useDiffBlame } from './diff-viewer/useDiffBlame';
-import { useDiffPreviewData } from './diff-viewer/useDiffPreviewData';
-import { useHunkPatchActions } from './diff-viewer/useHunkPatchActions';
-import { useMarkdownPreview } from './diff-viewer/useMarkdownPreview';
+import { useI18n } from '../../i18n';
+import type { DiffRequest } from '../../types/diff';
+import { isMarkdownFilePath } from '../../utils/markdownPreview';
+import type { DiffViewMode } from '../../utils/diffParser';
+import { DiffContentPane } from './DiffContentPane';
+import { DiffToolbar } from './DiffToolbar';
+import { MarkdownPreviewPane } from './MarkdownPreviewPane';
+import { useDiffBlame } from './useDiffBlame';
+import { useDiffPreviewData } from './useDiffPreviewData';
+import { useHunkPatchActions } from './useHunkPatchActions';
+import { useMarkdownPreview } from './useMarkdownPreview';
 
 interface DiffViewerProps {
   repoPath: string | null;

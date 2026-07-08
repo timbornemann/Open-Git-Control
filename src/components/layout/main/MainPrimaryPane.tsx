@@ -1,11 +1,11 @@
 import React from 'react';
-import { DiffViewer } from '../../DiffViewer';
+import { DiffViewer } from '../../diff-viewer';
 import { FileTimelineView } from '../../FileTimelineView';
-import { CommitGraph } from '../../CommitGraph';
+import { CommitGraph } from '../../commit-graph';
 import { RecoveryCenter } from '../../RecoveryCenter';
 import { ReleaseCreator } from '../../ReleaseCreator';
-import { StagingArea } from '../../StagingArea';
-import { ProjectPlannerView } from '../../ProjectPlannerView';
+import { StagingArea } from '../../staging-area';
+import { ProjectPlannerView } from '../../project-planner';
 import { SettingsMainContent } from '../SettingsMainContent';
 import {
   useGithubContext,

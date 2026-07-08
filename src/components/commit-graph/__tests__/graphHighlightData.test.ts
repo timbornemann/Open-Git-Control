@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGraphHighlightData, findCommitIndexByNavigationTarget } from '../../CommitGraph';
+import { buildGraphHighlightData, findCommitIndexByNavigationTarget } from '..';
 import { computeGraphLayout } from '../../../utils/graphLayout';
 import type { GitCommit } from '../../../utils/gitParsing';
 

@@ -1,24 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useToastQueue } from '../hooks/useToastQueue';
-import { useI18n } from '../i18n';
-import { useUIContext } from '../contexts/AppStateContext';
+import { useToastQueue } from '../../hooks/useToastQueue';
+import { useI18n } from '../../i18n';
+import { useUIContext } from '../../contexts/AppStateContext';
 import {
   getCommitMessageStyleLabel,
-} from '../utils/commitMessagePreferences';
-import { ActionToastViewport } from './ActionToastViewport';
-import { ConflictResolverPanel } from './staging-area/ConflictResolverPanel';
-import { StagingCommitPanel } from './staging-area/StagingCommitPanel';
-import { StagingContextMenu } from './staging-area/StagingContextMenu';
-import { StagingFileSections } from './staging-area/StagingFileSections';
-import { StagingToolbar } from './staging-area/StagingToolbar';
-import { StashPanel } from './staging-area/StashPanel';
-import type { StagingAreaProps } from './staging-area/types';
-import { useAiCommit } from './staging-area/useAiCommit';
-import { useAiCommitMessageDialog } from './staging-area/useAiCommitMessageDialog';
-import { useCommitForm } from './staging-area/useCommitForm';
-import { useConflictResolver } from './staging-area/useConflictResolver';
-import { useFileOperations } from './staging-area/useFileOperations';
-import { useVisibleStagingFiles } from './staging-area/useVisibleStagingFiles';
+} from '../../utils/commitMessagePreferences';
+import { ActionToastViewport } from '../ActionToastViewport';
+import { ConflictResolverPanel } from './ConflictResolverPanel';
+import { StagingCommitPanel } from './StagingCommitPanel';
+import { StagingContextMenu } from './StagingContextMenu';
+import { StagingFileSections } from './StagingFileSections';
+import { StagingToolbar } from './StagingToolbar';
+import { StashPanel } from './StashPanel';
+import type { StagingAreaProps } from './types';
+import { useAiCommit } from './useAiCommit';
+import { useAiCommitMessageDialog } from './useAiCommitMessageDialog';
+import { useCommitForm } from './useCommitForm';
+import { useConflictResolver } from './useConflictResolver';
+import { useFileOperations } from './useFileOperations';
+import { useVisibleStagingFiles } from './useVisibleStagingFiles';
 
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
