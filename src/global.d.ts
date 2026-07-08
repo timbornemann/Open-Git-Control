@@ -22,17 +22,57 @@ export interface StoredRepoData {
   sortBy?: RepoSortByDto;
 }
 
-type IpcSuccessResult<T> = {
+export type IpcSuccessResult<T> = {
   success: true;
   data: T;
+  error?: never;
 };
 
-type IpcErrorResult = {
+export type IpcErrorResult = {
   success: false;
   error: string;
+  data?: never;
 };
 
-type IpcResult<T> = IpcSuccessResult<T> | IpcErrorResult;
+export type IpcResult<T> = IpcSuccessResult<T> | IpcErrorResult;
+
+export type GitCommandNameDto =
+  | 'status'
+  | 'statusPorcelain'
+  | 'log'
+  | 'branches'
+  | 'commitDetails'
+  | 'conflictTakeOurs'
+  | 'conflictTakeTheirs'
+  | 'conflictMarkResolved'
+  | 'mergeContinue'
+  | 'mergeAbort'
+  | 'rebaseContinue'
+  | 'rebaseAbort'
+  | 'branch'
+  | 'remote'
+  | 'tag'
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'checkout'
+  | 'commit'
+  | 'reset'
+  | 'clean'
+  | 'stash'
+  | 'diff'
+  | 'show'
+  | 'add'
+  | 'cherry-pick'
+  | 'revert'
+  | 'merge'
+  | 'submoduleStatus'
+  | 'submoduleUpdateInitRecursive'
+  | 'submoduleSyncRecursive'
+  | 'reflog'
+  | 'forensicHistory';
+
+export type GitCommandResultDto = IpcResult<string>;
 
 export interface GitHubRepositoryDto {
   id: number;
@@ -427,6 +467,20 @@ export interface RepoFileDataUrlDto {
   bytes: number;
 }
 
+export type FileTimelineChangeDto = {
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  path: string;
+  oldPath?: string;
+};
+
+export type FileTimelineCommitDto = {
+  hash: string;
+  author: string;
+  date: string;
+  subject: string;
+  changes: FileTimelineChangeDto[];
+};
+
 export interface ElectronAPI {
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
@@ -434,7 +488,7 @@ export interface ElectronAPI {
   setRepoPath: (repoPath: string) => Promise<boolean>;
   clearRepoPath: () => Promise<boolean>;
   openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
-  runGitCommand: (command: string, ...args: any[]) => Promise<{ success: boolean; data?: any; error?: string }>;
+  runGitCommand: (command: GitCommandNameDto, ...args: string[]) => Promise<GitCommandResultDto>;
   createCommit: (params: {
     title: string;
     description?: string;
@@ -459,22 +513,22 @@ export interface ElectronAPI {
     lineCount: number,
   ) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onRepoUnavailable: (callback: (payload: { command: string; error: string }) => void) => () => void;
-  startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<{ success: boolean; data?: any; error?: string }>;
-  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<{ success: boolean; data?: any; error?: string }>;
+  startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<IpcResult<string>>;
+  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<IpcResult<string>>;
   getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
   gitStashBranch: (stashName: string, branchName: string) => Promise<IpcResult<string>>;
   getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;
   addIgnoreRule: (pattern: string) => Promise<{ success: boolean; added?: boolean; pattern?: string; error?: string }>;
-  gitFetch: () => Promise<{ success: boolean; data?: any; error?: string }>;
-  gitPull: () => Promise<{ success: boolean; data?: any; error?: string }>;
-  gitPush: () => Promise<{ success: boolean; data?: any; error?: string }>;
+  gitFetch: () => Promise<GitCommandResultDto>;
+  gitPull: () => Promise<GitCommandResultDto>;
+  gitPush: () => Promise<GitCommandResultDto>;
   scanPushSecrets: (params?: { includeTags?: boolean }) => Promise<IpcResult<SecretScanResultDto>>;
   cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<{ success: boolean; repoPath: string; error?: string }>;
   gitInit: (repoPath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
-  getFileTimelineData: (limit?: number) => Promise<{ success: boolean; data: any[]; error?: string }>;
+  getFileTimelineData: (limit?: number) => Promise<IpcResult<FileTimelineCommitDto[]>>;
   readRepoFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   getMarkdownPreviewFile: (params: {
     source: RepositoryFileSourceDto;

@@ -1,5 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
+import { githubClient } from '../../../services/githubClient';
 import type { RepoOwnerRef } from '../../../types/git';
 import type { RunGitCommandOptions } from '../state/appStateShared';
 import type { ConfirmDialogState } from '../layoutTypes';
@@ -69,7 +71,8 @@ export const usePullRequestWorkflow = ({
   }, [createPullRequest, currentBranch, newPRBase, newPRBody, newPRHead, newPRTitle]);
 
   const handleOpenPR = useCallback((url: string) => {
-    void window.electronAPI?.openExternalUrl(url);
+    if (!githubClient.isAvailable()) return;
+    void githubClient.openExternalUrl(url);
   }, []);
 
   const handleCopyPRUrl = useCallback(async (url: string) => {
@@ -85,11 +88,11 @@ export const usePullRequestWorkflow = ({
     prNumber: number,
     mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge',
   ) => {
-    if (!window.electronAPI || !ownerRepo) return;
+    if (!githubClient.isAvailable() || !ownerRepo) return;
 
     const executeMerge = async () => {
       try {
-        const result = await window.electronAPI.githubMergePR({
+        const result = await githubClient.mergePullRequest({
           owner: ownerRepo.owner,
           repo: ownerRepo.repo,
           pullNumber: prNumber,
@@ -144,15 +147,18 @@ export const usePullRequestWorkflow = ({
   ]);
 
   const handleCheckoutPR = useCallback(async (prNumber: number, headRef: string) => {
-    const targetBranch = `pr-${prNumber}-${headRef.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+    const targetBranch = gitClient.getPullRequestBranchName(prNumber, headRef);
     const fetched = await runGitCommand(
-      ['fetch', 'origin', `pull/${prNumber}/head:${targetBranch}`],
+      gitClient.buildFetchPullRequestBranchArgs(prNumber, targetBranch),
       tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
       tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
       { skipDirtyGuard: true },
     );
     if (!fetched) return;
-    await runGitCommand(['checkout', targetBranch], tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`));
+    await runGitCommand(
+      gitClient.buildCheckoutBranchArgs(targetBranch),
+      tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
+    );
   }, [runGitCommand, tr]);
 
   return {

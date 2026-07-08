@@ -4,6 +4,7 @@ import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
 import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
+import { gitClient } from '../services/gitClient';
 import { VirtualList } from './VirtualList';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
@@ -65,7 +66,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
   }, [normalizedHash]);
 
   useEffect(() => {
-    if (!normalizedHash || !window.electronAPI) return;
+    if (!normalizedHash || !gitClient.isAvailable()) return;
 
     const fetchDetails = async () => {
       setLoadingFiles(true);
@@ -75,19 +76,19 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
       setCommitDescription('');
 
       try {
-        const parentsResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%P', normalizedHash);
+        const parentsResult = await gitClient.runGitCommand('show', '-s', '--format=%P', normalizedHash);
         const parents = parentsResult.success
           ? String(parentsResult.data || '').trim().split(/\s+/).filter(Boolean)
           : [];
         const mergeCommit = parents.length > 1;
         setIsMergeCommit(mergeCommit);
 
-        const messageResult = await window.electronAPI.runGitCommand('show', '-s', '--format=%B', normalizedHash);
+        const messageResult = await gitClient.runGitCommand('show', '-s', '--format=%B', normalizedHash);
         if (messageResult.success) {
           setCommitDescription(extractCommitDescription(String(messageResult.data || '')));
         }
 
-        const detailResult = await window.electronAPI.runGitCommand('commitDetails', normalizedHash);
+        const detailResult = await gitClient.runGitCommand('commitDetails', normalizedHash);
         if (!detailResult.success) {
           setFiles([]);
           setFilesError(detailResult.error || tr('Commit-Details konnten nicht geladen werden.', 'Could not load commit details.'));
@@ -101,7 +102,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
         }
 
         if (mergeCommit) {
-          const mergeRangeResult = await window.electronAPI.runGitCommand('diff', '--name-status', `${normalizedHash}^1`, normalizedHash);
+          const mergeRangeResult = await gitClient.runGitCommand('diff', '--name-status', `${normalizedHash}^1`, normalizedHash);
           if (mergeRangeResult.success) {
             const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
             if (mergedBranchFiles.length > 0) {

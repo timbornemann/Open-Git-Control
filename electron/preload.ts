@@ -3,6 +3,8 @@ import type {
   AppSettingsDto,
   CommitStatsUpdateDto,
   ElectronAPI,
+  GitCommandNameDto,
+  GitCommandResultDto,
   GitJobEventDto,
   PlanningApiTokenLifetimeDto,
   StoredRepoData,
@@ -51,7 +53,10 @@ const notifyRepoUnavailable = (payload: RepoUnavailablePayload) => {
   }
 };
 
-const invokeGitCommand = async (commandName: string, ...args: any[]) => {
+const invokeGitCommand = async (
+  commandName: GitCommandNameDto,
+  ...args: string[]
+): Promise<GitCommandResultDto> => {
   const result = await ipcRenderer.invoke('git:command', commandName, ...args);
   if (result && !result.success && isRepoUnavailableError(result.error)) {
     notifyRepoUnavailable({
@@ -80,7 +85,7 @@ const electronAPI: ElectronAPI = {
   setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
   clearRepoPath: () => ipcRenderer.invoke('git:clearRepo'),
   openExternalUrl: (url: string) => ipcRenderer.invoke('external:open', url),
-  runGitCommand: (commandName: string, ...args: any[]) => invokeGitCommand(commandName, ...args),
+  runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
   createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
     invokeGitMutation('git:createCommit', 'commit', params),
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>

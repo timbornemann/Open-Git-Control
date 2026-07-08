@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppSettingsDto } from '../../global';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { gitClient } from '../../services/gitClient';
 import type { GitStatusWithConflicts } from './types';
 import {
   getCommitFormDraft,
@@ -65,8 +66,8 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   }, [repoPath, settings.commitTemplate]);
 
   useEffect(() => {
-    if (!amendCommit || !repoPath || !window.electronAPI) return;
-    void window.electronAPI.runGitCommand('show', '--format=%B', '-s', 'HEAD').then((r) => {
+    if (!amendCommit || !repoPath || !gitClient.isAvailable()) return;
+    void gitClient.runGitCommand('show', '--format=%B', '-s', 'HEAD').then((r) => {
       if (r.success && typeof r.data === 'string') {
         const lines = r.data.trimEnd().split('\n');
         setCommitMsg(lines[0] || '');
@@ -116,7 +117,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
           if (signoffCommit) commitArgs.push('--signoff');
           commitArgs.push('-m', title);
           if (description) commitArgs.push('-m', description);
-          return window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
+          return gitClient.runGitCommand('commit', ...commitArgs.slice(1));
         })();
       if (r.success) {
         const nextDraft = resetCommitFormDraft(repoPath, settings.commitTemplate || '');

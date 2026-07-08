@@ -1,5 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
 import { isWorkTreeRequiredError } from '../../../utils/gitPushRecovery';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
 import type { ConfirmDialogState } from '../layoutTypes';
@@ -27,7 +28,7 @@ export const useInitialCommitRecoveryWorkflow = ({
   const ensureInitialCommitForPush = useCallback(async (
     options: { skipBareRepoRecovery?: boolean } = {},
   ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
+    if (!gitClient.isAvailable()) return false;
 
     const commitMessage = tr('Initial commit', 'Initial commit');
     const isIdentityMissingError = (message: string) => (
@@ -41,11 +42,11 @@ export const useInitialCommitRecoveryWorkflow = ({
       || /working tree clean/i.test(message)
     );
 
-    const statusResult = await window.electronAPI.runGitCommand('statusPorcelain');
+    const statusResult = await gitClient.getStatusPorcelain();
     const hasChanges = Boolean(statusResult.success && String(statusResult.data || '').trim().length > 0);
 
     if (hasChanges) {
-      const addResult = await window.electronAPI.runGitCommand('add', '-A');
+      const addResult = await gitClient.stageAll();
       if (!addResult.success) {
         setGitActionToast({
           msg: addResult.error || tr('Konnte Aenderungen nicht automatisch stagen.', 'Could not stage changes automatically.'),
@@ -55,18 +56,16 @@ export const useInitialCommitRecoveryWorkflow = ({
       }
     }
 
-    const commitArgs = hasChanges
-      ? ['commit', '-m', commitMessage]
-      : ['commit', '--allow-empty', '-m', commitMessage];
-
-    const commitResult = await window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
+    const commitResult = hasChanges
+      ? await gitClient.commitMessage(commitMessage)
+      : await gitClient.commitAllowEmpty(commitMessage);
     if (commitResult.success) {
       return true;
     }
 
     const commitError = String(commitResult.error || '');
     if (isNothingToCommitError(commitError)) {
-      const emptyCommitResult = await window.electronAPI.runGitCommand('commit', '--allow-empty', '-m', commitMessage);
+      const emptyCommitResult = await gitClient.commitAllowEmpty(commitMessage);
       if (emptyCommitResult.success) {
         return true;
       }
@@ -130,11 +129,11 @@ export const useInitialCommitRecoveryWorkflow = ({
       onConfirm: () => Promise<void>;
     },
   ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
+    if (!gitClient.isAvailable()) return false;
 
     let changedFiles: number | null = null;
     try {
-      const statusResult = await window.electronAPI.runGitCommand('statusPorcelain');
+      const statusResult = await gitClient.getStatusPorcelain();
       if (statusResult.success) {
         changedFiles = String(statusResult.data || '')
           .split('\n')

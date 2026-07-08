@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import { GitStashEntryDto } from '../../global';
 import { useI18n } from '../../i18n';
+import { gitClient } from '../../services/gitClient';
 import { EmptyState } from '../EmptyState';
 import type { InputDialogState } from './types';
 import { basename } from './utils';
@@ -63,7 +64,7 @@ export const StashPanel: React.FC<Props> = ({
       [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
     }));
     try {
-      const result = await window.electronAPI.runGitCommand('stash', 'show', '-u', '--name-only', stashName);
+      const result = await gitClient.runGitCommand('stash', 'show', '-u', '--name-only', stashName);
       if (!result.success) {
         setStashFiles((current) => ({
           ...current,
@@ -97,7 +98,7 @@ export const StashPanel: React.FC<Props> = ({
   }, [collapsed, load, refreshTrigger]);
 
   const runStashOp = async (stashName: string, op: StashOp) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     try {
       let args: string[];
       if (op === 'apply') {
@@ -107,7 +108,7 @@ export const StashPanel: React.FC<Props> = ({
       } else {
         args = ['stash', 'drop', stashName];
       }
-      const result = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const result = await gitClient.runGitCommand('stash', ...args.slice(1));
       if (result.success) {
         if (op === 'pop' || op === 'drop') {
           setExpandedFiles(new Set());
@@ -176,7 +177,7 @@ export const StashPanel: React.FC<Props> = ({
         setError(null);
         const result = typeof api.gitStashBranch === 'function'
           ? await api.gitStashBranch(stash.name, branchName)
-          : await api.runGitCommand('stash', 'branch', branchName, stash.name);
+          : await gitClient.runGitCommand('stash', 'branch', branchName, stash.name);
 
         if (result.success) {
           setExpandedFiles(new Set());
@@ -204,14 +205,14 @@ export const StashPanel: React.FC<Props> = ({
   };
 
   const restoreStashFile = async (stashName: string, filePath: string) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     setPendingFileOp({ stashName, path: filePath });
     setError(null);
     try {
-      const trackedResult = await window.electronAPI.runGitCommand('checkout', stashName, '--', filePath);
+      const trackedResult = await gitClient.runGitCommand('checkout', stashName, '--', filePath);
       const finalResult = trackedResult.success
         ? trackedResult
-        : await window.electronAPI.runGitCommand('checkout', `${stashName}^3`, '--', filePath);
+        : await gitClient.runGitCommand('checkout', `${stashName}^3`, '--', filePath);
 
       if (finalResult.success) {
         onRepoChanged?.();

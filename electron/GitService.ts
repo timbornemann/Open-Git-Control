@@ -4,6 +4,9 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { GitJobKind, GitScheduler } from './GitScheduler';
+import { CommitService, type CommitMessageInput } from './git/CommitService';
+import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
+import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
 
 const execFileAsync = util.promisify(execFile);
 const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
@@ -41,43 +44,14 @@ const SERIALIZED_GIT_COMMANDS = new Set<string>([
   'push',
 ]);
 
-export type CommitStats = { files: number; additions: number; deletions: number };
+export type { CommitStats, FileTimelineCommit };
 export type DiffPreviewResult = {
   text: string;
   truncated: boolean;
   bytes: number;
   lines: number;
 };
-export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
-export type RepositoryFileDataUrl = {
-  dataUrl: string;
-  mimeType: string;
-  bytes: number;
-};
-export type CommitMessageInput = {
-  title: string;
-  description?: string;
-  amend?: boolean;
-  signoff?: boolean;
-  allowEmpty?: boolean;
-};
-
-const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
-const MAX_MARKDOWN_PREVIEW_FILE_BYTES = 2 * 1024 * 1024;
-const MAX_MARKDOWN_PREVIEW_ASSET_BYTES = 10 * 1024 * 1024;
-const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
-const IMAGE_MIME_TYPES = new Map<string, string>([
-  ['apng', 'image/apng'],
-  ['avif', 'image/avif'],
-  ['bmp', 'image/bmp'],
-  ['gif', 'image/gif'],
-  ['ico', 'image/x-icon'],
-  ['jpeg', 'image/jpeg'],
-  ['jpg', 'image/jpeg'],
-  ['png', 'image/png'],
-  ['svg', 'image/svg+xml'],
-  ['webp', 'image/webp'],
-]);
+export type { RepositoryFileDataUrl, RepositoryFileSource };
 const statusPorcelainArgs = (): string[] => [
   '-c',
   'core.quotepath=false',
@@ -89,11 +63,24 @@ const statusPorcelainArgs = (): string[] => [
 export class GitService {
   private repoPath: string | null = null;
   private repoIsBare: boolean | null = null;
+  private readonly commitService: CommitService;
+  private readonly historyService: HistoryService;
+  private readonly repositoryFiles: RepositoryFiles;
 
   constructor(
     private readonly execFileAsyncRunner: ExecFileAsyncRunner = execFileAsync as ExecFileAsyncRunner,
     private readonly scheduler: GitScheduler = new GitScheduler(),
-  ) {}
+  ) {
+    this.commitService = new CommitService(this.execGit.bind(this));
+    this.historyService = new HistoryService(
+      (args) => this.runCommand(args),
+      (repoPath, args, signal) => this.runCommandAtPathWithSignal(repoPath, args, signal),
+    );
+    this.repositoryFiles = new RepositoryFiles(
+      () => this.ensureRepoPath(),
+      (revisionSpec, maxBytes) => this.readGitFileBuffer(revisionSpec, maxBytes),
+    );
+  }
 
   private createPrivateTempDir(prefix: string): string {
     const safePrefix = String(prefix || 'ogc-temp-').replace(/[^a-z0-9_-]/gi, '-') || 'ogc-temp-';
@@ -113,30 +100,6 @@ export class GitService {
     } catch {
       // Some platforms ignore chmod for temp files.
     }
-  }
-
-  private normalizePathspecEntries(paths: string[]): string[] {
-    const normalized = [...new Set(
-      paths
-        .map((filePath) => String(filePath || '').trim())
-        .filter(Boolean),
-    )];
-    if (normalized.some((filePath) => /[\0\r\n]/.test(filePath))) {
-      throw new Error('Pathspec entries must not contain control characters.');
-    }
-    return normalized;
-  }
-
-  private createPathspecFile(tempPrefix: string, paths: string[]): { tempDir: string; pathspecFile: string; entries: string[] } {
-    const entries = this.normalizePathspecEntries(paths);
-    if (entries.length === 0) {
-      throw new Error('At least one path is required.');
-    }
-
-    const tempDir = this.createPrivateTempDir(tempPrefix);
-    const pathspecFile = path.join(tempDir, 'paths.nul');
-    this.writePrivateTempFile(pathspecFile, `${entries.join('\0')}\0`);
-    return { tempDir, pathspecFile, entries };
   }
 
   private cleanupPrivateTempDir(tempDir: string | null): void {
@@ -314,79 +277,6 @@ export class GitService {
     } catch {
       return false;
     }
-  }
-
-  private isPathInsideRepo(repoPath: string, filePath: string): boolean {
-    const relative = path.relative(repoPath, filePath);
-    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
-  }
-
-  private normalizeRepoRelativePath(relativePath: string): string {
-    const rawPath = String(relativePath || '').trim();
-    if (!rawPath) {
-      throw new Error('File path is required.');
-    }
-
-    const normalizedForCheck = rawPath.replace(/\\/g, '/');
-    const segments = normalizedForCheck.split('/');
-    if (
-      path.isAbsolute(rawPath)
-      || path.win32.isAbsolute(rawPath)
-      || normalizedForCheck.startsWith('/')
-      || normalizedForCheck.startsWith(':(')
-      || segments.includes('..')
-      || /[\0\r\n]/.test(rawPath)
-    ) {
-      throw new Error('File path must be repository-relative.');
-    }
-
-    return normalizedForCheck;
-  }
-
-  private getImageMimeType(relativePath: string): string {
-    const fileName = relativePath.split('/').pop() || relativePath;
-    const lastDot = fileName.lastIndexOf('.');
-    const extension = lastDot >= 0 ? fileName.slice(lastDot + 1).toLowerCase() : '';
-    const mimeType = IMAGE_MIME_TYPES.get(extension);
-    if (!mimeType) {
-      throw new Error('Only image assets can be loaded for Markdown preview.');
-    }
-    return mimeType;
-  }
-
-  private buildRevisionFileSpec(source: RepositoryFileSource, relativePath: string, commitHash?: string): string {
-    if (source === 'staged') {
-      return `:${relativePath}`;
-    }
-
-    if (source === 'commit') {
-      const normalizedHash = String(commitHash || '').trim();
-      if (!COMMIT_HASH_RE.test(normalizedHash)) {
-        throw new Error('Invalid commit hash.');
-      }
-      return `${normalizedHash}:${relativePath}`;
-    }
-
-    throw new Error('Working tree files are not addressed by a Git revision spec.');
-  }
-
-  private readWorkingTreeFileBuffer(relativePath: string, maxBytes: number): Buffer {
-    const repoPath = this.ensureRepoPath();
-    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
-
-    const stat = fs.statSync(resolvedPath);
-    if (!stat.isFile()) {
-      throw new Error('Target path is not a file.');
-    }
-    if (stat.size > maxBytes) {
-      throw new Error('File is too large for Markdown preview.');
-    }
-
-    return fs.readFileSync(resolvedPath);
   }
 
   private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
@@ -672,26 +562,7 @@ export class GitService {
    * Liest eine Textdatei innerhalb des aktiven Repositories.
    */
   async readRepoFile(relativePath: string): Promise<string> {
-    const repoPath = this.ensureRepoPath();
-    const normalizedRelativePath = (relativePath || '').trim();
-    if (!normalizedRelativePath) {
-      throw new Error('File path is required.');
-    }
-
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
-
-    const stat = fs.statSync(resolvedPath);
-    if (!stat.isFile()) {
-      throw new Error('Target path is not a file.');
-    }
-    if (stat.size > 2 * 1024 * 1024) {
-      throw new Error('File is too large for inline conflict editing (>2MB).');
-    }
-
-    return fs.readFileSync(resolvedPath, 'utf8');
+    return this.repositoryFiles.readRepoFile(relativePath);
   }
 
   async readRepositoryFileTextAtSource(
@@ -699,13 +570,7 @@ export class GitService {
     relativePath: string,
     commitHash?: string,
   ): Promise<string> {
-    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
-    if (source === 'unstaged') {
-      return this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES).toString('utf8');
-    }
-
-    const revisionSpec = this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash);
-    return (await this.readGitFileBuffer(revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).toString('utf8');
+    return this.repositoryFiles.readRepositoryFileTextAtSource(source, relativePath, commitHash);
   }
 
   async readRepositoryImageDataUrlAtSource(
@@ -713,44 +578,14 @@ export class GitService {
     relativePath: string,
     commitHash?: string,
   ): Promise<RepositoryFileDataUrl> {
-    const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
-    const mimeType = this.getImageMimeType(normalizedRelativePath);
-    const buffer = source === 'unstaged'
-      ? this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
-      : await this.readGitFileBuffer(
-        this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash),
-        MAX_MARKDOWN_PREVIEW_ASSET_BYTES,
-      );
-
-    return {
-      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
-      mimeType,
-      bytes: buffer.length,
-    };
+    return this.repositoryFiles.readRepositoryImageDataUrlAtSource(source, relativePath, commitHash);
   }
 
   /**
    * Schreibt eine Textdatei innerhalb des aktiven Repositories.
    */
   async writeRepoFile(relativePath: string, content: string): Promise<void> {
-    const repoPath = this.ensureRepoPath();
-    const normalizedRelativePath = (relativePath || '').trim();
-    if (!normalizedRelativePath) {
-      throw new Error('File path is required.');
-    }
-
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
-
-    const stat = fs.statSync(resolvedPath);
-    if (!stat.isFile()) {
-      throw new Error('Target path is not a file.');
-    }
-
-    const textValue = typeof content === 'string' ? content : String(content ?? '');
-    fs.writeFileSync(resolvedPath, textValue, 'utf8');
+    await this.repositoryFiles.writeRepoFile(relativePath, content);
   }
 
   /**
@@ -857,44 +692,7 @@ export class GitService {
   }
 
   async commitWithMessageAtPath(repoPath: string, input: CommitMessageInput, paths?: string[]): Promise<string> {
-    const normalizedPath = (repoPath || '').trim();
-    if (!normalizedPath) {
-      throw new Error('Repository path is required.');
-    }
-
-    const title = String(input.title || '').trim();
-    const description = String(input.description || '').trim();
-    if (!title) {
-      throw new Error('Commit title is required.');
-    }
-
-    const message = description ? `${title}\n\n${description}` : title;
-    if (message.length > MAX_COMMIT_MESSAGE_FILE_LENGTH) {
-      throw new Error('Commit message is too long.');
-    }
-
-    const tempDir = this.createPrivateTempDir('ogc-commit-message-');
-    const messageFile = path.join(tempDir, 'message.txt');
-    this.writePrivateTempFile(messageFile, message);
-    let pathspecTempDir: string | null = null;
-
-    const args = ['commit'];
-    if (input.amend) args.push('--amend');
-    if (input.signoff) args.push('--signoff');
-    if (input.allowEmpty) args.push('--allow-empty');
-    args.push('-F', messageFile);
-    if (paths) {
-      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', paths);
-      pathspecTempDir = pathspec.tempDir;
-      args.push(`--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul');
-    }
-
-    try {
-      return await this.execGit(normalizedPath, args);
-    } finally {
-      this.cleanupPrivateTempDir(tempDir);
-      this.cleanupPrivateTempDir(pathspecTempDir);
-    }
+    return this.commitService.commitWithMessageAtPath(repoPath, input, paths);
   }
 
   /**
@@ -1016,127 +814,48 @@ export class GitService {
     return this.runCommand(['branch', '-a']);
   }
 
-  /**
-   * Holt das Git Log in einem einfach parsebaren Format
-   */
-  private getStructuredLogFormat(): string {
-    return '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
-  }
-
   async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0): Promise<string> {
-    // NUL separates commits (with -z) and US (\x1f) separates fixed fields.
-    // Refs use GS (\x1d) as an explicit separator to avoid ambiguities.
-    const format = this.getStructuredLogFormat();
-    const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
-    const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso'];
-
-    if (includeAll) {
-      args.splice(1, 0, '--all');
-    }
-
-    return this.runCommand(args);
+    return this.historyService.getLog(limit, includeAll, offset);
   }
 
   async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
-    const format = this.getStructuredLogFormat();
-    return this.runCommand([
-      'log',
-      '-z',
-      `-${safeLimit}`,
-      '--date=iso',
-      `--pretty=format:${format}`,
-      '--numstat',
-      '-S',
-      search,
-      '--',
-      filePath,
-    ]);
+    return this.historyService.getForensicHistoryByString(search, filePath, limit);
   }
 
   async getForensicHistoryByRegex(regex: string, filePath: string, limit: number = 200): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
-    const format = this.getStructuredLogFormat();
-    return this.runCommand([
-      'log',
-      '-z',
-      `-${safeLimit}`,
-      '--date=iso',
-      `--pretty=format:${format}`,
-      '--numstat',
-      '-G',
-      regex,
-      '--',
-      filePath,
-    ]);
+    return this.historyService.getForensicHistoryByRegex(regex, filePath, limit);
   }
 
   async getForensicHistoryByLineRange(filePath: string, startLine: number, endLine: number, limit: number = 200): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
-    return this.runCommand([
-      'log',
-      `-${safeLimit}`,
-      '--date=iso',
-      '--pretty=format:%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%x00',
-      `-L${startLine},${endLine}:${filePath}`,
-    ]);
+    return this.historyService.getForensicHistoryByLineRange(filePath, startLine, endLine, limit);
   }
 
   /**
    * Liefert Reflog-Eintraege in einem stabil parsebaren Format.
    */
   async getReflog(limit: number = 300): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 300;
-    const format = '%H%x1f%h%x1f%gd%x1f%gs%x1f%cd%x00';
-    return this.runCommand([
-      'reflog',
-      '--date=iso',
-      `--max-count=${safeLimit}`,
-      '--pretty=format:' + format,
-    ]);
+    return this.historyService.getReflog(limit);
   }
 
   /**
    * Holt die Details eines einzelnen Commits (veraenderte Dateien)
    */
   async getCommitDetails(hash: string): Promise<string> {
-    // Liefert Status (A, M, D) und Dateipfad (-M, --name-status)
-    return this.runCommand(['show', '--name-status', '--format=', hash]);
+    return this.historyService.getCommitDetails(hash);
   }
 
   /**
    * Liefert die Historie einer einzelnen Datei.
    */
   async getFileHistory(filePath: string, limit: number = 100, commitHash?: string): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 100;
-    const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x00';
-    const args = [
-      'log',
-      '--follow',
-      '-z',
-      `-${safeLimit}`,
-      `--pretty=format:${format}`,
-      '--date=iso',
-    ];
-
-    if (commitHash) {
-      args.push(commitHash);
-    }
-
-    args.push('--', filePath);
-    return this.runCommand(args);
+    return this.historyService.getFileHistory(filePath, limit, commitHash);
   }
 
   /**
    * Liefert Blame-Informationen einer Datei.
    */
   async getFileBlame(filePath: string, commitHash?: string): Promise<string> {
-    const args = ['blame', '--line-porcelain'];
-    if (commitHash) {
-      args.push(commitHash);
-    }
-    args.push('--', filePath);
-    return this.runCommand(args);
+    return this.historyService.getFileBlame(filePath, commitHash);
   }
 
   async getFileBlameRange(
@@ -1145,38 +864,11 @@ export class GitService {
     startLine: number,
     lineCount: number,
   ): Promise<string> {
-    const safeStart = Number.isFinite(startLine) ? Math.max(1, Math.floor(startLine)) : 1;
-    const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 500)) : 500;
-    const endLine = safeStart + safeCount - 1;
-    const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
-    if (commitHash) {
-      args.push(commitHash);
-    }
-    args.push('--', filePath);
-    return this.runCommand(args);
+    return this.historyService.getFileBlameRange(filePath, commitHash, startLine, lineCount);
   }
 
   async getCommitStatsAtPath(repoPath: string, hash: string, signal: AbortSignal): Promise<CommitStats> {
-    const normalizedHash = String(hash || '').trim();
-    if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) {
-      throw new Error('Invalid commit hash.');
-    }
-
-    const raw = await this.runCommandAtPathWithSignal(
-      repoPath,
-      ['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', normalizedHash],
-      signal,
-    );
-    const stats: CommitStats = { files: 0, additions: 0, deletions: 0 };
-
-    for (const line of raw.split(/\r?\n/)) {
-      const match = line.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
-      if (!match) continue;
-      stats.files += 1;
-      if (match[1] !== '-') stats.additions += Number(match[1]);
-      if (match[2] !== '-') stats.deletions += Number(match[2]);
-    }
-    return stats;
+    return this.historyService.getCommitStatsAtPath(repoPath, hash, signal);
   }
 
   async stagePaths(paths: string[]): Promise<string> {
@@ -1184,37 +876,11 @@ export class GitService {
   }
 
   async stagePathsAtPath(repoPath: string, paths: string[]): Promise<string> {
-    const normalizedPath = (repoPath || '').trim();
-    if (!normalizedPath) {
-      throw new Error('Repository path is required.');
-    }
-
-    const normalized = this.normalizePathspecEntries(paths);
-    if (normalized.length === 0) return '';
-
-    const pathspec = this.createPathspecFile('ogc-add-pathspec-', normalized);
-    try {
-      return await this.execGit(normalizedPath, ['add', `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
-    } finally {
-      this.cleanupPrivateTempDir(pathspec.tempDir);
-    }
+    return this.commitService.stagePathsAtPath(repoPath, paths);
   }
 
   async unstagePathsAtPath(repoPath: string, paths: string[]): Promise<string> {
-    const normalizedPath = (repoPath || '').trim();
-    if (!normalizedPath) {
-      throw new Error('Repository path is required.');
-    }
-
-    const normalized = this.normalizePathspecEntries(paths);
-    if (normalized.length === 0) return '';
-
-    const pathspec = this.createPathspecFile('ogc-reset-pathspec-', normalized);
-    try {
-      return await this.execGit(normalizedPath, ['reset', `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
-    } finally {
-      this.cleanupPrivateTempDir(pathspec.tempDir);
-    }
+    return this.commitService.unstagePathsAtPath(repoPath, paths);
   }
 
   async getDiffPreview(
@@ -1434,65 +1100,8 @@ export class GitService {
     return repoPath;
   }
 
-  async getFileTimelineData(limit: number = 2000): Promise<any[]> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 5000)) : 2000;
-    const recordSeparator = '\x1e';
-    const fieldSeparator = '\x1f';
-    const format = `%x1e%H%x1f%an%x1f%ad%x1f%s%x00`;
-    const args = ['log', `-${safeLimit}`, '-z', '--name-status', `--pretty=format:${format}`, '--date=iso'];
-    const output = await this.runCommand(args);
-    const commits: any[] = [];
-
-    for (const record of output.split(recordSeparator)) {
-      const tokens = record
-        .split('\x00')
-        .map((token) => token.replace(/^\r?\n/, ''))
-        .filter((token) => token.length > 0);
-      if (tokens.length === 0) continue;
-
-      const [hash = '', author = '', date = '', subject = ''] = tokens[0].split(fieldSeparator);
-      if (!/^[0-9a-f]{7,40}$/i.test(hash)) continue;
-
-      const currentCommit = {
-        hash,
-        author,
-        date,
-        subject,
-        changes: [] as Array<{ status: 'added' | 'modified' | 'deleted' | 'renamed'; path: string; oldPath?: string }>,
-      };
-
-      for (let i = 1; i < tokens.length;) {
-        const statusToken = tokens[i].trim();
-        i += 1;
-        if (!statusToken) continue;
-
-        const statusChar = statusToken[0];
-        let status: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
-        if (statusChar === 'A') status = 'added';
-        else if (statusChar === 'D') status = 'deleted';
-        else if (statusChar === 'R') status = 'renamed';
-
-        if (status === 'renamed') {
-          const oldPath = tokens[i] || '';
-          const newPath = tokens[i + 1] || '';
-          i += 2;
-          if (newPath) {
-            currentCommit.changes.push({ status, path: newPath, oldPath });
-          }
-          continue;
-        }
-
-        const path = tokens[i] || '';
-        i += 1;
-        if (path) {
-          currentCommit.changes.push({ status, path });
-        }
-      }
-
-      commits.push(currentCommit);
-    }
-
-    return commits;
+  async getFileTimelineData(limit: number = 2000): Promise<FileTimelineCommit[]> {
+    return this.historyService.getFileTimelineData(limit);
   }
 
   /**

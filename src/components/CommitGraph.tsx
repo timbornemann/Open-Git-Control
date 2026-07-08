@@ -21,6 +21,8 @@ import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
 import { BranchInfo, GitMergeMode } from '../types/git';
+import type { GitCommandNameDto } from '../global';
+import { gitClient } from '../services/gitClient';
 import { useCommitGraphData } from './commit-graph/useCommitGraphData';
 import { EmptyState } from './EmptyState';
 
@@ -816,7 +818,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     setForensicError(null);
 
     try {
-      const { success, data, error } = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const { success, data, error } = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
       if (!success) {
         const message = String(error || tr('Forensische Suche fehlgeschlagen.', 'Forensic search failed.'));
         const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
@@ -839,7 +841,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
   }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, tr]);
   const runGitAction = async (args: string[], successMsg: string) => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable() || args.length === 0) return;
     if (onRunGitCommand) {
       const success = await onRunGitCommand(args, successMsg);
       if (success) {
@@ -850,7 +852,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
 
     try {
-      const result = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
       if (result.success) {
         setToast({ msg: successMsg, isError: false });
         refreshCommits();
@@ -860,7 +862,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         refreshCommits();
         void refreshWorkingTreeStatus();
         try {
-          const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+          const statusAfter = await gitClient.getStatusPorcelain();
           const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
           const conflictPath = resolveConflictPathAfterGitFailure(porcelain, result.error);
           if (conflictPath && onOpenConflictResolverForPath) {
@@ -887,7 +889,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       refreshCommits();
       void refreshWorkingTreeStatus();
       try {
-        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const statusAfter = await gitClient.getStatusPorcelain();
         const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
         const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
         if (conflictPath && onOpenConflictResolverForPath) {

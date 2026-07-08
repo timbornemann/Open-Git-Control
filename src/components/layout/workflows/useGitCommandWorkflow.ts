@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto } from '../../../global';
+import type { AppSettingsDto, GitCommandNameDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
 import {
   isMergeInProgressError,
   resolveConflictPathAfterGitFailure,
@@ -107,15 +108,20 @@ export const useGitCommandWorkflow = ({
     actionLabel?: string,
     options?: RunGitCommandOptions,
   ): Promise<boolean> => {
-    if (!window.electronAPI || !workspace.activeRepo || args.length === 0) return false;
+    if (!gitClient.isAvailable() || !workspace.activeRepo || args.length === 0) return false;
 
-    const command = args[0];
+    const command = args[0] as GitCommandNameDto;
     const tryAutoSetUpstreamPush = async (failureMessage: unknown): Promise<boolean> => {
       if (command !== 'push' || options?.skipAutoSetUpstreamOnPushFailure || !isMissingUpstreamPushError(failureMessage)) {
         return false;
       }
 
-      const fallbackArgs = ['push', ...args.slice(1), '-u', 'origin', 'HEAD'];
+      const fallbackArgs = gitClient.buildPushCurrentBranchArgs({
+        extraArgs: args.slice(1),
+        remote: 'origin',
+        ref: 'HEAD',
+        setUpstream: true,
+      });
       const fallbackSuccess = await runGitCommand(
         fallbackArgs,
         tr('Branch gepusht und Upstream gesetzt.', 'Pushed branch and set upstream.'),
@@ -136,7 +142,7 @@ export const useGitCommandWorkflow = ({
     setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgefÃ¼hrt...`, `Running git ${command}...`));
 
     try {
-      const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
+      const r = await gitClient.runGitCommand(command, ...args.slice(1));
       if (r.success) {
         if (forceGithubRepoCreationPrompt && (command === 'push' || command === 'pull' || command === 'fetch')) {
           setForceGithubRepoCreationPrompt(false);
@@ -212,7 +218,7 @@ export const useGitCommandWorkflow = ({
       const mergeInProgress = isMergeInProgressError(r.error);
       triggerRefresh();
       try {
-        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const statusAfter = await gitClient.getStatusPorcelain();
         const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
         const conflictPath = resolveConflictPathAfterGitFailure(porcelain, r.error);
         if (conflictPath) {
@@ -315,7 +321,7 @@ export const useGitCommandWorkflow = ({
       const mergeInProgress = isMergeInProgressError(e?.message);
       triggerRefresh();
       try {
-        const statusAfter = await window.electronAPI.runGitCommand('statusPorcelain');
+        const statusAfter = await gitClient.getStatusPorcelain();
         const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
         const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
         if (conflictPath) {

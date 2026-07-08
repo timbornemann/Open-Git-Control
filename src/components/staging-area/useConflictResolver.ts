@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { normalizeMergeConflictFileContent } from '../../utils/conflictLineGutter';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { gitClient } from '../../services/gitClient';
 import {
   basename,
   buildConflictResolution,
@@ -303,7 +304,7 @@ export const useConflictResolver = ({
       const writeResult = await window.electronAPI.writeRepoFile(targetPath, targetContent);
       if (!writeResult.success) throw new Error(writeResult.error || tr('Datei konnte nicht gespeichert werden.', 'Could not save file.'));
       if (markResolvedAfterSave) {
-        const stageResult = await window.electronAPI.runGitCommand('conflictMarkResolved', targetPath);
+        const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
         if (!stageResult.success) throw new Error(stageResult.error || tr('Datei konnte nicht als geloest markiert werden.', 'Could not mark file as resolved.'));
       }
       setConflictEditor((prev) => {

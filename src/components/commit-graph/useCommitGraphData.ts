@@ -9,6 +9,7 @@ import {
   type GitStatusDetailed,
 } from '../../utils/gitParsing';
 import { normalizeRepoPathKey } from '../../utils/repoPath';
+import { gitClient } from '../../services/gitClient';
 import {
   mergeCommitStatsUpdate,
   type CommitStatsUpdate,
@@ -290,18 +291,19 @@ export const useCommitGraphData = ({
       await onRefreshWorkingTree();
       return;
     }
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
     try {
-      const { success, data } = await window.electronAPI.runGitCommand('status', '-s');
+      const { success, data } = await gitClient.runGitCommand('status', '-s');
       if (success) {
         setWorkingTreeStatus(parseGitStatusDetailed(data || ''));
       }
-    } catch (e: any) {
-      if (isRepoUnavailableError(String(e?.message || e || ''))) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error || '');
+      if (isRepoUnavailableError(message)) {
         setWorkingTreeStatus(null);
         return;
       }
-      console.error(e);
+      console.error(error);
     }
   }, [onRefreshWorkingTree, repoPath]);
 

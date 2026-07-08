@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import type { AppSettingsDto, SecretScanFindingDto } from '../global';
+import type { AppSettingsDto, GitCommandNameDto, SecretScanFindingDto } from '../global';
+import { gitClient } from '../services/gitClient';
 
 type RunGitCommandOptions = {
   args: string[];
@@ -28,12 +29,12 @@ export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuc
   }, []);
 
   const runGitCommand = useCallback(async ({ args, successMsg, actionLabel, skipSecretScan }: RunGitCommandOptions) => {
-    if (!window.electronAPI || !activeRepo) return false;
-    const command = args[0];
+    if (!gitClient.isAvailable() || !activeRepo) return false;
+    const command = args[0] as GitCommandNameDto;
 
     const shouldScanPush = command === 'push' && settings?.secretScanBeforePushEnabled && !skipSecretScan;
     if (shouldScanPush) {
-      const scanResult = await window.electronAPI.scanPushSecrets({
+      const scanResult = await gitClient.scanPushSecrets({
         includeTags: args.some((arg) => arg === '--tags'),
       });
       if (!scanResult.success) {
@@ -57,7 +58,7 @@ export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuc
     setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
 
     try {
-      const r = await window.electronAPI.runGitCommand(command, ...args.slice(1));
+      const r = await gitClient.runGitCommand(command, ...args.slice(1));
       if (r.success) {
         onSuccessToast?.(successMsg);
         onSuccess?.();

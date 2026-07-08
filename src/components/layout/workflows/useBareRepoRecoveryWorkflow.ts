@@ -1,6 +1,8 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { getElectronApi } from '../../../services/electronApi';
+import { gitClient } from '../../../services/gitClient';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
 import {
   normalizeRepoPointer,
@@ -34,7 +36,8 @@ export const useBareRepoRecoveryWorkflow = ({
     return trByLanguage(settings.language as AppLanguage, deText, enText);
   }, [settings.language]);
   const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
-    if (!window.electronAPI || !workspace.activeRepo) return false;
+    const electronApi = getElectronApi();
+    if (!electronApi || !gitClient.isAvailable() || !workspace.activeRepo) return false;
 
     const sourceRepoPath = workspace.activeRepo;
     const { parentDir, baseName } = splitRepoPath(sourceRepoPath);
@@ -47,7 +50,7 @@ export const useBareRepoRecoveryWorkflow = ({
 
     let existingOriginUrl: string | null = null;
     try {
-      const originResult = await window.electronAPI.runGitCommand('remote', 'get-url', 'origin');
+      const originResult = await gitClient.getRemoteUrl('origin');
       if (originResult.success) {
         const rawOrigin = String(originResult.data || '').trim();
         existingOriginUrl = rawOrigin || null;
@@ -60,7 +63,7 @@ export const useBareRepoRecoveryWorkflow = ({
     let lastCloneError = '';
 
     for (const candidateName of candidateNames) {
-      const nextResult = await window.electronAPI.gitClone(sourceRepoPath, parentDir, candidateName);
+      const nextResult = await electronApi.gitClone(sourceRepoPath, parentDir, candidateName);
       if (nextResult.success) {
         cloneResult = nextResult;
         break;
@@ -90,7 +93,7 @@ export const useBareRepoRecoveryWorkflow = ({
 
     const switchedPath = cloneResult.repoPath;
     const ensureRecoveredRepoSelected = async () => {
-      await window.electronAPI.setRepoPath(switchedPath);
+      await electronApi.setRepoPath(switchedPath);
       workspace.setActiveRepo(switchedPath);
     };
 
@@ -102,10 +105,10 @@ export const useBareRepoRecoveryWorkflow = ({
 
     await ensureRecoveredRepoSelected();
 
-    const headAfterCloneResult = await window.electronAPI.runGitCommand('show', '--quiet', '--format=%H', 'HEAD');
+    const headAfterCloneResult = await gitClient.runGitCommand('show', '--quiet', '--format=%H', 'HEAD');
     const hasLocalCommit = Boolean(headAfterCloneResult.success && String(headAfterCloneResult.data || '').trim());
     if (!hasLocalCommit) {
-      const remoteBranchesResult = await window.electronAPI.runGitCommand('branch', '-r');
+      const remoteBranchesResult = await gitClient.runGitCommand('branch', '-r');
       const remoteBranches = remoteBranchesResult.success
         ? String(remoteBranchesResult.data || '')
           .split('\n')
@@ -123,17 +126,11 @@ export const useBareRepoRecoveryWorkflow = ({
       if (preferredRemoteBranch) {
         const localBranchName = preferredRemoteBranch.replace(/^origin\//, '').trim();
         await ensureRecoveredRepoSelected();
-        const checkoutTracked = await window.electronAPI.runGitCommand(
-          'checkout',
-          '-b',
-          localBranchName,
-          '--track',
-          preferredRemoteBranch,
-        );
+        const checkoutTracked = await gitClient.checkoutRemoteBranch(preferredRemoteBranch, localBranchName);
 
         if (!checkoutTracked.success) {
           await ensureRecoveredRepoSelected();
-          const checkoutForced = await window.electronAPI.runGitCommand(
+          const checkoutForced = await gitClient.runGitCommand(
             'checkout',
             '-B',
             localBranchName,
@@ -160,7 +157,7 @@ export const useBareRepoRecoveryWorkflow = ({
 
     if (!existingOriginUrl || originPointsToSource) {
       await ensureRecoveredRepoSelected();
-      const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
+      const removeOriginResult = await gitClient.removeRemote('origin');
       if (!removeOriginResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
@@ -174,7 +171,7 @@ export const useBareRepoRecoveryWorkflow = ({
       }
     } else {
       await ensureRecoveredRepoSelected();
-      const setUrlResult = await window.electronAPI.runGitCommand('remote', 'set-url', 'origin', existingOriginUrl);
+      const setUrlResult = await gitClient.setRemoteUrl('origin', existingOriginUrl);
       if (!setUrlResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({

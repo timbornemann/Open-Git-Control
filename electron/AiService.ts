@@ -2,6 +2,8 @@ import { GitService, gitService } from './GitService';
 import { AiCommitMessageLanguage, AiCommitMessageStyle, AppSettings, AiProvider } from './settings';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AiProviderClient, getSelectedAiModel } from './ai/AiProviderClient';
+import { AutoCommitPlanner } from './ai/AutoCommitPlanner';
 
 type StatusEntry = {
   path: string;
@@ -32,6 +34,23 @@ export type CommitMessage = {
 type AiCommit = {
   hash: string;
   subject: string;
+};
+
+type StagePathsCapable = {
+  stagePaths: (paths: string[]) => Promise<string>;
+};
+
+type CommitForPathsCapable = {
+  commitWithMessageForPaths: (message: CommitMessage, paths: string[]) => Promise<string>;
+};
+
+type CommitAtPathCapable = {
+  getRepoPath: () => string | null;
+  commitWithMessageAtPath: (repoPath: string, message: CommitMessage, paths?: string[]) => Promise<string>;
+};
+
+type CommitMessageCapable = {
+  commitWithMessage: (message: CommitMessage) => Promise<string>;
 };
 
 type ProgressPhase = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
@@ -98,6 +117,39 @@ const LARGE_HYBRID_SELECT_TIMEOUT_MS = 10_000;
 const LARGE_HYBRID_MESSAGE_TIMEOUT_MS = 14_000;
 const MIN_AI_CALL_BUDGET_MS = 1_200;
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
+const aiProviderClient = new AiProviderClient();
+const autoCommitPlanner = new AutoCommitPlanner({
+  maxFilesNormal: MAX_COMMIT_FILES_NORMAL,
+  maxFilesRetry: MAX_COMMIT_FILES_RETRY,
+  maxFilesFallback: MAX_COMMIT_FILES_FALLBACK,
+  maxNetLinesPerCommit: MAX_NET_LINES_PER_COMMIT,
+});
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object'
+);
+
+const hasStringArrayPaths = (value: unknown): value is { paths: unknown[] } => (
+  isObjectRecord(value) && Array.isArray(value.paths)
+);
+
+const hasStagePaths = (value: unknown): value is StagePathsCapable => (
+  isObjectRecord(value) && typeof value.stagePaths === 'function'
+);
+
+const hasCommitWithMessageForPaths = (value: unknown): value is CommitForPathsCapable => (
+  isObjectRecord(value) && typeof value.commitWithMessageForPaths === 'function'
+);
+
+const hasCommitWithMessageAtPath = (value: unknown): value is CommitAtPathCapable => (
+  isObjectRecord(value)
+  && typeof value.commitWithMessageAtPath === 'function'
+  && typeof value.getRepoPath === 'function'
+);
+
+const hasCommitWithMessage = (value: unknown): value is CommitMessageCapable => (
+  isObjectRecord(value) && typeof value.commitWithMessage === 'function'
+);
 
 function safeString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
@@ -186,18 +238,6 @@ export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-function normalizeGeminiModel(model: string): string {
-  const trimmed = model.trim();
-  if (!trimmed) return '';
-  return trimmed.startsWith('models/') ? trimmed.slice('models/'.length) : trimmed;
-}
-
-function getSelectedModel(settings: AppSettings): string {
-  return settings.aiProvider === 'gemini'
-    ? normalizeGeminiModel(settings.geminiModel)
-    : settings.ollamaModel.trim();
 }
 
 function detectChangeType(entry: StatusEntry): FileChangeType {
@@ -459,48 +499,6 @@ function parseJsonFromText(rawText: string): Record<string, unknown> | null {
   return null;
 }
 
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  shouldCancel?: () => boolean,
-): Promise<Response> {
-  const controller = new AbortController();
-  let abortedByTimeout = false;
-  let abortedByCancel = false;
-  const timeout = setTimeout(() => {
-    abortedByTimeout = true;
-    controller.abort();
-  }, timeoutMs);
-  const cancelPoll = setInterval(() => {
-    if (!shouldCancel?.()) return;
-    abortedByCancel = true;
-    controller.abort();
-  }, 120);
-
-  try {
-    if (shouldCancel?.()) {
-      abortedByCancel = true;
-      controller.abort();
-    }
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error: unknown) {
-    if ((error as any)?.name === 'AbortError') {
-      if (abortedByCancel || shouldCancel?.()) {
-        throw new Error('KI Auto-Commit wurde abgebrochen.');
-      }
-      if (abortedByTimeout) {
-        throw new Error(`KI Anfrage Zeitlimit ueberschritten (${Math.round(timeoutMs / 1000)}s).`);
-      }
-      throw new Error(`KI Anfrage Zeitlimit ueberschritten (${Math.round(timeoutMs / 1000)}s).`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-    clearInterval(cancelPoll);
-  }
-}
-
 async function runProviderText(
   settings: AppSettings,
   systemPrompt: string,
@@ -509,122 +507,14 @@ async function runProviderText(
   shouldCancel?: () => boolean,
   timeoutMs = CHAT_TIMEOUT_MS,
 ): Promise<string> {
-  if (settings.aiProvider === 'gemini') {
-    const apiKey = getGeminiApiKey().trim();
-    if (!apiKey) {
-      throw new Error('Gemini API key fehlt.');
-    }
-
-    const model = normalizeGeminiModel(settings.geminiModel);
-    if (!model) {
-      throw new Error('Gemini Modell fehlt.');
-    }
-
-    const response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: { temperature: 0.1 },
-        }),
-      },
-      timeoutMs,
-      shouldCancel,
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Gemini Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
-    };
-
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const content = parts
-      .map((part) => safeString((part as any).text))
-      .join('')
-      .trim();
-
-    return content;
-  }
-
-  const response = await fetchWithTimeout(
-    `${settings.ollamaBaseUrl}/api/chat`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: settings.ollamaModel,
-        stream: false,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        options: { temperature: 0.1 },
-      }),
-    },
-    timeoutMs,
+  return aiProviderClient.generateText({
+    settings,
+    systemPrompt,
+    userPrompt,
+    getGeminiApiKey,
     shouldCancel,
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Ollama Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
-  }
-
-  const data = (await response.json()) as { message?: { content?: unknown } };
-  return safeString(data.message?.content).trim();
-}
-
-function groupFilesDeterministically(files: SnapshotFile[]): SnapshotFile[][] {
-  const groups = new Map<string, SnapshotFile[]>();
-
-  for (const file of files) {
-    const arr = groups.get(file.groupKey) || [];
-    arr.push(file);
-    groups.set(file.groupKey, arr);
-  }
-
-  return [...groups.values()]
-    .map(group => group.sort((a, b) => a.path.localeCompare(b.path)))
-    .sort((a, b) => {
-      const aSpecial = a[0]?.groupKey.startsWith('special:') ? 0 : 1;
-      const bSpecial = b[0]?.groupKey.startsWith('special:') ? 0 : 1;
-      if (aSpecial !== bSpecial) return aSpecial - bSpecial;
-      return a[0].groupKey.localeCompare(b[0].groupKey);
-    });
-}
-
-function pickWindow(group: SnapshotFile[], mode: ProgressMode): SnapshotFile[] {
-  const maxFiles = mode === 'fallback'
-    ? MAX_COMMIT_FILES_FALLBACK
-    : mode === 'retry'
-      ? MAX_COMMIT_FILES_RETRY
-      : MAX_COMMIT_FILES_NORMAL;
-
-  const selected: SnapshotFile[] = [];
-  let netLines = 0;
-
-  for (const file of group) {
-    if (selected.length >= maxFiles) break;
-    const weight = file.additions + file.deletions;
-    if (selected.length > 0 && netLines + weight > MAX_NET_LINES_PER_COMMIT) {
-      break;
-    }
-    selected.push(file);
-    netLines += weight;
-  }
-
-  if (selected.length === 0 && group.length > 0) {
-    return [group[0]];
-  }
-
-  return selected;
+    timeoutMs,
+  });
 }
 
 async function chooseFilesWithAi(
@@ -714,8 +604,8 @@ async function planGroupsWithAi(
       if (Array.isArray(group)) {
         return group;
       }
-      if (group && typeof group === 'object' && Array.isArray((group as any).paths)) {
-        return (group as any).paths;
+      if (hasStringArrayPaths(group)) {
+        return group.paths;
       }
       return [];
     })
@@ -922,78 +812,17 @@ function buildFallbackCommitMessageFromNotes(notes: string, style: AiCommitMessa
 }
 
 export class AiService {
-  constructor(private readonly gitService: GitService) {}
+  constructor(
+    private readonly gitService: GitService,
+    private readonly providerClient: AiProviderClient = aiProviderClient,
+  ) {}
 
   async testConnection(settings: AppSettings, getGeminiApiKey: () => string): Promise<{ ok: true; provider: AiProvider; model: string; detail: string }> {
-    if (settings.aiProvider === 'gemini') {
-      const apiKey = getGeminiApiKey().trim();
-      if (!apiKey) {
-        throw new Error('Gemini API key fehlt.');
-      }
-
-      const model = normalizeGeminiModel(settings.geminiModel);
-      if (!model) {
-        throw new Error('Gemini Modell fehlt.');
-      }
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Gemini nicht erreichbar (${response.status}): ${text || response.statusText}`);
-      }
-
-      return { ok: true, provider: 'gemini', model, detail: 'Gemini API erreichbar' };
-    }
-
-    const response = await fetch(`${settings.ollamaBaseUrl}/api/version`);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama nicht erreichbar (${response.status}): ${text || response.statusText}`);
-    }
-
-    const json = (await response.json()) as { version?: unknown };
-    return { ok: true, provider: 'ollama', model: settings.ollamaModel, detail: `Ollama ${safeString(json.version, 'unknown')}` };
+    return this.providerClient.testConnection(settings, getGeminiApiKey);
   }
 
   async listModels(settings: AppSettings, getGeminiApiKey: () => string): Promise<string[]> {
-    if (settings.aiProvider === 'gemini') {
-      const apiKey = getGeminiApiKey().trim();
-      if (!apiKey) {
-        throw new Error('Gemini API key fehlt.');
-      }
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Gemini Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
-      }
-
-      const data = (await response.json()) as { models?: Array<{ name?: unknown; supportedGenerationMethods?: unknown }> };
-      const models = Array.isArray(data.models) ? data.models : [];
-      return uniqueSorted(
-        models
-          .filter(model => {
-            const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods : [];
-            return methods.includes('generateContent');
-          })
-          .map(model => normalizeGeminiModel(safeString(model.name)))
-          .filter(Boolean),
-      );
-    }
-
-    const response = await fetch(`${settings.ollamaBaseUrl}/api/tags`);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { models?: Array<{ name?: unknown; model?: unknown }> };
-    const models = Array.isArray(data.models) ? data.models : [];
-    return uniqueSorted(
-      models
-        .map(model => safeString(model.name || model.model).trim())
-        .filter(Boolean),
-    );
+    return this.providerClient.listModels(settings, getGeminiApiKey);
   }
 
   async generateCommitMessageFromUserNotes(
@@ -1006,7 +835,7 @@ export class AiService {
       throw new Error('Bitte beschreibe die Aenderungen fuer die Commit-Message.');
     }
 
-    const model = getSelectedModel(settings);
+    const model = getSelectedAiModel(settings);
     if (!model) {
       throw new Error('Kein KI-Modell konfiguriert.');
     }
@@ -1163,7 +992,7 @@ export class AiService {
       throw new Error('AI Auto-Commit ist in den Einstellungen deaktiviert.');
     }
 
-    const model = getSelectedModel(settings);
+    const model = getSelectedAiModel(settings);
     if (!model) {
       throw new Error('Kein KI-Modell konfiguriert.');
     }
@@ -1377,7 +1206,7 @@ export class AiService {
       }),
     });
 
-    let groups = groupFilesDeterministically(snapshotFiles);
+    let groups = autoCommitPlanner.groupFilesDeterministically(snapshotFiles);
     if (strategy === 'large-hybrid') {
       await hydrateLargeBatchSignals(snapshotFiles);
 
@@ -1458,7 +1287,7 @@ export class AiService {
         }
 
         const phase: ProgressPhase = mode === 'fallback' ? 'fallback' : mode === 'retry' ? 'retry' : 'committing';
-        const windowFiles = pickWindow(queue, mode);
+        const windowFiles = autoCommitPlanner.pickWindow(queue, mode);
 
         onProgress?.({
           phase,
@@ -1618,8 +1447,9 @@ export class AiService {
         }
 
         try {
-          if (typeof (this.gitService as any).stagePaths === 'function') {
-            await this.gitService.stagePaths(batchFiles.map((file) => file.path));
+          const gitCapabilities: unknown = this.gitService;
+          if (hasStagePaths(gitCapabilities)) {
+            await gitCapabilities.stagePaths(batchFiles.map((file) => file.path));
             ensureNotCancelled();
           } else {
             for (const file of batchFiles) {
@@ -1670,22 +1500,22 @@ export class AiService {
           }
 
           const batchPaths = batchFiles.map((file) => file.path);
-          if (typeof (this.gitService as any).commitWithMessageForPaths === 'function') {
-            await this.gitService.commitWithMessageForPaths({
+          if (hasCommitWithMessageForPaths(gitCapabilities)) {
+            await gitCapabilities.commitWithMessageForPaths({
               title: message.title,
               description: message.description,
             }, batchPaths);
-          } else if (typeof (this.gitService as any).commitWithMessageAtPath === 'function' && typeof this.gitService.getRepoPath === 'function') {
-            const repoPath = this.gitService.getRepoPath();
+          } else if (hasCommitWithMessageAtPath(gitCapabilities)) {
+            const repoPath = gitCapabilities.getRepoPath();
             if (!repoPath) {
               throw new Error('Repository path is required.');
             }
-            await this.gitService.commitWithMessageAtPath(repoPath, {
+            await gitCapabilities.commitWithMessageAtPath(repoPath, {
               title: message.title,
               description: message.description,
             }, batchPaths);
-          } else if (typeof (this.gitService as any).commitWithMessage === 'function' && batchPaths.length === 0) {
-            await this.gitService.commitWithMessage({
+          } else if (hasCommitWithMessage(gitCapabilities) && batchPaths.length === 0) {
+            await gitCapabilities.commitWithMessage({
               title: message.title,
               description: message.description,
             });

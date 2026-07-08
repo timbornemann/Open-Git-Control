@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileEntry, parseGitStatusDetailed, type GitStatusDetailed } from '../../utils/gitParsing';
-import type { WorkingTreeStatsDto } from '../../global';
+import type { GitCommandNameDto, WorkingTreeStatsDto } from '../../global';
 import type { DiffRequest } from '../../types/diff';
 import type { ToastMessage } from '../../types/git';
 import { useI18n } from '../../i18n';
+import { gitClient } from '../../services/gitClient';
 import {
   EMPTY_DIFF_STATS,
   basename,
@@ -73,16 +74,16 @@ export const useFileOperations = ({
   }, [mutationStartedAt]);
 
   const refresh = useCallback(async () => {
-    if (!repoPath || !window.electronAPI) return;
+    if (!repoPath || !gitClient.isAvailable()) return;
     if (externalRefresh) {
       await externalRefresh();
       return;
     }
     try {
       const [statusResult, stagedResult, unstagedResult] = await Promise.all([
-        window.electronAPI.runGitCommand('statusPorcelain'),
-        window.electronAPI.runGitCommand('diff', '--numstat', '--cached'),
-        window.electronAPI.runGitCommand('diff', '--numstat'),
+        gitClient.getStatusPorcelain(),
+        gitClient.runGitCommand('diff', '--numstat', '--cached'),
+        gitClient.runGitCommand('diff', '--numstat'),
       ]);
       if (externalRefreshRef.current) return;
 
@@ -178,12 +179,12 @@ export const useFileOperations = ({
   }, [contextMenu]);
 
   const git = useCallback(async (args: string[], msg: string, notify = false) => {
-    if (!window.electronAPI) return false;
+    if (!gitClient.isAvailable() || args.length === 0) return false;
     if (mutationInFlightRef.current) return false;
     mutationInFlightRef.current = true;
     setMutationStartedAt(Date.now());
     try {
-      const r = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+      const r = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
       if (r.success) {
         setToast({ msg, isError: false });
         if (notify && onRepoChanged) onRepoChanged();
@@ -219,7 +220,7 @@ export const useFileOperations = ({
         return;
       }
       if (section === 'staged' && entry.x === 'A') {
-        await window.electronAPI.runGitCommand('reset', 'HEAD', '--', entry.path);
+        await gitClient.runGitCommand('reset', 'HEAD', '--', entry.path);
       }
       setToast({
         msg: result.added

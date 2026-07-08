@@ -1,6 +1,7 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
 import {
   countChangedEntriesFromPorcelainV2,
   parseBranchSyncFromPorcelainV2,
@@ -106,7 +107,7 @@ export const useGitCommandGuardWorkflow = ({
 
     if (shouldGuardRemoteAheadWithDirtyState) {
       try {
-        const statusResult = await window.electronAPI.runGitCommand('status', '--porcelain=v2', '--branch');
+        const statusResult = await gitClient.getBranchStatusPorcelainV2();
         const statusText = statusResult.success ? String(statusResult.data || '') : '';
         const remoteSyncState = parseBranchSyncFromPorcelainV2(statusText);
         const behindCount = remoteSyncState.behind;
@@ -172,7 +173,7 @@ export const useGitCommandGuardWorkflow = ({
 
     if (shouldGuard) {
       try {
-        const status = await window.electronAPI.runGitCommand('statusPorcelain');
+        const status = await gitClient.getStatusPorcelain();
         const hasLocalChanges = Boolean(status.success && String(status.data || '').trim().length > 0);
         if (hasLocalChanges) {
           setConfirmDialog({
@@ -204,12 +205,12 @@ export const useGitCommandGuardWorkflow = ({
         const timeoutPromise = new Promise<never>((_, reject) => {
           scanTimeoutId = window.setTimeout(() => reject(new Error('__timeout__')), scanTimeoutMs);
         });
-        let scanResult: Awaited<ReturnType<typeof window.electronAPI.scanPushSecrets>>;
+        let scanResult: Awaited<ReturnType<typeof gitClient.scanPushSecrets>>;
         try {
-          scanResult = await Promise.race([window.electronAPI.scanPushSecrets({ includeTags: shouldScanTagRefs }), timeoutPromise]);
+          scanResult = await Promise.race([gitClient.scanPushSecrets({ includeTags: shouldScanTagRefs }), timeoutPromise]);
         } catch (timeoutErr: any) {
           if (timeoutErr?.message === '__timeout__') {
-            await window.electronAPI.cancelSecretScan();
+            await gitClient.cancelSecretScan();
             setConfirmDialog({
               variant: 'danger',
               title: tr('Secret-Scan Timeout', 'Secret scan timed out'),

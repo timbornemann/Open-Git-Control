@@ -5,6 +5,7 @@ import type {
   GitHubReleaseDto,
 } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { githubClient } from '../../../services/githubClient';
 import type { ReleaseNotesOptions } from '../../../types/releaseNotes';
 import type { RepoOwnerRef } from '../../../types/git';
 import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
@@ -129,7 +130,7 @@ export const useReleaseWorkflow = ({
   }, [currentBranch, ownerRepo, setReleaseFormState]);
 
   const refreshReleaseContext = useCallback(async (targetCommitishOverride?: string) => {
-    if (!window.electronAPI || !isGithubAuthenticated || !ownerRepo) {
+    if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
       setReleaseContext(null);
       setReleaseContextError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
       return;
@@ -140,7 +141,7 @@ export const useReleaseWorkflow = ({
 
     try {
       const targetCommitish = (targetCommitishOverride ?? releaseForm.targetCommitish ?? '').trim() || currentBranch;
-      const result = await window.electronAPI.githubGetReleaseContext({
+      const result = await githubClient.getReleaseContext({
         owner: ownerRepo.owner,
         repo: ownerRepo.repo,
         targetCommitish,
@@ -195,7 +196,7 @@ export const useReleaseWorkflow = ({
   ]);
 
   const handleCreateRelease = useCallback(async (confirmedEmptyReleaseNotes = false) => {
-    if (!window.electronAPI || !isGithubAuthenticated || !ownerRepo) {
+    if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
       setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
       return;
     }
@@ -267,7 +268,7 @@ export const useReleaseWorkflow = ({
     setReleaseSuccess(null);
 
     try {
-      const result = await window.electronAPI.githubCreateRelease({
+      const result = await githubClient.createRelease({
         owner: ownerRepo.owner,
         repo: ownerRepo.repo,
         tagName: releaseForm.tagName.trim(),
@@ -332,7 +333,7 @@ export const useReleaseWorkflow = ({
   ]);
 
   const generateReleaseNotesWithAI = useCallback(async (versionBump: ReleaseVersionBump) => {
-    if (!window.electronAPI) return;
+    if (!githubClient.isAvailable()) return;
     if (!isGithubAuthenticated || !ownerRepo) {
       setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
       return;
@@ -357,7 +358,7 @@ export const useReleaseWorkflow = ({
     setReleaseError(null);
 
     try {
-      const result = await window.electronAPI.aiGenerateReleaseNotes({
+      const result = await githubClient.generateReleaseNotes({
         tagName,
         releaseName,
         lastReleaseTag: releaseContext?.lastReleaseTag || null,

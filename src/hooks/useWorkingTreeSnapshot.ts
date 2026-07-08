@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../global';
+import { gitClient } from '../services/gitClient';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '../utils/gitParsing';
 import { normalizeRepoPathKey } from '../utils/repoPath';
 
@@ -59,7 +60,7 @@ export const useWorkingTreeSnapshot = (
           }
         }
 
-        const fallback = await window.electronAPI.runGitCommand('statusPorcelain');
+        const fallback = await gitClient.getStatusPorcelain();
         if (generation !== generationRef.current || !fallback.success) return;
         snapshotRef.current = null;
         statsRef.current = null;

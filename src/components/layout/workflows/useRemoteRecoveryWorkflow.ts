@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
 import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { gitClient } from '../../../services/gitClient';
+import { githubClient } from '../../../services/githubClient';
 import {
   compactGitError,
   isMissingRemotePushError,
@@ -113,7 +115,7 @@ export const useRemoteRecoveryWorkflow = ({
     const missingRemote = isMissingRemotePushError(failureMessage);
 
     if (isRemoteRepositoryMissingError(failureMessage)) {
-      const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
+      const removeOriginResult = await gitClient.removeRemote('origin');
       const removeOriginError = String(removeOriginResult.error || '').trim();
       const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
       if (!removeOriginResult.success && !originAlreadyMissing) {
@@ -170,7 +172,7 @@ export const useRemoteRecoveryWorkflow = ({
     const shortError = compactGitError(failureMessage);
     let isGithubAuthenticated = false;
     try {
-      const authStatus = await window.electronAPI.githubCheckAuthStatus();
+      const authStatus = await githubClient.checkAuthStatus();
       isGithubAuthenticated = Boolean(authStatus.authenticated);
     } catch {
       isGithubAuthenticated = false;
@@ -217,7 +219,7 @@ export const useRemoteRecoveryWorkflow = ({
       return false;
     }
 
-    const remotesResult = await window.electronAPI.runGitCommand('remote');
+    const remotesResult = await gitClient.listRemotes();
     if (!remotesResult.success) {
       return false;
     }
@@ -258,7 +260,7 @@ export const useRemoteRecoveryWorkflow = ({
       confirmedAutoInitialCommit?: boolean;
     } = {},
   ): Promise<boolean> => {
-    if (!window.electronAPI || !workspace.activeRepo) return false;
+    if (!gitClient.isAvailable() || !githubClient.isAvailable() || !workspace.activeRepo) return false;
 
     const { replaceOriginIfExists = true, pushAfterConnect = true, confirmedAutoInitialCommit = false } = options;
     const folderName = stripGitSuffix(workspace.activeRepo.split(/[\\/]/).pop() || '') || 'repository';
@@ -276,13 +278,13 @@ export const useRemoteRecoveryWorkflow = ({
     setConnectError(null);
 
     try {
-      const result = await window.electronAPI.githubCreateRepo(name, description, newRepoPrivate);
+      const result = await githubClient.createRepository(name, description, newRepoPrivate);
       if (!result.success) {
         throw new Error(result.error || tr('Fehler beim Erstellen des GitHub-Repositories.', 'Error while creating the GitHub repository.'));
       }
 
       const remoteUrl = result.data.cloneUrl;
-      const remotesResult = await window.electronAPI.runGitCommand('remote');
+      const remotesResult = await gitClient.listRemotes();
       const remoteNames = remotesResult.success
         ? String(remotesResult.data || '')
           .split('\n')
@@ -291,7 +293,7 @@ export const useRemoteRecoveryWorkflow = ({
         : [];
 
       if (remoteNames.includes('origin')) {
-        const originUrlResult = await window.electronAPI.runGitCommand('remote', 'get-url', 'origin');
+        const originUrlResult = await gitClient.getRemoteUrl('origin');
         const currentOriginUrl = originUrlResult.success ? String(originUrlResult.data || '').trim() : '';
         const needsUpdate = currentOriginUrl !== remoteUrl;
 
@@ -299,20 +301,20 @@ export const useRemoteRecoveryWorkflow = ({
           if (!replaceOriginIfExists) {
             throw new Error(tr('Remote "origin" existiert bereits mit anderer URL.', 'Remote "origin" already exists with a different URL.'));
           }
-          const setUrlResult = await window.electronAPI.runGitCommand('remote', 'set-url', 'origin', remoteUrl);
+          const setUrlResult = await gitClient.setRemoteUrl('origin', remoteUrl);
           if (!setUrlResult.success) {
             throw new Error(setUrlResult.error || tr('Fehler beim Aktualisieren von remote "origin".', 'Error while updating remote "origin".'));
           }
         }
       } else {
-        const addRemoteResult = await window.electronAPI.runGitCommand('remote', 'add', 'origin', remoteUrl);
+        const addRemoteResult = await gitClient.addRemote('origin', remoteUrl);
         if (!addRemoteResult.success) {
           throw new Error(addRemoteResult.error || tr('Fehler beim Setzen des Git-Remotes.', 'Error while setting Git remote.'));
         }
       }
 
       if (pushAfterConnect) {
-        const pushResult = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
+        const pushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
         if (!pushResult.success) {
           const errorMessage = String(pushResult.error || '');
           if (isNoLocalCommitPushError(errorMessage)) {
@@ -321,14 +323,14 @@ export const useRemoteRecoveryWorkflow = ({
                 commandLabel: 'git push -u origin HEAD',
                 confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
                 onConfirm: async () => {
-                  if (!window.electronAPI) return;
+                  if (!gitClient.isAvailable()) return;
                   setIsConnectingGithubRepo(true);
                   try {
                     const prepared = await ensureInitialCommitForPush();
                     if (!prepared) {
                       return;
                     }
-                    const retryPushResult = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
+                    const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
                     if (!retryPushResult.success) {
                       throw new Error(retryPushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
                     }
@@ -359,7 +361,7 @@ export const useRemoteRecoveryWorkflow = ({
             if (!prepared) {
               throw new Error(tr('Push konnte nicht automatisch vorbereitet werden.', 'Could not auto-prepare push.'));
             }
-            const retryPushResult = await window.electronAPI.runGitCommand('push', '-u', 'origin', 'HEAD');
+            const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
             if (!retryPushResult.success) {
               throw new Error(retryPushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
             }

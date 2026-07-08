@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { parseGitReflog } from '../utils/gitParsing';
-import type { AppSettingsDto } from '../global';
+import type { AppSettingsDto, GitCommandNameDto } from '../global';
 import type { GitReflogEntryDto } from '../types/git';
 import { useI18n } from '../i18n';
+import { gitClient } from '../services/gitClient';
 import { DangerConfirm } from './DangerConfirm';
 
 type Props = {
@@ -27,10 +28,10 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
   const [dangerAction, setDangerAction] = useState<DangerAction>(null);
 
   const loadReflog = useCallback(async () => {
-    if (!window.electronAPI) return;
+    if (!gitClient.isAvailable()) return;
     setIsLoading(true);
     try {
-      const result = await window.electronAPI.runGitCommand('reflog', '300');
+      const result = await gitClient.runGitCommand('reflog', '300');
       if (!result.success) {
         setEntries([]);
         return;
@@ -56,8 +57,8 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
   const selected = useMemo(() => filtered.find((e) => e.hash === selectedHash) ?? filtered[0] ?? null, [filtered, selectedHash]);
 
   const runAction = useCallback(async (args: string[]) => {
-    if (!window.electronAPI) return;
-    const result = await window.electronAPI.runGitCommand(args[0], ...args.slice(1));
+    if (!gitClient.isAvailable() || args.length === 0) return;
+    const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
     if (result.success) {
       onRepoChanged();
       await loadReflog();

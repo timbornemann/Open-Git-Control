@@ -6,6 +6,8 @@ import { isRemoteRepositoryMissingError } from '../../../utils/gitPushRecovery';
 import { getLocale, trByLanguage, type AppLanguage } from '../../../i18n';
 import { ConfirmDialogState, InputDialogState, BranchContextMenuState, RemoteStatusInfo } from '../layoutTypes';
 import { formatTime } from '../../../utils/dateTime';
+import { getElectronApi } from '../../../services/electronApi';
+import { gitClient } from '../../../services/gitClient';
 
 const EMPTY_REMOTE_SYNC_STATE: RemoteSyncState = {
   isFetching: false,
@@ -99,7 +101,7 @@ export const useRepositoryDomain = ({
   }, [activeRepo]);
 
   useEffect(() => {
-    if (!activeRepo || !window.electronAPI) {
+    if (!activeRepo || !gitClient.isAvailable()) {
       setBranches([]);
       setCurrentBranch('');
       setHasRemoteOrigin(null);
@@ -108,7 +110,7 @@ export const useRepositoryDomain = ({
 
     const fetchBranches = async () => {
       try {
-        const { success, data } = await window.electronAPI.runGitCommand('branch', '-a');
+        const { success, data } = await gitClient.runGitCommand('branch', '-a');
         if (success && data) {
           const lines = data.split('\n').filter((l: string) => l.trim().length > 0);
           const parsedBranches = lines
@@ -136,13 +138,13 @@ export const useRepositoryDomain = ({
 
   useEffect(() => {
     const fetchRemoteTracking = async () => {
-      if (!activeRepo || !window.electronAPI) {
+      if (!activeRepo || !gitClient.isAvailable()) {
         setRemoteSync(prev => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
         return;
       }
 
       try {
-        const { success, data } = await window.electronAPI.runGitCommand('status', '--porcelain=v2', '--branch');
+        const { success, data } = await gitClient.getBranchStatusPorcelainV2();
         if (!success || !data) {
           return;
         }
@@ -165,13 +167,13 @@ export const useRepositoryDomain = ({
 
   useEffect(() => {
     const checkRemote = async () => {
-      if (!activeRepo || !window.electronAPI) {
+      if (!activeRepo || !gitClient.isAvailable()) {
         setHasRemoteOrigin(null);
         setRemotes([]);
         return;
       }
       try {
-        const r = await window.electronAPI.runGitCommand('remote', '-v');
+        const r = await gitClient.runGitCommand('remote', '-v');
         if (!r.success) {
           return;
         }
@@ -206,7 +208,7 @@ export const useRepositoryDomain = ({
   }, [activeRepo, refreshTrigger]);
 
   useEffect(() => {
-    if (!activeRepo || !window.electronAPI) {
+    if (!activeRepo || !gitClient.isAvailable()) {
       setTags([]);
       return;
     }
@@ -217,7 +219,7 @@ export const useRepositoryDomain = ({
           .map((t: string) => t.trim())
           .filter((t: string) => t.length > 0);
 
-        const byVersion = await window.electronAPI.runGitCommand('tag', '-l', '--sort=-v:refname');
+        const byVersion = await gitClient.runGitCommand('tag', '-l', '--sort=-v:refname');
         setTags(byVersion.success ? parseTags(byVersion.data) : []);
       } catch {
         setTags([]);
@@ -247,7 +249,7 @@ export const useRepositoryDomain = ({
   }, [branchContextMenu]);
 
   const refreshRemoteState = useCallback(async (showToast = false) => {
-    if (!window.electronAPI || !activeRepo) return false;
+    if (!gitClient.isAvailable() || !activeRepo) return false;
     if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
 
     isRemoteFetchRunningRef.current = true;
@@ -255,7 +257,7 @@ export const useRepositoryDomain = ({
     setRemoteSync(prev => ({ ...prev, isFetching: true }));
 
     try {
-      const result = await window.electronAPI.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
+      const result = await gitClient.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
       if (result.success) {
         setRemoteSync(prev => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
         triggerRefresh();
@@ -267,7 +269,7 @@ export const useRepositoryDomain = ({
 
       const errorMessage = String(result.error || tr('Remote konnte nicht aktualisiert werden.', 'Could not update remote.'));
       if (isRemoteRepositoryMissingError(errorMessage)) {
-        const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
+        const removeOriginResult = await gitClient.removeRemote('origin');
         const removeOriginError = String(removeOriginResult.error || '').trim();
         const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
 
@@ -349,13 +351,13 @@ export const useRepositoryDomain = ({
 
   useEffect(() => {
     const fetchSubmodules = async () => {
-      if (!activeRepo || !window.electronAPI) {
+      if (!activeRepo || !gitClient.isAvailable()) {
         setSubmodules([]);
         return;
       }
 
       try {
-        const response = await window.electronAPI.runGitCommand('submoduleStatus');
+        const response = await gitClient.runGitCommand('submoduleStatus');
         if (!response.success) {
           setSubmodules([]);
           return;
@@ -539,11 +541,11 @@ export const useRepositoryDomain = ({
   };
 
   const handleSelectTag = useCallback(async (tagName: string) => {
-    if (!activeRepo || !window.electronAPI) return;
+    if (!activeRepo || !gitClient.isAvailable()) return;
 
     try {
       const tagRef = `refs/tags/${tagName}^{commit}`;
-      const result = await window.electronAPI.runGitCommand('show', '--quiet', '--format=%H', tagRef);
+      const result = await gitClient.runGitCommand('show', '--quiet', '--format=%H', tagRef);
       const hash = String(result.data || '').trim().split(/\s+/)[0] || '';
 
       if (!result.success || !/^[0-9a-f]{40}$/i.test(hash)) {
@@ -657,8 +659,9 @@ export const useRepositoryDomain = ({
   };
 
   const handleOpenSubmodule = async (submodulePath: string) => {
-    if (!window.electronAPI) return;
-    const result = await window.electronAPI.openSubmodule(submodulePath);
+    const electronApi = getElectronApi();
+    if (!electronApi) return;
+    const result = await electronApi.openSubmodule(submodulePath);
     if (!result.success) {
       setGitActionToast({ msg: result.error || tr('Submodule konnte nicht geöffnet werden.', 'Could not open submodule.'), isError: true });
     }
