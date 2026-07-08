@@ -1,0 +1,59 @@
+name: Question / Frage
+description: Ask about current behavior, setup, usage, or project direction.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for questions about existing behavior. If something is broken, please use the bug report form instead.
+
+        Nutze dieses Formular fuer Fragen zum bestehenden Verhalten. Wenn etwas kaputt ist, nutze bitte das Bug-Report-Formular.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question / Frage
+      description: What do you want to understand or clarify?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area / Bereich
+      options:
+        - Installation or updates
+        - Git workflow
+        - GitHub authentication or pull requests
+        - Releases
+        - Project planning API/MCP
+        - AI-assisted features
+        - Security or secret scanning
+        - Development from source
+        - Documentation
+        - Other / Andere
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / Kontext
+      description: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried / Was du bereits versucht hast
+      description: Link docs, commands, settings, or workflows you already checked.
+  - type: input
+    id: app-version
+    attributes:
+      label: Open-Git-Control version, if relevant / Version, falls relevant
+      placeholder: "Example: v1.3.0"
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting / Vor dem Absenden
+      options:
+        - label: I searched existing issues. / Ich habe bestehende Issues durchsucht.
+          required: true

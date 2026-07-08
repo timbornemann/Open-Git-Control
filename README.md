@@ -94,6 +94,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - [Release Builds](#release-builds)
 - [Data Storage and Security](#data-storage-and-security)
 - [Troubleshooting](#troubleshooting)
+- [Contributing and Support](#contributing-and-support)
 - [License](#license)
 
 ## Feature Reference
@@ -855,6 +856,19 @@ Expected release assets:
 - For Ollama, verify the Ollama server URL and model name.
 - For Gemini, store a valid API key and select a supported model.
 - Use "Test connection" and "Load models" in Settings -> Integrations.
+
+## Contributing and Support
+
+Open-Git-Control uses structured GitHub forms for bug reports, feature requests, questions, and documentation reports:
+
+[Open a structured issue](https://github.com/timbornemann/Open-Git-Control/issues/new/choose)
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+- Use [SUPPORT.md](SUPPORT.md) to choose the right report or question path.
+- Report security vulnerabilities privately through [SECURITY.md](SECURITY.md), not in public issues.
+- Follow the [Code of Conduct](CODE_OF_CONDUCT.md) when participating in issues, reviews, and pull requests.
+
+Blank issues are disabled so new reports include enough context to be triaged.
 
 ## License
 

@@ -1,0 +1,126 @@
+name: Bug report / Fehler melden
+description: Report something that is broken or not working as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please provide enough detail so the problem can be reproduced.
+
+        Danke fuer die Fehlermeldung. Bitte gib genug Kontext an, damit das Problem reproduziert werden kann.
+  - type: input
+    id: app-version
+    attributes:
+      label: Open-Git-Control version / Version
+      description: Use the version from Settings or the release you installed.
+      placeholder: "Example: v1.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Installation method / Installationsart
+      options:
+        - GitHub release installer
+        - Built from source
+        - Development mode with npm run dev
+        - Other / Andere
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system / Betriebssystem
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other / Andere
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version / Betriebssystem-Version
+      placeholder: "Example: Windows 11 23H2, macOS 15, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: git-version
+    attributes:
+      label: Git version / Git-Version
+      placeholder: "Run: git --version"
+    validations:
+      required: true
+  - type: input
+    id: gh-version
+    attributes:
+      label: GitHub CLI version, if relevant / GitHub-CLI-Version, falls relevant
+      placeholder: "Run: gh --version"
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected area / Betroffener Bereich
+      options:
+        - Repository workspace
+        - Commit graph
+        - Staging and commits
+        - Diff viewer
+        - Conflict resolver
+        - GitHub authentication
+        - Pull requests and CI status
+        - Release creator
+        - Project planning API/MCP
+        - Secret scanning or security settings
+        - AI-assisted features
+        - Packaging, install, or auto-update
+        - Documentation
+        - Other / Andere
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Schritte zum Reproduzieren
+      description: List the exact steps that trigger the problem.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / Erwartetes Verhalten
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / Tatsaechliches Verhalten
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or diagnostics / Logs oder Diagnoseinformationen
+      description: Paste relevant logs only. Remove tokens, secrets, private repository names, and personal data.
+      render: text
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or screen recordings / Screenshots oder Screen Recordings
+      description: Add images or recordings if they help explain the issue.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting / Vor dem Absenden
+      options:
+        - label: I searched existing issues. / Ich habe bestehende Issues durchsucht.
+          required: true
+        - label: I removed secrets and private data from logs and screenshots. / Ich habe Secrets und private Daten aus Logs und Screenshots entfernt.
+          required: true

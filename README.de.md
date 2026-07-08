@@ -94,6 +94,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - [Release Builds](#release-builds)
 - [Datenhaltung und Sicherheit](#datenhaltung-und-sicherheit)
 - [Troubleshooting](#troubleshooting)
+- [Beitraege und Support](#beitraege-und-support)
 - [Lizenz](#lizenz)
 
 ## Feature-Referenz
@@ -855,6 +856,19 @@ Erwartete Release Assets:
 - Fuer Ollama Server-URL und Modellnamen pruefen.
 - Fuer Gemini gueltigen API Key speichern und passendes Modell auswaehlen.
 - "Test connection" und "Load models" in Settings -> Integrations nutzen.
+
+## Beitraege und Support
+
+Open-Git-Control nutzt strukturierte GitHub-Formulare fuer Bug Reports, Feature Requests, Fragen und Dokumentationsmeldungen:
+
+[Strukturiertes Issue oeffnen](https://github.com/timbornemann/Open-Git-Control/issues/new/choose)
+
+- Lies [CONTRIBUTING.de.md](CONTRIBUTING.de.md), bevor du einen Pull Request oeffnest.
+- Nutze [SUPPORT.de.md](SUPPORT.de.md), um den passenden Weg fuer Meldungen oder Fragen zu waehlen.
+- Melde Sicherheitsluecken privat ueber [SECURITY.de.md](SECURITY.de.md), nicht in oeffentlichen Issues.
+- Beachte den [Verhaltenskodex](CODE_OF_CONDUCT.de.md) bei Issues, Reviews und Pull Requests.
+
+Leere Issues sind deaktiviert, damit neue Meldungen genug Kontext fuer die Triage enthalten.
 
 ## Lizenz
 

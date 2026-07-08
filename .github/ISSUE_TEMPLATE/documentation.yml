@@ -1,0 +1,59 @@
+name: Documentation / Dokumentation
+description: Report unclear, missing, outdated, or incorrect documentation.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for README, screenshots, setup steps, release notes, or contributor documentation.
+
+        Nutze dieses Formular fuer README, Screenshots, Setup-Schritte, Release Notes oder Contributor-Dokumentation.
+  - type: dropdown
+    id: documentation-area
+    attributes:
+      label: Documentation area / Dokumentationsbereich
+      options:
+        - README.md
+        - README.de.md
+        - Contributing docs
+        - Security or support docs
+        - Screenshots in Docs/
+        - Release notes or download links
+        - GitHub issue or PR templates
+        - Other / Andere
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language / Sprache
+      options:
+        - English
+        - Deutsch
+        - Both / Beide
+        - Not language-specific / Nicht sprachspezifisch
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is unclear, missing, outdated, or wrong? / Was ist unklar, fehlt, ist veraltet oder falsch?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-change
+    attributes:
+      label: Suggested change / Vorgeschlagene Aenderung
+      description: If you know the wording or structure that would help, add it here.
+  - type: textarea
+    id: references
+    attributes:
+      label: Links, screenshots, or related issues / Links, Screenshots oder verwandte Issues
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting / Vor dem Absenden
+      options:
+        - label: I checked whether the same problem exists in both English and German docs. / Ich habe geprueft, ob das Problem in englischer und deutscher Doku existiert.
+          required: true

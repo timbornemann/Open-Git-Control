@@ -1,0 +1,80 @@
+name: Feature request / Feature vorschlagen
+description: Suggest a new capability or workflow improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the workflow you want to improve, not only the UI element you imagine.
+
+        Bitte beschreibe den Workflow, den du verbessern moechtest, nicht nur das UI-Element, das du dir vorstellst.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity / Problem oder Chance
+      description: What is difficult, missing, slow, risky, or confusing today?
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Desired workflow / Gewuenschter Workflow
+      description: Describe how a user would use this from start to finish.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / Vorgeschlagene Loesung
+      description: Share your preferred approach, UI idea, command, setting, or behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered / Gepruefte Alternativen
+      description: What workaround or alternative design could also solve this?
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Affected area / Betroffener Bereich
+      multiple: true
+      options:
+        - Repository workspace
+        - Commit graph
+        - Staging and commits
+        - Diff viewer
+        - Conflict resolver
+        - GitHub workflows
+        - Release creator
+        - Project planning API/MCP
+        - Secret scanning or security settings
+        - AI-assisted features
+        - Settings
+        - Packaging, install, or auto-update
+        - Documentation
+        - Other / Andere
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: User value / Nutzen
+      description: Who benefits from this and why?
+    validations:
+      required: true
+  - type: textarea
+    id: ui-docs-impact
+    attributes:
+      label: UI, documentation, or compatibility impact / Auswirkungen auf UI, Doku oder Kompatibilitaet
+      description: Mention expected screenshots, README changes, settings, migrations, or compatibility concerns.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting / Vor dem Absenden
+      options:
+        - label: I searched existing issues. / Ich habe bestehende Issues durchsucht.
+          required: true
+        - label: I described the user workflow and not only an implementation detail. / Ich habe den Nutzer-Workflow beschrieben, nicht nur ein Implementierungsdetail.
+          required: true
