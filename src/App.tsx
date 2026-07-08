@@ -13,7 +13,11 @@ import { I18nProvider } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { CommandPalette, PaletteCommand } from './components/CommandPalette';
 import { ActionToastViewport } from './components/ActionToastViewport';
-import { AppStateContext, AppContextValue } from './contexts/AppStateContext';
+import {
+  AppStateSlicesProvider,
+  createAppStateSlices,
+  type AppContextValue,
+} from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import './index.css';
 
@@ -496,10 +500,30 @@ const App: React.FC = () => {
     onConflictRebaseContinue: () => { void state.runGitCommand(['rebaseContinue'], tr('Rebase fortgesetzt.', 'Rebase continued.'), tr('Rebase wird fortgesetzt...', 'Continuing rebase...')); },
     onConflictRebaseAbort: () => { void state.runGitCommand(['rebaseAbort'], tr('Rebase abgebrochen.', 'Rebase aborted.'), tr('Rebase wird abgebrochen...', 'Aborting rebase...')); },
   };
+  const appStateSlices = createAppStateSlices(ctxValue, {
+    sidebarWidth,
+    isSidebarCollapsed,
+    isSidebarResizing,
+    onToggleSidebar: handleToggleSidebar,
+    onSidebarResizeStart: handleSidebarResizeStart,
+    isCommandPaletteOpen: isPaletteOpen,
+    setCommandPaletteOpen: setIsPaletteOpen,
+    branchContextMenu: state.branchContextMenu,
+    setBranchContextMenu: state.setBranchContextMenu,
+    confirmDialog: state.confirmDialog,
+    setConfirmDialog: state.setConfirmDialog,
+    inputDialog: state.inputDialog,
+    setInputDialog: state.setInputDialog,
+    closeConfirmDialog: state.closeConfirmDialog,
+    executeConfirmDialog: state.executeConfirmDialog,
+    executeConfirmDialogSecondary: state.executeConfirmDialogSecondary,
+    closeInputDialog: state.closeInputDialog,
+    executeInputDialog: state.executeInputDialog,
+  });
 
   return (
     <I18nProvider language={state.settings.language}>
-      <AppStateContext.Provider value={ctxValue}>
+      <AppStateSlicesProvider value={appStateSlices}>
         <ProjectPlannerProvider
           activeRepo={state.activeRepo}
           refreshSignal={state.plannerRefreshSignal}
@@ -519,10 +543,7 @@ const App: React.FC = () => {
           className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
           style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
         >
-          <AppSidebar
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapsed={handleToggleSidebar}
-          />
+          <AppSidebar />
 
           {!isSidebarCollapsed && (
             <div
@@ -669,7 +690,7 @@ const App: React.FC = () => {
           />
         </div>
         </ProjectPlannerProvider>
-      </AppStateContext.Provider>
+      </AppStateSlicesProvider>
     </I18nProvider>
   );
 };

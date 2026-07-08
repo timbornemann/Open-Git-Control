@@ -759,6 +759,7 @@ export const useAppState = () => {
     confirmDialog,
     setConfirmDialog,
     inputDialog,
+    setInputDialog,
     closeConfirmDialog,
     executeConfirmDialog,
     executeConfirmDialogSecondary,
@@ -766,7 +767,6 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
 
 
 

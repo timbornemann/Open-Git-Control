@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Columns, Eye, FileText, FileWarning, LayoutL
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { GitFileBlameLineDto } from '../types/git';
+import { useDiffSyntaxHighlighting } from '../hooks/useDiffSyntaxHighlighting';
 import {
   applyMarkdownPreviewImageDataUrls,
   collectMarkdownPreviewImageSources,
@@ -11,28 +12,14 @@ import {
   renderMarkdownToSanitizedHtml,
   resolveMarkdownPreviewAssetPath,
 } from '../utils/markdownPreview';
-
-type DiffViewMode = 'unified' | 'side-by-side' | 'preview';
-type ParsedLineType = 'context' | 'add' | 'del';
-
-type ParsedLine = {
-  type: ParsedLineType;
-  text: string;
-  leftNo: number | null;
-  rightNo: number | null;
-};
-
-type ParsedHunk = {
-  id: string;
-  header: string;
-  rawLines: string[];
-  rows: ParsedLine[];
-};
-
-type ParsedDiff = {
-  fileHeader: string[];
-  hunks: ParsedHunk[];
-};
+import {
+  buildHunkPatch,
+  parseDiff,
+  sideBySideRows,
+  type DiffViewMode,
+  type ParsedHunk,
+  type ParsedLine,
+} from '../utils/diffParser';
 
 type MarkdownPreviewState = {
   loading: boolean;
@@ -66,194 +53,6 @@ const getExtension = (filePath: string) => {
     return '';
   }
   return fileName.slice(lastDot + 1).toLowerCase();
-};
-
-const parseHunkHeader = (line: string): { leftStart: number; rightStart: number } | null => {
-  const match = line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
-  if (!match) return null;
-  return {
-    leftStart: Number(match[1]),
-    rightStart: Number(match[3]),
-  };
-};
-
-export const parseDiff = (diffText: string): ParsedDiff => {
-  const lines = diffText.split('\n');
-  const fileHeader: string[] = [];
-  const hunks: ParsedHunk[] = [];
-
-  let currentHunk: ParsedHunk | null = null;
-  let leftLine = 0;
-  let rightLine = 0;
-
-  for (const line of lines) {
-    if (line.startsWith('@@')) {
-      const parsed = parseHunkHeader(line);
-      if (!parsed) {
-        continue;
-      }
-
-      currentHunk = {
-        id: `hunk-${hunks.length + 1}`,
-        header: line,
-        rawLines: [],
-        rows: [],
-      };
-      hunks.push(currentHunk);
-      leftLine = parsed.leftStart;
-      rightLine = parsed.rightStart;
-      continue;
-    }
-
-    if (!currentHunk) {
-      fileHeader.push(line);
-      continue;
-    }
-
-    currentHunk.rawLines.push(line);
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      currentHunk.rows.push({
-        type: 'add',
-        text: line.slice(1),
-        leftNo: null,
-        rightNo: rightLine,
-      });
-      rightLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('-') && !line.startsWith('---')) {
-      currentHunk.rows.push({
-        type: 'del',
-        text: line.slice(1),
-        leftNo: leftLine,
-        rightNo: null,
-      });
-      leftLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('\\ No newline at end of file')) {
-      continue;
-    }
-
-    const contextLine = line.startsWith(' ') ? line.slice(1) : line;
-    currentHunk.rows.push({
-      type: 'context',
-      text: contextLine,
-      leftNo: leftLine,
-      rightNo: rightLine,
-    });
-    leftLine += 1;
-    rightLine += 1;
-  }
-
-  return { fileHeader, hunks };
-};
-
-const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
-  const output: ParsedLine[] = [];
-
-  for (let i = 0; i < rows.length;) {
-    const row = rows[i];
-
-    if (row.type === 'context') {
-      output.push(row);
-      i += 1;
-      continue;
-    }
-
-    if (row.type === 'del') {
-      const dels: ParsedLine[] = [];
-      const adds: ParsedLine[] = [];
-
-      while (i < rows.length && rows[i].type === 'del') {
-        dels.push(rows[i]);
-        i += 1;
-      }
-
-      while (i < rows.length && rows[i].type === 'add') {
-        adds.push(rows[i]);
-        i += 1;
-      }
-
-      const max = Math.max(dels.length, adds.length);
-      for (let idx = 0; idx < max; idx += 1) {
-        const del = dels[idx] || null;
-        const add = adds[idx] || null;
-        output.push({
-          type: del && add ? 'context' : (del ? 'del' : 'add'),
-          text: `${del?.text || ''}\x1f${add?.text || ''}`,
-          leftNo: del?.leftNo || null,
-          rightNo: add?.rightNo || null,
-        });
-      }
-      continue;
-    }
-
-    output.push(row);
-    i += 1;
-  }
-
-  return output;
-};
-
-
-
-/** Reconstruct a minimal unified-diff patch for a single hunk */
-export const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
-  const header = fileHeader.filter((line, index) => line || index < fileHeader.length - 1);
-  const rawHunkLines = hunk.rawLines.length
-    ? hunk.rawLines
-    : hunk.rows.map((row) => {
-      const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
-      return prefix + row.text;
-    });
-  return [...header, hunk.header, ...rawHunkLines, ''].join('\n');
-};
-
-const highlightLine = (text: string | null | undefined): React.ReactNode[] => {
-  if (typeof text !== 'string' || !text) return [];
-
-  const tokenRegex = /(\/\/.*|#.*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^\`\\]|\\.)*`)|(\b(?:const|let|var|function|class|interface|type|struct|import|export|from|as|return|if|else|for|while|do|switch|case|default|break|continue|new|delete|try|catch|finally|throw|def|fn|func|pub|impl|use|package|go|defer|select|chan|map|range|nil|null|undefined|true|false|void|int|float|string|bool|boolean|any|public|private|protected|static|readonly|async|await|yield)\b)|(\b\d+(?:\.\d+)?\b)|(\b[A-Z][a-zA-Z0-9_]*\b)|(\b[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\())/g;
-
-  const result: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = tokenRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      result.push(text.slice(lastIndex, match.index));
-    }
-
-    const matchedText = match[0];
-    const key = `hl-${match.index}`;
-
-    if (match[1]) {
-      result.push(<span key={key} className="hl-comment">{matchedText}</span>);
-    } else if (match[2]) {
-      result.push(<span key={key} className="hl-string">{matchedText}</span>);
-    } else if (match[3]) {
-      result.push(<span key={key} className="hl-keyword">{matchedText}</span>);
-    } else if (match[4]) {
-      result.push(<span key={key} className="hl-number">{matchedText}</span>);
-    } else if (match[5]) {
-      result.push(<span key={key} className="hl-type">{matchedText}</span>);
-    } else if (match[6]) {
-      result.push(<span key={key} className="hl-function">{matchedText}</span>);
-    } else {
-      result.push(matchedText);
-    }
-
-    lastIndex = tokenRegex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    result.push(text.slice(lastIndex));
-  }
-
-  return result;
 };
 
 const formatBlameDate = (dateStr: string, tr: any) => {
@@ -304,6 +103,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const [sourceTruncated, setSourceTruncated] = useState(false);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const { tr } = useI18n();
+  const { highlightLine } = useDiffSyntaxHighlighting();
 
   const [showBlame, setShowBlame] = useState(false);
   const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);

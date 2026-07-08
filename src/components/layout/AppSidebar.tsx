@@ -6,16 +6,28 @@ import { RepoSidebarContent } from './sidebar/RepoSidebarContent';
 import { GithubAuthContent } from './sidebar/GithubAuthContent';
 import { GithubConnectedContent } from './sidebar/GithubConnectedContent';
 import { useI18n } from '../../i18n';
-import { useAppContext } from '../../contexts/AppStateContext';
+import {
+  useGithubContext,
+  useRepositoryContext,
+  useSettingsContext,
+  useUIContext,
+  useWorkflowContext,
+} from '../../contexts/AppStateContext';
 import { ProjectPlannerSidebarContent } from '../project-planner/ProjectPlannerSidebarContent';
 
-type AppSidebarProps = {
-  isCollapsed: boolean;
-  onToggleCollapsed: () => void;
-};
-
-export const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, onToggleCollapsed }) => {
-  const props = useAppContext();
+export const AppSidebar: React.FC = () => {
+  const ui = useUIContext();
+  const repository = useRepositoryContext();
+  const github = useGithubContext();
+  const settings = useSettingsContext();
+  const workflow = useWorkflowContext();
+  const props = {
+    ...ui,
+    ...repository,
+    ...github,
+    ...settings,
+    ...workflow,
+  };
   const { tr } = useI18n();
   const settingsTabs = [
     { id: 'general' as const, label: tr('Allgemein', 'General') },
@@ -30,11 +42,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isCollapsed, onToggleCol
       <SidebarActivityBar
         activeTab={props.activeTab}
         setActiveTab={props.setActiveTab}
-        isSidebarCollapsed={isCollapsed}
-        onToggleSidebar={onToggleCollapsed}
+        isSidebarCollapsed={ui.isSidebarCollapsed}
+        onToggleSidebar={ui.onToggleSidebar}
       />
 
-      {!isCollapsed && (
+      {!ui.isSidebarCollapsed && (
         <div className="sidebar">
           <SidebarHeader
             activeTab={props.activeTab}

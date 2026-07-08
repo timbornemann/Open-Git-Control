@@ -13,18 +13,23 @@ import {
 import { validateBranchName } from '../utils/gitRefValidation';
 import { GraphNode, GraphEdge } from '../utils/graphLayout';
 import { useToastQueue } from '../hooks/useToastQueue';
-import { Confirm, DialogContextItem } from './Confirm';
+import { Confirm } from './Confirm';
 import { DangerConfirm } from './DangerConfirm';
-import { Input, InputDialogField } from './Input';
+import { Input } from './Input';
 import { ActionToastViewport } from './ActionToastViewport';
 import { DiffRequest } from '../types/diff';
 import { useI18n } from '../i18n';
 import { formatDate, formatRelativeTime, formatTime } from '../utils/dateTime';
 import { BranchInfo, GitMergeMode } from '../types/git';
 import type { GitCommandNameDto } from '../global';
+import { useOptionalUIContext } from '../contexts/AppStateContext';
 import { gitClient } from '../services/gitClient';
 import { useCommitGraphData } from './commit-graph/useCommitGraphData';
+import { CommitGraphSvg, graphEdgeKey } from './commit-graph/CommitGraphSvg';
+import { ForensicSearchPanel, type ForensicSearchType, type SearchPanel } from './commit-graph/ForensicSearchPanel';
+import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commit-graph/commitGraphConstants';
 import { EmptyState } from './EmptyState';
+import type { ConfirmDialogState, InputDialogState } from './layout/layoutTypes';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -47,13 +52,7 @@ interface CommitGraphProps {
   onRefreshWorkingTree?: () => Promise<void>;
 }
 
-const ROW_HEIGHT = 44;
-const LANE_WIDTH = 28;
-const GRAPH_PADDING = 16;
-const NODE_RADIUS = 4;
-const MERGE_NODE_RADIUS = 6;
 const NAVIGATION_MAX_LOAD_ATTEMPTS = 50;
-const SECONDARY_GRAPH_ACCENT = 'var(--status-untracked-border)';
 const FORENSIC_PATH_HISTORY_STORAGE_KEY = 'open-git-control:forensic-path-history:v1';
 
 interface ContextMenuState {
@@ -77,32 +76,8 @@ interface MenuAction {
   action: () => void;
 }
 
-type ConfirmDialogState = {
-  variant: 'confirm' | 'danger';
-  title: string;
-  message: string;
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onConfirm: () => Promise<void> | void;
-};
-
-type InputDialogState = {
-  title: string;
-  message: string;
-  fields: InputDialogField[];
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onSubmit: (values: Record<string, string>) => Promise<void> | void;
-};
-
 type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
 type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
-type ForensicSearchType = 'string' | 'regex' | 'line';
-type SearchPanel = 'commits' | 'forensic';
 
 const getRefKind = (ref: string): RefKind => {
   if (ref.startsWith('tag:')) return 'tag';
@@ -133,10 +108,6 @@ const resolveHighlightableBranchRef = (ref: string): string | null => {
   if (!normalized || normalized.endsWith('/HEAD')) return null;
   return normalized;
 };
-
-const graphEdgeKey = (edge: GraphEdge) => (
-  `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`
-);
 
 export const findCommitIndexByNavigationTarget = (
   nodes: GraphNode[],
@@ -308,8 +279,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toasts, setToast, dismiss } = useToastQueue(4000);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [inputDialog, setInputDialog] = useState<InputDialogState | null>(null);
+  const uiContext = useOptionalUIContext();
+  const [localConfirmDialog, setLocalConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [localInputDialog, setLocalInputDialog] = useState<InputDialogState | null>(null);
+  const setConfirmDialog = uiContext?.setConfirmDialog ?? setLocalConfirmDialog;
+  const setInputDialog = uiContext?.setInputDialog ?? setLocalInputDialog;
+  const confirmDialog = uiContext ? null : localConfirmDialog;
+  const inputDialog = uiContext ? null : localInputDialog;
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
@@ -1476,7 +1452,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const headNode = memoizedHeadNode as GraphNode;
   const graphWidth = Math.max((layout.maxLane + 1) * LANE_WIDTH + GRAPH_PADDING * 2, 60);
   const totalHeight = (layout.nodes.length + workingTreeRowOffset) * ROW_HEIGHT;
-  const laneX = (lane: number) => GRAPH_PADDING + lane * LANE_WIDTH + LANE_WIDTH / 2;
   const topSpacerHeight = visibleStartIdx * ROW_HEIGHT;
   const bottomSpacerHeight = Math.max(0, (layout.nodes.length - visibleEndIdx) * ROW_HEIGHT);
   const workingTreeLabel = !workingTreeStatus ? ''
@@ -1488,79 +1463,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
   const hasPassiveHeadFocus = !hasWorkingTreeChanges && !selectedHash && !hasAnyPathHighlight;
 
-  const buildEdgePath = (edge: GraphEdge): string => {
-    const x1 = laneX(edge.fromLane);
-    const y1 = (edge.fromRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
-    const x2 = laneX(edge.toLane);
-    const y2 = Math.min((edge.toRow + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2, totalHeight);
-
-    if (x1 === x2) {
-      return `M ${x1} ${y1} L ${x2} ${y2}`;
-    }
-
-    const verticalSpan = Math.max(8, y2 - y1);
-    const turnOffset = Math.min(ROW_HEIGHT * 0.8, Math.max(10, verticalSpan * 0.42));
-    // Keep the lane change close to the parent row so branch origins remain visually anchored.
-    const rawTurnY = y2 - turnOffset;
-    const turnY = Math.max(y1 + 8, Math.min(y2 - 8, rawTurnY));
-    const direction = x2 > x1 ? 1 : -1;
-    const controlInset = Math.min(14, Math.abs(x2 - x1) * 0.45);
-
-    return `M ${x1} ${y1} L ${x1} ${turnY} C ${x1 + direction * controlInset} ${turnY}, ${x2 - direction * controlInset} ${turnY}, ${x2} ${turnY} L ${x2} ${y2}`;
-  };
-
   const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
-  const isEdgeOnCurrentPath = (edge: GraphEdge) => currentPathEdgeKeys.has(graphEdgeKey(edge));
-  const isEdgeOnSelectedPath = (edge: GraphEdge) => selectedPathEdgeKeys.has(graphEdgeKey(edge));
-
-  const getBaseEdgeStroke = (edge: GraphEdge) => {
-    const fromNode = layout.nodes[edge.fromRow];
-    if (!fromNode) return edge.color;
-    if (!showSecondaryHistory || !isSecondaryCommit(fromNode.commit.hash)) {
-      return edge.color;
-    }
-    return edge.kind === 'merge' ? SECONDARY_GRAPH_ACCENT : edge.color;
-  };
-
-  const getEdgeStroke = (edge: GraphEdge) => {
-    const onSelectedPath = isEdgeOnSelectedPath(edge);
-    const onCurrentPath = isEdgeOnCurrentPath(edge);
-    if (onSelectedPath) return selectedPathColor;
-    if (onCurrentPath) return currentPathColor;
-    return getBaseEdgeStroke(edge);
-  };
-
-  const getEdgeOpacity = (edge: GraphEdge, layer: 'glow' | 'core') => {
-    const onSelectedPath = isEdgeOnSelectedPath(edge);
-    const onCurrentPath = isEdgeOnCurrentPath(edge);
-    if (layer === 'glow') {
-      if (onSelectedPath) return 0.18;
-      if (onCurrentPath) return 0.14;
-      if (hasAnyPathHighlight) return 0.02;
-      return 0.08;
-    }
-
-    if (onSelectedPath) return 0.88;
-    if (onCurrentPath) return 0.8;
-    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.24 : 0.34;
-    return edge.kind === 'merge' ? 0.78 : 0.9;
-  };
-
-  const getEdgeWidth = (edge: GraphEdge, layer: 'glow' | 'core') => {
-    const onSelectedPath = isEdgeOnSelectedPath(edge);
-    const onCurrentPath = isEdgeOnCurrentPath(edge);
-    if (layer === 'glow') {
-      if (onSelectedPath) return edge.kind === 'merge' ? 3.1 : 3.8;
-      if (onCurrentPath) return edge.kind === 'merge' ? 2.8 : 3.5;
-      if (hasAnyPathHighlight) return edge.kind === 'merge' ? 1.5 : 1.9;
-      return edge.kind === 'merge' ? 2.4 : 2.8;
-    }
-
-    if (onSelectedPath) return edge.kind === 'merge' ? 1.9 : 2.5;
-    if (onCurrentPath) return edge.kind === 'merge' ? 1.7 : 2.2;
-    if (hasAnyPathHighlight) return edge.kind === 'merge' ? 0.9 : 1.2;
-    return edge.kind === 'merge' ? 1.25 : 1.7;
-  };
 
   return (
     <>
@@ -1622,255 +1525,59 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       </div>
 
 
-      <div style={{ borderBottom: '1px solid var(--border-color)', padding: '8px', display: activeSearchPanel === 'forensic' ? 'flex' : 'none', flexDirection: 'column', gap: '8px', background: 'var(--bg-dark)' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            {tr('Suchmodus:', 'Search mode:')}
-            <select
-              value={activeSearchPanel}
-              onChange={(e) => {
-                const mode = e.target.value as SearchPanel;
-                setActiveSearchPanel(mode);
-                if (mode === 'forensic') setForensicError(null);
-              }}
-              style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
-            >
-              <option value="commits">{tr('Commit-Suche', 'Commit search')}</option>
-              <option value="forensic">{tr('Forensische Historie', 'Forensic history')}</option>
-            </select>
-          </label>
-          <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            {tr('Forensik-Modus:', 'Forensics mode:')}
-            <select
-              value={forensicType}
-              onChange={(e) => {
-                setForensicType(e.target.value as ForensicSearchType);
-                setForensicError(null);
-              }}
-              style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '5px 8px', fontSize: '0.78rem' }}
-            >
-              {(Object.keys(forensicSearchTypeLabels) as ForensicSearchType[]).map((type) => (
-                <option key={type} value={type}>{forensicSearchTypeLabels[type]}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={forensicPath}
-            onChange={(e) => setForensicPath(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }}
-            list="forensic-path-suggestions"
-            placeholder={tr('Dateipfad (z.B. src/components/CommitGraph.tsx)', 'File path (e.g. src/components/CommitGraph.tsx)')}
-            style={{ flex: 1, minWidth: 260, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
-          />
-          <datalist id="forensic-path-suggestions">
-            {forensicPathSuggestions.map((pathValue) => (
-              <option key={pathValue} value={pathValue} />
-            ))}
-          </datalist>
-          {forensicType === 'line' ? (
-            <>
-              <input type="number" min={1} value={forensicStartLine} onChange={(e) => setForensicStartLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder={tr('Startzeile', 'Start line')} style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
-              <input type="number" min={1} value={forensicEndLine} onChange={(e) => setForensicEndLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }} placeholder={tr('Endzeile', 'End line')} style={{ width: 120, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 8px', fontSize: '0.8rem' }} />
-            </>
-          ) : (
-            <input
-              type="text"
-              value={forensicValue}
-              onChange={(e) => setForensicValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void runForensicSearch(); }}
-              placeholder={forensicType === 'regex' ? tr('Regex-Muster (git -G)', 'Regex pattern (git -G)') : tr('Suchstring im Dateiinhalt (git -S)', 'Search string in file content (git -S)')}
-              style={{ flex: 1, minWidth: 220, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.8rem' }}
-            />
-          )}
-          <button onClick={() => void runForensicSearch()} disabled={forensicLoading} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', borderRadius: '6px', padding: '6px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>
-            {forensicLoading ? tr('Suche...', 'Searching...') : tr('Forensisch suchen', 'Run forensic search')}
-          </button>
-        </div>
-        {forensicError && <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>{forensicError}</div>}
-        {forensicResults.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 180, overflowY: 'auto' }}>
-            {forensicResults.map((node) => (
-              <div key={`forensic-${node.commit.hash}`} style={{ border: '1px solid var(--border-color)', borderRadius: 6, backgroundColor: 'var(--bg-panel)', padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => onSelectCommit?.(node.commit.hash)} style={{ border: 'none', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'monospace' }}>{node.commit.abbrevHash}</button>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{node.commit.subject}</span>
-                <button onClick={() => onOpenDiff?.({ source: 'commit', path: forensicPath.trim(), commitHash: node.commit.hash, title: `${node.commit.abbrevHash} · ${forensicPath.trim()}` })} style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', borderRadius: 4, padding: '3px 6px', fontSize: '0.72rem', cursor: 'pointer' }}>{tr('Diff', 'Diff')}</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ForensicSearchPanel
+        activeSearchPanel={activeSearchPanel}
+        setActiveSearchPanel={(mode) => {
+          setActiveSearchPanel(mode);
+          if (mode === 'forensic') setForensicError(null);
+        }}
+        forensicType={forensicType}
+        setForensicType={(type) => {
+          setForensicType(type);
+          setForensicError(null);
+        }}
+        forensicSearchTypeLabels={forensicSearchTypeLabels}
+        forensicPath={forensicPath}
+        setForensicPath={setForensicPath}
+        forensicPathSuggestions={forensicPathSuggestions}
+        forensicValue={forensicValue}
+        setForensicValue={setForensicValue}
+        forensicStartLine={forensicStartLine}
+        setForensicStartLine={setForensicStartLine}
+        forensicEndLine={forensicEndLine}
+        setForensicEndLine={setForensicEndLine}
+        forensicLoading={forensicLoading}
+        forensicError={forensicError}
+        forensicResults={forensicResults}
+        runForensicSearch={runForensicSearch}
+        onSelectCommit={onSelectCommit}
+        onOpenDiff={onOpenDiff}
+        tr={tr}
+      />
 
       <div ref={logContainerRef} className="commit-graph-container">
-        <svg
-          width={graphWidth}
-          height={totalHeight}
-          className="commit-graph-svg"
-        >
-          {Array.from({ length: layout.maxLane + 1 }).map((_, lane) => {
-            const x = laneX(lane);
-            return (
-              <line
-                key={`lane-${lane}`}
-                x1={x}
-                y1={0}
-                x2={x}
-                y2={totalHeight}
-                stroke="var(--line-subtle)"
-                strokeWidth={1}
-              />
-            );
-          })}
-          {hasWorkingTreeChanges && headNode && (
-            <>
-              <path
-                d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
-                stroke={headNode.color}
-                strokeWidth={5}
-                strokeOpacity={0.1}
-                fill="none"
-                strokeLinecap="round"
-              />
-              <path
-                d={`M ${laneX(headNode.lane)} ${ROW_HEIGHT / 2} L ${laneX(headNode.lane)} ${ROW_HEIGHT + ROW_HEIGHT / 2}`}
-                stroke={headNode.color}
-                strokeWidth={2.2}
-                strokeOpacity={0.92}
-                fill="none"
-                strokeLinecap="round"
-              />
-              <circle
-                cx={laneX(headNode.lane)}
-                cy={ROW_HEIGHT / 2}
-                r={NODE_RADIUS + 2}
-                fill="var(--bg-darker)"
-                stroke="var(--status-warning)"
-                strokeWidth={2.2}
-              />
-            </>
-          )}
-          {visibleEdges.map((edge, i) => (
-            <path
-              key={`eg${i}`}
-              d={buildEdgePath(edge)}
-              stroke={getEdgeStroke(edge)}
-              strokeWidth={getEdgeWidth(edge, 'glow')}
-              strokeOpacity={getEdgeOpacity(edge, 'glow')}
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
-            />
-          ))}
-          {visibleEdges.map((edge, i) => (
-            <path
-              key={`em${i}`}
-              d={buildEdgePath(edge)}
-              stroke={getEdgeStroke(edge)}
-              strokeWidth={getEdgeWidth(edge, 'core')}
-              strokeOpacity={getEdgeOpacity(edge, 'core')}
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray={edge.kind === 'merge' ? '4 4' : undefined}
-            />
-          ))}
-          {visibleNodes.map((node) => {
-            const cx = laneX(node.lane);
-            const cy = (node.row + workingTreeRowOffset) * ROW_HEIGHT + ROW_HEIGHT / 2;
-            const isSelected = selectedHash === node.commit.hash;
-            const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
-            const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
-            const isOnAnyFocusedPath = isOnCurrentPath || isOnSelectedPath;
-            const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
-            const r = node.isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
-            const fillColor = node.color;
-            const focusColor = isSelected ? selectedPathColor : fillColor;
-            const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.72 : 1;
-            const pathStroke = isOnSelectedPath
-              ? selectedPathColor
-              : isOnCurrentPath
-                ? currentPathColor
-                : fillColor;
-
-            return (
-              <g key={node.commit.hash}>
-                {isSelected && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r + 10}
-                    fill={focusColor}
-                    opacity={0.22}
-                  />
-                )}
-                {isSelected && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r + 6}
-                    fill="none"
-                    stroke={focusColor}
-                    strokeWidth={2.7}
-                    opacity={0.9}
-                  />
-                )}
-                {isLatestCommitFocus && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r + 5}
-                    fill="none"
-                    stroke={fillColor}
-                    strokeWidth={1.8}
-                    opacity={0.68}
-                  />
-                )}
-                {isOnAnyFocusedPath && !isSelected && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={isOnSelectedPath ? r + 4 : r + 3}
-                    fill="none"
-                    stroke={pathStroke}
-                    strokeWidth={isOnSelectedPath ? 1.6 : 1.4}
-                    opacity={isOnSelectedPath ? 0.66 : 0.58}
-                  />
-                )}
-                {node.isMerge && (
-                  <>
-                    <rect
-                      x={cx - r}
-                      y={cy - r}
-                      width={r * 2}
-                      height={r * 2}
-                      transform={`rotate(45 ${cx} ${cy})`}
-                      fill={fillColor}
-                      fillOpacity={baseOpacity}
-                      stroke="var(--bg-darker)"
-                      strokeWidth={2.5}
-                      strokeOpacity={baseOpacity}
-                      rx={1.5}
-                    />
-                    <circle cx={cx} cy={cy} r={r * 0.34} fill="var(--bg-darker)" fillOpacity={baseOpacity} />
-                  </>
-                )}
-                {!node.isMerge && (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r}
-                    fill={fillColor}
-                    fillOpacity={baseOpacity}
-                    stroke="var(--bg-darker)"
-                    strokeWidth={2.5}
-                    strokeOpacity={baseOpacity}
-                  />
-                )}
-              </g>
-            );
-          })}
-        </svg>
+        <CommitGraphSvg
+          maxLane={layout.maxLane}
+          graphWidth={graphWidth}
+          totalHeight={totalHeight}
+          workingTreeRowOffset={workingTreeRowOffset}
+          visibleEdges={visibleEdges}
+          visibleNodes={visibleNodes}
+          allNodes={layout.nodes}
+          headNode={headNode}
+          hasWorkingTreeChanges={hasWorkingTreeChanges}
+          selectedHash={selectedHash}
+          showSecondaryHistory={showSecondaryHistory}
+          reachableFromHead={reachableFromHead}
+          currentPathHashes={currentPathHashes}
+          selectedPathHashes={selectedPathHashes}
+          hasAnyPathHighlight={hasAnyPathHighlight}
+          currentPathColor={currentPathColor}
+          selectedPathColor={selectedPathColor}
+          currentPathEdgeKeys={currentPathEdgeKeys}
+          selectedPathEdgeKeys={selectedPathEdgeKeys}
+          hasPassiveHeadFocus={hasPassiveHeadFocus}
+        />
 
         {hasWorkingTreeChanges && (
           <div

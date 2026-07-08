@@ -14,7 +14,13 @@ import { useI18n } from '../../i18n';
 import { GithubAuthHelpMethod } from './sidebar/AppSidebar.types';
 import { useMainViewPaneResizer, INSPECTOR_PANE_MIN_WIDTH, PRIMARY_PANE_MIN_WIDTH } from './hooks/useMainViewPaneResizer';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
-import { useAppContext } from '../../contexts/AppStateContext';
+import {
+  useGithubContext,
+  useRepositoryContext,
+  useSettingsContext,
+  useUIContext,
+  useWorkflowContext,
+} from '../../contexts/AppStateContext';
 import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
 import { ProjectPlannerView } from '../ProjectPlannerView';
 
@@ -199,6 +205,18 @@ const GithubAuthGuide: React.FC<{
 };
 
 export const MainView: React.FC = () => {
+  const ui = useUIContext();
+  const settingsState = useSettingsContext();
+  const repository = useRepositoryContext();
+  const github = useGithubContext();
+  const workflow = useWorkflowContext();
+  const context = {
+    ...ui,
+    ...settingsState,
+    ...repository,
+    ...github,
+    ...workflow,
+  };
   const {
     activeTab,
     setActiveTab,
@@ -266,7 +284,7 @@ export const MainView: React.FC = () => {
     onConflictMergeAbort,
     onConflictRebaseContinue,
     onConflictRebaseAbort,
-  } = useAppContext();
+  } = context;
   const { tr } = useI18n();
   const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger);
 
