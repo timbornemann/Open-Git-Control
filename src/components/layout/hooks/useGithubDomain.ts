@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { appClient } from '../../../services/appClient';
 import { gitClient } from '../../../services/gitClient';
 import { githubClient } from '../../../services/githubClient';
@@ -66,6 +66,7 @@ export const useGithubDomain = ({
   const [isLoadingMoreRepos, setIsLoadingMoreRepos] = useState(false);
 
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {
@@ -93,7 +94,7 @@ export const useGithubDomain = ({
       });
 
       if (!result.success) {
-        throw new Error(result.error || tr('Repositories konnten nicht geladen werden.', 'Could not load repositories.'));
+        throw new Error(result.error || t('generated.components.layout.hooks.usegithubdomain.could_not_load_repositories_cec34760'));
       }
 
       const payload = result.data;
@@ -243,10 +244,10 @@ export const useGithubDomain = ({
         setNextRepoPage(1);
         setGithubReposHasMore(false);
       } else {
-        setAuthError(tr('Token ungueltig. Bitte pruefe die Berechtigungen.', 'Invalid token. Please check permissions.'));
+        setAuthError(t('generated.components.layout.hooks.usegithubdomain.invalid_token_please_check_permissions_73c7b36b'));
       }
     } catch {
-      setAuthError(tr('Fehler bei der Authentifizierung.', 'Authentication error.'));
+      setAuthError(t('generated.components.layout.hooks.usegithubdomain.authentication_error_a366cc27'));
     } finally {
       setIsAuthenticating(false);
     }
@@ -261,7 +262,7 @@ export const useGithubDomain = ({
         const pollResult = await githubClient.devicePoll(deviceCode);
         if (!pollResult.success) {
           setIsDeviceFlowRunning(false);
-          setDeviceFlowError(pollResult.error || tr('Device Flow Polling fehlgeschlagen.', 'Device flow polling failed.'));
+          setDeviceFlowError(pollResult.error || t('generated.components.layout.hooks.usegithubdomain.device_flow_polling_failed_bbf5f761'));
           return;
         }
 
@@ -273,7 +274,7 @@ export const useGithubDomain = ({
 
         if (data.status === 'error') {
           setIsDeviceFlowRunning(false);
-          setDeviceFlowError(data.errorDescription || data.error || tr('Device Flow fehlgeschlagen.', 'Device flow failed.'));
+          setDeviceFlowError(data.errorDescription || data.error || t('generated.components.layout.hooks.usegithubdomain.device_flow_failed_0da9c84a'));
           return;
         }
 
@@ -286,7 +287,7 @@ export const useGithubDomain = ({
         setGithubReposHasMore(false);
       } catch (error: any) {
         setIsDeviceFlowRunning(false);
-        setDeviceFlowError(error?.message || tr('Device Flow Polling fehlgeschlagen.', 'Device flow polling failed.'));
+        setDeviceFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.device_flow_polling_failed_bbf5f761'));
       }
     }, Math.max(2, intervalSeconds) * 1000);
   };
@@ -301,7 +302,7 @@ export const useGithubDomain = ({
 
     const startResult = await githubClient.deviceStart();
     if (!startResult.success) {
-      setDeviceFlowError(startResult.error || tr('Device Flow konnte nicht gestartet werden.', 'Could not start device flow.'));
+      setDeviceFlowError(startResult.error || t('generated.components.layout.hooks.usegithubdomain.could_not_start_device_flow_4b39f59a'));
       return;
     }
 
@@ -327,7 +328,7 @@ export const useGithubDomain = ({
     try {
       const loginResult = await githubClient.webLogin();
       if (!loginResult.success) {
-        setWebFlowError(loginResult.error || tr('GitHub 1-Klick Login fehlgeschlagen.', 'GitHub one-click login failed.'));
+        setWebFlowError(loginResult.error || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));
         return;
       }
 
@@ -337,7 +338,7 @@ export const useGithubDomain = ({
       setNextRepoPage(1);
       setGithubReposHasMore(false);
     } catch (error: any) {
-      setWebFlowError(error?.message || tr('GitHub 1-Klick Login fehlgeschlagen.', 'GitHub one-click login failed.'));
+      setWebFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));
     } finally {
       setIsWebFlowRunning(false);
     }
@@ -388,7 +389,7 @@ export const useGithubDomain = ({
     if (!gitClient.isAvailable() || !appClient.isAvailable()) return false;
     const normalizedCloneUrl = String(cloneUrl || '').trim();
     if (!normalizedCloneUrl) {
-      setCloneError(tr('Clone-URL fehlt.', 'Clone URL is required.'));
+      setCloneError(t('generated.components.layout.hooks.usegithubdomain.clone_url_is_required_f633ac79'));
       return false;
     }
     const targetDir = options.targetDir ?? await appClient.selectDirectory();
@@ -408,14 +409,14 @@ export const useGithubDomain = ({
       const result = await gitClient.gitClone(normalizedCloneUrl, targetDir, options.targetName);
       if (result.success) {
         setCloneFinished(true);
-        setCloneLog(prev => [...prev, `SUCCESS: ${tr('Repository erfolgreich geklont nach', 'Repository cloned successfully to')}: ${result.repoPath}`]);
+        setCloneLog(prev => [...prev, `SUCCESS: ${t('generated.components.layout.hooks.usegithubdomain.repository_cloned_successfully_to_667ce18e')}: ${result.repoPath}`]);
         await onRepoCloned(result.repoPath);
         if (options.switchToRepoTab !== false) {
           setActiveTab('repo');
         }
         return true;
       } else {
-        const errorMessage = result.error || tr('Unbekannter Fehler', 'Unknown error');
+        const errorMessage = result.error || t('generated.components.layout.hooks.usegithubdomain.unknown_error_2e5d0f05');
         setCloneError(errorMessage);
         setCloneLog(prev => [...prev, `ERROR: ${errorMessage}`]);
         return false;

@@ -20,7 +20,7 @@ export const CloneProgressModal: React.FC<Props> = ({
   cloneLog,
   onClose,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   if (!isCloning && !cloneFinished && !cloneError) return null;
 
@@ -28,16 +28,16 @@ export const CloneProgressModal: React.FC<Props> = ({
 
   return (
     <div className="git-transfer-backdrop">
-      <div className="git-transfer-modal" role="dialog" aria-modal="true" aria-label={tr('Repository klonen', 'Clone repository')}>
+      <div className="git-transfer-modal" role="dialog" aria-modal="true" aria-label={t('generated.components.layout.cloneprogressmodal.clone_repository_25099131')}>
         <div className="git-transfer-modal-header">
           <DownloadCloud size={18} className="git-transfer-header-icon" aria-hidden="true" />
           <span className="git-transfer-modal-title">
-            {tr('Klone', 'Cloning')}: {cloneRepoName || tr('Repository', 'Repository')}
+            {t('generated.components.layout.cloneprogressmodal.cloning_7c6e2dc2')}: {cloneRepoName || t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb')}
           </span>
           <div className="git-transfer-header-spacer" />
           {isRunning && <div className="clone-spinner" />}
-          {cloneFinished && <span className="git-transfer-header-state complete">{tr('Fertig', 'Done')}</span>}
-          {cloneError && <span className="git-transfer-header-state error">{tr('Fehler', 'Error')}</span>}
+          {cloneFinished && <span className="git-transfer-header-state complete">{t('generated.components.layout.cloneprogressmodal.done_724fd90c')}</span>}
+          {cloneError && <span className="git-transfer-header-state error">{t('generated.components.layout.cloneprogressmodal.error_7d62310f')}</span>}
         </div>
 
         <GitTransferProgressPanel
@@ -45,13 +45,13 @@ export const CloneProgressModal: React.FC<Props> = ({
           isRunning={isRunning}
           isComplete={cloneFinished}
           error={cloneError}
-          emptyText={tr('Starte Clone-Prozess...', 'Starting clone process...')}
+          emptyText={t('generated.components.layout.cloneprogressmodal.starting_clone_process_cdb1450a')}
         />
 
         {(cloneFinished || cloneError) && (
           <div className="git-transfer-modal-footer">
             <button type="button" className="git-transfer-close-button" onClick={onClose}>
-              {tr('Schliessen', 'Close')}
+              {t('generated.components.actiontoastviewport.close_181764fa')}
             </button>
           </div>
         )}

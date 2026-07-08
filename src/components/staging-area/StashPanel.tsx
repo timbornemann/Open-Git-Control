@@ -29,7 +29,7 @@ export const StashPanel: React.FC<Props> = ({
   setInputDialog,
   refreshTrigger,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [collapsed, setCollapsed] = useState(true);
   const [stashes, setStashes] = useState<GitStashEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,7 +48,7 @@ export const StashPanel: React.FC<Props> = ({
       if (result.success) {
         setStashes((result as any).data ?? []);
       } else {
-        setError((result as any).error || tr('Stash-Liste konnte nicht geladen werden.', 'Failed to load stash list.'));
+        setError((result as any).error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_list_29c36606'));
       }
     } catch (e: any) {
       setError(e.message);
@@ -71,7 +71,7 @@ export const StashPanel: React.FC<Props> = ({
           [stashName]: {
             loading: false,
             files: [],
-            error: result.error || tr('Stash-Dateien konnten nicht geladen werden.', 'Failed to load stash files.'),
+            error: result.error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_files_7a7abbc7'),
           },
         }));
         return;
@@ -117,7 +117,7 @@ export const StashPanel: React.FC<Props> = ({
         await load();
         if (op !== 'drop') onRepoChanged?.();
       } else {
-        setError(result.error || tr('Stash-Operation fehlgeschlagen.', 'Stash operation failed.'));
+        setError(result.error || t('generated.components.staging_area.stashpanel.stash_operation_failed_7a8358ef'));
       }
     } catch (e: any) {
       setError(e.message);
@@ -137,40 +137,34 @@ export const StashPanel: React.FC<Props> = ({
   const branchFromStash = useCallback((stash: GitStashEntryDto) => {
     if (!gitClient.isAvailable()) return;
     if (!setInputDialog) {
-      setError(tr('Branch-Dialog ist nicht verfuegbar.', 'Branch dialog is not available.'));
+      setError(t('generated.components.staging_area.stashpanel.branch_dialog_is_not_available_00daf191'));
       return;
     }
 
     const defaultBranchName = `stash-${stash.index}`;
     setInputDialog({
-      title: tr('Branch aus Stash erstellen', 'Create branch from stash'),
-      message: tr(
-        'Git erstellt einen neuen Branch vom urspruenglichen Stash-Base-Commit und wendet den Stash darauf an.',
-        'Git creates a new branch from the original stash base commit and applies the stash onto it.',
-      ),
+      title: t('generated.components.staging_area.stashpanel.create_branch_from_stash_bada7c93'),
+      message: t('generated.components.staging_area.stashpanel.git_creates_a_new_branch_from_the_original_stash_base_co_c5d0afdf'),
       fields: [{
         id: 'branchName',
-        label: tr('Branch-Name', 'Branch name'),
+        label: t('generated.components.staging_area.stashpanel.branch_name_f97f5dd8'),
         placeholder: defaultBranchName,
         defaultValue: defaultBranchName,
         required: true,
         validate: (value) => {
           if (!value.trim()) {
-            return tr('Bitte einen Branch-Namen eingeben.', 'Please enter a branch name.');
+            return t('generated.components.staging_area.stashpanel.please_enter_a_branch_name_0ca67048');
           }
           return null;
         },
       }],
       contextItems: [
-        { label: tr('Stash', 'Stash'), value: stash.name },
-        { label: tr('Beschreibung', 'Description'), value: stash.subject },
+        { label: t('generated.components.staging_area.stashpanel.stash_66a26771'), value: stash.name },
+        { label: t('generated.components.commitdetails.description_3f0f0c88'), value: stash.subject },
       ],
       irreversible: false,
-      consequences: tr(
-        'Wenn das Anwenden erfolgreich ist, entfernt Git den Stash automatisch aus der Liste.',
-        'If applying succeeds, Git automatically removes the stash from the list.',
-      ),
-      confirmLabel: tr('Branch erstellen', 'Create branch'),
+      consequences: t('generated.components.staging_area.stashpanel.if_applying_succeeds_git_automatically_removes_the_stash_0f54e6bb'),
+      confirmLabel: t('generated.components.staging_area.stashpanel.create_branch_f1e70a0b'),
       onSubmit: async (values) => {
         const branchName = String(values.branchName || '').trim();
         setError(null);
@@ -183,7 +177,7 @@ export const StashPanel: React.FC<Props> = ({
           onRepoChanged?.();
           return;
         }
-        setError(result.error || tr('Branch konnte nicht aus dem Stash erstellt werden.', 'Failed to create branch from stash.'));
+        setError(result.error || t('generated.components.staging_area.stashpanel.failed_to_create_branch_from_stash_1bbcc9af'));
       },
     });
   }, [load, onRepoChanged, setInputDialog, tr]);
@@ -214,7 +208,7 @@ export const StashPanel: React.FC<Props> = ({
       if (finalResult.success) {
         onRepoChanged?.();
       } else {
-        setError(trackedResult.error || finalResult.error || tr('Datei konnte nicht aus dem Stash geholt werden.', 'Could not apply file from the stash.'));
+        setError(trackedResult.error || finalResult.error || t('generated.components.staging_area.stashpanel.could_not_apply_file_from_the_stash_cd8005a7'));
       }
     } catch (e: any) {
       setError(e.message);
@@ -228,11 +222,11 @@ export const StashPanel: React.FC<Props> = ({
       <button
         className="stash-panel-header"
         onClick={() => setCollapsed((c) => !c)}
-        title={collapsed ? tr('Stashes anzeigen', 'Show stashes') : tr('Stashes einklappen', 'Collapse stashes')}
+        title={collapsed ? t('generated.components.staging_area.stashpanel.show_stashes_846c3181') : t('generated.components.staging_area.stashpanel.collapse_stashes_5cded4e2')}
       >
         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
         <Archive size={13} style={{ opacity: 0.7 }} />
-        <span>{tr('Stashes', 'Stashes')}</span>
+        <span>{t('generated.components.staging_area.stashpanel.stashes_2446335b')}</span>
         {stashes.length > 0 && !collapsed && (
           <span className="stash-panel-count">{stashes.length}</span>
         )}
@@ -241,7 +235,7 @@ export const StashPanel: React.FC<Props> = ({
       {!collapsed && (
         <div className="stash-panel-body">
           {loading && (
-            <div className="stash-panel-hint">{tr('Lade Stashes...', 'Loading stashes...')}</div>
+            <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.loading_stashes_0cdfcdf1')}</div>
           )}
 
           {!loading && error && (
@@ -251,8 +245,8 @@ export const StashPanel: React.FC<Props> = ({
           {!loading && !error && stashes.length === 0 && (
             <EmptyState
               icon={<Archive size={24} />}
-              title={tr('Keine Stashes vorhanden.', 'No stashes found.')}
-              description={tr('Erstelle einen Stash ueber das Rechtsklickmenue einer Datei.', 'Create a stash from a file row context menu.')}
+              title={t('generated.components.staging_area.stashpanel.no_stashes_found_b1e3c59f')}
+              description={t('generated.components.staging_area.stashpanel.create_a_stash_from_a_file_row_context_menu_c1113ce3')}
             />
           )}
 
@@ -271,13 +265,13 @@ export const StashPanel: React.FC<Props> = ({
                         className="staging-btn-sm staging-btn-danger"
                         onClick={() => { void runStashOp(stash.name, 'drop'); }}
                       >
-                        {tr('Loeschen', 'Delete')}
+                        {t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}
                       </button>
                       <button
                         className="staging-btn-sm"
                         onClick={() => setPendingOp(null)}
                       >
-                        {tr('Abbrechen', 'Cancel')}
+                        {t('generated.components.confirm.cancel_035b7526')}
                       </button>
                     </div>
                   </div>
@@ -294,49 +288,49 @@ export const StashPanel: React.FC<Props> = ({
                       <button
                         className="staging-btn-sm"
                         onClick={() => toggleFiles(stash)}
-                        title={isExpanded ? tr('Stash-Dateien ausblenden', 'Hide stash files') : tr('Stash-Dateien anzeigen', 'Show stash files')}
+                        title={isExpanded ? t('generated.components.staging_area.stashpanel.hide_stash_files_be566d4a') : t('generated.components.staging_area.stashpanel.show_stash_files_7f625fc7')}
                       >
-                        {isExpanded ? tr('Dateien ausblenden', 'Hide files') : tr('Dateien', 'Files')}
+                        {isExpanded ? t('generated.components.staging_area.stashpanel.hide_files_dab93cd7') : t('generated.components.commitdetails.files_f77bc482')}
                       </button>
                       <button
                         className="staging-btn-sm"
                         onClick={() => handleOp(stash, 'apply')}
-                        title={tr('Stash anwenden (behaelt Stash)', 'Apply stash (keep stash)')}
+                        title={t('generated.components.staging_area.stashpanel.apply_stash_keep_stash_43a20097')}
                       >
-                        {tr('Apply', 'Apply')}
+                        {t('generated.components.staging_area.stashpanel.apply_e7699992')}
                       </button>
                       <button
                         className="staging-btn-sm"
                         onClick={() => handleOp(stash, 'pop')}
-                        title={tr('Stash anwenden und loeschen', 'Apply and delete stash')}
+                        title={t('generated.components.staging_area.stashpanel.apply_and_delete_stash_2df674b9')}
                       >
-                        {tr('Pop', 'Pop')}
+                        {t('generated.components.staging_area.stashpanel.pop_060eb5a7')}
                       </button>
                       <button
                         className="staging-btn-sm"
                         onClick={() => branchFromStash(stash)}
-                        title={tr('Branch aus diesem Stash erstellen', 'Create a branch from this stash')}
+                        title={t('generated.components.staging_area.stashpanel.create_a_branch_from_this_stash_caa1dff5')}
                       >
-                        {tr('Branch', 'Branch')}
+                        {t('generated.components.staging_area.stashpanel.branch_0e8da813')}
                       </button>
                       <button
                         className="staging-btn-sm staging-btn-danger"
                         onClick={() => handleOp(stash, 'drop')}
-                        title={tr('Stash loeschen', 'Delete stash')}
+                        title={t('generated.components.staging_area.stashpanel.delete_stash_6804245b')}
                       >
-                        {tr('Drop', 'Drop')}
+                        {t('generated.components.staging_area.stashpanel.drop_f1887911')}
                       </button>
                     </div>
                     {isExpanded && (
                       <div className="stash-file-list">
                         {fileState?.loading && (
-                          <div className="stash-panel-hint">{tr('Lade Dateien...', 'Loading files...')}</div>
+                          <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.loading_files_df8b1d70')}</div>
                         )}
                         {!fileState?.loading && fileState?.error && (
                           <div className="stash-panel-hint stash-panel-hint--error">{fileState.error}</div>
                         )}
                         {!fileState?.loading && !fileState?.error && (fileState?.files || []).length === 0 && (
-                          <div className="stash-panel-hint">{tr('Keine Dateien gefunden.', 'No files found.')}</div>
+                          <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.no_files_found_5e448811')}</div>
                         )}
                         {!fileState?.loading && !fileState?.error && (fileState?.files || []).map((filePath) => (
                           <div key={`${stash.name}:${filePath}`} className="stash-file-row">
@@ -345,11 +339,11 @@ export const StashPanel: React.FC<Props> = ({
                               className="staging-btn-sm"
                               disabled={pendingFileOp !== null}
                               onClick={() => { void restoreStashFile(stash.name, filePath); }}
-                              title={tr('Datei aus diesem Stash holen', 'Apply file from this stash')}
+                              title={t('generated.components.staging_area.stashpanel.apply_file_from_this_stash_8651c38e')}
                             >
                               {pendingFileOp?.stashName === stash.name && pendingFileOp.path === filePath
-                                ? tr('Hole...', 'Applying...')
-                                : tr('Holen', 'Apply')}
+                                ? t('generated.components.staging_area.stashpanel.applying_74286d47')
+                                : t('generated.components.staging_area.stashpanel.apply_48b5b14b')}
                             </button>
                           </div>
                         ))}

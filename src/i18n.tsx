@@ -6,7 +6,7 @@ export type AppLanguage = 'de' | 'en';
 export type TranslationVariables = Record<string, string | number | boolean | null | undefined>;
 
 type TranslateFn = (deText: string, enText: string) => string;
-type CatalogTranslateFn = (key: string, variables?: TranslationVariables) => string;
+export type CatalogTranslateFn = (key: string, variables?: TranslationVariables) => string;
 type TranslationCatalog = Record<string, unknown>;
 
 type I18nContextValue = {

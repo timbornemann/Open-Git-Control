@@ -2,55 +2,56 @@ import type {
   AiCommitMessageLanguageDto,
   AiCommitMessageStyleDto,
 } from '../global';
+import type { CatalogTranslateFn } from '../i18n';
 
-type Translate = (deText: string, enText: string) => string;
+type Translate = CatalogTranslateFn;
 
 export const getCommitMessageStyleLabel = (
   style: AiCommitMessageStyleDto,
-  tr: Translate,
+  t: Translate,
 ): string => {
   switch (style) {
     case 'plain':
-      return tr('Plain', 'Plain');
+      return t('commitMessage.styles.plain');
     case 'detailed':
-      return tr('Detailliert', 'Detailed');
+      return t('commitMessage.styles.detailed');
     case 'conventional':
     default:
-      return tr('Conventional Commits', 'Conventional Commits');
+      return t('commitMessage.styles.conventional');
   }
 };
 
 export const getCommitMessageLanguageLabel = (
   language: AiCommitMessageLanguageDto,
-  tr: Translate,
+  t: Translate,
 ): string => {
   switch (language) {
     case 'de':
-      return tr('Deutsch', 'German');
+      return t('commitMessage.languages.german');
     case 'en':
-      return tr('Englisch', 'English');
+      return t('commitMessage.languages.english');
     case 'auto':
     default:
-      return tr('Automatisch aus Notizen', 'Auto from notes');
+      return t('commitMessage.languages.auto');
   }
 };
 
-export const getCommitMessageLanguageOptions = (tr: Translate): Array<{ value: AiCommitMessageLanguageDto; label: string }> => [
-  { value: 'auto', label: getCommitMessageLanguageLabel('auto', tr) },
-  { value: 'de', label: getCommitMessageLanguageLabel('de', tr) },
-  { value: 'en', label: getCommitMessageLanguageLabel('en', tr) },
+export const getCommitMessageLanguageOptions = (t: Translate): Array<{ value: AiCommitMessageLanguageDto; label: string }> => [
+  { value: 'auto', label: getCommitMessageLanguageLabel('auto', t) },
+  { value: 'de', label: getCommitMessageLanguageLabel('de', t) },
+  { value: 'en', label: getCommitMessageLanguageLabel('en', t) },
 ];
 
-export const getCommitMessageStyleOptions = (tr: Translate): Array<{ value: AiCommitMessageStyleDto; label: string }> => [
-  { value: 'conventional', label: getCommitMessageStyleLabel('conventional', tr) },
-  { value: 'plain', label: getCommitMessageStyleLabel('plain', tr) },
-  { value: 'detailed', label: getCommitMessageStyleLabel('detailed', tr) },
+export const getCommitMessageStyleOptions = (t: Translate): Array<{ value: AiCommitMessageStyleDto; label: string }> => [
+  { value: 'conventional', label: getCommitMessageStyleLabel('conventional', t) },
+  { value: 'plain', label: getCommitMessageStyleLabel('plain', t) },
+  { value: 'detailed', label: getCommitMessageStyleLabel('detailed', t) },
 ];
 
 export const getCommitMessageStyleExample = (
   style: AiCommitMessageStyleDto,
   language: AiCommitMessageLanguageDto,
-  tr: Translate,
+  t: Translate,
 ): { title: string; description: string } => {
   const useGerman = language === 'de';
 
@@ -58,11 +59,11 @@ export const getCommitMessageStyleExample = (
     return useGerman
       ? {
         title: 'verbessere Clone-Fortschritt',
-        description: tr('Beschreibung meist leer; nur bei wichtigem Kontext nutzen.', 'Description usually empty; only use it for important context.'),
+        description: t('commitMessage.examples.plainDescriptionHint'),
       }
       : {
         title: 'improve clone progress',
-        description: tr('Beschreibung meist leer; nur bei wichtigem Kontext nutzen.', 'Description usually empty; only use it for important context.'),
+        description: t('commitMessage.examples.plainDescriptionHint'),
       };
   }
 
@@ -92,9 +93,9 @@ export const getCommitMessageStyleExample = (
 export const formatCommitMessageStyleExample = (
   style: AiCommitMessageStyleDto,
   language: AiCommitMessageLanguageDto,
-  tr: Translate,
+  t: Translate,
 ): string => {
-  const example = getCommitMessageStyleExample(style, language, tr);
+  const example = getCommitMessageStyleExample(style, language, t);
   const description = example.description.trim();
   return description
     ? `${example.title}\n\n${description}`

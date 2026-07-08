@@ -62,7 +62,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const repository = useRepositoryContext();
   const github = useGithubContext();
   const workflow = useWorkflowContext();
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   const showGithubGuide = ui.activeTab === 'github' && !github.isAuthenticated && Boolean(github.selectedGithubAuthHelpMethod);
   const isSettingsView = ui.activeTab === 'settings';
@@ -70,19 +70,19 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isReleaseView = ui.activeTab === 'repo' && github.showReleaseCreator;
   const isTimelineView = ui.activeTab === 'repo' && showTimeline;
   const primaryPaneTitle = isSettingsView
-    ? tr('Einstellungen', 'Settings')
+    ? t('generated.components.layout.main.mainprimarypane.settings_c6256784')
     : isReleaseView
-      ? tr('Release Ersteller', 'Release creator')
+      ? t('generated.components.layout.main.mainprimarypane.release_creator_e28377be')
       : isTimelineView
-        ? tr('Codebase-Zeitleiste', 'Codebase Timeline')
+        ? t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25')
         : showGithubGuide
-          ? tr('GitHub Login Anleitung', 'GitHub login guide')
+          ? t('generated.components.layout.main.mainprimarypane.github_login_guide_c2a55182')
           : showRecoveryCenter
-            ? tr('Recovery Center', 'Recovery Center')
+            ? t('generated.components.layout.main.mainprimarypane.recovery_center_0adebec8')
             : activeConflictPath
-              ? tr('Konflikt-Resolver', 'Conflict resolver')
+              ? t('generated.components.layout.main.mainprimarypane.conflict_resolver_1f790ac5')
               : activeDiffRequest
-                ? tr('Diff Viewer', 'Diff Viewer')
+                ? t('generated.components.layout.main.mainprimarypane.diff_viewer_979e21a6')
                 : '';
   const shouldShowPrimaryPaneHeader = isSettingsView
     || isReleaseView
@@ -108,41 +108,41 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             <div className="pane-header-main-center">
               <div className="conflict-global-actions-rail conflict-global-actions-rail--topbar">
                 <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">{tr('Merge', 'Merge')}</span>
-                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictMergeContinue} disabled={workflow.isGitActionRunning} title={tr('Merge abschliessen', 'Complete merge')}>{tr('Fortsetzen', 'Continue')}</button>
-                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictMergeAbort} disabled={workflow.isGitActionRunning} title={tr('Merge abbrechen', 'Abort merge')}>{tr('Abbrechen', 'Cancel')}</button>
+                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
+                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictMergeContinue} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.complete_merge_a4b16236')}>{t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}</button>
+                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictMergeAbort} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66')}>{t('generated.components.confirm.cancel_035b7526')}</button>
                 </div>
                 <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">{tr('Rebase', 'Rebase')}</span>
-                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictRebaseContinue} disabled={workflow.isGitActionRunning} title={tr('Rebase fortsetzen', 'Continue rebase')}>{tr('Fortsetzen', 'Continue')}</button>
-                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictRebaseAbort} disabled={workflow.isGitActionRunning} title={tr('Rebase abbrechen', 'Abort rebase')}>{tr('Abbrechen', 'Cancel')}</button>
+                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.rebase_26c8effa')}</span>
+                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictRebaseContinue} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9')}>{t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}</button>
+                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictRebaseAbort} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71')}>{t('generated.components.confirm.cancel_035b7526')}</button>
                 </div>
               </div>
             </div>
           ) : null}
           {isSettingsView ? null : isReleaseView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={github.onCloseReleaseCreator}>
-              {tr('Zurueck zum Graph', 'Back to graph')}
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : isTimelineView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowTimeline(false)}>
-              {tr('Zurueck zum Graph', 'Back to graph')}
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : showGithubGuide ? (
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onClearGithubAuthHelpMethod}>
-              {tr('Zurueck', 'Back')}
+              {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
             </button>
           ) : showRecoveryCenter ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
-              {tr('Zurueck zum Graph', 'Back to graph')}
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : activeConflictPath ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setActiveConflictPath(null)}>
-              {tr('Zurueck zum Graph', 'Back to graph')}
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : activeDiffRequest ? (
             <button className="icon-btn pane-header-nav-btn" onClick={closeInspector}>
-              {tr('Zurueck zum Graph', 'Back to graph')}
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : null}
         </div>

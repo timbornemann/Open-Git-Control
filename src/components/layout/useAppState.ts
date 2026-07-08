@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppSettingsDto, GitJobEventDto } from '../../global';
 import { useToastQueue } from '../../hooks/useToastQueue';
-import { trByLanguage } from '../../i18n';
+import { translateFromCatalog, trByLanguage, type TranslationVariables } from '../../i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
@@ -98,6 +98,7 @@ export const useAppState = () => {
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(settings.language, deText, enText);
   }, [settings.language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language, key, variables), [settings.language]);
 
   const triggerRefresh = useCallback(() => {
     setRefreshTrigger(prev => prev + 1);
@@ -174,9 +175,9 @@ export const useAppState = () => {
     try {
       const next = await appClient.setSettings(partial);
       setSettings(next);
-      setGitActionToast({ msg: tr('Einstellungen gespeichert.', 'Settings saved.'), isError: false });
+      setGitActionToast({ msg: t('generated.components.layout.useappstate.settings_saved_d81d1258'), isError: false });
     } catch (e: any) {
-      setGitActionToast({ msg: e?.message || tr('Einstellungen konnten nicht gespeichert werden.', 'Could not save settings.'), isError: true });
+      setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
     }
   }, [setGitActionToast, tr]);
 
@@ -267,15 +268,12 @@ export const useAppState = () => {
   ): Promise<boolean> => {
     const cloneSource = String(cloneSourceRaw || '').trim();
     if (!cloneSource) {
-      setGitActionToast({ msg: tr('Clone-Quelle fehlt.', 'Clone source is required.'), isError: true });
+      setGitActionToast({ msg: t('generated.components.layout.useappstate.clone_source_is_required_0f140f6c'), isError: true });
       return false;
     }
     if (!isCloneSourceLikelyRemote(cloneSource)) {
       setGitActionToast({
-        msg: tr(
-          'Bitte eine HTTP/HTTPS/SSH URL angeben (z.B. https://..., ssh://... oder git@host:owner/repo.git).',
-          'Please provide an HTTP/HTTPS/SSH URL (for example https://..., ssh://..., or git@host:owner/repo.git).',
-        ),
+        msg: t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_s_834268dc'),
         isError: true,
       });
       return false;
@@ -290,46 +288,37 @@ export const useAppState = () => {
 
   const handleCloneByUrl = useCallback(() => {
     setInputDialog({
-      title: tr('Repository per URL klonen', 'Clone repository from URL'),
-      message: tr(
-        'HTTP/HTTPS oder SSH URL eingeben und Zielordner waehlen.',
-        'Enter an HTTP/HTTPS or SSH URL and choose a target directory.',
-      ),
+      title: t('generated.components.sidebar.repolist.clone_repository_from_url_b2415d88'),
+      message: t('generated.components.layout.useappstate.enter_an_http_https_or_ssh_url_and_choose_a_target_direc_4e24ef1b'),
       fields: [
         {
           id: 'cloneSource',
-          label: tr('Clone-URL', 'Clone URL'),
+          label: t('generated.components.layout.useappstate.clone_url_449646ea'),
           placeholder: 'https://github.com/owner/repo.git',
           required: true,
           validate: (value) => {
             const normalized = String(value || '').trim();
             if (!normalized) return null;
             if (isCloneSourceLikelyRemote(normalized)) return null;
-            return tr(
-              'Bitte HTTP/HTTPS/SSH URL angeben (z.B. https://... oder git@host:owner/repo.git).',
-              'Please provide an HTTP/HTTPS/SSH URL (for example https://... or git@host:owner/repo.git).',
-            );
+            return t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_o_f3e16379');
           },
         },
         {
           id: 'targetName',
-          label: tr('Ordnername (optional)', 'Folder name (optional)'),
-          placeholder: tr('Standard: Name aus URL', 'Default: name from URL'),
+          label: t('generated.components.layout.useappstate.folder_name_optional_bcb3f976'),
+          placeholder: t('generated.components.layout.useappstate.default_name_from_url_3a3ad316'),
           required: false,
         },
       ],
       contextItems: [],
       irreversible: false,
-      consequences: tr(
-        'Der Zielordner wird erstellt und das Repository lokal geklont.',
-        'A target folder will be created and the repository will be cloned locally.',
-      ),
-      confirmLabel: tr('Klonen', 'Clone'),
+      consequences: t('generated.components.layout.useappstate.a_target_folder_will_be_created_and_the_repository_will_c295fbf1'),
+      confirmLabel: t('generated.components.layout.useappstate.clone_6a063226'),
       onSubmit: async (values) => {
         const cloned = await cloneFromRemoteSource(values.cloneSource || '', values.targetName || '');
         if (!cloned) return;
         setGitActionToast({
-          msg: tr('Repository erfolgreich geklont.', 'Repository cloned successfully.'),
+          msg: t('generated.components.layout.useappstate.repository_cloned_successfully_7b3b2cd9'),
           isError: false,
         });
       },
@@ -341,22 +330,19 @@ export const useAppState = () => {
     if (!github.isAuthenticated) {
       workspace.setActiveTab('github');
       setGitActionToast({
-        msg: tr('Bitte zuerst im GitHub-Tab anmelden.', 'Please sign in first in the GitHub tab.'),
+        msg: t('generated.components.layout.useappstate.please_sign_in_first_in_the_github_tab_d5addce9'),
         isError: true,
       });
       return;
     }
 
     setInputDialog({
-      title: tr('GitHub-Repository forken', 'Fork GitHub repository'),
-      message: tr(
-        'GitHub Repository-URL eingeben. Der Fork wird erstellt und danach geklont.',
-        'Enter a GitHub repository URL. The fork will be created and then cloned.',
-      ),
+      title: t('generated.components.layout.useappstate.fork_github_repository_1007beda'),
+      message: t('generated.components.layout.useappstate.enter_a_github_repository_url_the_fork_will_be_created_a_d4393eec'),
       fields: [
         {
           id: 'sourceUrl',
-          label: tr('Quell-URL', 'Source URL'),
+          label: t('generated.components.layout.useappstate.source_url_7796b5a2'),
           placeholder: 'https://github.com/owner/repo',
           required: true,
           validate: (value) => {
@@ -364,37 +350,31 @@ export const useAppState = () => {
             if (!normalized) return null;
             return parseGithubRepoReference(normalized)
               ? null
-              : tr(
-                'Bitte gueltige GitHub-URL angeben (https://..., ssh://... oder git@host:owner/repo.git).',
-                'Please provide a valid GitHub URL (https://..., ssh://..., or git@host:owner/repo.git).',
-              );
+              : t('generated.components.layout.useappstate.please_provide_a_valid_github_url_https_ssh_or_git_host_e46862d3');
           },
         },
         {
           id: 'forkName',
-          label: tr('Fork-Name (optional)', 'Fork name (optional)'),
-          placeholder: tr('Standard: gleicher Name', 'Default: same name'),
+          label: t('generated.components.layout.useappstate.fork_name_optional_0bb173f5'),
+          placeholder: t('generated.components.layout.useappstate.default_same_name_beadebe3'),
           required: false,
         },
       ],
       contextItems: [
         {
-          label: tr('GitHub Host', 'GitHub host'),
+          label: t('generated.components.layout.useappstate.github_host_fe3a52b8'),
           value: normalizeGitHost(settings.githubHost),
         },
       ],
       irreversible: false,
-      consequences: tr(
-        'Ein Fork wird in deinem GitHub-Account erstellt und direkt lokal geklont.',
-        'A fork will be created in your GitHub account and cloned locally right away.',
-      ),
-      confirmLabel: tr('Forken & Klonen', 'Fork & clone'),
+      consequences: t('generated.components.layout.useappstate.a_fork_will_be_created_in_your_github_account_and_cloned_b2f425e5'),
+      confirmLabel: t('generated.components.layout.useappstate.fork_clone_b5d1214a'),
       onSubmit: async (values) => {
         const sourceUrl = String(values.sourceUrl || '').trim();
         const parsed = parseGithubRepoReference(sourceUrl);
         if (!parsed) {
           setGitActionToast({
-            msg: tr('Ungueltige GitHub-URL.', 'Invalid GitHub URL.'),
+            msg: t('generated.components.layout.useappstate.invalid_github_url_926331e1'),
             isError: true,
           });
           return;
@@ -421,7 +401,7 @@ export const useAppState = () => {
 
         if (!forkResult.success) {
           setGitActionToast({
-            msg: forkResult.error || tr('Fork konnte nicht erstellt werden.', 'Could not create fork.'),
+            msg: forkResult.error || t('generated.components.layout.useappstate.could_not_create_fork_bbfec539'),
             isError: true,
           });
           return;
@@ -440,10 +420,7 @@ export const useAppState = () => {
         });
         if (!cloneSuccess) {
           setGitActionToast({
-            msg: tr(
-              'Fork erstellt, aber Clone fehlgeschlagen. Bitte Clone erneut starten.',
-              'Fork created, but clone failed. Please retry cloning.',
-            ),
+            msg: t('generated.components.layout.useappstate.fork_created_but_clone_failed_please_retry_cloning_939a65a0'),
             isError: true,
           });
         }
@@ -472,7 +449,7 @@ export const useAppState = () => {
   const handleCreateGithubRepoForCurrent = async () => {
     if (!githubClient.isAvailable() || !workspace.activeRepo) return;
     if (!github.isAuthenticated) {
-      setConnectError(tr('Bitte zuerst GitHub verbinden (GitHub-Tab).', 'Please connect GitHub first (GitHub tab).'));
+      setConnectError(t('generated.components.layout.useappstate.please_connect_github_first_github_tab_68715c85'));
       return;
     }
     await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });
@@ -554,7 +531,7 @@ export const useAppState = () => {
     const parsed = parseRemoteBranchRef(normalized);
     if (!parsed) {
       setGitActionToast({
-        msg: tr('Ungueltiger Remote-Branch.', 'Invalid remote branch.'),
+        msg: t('generated.components.layout.useappstate.invalid_remote_branch_3042f288'),
         isError: true,
       });
       return;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import { githubClient } from '../../../services/githubClient';
 import {
@@ -62,6 +62,7 @@ export const useRemoteRecoveryWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(settings.language as AppLanguage, deText, enText);
   }, [settings.language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables), [settings.language]);
 
   useEffect(() => {
     setNewRepoName('');
@@ -96,10 +97,7 @@ export const useRemoteRecoveryWorkflow = ({
     });
     setForceGithubRepoCreationPrompt(true);
     const shortError = compactGitError(failureMessage, 320);
-    setConnectError(shortError || tr(
-      'Der aktuelle Remote ist nicht mehr nutzbar. Bitte neues GitHub-Repository anlegen oder origin aktualisieren.',
-      'The current remote is no longer usable. Please create a new GitHub repository or update origin.',
-    ));
+    setConnectError(shortError || t('generated.components.layout.workflows.useremoterecoveryworkflow.the_current_remote_is_no_longer_usable_please_create_a_n_3133bbff'));
     workspace.setActiveTab('repo');
   }, [tr, workspace]);
 
@@ -120,10 +118,7 @@ export const useRemoteRecoveryWorkflow = ({
       const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
       if (!removeOriginResult.success && !originAlreadyMissing) {
         setGitActionToast({
-          msg: removeOriginResult.error || tr(
-            'Das nicht mehr gueltige origin-Remote konnte nicht automatisch entfernt werden.',
-            'Could not automatically remove the invalid origin remote.',
-          ),
+          msg: removeOriginResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_automatically_remove_the_invalid_origin_remote_117d0832'),
           isError: true,
         });
         return false;
@@ -140,10 +135,7 @@ export const useRemoteRecoveryWorkflow = ({
       workspace.setActiveTab('repo');
       triggerRefresh();
       setGitActionToast({
-        msg: tr(
-          'GitHub-Repository nicht mehr vorhanden: origin wurde entfernt. Bitte jetzt Name/Private setzen und neues GitHub-Repository erstellen.',
-          'GitHub repository no longer exists: origin was removed. Please set name/private and create a new GitHub repository now.',
-        ),
+        msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_repository_no_longer_exists_origin_was_removed_pl_d880ec95'),
         isError: false,
       });
       return true;
@@ -160,10 +152,7 @@ export const useRemoteRecoveryWorkflow = ({
       setConnectError(null);
       workspace.setActiveTab('repo');
       setGitActionToast({
-        msg: tr(
-          'Kein gueltiges origin-Remote konfiguriert. Bitte jetzt Name/Private setzen und GitHub-Repository erstellen.',
-          'No valid origin remote is configured. Please set name/private and create a GitHub repository now.',
-        ),
+        msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.no_valid_origin_remote_is_configured_please_set_name_pri_c0095a48'),
         isError: false,
       });
       return true;
@@ -181,18 +170,12 @@ export const useRemoteRecoveryWorkflow = ({
     if (!isGithubAuthenticated) {
       setConfirmDialog({
         variant: 'confirm',
-        title: tr('GitHub-Verbindung erforderlich', 'GitHub connection required'),
-        message: tr(
-          'Das Remote ist nicht mehr gueltig. Melde dich bei GitHub an, danach kannst du direkt ein neues Repository anlegen und verbinden.',
-          'The remote is no longer valid. Sign in to GitHub, then you can create and connect a new repository directly.',
-        ),
-        contextItems: shortError ? [{ label: tr('Git-Fehler', 'Git error'), value: shortError }] : [],
+        title: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_connection_required_065a4af5'),
+        message: t('generated.components.layout.workflows.useremoterecoveryworkflow.the_remote_is_no_longer_valid_sign_in_to_github_then_you_ce6305ac'),
+        contextItems: shortError ? [{ label: t('generated.components.layout.workflows.useremoterecoveryworkflow.git_error_91da27d4'), value: shortError }] : [],
         irreversible: false,
-        consequences: tr(
-          'Nach dem Login wird im Repo-Tab wieder das Formular fuer Name/Beschreibung/Private sichtbar.',
-          'After login the repo tab will show the form for name/description/private again.',
-        ),
-        confirmLabel: tr('Zum GitHub-Tab', 'Go to GitHub tab'),
+        consequences: t('generated.components.layout.workflows.useremoterecoveryworkflow.after_login_the_repo_tab_will_show_the_form_for_name_des_bef9f3d7'),
+        confirmLabel: t('generated.components.layout.sidebar.reposidebarcontent.go_to_github_tab_f834a24c'),
         onConfirm: async () => {
           workspace.setActiveTab('github');
         },
@@ -202,10 +185,7 @@ export const useRemoteRecoveryWorkflow = ({
 
     openGithubRepoCreationRecovery(failureMessage);
     setGitActionToast({
-      msg: tr(
-        'Remote auf GitHub nicht mehr gueltig. Bitte im Repo-Tab Name/Private einstellen und "GitHub-Repo erstellen & verbinden" ausfuehren.',
-        'GitHub remote is no longer valid. Please set name/private in the repo tab and run "Create & connect GitHub repo".',
-      ),
+      msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_remote_is_no_longer_valid_please_set_name_private_6fe27238'),
       isError: true,
     });
     return true;
@@ -244,10 +224,7 @@ export const useRemoteRecoveryWorkflow = ({
     workspace.setActiveTab('repo');
     triggerRefresh();
     setGitActionToast({
-      msg: tr(
-        'Kein origin-Remote vorhanden. Bitte jetzt Name/Private setzen und GitHub-Repository erstellen.',
-        'No origin remote is configured. Please set name/private and create a GitHub repository now.',
-      ),
+      msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.no_origin_remote_is_configured_please_set_name_private_a_7c734d64'),
       isError: false,
     });
     return true;
@@ -268,7 +245,7 @@ export const useRemoteRecoveryWorkflow = ({
     const description = newRepoDescription.trim();
 
     if (!name) {
-      const message = tr('Repository-Name darf nicht leer sein.', 'Repository name must not be empty.');
+      const message = t('generated.components.layout.workflows.useremoterecoveryworkflow.repository_name_must_not_be_empty_d1636d83');
       setConnectError(message);
       setGitActionToast({ msg: message, isError: true });
       return false;
@@ -280,7 +257,7 @@ export const useRemoteRecoveryWorkflow = ({
     try {
       const result = await githubClient.createRepository(name, description, newRepoPrivate);
       if (!result.success) {
-        throw new Error(result.error || tr('Fehler beim Erstellen des GitHub-Repositories.', 'Error while creating the GitHub repository.'));
+        throw new Error(result.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_creating_the_github_repository_8f0393dd'));
       }
 
       const remoteUrl = result.data.cloneUrl;
@@ -299,17 +276,17 @@ export const useRemoteRecoveryWorkflow = ({
 
         if (needsUpdate) {
           if (!replaceOriginIfExists) {
-            throw new Error(tr('Remote "origin" existiert bereits mit anderer URL.', 'Remote "origin" already exists with a different URL.'));
+            throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.remote_origin_already_exists_with_a_different_url_06d60d88'));
           }
           const setUrlResult = await gitClient.setRemoteUrl('origin', remoteUrl);
           if (!setUrlResult.success) {
-            throw new Error(setUrlResult.error || tr('Fehler beim Aktualisieren von remote "origin".', 'Error while updating remote "origin".'));
+            throw new Error(setUrlResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_updating_remote_origin_74dca838'));
           }
         }
       } else {
         const addRemoteResult = await gitClient.addRemote('origin', remoteUrl);
         if (!addRemoteResult.success) {
-          throw new Error(addRemoteResult.error || tr('Fehler beim Setzen des Git-Remotes.', 'Error while setting Git remote.'));
+          throw new Error(addRemoteResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_setting_git_remote_2d2ed41d'));
         }
       }
 
@@ -321,7 +298,7 @@ export const useRemoteRecoveryWorkflow = ({
             if (!confirmedAutoInitialCommit) {
               const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
                 commandLabel: 'git push -u origin HEAD',
-                confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+                confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
                 onConfirm: async () => {
                   if (!gitClient.isAvailable()) return;
                   setIsConnectingGithubRepo(true);
@@ -332,20 +309,17 @@ export const useRemoteRecoveryWorkflow = ({
                     }
                     const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
                     if (!retryPushResult.success) {
-                      throw new Error(retryPushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
+                      throw new Error(retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'));
                     }
                     setGitActionToast({
-                      msg: tr(
-                        'GitHub-Repository erstellt, Initial-Commit erstellt und gepusht.',
-                        'GitHub repository created, initial commit created, and pushed.',
-                      ),
+                      msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_repository_created_initial_commit_created_and_pus_b5ecc5f6'),
                       isError: false,
                     });
                     setForceGithubRepoCreationPrompt(false);
                     setConnectError(null);
                     triggerRefresh();
                   } catch (confirmError: any) {
-                    const message = confirmError?.message || tr('Push konnte nicht vorbereitet werden.', 'Could not prepare push.');
+                    const message = confirmError?.message || t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_prepare_push_ca1050f2');
                     setConnectError(message);
                     setGitActionToast({ msg: message, isError: true });
                   } finally {
@@ -359,17 +333,14 @@ export const useRemoteRecoveryWorkflow = ({
             }
             const prepared = await ensureInitialCommitForPush();
             if (!prepared) {
-              throw new Error(tr('Push konnte nicht automatisch vorbereitet werden.', 'Could not auto-prepare push.'));
+              throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_auto_prepare_push_15a11b83'));
             }
             const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
             if (!retryPushResult.success) {
-              throw new Error(retryPushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
+              throw new Error(retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'));
             }
             setGitActionToast({
-              msg: tr(
-                'GitHub-Repository erstellt, Initial-Commit erstellt und gepusht.',
-                'GitHub repository created, initial commit created, and pushed.',
-              ),
+              msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_repository_created_initial_commit_created_and_pus_b5ecc5f6'),
               isError: false,
             });
             setForceGithubRepoCreationPrompt(false);
@@ -377,14 +348,14 @@ export const useRemoteRecoveryWorkflow = ({
             triggerRefresh();
             return true;
           }
-          throw new Error(pushResult.error || tr('Fehler beim Pushen nach GitHub.', 'Error while pushing to GitHub.'));
+          throw new Error(pushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'));
         }
       }
 
       setGitActionToast({
         msg: pushAfterConnect
-          ? tr('Neues GitHub-Repository erstellt, verbunden und Branch gepusht.', 'Created new GitHub repository, connected it, and pushed the branch.')
-          : tr('Neues GitHub-Repository erstellt und verbunden.', 'Created and connected new GitHub repository.'),
+          ? t('generated.components.layout.workflows.useremoterecoveryworkflow.created_new_github_repository_connected_it_and_pushed_th_da33aa0c')
+          : t('generated.components.layout.workflows.useremoterecoveryworkflow.created_and_connected_new_github_repository_68f5adac'),
         isError: false,
       });
       setForceGithubRepoCreationPrompt(false);
@@ -392,7 +363,7 @@ export const useRemoteRecoveryWorkflow = ({
       triggerRefresh();
       return true;
     } catch (e: any) {
-      const message = e?.message || tr('Fehler beim Erstellen und Verbinden mit GitHub.', 'Error while creating and connecting GitHub repository.');
+      const message = e?.message || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_creating_and_connecting_github_repository_7e19e737');
       setConnectError(message);
       setGitActionToast({ msg: message, isError: true });
       return false;

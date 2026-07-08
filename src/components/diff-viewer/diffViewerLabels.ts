@@ -1,9 +1,10 @@
 import type { DiffRequest } from '../../types/diff';
+import type { CatalogTranslateFn } from '../../i18n';
 import { toShortHash } from './diffViewerConstants';
 
 export type TranslateFn = (deText: string, enText: string) => string;
 
-export const formatBlameDate = (dateStr: string, tr: TranslateFn) => {
+export const formatBlameDate = (dateStr: string, t: CatalogTranslateFn, tr: TranslateFn) => {
   if (!dateStr) return '';
   const parsed = new Date(dateStr);
   if (Number.isNaN(parsed.getTime())) return dateStr;
@@ -18,7 +19,7 @@ export const formatBlameDate = (dateStr: string, tr: TranslateFn) => {
   const year = 365 * day;
 
   if (absMs < minute) {
-    return tr('Gerade eben', 'Just now');
+    return t('diffViewer.labels.justNow');
   }
   if (absMs < hour) {
     const mins = Math.max(1, Math.round(absMs / minute));
@@ -40,8 +41,8 @@ export const formatBlameDate = (dateStr: string, tr: TranslateFn) => {
   return tr(`${yrs} J.`, `${yrs} y.`);
 };
 
-export const readableSourceLabel = (request: DiffRequest, tr: TranslateFn): string => {
-  if (request.source === 'staged') return tr('Staging Area', 'Staging Area');
-  if (request.source === 'unstaged') return tr('Working Tree', 'Working Tree');
+export const readableSourceLabel = (request: DiffRequest, t: CatalogTranslateFn, tr: TranslateFn): string => {
+  if (request.source === 'staged') return t('diffViewer.labels.stagingArea');
+  if (request.source === 'unstaged') return t('diffViewer.labels.workingTree');
   return tr(`Commit ${toShortHash(request.commitHash)}`, `Commit ${toShortHash(request.commitHash)}`);
 };

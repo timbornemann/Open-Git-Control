@@ -13,7 +13,7 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
     requestCreateProject,
     requestDeleteProject,
   } = useProjectPlanner();
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   const itemCountByProject = React.useMemo(() => {
     const counts = new Map<string, number>();
@@ -43,7 +43,7 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
           <strong>{project.name}</strong>
           <small>
             {itemCountByProject.get(project.id) || 0}{' '}
-            {tr('Eintraege', 'items')}
+            {t('generated.components.project_planner.projectplannersidebarcontent.items_8845c47b')}
           </small>
         </span>
       </button>
@@ -51,7 +51,7 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
         <button
           className="planner-sidebar-project-delete"
           onClick={() => requestDeleteProject(project.id)}
-          title={tr('Projektidee loeschen', 'Delete project idea')}
+          title={t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')}
           aria-label={tr(`Projektidee ${project.name} loeschen`, `Delete project idea ${project.name}`)}
           disabled={busy}
         >
@@ -62,19 +62,19 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
   );
 
   if (loading) {
-    return <div className="planner-sidebar-empty">{tr('Projektplanung wird geladen...', 'Loading project planning...')}</div>;
+    return <div className="planner-sidebar-empty">{t('generated.components.project_planner.projectplannersidebarcontent.loading_project_planning_77574995')}</div>;
   }
 
   return (
     <div className="planner-sidebar-content">
       <section className="planner-sidebar-section">
         <div className="planner-sidebar-section-heading">
-          <div className="planner-sidebar-section-title">{tr('Zukuenftige Projekte', 'Future projects')}</div>
+          <div className="planner-sidebar-section-title">{t('generated.components.project_planner.projectplannersidebarcontent.future_projects_b6bb9724')}</div>
           <button
             className="planner-sidebar-add-project"
             onClick={requestCreateProject}
-            title={tr('Zukuenftiges Projekt anlegen', 'Create future project')}
-            aria-label={tr('Zukuenftiges Projekt anlegen', 'Create future project')}
+            title={t('generated.components.project_planner.plannerdialogs.create_future_project_293a417d')}
+            aria-label={t('generated.components.project_planner.plannerdialogs.create_future_project_293a417d')}
           >
             <Plus size={14} />
           </button>
@@ -84,16 +84,16 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
           : (
             <button className="planner-sidebar-empty-action" onClick={requestCreateProject}>
               <Plus size={13} />
-              {tr('Erste Projektidee anlegen', 'Create first project idea')}
+              {t('generated.components.project_planner.projectplannersidebarcontent.create_first_project_idea_f9346c77')}
             </button>
           )}
       </section>
 
       <section className="planner-sidebar-section">
-        <div className="planner-sidebar-section-title">{tr('Repositories', 'Repositories')}</div>
+        <div className="planner-sidebar-section-title">{t('generated.components.project_planner.projectplannersidebarcontent.repositories_1c8342c2')}</div>
         {repositoryProjects.length > 0
           ? repositoryProjects.map(renderProject)
-          : <div className="planner-sidebar-empty">{tr('Kein Repository zugeordnet.', 'No repository assigned.')}</div>}
+          : <div className="planner-sidebar-empty">{t('generated.components.project_planner.projectplannersidebarcontent.no_repository_assigned_0fef515d')}</div>}
       </section>
     </div>
   );

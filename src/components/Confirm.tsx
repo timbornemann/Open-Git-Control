@@ -40,7 +40,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
   confirmVariant = 'default',
   secondaryActionVariant = 'default',
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <DialogFrame
@@ -49,9 +49,9 @@ export const Confirm: React.FC<ConfirmProps> = ({
       onClose={onCancel}
       onConfirm={onConfirm}
       onEnter={onConfirm}
-      confirmLabel={confirmLabel ?? tr('Fortfahren', 'Continue')}
+      confirmLabel={confirmLabel ?? t('generated.components.confirm.continue_f7e20a9a')}
       secondaryActionLabel={secondaryActionLabel}
-      cancelLabel={cancelLabel ?? tr('Abbrechen', 'Cancel')}
+      cancelLabel={cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
       confirmVariant={confirmVariant}
       secondaryActionVariant={secondaryActionVariant}
       onSecondaryAction={onSecondaryAction}
@@ -69,7 +69,7 @@ export const Confirm: React.FC<ConfirmProps> = ({
       )}
       <div className="dialog-impact">
         <span>
-          {tr('Irreversibel', 'Irreversible')}: <strong>{irreversible ? tr('Ja', 'Yes') : tr('Nein', 'No')}</strong>
+          {t('generated.components.confirm.irreversible_6920e2ad')}: <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
         </span>
         {consequences && <span>{consequences}</span>}
       </div>

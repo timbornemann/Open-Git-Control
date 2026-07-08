@@ -33,7 +33,7 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
   onCancel,
   secondaryActionVariant = 'default',
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <Confirm
@@ -43,7 +43,7 @@ export const DangerConfirm: React.FC<DangerConfirmProps> = ({
       contextItems={contextItems}
       irreversible={irreversible}
       consequences={consequences}
-      confirmLabel={confirmLabel ?? tr('Trotzdem ausführen', 'Run anyway')}
+      confirmLabel={confirmLabel ?? t('generated.components.dangerconfirm.run_anyway_b076d96d')}
       secondaryActionLabel={secondaryActionLabel}
       cancelLabel={cancelLabel}
       onConfirm={onConfirm}

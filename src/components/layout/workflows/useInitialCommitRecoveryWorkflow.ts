@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import { isWorkTreeRequiredError } from '../../../utils/gitPushRecovery';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
@@ -25,12 +25,13 @@ export const useInitialCommitRecoveryWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(language, deText, enText);
   }, [language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
   const ensureInitialCommitForPush = useCallback(async (
     options: { skipBareRepoRecovery?: boolean } = {},
   ): Promise<boolean> => {
     if (!gitClient.isAvailable()) return false;
 
-    const commitMessage = tr('Initial commit', 'Initial commit');
+    const commitMessage = t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.initial_commit_de27cf34');
     const isIdentityMissingError = (message: string) => (
       /please tell me who you are/i.test(message)
       || /unable to auto-detect email address/i.test(message)
@@ -49,7 +50,7 @@ export const useInitialCommitRecoveryWorkflow = ({
       const addResult = await gitClient.stageAll();
       if (!addResult.success) {
         setGitActionToast({
-          msg: addResult.error || tr('Konnte Aenderungen nicht automatisch stagen.', 'Could not stage changes automatically.'),
+          msg: addResult.error || t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.could_not_stage_changes_automatically_b576daaf'),
           isError: true,
         });
         return false;
@@ -80,16 +81,13 @@ export const useInitialCommitRecoveryWorkflow = ({
       if (isIdentityMissingError(String(emptyCommitResult.error || ''))) {
         setActiveTab('repo');
         setGitActionToast({
-          msg: tr(
-            'Push konnte nicht automatisch vorbereitet werden: Git user.name/user.email fehlt. Bitte Git-Identity konfigurieren.',
-            'Could not auto-prepare push: missing Git user.name/user.email. Please configure your Git identity.',
-          ),
+          msg: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.could_not_auto_prepare_push_missing_git_user_name_user_e_bb15207e'),
           isError: true,
         });
         return false;
       }
       setGitActionToast({
-        msg: emptyCommitResult.error || tr('Automatischer Initial-Commit fehlgeschlagen.', 'Automatic initial commit failed.'),
+        msg: emptyCommitResult.error || t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.automatic_initial_commit_failed_04edc3ad'),
         isError: true,
       });
       return false;
@@ -106,17 +104,14 @@ export const useInitialCommitRecoveryWorkflow = ({
     if (isIdentityMissingError(commitError)) {
       setActiveTab('repo');
       setGitActionToast({
-        msg: tr(
-          'Push konnte nicht automatisch vorbereitet werden: Git user.name/user.email fehlt. Bitte Git-Identity konfigurieren.',
-          'Could not auto-prepare push: missing Git user.name/user.email. Please configure your Git identity.',
-        ),
+        msg: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.could_not_auto_prepare_push_missing_git_user_name_user_e_bb15207e'),
         isError: true,
       });
       return false;
     }
 
     setGitActionToast({
-      msg: commitResult.error || tr('Automatischer Initial-Commit fehlgeschlagen.', 'Automatic initial commit failed.'),
+      msg: commitResult.error || t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.automatic_initial_commit_failed_04edc3ad'),
       isError: true,
     });
     return false;
@@ -152,32 +147,26 @@ export const useInitialCommitRecoveryWorkflow = ({
     setActiveTab('repo');
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Initial-Commit mit allen lokalen Aenderungen?', 'Initial commit with all local changes?'),
-      message: tr(
-        'Dieses Repository hat noch keinen lokalen Commit. Zum Pushen muessten jetzt alle lokalen Aenderungen inklusive untracked Dateien gestaged und als Initial-Commit gespeichert werden.',
-        'This repository has no local commit yet. To push it now, all local changes including untracked files would be staged and saved as the initial commit.',
-      ),
+      title: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.initial_commit_with_all_local_changes_0bd00588'),
+      message: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.this_repository_has_no_local_commit_yet_to_push_it_now_a_aa3b8ab1'),
       contextItems: [
-        { label: tr('Befehl', 'Command'), value: params.commandLabel },
+        { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: params.commandLabel },
         {
-          label: tr('Lokale Aenderungen', 'Local changes'),
+          label: t('generated.components.layout.workflows.usegitcommandguardworkflow.local_changes_fc4435ff'),
           value: changedFiles === null
-            ? tr('Status konnte nicht gelesen werden', 'Status could not be read')
+            ? t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.status_could_not_be_read_69bd4231')
             : tr(
               `${changedFiles} Datei${changedFiles === 1 ? '' : 'en'} betroffen`,
               `${changedFiles} file${changedFiles === 1 ? '' : 's'} affected`,
             ),
         },
         {
-          label: tr('Automatischer Schritt', 'Automatic step'),
+          label: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.automatic_step_54ebc5e4'),
           value: 'git add -A && git commit -m "Initial commit"',
         },
       ],
       irreversible: false,
-      consequences: tr(
-        'Bitte pruefe vorher, ob keine lokalen Artefakte, Secrets oder versehentlich erzeugten Dateien im Working Tree liegen.',
-        'Please check first that the working tree does not contain local artifacts, secrets, or accidentally generated files.',
-      ),
+      consequences: t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.please_check_first_that_the_working_tree_does_not_contai_a7038b17'),
       confirmLabel: params.confirmLabel,
       onConfirm: params.onConfirm,
     });

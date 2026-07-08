@@ -4,16 +4,16 @@ import {
   type ParsedHunk,
 } from '../../utils/diffParser';
 import { gitClient } from '../../services/gitClient';
-import type { TranslateFn } from './diffViewerLabels';
+import type { CatalogTranslateFn } from '../../i18n';
 
 export type HunkPatchOperation = 'stage' | 'unstage' | 'discard';
 
 type UseHunkPatchActionsParams = {
   onRepoChanged?: () => void;
-  tr: TranslateFn;
+  t: CatalogTranslateFn;
 };
 
-export const useHunkPatchActions = ({ onRepoChanged, tr }: UseHunkPatchActionsParams) => {
+export const useHunkPatchActions = ({ onRepoChanged, t }: UseHunkPatchActionsParams) => {
   const [hunkOpError, setHunkOpError] = useState<string | null>(null);
 
   const applyHunk = useCallback(async (
@@ -34,12 +34,12 @@ export const useHunkPatchActions = ({ onRepoChanged, tr }: UseHunkPatchActionsPa
       if (result.success) {
         onRepoChanged?.();
       } else {
-        setHunkOpError(result.error || tr('Hunk-Operation fehlgeschlagen.', 'Hunk operation failed.'));
+        setHunkOpError(result.error || t('diffViewer.errors.hunkOperationFailed'));
       }
     } catch (error: unknown) {
-      setHunkOpError(error instanceof Error ? error.message : tr('Hunk-Operation fehlgeschlagen.', 'Hunk operation failed.'));
+      setHunkOpError(error instanceof Error ? error.message : t('diffViewer.errors.hunkOperationFailed'));
     }
-  }, [onRepoChanged, tr]);
+  }, [onRepoChanged, t]);
 
   return {
     hunkOpError,

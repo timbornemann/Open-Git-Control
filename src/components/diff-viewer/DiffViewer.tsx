@@ -26,7 +26,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   onRepoChanged,
   onNavigateToCommit,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -34,14 +34,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   const isMarkdownFile = useMemo(() => isMarkdownFilePath(request.path), [request.path]);
   const isMarkdownPreviewMode = viewMode === 'preview' && isMarkdownFile;
 
-  const diffData = useDiffPreviewData({ repoPath, request, tr });
+  const diffData = useDiffPreviewData({ repoPath, request, t });
   const blame = useDiffBlame({ repoPath, request });
-  const { hunkOpError, applyHunk } = useHunkPatchActions({ onRepoChanged, tr });
+  const { hunkOpError, applyHunk } = useHunkPatchActions({ onRepoChanged, t });
   const { markdownPreview, handleMarkdownPreviewClick } = useMarkdownPreview({
     repoPath,
     request,
     isActive: isMarkdownPreviewMode,
-    tr,
+    t,
   });
 
   useEffect(() => {

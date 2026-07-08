@@ -52,7 +52,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
 }) => {
   const repository = useRepositoryContext();
   const settingsState = useSettingsContext();
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <>
@@ -60,7 +60,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
         className={`pane-resizer content-pane-resizer ${isContentResizing ? 'dragging' : ''}`}
         role="separator"
         aria-orientation="vertical"
-        aria-label={tr('Breite zwischen Verlauf und Inspector anpassen', 'Resize history and inspector')}
+        aria-label={t('generated.components.layout.main.maininspectorpane.resize_history_and_inspector_58741690')}
         onPointerDown={onContentResizeStart}
       />
 
@@ -68,29 +68,29 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
         <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
             {isCommitInspectorOpen && repository.selectedCommit
-              ? tr('Commit Inspector', 'Commit Inspector')
+              ? t('generated.components.layout.main.maininspectorpane.commit_inspector_3b636d23')
               : workingTreeSelection
-                ? tr('Datei-Inspector', 'File inspector')
-                : tr('Working Directory', 'Working Directory')}
+                ? t('generated.components.layout.main.maininspectorpane.file_inspector_57b931aa')
+                : t('generated.components.layout.main.maininspectorpane.working_directory_d9a68dee')}
           </span>
           <div style={{ display: 'flex', gap: '6px' }}>
             {((isCommitInspectorOpen && repository.selectedCommit) || workingTreeSelection) && (
               <>
                 {isCommitInspectorOpen && repository.selectedCommit && commitHistoryStack.length > 0 && (
                   <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                    {tr('Zurueck', 'Back')}
+                    {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
                   </button>
                 )}
                 <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                  {tr('Schliessen', 'Close')}
+                  {t('generated.components.actiontoastviewport.close_181764fa')}
                 </button>
               </>
             )}
             <button
               className="icon-btn inspector-pane-close"
               onClick={onHideInspectorPane}
-              title={tr('Inspector ausblenden', 'Hide inspector')}
-              aria-label={tr('Inspector ausblenden', 'Hide inspector')}
+              title={t('generated.components.layout.main.maininspectorpane.hide_inspector_afb783c1')}
+              aria-label={t('generated.components.layout.main.maininspectorpane.hide_inspector_afb783c1')}
             >
               <PanelRightClose size={16} />
             </button>

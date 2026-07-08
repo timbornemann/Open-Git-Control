@@ -16,7 +16,7 @@ type Props = {
 };
 
 export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,13 +73,13 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
         <input
           ref={inputRef}
           className="cmd-palette-input"
-          placeholder={tr('Befehl suchen...', 'Search command...')}
+          placeholder={t('generated.components.commandpalette.search_command_e3feb446')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div ref={listRef} className="cmd-palette-list">
           {filtered.length === 0 && (
-            <div className="cmd-palette-empty">{tr('Keine Treffer', 'No matches')}</div>
+            <div className="cmd-palette-empty">{t('generated.components.commandpalette.no_matches_60e7ba98')}</div>
           )}
           {filtered.map((cmd, i) => (
             <button
@@ -95,7 +95,7 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
           ))}
         </div>
         <div className="cmd-palette-footer">
-          {tr('Pfeile navigieren | Enter ausfuehren | Esc schliessen', 'Arrows navigate | Enter runs | Esc closes')}
+          {t('generated.components.commandpalette.arrows_navigate_enter_runs_esc_closes_73b4d914')}
         </div>
       </div>
     </div>

@@ -103,17 +103,17 @@ type RepoSidebarContentProps = Pick<
 };
 
 export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const shouldShowGithubConnect = props.hasRemoteOrigin === false || props.forceGithubRepoCreationPrompt;
 
   if (!props.activeRepo) {
     return (
       <RepoCard className="repo-empty-card">
         <div className="repo-state-text" style={{ fontSize: '0.82rem' }}>
-          {tr('Kein aktives Repository. Bitte waehle zuerst ein lokales Repository.', 'No active repository. Please select a local repository first.')}
+          {t('generated.components.layout.sidebar.reposidebarcontent.no_active_repository_please_select_a_local_repository_fi_5152f3b9')}
         </div>
         <button className="staging-tool-btn" onClick={() => props.setActiveTab('localRepos')}>
-          {tr('Zu Lokale Repositories', 'Go to Local repositories')}
+          {t('generated.components.layout.sidebar.reposidebarcontent.go_to_local_repositories_0c75965d')}
         </button>
       </RepoCard>
     );
@@ -124,7 +124,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
   return (
     <div className="repo-cockpit">
       <div className="repo-cockpit-header">
-        <div className="repo-cockpit-kicker">{tr('Repository-Arbeitsbereich', 'Repository workspace')}</div>
+        <div className="repo-cockpit-kicker">{t('generated.components.layout.sidebar.reposidebarcontent.repository_workspace_4af6930f')}</div>
         <div className="repo-cockpit-title" title={repoName}>{repoName}</div>
         <div className="repo-cockpit-path" title={props.activeRepo}>{props.activeRepo}</div>
       </div>
@@ -175,28 +175,28 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
 
       {shouldShowGithubConnect && (
           <RepoCard>
-            <RepoCardHeader title={tr('GitHub Verbindung', 'GitHub connection')} />
+            <RepoCardHeader title={t('generated.components.layout.sidebar.reposidebarcontent.github_connection_461ea598')} />
             <RepoCardContent className="repo-form-stack">
               <RepoCardStatus
                 variant="warning"
                 title={props.hasRemoteOrigin === false
-                  ? tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')
-                  : tr('Remote ist nicht mehr gueltig.', 'Remote is no longer valid.')}
+                  ? t('generated.components.layout.sidebar.reposidebarcontent.not_connected_to_github_yet_9a7afeaa')
+                  : t('generated.components.layout.sidebar.reposidebarcontent.remote_is_no_longer_valid_6ffdf83b')}
                 detail={props.hasRemoteOrigin === false
-                  ? tr('Repository direkt auf GitHub erstellen und als origin verbinden.', 'Create a GitHub repository and connect it as origin.')
-                  : tr('Bitte ein neues GitHub-Repository anlegen; origin wird dabei automatisch ersetzt.', 'Please create a new GitHub repository; origin will be replaced automatically.')}
+                  ? t('generated.components.layout.sidebar.reposidebarcontent.create_a_github_repository_and_connect_it_as_origin_83d10e69')
+                  : t('generated.components.layout.sidebar.reposidebarcontent.please_create_a_new_github_repository_origin_will_be_rep_882432c5')}
               />
               <div className="repo-form-stack">
               <input
                 className="repo-filter-input"
                 type="text"
-                placeholder={tr('Repository-Name auf GitHub', 'Repository name on GitHub')}
+                placeholder={t('generated.components.layout.sidebar.reposidebarcontent.repository_name_on_github_9ca29e86')}
                 value={props.newRepoName}
                 onChange={e => props.setNewRepoName(e.target.value)}
               />
               <textarea
                 className="repo-filter-input"
-                placeholder={tr('Beschreibung (optional)', 'Description (optional)')}
+                placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.description_optional_30003d39')}
                 value={props.newRepoDescription}
                 onChange={e => props.setNewRepoDescription(e.target.value)}
                 rows={2}
@@ -205,7 +205,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
               <div className="repo-check-row">
                 <label>
                   <input type="checkbox" checked={props.newRepoPrivate} onChange={e => props.setNewRepoPrivate(e.target.checked)} />
-                  {tr('Privat', 'Private')}
+                  {t('generated.components.layout.sidebar.reposidebarcontent.private_d6902471')}
                 </label>
               </div>
               </div>
@@ -227,11 +227,11 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
                 }}
               >
                 <Github size={14} />
-                {props.isConnectingGithubRepo ? tr('Verbinde...', 'Connecting...') : tr('GitHub-Repo erstellen & verbinden', 'Create & connect GitHub repo')}
+                {props.isConnectingGithubRepo ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1') : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
               </button>
             {!props.isAuthenticated && (
               <div className="repo-state-text" style={{ fontSize: '0.78rem' }}>
-                {tr('Hinweis: Bitte zuerst im GitHub-Tab anmelden.', 'Note: Please sign in first in the GitHub tab.')}
+                {t('generated.components.layout.sidebar.reposidebarcontent.note_please_sign_in_first_in_the_github_tab_a84a54c9')}
               </div>
             )}
             </RepoCardContent>
@@ -244,11 +244,11 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
           <RepoCardContent className="repo-form-stack">
             <RepoCardStatus
               variant="neutral"
-              title={tr('GitHub-Anmeldung erforderlich.', 'GitHub sign-in required.')}
-              detail={tr('Fuer Pull Requests, Releases und Workflows bitte erst bei GitHub anmelden.', 'Please sign in to GitHub first for pull requests, releases, and workflows.')}
+              title={t('generated.components.layout.sidebar.reposidebarcontent.github_sign_in_required_dabe2882')}
+              detail={t('generated.components.layout.sidebar.reposidebarcontent.please_sign_in_to_github_first_for_pull_requests_release_cd7a7c88')}
             />
             <button className="staging-tool-btn" onClick={() => props.setActiveTab('github')}>
-              {tr('Zum GitHub-Tab', 'Go to GitHub tab')}
+              {t('generated.components.layout.sidebar.reposidebarcontent.go_to_github_tab_f834a24c')}
             </button>
           </RepoCardContent>
         </RepoCard>

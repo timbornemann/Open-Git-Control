@@ -15,7 +15,7 @@ export const GitTransferProgressOverlay: React.FC<Props> = ({
   title,
   events,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   if (!open) return null;
 
@@ -29,7 +29,7 @@ export const GitTransferProgressOverlay: React.FC<Props> = ({
         <div className="git-transfer-modal-header">
           <DownloadCloud size={18} className="git-transfer-header-icon" aria-hidden="true" />
           <span className="git-transfer-modal-title">
-            {title || tr('GitHub-Aktualisierung laeuft...', 'GitHub update running...')}
+            {title || t('generated.components.layout.gittransferprogressoverlay.github_update_running_3a747d60')}
           </span>
           <div className="git-transfer-header-spacer" />
           <div className="clone-spinner" />
@@ -38,7 +38,7 @@ export const GitTransferProgressOverlay: React.FC<Props> = ({
         <GitTransferProgressPanel
           lines={lines}
           isRunning={true}
-          emptyText={tr('Git wartet auf Fortschritt...', 'Waiting for git progress...')}
+          emptyText={t('generated.components.layout.gittransferprogressoverlay.waiting_for_git_progress_66cb9173')}
         />
       </div>
     </div>

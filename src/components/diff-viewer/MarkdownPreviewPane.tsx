@@ -10,7 +10,7 @@ export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({
   markdownPreview,
   onPreviewClick,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div className="markdown-preview-scroll">
@@ -40,7 +40,7 @@ export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({
         />
       )}
       {!markdownPreview.loading && !markdownPreview.error && !markdownPreview.html && (
-        <div className="diff-empty-state">{tr('Markdown-Datei ist leer.', 'Markdown file is empty.')}</div>
+        <div className="diff-empty-state">{t('generated.components.diff_viewer.markdownpreviewpane.markdown_file_is_empty_4443e82a')}</div>
       )}
     </div>
   );

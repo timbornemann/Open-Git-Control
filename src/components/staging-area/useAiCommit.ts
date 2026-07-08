@@ -40,7 +40,7 @@ const asString = (value: unknown): string | null => (
 );
 
 export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommitsCreated }: Params) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [isAiCommitting, setIsAiCommitting] = useState(false);
   const [isAiJobRunning, setIsAiJobRunning] = useState(false);
   const [aiProgressMessage, setAiProgressMessage] = useState<string | null>(null);
@@ -143,7 +143,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       lastKnownStatusRef.current = statusValue;
       setIsAiCommitting(true);
       setIsAiJobRunning(true);
-      setAiProgressMessage(asString(eventRaw.message) || tr('KI arbeitet...', 'AI is working...'));
+      setAiProgressMessage(asString(eventRaw.message) || t('generated.components.staging_area.stagingcommitpanel.ai_is_working_2f3bf7e0'));
       maybeRefresh();
       return;
     }
@@ -156,11 +156,11 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       setIsAiJobRunning(false);
 
       if (statusValue === 'done') {
-        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
+        setAiProgressMessage(asString(eventRaw.message) || t('generated.components.staging_area.useaicommit.ai_auto_commit_completed_671832fb'));
       } else if (statusValue === 'cancelled') {
-        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit abgebrochen.', 'AI auto-commit cancelled.'));
+        setAiProgressMessage(asString(eventRaw.message) || t('generated.components.staging_area.useaicommit.ai_auto_commit_cancelled_dace648f'));
       } else {
-        setAiProgressMessage(asString(eventRaw.message) || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.'));
+        setAiProgressMessage(asString(eventRaw.message) || t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375'));
       }
 
       lastRefreshAtRef.current = Date.now();
@@ -212,13 +212,13 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     if (aiStartLockRef.current || isAiCommitting || isAiJobRunning) return;
 
     if (status.conflicts.length > 0) {
-      setToast({ msg: tr('Bitte zuerst alle Konflikte aufloesen.', 'Please resolve all conflicts first.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.useaicommit.please_resolve_all_conflicts_first_9e29c688'), isError: true });
       return;
     }
 
     const totalFiles = status.staged.length + status.unstaged.length + status.untracked.length;
     if (totalFiles === 0) {
-      setToast({ msg: tr('Keine Aenderungen fuer KI Auto-Commit vorhanden.', 'No changes available for AI auto-commit.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.useaicommit.no_changes_available_for_ai_auto_commit_b9e2c2bc'), isError: true });
       return;
     }
 
@@ -238,7 +238,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     setAiTotalCommits(null);
     setAiProcessedFiles(0);
     setAiRemainingFiles(totalFiles);
-    setAiProgressMessage(tr('KI startet...', 'AI is starting...'));
+    setAiProgressMessage(t('generated.components.staging_area.useaicommit.ai_is_starting_e50f32f8'));
     setIsAiCommitting(true);
     setIsAiJobRunning(true);
     maybeRefresh();
@@ -248,7 +248,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       if (cancelRequestedRef.current) return;
 
       if (!result.success) {
-        const errorMessage = result.error || tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.');
+        const errorMessage = result.error || t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
         const cancelled = /abgebrochen|cancel/i.test(errorMessage);
         setToast({ msg: errorMessage, isError: !cancelled });
         lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
@@ -266,7 +266,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
 
       if (commits.length === 0) {
         setToast({
-          msg: result.data.summary || tr('KI hat keine Commits erstellt.', 'AI did not create commits.'),
+          msg: result.data.summary || t('generated.components.staging_area.useaicommit.ai_did_not_create_commits_fa18e8e4'),
           isError: false,
         });
       } else {
@@ -288,7 +288,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
         lastKnownStatusRef.current = 'done';
         setAiPhase('done');
-        setAiProgressMessage(result.data.summary || tr('KI Auto-Commit abgeschlossen.', 'AI auto-commit completed.'));
+        setAiProgressMessage(result.data.summary || t('generated.components.staging_area.useaicommit.ai_auto_commit_completed_671832fb'));
       }
       setIsAiJobRunning(false);
       scheduleTerminalClear();
@@ -297,7 +297,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
 
       const message = error instanceof Error
         ? error.message
-        : tr('KI Auto-Commit fehlgeschlagen.', 'AI auto-commit failed.');
+        : t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
 
       const cancelled = /abgebrochen|cancel/i.test(message);
       setToast({ msg: message, isError: !cancelled });
@@ -318,12 +318,12 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     if (!aiClient.isAvailable()) return;
 
     if (!isAiCommitting && !isAiJobRunning) {
-      setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
+      setAiProgressMessage(t('generated.components.staging_area.useaicommit.no_running_ai_auto_commit_found_2b61aefa'));
       return;
     }
 
     cancelRequestedRef.current = true;
-    setAiProgressMessage(tr('Abbruch angefordert...', 'Cancellation requested...'));
+    setAiProgressMessage(t('generated.components.staging_area.useaicommit.cancellation_requested_c2ba3e99'));
     setIsAiJobRunning(true);
 
     try {
@@ -332,7 +332,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
         cancelRequestedRef.current = false;
         setIsAiCommitting(false);
         setIsAiJobRunning(false);
-        setAiProgressMessage(tr('Kein laufender KI Auto-Commit gefunden.', 'No running AI auto-commit found.'));
+        setAiProgressMessage(t('generated.components.staging_area.useaicommit.no_running_ai_auto_commit_found_2b61aefa'));
         scheduleTerminalClear();
         return;
       }
@@ -343,7 +343,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       setToast({
         msg: error instanceof Error
           ? error.message
-          : tr('KI Auto-Commit konnte nicht abgebrochen werden.', 'Could not cancel AI auto-commit.'),
+          : t('generated.components.staging_area.useaicommit.could_not_cancel_ai_auto_commit_98ec4d8d'),
         isError: true,
       });
     }
@@ -354,7 +354,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
 
     const normalizedNotes = notes.trim();
     if (!normalizedNotes) {
-      setToast({ msg: tr('Bitte beschreibe die Aenderungen fuer die Commit-Message.', 'Please describe the changes for the commit message.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.useaicommit.please_describe_the_changes_for_the_commit_message_3c7330a3'), isError: true });
       return null;
     }
 
@@ -362,17 +362,17 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     try {
       const result = await aiClient.generateCommitMessage({ notes: normalizedNotes });
       if (!result.success) {
-        setToast({ msg: result.error || tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'), isError: true });
+        setToast({ msg: result.error || t('generated.components.staging_area.useaicommit.could_not_create_ai_commit_message_ee54707d'), isError: true });
         return null;
       }
 
-      setToast({ msg: tr('KI Commit-Message eingefuegt.', 'AI commit message inserted.'), isError: false });
+      setToast({ msg: t('generated.components.staging_area.useaicommit.ai_commit_message_inserted_bead6485'), isError: false });
       return result.data;
     } catch (error: unknown) {
       setToast({
         msg: error instanceof Error
           ? error.message
-          : tr('KI Commit-Message konnte nicht erstellt werden.', 'Could not create AI commit message.'),
+          : t('generated.components.staging_area.useaicommit.could_not_create_ai_commit_message_ee54707d'),
         isError: true,
       });
       return null;

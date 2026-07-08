@@ -9,7 +9,7 @@ import { DangerConfirm } from './components/DangerConfirm';
 import { Input } from './components/Input';
 import { useAppState } from './components/layout/useAppState';
 import { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
-import { I18nProvider } from './i18n';
+import { I18nProvider, translateFromCatalog, type TranslationVariables } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { CommandPalette, PaletteCommand } from './components/CommandPalette';
 import { ActionToastViewport } from './components/ActionToastViewport';
@@ -59,6 +59,10 @@ const getRepoDisplayName = (repoPath: string) => repoPath.split(/[\\/]/).filter(
 const App: React.FC = () => {
   const state = useAppState();
   const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
+  const t = useCallback(
+    (key: string, variables?: TranslationVariables) => translateFromCatalog(state.settings.language, key, variables),
+    [state.settings.language],
+  );
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
@@ -253,32 +257,32 @@ const App: React.FC = () => {
 
   const paletteCommands: PaletteCommand[] = [
     // Navigation
-    { id: 'tab-repos', label: tr('Lokale Repos', 'Local repos'), keywords: ['local', 'repos', 'lokal'], action: () => state.setActiveTab('localRepos') },
-    { id: 'tab-repo', label: tr('Repository-Ansicht', 'Repository view'), keywords: ['repo', 'branch', 'commits'], action: () => state.setActiveTab('repo') },
-    { id: 'tab-planner', label: tr('Projektplanung', 'Project planning'), keywords: ['todo', 'ideas', 'bugs', 'features', 'planung'], action: () => state.setActiveTab('planner') },
-    { id: 'tab-github', label: tr('GitHub', 'GitHub'), keywords: ['github', 'pr', 'pull request'], action: () => state.setActiveTab('github') },
-    { id: 'tab-settings', label: tr('Einstellungen', 'Settings'), keywords: ['settings', 'preferences'], action: () => state.setActiveTab('settings') },
+    { id: 'tab-repos', label: t('generated.app.local_repos_c90bebd3'), keywords: ['local', 'repos', 'lokal'], action: () => state.setActiveTab('localRepos') },
+    { id: 'tab-repo', label: t('generated.app.repository_view_400eb999'), keywords: ['repo', 'branch', 'commits'], action: () => state.setActiveTab('repo') },
+    { id: 'tab-planner', label: t('generated.components.layout.main.maintopbar.project_planning_71556778'), keywords: ['todo', 'ideas', 'bugs', 'features', 'planung'], action: () => state.setActiveTab('planner') },
+    { id: 'tab-github', label: t('generated.components.layout.settingsmaincontent.github_6d98f785'), keywords: ['github', 'pr', 'pull request'], action: () => state.setActiveTab('github') },
+    { id: 'tab-settings', label: t('generated.components.layout.main.mainprimarypane.settings_c6256784'), keywords: ['settings', 'preferences'], action: () => state.setActiveTab('settings') },
     // Remote
-    { id: 'fetch', label: tr('Fetch (Remote aktualisieren)', 'Fetch (refresh remote)'), keywords: ['fetch', 'remote', 'sync'], action: () => state.refreshRemoteState(true) },
-    { id: 'pull', label: tr('Pull', 'Pull'), keywords: ['pull', 'download'], action: () => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.')) },
-    { id: 'pull-rebase', label: tr('Pull --rebase', 'Pull --rebase'), keywords: ['pull', 'rebase'], action: () => state.runGitCommand(['pull', '--rebase'], tr('Pull mit Rebase abgeschlossen.', 'Pull with rebase completed.')) },
-    { id: 'push', label: tr('Push', 'Push'), keywords: ['push', 'upload'], action: () => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.')) },
-    { id: 'push-force', label: tr('Push --force-with-lease', 'Push --force-with-lease'), keywords: ['push', 'force'], action: () => state.runGitCommand(['push', '--force-with-lease'], tr('Force-Push abgeschlossen.', 'Force push completed.')) },
+    { id: 'fetch', label: t('generated.app.fetch_refresh_remote_88270faa'), keywords: ['fetch', 'remote', 'sync'], action: () => state.refreshRemoteState(true) },
+    { id: 'pull', label: t('generated.app.pull_8c55fb85'), keywords: ['pull', 'download'], action: () => state.runGitCommand(['pull'], t('generated.app.pull_completed_successfully_a760cd36')) },
+    { id: 'pull-rebase', label: t('generated.app.pull_rebase_5d462c6a'), keywords: ['pull', 'rebase'], action: () => state.runGitCommand(['pull', '--rebase'], t('generated.app.pull_with_rebase_completed_a6e6129f')) },
+    { id: 'push', label: t('generated.app.push_61ad6264'), keywords: ['push', 'upload'], action: () => state.runGitCommand(['push'], t('generated.app.push_completed_successfully_edf8c1c9')) },
+    { id: 'push-force', label: t('generated.app.push_force_with_lease_f7c67bfe'), keywords: ['push', 'force'], action: () => state.runGitCommand(['push', '--force-with-lease'], t('generated.app.force_push_completed_1f9d562e')) },
     // Branches
-    { id: 'branch-create', label: tr('Branch erstellen...', 'Create branch...'), keywords: ['branch', 'new', 'erstellen'], action: () => { state.setActiveTab('repo'); state.setIsCreatingBranch(true); } },
+    { id: 'branch-create', label: t('generated.app.create_branch_d8083e45'), keywords: ['branch', 'new', 'erstellen'], action: () => { state.setActiveTab('repo'); state.setIsCreatingBranch(true); } },
     // Stash
-    { id: 'stash-push', label: tr('Stash erstellen', 'Create stash'), keywords: ['stash', 'save', 'speichern'], action: () => state.runGitCommand(['stash', 'push', '-m', 'Quick stash'], tr('Stash erstellt.', 'Stash created.')) },
-    { id: 'stash-pop', label: tr('Letzten Stash anwenden (pop)', 'Apply last stash (pop)'), keywords: ['stash', 'pop', 'apply', 'anwenden'], action: () => state.runGitCommand(['stash', 'pop'], tr('Stash angewendet.', 'Stash applied.')) },
+    { id: 'stash-push', label: t('generated.components.staging_area.usefileoperations.create_stash_ebe60340'), keywords: ['stash', 'save', 'speichern'], action: () => state.runGitCommand(['stash', 'push', '-m', 'Quick stash'], t('generated.app.stash_created_56116f06')) },
+    { id: 'stash-pop', label: t('generated.app.apply_last_stash_pop_120593db'), keywords: ['stash', 'pop', 'apply', 'anwenden'], action: () => state.runGitCommand(['stash', 'pop'], t('generated.app.stash_applied_4b30902e')) },
     // Merge / Rebase
-    { id: 'merge-abort', label: tr('Merge abbrechen', 'Abort merge'), keywords: ['merge', 'abort', 'abbrechen'], action: () => state.runGitCommand(['mergeAbort'], tr('Merge abgebrochen.', 'Merge aborted.')) },
-    { id: 'merge-continue', label: tr('Merge fortsetzen', 'Continue merge'), keywords: ['merge', 'continue', 'fortsetzen'], action: () => state.runGitCommand(['mergeContinue'], tr('Merge fortgesetzt.', 'Merge continued.')) },
-    { id: 'rebase-abort', label: tr('Rebase abbrechen', 'Abort rebase'), keywords: ['rebase', 'abort', 'abbrechen'], action: () => state.runGitCommand(['rebaseAbort'], tr('Rebase abgebrochen.', 'Rebase aborted.')) },
-    { id: 'rebase-continue', label: tr('Rebase fortsetzen', 'Continue rebase'), keywords: ['rebase', 'continue', 'fortsetzen'], action: () => state.runGitCommand(['rebaseContinue'], tr('Rebase fortgesetzt.', 'Rebase continued.')) },
+    { id: 'merge-abort', label: t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66'), keywords: ['merge', 'abort', 'abbrechen'], action: () => state.runGitCommand(['mergeAbort'], t('generated.app.merge_aborted_b602bf32')) },
+    { id: 'merge-continue', label: t('generated.app.continue_merge_56cfed8e'), keywords: ['merge', 'continue', 'fortsetzen'], action: () => state.runGitCommand(['mergeContinue'], t('generated.app.merge_continued_63b9ee36')) },
+    { id: 'rebase-abort', label: t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71'), keywords: ['rebase', 'abort', 'abbrechen'], action: () => state.runGitCommand(['rebaseAbort'], t('generated.app.rebase_aborted_74ce61c8')) },
+    { id: 'rebase-continue', label: t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9'), keywords: ['rebase', 'continue', 'fortsetzen'], action: () => state.runGitCommand(['rebaseContinue'], t('generated.app.rebase_continued_181b298d')) },
     // Repo
-    { id: 'open-folder', label: tr('Repository öffnen...', 'Open repository...'), keywords: ['open', 'folder', 'öffnen'], action: () => state.handleOpenFolder() },
-    { id: 'clone-url', label: tr('Repository per URL klonen...', 'Clone repository from URL...'), keywords: ['clone', 'url', 'ssh', 'http'], action: () => state.handleCloneByUrl() },
-    { id: 'fork-url', label: tr('GitHub-Repository per URL forken...', 'Fork GitHub repository from URL...'), keywords: ['fork', 'github', 'url'], action: () => state.handleForkByUrl() },
-    { id: 'add-remote', label: tr('Remote hinzufügen...', 'Add remote...'), keywords: ['remote', 'add', 'hinzufügen'], action: () => { state.setActiveTab('repo'); state.handleAddRemote(); } },
+    { id: 'open-folder', label: t('generated.app.open_repository_09ccbb87'), keywords: ['open', 'folder', 'öffnen'], action: () => state.handleOpenFolder() },
+    { id: 'clone-url', label: t('generated.app.clone_repository_from_url_94b504ff'), keywords: ['clone', 'url', 'ssh', 'http'], action: () => state.handleCloneByUrl() },
+    { id: 'fork-url', label: t('generated.app.fork_github_repository_from_url_6e2cc177'), keywords: ['fork', 'github', 'url'], action: () => state.handleForkByUrl() },
+    { id: 'add-remote', label: t('generated.app.add_remote_3a4267c1'), keywords: ['remote', 'add', 'hinzufügen'], action: () => { state.setActiveTab('repo'); state.handleAddRemote(); } },
   ];
 
   useGlobalKeyboardShortcuts({
@@ -463,12 +467,12 @@ const App: React.FC = () => {
     showSecondaryHistory: state.settings.showSecondaryHistory,
 
     onFetch: () => state.refreshRemoteState(true),
-    onPull: () => state.runGitCommand(['pull'], tr('Erfolgreich gepullt.', 'Pull completed successfully.'), tr('Pull wird ausgefuehrt...', 'Running pull...')),
-    onPullRebase: () => state.runGitCommand(['pull', '--rebase'], tr('Erfolgreich mit Rebase gepullt.', 'Pull with rebase completed successfully.'), tr('Pull --rebase wird ausgefuehrt...', 'Running pull --rebase...')),
-    onPullFfOnly: () => state.runGitCommand(['pull', '--ff-only'], tr('Erfolgreich mit ff-only gepullt.', 'Pull with ff-only completed successfully.'), tr('Pull --ff-only wird ausgefuehrt...', 'Running pull --ff-only...')),
-    onPullNoFf: () => state.runGitCommand(['pull', '--no-ff'], tr('Erfolgreich mit --no-ff gepullt.', 'Pull with --no-ff completed.'), tr('Pull --no-ff wird ausgefuehrt...', 'Running pull --no-ff...')),
-    onPush: () => state.runGitCommand(['push'], tr('Erfolgreich gepusht.', 'Push completed successfully.'), tr('Push wird ausgefuehrt...', 'Running push...')),
-    onPushForceWithLease: () => state.runGitCommand(['push', '--force-with-lease'], tr('Erfolgreich mit force-with-lease gepusht.', 'Push with force-with-lease completed successfully.'), tr('Push --force-with-lease wird ausgefuehrt...', 'Running push --force-with-lease...')),
+    onPull: () => state.runGitCommand(['pull'], t('generated.app.pull_completed_successfully_a760cd36'), t('generated.app.running_pull_282e1a76')),
+    onPullRebase: () => state.runGitCommand(['pull', '--rebase'], t('generated.app.pull_with_rebase_completed_successfully_732a6b7f'), t('generated.app.running_pull_rebase_f9ca4da2')),
+    onPullFfOnly: () => state.runGitCommand(['pull', '--ff-only'], t('generated.app.pull_with_ff_only_completed_successfully_01a725eb'), t('generated.app.running_pull_ff_only_efd80da9')),
+    onPullNoFf: () => state.runGitCommand(['pull', '--no-ff'], t('generated.app.pull_with_no_ff_completed_0271e730'), t('generated.app.running_pull_no_ff_222dffa5')),
+    onPush: () => state.runGitCommand(['push'], t('generated.app.push_completed_successfully_edf8c1c9'), t('generated.app.running_push_0ab33329')),
+    onPushForceWithLease: () => state.runGitCommand(['push', '--force-with-lease'], t('generated.app.push_with_force_with_lease_completed_successfully_a27c0ef4'), t('generated.app.running_push_force_with_lease_590e0aba')),
     onPushSetUpstream: () => { const b = state.currentBranch; if (b) void state.runGitCommand(['push', '-u', 'origin', b], tr(`Branch "${b}" gepusht & Upstream gesetzt.`, `Pushed "${b}" & set upstream.`), 'Push -u...'); },
     onMergeBranch: state.handleMergeBranch,
     onOpenRepoWorkspace: () => state.setActiveTab('repo'),
@@ -490,10 +494,10 @@ const App: React.FC = () => {
     autoOpenConflictResolverPath: state.autoOpenConflictResolverPath,
     onAutoOpenConflictResolverConsumed: state.clearAutoOpenConflictResolverPath,
     onOpenConflictResolverForPath: state.openConflictResolverForPath,
-    onConflictMergeContinue: () => { void state.runGitCommand(['mergeContinue'], tr('Merge fortgesetzt.', 'Merge continued.'), tr('Merge wird fortgesetzt...', 'Continuing merge...')); },
-    onConflictMergeAbort: () => { void state.runGitCommand(['mergeAbort'], tr('Merge abgebrochen.', 'Merge aborted.'), tr('Merge wird abgebrochen...', 'Aborting merge...')); },
-    onConflictRebaseContinue: () => { void state.runGitCommand(['rebaseContinue'], tr('Rebase fortgesetzt.', 'Rebase continued.'), tr('Rebase wird fortgesetzt...', 'Continuing rebase...')); },
-    onConflictRebaseAbort: () => { void state.runGitCommand(['rebaseAbort'], tr('Rebase abgebrochen.', 'Rebase aborted.'), tr('Rebase wird abgebrochen...', 'Aborting rebase...')); },
+    onConflictMergeContinue: () => { void state.runGitCommand(['mergeContinue'], t('generated.app.merge_continued_63b9ee36'), t('generated.app.continuing_merge_9ed78a88')); },
+    onConflictMergeAbort: () => { void state.runGitCommand(['mergeAbort'], t('generated.app.merge_aborted_b602bf32'), t('generated.app.aborting_merge_4f4ac264')); },
+    onConflictRebaseContinue: () => { void state.runGitCommand(['rebaseContinue'], t('generated.app.rebase_continued_181b298d'), t('generated.app.continuing_rebase_21242ce6')); },
+    onConflictRebaseAbort: () => { void state.runGitCommand(['rebaseAbort'], t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b')); },
   };
   const appStateSlices = createAppStateSlices(ctxValue, {
     sidebarWidth,
@@ -527,7 +531,7 @@ const App: React.FC = () => {
             await state.addOpenRepo(repoPath);
             state.setActiveTab('planner');
             state.setGitActionToast({
-              msg: tr('Projektordner erstellt und Git-Repository initialisiert.', 'Created project folder and initialized Git repository.'),
+              msg: t('generated.app.created_project_folder_and_initialized_git_repository_1d314004'),
               isError: false,
             });
           }}
@@ -545,7 +549,7 @@ const App: React.FC = () => {
               className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
               role="separator"
               aria-orientation="vertical"
-              aria-label={tr('Sidebar-Breite anpassen', 'Resize sidebar width')}
+              aria-label={t('generated.app.resize_sidebar_width_d9368c0f')}
               onPointerDown={handleSidebarResizeStart}
             />
           )}
@@ -554,8 +558,8 @@ const App: React.FC = () => {
 
           {repoSwitcherIndex !== null && state.openRepos.length > 0 && (
             <div className="repo-switcher-backdrop">
-              <div className="repo-switcher-modal" role="dialog" aria-label={tr('Repository wechseln', 'Switch repository')}>
-                <div className="repo-switcher-title">{tr('Repository wechseln', 'Switch repository')}</div>
+              <div className="repo-switcher-modal" role="dialog" aria-label={t('generated.app.switch_repository_84935354')}>
+                <div className="repo-switcher-title">{t('generated.app.switch_repository_84935354')}</div>
                 <div
                   ref={repoSwitcherListRef}
                   className="repo-switcher-list"
@@ -578,7 +582,7 @@ const App: React.FC = () => {
                           <span className="repo-switcher-name">{getRepoDisplayName(repoPath)}</span>
                           <span className="repo-switcher-path">{repoPath}</span>
                         </div>
-                        {isActive && <span className="repo-switcher-active">{tr('Aktiv', 'Active')}</span>}
+                        {isActive && <span className="repo-switcher-active">{t('generated.app.active_28dac35a')}</span>}
                       </div>
                     );
                   })}

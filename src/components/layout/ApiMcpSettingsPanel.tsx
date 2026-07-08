@@ -23,7 +23,7 @@ const formatDateTime = (value: number | null): string | null => {
 };
 
 const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const copyValue = async () => {
@@ -37,10 +37,10 @@ const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
       className="settings-copy-btn"
       type="button"
       onClick={() => void copyValue()}
-      title={tr('Kopieren', 'Copy')}
+      title={t('generated.components.actiontoastviewport.copy_5c2a9afe')}
     >
       <Copy size={13} />
-      {copied ? tr('Kopiert', 'Copied') : (label || tr('Kopieren', 'Copy'))}
+      {copied ? t('generated.components.layout.apimcpsettingspanel.copied_08c1a6a7') : (label || t('generated.components.actiontoastviewport.copy_5c2a9afe'))}
     </button>
   );
 };
@@ -76,7 +76,7 @@ const buildAgentConfig = (mcpUrl: string, authHeaderName: string, authToken: str
 }, null, 2);
 
 export const ApiMcpSettingsPanel: React.FC = () => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [apiInfo, setApiInfo] = useState<PlanningApiInfoDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tokenLifetime, setTokenLifetime] = useState<PlanningApiTokenLifetimeDto>('month');
@@ -86,7 +86,7 @@ export const ApiMcpSettingsPanel: React.FC = () => {
 
   const loadApiInfo = async () => {
     if (!appClient.isAvailable()) {
-      setLoadError(tr('API-Status ist in diesem App-Prozess nicht verfuegbar.', 'API status is not available in this app process.'));
+      setLoadError(t('generated.components.layout.apimcpsettingspanel.api_status_is_not_available_in_this_app_process_e90733fe'));
       return;
     }
     try {
@@ -114,8 +114,8 @@ export const ApiMcpSettingsPanel: React.FC = () => {
       setApiInfo(result);
       setLoadError(null);
       setTokenActionMessage(action === 'generate'
-        ? tr('Neuer API-Token ist aktiv.', 'New API token is active.')
-        : tr('Gespeicherter API-Token wurde entfernt.', 'Saved API token was removed.'));
+        ? t('generated.components.layout.apimcpsettingspanel.new_api_token_is_active_93efc190')
+        : t('generated.components.layout.apimcpsettingspanel.saved_api_token_was_removed_57346f73'));
     } catch (error) {
       setTokenActionError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -135,42 +135,42 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const authHeader = `-H "${authHeaderName}: ${authToken || '<TOKEN>'}"`;
   const authTokenSource = apiInfo?.authTokenSource || 'session';
   const authTokenSourceLabel = authTokenSource === 'environment'
-    ? tr('Umgebungsvariable', 'Environment variable')
+    ? t('generated.components.layout.apimcpsettingspanel.environment_variable_c6f17ddc')
     : authTokenSource === 'saved'
-      ? tr('Gespeichert', 'Saved')
-      : tr('Temporär', 'Temporary');
+      ? t('generated.components.layout.apimcpsettingspanel.saved_f27acef4')
+      : t('generated.components.layout.apimcpsettingspanel.temporary_d13a9244');
   const authTokenExpiryLabel = authTokenSource === 'session'
-    ? tr('Bis zum App-Neustart', 'Until app restart')
+    ? t('generated.components.layout.apimcpsettingspanel.until_app_restart_5c7de626')
     : apiInfo?.authTokenExpiresAt
       ? formatDateTime(apiInfo.authTokenExpiresAt) || '-'
-      : tr('Dauerhaft', 'Persistent');
+      : t('generated.components.layout.apimcpsettingspanel.persistent_33c50e91');
   const tokenManagerDisabled = !apiInfo?.authTokenManageable || isTokenActionRunning;
   const clearTokenDisabled = tokenManagerDisabled || !apiInfo?.authTokenPersistent;
 
   const planningEndpoints = useMemo<EndpointInfo[]>(() => [
-    { method: 'GET', path: '/api/health', description: tr('Status, Port und MCP-Adresse pruefen.', 'Check status, port, and MCP URL.') },
-    { method: 'GET', path: '/api/', description: tr('HTML-Dokumentation der lokalen API.', 'HTML documentation for the local API.') },
-    { method: 'GET', path: '/api/openapi.json', description: tr('Maschinenlesbare API-Beschreibung.', 'Machine-readable API description.') },
-    { method: 'GET', path: '/api/projects', description: tr('Planungsprojekte mit Todo-Zaehlern listen.', 'List planning projects with todo counts.') },
-    { method: 'POST', path: '/api/projects', description: tr('Geplantes Projekt erstellen.', 'Create a planned project.') },
-    { method: 'GET', path: '/api/repositories', description: tr('Bekannte Repositories und Planner-Verknuepfung listen.', 'List known repositories and planner links.') },
-    { method: 'POST', path: '/api/repositories/ensure', description: tr('Planner-Projekt fuer repoPath erstellen oder holen.', 'Create or get planner project for repoPath.') },
-    { method: 'GET', path: '/api/repositories/todos', description: tr('Todos aller Repository-Projekte abrufen.', 'Fetch todos from repository projects.') },
-    { method: 'GET', path: '/api/todos', description: tr('Todos filtern und nach Dringlichkeit sortieren.', 'Filter todos and sort by urgency.') },
-    { method: 'POST', path: '/api/todos', description: tr('Todo erstellen.', 'Create a todo.') },
-    { method: 'GET', path: '/api/todos/next', description: tr('Naechste offene Todos nach Dringlichkeit.', 'Next open todos by urgency.') },
-    { method: 'PATCH', path: '/api/todos/:id', description: tr('Todo aktualisieren.', 'Update a todo.') },
-    { method: 'POST', path: '/api/todos/:id/move', description: tr('Todo in Tab, Status oder Projekt verschieben.', 'Move a todo to a tab, status, or project.') },
-    { method: 'DELETE', path: '/api/todos/:id', description: tr('Todo loeschen.', 'Delete a todo.') },
-    { method: 'GET/POST', path: '/api/tabs/:tab/todos', description: tr('Todos in idea, bug, planned, working, blocked oder done lesen/erstellen.', 'Read or create todos in idea, bug, planned, working, blocked, or done.') },
-    { method: 'GET', path: '/api/agent/next', description: tr('Agenten-Shortcut fuer offene Arbeit in Projekt X.', 'Agent shortcut for open work in project X.') },
-  ], [tr]);
+    { method: 'GET', path: '/api/health', description: t('generated.components.layout.apimcpsettingspanel.check_status_port_and_mcp_url_b8b9a843') },
+    { method: 'GET', path: '/api/', description: t('generated.components.layout.apimcpsettingspanel.html_documentation_for_the_local_api_d9361870') },
+    { method: 'GET', path: '/api/openapi.json', description: t('generated.components.layout.apimcpsettingspanel.machine_readable_api_description_240ffe8c') },
+    { method: 'GET', path: '/api/projects', description: t('generated.components.layout.apimcpsettingspanel.list_planning_projects_with_todo_counts_8731df40') },
+    { method: 'POST', path: '/api/projects', description: t('generated.components.layout.apimcpsettingspanel.create_a_planned_project_1b2753a8') },
+    { method: 'GET', path: '/api/repositories', description: t('generated.components.layout.apimcpsettingspanel.list_known_repositories_and_planner_links_c650f361') },
+    { method: 'POST', path: '/api/repositories/ensure', description: t('generated.components.layout.apimcpsettingspanel.create_or_get_planner_project_for_repopath_334abe51') },
+    { method: 'GET', path: '/api/repositories/todos', description: t('generated.components.layout.apimcpsettingspanel.fetch_todos_from_repository_projects_0a36fb2b') },
+    { method: 'GET', path: '/api/todos', description: t('generated.components.layout.apimcpsettingspanel.filter_todos_and_sort_by_urgency_7e9cb339') },
+    { method: 'POST', path: '/api/todos', description: t('generated.components.layout.apimcpsettingspanel.create_a_todo_b647e553') },
+    { method: 'GET', path: '/api/todos/next', description: t('generated.components.layout.apimcpsettingspanel.next_open_todos_by_urgency_962c5683') },
+    { method: 'PATCH', path: '/api/todos/:id', description: t('generated.components.layout.apimcpsettingspanel.update_a_todo_77229825') },
+    { method: 'POST', path: '/api/todos/:id/move', description: t('generated.components.layout.apimcpsettingspanel.move_a_todo_to_a_tab_status_or_project_f38b773a') },
+    { method: 'DELETE', path: '/api/todos/:id', description: t('generated.components.layout.apimcpsettingspanel.delete_a_todo_e08a8642') },
+    { method: 'GET/POST', path: '/api/tabs/:tab/todos', description: t('generated.components.layout.apimcpsettingspanel.read_or_create_todos_in_idea_bug_planned_working_blocked_534eb46b') },
+    { method: 'GET', path: '/api/agent/next', description: t('generated.components.layout.apimcpsettingspanel.agent_shortcut_for_open_work_in_project_x_053c8a6e') },
+  ], [t]);
 
   const mcpEndpoints = useMemo<EndpointInfo[]>(() => [
-    { method: 'POST', path: '/mcp', description: tr('MCP-aehnlicher JSON-RPC-Endpunkt fuer initialize, tools/list und tools/call.', 'MCP-style JSON-RPC endpoint for initialize, tools/list, and tools/call.') },
-    { method: 'GET', path: '/api/mcp/tools', description: tr('Tool-Katalog ueber REST lesen.', 'Read the tool catalog through REST.') },
-    { method: 'POST', path: '/api/mcp/tools/call', description: tr('MCP-Tool ueber REST-Wrapper ausfuehren.', 'Run an MCP tool through the REST wrapper.') },
-  ], [tr]);
+    { method: 'POST', path: '/mcp', description: t('generated.components.layout.apimcpsettingspanel.mcp_style_json_rpc_endpoint_for_initialize_tools_list_an_8e0f7a51') },
+    { method: 'GET', path: '/api/mcp/tools', description: t('generated.components.layout.apimcpsettingspanel.read_the_tool_catalog_through_rest_d27974db') },
+    { method: 'POST', path: '/api/mcp/tools/call', description: t('generated.components.layout.apimcpsettingspanel.run_an_mcp_tool_through_the_rest_wrapper_dee47730') },
+  ], [t]);
 
   const nextTodosCurl = `curl "${baseUrl}/api/agent/next?repoPath=<REPO_PATH_URL_ENCODED>&limit=10" ${authHeader}`;
   const createTodoCurl = `curl -X POST "${baseUrl}/api/todos" ${authHeader} -H "content-type: application/json" -d "{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"title\\":\\"Naechste Arbeit\\",\\"status\\":\\"planned\\",\\"priority\\":\\"high\\"}"`;
@@ -182,46 +182,43 @@ export const ApiMcpSettingsPanel: React.FC = () => {
     <div className="settings-grid">
       <section className="settings-card">
         <div className="settings-card-header-row">
-          <h3>{tr('Lokale API', 'Local API')}</h3>
+          <h3>{t('generated.components.layout.apimcpsettingspanel.local_api_940afb5b')}</h3>
           <button className="staging-tool-btn" type="button" onClick={() => void loadApiInfo()}>
             <RefreshCw size={13} />
-            {tr('Aktualisieren', 'Refresh')}
+            {t('generated.components.layout.apimcpsettingspanel.refresh_4825b0d7')}
           </button>
         </div>
         <p>
-          {tr(
-            'Diese Werte gelten fuer den aktuell laufenden App-Prozess. Wenn Port 2990 belegt ist, zeigt die App hier den tatsaechlichen Ausweichport.',
-            'These values belong to the current app process. If port 2990 is occupied, the app shows the actual fallback port here.',
-          )}
+          {t('generated.components.layout.apimcpsettingspanel.these_values_belong_to_the_current_app_process_if_port_2_891cfc37')}
         </p>
         {loadError && <p className="settings-danger">{loadError}</p>}
         {apiInfo?.error && <p className="settings-danger">{apiInfo.error}</p>}
         <div className="settings-api-status-grid">
-          <CopyValueRow label={tr('Status', 'Status')} value={apiInfo?.status || 'starting'} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.status_b853ab43')} value={apiInfo?.status || 'starting'} />
           <CopyValueRow label="IP" value={apiHost} />
           <CopyValueRow label="Port" value={apiPort} />
-          <CopyValueRow label={tr('Base URL', 'Base URL')} value={baseUrl} />
-          <CopyValueRow label={tr('API-Doku', 'API docs')} value={docsUrl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.base_url_929883ce')} value={baseUrl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.api_docs_3610985f')} value={docsUrl} />
           <CopyValueRow label="OpenAPI" value={openApiUrl} />
           <CopyValueRow label="MCP" value={mcpUrl} />
-          <CopyValueRow label={tr('Token-Header', 'Token header')} value={authHeaderName} />
-          <CopyValueRow label={tr('API-Token', 'API token')} value={authToken || tr('Noch nicht verfuegbar', 'Not available yet')} />
-          <CopyValueRow label={tr('Token-Quelle', 'Token source')} value={authTokenSourceLabel} />
-          <CopyValueRow label={tr('Token gueltig', 'Token valid')} value={authTokenExpiryLabel} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_header_2861ebc8')} value={authHeaderName} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.api_token_2d54a561')} value={authToken || t('generated.components.layout.apimcpsettingspanel.not_available_yet_f74be795')} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_source_65f47a01')} value={authTokenSourceLabel} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_valid_cecc6640')} value={authTokenExpiryLabel} />
         </div>
         <div className="settings-api-token-manager">
           <div className="settings-api-token-controls">
-            <label htmlFor="planning-api-token-lifetime">{tr('Gueltigkeit', 'Validity')}</label>
+            <label htmlFor="planning-api-token-lifetime">{t('generated.components.layout.apimcpsettingspanel.validity_e481f83d')}</label>
             <select
               id="planning-api-token-lifetime"
               value={tokenLifetime}
               onChange={(event) => setTokenLifetime(event.target.value as PlanningApiTokenLifetimeDto)}
               disabled={tokenManagerDisabled}
             >
-              <option value="day">{tr('1 Tag', '1 day')}</option>
-              <option value="month">{tr('1 Monat', '1 month')}</option>
-              <option value="year">{tr('1 Jahr', '1 year')}</option>
-              <option value="forever">{tr('Immer', 'Forever')}</option>
+              <option value="day">{t('generated.components.layout.apimcpsettingspanel.1_day_104e7836')}</option>
+              <option value="month">{t('generated.components.layout.apimcpsettingspanel.1_month_81ffd88d')}</option>
+              <option value="year">{t('generated.components.layout.apimcpsettingspanel.1_year_032918f1')}</option>
+              <option value="forever">{t('generated.components.layout.apimcpsettingspanel.forever_dab8b802')}</option>
             </select>
             <button
               className="staging-tool-btn"
@@ -230,7 +227,7 @@ export const ApiMcpSettingsPanel: React.FC = () => {
               disabled={tokenManagerDisabled}
             >
               <KeyRound size={13} />
-              {isTokenActionRunning ? tr('Speichere...', 'Saving...') : tr('Token generieren', 'Generate token')}
+              {isTokenActionRunning ? t('generated.components.layout.apimcpsettingspanel.saving_cf3ffe37') : t('generated.components.layout.apimcpsettingspanel.generate_token_8fa2cce1')}
             </button>
             <button
               className="staging-tool-btn"
@@ -239,20 +236,14 @@ export const ApiMcpSettingsPanel: React.FC = () => {
               disabled={clearTokenDisabled}
             >
               <Trash2 size={13} />
-              {tr('Gespeicherten Token loeschen', 'Delete saved token')}
+              {t('generated.components.layout.apimcpsettingspanel.delete_saved_token_0f0d2306')}
             </button>
           </div>
           {!apiInfo?.authTokenStorageAvailable && (
-            <p className="settings-danger">{tr(
-              'OS-Verschluesselung ist nicht verfuegbar; persistente API-Token koennen nicht gespeichert werden.',
-              'OS encryption is not available; persistent API tokens cannot be saved.',
-            )}</p>
+            <p className="settings-danger">{t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad')}</p>
           )}
           {authTokenSource === 'environment' && (
-            <p>{tr(
-              'OPEN_GIT_CONTROL_API_TOKEN ist gesetzt und ueberschreibt gespeicherte API-Token.',
-              'OPEN_GIT_CONTROL_API_TOKEN is set and overrides saved API tokens.',
-            )}</p>
+            <p>{t('generated.components.layout.apimcpsettingspanel.open_git_control_api_token_is_set_and_overrides_saved_ap_c28b0658')}</p>
           )}
           {tokenActionError && <p className="settings-danger">{tokenActionError}</p>}
           {tokenActionMessage && <p className="settings-success">{tokenActionMessage}</p>}
@@ -260,35 +251,32 @@ export const ApiMcpSettingsPanel: React.FC = () => {
       </section>
 
       <section className="settings-card">
-        <h3>{tr('KI-Agent verbinden', 'Connect an AI agent')}</h3>
+        <h3>{t('generated.components.layout.apimcpsettingspanel.connect_an_ai_agent_be1931f0')}</h3>
         <p>
-          {tr(
-            'Wenn dein Agent HTTP-MCP oder JSON-RPC ueber HTTP unterstuetzt, verwende die MCP-URL direkt. Fuer reine REST-Agenten reichen die /api-Endpunkte. Die lokale API stellt nur Planning-Funktionen bereit; Git- und GitHub-Operationen werden nicht exportiert. Sende bei allen Daten- und Tool-Aufrufen den Token-Header mit.',
-            'If your agent supports HTTP MCP or JSON-RPC over HTTP, use the MCP URL directly. For REST-only agents, use the /api endpoints. The local API only exposes planning features; Git and GitHub operations are not exported. Send the token header with all data and tool calls.',
-          )}
+          {t('generated.components.layout.apimcpsettingspanel.if_your_agent_supports_http_mcp_or_json_rpc_over_http_us_7564fb62')}
         </p>
         <div className="settings-api-command-block">
           <div className="settings-card-header-row">
-            <span>{tr('MCP Server Config', 'MCP server config')}</span>
+            <span>{t('generated.components.layout.apimcpsettingspanel.mcp_server_config_0229cc08')}</span>
             <CopyButton value={mcpConfig} />
           </div>
           <pre>{mcpConfig}</pre>
         </div>
         <div className="settings-api-command-grid">
-          <CopyValueRow label={tr('Tools listen', 'List tools')} value={listToolsCurl} />
-          <CopyValueRow label={tr('Tool ausfuehren', 'Call tool')} value={callToolCurl} />
-          <CopyValueRow label={tr('Naechste Todos', 'Next todos')} value={nextTodosCurl} />
-          <CopyValueRow label={tr('Todo erstellen', 'Create todo')} value={createTodoCurl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.list_tools_ed53da16')} value={listToolsCurl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.call_tool_e25d577f')} value={callToolCurl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.next_todos_24b89c6d')} value={nextTodosCurl} />
+          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.create_todo_a64f0415')} value={createTodoCurl} />
         </div>
       </section>
 
       <section className="settings-card">
-        <h3>{tr('Planning-Endpunkte', 'Planning endpoints')}</h3>
+        <h3>{t('generated.components.layout.apimcpsettingspanel.planning_endpoints_8f68ac5f')}</h3>
         <EndpointTable endpoints={planningEndpoints} />
       </section>
 
       <section className="settings-card">
-        <h3>{tr('MCP-Endpunkte', 'MCP endpoints')}</h3>
+        <h3>{t('generated.components.layout.apimcpsettingspanel.mcp_endpoints_2f04d803')}</h3>
         <EndpointTable endpoints={mcpEndpoints} />
       </section>
     </div>

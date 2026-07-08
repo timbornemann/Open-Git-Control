@@ -36,7 +36,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   workingTreeStats,
   onRefreshWorkingTree,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const { setConfirmDialog, setInputDialog } = useUIContext();
   const { toasts, setToast, dismiss } = useToastQueue(3000);
   const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
@@ -93,8 +93,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   });
 
   const aiCommitMessageStyleLabel = useMemo(() => {
-    return getCommitMessageStyleLabel(settings.aiCommitMessageStyle, tr);
-  }, [settings.aiCommitMessageStyle, tr]);
+    return getCommitMessageStyleLabel(settings.aiCommitMessageStyle, t);
+  }, [settings.aiCommitMessageStyle, t]);
 
   const openAiCommitMessageDialog = useAiCommitMessageDialog({
     aiCommit,
@@ -115,7 +115,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   if (!repoPath) return null;
   if (!fileOps.status) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{tr('Lade Status...', 'Loading status...')}</div>;
+    return <div style={{ color: 'var(--text-secondary)', padding: '16px' }}>{t('generated.components.staging_area.stagingarea.loading_status_bff97099')}</div>;
   }
 
   const status = fileOps.status;
@@ -152,7 +152,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       <div className="staging-files">
         {totalChanges === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            {isConflictOnly ? tr('Keine offenen Konflikte.', 'No open conflicts.') : tr('Working Tree ist sauber.', 'Working tree is clean.')}
+            {isConflictOnly ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5') : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
           </div>
         )}
 

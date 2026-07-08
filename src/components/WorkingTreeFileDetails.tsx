@@ -24,10 +24,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
   const [blameHasMore, setBlameHasMore] = useState(false);
 
-  const { tr, locale } = useI18n();
+  const { t, tr, locale } = useI18n();
 
   const sourceLabel = useMemo(
-    () => source === 'staged' ? tr('Staged Änderungen', 'Staged changes') : tr('Unstaged Änderungen', 'Unstaged changes'),
+    () => source === 'staged' ? t('generated.components.workingtreefiledetails.staged_changes_2b2e99a1') : t('generated.components.workingtreefiledetails.unstaged_changes_898c9c1d'),
     [source, tr],
   );
 
@@ -52,12 +52,12 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           setHistoryEntries(result.data || []);
         } else {
           setHistoryEntries([]);
-          setHistoryError(result.error || tr('Datei-Historie konnte nicht geladen werden.', 'Could not load file history.'));
+          setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
         }
       } catch (fetchError) {
         console.error(fetchError);
         setHistoryEntries([]);
-        setHistoryError(tr('Datei-Historie konnte nicht geladen werden.', 'Could not load file history.'));
+        setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
       } finally {
         setHistoryLoading(false);
       }
@@ -79,12 +79,12 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           setBlameHasMore((result.data || []).length === 500);
         } else {
           setBlameLines([]);
-          setBlameError(result.error || tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
+          setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
         }
       } catch (fetchError) {
         console.error(fetchError);
         setBlameLines([]);
-        setBlameError(tr('Blame-Daten konnten nicht geladen werden.', 'Could not load blame data.'));
+        setBlameError(t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
       } finally {
         setBlameLoading(false);
       }
@@ -115,7 +115,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     onOpenDiff?.({
       source,
       path,
-      title: tr(`Working Tree Diff`, 'Working tree diff'),
+      title: t('generated.components.workingtreefiledetails.working_tree_diff_c7f9bda9'),
     });
   }, [activeTab, onOpenDiff, path, source, tr]);
 
@@ -135,7 +135,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   return (
     <div className="commit-details-panel" style={{ padding: '12px', height: '100%', overflowY: 'auto' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>{tr('Datei-Inspector', 'File inspector')}</h4>
+        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>{t('generated.components.layout.main.maininspectorpane.file_inspector_57b931aa')}</h4>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{sourceLabel}</span>
         <code style={{ fontSize: '0.76rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '6px 8px', overflowX: 'auto', whiteSpace: 'nowrap' }}>{path}</code>
       </div>
@@ -147,17 +147,17 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
             onClick={() => setActiveTab(tab)}
             style={{ fontSize: '0.78rem', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-color)', backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)', color: activeTab === tab ? 'var(--on-accent)' : 'var(--text-primary)', cursor: 'pointer' }}
           >
-            {tab === 'history' ? tr('Historie', 'History') : tab === 'blame' ? 'Blame' : 'Patch'}
+            {tab === 'history' ? t('generated.components.commitdetails.history_83156612') : tab === 'blame' ? 'Blame' : 'Patch'}
           </button>
         ))}
       </div>
 
       {activeTab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Lade Historie...', 'Loading history...')}</span>}
+          {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_history_3ca2a3ab')}</span>}
           {historyError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{historyError}</span>}
           {!historyLoading && !historyError && historyEntries.length === 0 && (
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Keine Historie gefunden.', 'No history found.')}</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_history_found_a820bc27')}</span>
           )}
           {!historyLoading && !historyError && historyEntries.map(entry => (
             <button
@@ -166,7 +166,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
               style={{ width: '100%', textAlign: 'left', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', padding: '8px 9px', cursor: onSelectCommit ? 'pointer' : 'default', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}
             >
               <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.abbrevHash}</span>
-              <span style={{ fontSize: '0.84rem' }}>{entry.subject || tr('(ohne Nachricht)', '(no message)')}</span>
+              <span style={{ fontSize: '0.84rem' }}>{entry.subject || t('generated.components.commitdetails.no_message_e74e94fd')}</span>
               <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{entry.author || '-'} | {formatDate(entry.date)}</span>
             </button>
           ))}
@@ -175,10 +175,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
 
       {activeTab === 'blame' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Lade Blame...', 'Loading blame...')}</span>}
+          {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>}
           {blameError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{blameError}</span>}
           {!blameLoading && !blameError && blameLines.length === 0 && (
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{tr('Keine Blame-Daten gefunden.', 'No blame data found.')}</span>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_blame_data_found_e996f81f')}</span>
           )}
           {!blameLoading && !blameError && blameLines.length > 0 && (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
@@ -198,7 +198,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
                   disabled={blameLoading}
                   style={{ margin: 8 }}
                 >
-                  {tr('Weitere 500 Zeilen laden', 'Load 500 more lines')}
+                  {t('generated.components.commitdetails.load_500_more_lines_16c0eb75')}
                 </button>
               )}
             </div>
@@ -209,10 +209,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       {activeTab === 'patch' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-            {tr('Diff im Hauptfenster geöffnet. Nutze dort Unified/Side-by-Side und Hunk-Navigation.', 'Diff opened in the main window. Use Unified/Side-by-Side and hunk navigation there.')}
+            {t('generated.components.commitdetails.diff_opened_in_the_main_window_use_unified_side_by_side_87e4a2ac')}
           </span>
-          <button className="staging-tool-btn" onClick={() => onOpenDiff?.({ source, path, title: tr('Working Tree Diff', 'Working tree diff') })}>
-            {tr('Diff erneut im Hauptfenster anzeigen', 'Show diff again in main window')}
+          <button className="staging-tool-btn" onClick={() => onOpenDiff?.({ source, path, title: t('generated.components.workingtreefiledetails.working_tree_diff_c7f9bda9') })}>
+            {t('generated.components.commitdetails.show_diff_again_in_main_window_d9b0309b')}
           </button>
         </div>
       )}

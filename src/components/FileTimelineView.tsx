@@ -29,7 +29,7 @@ type FileTimelineViewProps = {
 };
 
 export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, commits }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(commits.length > 0 ? commits.length - 1 : 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(800); // ms per step
@@ -154,8 +154,8 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
   if (commits.length === 0) {
     return (
       <div className="diff-empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <span>{tr('Keine Commits im Repository gefunden.', 'No commits found in repository.')}</span>
-        <button className="staging-btn-sm" onClick={onClose}>{tr('Zurück', 'Back')}</button>
+        <span>{t('generated.components.filetimelineview.no_commits_found_in_repository_1449958f')}</span>
+        <button className="staging-btn-sm" onClick={onClose}>{t('generated.components.filetimelineview.back_4e004d2b')}</button>
       </div>
     );
   }
@@ -223,7 +223,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
             <button
               onClick={handleReset}
               className="diff-nav-btn"
-              title={tr('Zurück zum Anfang', 'Reset to start')}
+              title={t('generated.components.filetimelineview.reset_to_start_e56647b1')}
               style={{ width: '32px', height: '32px' }}
             >
               <RotateCcw size={15} />
@@ -232,14 +232,14 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
               onClick={handlePlayPause}
               className="diff-nav-btn"
               style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary-soft)', color: 'var(--text-accent)', border: '1px solid var(--accent-primary-border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-              title={isPlaying ? tr('Pause', 'Pause') : tr('Abspielen', 'Play')}
+              title={isPlaying ? t('generated.components.filetimelineview.pause_a1839c38') : t('generated.components.filetimelineview.play_55b22fd2')}
             >
               {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
             </button>
             <button
               onClick={handleSkipToEnd}
               className="diff-nav-btn"
-              title={tr('Zum Ende springen', 'Skip to end')}
+              title={t('generated.components.filetimelineview.skip_to_end_8be57eb0')}
               style={{ width: '32px', height: '32px' }}
             >
               <FastForward size={15} />
@@ -248,7 +248,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-              {tr('Geschwindigkeit:', 'Speed:')}
+              {t('generated.components.filetimelineview.speed_805e4a3b')}
             </span>
             <select
               value={speed}
@@ -264,10 +264,10 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
                 cursor: 'pointer'
               }}
             >
-              <option value={1500}>{tr('Sehr langsam (1.5s)', 'Very slow (1.5s)')}</option>
-              <option value={800}>{tr('Normal (0.8s)', 'Normal (0.8s)')}</option>
-              <option value={300}>{tr('Schnell (0.3s)', 'Fast (0.3s)')}</option>
-              <option value={100}>{tr('Sehr schnell (0.1s)', 'Very fast (0.1s)')}</option>
+              <option value={1500}>{t('generated.components.filetimelineview.very_slow_1_5s_f46bec3e')}</option>
+              <option value={800}>{t('generated.components.filetimelineview.normal_0_8s_4f228619')}</option>
+              <option value={300}>{t('generated.components.filetimelineview.fast_0_3s_231c3abf')}</option>
+              <option value={100}>{t('generated.components.filetimelineview.very_fast_0_1s_d3e91155')}</option>
             </select>
           </div>
         </div>

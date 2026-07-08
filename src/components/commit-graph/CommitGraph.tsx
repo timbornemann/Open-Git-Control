@@ -82,7 +82,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   workingTreeStatus: externalWorkingTreeStatus,
   onRefreshWorkingTree,
 }) => {
-  const { locale, tr } = useI18n();
+  const { t, locale, tr } = useI18n();
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
@@ -97,9 +97,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const resetForensicStateRef = useRef<() => void>(() => {});
 
   const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(() => ({
-    string: tr('-S String', '-S string'),
-    regex: tr('-G Regex', '-G regex'),
-    line: tr('-L Zeilenbereich', '-L line range'),
+    string: t('generated.components.commit_graph.commitgraph.s_string_0380d62c'),
+    regex: t('generated.components.commit_graph.commitgraph.g_regex_45e4b70c'),
+    line: t('generated.components.commit_graph.commitgraph.l_line_range_a736c2f1'),
   }), [tr]);
 
   const handleRepoCleared = useCallback(() => {
@@ -157,7 +157,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     layout,
     selectedHash,
     onSelectCommit,
-    tr,
+    t,
   });
   const {
     forensicType,
@@ -180,7 +180,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   } = useForensicSearch({
     repoPath,
     workingTreeStatus,
-    tr,
+    t,
   });
   resetForensicStateRef.current = resetForensicState;
   const runGitAction = useCommitGraphGitActions({
@@ -189,7 +189,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     refreshCommits,
     refreshWorkingTreeStatus,
     setToast,
-    tr,
+    t,
   });
 
   useEffect(() => {
@@ -412,7 +412,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     setToast,
     refreshCommits,
     refreshWorkingTreeStatus,
-    tr,
+    t,
   }), [
     branches,
     currentBranch,
@@ -424,11 +424,11 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     setConfirmDialog,
     setInputDialog,
     setToast,
-    tr,
+    t,
   ]);
 
   if (!repoPath) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{tr('Bitte waehle ein Repository aus, um den Graphen zu sehen.', 'Please select a repository to view the graph.')}</div>;
+    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{t('generated.components.commit_graph.commitgraph.please_select_a_repository_to_view_the_graph_3653ac88')}</div>;
   }
   if (loading) {
     return (
@@ -446,8 +446,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   if (!layout || layout.nodes.length === 0) {
     return (
       <EmptyState
-        title={tr('Keine Commits gefunden.', 'No commits found.')}
-        description={tr('Erstelle deinen ersten Commit im Staging-Bereich.', 'Create your first commit in the staging area.')}
+        title={t('generated.components.commit_graph.commitgraph.no_commits_found_c43024aa')}
+        description={t('generated.components.commit_graph.commitgraph.create_your_first_commit_in_the_staging_area_6d149098')}
       />
     );
   }
@@ -487,7 +487,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         matchCount={matchedNodes.length}
         onJumpToPreviousMatch={() => jumpToMatch(-1)}
         onJumpToNextMatch={() => jumpToMatch(1)}
-        tr={tr}
+        t={t}
       />
 
 
@@ -518,7 +518,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         runForensicSearch={runForensicSearch}
         onSelectCommit={onSelectCommit}
         onOpenDiff={onOpenDiff}
-        tr={tr}
+        t={t}
       />
 
       <div ref={logContainerRef} className="commit-graph-container">
@@ -578,7 +578,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                 <div className="commit-subject-row">
                   <span className="commit-subject">{workingTreeLabel}</span>
                   <span className="commit-meta">
-                    <span className="commit-author">{tr('Klicken zum Stage / Commit', 'Click to stage / commit')}</span>
+                    <span className="commit-author">{t('generated.components.commit_graph.commitgraph.click_to_stage_commit_ed989f59')}</span>
                     <span className="commit-date">{workingTreeCount}</span>
                   </span>
                 </div>
@@ -657,7 +657,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                               setHighlightedBranchRef((previous) => (previous === branchTarget ? null : branchTarget));
                             }}
                             style={isActiveBranchRef ? ({ ['--branch-focus-color' as any]: branchFocusColor } as React.CSSProperties) : undefined}
-                            title={tr('Branch-Pfad hervorheben', 'Highlight branch path')}
+                            title={t('generated.components.commit_graph.commitgraph.highlight_branch_path_d8128078')}
                           >
                             {ref}
                           </button>
@@ -673,7 +673,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                         className="commit-stats"
                         title={node.commit.stats
                           ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
-                          : tr('Commit-Statistiken werden im Hintergrund geladen.', 'Commit statistics are loading in the background.')}
+                          : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683')}
                       >
                         {node.commit.stats
                           ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)
@@ -730,21 +730,15 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             setContextMenu(null);
             setConfirmDialog({
               variant: 'confirm',
-              title: tr('Commit mergen?', 'Merge commit?'),
-              message: tr(
-                'git merge fuegt diesen Commit-Stand in den aktuellen Branch ein (ggf. Merge-Commit).',
-                'git merge merges this commit into the current branch (may create a merge commit).',
-              ),
+              title: t('generated.components.commit_graph.commitgraph.merge_commit_29707783'),
+              message: t('generated.components.commit_graph.commitgraph.git_merge_merges_this_commit_into_the_current_branch_may_a39118f2'),
               contextItems: [
-                { label: tr('Commit', 'Commit'), value: shortHash },
-                { label: tr('Befehl', 'Command'), value: `git merge ${hash}` },
+                { label: t('generated.components.commit_graph.commitgraph.commit_b9ec78bd'), value: shortHash },
+                { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git merge ${hash}` },
               ],
               irreversible: false,
-              consequences: tr(
-                'Bei Konflikten loest du sie im Working Directory und setzt den Merge fort.',
-                'If conflicts occur, resolve them in the working tree and continue the merge.',
-              ),
-              confirmLabel: tr('Merge starten', 'Start merge'),
+              consequences: t('generated.components.commit_graph.commitgraph.if_conflicts_occur_resolve_them_in_the_working_tree_and_54357bae'),
+              confirmLabel: t('generated.components.commit_graph.commitgraph.start_merge_516b5e37'),
               onConfirm: async () => {
                 await runGitAction(
                   ['merge', hash],
@@ -757,7 +751,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
             setContextMenu(null);
             onMergeBranch?.(branchRef, 'default');
           }}
-          tr={tr}
+          t={t}
         />
       )}
 

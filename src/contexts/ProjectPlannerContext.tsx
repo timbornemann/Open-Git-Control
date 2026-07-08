@@ -72,7 +72,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   setConfirmDialog,
   children,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [data, setData] = useState<ProjectPlannerData>(EMPTY_DATA);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -226,29 +226,20 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     setConfirmDialog({
       variant: 'danger',
       title: isPlannedProject
-        ? tr('Projektidee loeschen?', 'Delete project idea?')
-        : tr('Planungsdaten loeschen?', 'Delete planning data?'),
+        ? t('generated.contexts.projectplannercontext.delete_project_idea_9116ddf5')
+        : t('generated.contexts.projectplannercontext.delete_planning_data_fa92b687'),
       message: isPlannedProject
-        ? tr(
-          'Das zukuenftige Projekt und alle zugehoerigen Ideen werden aus der Projektplanung entfernt.',
-          'The future project and all related ideas will be removed from project planning.',
-        )
-        : tr(
-          'Die Planungsdaten werden entfernt. Das Repository und seine Dateien bleiben unveraendert.',
-          'The planning data will be removed. The repository and its files remain unchanged.',
-        ),
+        ? t('generated.contexts.projectplannercontext.the_future_project_and_all_related_ideas_will_be_removed_b6147253')
+        : t('generated.contexts.projectplannercontext.the_planning_data_will_be_removed_the_repository_and_its_64f80fc8'),
       contextItems: [
-        { label: tr('Projekt', 'Project'), value: project.name },
-        { label: tr('Eintraege', 'Items'), value: String(itemCount) },
+        { label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name },
+        { label: t('generated.contexts.projectplannercontext.items_334c7d10'), value: String(itemCount) },
       ],
       irreversible: true,
-      consequences: tr(
-        'Die geloeschten Planungsdaten koennen nicht wiederhergestellt werden.',
-        'Deleted planning data cannot be restored.',
-      ),
+      consequences: t('generated.contexts.projectplannercontext.deleted_planning_data_cannot_be_restored_c65a170b'),
       confirmLabel: isPlannedProject
-        ? tr('Projektidee loeschen', 'Delete project idea')
-        : tr('Planungsdaten loeschen', 'Delete planning data'),
+        ? t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')
+        : t('generated.components.project_planner.plannerdialogs.delete_planning_data_2c761284'),
       onConfirm: async () => {
         await deleteProject(projectId);
       },
@@ -262,21 +253,15 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
 
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Eintrag loeschen?', 'Delete item?'),
-      message: tr(
-        'Der ausgewaehlte Eintrag wird dauerhaft aus der Projektplanung entfernt.',
-        'The selected item will be permanently removed from project planning.',
-      ),
+      title: t('generated.contexts.projectplannercontext.delete_item_e3fbac1b'),
+      message: t('generated.contexts.projectplannercontext.the_selected_item_will_be_permanently_removed_from_proje_cf6c54ee'),
       contextItems: [
-        { label: tr('Eintrag', 'Item'), value: item.title },
-        ...(project ? [{ label: tr('Projekt', 'Project'), value: project.name }] : []),
+        { label: t('generated.contexts.projectplannercontext.item_177db219'), value: item.title },
+        ...(project ? [{ label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name }] : []),
       ],
       irreversible: true,
-      consequences: tr(
-        'Der geloeschte Eintrag kann nicht wiederhergestellt werden.',
-        'The deleted item cannot be restored.',
-      ),
-      confirmLabel: tr('Eintrag loeschen', 'Delete item'),
+      consequences: t('generated.contexts.projectplannercontext.the_deleted_item_cannot_be_restored_8ab41906'),
+      confirmLabel: t('generated.components.project_planner.projectplannerview.delete_item_afc7d611'),
       onConfirm: async () => {
         await deleteItem(itemId);
       },

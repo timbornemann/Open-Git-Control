@@ -47,7 +47,7 @@ export const useFileOperations = ({
   externalStats,
   externalRefresh,
 }: Params) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [status, setStatus] = useState<GitStatusWithConflicts | null>(null);
   const [stagedStats, setStagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
   const [unstagedStats, setUnstagedStats] = useState<DiffStats>(EMPTY_DIFF_STATS);
@@ -191,7 +191,7 @@ export const useFileOperations = ({
         await refresh();
         return true;
       } else {
-        setToast({ msg: r.error || tr('Fehler', 'Error'), isError: true });
+        setToast({ msg: r.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
         return false;
       }
     } catch (e: any) {
@@ -216,7 +216,7 @@ export const useFileOperations = ({
     try {
       const result = await gitClient.addIgnoreRule(normalizedPattern);
       if (!result.success) {
-        setToast({ msg: result.error || tr('Konnte .gitignore nicht aktualisieren.', 'Could not update .gitignore.'), isError: true });
+        setToast({ msg: result.error || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
         return;
       }
       if (section === 'staged' && entry.x === 'A') {
@@ -231,14 +231,14 @@ export const useFileOperations = ({
       if (onRepoChanged) onRepoChanged();
       await refresh();
     } catch (e: any) {
-      setToast({ msg: e.message || tr('Konnte .gitignore nicht aktualisieren.', 'Could not update .gitignore.'), isError: true });
+      setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
     }
   }, [setToast, onRepoChanged, refresh, tr]);
 
   const stageFile = useCallback((f: string) => git(['add', '--', f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)), [git, tr]);
   const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
-  const stageAll = useCallback(() => git(['add', '.'], tr('Alle Dateien gestaged', 'Staged all files')), [git, tr]);
-  const unstageAll = useCallback(() => git(['reset', 'HEAD'], tr('Alle Dateien unstaged', 'Unstaged all files')), [git, tr]);
+  const stageAll = useCallback(() => git(['add', '.'], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702')), [git, tr]);
+  const unstageAll = useCallback(() => git(['reset', 'HEAD'], t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313')), [git, tr]);
 
   const stageAllUntracked = useCallback(async () => {
     if (!gitClient.isAvailable() || !status || status.untracked.length === 0) return;
@@ -268,12 +268,12 @@ export const useFileOperations = ({
   const discardFile = useCallback((f: string) => {
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Datei-Aenderungen verwerfen?', 'Discard file changes?'),
-      message: tr('Alle nicht gespeicherten Aenderungen dieser Datei werden verworfen.', 'All unsaved changes in this file will be discarded.'),
-      contextItems: [{ label: tr('Datei', 'File'), value: f }, { label: tr('Bereich', 'Scope'), value: tr('Unstaged Working Tree', 'Unstaged working tree') }],
+      title: t('generated.components.staging_area.usefileoperations.discard_file_changes_ba9a3d21'),
+      message: t('generated.components.staging_area.usefileoperations.all_unsaved_changes_in_this_file_will_be_discarded_8d5f1078'),
+      contextItems: [{ label: t('generated.components.commitdetails.file_9d811416'), value: f }, { label: t('generated.components.staging_area.usefileoperations.scope_9817b017'), value: t('generated.components.staging_area.usefileoperations.unstaged_working_tree_4bf6f78b') }],
       irreversible: true,
-      consequences: tr('Die verworfenen Zeilen koennen nicht aus Git wiederhergestellt werden.', 'Discarded lines cannot be restored from Git.'),
-      confirmLabel: tr('Aenderungen verwerfen', 'Discard changes'),
+      consequences: t('generated.components.staging_area.usefileoperations.discarded_lines_cannot_be_restored_from_git_d40dd8f1'),
+      confirmLabel: t('generated.components.staging_area.conflictresolverpanel.discard_changes_b80ac3bd'),
       onConfirm: async () => {
         await git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true);
       },
@@ -283,14 +283,14 @@ export const useFileOperations = ({
   const discardAll = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Alle unstaged Aenderungen verwerfen?', 'Discard all unstaged changes?'),
-      message: tr('Alle lokalen unstaged Aenderungen werden auf den letzten Commit zurueckgesetzt.', 'All local unstaged changes will be reset to the last commit.'),
-      contextItems: [{ label: tr('Umfang', 'Scope'), value: tr('Gesamtes Repository', 'Entire repository') }, { label: tr('Betrifft', 'Affects'), value: tr('Nur unstaged Dateien', 'Only unstaged files') }],
+      title: t('generated.components.staging_area.usefileoperations.discard_all_unstaged_changes_aa3f4f05'),
+      message: t('generated.components.staging_area.usefileoperations.all_local_unstaged_changes_will_be_reset_to_the_last_com_2a16eed6'),
+      contextItems: [{ label: t('generated.components.staging_area.usefileoperations.scope_7d90ed9d'), value: t('generated.components.staging_area.usefileoperations.entire_repository_3b268641') }, { label: t('generated.components.staging_area.usefileoperations.affects_80a8b1b0'), value: t('generated.components.staging_area.usefileoperations.only_unstaged_files_edd96f1c') }],
       irreversible: true,
-      consequences: tr('Nicht gespeicherte Aenderungen gehen unwiderruflich verloren.', 'Unsaved changes will be permanently lost.'),
-      confirmLabel: tr('Alles verwerfen', 'Discard all'),
+      consequences: t('generated.components.staging_area.usefileoperations.unsaved_changes_will_be_permanently_lost_7fed012c'),
+      confirmLabel: t('generated.components.staging_area.usefileoperations.discard_all_5a080ac9'),
       onConfirm: async () => {
-        await git(['checkout', '--', '.'], tr('Alle Aenderungen verworfen', 'Discarded all changes'), true);
+        await git(['checkout', '--', '.'], t('generated.components.staging_area.usefileoperations.discarded_all_changes_f85f8117'), true);
       },
     });
   }, [setConfirmDialog, git, tr]);
@@ -298,12 +298,12 @@ export const useFileOperations = ({
   const deleteUntracked = useCallback((f: string) => {
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Untracked Datei loeschen?', 'Delete untracked file?'),
-      message: tr('Die Datei ist nicht versioniert und wird direkt vom Dateisystem entfernt.', 'The file is not tracked and will be removed from the filesystem.'),
-      contextItems: [{ label: tr('Datei', 'File'), value: f }, { label: tr('Git-Status', 'Git status'), value: tr('Untracked', 'Untracked') }],
+      title: t('generated.components.staging_area.usefileoperations.delete_untracked_file_bbf6e21c'),
+      message: t('generated.components.staging_area.usefileoperations.the_file_is_not_tracked_and_will_be_removed_from_the_fil_59ed3043'),
+      contextItems: [{ label: t('generated.components.commitdetails.file_9d811416'), value: f }, { label: t('generated.components.staging_area.usefileoperations.git_status_98e69c47'), value: t('generated.components.staging_area.stagingfilesections.untracked_d2518623') }],
       irreversible: true,
-      consequences: tr('Die Datei ist danach ohne Backup nicht wiederherstellbar.', 'The file cannot be restored without backup afterwards.'),
-      confirmLabel: tr('Datei loeschen', 'Delete file'),
+      consequences: t('generated.components.staging_area.usefileoperations.the_file_cannot_be_restored_without_backup_afterwards_cb997723'),
+      confirmLabel: t('generated.components.staging_area.usefileoperations.delete_file_67f7198d'),
       onConfirm: async () => {
         await git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true);
       },
@@ -312,17 +312,17 @@ export const useFileOperations = ({
 
   const stashFile = useCallback((filePath: string, section: FileSection) => {
     setInputDialog({
-      title: tr('Datei stashen', 'Stash file'),
-      message: tr('Optional eine Nachricht fuer den neuen Datei-Stash hinterlegen.', 'Optionally add a message for the new file stash.'),
-      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: einzelne Datei', 'e.g. WIP: single file') }],
+      title: t('generated.components.staging_area.usefileoperations.stash_file_06bcc105'),
+      message: t('generated.components.staging_area.usefileoperations.optionally_add_a_message_for_the_new_file_stash_08b0ff6d'),
+      fields: [{ id: 'message', label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'), placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_single_file_f4ef1437') }],
       contextItems: [
-        { label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') },
-        { label: tr('Datei', 'File'), value: filePath },
-        { label: tr('Bereich', 'Section'), value: section },
+        { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4') },
+        { label: t('generated.components.commitdetails.file_9d811416'), value: filePath },
+        { label: t('generated.components.staging_area.usefileoperations.section_254cebe4'), value: section },
       ],
       irreversible: false,
-      consequences: tr('Nur diese Datei wird in einen neuen Stash verschoben. Untracked Dateien werden bei Bedarf eingeschlossen.', 'Only this file is moved into a new stash. Untracked files are included when needed.'),
-      confirmLabel: tr('Stash erstellen', 'Create stash'),
+      consequences: t('generated.components.staging_area.usefileoperations.only_this_file_is_moved_into_a_new_stash_untracked_files_fb0d5119'),
+      confirmLabel: t('generated.components.staging_area.usefileoperations.create_stash_ebe60340'),
       onSubmit: async (values) => {
         const msg = (values.message || '').trim();
         const args = [
@@ -343,17 +343,17 @@ export const useFileOperations = ({
     const trackedCount = (status?.staged.length || 0) + (status?.unstaged.length || 0);
     const untrackedCount = status?.untracked.length || 0;
     setInputDialog({
-      title: tr('Alle Aenderungen stashen', 'Stash all changes'),
-      message: tr('Optional eine Nachricht fuer den neuen Stash mit allen lokalen Aenderungen hinterlegen.', 'Optionally add a message for the new stash with all local changes.'),
-      fields: [{ id: 'message', label: tr('Stash-Nachricht (optional)', 'Stash message (optional)'), placeholder: tr('z.B. WIP: groesserer Umbau', 'e.g. WIP: larger change') }],
+      title: t('generated.components.staging_area.usefileoperations.stash_all_changes_48324425'),
+      message: t('generated.components.staging_area.usefileoperations.optionally_add_a_message_for_the_new_stash_with_all_loca_3a612534'),
+      fields: [{ id: 'message', label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'), placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_larger_change_b8c378c4') }],
       contextItems: [
-        { label: tr('Repository', 'Repository'), value: repoPath ? basename(repoPath) : tr('(unbekannt)', '(unknown)') },
-        { label: tr('Tracked', 'Tracked'), value: String(trackedCount) },
-        { label: tr('Untracked', 'Untracked'), value: String(untrackedCount) },
+        { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4') },
+        { label: t('generated.components.staging_area.usefileoperations.tracked_8e161c2e'), value: String(trackedCount) },
+        { label: t('generated.components.staging_area.stagingfilesections.untracked_d2518623'), value: String(untrackedCount) },
       ],
       irreversible: false,
-      consequences: tr('Staged, unstaged und untracked Dateien werden in einen neuen Stash verschoben.', 'Staged, unstaged and untracked files are moved into a new stash.'),
-      confirmLabel: tr('Alles stashen', 'Stash all'),
+      consequences: t('generated.components.staging_area.usefileoperations.staged_unstaged_and_untracked_files_are_moved_into_a_new_01585ccc'),
+      confirmLabel: t('generated.components.staging_area.usefileoperations.stash_all_602ded33'),
       onSubmit: async (values) => {
         const msg = (values.message || '').trim();
         const args = [
@@ -362,7 +362,7 @@ export const useFileOperations = ({
           '--include-untracked',
           ...(msg ? ['-m', msg] : []),
         ];
-        const ok = await git(args, tr('Alle Aenderungen gestasht', 'Stashed all changes'), true);
+        const ok = await git(args, t('generated.components.staging_area.usefileoperations.stashed_all_changes_c28f9b06'), true);
         if (ok) onStashChanged?.();
       },
     });
@@ -372,7 +372,7 @@ export const useFileOperations = ({
     const request: DiffRequest = {
       source: staged ? 'staged' : 'unstaged',
       path: filePath,
-      title: staged ? tr('Staged Diff', 'Staged diff') : tr('Unstaged Diff', 'Unstaged diff'),
+      title: staged ? t('generated.components.staging_area.usefileoperations.staged_diff_6db84f1e') : t('generated.components.staging_area.usefileoperations.unstaged_diff_a19af98a'),
     };
     onOpenDiff?.(request);
   }, [onOpenDiff, tr]);

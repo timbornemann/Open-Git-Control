@@ -33,13 +33,13 @@ export const RepoList: React.FC<Props> = ({
   onToggleCollapsed,
 }) => {
   const [query, setQuery] = useState('');
-  const { tr, locale } = useI18n();
+  const { t, tr, locale } = useI18n();
   const sortOptions: Array<{ value: RepoSortByDto; label: string }> = [
-    { value: 'lastOpenedDesc', label: tr('Zuletzt geöffnet', 'Last opened') },
-    { value: 'nameAsc', label: tr('Name (A-Z)', 'Name (A-Z)') },
-    { value: 'nameDesc', label: tr('Name (Z-A)', 'Name (Z-A)') },
-    { value: 'createdAtDesc', label: tr('Erstellt (neu-alt)', 'Created (new-old)') },
-    { value: 'createdAtAsc', label: tr('Erstellt (alt-neu)', 'Created (old-new)') },
+    { value: 'lastOpenedDesc', label: t('generated.components.sidebar.repolist.last_opened_6ece1ffe') },
+    { value: 'nameAsc', label: t('generated.components.sidebar.repolist.name_a_z_fcdceb45') },
+    { value: 'nameDesc', label: t('generated.components.sidebar.repolist.name_z_a_f90e4631') },
+    { value: 'createdAtDesc', label: t('generated.components.sidebar.repolist.created_new_old_3f1c4e45') },
+    { value: 'createdAtAsc', label: t('generated.components.sidebar.repolist.created_old_new_2f916185') },
   ];
 
   const filteredRepos = useMemo(() => {
@@ -58,11 +58,11 @@ export const RepoList: React.FC<Props> = ({
           className="icon-btn"
           onClick={onToggleCollapsed}
           style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? tr('Repos anzeigen', 'Show repos') : tr('Repos einklappen', 'Collapse repos')}
+          title={collapsed ? t('generated.components.sidebar.repolist.show_repos_2ba8eb08') : t('generated.components.sidebar.repolist.collapse_repos_388ced69')}
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
           <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
-            {tr('Repos', 'Repos')}
+            {t('generated.components.sidebar.repolist.repos_6d1e0da7')}
           </span>
         </button>
         <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', paddingRight: '4px' }}>
@@ -78,7 +78,7 @@ export const RepoList: React.FC<Props> = ({
                 htmlFor="repo-sort-select"
                 style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}
               >
-                {tr('Sortierung', 'Sort')}
+                {t('generated.components.sidebar.repolist.sort_408bf88f')}
               </label>
               <select
                 id="repo-sort-select"
@@ -94,7 +94,7 @@ export const RepoList: React.FC<Props> = ({
                   color: 'var(--text-primary)',
                   fontSize: '0.78rem',
                 }}
-                title={tr('Sortierreihenfolge für Repositories', 'Repository sort order')}
+                title={t('generated.components.sidebar.repolist.repository_sort_order_4a096d7e')}
               >
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -111,7 +111,7 @@ export const RepoList: React.FC<Props> = ({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={tr('Repository suchen...', 'Search repository...')}
+                placeholder={t('generated.components.sidebar.repolist.search_repository_4f79edce')}
                 className="sidebar-filter-input"
                 style={{ padding: '7px 8px 7px 28px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
               />
@@ -160,12 +160,12 @@ export const RepoList: React.FC<Props> = ({
                     }}
                     className="icon-btn sidebar-row-action-icon"
                     style={{ opacity: isPinned ? 1 : 0.7, color: isPinned ? 'var(--status-warning)' : 'var(--text-secondary)' }}
-                    title={isPinned ? tr('Favorit entfernen', 'Remove favorite') : tr('Als Favorit markieren', 'Mark as favorite')}
+                    title={isPinned ? t('generated.components.sidebar.repolist.remove_favorite_baff5f08') : t('generated.components.sidebar.repolist.mark_as_favorite_e3ba96ce')}
                   >
                     {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn sidebar-row-action-icon" style={{ opacity: 0 }} title={tr('Entfernen', 'Remove')}>
+                  <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn sidebar-row-action-icon" style={{ opacity: 0 }} title={t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}>
                     <X size={12} />
                   </button>
                 </div>
@@ -181,9 +181,9 @@ export const RepoList: React.FC<Props> = ({
             {openRepos.length === 0 && (
               <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                 <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
-                {tr('Kein Repository ge\u00f6ffnet.', 'No repository opened.')}
+                {t('generated.components.sidebar.repolist.no_repository_opened_97f33d44')}
                 <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
-                  {tr('Repository \u00f6ffnen', 'Open repository')}
+                  {t('generated.components.sidebar.repolist.open_repository_82c17989')}
                 </button>
                 <button
                   onClick={onCloneByUrl}
@@ -201,7 +201,7 @@ export const RepoList: React.FC<Props> = ({
                     fontWeight: 600,
                   }}
                 >
-                  {tr('Repository per URL klonen', 'Clone repository from URL')}
+                  {t('generated.components.sidebar.repolist.clone_repository_from_url_b2415d88')}
                 </button>
               </div>
             )}

@@ -33,7 +33,7 @@ export const BranchContextMenu: React.FC<Props> = ({
   onRename,
   onDelete,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   if (!branchContextMenu) return null;
   const isRemoteBranch = branchContextMenu.branch.startsWith('remotes/');
@@ -56,8 +56,8 @@ export const BranchContextMenu: React.FC<Props> = ({
           <button
             className="ctx-menu-item"
             title={isRemoteBranch
-              ? tr('Erstellt oder oeffnet einen lokalen Tracking-Branch fuer diesen Remote-Branch.', 'Creates or opens a local tracking branch for this remote branch.')
-              : tr('Wechselt auf diesen lokalen Branch.', 'Switches to this local branch.')}
+              ? t('generated.components.layout.branchcontextmenu.creates_or_opens_a_local_tracking_branch_for_this_remote_fb70f9fa')
+              : t('generated.components.layout.branchcontextmenu.switches_to_this_local_branch_ad1a868d')}
             onClick={() => {
               const b = branchContextMenu.branch;
               setBranchContextMenu(null);
@@ -67,11 +67,11 @@ export const BranchContextMenu: React.FC<Props> = ({
             <span className="ctx-menu-icon">CO</span>
             <MenuLabel
               label={isRemoteBranch
-                ? tr('Tracking-Branch auschecken', 'Checkout tracking branch')
-                : tr('Checkout', 'Checkout')}
+                ? t('generated.components.layout.branchcontextmenu.checkout_tracking_branch_72fd20f4')
+                : t('generated.components.layout.branchcontextmenu.checkout_d9bc41ee')}
               help={isRemoteBranch
-                ? tr('Legt bei Bedarf einen lokalen Branch an und verbindet ihn mit dem Remote.', 'Creates a local branch when needed and tracks the remote.')
-                : tr('Wechselt deinen Working Tree auf diesen Branch.', 'Switches your working tree to this branch.')}
+                ? t('generated.components.layout.branchcontextmenu.creates_a_local_branch_when_needed_and_tracks_the_remote_926cdb5d')
+                : t('generated.components.layout.branchcontextmenu.switches_your_working_tree_to_this_branch_447f4c22')}
             />
           </button>
         )}
@@ -79,7 +79,7 @@ export const BranchContextMenu: React.FC<Props> = ({
           <>
             <button
               className="ctx-menu-item"
-              title={tr('Fuegt diesen Branch in den aktuell ausgecheckten Branch ein.', 'Merges this branch into the currently checked out branch.')}
+              title={t('generated.components.layout.branchcontextmenu.merges_this_branch_into_the_currently_checked_out_branch_88f4ab90')}
               onClick={() => {
                 const b = branchContextMenu.branch;
                 setBranchContextMenu(null);
@@ -88,13 +88,13 @@ export const BranchContextMenu: React.FC<Props> = ({
             >
               <span className="ctx-menu-icon">MG</span>
               <MenuLabel
-                label={tr('In aktuellen Branch mergen', 'Merge into current branch')}
-                help={tr('Standard-Merge: Git entscheidet Fast-Forward oder Merge-Commit.', 'Default merge: Git decides fast-forward or merge commit.')}
+                label={t('generated.components.layout.branchcontextmenu.merge_into_current_branch_07cabe72')}
+                help={t('generated.components.layout.branchcontextmenu.default_merge_git_decides_fast_forward_or_merge_commit_7a51dc34')}
               />
             </button>
             <button
               className="ctx-menu-item"
-              title={tr('Erzwingt einen Merge-Commit, auch wenn Fast-Forward moeglich waere.', 'Forces a merge commit even when fast-forward would be possible.')}
+              title={t('generated.components.layout.branchcontextmenu.forces_a_merge_commit_even_when_fast_forward_would_be_po_06b29673')}
               onClick={() => {
                 const b = branchContextMenu.branch;
                 setBranchContextMenu(null);
@@ -103,13 +103,13 @@ export const BranchContextMenu: React.FC<Props> = ({
             >
               <span className="ctx-menu-icon">NF</span>
               <MenuLabel
-                label={tr('Mergen (--no-ff)', 'Merge (--no-ff)')}
-                help={tr('Erstellt bewusst einen Merge-Commit fuer sichtbare Historie.', 'Creates a merge commit intentionally for visible history.')}
+                label={t('generated.components.layout.branchcontextmenu.merge_no_ff_67561214')}
+                help={t('generated.components.layout.branchcontextmenu.creates_a_merge_commit_intentionally_for_visible_history_3f43a889')}
               />
             </button>
             <button
               className="ctx-menu-item"
-              title={tr('Fasst die Aenderungen dieses Branches zu einem neuen Commit zusammen.', 'Squashes this branch into one new commit.')}
+              title={t('generated.components.layout.branchcontextmenu.squashes_this_branch_into_one_new_commit_d95843c2')}
               onClick={() => {
                 const b = branchContextMenu.branch;
                 setBranchContextMenu(null);
@@ -118,13 +118,13 @@ export const BranchContextMenu: React.FC<Props> = ({
             >
               <span className="ctx-menu-icon">SQ</span>
               <MenuLabel
-                label={tr('Squash-Merge', 'Squash merge')}
-                help={tr('Uebernimmt die Aenderungen als einen neuen Commit ohne Branch-Historie.', 'Applies the changes as one new commit without branch history.')}
+                label={t('generated.components.layout.branchcontextmenu.squash_merge_1e4db720')}
+                help={t('generated.components.layout.branchcontextmenu.applies_the_changes_as_one_new_commit_without_branch_his_e7f8d104')}
               />
             </button>
             <button
               className="ctx-menu-item"
-              title={tr('Fuehrt nur aus, wenn der aktuelle Branch ohne Merge-Commit vorgezogen werden kann.', 'Runs only if the current branch can be fast-forwarded without a merge commit.')}
+              title={t('generated.components.layout.branchcontextmenu.runs_only_if_the_current_branch_can_be_fast_forwarded_wi_06ba4fc6')}
               onClick={() => {
                 const b = branchContextMenu.branch;
                 setBranchContextMenu(null);
@@ -133,8 +133,8 @@ export const BranchContextMenu: React.FC<Props> = ({
             >
               <span className="ctx-menu-icon">FF</span>
               <MenuLabel
-                label={tr('Nur Fast-Forward (--ff-only)', 'Fast-forward only (--ff-only)')}
-                help={tr('Bricht ab, wenn ein echter Merge notwendig waere.', 'Stops if a real merge would be required.')}
+                label={t('generated.components.layout.branchcontextmenu.fast_forward_only_ff_only_247cf7fb')}
+                help={t('generated.components.layout.branchcontextmenu.stops_if_a_real_merge_would_be_required_afb862e2')}
               />
             </button>
           </>
@@ -142,7 +142,7 @@ export const BranchContextMenu: React.FC<Props> = ({
         {!branchContextMenu.branch.startsWith('remotes/') && (
           <button
             className="ctx-menu-item"
-            title={tr('Benennt diesen lokalen Branch um.', 'Renames this local branch.')}
+            title={t('generated.components.layout.branchcontextmenu.renames_this_local_branch_1c165d74')}
             onClick={() => {
               const b = branchContextMenu.branch;
               setBranchContextMenu(null);
@@ -151,8 +151,8 @@ export const BranchContextMenu: React.FC<Props> = ({
           >
             <span className="ctx-menu-icon">RN</span>
             <MenuLabel
-              label={tr('Umbenennen', 'Rename')}
-              help={tr('Aendert nur den lokalen Branch-Namen.', 'Changes only the local branch name.')}
+              label={t('generated.components.layout.branchcontextmenu.rename_cd5280ff')}
+              help={t('generated.components.layout.branchcontextmenu.changes_only_the_local_branch_name_73e31be2')}
             />
           </button>
         )}
@@ -160,7 +160,7 @@ export const BranchContextMenu: React.FC<Props> = ({
         {!branchContextMenu.isHead && !branchContextMenu.branch.startsWith('remotes/') && (
           <button
             className="ctx-menu-item danger"
-            title={tr('Loescht diesen lokalen Branch.', 'Deletes this local branch.')}
+            title={t('generated.components.layout.branchcontextmenu.deletes_this_local_branch_04f13ca4')}
             onClick={() => {
               const b = branchContextMenu.branch;
               setBranchContextMenu(null);
@@ -169,8 +169,8 @@ export const BranchContextMenu: React.FC<Props> = ({
           >
             <span className="ctx-menu-icon">DEL</span>
             <MenuLabel
-              label={tr('Branch loeschen', 'Delete branch')}
-              help={tr('Entfernt den lokalen Branch. Remote-Branches bleiben unberuehrt.', 'Removes the local branch. Remote branches are untouched.')}
+              label={t('generated.components.layout.branchcontextmenu.delete_branch_a5055577')}
+              help={t('generated.components.layout.branchcontextmenu.removes_the_local_branch_remote_branches_are_untouched_e5d04caa')}
             />
           </button>
         )}

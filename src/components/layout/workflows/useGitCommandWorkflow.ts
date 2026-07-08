@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto, GitCommandNameDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import {
   isMergeInProgressError,
@@ -57,6 +57,7 @@ export const useGitCommandWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(settings.language as AppLanguage, deText, enText);
   }, [settings.language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables), [settings.language]);
 
   const {
     connectError,
@@ -124,8 +125,8 @@ export const useGitCommandWorkflow = ({
       });
       const fallbackSuccess = await runGitCommand(
         fallbackArgs,
-        tr('Branch gepusht und Upstream gesetzt.', 'Pushed branch and set upstream.'),
-        tr('Push mit Upstream wird ausgefuehrt...', 'Running push with upstream...'),
+        t('generated.components.layout.workflows.usegitcommandworkflow.pushed_branch_and_set_upstream_486b4c06'),
+        t('generated.components.layout.workflows.usegitcommandworkflow.running_push_with_upstream_c4d07a1f'),
         { ...options, skipAutoSetUpstreamOnPushFailure: true },
       );
       return fallbackSuccess;
@@ -156,10 +157,7 @@ export const useGitCommandWorkflow = ({
         if (options?.skipAutoInitialCommitOnPushFailure) {
           workspace.setActiveTab('repo');
           setGitActionToast({
-            msg: tr(
-              'Push nicht moeglich: Es gibt noch keinen lokalen Commit. Bitte zuerst committen.',
-              'Push not possible: there is no local commit yet. Please commit first.',
-            ),
+            msg: t('generated.components.layout.workflows.usegitcommandworkflow.push_not_possible_there_is_no_local_commit_yet_please_co_7a8286f0'),
             isError: true,
           });
           return false;
@@ -168,7 +166,7 @@ export const useGitCommandWorkflow = ({
         if (!options?.confirmedAutoInitialCommit) {
           const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
             commandLabel: `git ${args.join(' ')}`,
-            confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+            confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
             onConfirm: async () => {
               await runGitCommand(args, successMsg, actionLabel, {
                 ...options,
@@ -192,8 +190,8 @@ export const useGitCommandWorkflow = ({
 
         return runGitCommand(
           argsWithUpstream,
-          tr('Initial-Commit erstellt und gepusht.', 'Initial commit created and pushed.'),
-          tr('Initial-Commit wird gepusht...', 'Pushing initial commit...'),
+          t('generated.components.layout.workflows.usegitcommandworkflow.initial_commit_created_and_pushed_295fbe68'),
+          t('generated.components.layout.workflows.usegitcommandworkflow.pushing_initial_commit_6b4afbb5'),
           {
             ...options,
             confirmedAutoInitialCommit: true,
@@ -244,25 +242,19 @@ export const useGitCommandWorkflow = ({
       if (mergeInProgress) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: tr(
-            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen ausfuehren.',
-            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-          ),
+          msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
           isError: true,
         });
         return false;
       }
-      setGitActionToast({ msg: r.error || tr('Fehler beim AusfÃ¼hren von git.', 'Error while running git.'), isError: true });
+      setGitActionToast({ msg: r.error || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'), isError: true });
       return false;
     } catch (e: any) {
       if (command === 'push' && isNoLocalCommitPushError(e?.message)) {
         if (options?.skipAutoInitialCommitOnPushFailure) {
           workspace.setActiveTab('repo');
           setGitActionToast({
-            msg: tr(
-              'Push nicht moeglich: Es gibt noch keinen lokalen Commit. Bitte zuerst committen.',
-              'Push not possible: there is no local commit yet. Please commit first.',
-            ),
+            msg: t('generated.components.layout.workflows.usegitcommandworkflow.push_not_possible_there_is_no_local_commit_yet_please_co_7a8286f0'),
             isError: true,
           });
           return false;
@@ -271,7 +263,7 @@ export const useGitCommandWorkflow = ({
         if (!options?.confirmedAutoInitialCommit) {
           const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
             commandLabel: `git ${args.join(' ')}`,
-            confirmLabel: tr('Alle Aenderungen committen und pushen', 'Commit all changes and push'),
+            confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
             onConfirm: async () => {
               await runGitCommand(args, successMsg, actionLabel, {
                 ...options,
@@ -295,8 +287,8 @@ export const useGitCommandWorkflow = ({
 
         return runGitCommand(
           argsWithUpstream,
-          tr('Initial-Commit erstellt und gepusht.', 'Initial commit created and pushed.'),
-          tr('Initial-Commit wird gepusht...', 'Pushing initial commit...'),
+          t('generated.components.layout.workflows.usegitcommandworkflow.initial_commit_created_and_pushed_295fbe68'),
+          t('generated.components.layout.workflows.usegitcommandworkflow.pushing_initial_commit_6b4afbb5'),
           {
             ...options,
             confirmedAutoInitialCommit: true,
@@ -347,10 +339,7 @@ export const useGitCommandWorkflow = ({
       if (mergeInProgress) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: tr(
-            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen ausfuehren.',
-            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-          ),
+          msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
           isError: true,
         });
         return false;

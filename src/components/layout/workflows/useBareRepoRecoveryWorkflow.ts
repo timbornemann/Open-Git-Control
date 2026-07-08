@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { getElectronApi } from '../../../services/electronApi';
 import { gitClient } from '../../../services/gitClient';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
@@ -35,6 +35,7 @@ export const useBareRepoRecoveryWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(settings.language as AppLanguage, deText, enText);
   }, [settings.language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables), [settings.language]);
   const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
     const electronApi = getElectronApi();
     if (!electronApi || !gitClient.isAvailable() || !workspace.activeRepo) return false;
@@ -82,10 +83,7 @@ export const useBareRepoRecoveryWorkflow = ({
     if (!cloneResult) {
       workspace.setActiveTab('repo');
       setGitActionToast({
-        msg: lastCloneError || tr(
-          'Bare-Repository konnte nicht automatisch in ein Arbeitsverzeichnis ueberfuehrt werden.',
-          'Could not automatically convert bare repository into a working directory.',
-        ),
+        msg: lastCloneError || t('generated.components.layout.workflows.usebarereporecoveryworkflow.could_not_automatically_convert_bare_repository_into_a_w_ebc84e9d'),
         isError: true,
       });
       return false;
@@ -139,10 +137,7 @@ export const useBareRepoRecoveryWorkflow = ({
           if (!checkoutForced.success) {
             workspace.setActiveTab('repo');
             setGitActionToast({
-              msg: checkoutForced.error || checkoutTracked.error || tr(
-                'Arbeitsverzeichnis wurde erstellt, aber ein Start-Branch konnte nicht automatisch ausgecheckt werden.',
-                'Working directory was created, but a starter branch could not be checked out automatically.',
-              ),
+              msg: checkoutForced.error || checkoutTracked.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_a_starter_branch_could_ae6fb2c4'),
               isError: true,
             });
             return false;
@@ -161,10 +156,7 @@ export const useBareRepoRecoveryWorkflow = ({
       if (!removeOriginResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: removeOriginResult.error || tr(
-            'Arbeitsverzeichnis wurde erstellt, aber lokales origin-Remote konnte nicht entfernt werden.',
-            'Working directory was created, but local origin remote could not be removed.',
-          ),
+          msg: removeOriginResult.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_local_origin_remote_co_c12936a4'),
           isError: true,
         });
         return false;
@@ -175,10 +167,7 @@ export const useBareRepoRecoveryWorkflow = ({
       if (!setUrlResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: setUrlResult.error || tr(
-            'Arbeitsverzeichnis wurde erstellt, aber origin-Remote konnte nicht auf die vorherige URL gesetzt werden.',
-            'Working directory was created, but origin remote could not be set to the previous URL.',
-          ),
+          msg: setUrlResult.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_origin_remote_could_no_a615df20'),
           isError: true,
         });
         return false;
@@ -187,10 +176,7 @@ export const useBareRepoRecoveryWorkflow = ({
 
     workspace.setActiveTab('repo');
     setGitActionToast({
-      msg: tr(
-        'Bare-Repository erkannt: automatisch in ein Arbeitsverzeichnis geklont und umgeschaltet.',
-        'Bare repository detected: automatically cloned to a working directory and switched.',
-      ),
+      msg: t('generated.components.layout.workflows.usebarereporecoveryworkflow.bare_repository_detected_automatically_cloned_to_a_worki_f3a9445c'),
       isError: false,
     });
     triggerRefresh();

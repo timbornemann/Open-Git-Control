@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
 
 type Toast = { msg: string; isError: boolean };
@@ -22,15 +22,13 @@ export const useConflictResolverWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(language, deText, enText);
   }, [language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
 
   const openConflictResolverForPath = useCallback((path: string) => {
     setActiveTab('repo');
     setConflictResolverPath(path);
     setGitActionToast({
-      msg: tr(
-        'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
-        'Merge conflict: opening the conflict resolver.',
-      ),
+      msg: t('generated.components.layout.workflows.useconflictresolverworkflow.merge_conflict_opening_the_conflict_resolver_2892ddfb'),
       isError: false,
     });
     triggerRefresh();

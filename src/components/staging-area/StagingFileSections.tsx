@@ -48,7 +48,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
   maxListHeight,
   onSelectFileInspect,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
@@ -67,18 +67,18 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
         <span className="staging-path" title={entry.path}>{basename(entry.path)}</span>
         <div className="staging-actions">
           {section === 'staged' && (
-            <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.unstageFile(entry.path); }} title={tr('Aus Stage entfernen', 'Unstage')}>-</button>
+            <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.unstageFile(entry.path); }} title={t('generated.components.staging_area.stagingfilesections.unstage_6b603f75')}>-</button>
           )}
           {section === 'unstaged' && (
             <>
-              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
-              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.discardFile(entry.path); }} title={tr('Verwerfen', 'Discard')}>x</button>
+              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.stageFile(entry.path); }} title={t('generated.components.staging_area.stagingfilesections.stage_9f9f36bd')}>+</button>
+              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.discardFile(entry.path); }} title={t('generated.components.diff_viewer.diffcontentpane.discard_23504c1c')}>x</button>
             </>
           )}
           {section === 'untracked' && (
             <>
-              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.stageFile(entry.path); }} title={tr('Stagen', 'Stage')}>+</button>
-              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.deleteUntracked(entry.path); }} title={tr('Loeschen', 'Delete')}>x</button>
+              <button className="staging-btn" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.stageFile(entry.path); }} title={t('generated.components.staging_area.stagingfilesections.stage_9f9f36bd')}>+</button>
+              <button className="staging-btn danger" disabled={fileOps.isMutating} onClick={(event) => { event.stopPropagation(); fileOps.deleteUntracked(entry.path); }} title={t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}>x</button>
             </>
           )}
         </div>
@@ -91,11 +91,11 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       {visibleStaged.length > 0 && (
         <div className="staging-section">
           <SectionHeader
-            title={tr('Staged Aenderungen', 'Staged changes')}
+            title={t('generated.components.staging_area.stagingfilesections.staged_changes_12b1a849')}
             count={visibleStaged.length}
             color="var(--status-success)"
             statsText={formatDiffStats(fileOps.stagedStats)}
-            actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.unstageAll} title={tr('Alle unstagen', 'Unstage all')}>- {tr('Alle', 'All')}</button>}
+            actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.unstageAll} title={t('generated.components.staging_area.stagingfilesections.unstage_all_13421edd')}>- {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}</button>}
           />
           <VirtualList
             items={visibleStaged}
@@ -110,14 +110,14 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       {visibleUnstaged.length > 0 && (
         <div className="staging-section">
           <SectionHeader
-            title={tr('Aenderungen', 'Changes')}
+            title={t('generated.components.staging_area.stagingfilesections.changes_69ca4922')}
             count={visibleUnstaged.length}
             color="var(--status-warning)"
             statsText={formatDiffStats(fileOps.unstagedStats)}
             actions={(
               <>
-                <button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAll} title={tr('Alle stagen', 'Stage all')}>+ {tr('Alle', 'All')}</button>
-                <button className="staging-btn-sm danger" disabled={fileOps.isMutating} onClick={fileOps.discardAll} title={tr('Alle verwerfen', 'Discard all')}>x {tr('Alle', 'All')}</button>
+                <button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAll} title={t('generated.components.staging_area.stagingfilesections.stage_all_e40e6a84')}>+ {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}</button>
+                <button className="staging-btn-sm danger" disabled={fileOps.isMutating} onClick={fileOps.discardAll} title={t('generated.components.staging_area.stagingfilesections.discard_all_327bcdfe')}>x {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}</button>
               </>
             )}
           />
@@ -134,10 +134,10 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       {visibleUntracked.length > 0 && (
         <div className="staging-section">
           <SectionHeader
-            title={tr('Untracked', 'Untracked')}
+            title={t('generated.components.staging_area.stagingfilesections.untracked_d2518623')}
             count={visibleUntracked.length}
             color="var(--status-untracked)"
-            actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAllUntracked} title={tr('Alle untracked stagen', 'Stage all untracked')}>+ {tr('Alle', 'All')}</button>}
+            actions={<button className="staging-btn-sm" disabled={fileOps.isMutating} onClick={fileOps.stageAllUntracked} title={t('generated.components.staging_area.stagingfilesections.stage_all_untracked_0db34fdb')}>+ {t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}</button>}
           />
           <VirtualList
             items={visibleUntracked}

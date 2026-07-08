@@ -20,7 +20,7 @@ export const MainView: React.FC = () => {
   const repository = useRepositoryContext();
   const github = useGithubContext();
   const workflow = useWorkflowContext();
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const workingTree = useWorkingTreeSnapshot(repository.activeRepo, repository.refreshTrigger);
 
   const {
@@ -76,7 +76,7 @@ export const MainView: React.FC = () => {
     activeRepo: repository.activeRepo,
     setActiveTab: ui.setActiveTab,
     onCloseReleaseCreator: github.onCloseReleaseCreator,
-    tr,
+    t,
   });
 
   React.useEffect(() => {

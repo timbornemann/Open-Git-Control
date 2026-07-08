@@ -43,7 +43,7 @@ export const useConflictResolver = ({
   isConflictOnly,
   onOpenConflictResolver,
 }: Params) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
   const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
@@ -238,10 +238,10 @@ export const useConflictResolver = ({
       return { ...prev, content: nextContent };
     });
     const selectedLabel = choice === 'ours'
-      ? tr('Aktueller Stand', 'Current version')
+      ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
       : choice === 'theirs'
-      ? tr('Eingehender Stand', 'Incoming version')
-      : tr('Beide Seiten', 'Both sides');
+      ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
+      : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
     setToast({ msg: tr(`${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.`, `Applied ${selectedLabel} for block ${blockIndex + 1}.`), isError: false });
   }, [conflictEditor, selectedConflictBlockIndex, setToast, tr]);
 
@@ -260,10 +260,10 @@ export const useConflictResolver = ({
     });
     setSelectedConflictBlockIndex(0);
     const selectedLabel = choice === 'ours'
-      ? tr('Aktueller Stand', 'Current version')
+      ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
       : choice === 'theirs'
-      ? tr('Eingehender Stand', 'Incoming version')
-      : tr('Beide Seiten', 'Both sides');
+      ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
+      : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
     setToast({ msg: tr(`${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, `Applied ${selectedLabel} for all conflict blocks.`), isError: false });
   }, [conflictEditor, setToast, tr]);
 
@@ -284,14 +284,14 @@ export const useConflictResolver = ({
       if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
       return { ...prev, content: prev.originalContent };
     });
-    setToast({ msg: tr('Lokale Editor-Aenderungen verworfen.', 'Discarded local editor changes.'), isError: false });
+    setToast({ msg: t('generated.components.staging_area.useconflictresolver.discarded_local_editor_changes_297514e3'), isError: false });
   }, [conflictEditor, setToast, tr]);
 
   const saveConflictEditor = useCallback(async (markResolvedAfterSave: boolean) => {
     if (!gitClient.isAvailable() || !conflictEditor) return;
     const pendingBlocks = parseConflictBlocks(conflictEditor.content);
     if (markResolvedAfterSave && pendingBlocks.length > 0) {
-      setToast({ msg: tr('Vor "Speichern + als geloest markieren" muessen alle Konfliktmarker entfernt sein.', 'Before "Save + mark as resolved", all conflict markers must be removed.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'), isError: true });
       return;
     }
     const targetPath = conflictEditor.filePath;
@@ -302,10 +302,10 @@ export const useConflictResolver = ({
     });
     try {
       const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
-      if (!writeResult.success) throw new Error(writeResult.error || tr('Datei konnte nicht gespeichert werden.', 'Could not save file.'));
+      if (!writeResult.success) throw new Error(writeResult.error || t('generated.components.staging_area.useconflictresolver.could_not_save_file_6d41241a'));
       if (markResolvedAfterSave) {
         const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
-        if (!stageResult.success) throw new Error(stageResult.error || tr('Datei konnte nicht als geloest markiert werden.', 'Could not mark file as resolved.'));
+        if (!stageResult.success) throw new Error(stageResult.error || t('generated.components.staging_area.useconflictresolver.could_not_mark_file_as_resolved_f7ee9c12'));
       }
       setConflictEditor((prev) => {
         if (!prev || prev.filePath !== targetPath) return prev;
@@ -324,38 +324,38 @@ export const useConflictResolver = ({
         if (!prev || prev.filePath !== targetPath) return prev;
         return { ...prev, isSaving: false };
       });
-      setToast({ msg: error?.message || tr('Konfliktdatei konnte nicht gespeichert werden.', 'Could not save conflict file.'), isError: true });
+      setToast({ msg: error?.message || t('generated.components.staging_area.useconflictresolver.could_not_save_conflict_file_e9930739'), isError: true });
     }
   }, [conflictEditor, onRepoChanged, refresh, setToast, tr]);
 
-  const mergeContinue = useCallback(() => git(['mergeContinue'], tr('Merge fortgesetzt', 'Merge continued'), true), [git, tr]);
+  const mergeContinue = useCallback(() => git(['mergeContinue'], t('generated.components.staging_area.useconflictresolver.merge_continued_fc503f43'), true), [git, tr]);
   const mergeAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Merge abbrechen?', 'Abort merge?'),
-      message: tr('Der laufende Merge wird verworfen und auf den Zustand vor dem Merge zurueckgesetzt.', 'The active merge will be discarded and reset to the pre-merge state.'),
-      contextItems: [{ label: tr('Aktion', 'Action'), value: 'git merge --abort' }],
+      title: t('generated.components.staging_area.useconflictresolver.abort_merge_b80580e6'),
+      message: t('generated.components.staging_area.useconflictresolver.the_active_merge_will_be_discarded_and_reset_to_the_pre_7fdcd8df'),
+      contextItems: [{ label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git merge --abort' }],
       irreversible: true,
-      consequences: tr('Alle noch nicht gesicherten Merge-Konfliktaufloesungen gehen verloren.', 'All unsaved merge conflict resolutions will be lost.'),
-      confirmLabel: tr('Merge abbrechen', 'Abort merge'),
+      consequences: t('generated.components.staging_area.useconflictresolver.all_unsaved_merge_conflict_resolutions_will_be_lost_96aa2476'),
+      confirmLabel: t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66'),
       onConfirm: async () => {
-        await git(['mergeAbort'], tr('Merge abgebrochen', 'Merge aborted'), true);
+        await git(['mergeAbort'], t('generated.components.staging_area.useconflictresolver.merge_aborted_1750e90f'), true);
       },
     });
   }, [setConfirmDialog, git, tr]);
 
-  const rebaseContinue = useCallback(() => git(['rebaseContinue'], tr('Rebase fortgesetzt', 'Rebase continued'), true), [git, tr]);
+  const rebaseContinue = useCallback(() => git(['rebaseContinue'], t('generated.components.staging_area.useconflictresolver.rebase_continued_d91def08'), true), [git, tr]);
   const rebaseAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
-      title: tr('Rebase abbrechen?', 'Abort rebase?'),
-      message: tr('Der laufende Rebase wird verworfen und der vorherige Branch-Zustand wiederhergestellt.', 'The active rebase will be discarded and the previous branch state restored.'),
-      contextItems: [{ label: tr('Aktion', 'Action'), value: 'git rebase --abort' }],
+      title: t('generated.components.staging_area.useconflictresolver.abort_rebase_1cf7416a'),
+      message: t('generated.components.staging_area.useconflictresolver.the_active_rebase_will_be_discarded_and_the_previous_bra_13fdc39c'),
+      contextItems: [{ label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git rebase --abort' }],
       irreversible: true,
-      consequences: tr('Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.', 'All unsaved rebase resolutions will be lost.'),
-      confirmLabel: tr('Rebase abbrechen', 'Abort rebase'),
+      consequences: t('generated.components.staging_area.useconflictresolver.all_unsaved_rebase_resolutions_will_be_lost_8fee553e'),
+      confirmLabel: t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71'),
       onConfirm: async () => {
-        await git(['rebaseAbort'], tr('Rebase abgebrochen', 'Rebase aborted'), true);
+        await git(['rebaseAbort'], t('generated.components.staging_area.useconflictresolver.rebase_aborted_339ee787'), true);
       },
     });
   }, [setConfirmDialog, git, tr]);

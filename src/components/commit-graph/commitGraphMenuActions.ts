@@ -1,4 +1,5 @@
 import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
+import type { CatalogTranslateFn } from '../../i18n';
 import type { ToastMessage, BranchInfo } from '../../types/git';
 import type { GraphLayout, GraphNode } from '../../utils/graphLayout';
 import type { MenuAction } from './CommitContextMenu';
@@ -17,7 +18,7 @@ type BuildCommitMenuActionsParams = {
   setToast: (toast: ToastMessage | null) => void;
   refreshCommits: () => Promise<void> | void;
   refreshWorkingTreeStatus: () => Promise<void> | void;
-  tr: (deText: string, enText: string) => string;
+  t: CatalogTranslateFn;
 };
 
 export const buildCommitMenuActions = ({
@@ -32,7 +33,7 @@ export const buildCommitMenuActions = ({
   setToast,
   refreshCommits,
   refreshWorkingTreeStatus,
-  tr,
+  t,
 }: BuildCommitMenuActionsParams): MenuAction[] => [
   ...buildCommitRefMenuActions({
     node,
@@ -41,7 +42,7 @@ export const buildCommitMenuActions = ({
     runGitAction,
     setConfirmDialog,
     setInputDialog,
-    tr,
+    t,
   }),
   ...buildCommitHistoryMenuActions({
     node,

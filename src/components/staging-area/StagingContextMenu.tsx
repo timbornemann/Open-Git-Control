@@ -16,7 +16,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({
   contextMenu,
   fileOps,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   if (!contextMenu) return null;
 
@@ -33,16 +33,16 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({
         <div className="ctx-menu-header">{contextEntry.path}</div>
         <button className="ctx-menu-item" disabled={fileOps.isMutating} onClick={() => { closeContextMenu(); fileOps.stashFile(contextEntry.path, contextSection); }}>
           <span className="ctx-menu-icon">ST</span>
-          {tr('Datei stashen...', 'Stash file...')}
+          {t('generated.components.staging_area.stagingcontextmenu.stash_file_4af4bc1d')}
         </button>
         <button className="ctx-menu-item" disabled={fileOps.isMutating} onClick={() => { closeContextMenu(); fileOps.stashAll(); }}>
           <span className="ctx-menu-icon">ALL</span>
-          {tr('Alle Aenderungen stashen...', 'Stash all changes...')}
+          {t('generated.components.staging_area.stagingcontextmenu.stash_all_changes_e6f3a2ed')}
         </button>
         <div className="ctx-menu-sep" />
         <button className="ctx-menu-item" onClick={() => { closeContextMenu(); fileOps.addIgnoreRule(contextEntry, contextSection, toGitPath(contextEntry.path)); }}>
           <span className="ctx-menu-icon">IG</span>
-          {tr('Datei zu .gitignore hinzufuegen', 'Add file to .gitignore')}
+          {t('generated.components.staging_area.stagingcontextmenu.add_file_to_gitignore_45f071fe')}
         </button>
         {contextDir && (
           <button className="ctx-menu-item" onClick={() => { closeContextMenu(); fileOps.addIgnoreRule(contextEntry, contextSection, `${contextDir}/`); }}>

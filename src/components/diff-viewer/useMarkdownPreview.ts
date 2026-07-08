@@ -9,7 +9,7 @@ import {
   renderMarkdownToSanitizedHtml,
   resolveMarkdownPreviewAssetPath,
 } from '../../utils/markdownPreview';
-import type { TranslateFn } from './diffViewerLabels';
+import type { CatalogTranslateFn } from '../../i18n';
 
 export type MarkdownPreviewState = {
   loading: boolean;
@@ -21,7 +21,7 @@ type UseMarkdownPreviewParams = {
   repoPath: string | null;
   request: DiffRequest;
   isActive: boolean;
-  tr: TranslateFn;
+  t: CatalogTranslateFn;
 };
 
 const EMPTY_MARKDOWN_PREVIEW: MarkdownPreviewState = {
@@ -30,7 +30,7 @@ const EMPTY_MARKDOWN_PREVIEW: MarkdownPreviewState = {
   html: '',
 };
 
-export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkdownPreviewParams) => {
+export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdownPreviewParams) => {
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownPreviewState>(EMPTY_MARKDOWN_PREVIEW);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
           if (!cancelled) {
             setMarkdownPreview({
               loading: false,
-              error: markdownResult.error || tr('Markdown-Vorschau konnte nicht geladen werden.', 'Could not load Markdown preview.'),
+              error: markdownResult.error || t('diffViewer.errors.markdownPreviewLoadFailed'),
               html: '',
             });
           }
@@ -96,7 +96,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
         if (!cancelled) {
           const message = previewError instanceof Error
             ? previewError.message
-            : tr('Markdown-Vorschau konnte nicht geladen werden.', 'Could not load Markdown preview.');
+            : t('diffViewer.errors.markdownPreviewLoadFailed');
           setMarkdownPreview({ loading: false, error: message, html: '' });
         }
       }
@@ -106,7 +106,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, tr }: UseMarkd
     return () => {
       cancelled = true;
     };
-  }, [isActive, repoPath, request, tr]);
+  }, [isActive, repoPath, request, t]);
 
   const handleMarkdownPreviewClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;

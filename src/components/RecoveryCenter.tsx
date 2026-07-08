@@ -20,7 +20,7 @@ type DangerAction = {
 } | null;
 
 export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged, settings }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [entries, setEntries] = useState<GitReflogEntryDto[]>([]);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -80,13 +80,13 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder={tr('Reflog filtern (Commit, Aktion, Datum)', 'Filter reflog (commit, action, date)')}
+            placeholder={t('generated.components.recoverycenter.filter_reflog_commit_action_date_b0b21090')}
             style={{ width: '100%' }}
           />
         </div>
         <div style={{ overflow: 'auto' }}>
-          {isLoading && <div style={{ padding: 10 }}>{tr('Lade Reflog...', 'Loading reflog...')}</div>}
-          {!isLoading && filtered.length === 0 && <div style={{ padding: 10, color: 'var(--text-secondary)' }}>{tr('Keine Reflog-Eintraege gefunden.', 'No reflog entries found.')}</div>}
+          {isLoading && <div style={{ padding: 10 }}>{t('generated.components.recoverycenter.loading_reflog_305d6291')}</div>}
+          {!isLoading && filtered.length === 0 && <div style={{ padding: 10, color: 'var(--text-secondary)' }}>{t('generated.components.recoverycenter.no_reflog_entries_found_78f44a49')}</div>}
           {filtered.map((entry) => (
             <button
               key={`${entry.selector}-${entry.hash}`}
@@ -104,10 +104,10 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
 
       <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!selected ? (
-          <div style={{ color: 'var(--text-secondary)' }}>{tr('Waehle einen Reflog-Eintrag aus.', 'Select a reflog entry.')}</div>
+          <div style={{ color: 'var(--text-secondary)' }}>{t('generated.components.recoverycenter.select_a_reflog_entry_2e3edbe5')}</div>
         ) : (
           <>
-            <div style={{ fontWeight: 700 }}>{tr('Reflog-Details', 'Reflog details')}</div>
+            <div style={{ fontWeight: 700 }}>{t('generated.components.recoverycenter.reflog_details_e7c5325b')}</div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{selected.selector}</div>
             <code style={{ fontSize: '0.8rem' }}>{selected.hash}</code>
             <div style={{ fontSize: '0.86rem' }}>{selected.subject || '-'}</div>
@@ -118,38 +118,38 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
                 className="icon-btn"
                 onClick={() => {
                   const defaultName = `recovery-${selected.abbrevHash}`;
-                  const name = window.prompt(tr('Branch-Name fuer Wiederherstellung', 'Recovery branch name'), defaultName);
+                  const name = window.prompt(t('generated.components.recoverycenter.recovery_branch_name_7dd1650e'), defaultName);
                   const trimmed = String(name || '').trim();
                   if (!trimmed) return;
                   void runAction(['checkout', '-b', trimmed, selected.hash]);
                 }}
               >
-                {tr('Branch von Eintrag erstellen', 'Create branch from entry')}
+                {t('generated.components.recoverycenter.create_branch_from_entry_605eb742')}
               </button>
 
               <button
                 className="icon-btn"
                 onClick={() => void runDangerAware({
-                  title: tr('Detached Checkout?', 'Detached checkout?'),
-                  message: tr('Du checkst den Commit direkt aus, ohne Branch.', 'You will checkout this commit directly, without a branch.'),
-                  confirmLabel: tr('Detached Checkout ausfuehren', 'Run detached checkout'),
+                  title: t('generated.components.recoverycenter.detached_checkout_3c9fd080'),
+                  message: t('generated.components.recoverycenter.you_will_checkout_this_commit_directly_without_a_branch_153b7dd0'),
+                  confirmLabel: t('generated.components.recoverycenter.run_detached_checkout_b4ea704c'),
                   run: async () => runAction(['checkout', selected.hash]),
                 })}
               >
-                {tr('Detached Checkout', 'Detached checkout')}
+                {t('generated.components.recoverycenter.detached_checkout_04424e95')}
               </button>
 
               <button
                 className="icon-btn"
                 style={{ borderColor: 'var(--status-danger-border)', color: 'var(--status-danger)' }}
                 onClick={() => void runDangerAware({
-                  title: tr('Hard Reset ausfuehren?', 'Run hard reset?'),
-                  message: tr('Setzt HEAD und Working Tree auf den Reflog-Commit zurueck. Nicht gesicherte Aenderungen gehen verloren.', 'Resets HEAD and working tree to this reflog commit. Unsaved changes will be lost.'),
-                  confirmLabel: tr('Hard Reset ausfuehren', 'Run hard reset'),
+                  title: t('generated.components.recoverycenter.run_hard_reset_77b9e84d'),
+                  message: t('generated.components.recoverycenter.resets_head_and_working_tree_to_this_reflog_commit_unsav_7ef0a45f'),
+                  confirmLabel: t('generated.components.recoverycenter.run_hard_reset_dadae533'),
                   run: async () => runAction(['reset', '--hard', selected.hash]),
                 })}
               >
-                {tr('Hard reset mit Bestaetigung', 'Hard reset with confirmation')}
+                {t('generated.components.recoverycenter.hard_reset_with_confirmation_b178e726')}
               </button>
             </div>
           </>

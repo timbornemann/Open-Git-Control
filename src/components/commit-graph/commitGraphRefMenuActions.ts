@@ -1,4 +1,5 @@
 import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
+import type { CatalogTranslateFn } from '../../i18n';
 import type { BranchInfo } from '../../types/git';
 import type { GraphNode } from '../../utils/graphLayout';
 import {
@@ -16,27 +17,21 @@ type BuildCommitRefMenuActionsParams = {
   runGitAction: (args: string[], successMsg: string) => Promise<void> | void;
   setConfirmDialog: (value: ConfirmDialogState | null) => void;
   setInputDialog: (value: InputDialogState | null) => void;
-  tr: (deText: string, enText: string) => string;
+  t: CatalogTranslateFn;
 };
 
 const getBranchNameValidationMessage = (
   value: string,
-  tr: (deText: string, enText: string) => string,
+  t: CatalogTranslateFn,
 ) => {
   const errorCode = validateBranchName(value);
   if (!errorCode) return null;
 
   if (errorCode === 'contains-space') {
-    return tr(
-      'Branch-Name darf keine Leerzeichen enthalten.',
-      'Branch name must not contain spaces.',
-    );
+    return t('commitGraph.refMenu.branchNameNoSpaces');
   }
 
-  return tr(
-    'Ungueltiger Branch-Name. Vermeide Sonderzeichen wie ~ ^ : ? * [ \\ sowie .. und @{.',
-    'Invalid branch name. Avoid special characters like ~ ^ : ? * [ \\ and patterns like .. or @{.',
-  );
+  return t('commitGraph.refMenu.invalidBranchName');
 };
 
 export const buildCommitRefMenuActions = ({
@@ -46,7 +41,7 @@ export const buildCommitRefMenuActions = ({
   runGitAction,
   setConfirmDialog,
   setInputDialog,
-  tr,
+  t,
 }: BuildCommitRefMenuActionsParams): MenuAction[] => {
   const hash = node.commit.hash;
   const shortHash = node.commit.abbrevHash;
@@ -126,7 +121,7 @@ export const buildCommitRefMenuActions = ({
               label: 'Neuer Branch-Name',
               defaultValue: suggested,
               required: true,
-              validate: (value) => getBranchNameValidationMessage(value.trim(), tr),
+              validate: (value) => getBranchNameValidationMessage(value.trim(), t),
             },
           ],
           contextItems: [
@@ -177,7 +172,7 @@ export const buildCommitRefMenuActions = ({
               id: 'name',
               label: 'Branch-Name',
               required: true,
-              validate: (value) => getBranchNameValidationMessage(value.trim(), tr),
+              validate: (value) => getBranchNameValidationMessage(value.trim(), t),
             },
           ],
           contextItems: [

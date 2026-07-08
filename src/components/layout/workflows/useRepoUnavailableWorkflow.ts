@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import { plannerClient } from '../../../services/plannerClient';
 import type { ConfirmDialogState } from '../layoutTypes';
@@ -25,6 +25,7 @@ export const useRepoUnavailableWorkflow = ({
 }: Params) => {
   const handlingRef = useRef<string | null>(null);
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
 
   useEffect(() => {
     if (!gitClient.isAvailable()) return;
@@ -39,21 +40,15 @@ export const useRepoUnavailableWorkflow = ({
 
       setConfirmDialog({
         variant: 'confirm',
-        title: tr('Repository nicht mehr verfuegbar', 'Repository no longer available'),
-        message: tr(
-          'Dieses lokale Repository wurde verschoben, geloescht oder ist nicht mehr erreichbar. Open-Git-Control entfernt es aus der lokalen Liste und wechselt erst danach zu einem anderen Repository.',
-          'This local repository was moved, deleted, or is no longer reachable. Open-Git-Control will remove it from the local list and only then switch to another repository.',
-        ),
+        title: t('generated.components.layout.workflows.userepounavailableworkflow.repository_no_longer_available_f884544b'),
+        message: t('generated.components.layout.workflows.userepounavailableworkflow.this_local_repository_was_moved_deleted_or_is_no_longer_1849146a'),
         contextItems: [
-          { label: tr('Repository', 'Repository'), value: repoName },
-          { label: tr('Pfad', 'Path'), value: repoPath },
+          { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: repoName },
+          { label: t('generated.components.layout.hooks.useworkspacedomain.path_f9011584'), value: repoPath },
         ],
         irreversible: false,
-        consequences: tr(
-          'Es werden keine Git-Dateien geloescht. Der gespeicherte Repo-Eintrag und zugehoerige Planungsdaten werden aus Open-Git-Control entfernt.',
-          'No Git files will be deleted. The saved repo entry and related planning data will be removed from Open-Git-Control.',
-        ),
-        confirmLabel: tr('Entfernen und wechseln', 'Remove and switch'),
+        consequences: t('generated.components.layout.workflows.userepounavailableworkflow.no_git_files_will_be_deleted_the_saved_repo_entry_and_re_ba819d24'),
+        confirmLabel: t('generated.components.layout.workflows.userepounavailableworkflow.remove_and_switch_72371909'),
         onConfirm: async () => {
           let deletedPlanningItems = 0;
           let plannerCleanupError = '';

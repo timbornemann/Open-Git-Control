@@ -28,7 +28,7 @@ type CopyableValueRowProps = {
 };
 
 const CopyableValueRow: React.FC<CopyableValueRowProps> = ({ label, value }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div
@@ -50,7 +50,7 @@ const CopyableValueRow: React.FC<CopyableValueRowProps> = ({ label, value }) => 
         onClick={() => void navigator.clipboard.writeText(value)}
         style={{ fontSize: '0.72rem', padding: '3px 7px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
       >
-        <Copy size={11} /> {tr('Kopieren', 'Copy')}
+        <Copy size={11} /> {t('generated.components.actiontoastviewport.copy_5c2a9afe')}
       </button>
     </div>
   );
@@ -62,43 +62,43 @@ type GithubAuthGuideProps = {
 };
 
 export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClose }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   if (method === 'pat') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontWeight: 700 }}>{tr('Methode 1: PAT - Schritt fuer Schritt', 'Method 1: PAT - step by step')}</div>
+          <div style={{ fontWeight: 700 }}>{t('generated.components.layout.main.githubauthguide.method_1_pat_step_by_step_8be31b40')}</div>
           <button className="icon-btn" onClick={onClose} style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
-            {tr('Schliessen', 'Close')}
+            {t('generated.components.actiontoastviewport.close_181764fa')}
           </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{tr('Direkt kopierbare Werte', 'Direct copy values')}</div>
-          <CopyableValueRow label={tr('PAT URL', 'PAT URL')} value="https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control" />
-          <CopyableValueRow label={tr('Note', 'Note')} value="Open-Git-Control" />
-          <CopyableValueRow label={tr('Scopes', 'Scopes')} value="repo,read:user" />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.pat_url_0653be9b')} value="https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control" />
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.note_ea35c916')} value="Open-Git-Control" />
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.scopes_6897f833')} value="repo,read:user" />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button style={linkStyle} onClick={() => openExternal('https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control')}>
-            <ExternalLink size={12} /> {tr('Token-Seite oeffnen', 'Open token page')}
+            <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.open_token_page_3cd9a682')}
           </button>
           <button style={linkStyle} onClick={() => openExternal('https://github.com/settings/personal-access-tokens')}>
-            <ExternalLink size={12} /> {tr('Alle Tokens ansehen', 'View all tokens')}
+            <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.view_all_tokens_d00176d0')}
           </button>
         </div>
 
         <ol style={{ margin: 0, paddingLeft: '18px', lineHeight: 1.5, fontSize: '0.82rem' }}>
-          <li>{tr('Browser oeffnen: github.com -> oben rechts Profilbild -> Settings.', 'Open browser: github.com -> top-right avatar -> Settings.')}</li>
-          <li>{tr('Links in der Seitenleiste: Developer settings -> Personal access tokens -> Tokens (classic).', 'In left sidebar: Developer settings -> Personal access tokens -> Tokens (classic).')}</li>
-          <li>{tr('Auf "Generate new token" klicken.', 'Click "Generate new token".')}</li>
-          <li>{tr('Feld "Note": z.B. "Open-Git-Control" eintragen.', 'Field "Note": enter e.g. "Open-Git-Control".')}</li>
-          <li>{tr('Feld "Expiration": z.B. 90 Tage waehlen.', 'Field "Expiration": choose e.g. 90 days.')}</li>
-          <li>{tr('Checkboxen setzen: "repo" und "read:user".', 'Set checkboxes: "repo" and "read:user".')}</li>
-          <li>{tr('Unten auf "Generate token" klicken und den Token sofort kopieren.', 'Click "Generate token" and copy token immediately.')}</li>
-          <li>{tr('Zur App zurueck: Token ins PAT-Feld einfuellen und "Mit Token verbinden" klicken.', 'Back in app: paste token into PAT field and click "Connect with token".')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.open_browser_github_com_top_right_avatar_settings_cc7202ab')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.in_left_sidebar_developer_settings_personal_access_token_44c06e62')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.click_generate_new_token_25b2c904')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.field_note_enter_e_g_open_git_control_7cf254aa')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.field_expiration_choose_e_g_90_days_c4991e97')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.set_checkboxes_repo_and_read_user_6b8bdd9c')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.click_generate_token_and_copy_token_immediately_53e3a386')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.back_in_app_paste_token_into_pat_field_and_click_connect_18f2d008')}</li>
         </ol>
       </div>
     );
@@ -108,38 +108,38 @@ export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClos
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontWeight: 700 }}>{tr('Methode 2: OAuth Device Flow - Schritt fuer Schritt', 'Method 2: OAuth Device Flow - step by step')}</div>
+          <div style={{ fontWeight: 700 }}>{t('generated.components.layout.main.githubauthguide.method_2_oauth_device_flow_step_by_step_b8683b32')}</div>
           <button className="icon-btn" onClick={onClose} style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
-            {tr('Schliessen', 'Close')}
+            {t('generated.components.actiontoastviewport.close_181764fa')}
           </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{tr('Direkt kopierbare Werte', 'Direct copy values')}</div>
-          <CopyableValueRow label={tr('Application name', 'Application name')} value="Open-Git-Control Local" />
-          <CopyableValueRow label={tr('Homepage URL', 'Homepage URL')} value="https://localhost" />
-          <CopyableValueRow label={tr('Callback URL', 'Callback URL')} value="http://localhost/callback" />
-          <CopyableValueRow label={tr('Settings Feld', 'Settings field')} value="GitHub OAuth Client ID (Device Flow)" />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.application_name_63a11e81')} value="Open-Git-Control Local" />
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.homepage_url_761e1021')} value="https://localhost" />
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.callback_url_5d702006')} value="http://localhost/callback" />
+          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.settings_field_c180b6ff')} value="GitHub OAuth Client ID (Device Flow)" />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button style={linkStyle} onClick={() => openExternal('https://github.com/settings/developers')}>
-            <ExternalLink size={12} /> {tr('Developer Settings', 'Developer settings')}
+            <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.developer_settings_016b30a0')}
           </button>
           <button style={linkStyle} onClick={() => openExternal('https://github.com/settings/apps/new')}>
-            <ExternalLink size={12} /> {tr('Neue OAuth App', 'New OAuth app')}
+            <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.new_oauth_app_5ff7425d')}
           </button>
         </div>
 
         <ol style={{ margin: 0, paddingLeft: '18px', lineHeight: 1.5, fontSize: '0.82rem' }}>
-          <li>{tr('In GitHub: Settings -> Developer settings -> OAuth Apps -> New OAuth App.', 'In GitHub: Settings -> Developer settings -> OAuth Apps -> New OAuth App.')}</li>
-          <li>{tr('Feld "Application name": z.B. "Open-Git-Control Local".', 'Field "Application name": e.g. "Open-Git-Control Local".')}</li>
-          <li>{tr('Feld "Homepage URL": z.B. https://localhost.', 'Field "Homepage URL": e.g. https://localhost.')}</li>
-          <li>{tr('Feld "Authorization callback URL": z.B. http://localhost/callback.', 'Field "Authorization callback URL": e.g. http://localhost/callback.')}</li>
-          <li>{tr('Auf "Register application" klicken und dann die "Client ID" kopieren.', 'Click "Register application" and then copy the "Client ID".')}</li>
-          <li>{tr('In der App: Tab Settings -> Feld "GitHub OAuth Client ID (Device Flow)" -> Client ID einfuegen.', 'In app: Settings tab -> field "GitHub OAuth Client ID (Device Flow)" -> paste Client ID.')}</li>
-          <li>{tr('Zurueck zum GitHub-Tab -> "Device Flow starten" klicken.', 'Go back to GitHub tab -> click "Start Device Flow".')}</li>
-          <li>{tr('Im Browser die angezeigte URL besuchen, den Code eingeben, auf "Continue" und dann "Authorize" klicken.', 'In browser visit shown URL, enter code, click "Continue" and then "Authorize".')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.in_github_settings_developer_settings_oauth_apps_new_oau_7f4322cc')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.field_application_name_e_g_open_git_control_local_43ad3686')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.field_homepage_url_e_g_https_localhost_05697d7c')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.field_authorization_callback_url_e_g_http_localhost_call_5cad09fb')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.click_register_application_and_then_copy_the_client_id_6c264de6')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.in_app_settings_tab_field_github_oauth_client_id_device_1018ab13')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.go_back_to_github_tab_click_start_device_flow_0ef93029')}</li>
+          <li>{t('generated.components.layout.main.githubauthguide.in_browser_visit_shown_url_enter_code_click_continue_and_29232245')}</li>
         </ol>
       </div>
     );
@@ -148,38 +148,38 @@ export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClos
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-        <div style={{ fontWeight: 700 }}>{tr('Methode 3: 1-Klick Login - Schritt fuer Schritt', 'Method 3: One-click login - step by step')}</div>
+        <div style={{ fontWeight: 700 }}>{t('generated.components.layout.main.githubauthguide.method_3_one_click_login_step_by_step_6d5e5618')}</div>
         <button className="icon-btn" onClick={onClose} style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
-          {tr('Schliessen', 'Close')}
+          {t('generated.components.actiontoastviewport.close_181764fa')}
         </button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{tr('Direkt kopierbare Werte', 'Direct copy values')}</div>
-        <CopyableValueRow label={tr('CLI URL', 'CLI URL')} value="https://cli.github.com/" />
-        <CopyableValueRow label={tr('Scopes', 'Scopes')} value="repo,read:user" />
-        <CopyableValueRow label={tr('gh Kommando', 'gh command')} value="gh auth login --hostname github.com --web --git-protocol https --scopes repo,read:user" />
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
+        <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.cli_url_385ee071')} value="https://cli.github.com/" />
+        <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.scopes_6897f833')} value="repo,read:user" />
+        <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.gh_command_d7dfde28')} value="gh auth login --hostname github.com --web --git-protocol https --scopes repo,read:user" />
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button style={linkStyle} onClick={() => openExternal('https://cli.github.com/')}>
-          <ExternalLink size={12} /> {tr('GitHub CLI herunterladen', 'Download GitHub CLI')}
+          <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.download_github_cli_e1f1463c')}
         </button>
         <button style={linkStyle} onClick={() => openExternal('https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps')}>
-          <ExternalLink size={12} /> {tr('OAuth Freigabe Hilfe', 'OAuth approval help')}
+          <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.oauth_approval_help_d7d07c91')}
         </button>
       </div>
 
       <ol style={{ margin: 0, paddingLeft: '18px', lineHeight: 1.5, fontSize: '0.82rem' }}>
-        <li>{tr('Falls noch nicht installiert: GitHub CLI (gh) von cli.github.com installieren.', 'If not installed yet: install GitHub CLI (gh) from cli.github.com.')}</li>
-        <li>{tr('App im GitHub-Tab offen lassen und auf "Bei GitHub anmelden" klicken.', 'Keep app open on GitHub tab and click "Sign in with GitHub".')}</li>
-        <li>{tr('Es oeffnet sich der Browser: GitHub-Login ausfuehren und evtl. 2FA bestaetigen.', 'Browser opens: complete GitHub login and confirm 2FA if needed.')}</li>
-        <li>{tr('Wenn abgefragt: den Zugriff fuer GitHub CLI erlauben (Authorize).', 'If asked: allow access for GitHub CLI (Authorize).')}</li>
-        <li>{tr('Nach der Freigabe kehrt die App automatisch zurueck und verbindet dein Konto.', 'After approval, app returns automatically and connects your account.')}</li>
+        <li>{t('generated.components.layout.main.githubauthguide.if_not_installed_yet_install_github_cli_gh_from_cli_gith_d1bbea8d')}</li>
+        <li>{t('generated.components.layout.main.githubauthguide.keep_app_open_on_github_tab_and_click_sign_in_with_githu_599dcdb0')}</li>
+        <li>{t('generated.components.layout.main.githubauthguide.browser_opens_complete_github_login_and_confirm_2fa_if_n_9ec3d6e3')}</li>
+        <li>{t('generated.components.layout.main.githubauthguide.if_asked_allow_access_for_github_cli_authorize_7f6d15f5')}</li>
+        <li>{t('generated.components.layout.main.githubauthguide.after_approval_app_returns_automatically_and_connects_yo_46ed1d90')}</li>
       </ol>
       <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <Check size={12} />
-        {tr('Hinweis: Diese Methode braucht keine eigene OAuth Client ID in den App-Settings.', 'Note: this method does not require your own OAuth Client ID in app settings.')}
+        {t('generated.components.layout.main.githubauthguide.note_this_method_does_not_require_your_own_oauth_client_12296b19')}
       </div>
     </div>
   );

@@ -53,7 +53,7 @@ export const ProjectPlannerView: React.FC = () => {
     requestDeleteProject,
     requestDeleteItem,
   } = useProjectPlanner();
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const labels = usePlannerLabels();
   const [search, setSearch] = React.useState('');
   const [priorityFilter, setPriorityFilter] = React.useState<PlannerPriority | 'all'>('all');
@@ -116,7 +116,7 @@ export const ProjectPlannerView: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="planner-loading">{tr('Projektplanung wird geladen...', 'Loading project planning...')}</div>;
+    return <div className="planner-loading">{t('generated.components.project_planner.projectplannersidebarcontent.loading_project_planning_77574995')}</div>;
   }
 
   if (!selectedProject) {
@@ -125,13 +125,10 @@ export const ProjectPlannerView: React.FC = () => {
         {error && <div className="planner-error">{error}</div>}
         <EmptyState
           icon={<Lightbulb size={42} />}
-          title={tr('Noch kein Projekt vorhanden', 'No project yet')}
-          description={tr(
-            'Lege eine zukuenftige Projektidee an oder oeffne ein Repository.',
-            'Create a future project idea or open a repository.',
-          )}
+          title={t('generated.components.project_planner.projectplannerview.no_project_yet_bd4bb891')}
+          description={t('generated.components.project_planner.projectplannerview.create_a_future_project_idea_or_open_a_repository_4dc6e28f')}
           action={{
-            label: tr('Projektidee anlegen', 'Create project idea'),
+            label: t('generated.components.project_planner.projectplannerview.create_project_idea_1befeb81'),
             onClick: requestCreateProject,
           }}
         />
@@ -155,15 +152,15 @@ export const ProjectPlannerView: React.FC = () => {
           <div className="planner-project-kind">
             {selectedProject.kind === 'planned' ? <Lightbulb size={14} /> : <FolderGit2 size={14} />}
             {selectedProject.kind === 'planned'
-              ? tr('Zukuenftiges Projekt', 'Future project')
-              : tr('Repository-Projekt', 'Repository project')}
+              ? t('generated.components.project_planner.projectplannerview.future_project_fcee88b5')
+              : t('generated.components.project_planner.projectplannerview.repository_project_3cee5d74')}
           </div>
           <h1>{selectedProject.name}</h1>
           <p>
             {selectedProject.description
               || (selectedProject.repoPath
                 ? selectedProject.repoPath
-                : tr('Sammle Ideen und forme daraus den naechsten Entwicklungsschritt.', 'Collect ideas and turn them into the next development step.'))}
+                : t('generated.components.project_planner.projectplannerview.collect_ideas_and_turn_them_into_the_next_development_st_bef17224'))}
           </p>
         </div>
         <div className="planner-hero-actions">
@@ -174,15 +171,15 @@ export const ProjectPlannerView: React.FC = () => {
               setProjectDialogOpen(true);
             }}
           >
-            <Pencil size={14} /> {tr('Projekt bearbeiten', 'Edit project')}
+            <Pencil size={14} /> {t('generated.components.project_planner.plannerdialogs.edit_project_624b2ea6')}
           </button>
           {selectedProject.kind === 'planned' && (
             <button className="planner-btn planner-btn-secondary" onClick={() => void handleSelectParent()} disabled={busy}>
-              <Rocket size={14} /> {tr('Repository starten', 'Start repository')}
+              <Rocket size={14} /> {t('generated.components.project_planner.projectplannerview.start_repository_28af9dd3')}
             </button>
           )}
           <button className="planner-btn planner-btn-primary" onClick={() => openNewItem()} disabled={busy}>
-            <Plus size={15} /> {tr('Neuer Eintrag', 'New item')}
+            <Plus size={15} /> {t('generated.components.project_planner.projectplannerview.new_item_bd553a03')}
           </button>
         </div>
       </header>
@@ -193,23 +190,23 @@ export const ProjectPlannerView: React.FC = () => {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={tr('Eintraege durchsuchen...', 'Search items...')}
+            placeholder={t('generated.components.project_planner.projectplannerview.search_items_31c15ae9')}
           />
         </label>
         <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PlannerPriority | 'all')}>
-          <option value="all">{tr('Alle Dringlichkeiten', 'All priorities')}</option>
+          <option value="all">{t('generated.components.project_planner.projectplannerview.all_priorities_cd27ede5')}</option>
           {PRIORITY_OPTIONS.map((priority) => (
             <option key={priority} value={priority}>{labels.priority[priority]}</option>
           ))}
         </select>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as PlannerStatus | 'all')}>
-          <option value="all">{tr('Alle Status', 'All statuses')}</option>
+          <option value="all">{t('generated.components.project_planner.projectplannerview.all_statuses_f6555111')}</option>
           {STATUS_OPTIONS.map((status) => (
             <option key={status} value={status}>{labels.status[status]}</option>
           ))}
         </select>
         <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
-          <option value="all">{tr('Alle Tags', 'All tags')}</option>
+          <option value="all">{t('generated.components.project_planner.projectplannerview.all_tags_ab4762d7')}</option>
           {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
         </select>
         <span className="planner-result-count">
@@ -255,7 +252,7 @@ export const ProjectPlannerView: React.FC = () => {
                       </span>
                       <button
                         className="planner-card-delete"
-                        title={tr('Eintrag loeschen', 'Delete item')}
+                        title={t('generated.components.project_planner.projectplannerview.delete_item_afc7d611')}
                         onClick={(event) => {
                           event.stopPropagation();
                           requestDeleteItem(item.id);
@@ -273,7 +270,7 @@ export const ProjectPlannerView: React.FC = () => {
                     )}
                     <select
                       value={item.status}
-                      aria-label={tr('Status aendern', 'Change status')}
+                      aria-label={t('generated.components.project_planner.projectplannerview.change_status_a62b7a50')}
                       onClick={(event) => event.stopPropagation()}
                       onChange={(event) => {
                         event.stopPropagation();
@@ -288,7 +285,7 @@ export const ProjectPlannerView: React.FC = () => {
                 ))}
                 {statusItems.length === 0 && (
                   <button className="planner-column-empty" onClick={() => openNewItem(status)}>
-                    <Plus size={13} /> {tr('Eintrag hinzufuegen', 'Add item')}
+                    <Plus size={13} /> {t('generated.components.project_planner.projectplannerview.add_item_d9f7598d')}
                   </button>
                 )}
               </div>

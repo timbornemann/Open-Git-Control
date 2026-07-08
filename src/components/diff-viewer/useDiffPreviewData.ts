@@ -7,12 +7,12 @@ import {
   MAX_RENDER_LINES,
   looksBinaryByExtension,
 } from './diffViewerConstants';
-import type { TranslateFn } from './diffViewerLabels';
+import type { CatalogTranslateFn } from '../../i18n';
 
 type UseDiffPreviewDataParams = {
   repoPath: string | null;
   request: DiffRequest;
-  tr: TranslateFn;
+  t: CatalogTranslateFn;
 };
 
 const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
@@ -25,7 +25,7 @@ const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
   return ['show', '--format=', '--binary', request.commitHash || '', '--', request.path];
 };
 
-export const useDiffPreviewData = ({ repoPath, request, tr }: UseDiffPreviewDataParams) => {
+export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataParams) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diffText, setDiffText] = useState('');
@@ -47,7 +47,7 @@ export const useDiffPreviewData = ({ repoPath, request, tr }: UseDiffPreviewData
         });
 
         if (!result.success) {
-          setError(result.error || tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
+          setError(result.error || t('diffViewer.errors.diffLoadFailed'));
           return;
         }
 
@@ -55,14 +55,14 @@ export const useDiffPreviewData = ({ repoPath, request, tr }: UseDiffPreviewData
         setSourceTruncated(result.data.truncated);
       } catch (fetchError: unknown) {
         console.error(fetchError);
-        setError(tr('Diff konnte nicht geladen werden.', 'Could not load diff.'));
+        setError(t('diffViewer.errors.diffLoadFailed'));
       } finally {
         setIsLoading(false);
       }
     };
 
     void fetchDiff();
-  }, [repoPath, request, tr]);
+  }, [repoPath, request, t]);
 
   const looksBinaryByExt = useMemo(() => looksBinaryByExtension(request.path), [request.path]);
 

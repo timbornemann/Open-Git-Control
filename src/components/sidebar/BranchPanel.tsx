@@ -27,7 +27,7 @@ export const BranchPanel: React.FC<Props> = ({
   collapsed,
   onToggleCollapsed,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [newBranchName, setNewBranchName] = useState('');
   const newBranchInputRef = useRef<HTMLInputElement | null>(null);
@@ -77,17 +77,17 @@ export const BranchPanel: React.FC<Props> = ({
   return (
     <RepoCard>
       <RepoCardHeader
-        title={tr('Branches', 'Branches')}
+        title={t('generated.components.sidebar.branchpanel.branches_4d013a68')}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        toggleTitle={collapsed ? tr('Branches anzeigen', 'Show branches') : tr('Branches einklappen', 'Collapse branches')}
+        toggleTitle={collapsed ? t('generated.components.sidebar.branchpanel.show_branches_cfab3e39') : t('generated.components.sidebar.branchpanel.collapse_branches_b4d0333a')}
         actions={(
           <button
             className="icon-btn sidebar-row-action-icon"
             onClick={() => {
               onSetCreatingBranch(true);
             }}
-            title={tr('Neuen Branch erstellen', 'Create new branch')}
+            title={t('generated.components.sidebar.branchpanel.create_new_branch_7f015dbf')}
           >
             <Plus size={13} />
           </button>
@@ -103,7 +103,7 @@ export const BranchPanel: React.FC<Props> = ({
                 className="repo-filter-input sidebar-filter-input"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
-                placeholder={tr('Branches filtern...', 'Filter branches...')}
+                placeholder={t('generated.components.sidebar.branchpanel.filter_branches_d57dded7')}
               />
             </div>
           </RepoCardToolbar>
@@ -135,28 +135,28 @@ export const BranchPanel: React.FC<Props> = ({
             <div className="sidebar-group-wrap">
               <div>
                 <div className="sidebar-group-label">
-                  {tr('Lokal', 'Local')} ({localBranches.length})
+                  {t('generated.components.layout.sidebar.githubconnectedcontent.local_0a3c619d')} ({localBranches.length})
                 </div>
                 <div className="sidebar-group-stack">
                   {localBranches.map(renderBranchRow)}
-                  {localBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{tr('Keine lokalen Branches.', 'No local branches.')}</span>}
+                  {localBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{t('generated.components.sidebar.branchpanel.no_local_branches_e65093da')}</span>}
                 </div>
               </div>
 
               <div>
                 <div className="sidebar-group-label">
-                  {tr('Remote', 'Remote')} ({remoteBranches.length})
+                  {t('generated.components.sidebar.branchpanel.remote_8a6f1451')} ({remoteBranches.length})
                 </div>
                 <div className="sidebar-group-stack">
                   {remoteBranches.map(renderBranchRow)}
-                  {remoteBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{tr('Keine Remote-Branches.', 'No remote branches.')}</span>}
+                  {remoteBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{t('generated.components.sidebar.branchpanel.no_remote_branches_595b2860')}</span>}
                 </div>
               </div>
             </div>
 
             {query.trim() && localBranches.length + remoteBranches.length === 0 && (
               <div className="repo-state-text" style={{ paddingTop: '8px' }}>
-                {tr('Keine Treffer fuer den Filter.', 'No matches for this filter.')}
+                {t('generated.components.layout.sidebar.repogithubactionscontent.no_matches_for_this_filter_c66c3d48')}
               </div>
             )}
           </RepoCardContent>

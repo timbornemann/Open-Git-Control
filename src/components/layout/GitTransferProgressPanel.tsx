@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Check, Loader2 } from 'lucide-react';
-import { useI18n } from '../../i18n';
+import { useI18n, type CatalogTranslateFn } from '../../i18n';
 import { summarizeGitTransferProgress } from '../../utils/gitTransferProgress';
 import type {
   GitTransferPhaseKey,
@@ -15,34 +15,34 @@ type Props = {
   emptyText: string;
 };
 
-const getPhaseLabel = (key: GitTransferPhaseKey, tr: (deText: string, enText: string) => string): string => {
+const getPhaseLabel = (key: GitTransferPhaseKey, t: CatalogTranslateFn): string => {
   switch (key) {
     case 'enumerating':
-      return tr('Objekte suchen', 'Enumerating');
+      return t('generated.components.layout.gittransferprogresspanel.enumerating_dfd54b13');
     case 'counting':
-      return tr('Objekte zaehlen', 'Counting');
+      return t('generated.components.layout.gittransferprogresspanel.counting_d1387dd0');
     case 'compressing':
-      return tr('Pack vorbereiten', 'Compressing');
+      return t('generated.components.layout.gittransferprogresspanel.compressing_0d99de7c');
     case 'receiving':
-      return tr('Receiving / Download', 'Receiving / download');
+      return t('generated.components.layout.gittransferprogresspanel.receiving_download_6eb73bf9');
     case 'resolving':
-      return tr('Resolving', 'Resolving');
+      return t('generated.components.layout.gittransferprogresspanel.resolving_6b422f1c');
     case 'writing':
-      return tr('Objekte schreiben', 'Writing objects');
+      return t('generated.components.layout.gittransferprogresspanel.writing_objects_649b0aa0');
     case 'updating':
-      return tr('Dateien aktualisieren', 'Updating files');
+      return t('generated.components.layout.gittransferprogresspanel.updating_files_b1ab9cbf');
     case 'checkingOut':
-      return tr('Checkout', 'Checkout');
+      return t('generated.components.layout.branchcontextmenu.checkout_d9bc41ee');
     default:
-      return tr('Git-Fortschritt', 'Git progress');
+      return t('generated.components.layout.gittransferprogresspanel.git_progress_480449ca');
   }
 };
 
 const formatPhaseMeta = (
   phase: GitTransferPhaseProgress,
-  tr: (deText: string, enText: string) => string,
+  t: CatalogTranslateFn,
 ): string => {
-  if (!phase.observed) return tr('Wartet', 'Waiting');
+  if (!phase.observed) return t('generated.components.layout.gittransferprogresspanel.waiting_729a8a6c');
 
   const parts: string[] = [];
   if (phase.percent !== null) parts.push(`${phase.percent}%`);
@@ -51,7 +51,7 @@ const formatPhaseMeta = (
   if (phase.speed) parts.push(phase.speed);
   if (parts.length > 0) return parts.join(' | ');
 
-  return phase.done ? tr('Fertig', 'Done') : tr('Laeuft', 'Running');
+  return phase.done ? t('generated.components.layout.cloneprogressmodal.done_724fd90c') : t('generated.components.layout.gittransferprogresspanel.running_c78d46de');
 };
 
 export const GitTransferProgressPanel: React.FC<Props> = ({
@@ -61,10 +61,10 @@ export const GitTransferProgressPanel: React.FC<Props> = ({
   error = null,
   emptyText,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const summary = useMemo(() => summarizeGitTransferProgress(lines), [lines]);
   const statusText = error
-    || (isComplete ? tr('Repository ist bereit.', 'Repository is ready.') : summary.latestLine || emptyText);
+    || (isComplete ? t('generated.components.layout.gittransferprogresspanel.repository_is_ready_c46ad14f') : summary.latestLine || emptyText);
 
   return (
     <div className="git-transfer-panel">
@@ -85,9 +85,9 @@ export const GitTransferProgressPanel: React.FC<Props> = ({
                   ) : (
                     <Loader2 size={14} aria-hidden="true" />
                   )}
-                  <span>{getPhaseLabel(phase.key, tr)}</span>
+                  <span>{getPhaseLabel(phase.key, t)}</span>
                 </div>
-                <span className="git-transfer-phase-meta">{formatPhaseMeta(phase, tr)}</span>
+                <span className="git-transfer-phase-meta">{formatPhaseMeta(phase, t)}</span>
               </div>
               <div className={`git-transfer-bar${isIndeterminate ? ' indeterminate' : ''}`}>
                 <div

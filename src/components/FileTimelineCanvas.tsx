@@ -41,7 +41,7 @@ interface LayoutNode {
 }
 
 export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree, activeCommit }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -698,7 +698,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
                 color: hoveredNode.type === 'folder' ? 'var(--text-accent)' : 'var(--text-secondary)'
               }}
             >
-              {hoveredNode.type === 'folder' ? tr('Ordner', 'Folder') : tr('Datei', 'File')}
+              {hoveredNode.type === 'folder' ? t('generated.components.filetimelinecanvas.folder_3dd8aff0') : t('generated.components.commitdetails.file_9d811416')}
             </span>
 
             {hoveredNode.status !== 'unchanged' && (
@@ -720,9 +720,9 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
                           '1px solid var(--status-merged-border)'
                 }}
               >
-                {hoveredNode.status === 'added' ? tr('Hinzugefügt', 'Added') :
-                 hoveredNode.status === 'modified' ? tr('Modifiziert', 'Modified') :
-                 tr('Umbenannt', 'Renamed')}
+                {hoveredNode.status === 'added' ? t('generated.components.filetimelinecanvas.added_577df313') :
+                 hoveredNode.status === 'modified' ? t('generated.components.filetimelinecanvas.modified_e02f778a') :
+                 t('generated.components.filetimelinecanvas.renamed_732ebae5')}
               </span>
             )}
           </div>
@@ -761,7 +761,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         <button
           onClick={zoomIn}
           className="diff-nav-btn"
-          title={tr('Vergrößern', 'Zoom In')}
+          title={t('generated.components.filetimelinecanvas.zoom_in_deebaa4e')}
           style={{
             width: '32px',
             height: '32px',
@@ -780,7 +780,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         <button
           onClick={zoomOut}
           className="diff-nav-btn"
-          title={tr('Verkleinern', 'Zoom Out')}
+          title={t('generated.components.filetimelinecanvas.zoom_out_b50cd9fb')}
           style={{
             width: '32px',
             height: '32px',
@@ -799,7 +799,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         <button
           onClick={centerView}
           className="diff-nav-btn"
-          title={tr('Ansicht zentrieren', 'Center View')}
+          title={t('generated.components.filetimelinecanvas.center_view_312a66fb')}
           style={{
             width: '32px',
             height: '32px',

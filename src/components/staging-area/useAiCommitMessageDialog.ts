@@ -15,27 +15,27 @@ export const useAiCommitMessageDialog = ({
   commitForm,
   setInputDialog,
 }: UseAiCommitMessageDialogParams) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   return useCallback(() => {
     setInputDialog({
-      title: tr('KI Commit-Message aus Notizen', 'AI commit message from notes'),
-      message: tr('Gib Stichpunkte oder eine kurze Beschreibung der Aenderungen ein.', 'Enter bullet points or a short description of the changes.'),
+      title: t('generated.components.staging_area.useaicommitmessagedialog.ai_commit_message_from_notes_ef03f5be'),
+      message: t('generated.components.staging_area.useaicommitmessagedialog.enter_bullet_points_or_a_short_description_of_the_change_5e34114c'),
       fields: [
         {
           id: 'notes',
-          label: tr('Aenderungen', 'Changes'),
-          placeholder: tr('z.B. Login-Fehler behoben, Settings validiert, Tests ergaenzt...', 'e.g. fixed login error, validated settings, added tests...'),
+          label: t('generated.components.staging_area.stagingfilesections.changes_69ca4922'),
+          placeholder: t('generated.components.staging_area.useaicommitmessagedialog.e_g_fixed_login_error_validated_settings_added_tests_9243134e'),
           required: true,
           multiline: true,
           rows: 8,
-          helperText: tr('Verwendet die zentralen KI-Commit-Message-Einstellungen.', 'Uses the central AI commit message settings.'),
+          helperText: t('generated.components.staging_area.useaicommitmessagedialog.uses_the_central_ai_commit_message_settings_8fb636c2'),
         },
       ],
       contextItems: [],
       irreversible: false,
-      consequences: tr('Fuellt nur Commit-Titel und Beschreibung aus.', 'Only fills commit title and description.'),
-      confirmLabel: tr('Generieren', 'Generate'),
+      consequences: t('generated.components.staging_area.useaicommitmessagedialog.only_fills_commit_title_and_description_03623172'),
+      confirmLabel: t('generated.components.staging_area.useaicommitmessagedialog.generate_c29b0144'),
       onSubmit: async (values) => {
         const message = await aiCommit.generateCommitMessageFromNotes(values.notes || '');
         if (!message) return;

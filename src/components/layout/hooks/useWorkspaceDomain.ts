@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RepoSortByDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { appClient } from '../../../services/appClient';
 import { gitClient } from '../../../services/gitClient';
 import { ConfirmDialogState } from '../layoutTypes';
@@ -112,7 +112,7 @@ export const useWorkspaceDomain = ({
   const [reposLoaded, setReposLoaded] = useState(false);
   const repoOperationSequenceRef = useRef(0);
 
-  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
 
   const sortedOpenRepos = useMemo(() => {
     return sortRepoPaths(openRepos, repoMeta, repoSortBy);
@@ -266,15 +266,15 @@ export const useWorkspaceDomain = ({
       } else if (result && !result.isRepo) {
         setConfirmDialog({
           variant: 'confirm',
-          title: tr('Git-Repository initialisieren?', 'Initialize Git repository?'),
-          message: tr('Das ausgewählte Verzeichnis ist noch kein Git-Repository.', 'The selected directory is not a Git repository yet.'),
+          title: t('generated.components.layout.hooks.useworkspacedomain.initialize_git_repository_0ba2d2a1'),
+          message: t('generated.components.layout.hooks.useworkspacedomain.the_selected_directory_is_not_a_git_repository_yet_4d2a99bd'),
           contextItems: [
-            { label: tr('Pfad', 'Path'), value: result.path },
-            { label: tr('Aktion', 'Action'), value: 'git init' },
+            { label: t('generated.components.layout.hooks.useworkspacedomain.path_f9011584'), value: result.path },
+            { label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git init' },
           ],
           irreversible: false,
-          consequences: tr('Es wird ein .git-Verzeichnis angelegt und das Verzeichnis als Repository vorbereitet.', 'A .git directory will be created and the folder prepared as repository.'),
-          confirmLabel: tr('Repository initialisieren', 'Initialize repository'),
+          consequences: t('generated.components.layout.hooks.useworkspacedomain.a_git_directory_will_be_created_and_the_folder_prepared_8a4dacda'),
+          confirmLabel: t('generated.components.layout.hooks.useworkspacedomain.initialize_repository_540255ad'),
           onConfirm: async () => {
             const initResult = await gitClient.gitInit(result.path);
             if (initResult.success) {
@@ -284,10 +284,10 @@ export const useWorkspaceDomain = ({
               if (repoOperationSequenceRef.current !== operationId) return;
               setActiveRepo(result.path);
               onRepoActivated();
-              setGitActionToast({ msg: tr('Neues Git-Repository initialisiert.', 'Initialized new Git repository.'), isError: false });
+              setGitActionToast({ msg: t('generated.components.layout.hooks.useworkspacedomain.initialized_new_git_repository_058c91a4'), isError: false });
               triggerRefresh();
             } else {
-              setGitActionToast({ msg: initResult.error || tr('Fehler bei git init.', 'Error during git init.'), isError: true });
+              setGitActionToast({ msg: initResult.error || t('generated.components.layout.hooks.useworkspacedomain.error_during_git_init_0313550f'), isError: true });
             }
           },
         });

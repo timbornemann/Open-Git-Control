@@ -95,7 +95,7 @@ export const ReleaseCreator: React.FC<Props> = ({
   notesOptions,
   setNotesOptions,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [versionBump, setVersionBump] = useState<ReleaseVersionBump>('patch');
 
   const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
@@ -126,16 +126,16 @@ export const ReleaseCreator: React.FC<Props> = ({
 
   const validationMessage = useMemo(() => {
     if (validation.errors.tagName === 'release.validation.tagRequired') {
-      return tr('Tag-Name darf nicht leer sein.', 'Tag name must not be empty.');
+      return t('generated.components.releasecreator.tag_name_must_not_be_empty_370b7b0d');
     }
     if (validation.errors.tagName === 'release.validation.tagInvalid') {
-      return tr('Tag-Name enthaelt ungueltige Zeichen oder Leerzeichen.', 'Tag name contains invalid characters or whitespace.');
+      return t('generated.components.releasecreator.tag_name_contains_invalid_characters_or_whitespace_ca817c36');
     }
     if (validation.errors.releaseName === 'release.validation.nameRequired') {
-      return tr('Release-Name darf nicht leer sein.', 'Release name must not be empty.');
+      return t('generated.components.layout.sidebar.githubconnectedcontent.release_name_must_not_be_empty_453809c9');
     }
     if (validation.errors.releaseName === 'release.validation.nameTooShort') {
-      return tr('Release-Name ist zu kurz (mind. 3 Zeichen).', 'Release name is too short (min. 3 chars).');
+      return t('generated.components.releasecreator.release_name_is_too_short_min_3_chars_c39377d1');
     }
     return null;
   }, [tr, validation.errors.releaseName, validation.errors.tagName]);
@@ -144,10 +144,10 @@ export const ReleaseCreator: React.FC<Props> = ({
   const commitsCount = commits.length;
   const bodyLineCount = (releaseForm.body || '').split(/\r?\n/g).length;
   const bodyCharCount = (releaseForm.body || '').length;
-  const targetForContext = trimmedTarget || context?.commitsTarget || tr('Unbekannt', 'Unknown');
+  const targetForContext = trimmedTarget || context?.commitsTarget || t('generated.components.releasecreator.unknown_e814b0a7');
   const repositoryLabel = ownerRepo
     ? `${ownerRepo.owner}/${ownerRepo.repo}`
-    : tr('Keine GitHub-Repository-Zuordnung', 'No GitHub repository mapping');
+    : t('generated.components.releasecreator.no_github_repository_mapping_65df7317');
 
   const canGenerateNotes = Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName) && commitsCount > 0;
   const canCreateRelease = Boolean(ownerRepo) && !releaseSubmitting && !tagAlreadyExists && validation.valid;
@@ -176,15 +176,15 @@ export const ReleaseCreator: React.FC<Props> = ({
 
   const createHint = useMemo(() => {
     if (!ownerRepo) {
-      return tr('Bitte zuerst ein Repository mit GitHub verknuepfen.', 'Please connect a repository to GitHub first.');
+      return t('generated.components.releasecreator.please_connect_a_repository_to_github_first_35d47eae');
     }
     if (tagAlreadyExists) {
-      return tr('Dieser Tag existiert bereits. Bitte einen neuen Tag vergeben.', 'This tag already exists. Please use a new tag.');
+      return t('generated.components.releasecreator.this_tag_already_exists_please_use_a_new_tag_a371149d');
     }
     if (!validation.valid && validationMessage) {
       return validationMessage;
     }
-    return tr('Die Release wird mit den aktuellen Angaben bei GitHub erstellt.', 'The release will be created on GitHub with the current inputs.');
+    return t('generated.components.releasecreator.the_release_will_be_created_on_github_with_the_current_i_3608f5d0');
   }, [ownerRepo, tagAlreadyExists, tr, validation.valid, validationMessage]);
 
   return (
@@ -193,13 +193,10 @@ export const ReleaseCreator: React.FC<Props> = ({
         <main className="release-main-clean">
           <header className="release-head-clean">
             <div>
-              <p className="release-eyebrow">{tr('Release Workflow', 'Release workflow')}</p>
-              <h1 className="release-title-clean">{tr('Release erstellen', 'Create release')}</h1>
+              <p className="release-eyebrow">{t('generated.components.releasecreator.release_workflow_51d7eb43')}</p>
+              <h1 className="release-title-clean">{t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}</h1>
               <p className="release-subtitle-clean">
-                {tr(
-                  'Version festlegen, Release Notes erstellen und direkt veroeffentlichen.',
-                  'Define version, create release notes, and publish in one flow.',
-                )}
+                {t('generated.components.releasecreator.define_version_create_release_notes_and_publish_in_one_f_4f23c303')}
               </p>
             </div>
             <div className="release-repo-chip" title={repositoryLabel}>{repositoryLabel}</div>
@@ -207,15 +204,15 @@ export const ReleaseCreator: React.FC<Props> = ({
 
           <section className="release-info-bar">
             <div className="release-info-item">
-              <span>{tr('Letztes Release', 'Last release')}</span>
-              <strong>{context?.lastReleaseTag || tr('Keins', 'None')}</strong>
+              <span>{t('generated.components.releasecreator.last_release_2873fe8a')}</span>
+              <strong>{context?.lastReleaseTag || t('generated.components.releasecreator.none_0641cbc2')}</strong>
             </div>
             <div className="release-info-item">
-              <span>{tr('Target', 'Target')}</span>
+              <span>{t('generated.components.releasecreator.target_3d406596')}</span>
               <strong>{targetForContext}</strong>
             </div>
             <div className="release-info-item">
-              <span>{tr('Commits seitdem', 'Commits since')}</span>
+              <span>{t('generated.components.releasecreator.commits_since_5f00f45c')}</span>
               <strong>{commitsCount}</strong>
             </div>
           </section>
@@ -224,12 +221,9 @@ export const ReleaseCreator: React.FC<Props> = ({
             <div className="release-alert release-alert--warning">
               <AlertCircle size={16} />
               <div>
-                <strong>{tr('GitHub-Zuordnung fehlt.', 'GitHub mapping missing.')}</strong>
+                <strong>{t('generated.components.releasecreator.github_mapping_missing_9975f757')}</strong>
                 <p>
-                  {tr(
-                    'Oeffne ein lokal mit GitHub verbundenes Repository, damit Releases erstellt werden koennen.',
-                    'Open a local repository connected to GitHub to create releases.',
-                  )}
+                  {t('generated.components.releasecreator.open_a_local_repository_connected_to_github_to_create_re_f178cf2f')}
                 </p>
               </div>
             </div>
@@ -244,10 +238,7 @@ export const ReleaseCreator: React.FC<Props> = ({
             <div className="release-alert release-alert--warning">
               <AlertCircle size={16} />
               <div>
-                {tr(
-                  'Letzter Release-Tag lokal nicht gefunden. Es wird stattdessen aktueller Verlauf verwendet.',
-                  'Latest release tag was not found locally. Showing recent history instead.',
-                )}
+                {t('generated.components.releasecreator.latest_release_tag_was_not_found_locally_showing_recent_b17316f0')}
               </div>
             </div>
           )}
@@ -261,9 +252,9 @@ export const ReleaseCreator: React.FC<Props> = ({
             <div className="release-alert release-alert--success">
               <CheckCircle2 size={16} />
               <div>
-                {tr('Release erfolgreich erstellt.', 'Release created successfully.')}{' '}
+                {t('generated.components.layout.sidebar.githubconnectedcontent.release_created_successfully_3bde93c8')}{' '}
                 <a href={releaseSuccess.htmlUrl} target="_blank" rel="noreferrer" className="release-alert-link">
-                  {tr('Release oeffnen', 'Open release')} <ExternalLink size={12} />
+                  {t('generated.components.releasecreator.open_release_d3a48bd7')} <ExternalLink size={12} />
                 </a>
               </div>
             </div>
@@ -272,23 +263,20 @@ export const ReleaseCreator: React.FC<Props> = ({
           <section className="release-form-shell">
             <section className="release-step-clean">
               <header className="release-step-title-row">
-                <h2>{tr('1. Version und Ziel', '1. Version and target')}</h2>
+                <h2>{t('generated.components.releasecreator.1_version_and_target_99fd2b69')}</h2>
               </header>
 
               <div className="release-version-bump">
                 <div className="release-version-bump-copy">
-                  <span className="release-field-label">{tr('Versionssprung', 'Version bump')}</span>
+                  <span className="release-field-label">{t('generated.components.releasecreator.version_bump_3bda5018')}</span>
                   <small>
-                    {tr(
-                      'Legt fest, welche Stelle erhoeht und wie das Release in den KI-Notizen bezeichnet wird.',
-                      'Controls which component is increased and how AI notes classify the release.',
-                    )}
+                    {t('generated.components.releasecreator.controls_which_component_is_increased_and_how_ai_notes_c_d39c7dfa')}
                   </small>
                 </div>
                 <div
                   className="release-version-bump-options"
                   role="group"
-                  aria-label={tr('Versionssprung auswaehlen', 'Select version bump')}
+                  aria-label={t('generated.components.releasecreator.select_version_bump_16edfafd')}
                 >
                   {(['major', 'minor', 'patch'] as ReleaseVersionBump[]).map((bump) => (
                     <button
@@ -307,45 +295,45 @@ export const ReleaseCreator: React.FC<Props> = ({
 
               <div className="release-field-grid">
                 <label className="release-field">
-                  <span className="release-field-label">{tr('Tag-Name (Pflicht)', 'Tag name (required)')}</span>
+                  <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.tag_name_required_f52acebf')}</span>
                   <input
                     type="text"
                     className="release-input"
                     value={releaseForm.tagName || ''}
                     onChange={(event) => setReleaseForm((prev) => ({ ...prev, tagName: event.target.value }))}
                     disabled={!ownerRepo || releaseSubmitting}
-                    placeholder={tr('z.B. v1.2.0', 'e.g. v1.2.0')}
+                    placeholder={t('generated.components.releasecreator.e_g_v1_2_0_65ddb49a')}
                   />
                 </label>
                 <button
                   className="release-tag-btn"
                   onClick={() => applySuggestedTag(suggestedTag)}
                   disabled={!ownerRepo || releaseSubmitting}
-                  title={tr('Tag-Vorschlag uebernehmen', 'Apply suggested tag')}
+                  title={t('generated.components.releasecreator.apply_suggested_tag_4bd41c42')}
                 >
                   <Tag size={14} />
                   {suggestedTag}
                 </button>
                 <label className="release-field release-field--full">
-                  <span className="release-field-label">{tr('Release-Name (Pflicht)', 'Release name (required)')}</span>
+                  <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.release_name_required_cbead0c8')}</span>
                   <input
                     type="text"
                     className="release-input"
                     value={releaseForm.releaseName || ''}
                     onChange={(event) => setReleaseForm((prev) => ({ ...prev, releaseName: event.target.value }))}
                     disabled={!ownerRepo || releaseSubmitting}
-                    placeholder={tr('z.B. Release v1.2.0', 'e.g. Release v1.2.0')}
+                    placeholder={t('generated.components.releasecreator.e_g_release_v1_2_0_cb9d37f6')}
                   />
                 </label>
                 <label className="release-field release-field--full">
-                  <span className="release-field-label">{tr('Ziel-Branch oder Commit (optional)', 'Target branch or commit (optional)')}</span>
+                  <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}</span>
                   <input
                     type="text"
                     className="release-input"
                     value={releaseForm.targetCommitish || ''}
                     onChange={(event) => setReleaseForm((prev) => ({ ...prev, targetCommitish: event.target.value }))}
                     disabled={!ownerRepo || releaseSubmitting}
-                    placeholder={tr('z.B. main oder SHA', 'e.g. main or SHA')}
+                    placeholder={t('generated.components.releasecreator.e_g_main_or_sha_5fadcf84')}
                   />
                 </label>
               </div>
@@ -353,7 +341,7 @@ export const ReleaseCreator: React.FC<Props> = ({
               {tagAlreadyExists ? (
                 <p className="release-inline release-inline--warning">
                   <XCircle size={13} />
-                  {tr('Dieser Tag existiert bereits.', 'This tag already exists.')}
+                  {t('generated.components.releasecreator.this_tag_already_exists_236e950d')}
                 </p>
               ) : validationMessage ? (
                 <p className="release-inline release-inline--warning">
@@ -363,14 +351,14 @@ export const ReleaseCreator: React.FC<Props> = ({
               ) : (
                 <p className="release-inline release-inline--muted">
                   <Check size={13} />
-                  {tr('Version und Name sind gueltig vorbereitet.', 'Version and name are ready.')}
+                  {t('generated.components.releasecreator.version_and_name_are_ready_3570b3a6')}
                 </p>
               )}
             </section>
 
             <section className="release-step-clean release-step-clean--notes-workbench">
               <header className="release-step-title-row">
-                <h2>{tr('2. Release Notes und Publish', '2. Release notes and publish')}</h2>
+                <h2>{t('generated.components.releasecreator.2_release_notes_and_publish_033f84f8')}</h2>
               </header>
 
               <div className="release-notes-workbench">
@@ -378,11 +366,11 @@ export const ReleaseCreator: React.FC<Props> = ({
                   <div className="release-ai-panel">
                     <div className="release-ai-headline">
                       <div className="release-ai-headline-copy">
-                        <strong>{tr('Tune AI notes', 'Tune AI notes')}</strong>
-                        <span>{tr('Verhalten feinsteuern und dann generieren.', 'Adjust behavior and generate.')}</span>
+                        <strong>{t('generated.components.releasecreator.tune_ai_notes_cd829863')}</strong>
+                        <span>{t('generated.components.releasecreator.adjust_behavior_and_generate_8d5ba99c')}</span>
                       </div>
                       <div className="release-language-wrap">
-                        <label htmlFor="release-language">{tr('KI-Sprache', 'AI language')}</label>
+                        <label htmlFor="release-language">{t('generated.components.releasecreator.ai_language_7ebc7cfd')}</label>
                         <select
                           id="release-language"
                           className="release-select"
@@ -390,51 +378,51 @@ export const ReleaseCreator: React.FC<Props> = ({
                           onChange={(event) => setNotesLanguage(event.target.value === 'de' ? 'de' : 'en')}
                           disabled={notesGenerating || releaseSubmitting}
                         >
-                          <option value="en">{tr('Englisch', 'English')}</option>
-                          <option value="de">{tr('Deutsch', 'German')}</option>
+                          <option value="en">{t('generated.components.releasecreator.english_61acbce0')}</option>
+                          <option value="de">{t('generated.components.releasecreator.german_239646b7')}</option>
                         </select>
                       </div>
                     </div>
 
                     <div className="release-ai-options-list">
                       <AiOptionToggle
-                        label={tr('Merge-Commits ausblenden', 'Exclude merge commits')}
-                        description={tr('Weniger Rauschen in den KI-Notizen.', 'Reduce noise in AI notes.')}
+                        label={t('generated.components.releasecreator.exclude_merge_commits_e56e6d3a')}
+                        description={t('generated.components.releasecreator.reduce_noise_in_ai_notes_cd0e4926')}
                         checked={notesOptions.omitMergeCommits}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, omitMergeCommits: next }))}
                         disabled={notesGenerating || releaseSubmitting}
                       />
                       <AiOptionToggle
-                        label={tr('Nach Bereichen gruppieren', 'Group into sections')}
-                        description={tr('Z.B. Added, Changed, Fixed.', 'E.g. Added, Changed, Fixed.')}
+                        label={t('generated.components.releasecreator.group_into_sections_620bb32f')}
+                        description={t('generated.components.releasecreator.e_g_added_changed_fixed_3d11f99e')}
                         checked={notesOptions.preferGroupedSections}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, preferGroupedSections: next }))}
                         disabled={notesGenerating || releaseSubmitting}
                       />
                       <AiOptionToggle
-                        label={tr('Mehr technische Details', 'More technical details')}
-                        description={tr('Fokus auf technische Aenderungen.', 'Focus on technical changes.')}
+                        label={t('generated.components.releasecreator.more_technical_details_b1a60fbc')}
+                        description={t('generated.components.releasecreator.focus_on_technical_changes_ee92f5fb')}
                         checked={notesOptions.includeTechnicalDetails}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeTechnicalDetails: next }))}
                         disabled={notesGenerating || releaseSubmitting}
                       />
                       <AiOptionToggle
-                        label={tr('Breaking-Changes-Abschnitt', 'Breaking changes section')}
-                        description={tr('Wird immer als eigener Abschnitt behandelt.', 'Always handled as a separate section.')}
+                        label={t('generated.components.releasecreator.breaking_changes_section_ccb42c05')}
+                        description={t('generated.components.releasecreator.always_handled_as_a_separate_section_5bb3fe16')}
                         checked={notesOptions.includeBreakingChangesSection}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeBreakingChangesSection: next }))}
                         disabled={notesGenerating || releaseSubmitting}
                       />
                       <AiOptionToggle
-                        label={tr('Automatische Commit-Liste anhaengen', 'Append automatic commit list')}
-                        description={tr('Wird lokal ohne KI erzeugt.', 'Generated locally without AI.')}
+                        label={t('generated.components.releasecreator.append_automatic_commit_list_53700f8a')}
+                        description={t('generated.components.releasecreator.generated_locally_without_ai_0d3c1350')}
                         checked={notesOptions.appendAlgorithmicChangeList}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, appendAlgorithmicChangeList: next }))}
                         disabled={notesGenerating || releaseSubmitting}
                       />
                       <AiOptionToggle
-                        label={tr('Commit-Hashes anzeigen', 'Show commit hashes')}
-                        description={tr('Nur fuer die automatische Commit-Liste.', 'Only for the automatic commit list.')}
+                        label={t('generated.components.releasecreator.show_commit_hashes_0ea4fe30')}
+                        description={t('generated.components.releasecreator.only_for_the_automatic_commit_list_1677c88d')}
                         checked={notesOptions.includeHashesInAlgorithmicList}
                         onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeHashesInAlgorithmicList: next }))}
                         disabled={notesGenerating || releaseSubmitting || !notesOptions.appendAlgorithmicChangeList}
@@ -448,14 +436,14 @@ export const ReleaseCreator: React.FC<Props> = ({
                         disabled={!canGenerateNotes}
                       >
                         <Sparkles size={16} />
-                        {notesGenerating ? tr('KI erstellt Release Notes...', 'AI is generating release notes...') : tr('Release Notes mit KI generieren', 'Generate release notes with AI')}
+                        {notesGenerating ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32') : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
                       </button>
                     </div>
                   </div>
 
                   <div className="release-publish-panel">
                     <header className="release-publish-head">
-                      <h3>{tr('3. Veroeffentlichen', '3. Publish')}</h3>
+                      <h3>{t('generated.components.releasecreator.3_publish_6d56d575')}</h3>
                     </header>
 
                     <div className="release-options-grid release-options-grid--compact">
@@ -467,8 +455,8 @@ export const ReleaseCreator: React.FC<Props> = ({
                           disabled={!ownerRepo || releaseSubmitting}
                         />
                         <span className="release-option-copy">
-                          <strong>{tr('Entwurf', 'Draft')}</strong>
-                          <small>{tr('Release speichern, aber nicht sofort veroeffentlichen.', 'Save the release without publishing it immediately.')}</small>
+                          <strong>{t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')}</strong>
+                          <small>{t('generated.components.releasecreator.save_the_release_without_publishing_it_immediately_492ee21f')}</small>
                         </span>
                       </label>
                       <label className="release-option-card">
@@ -479,8 +467,8 @@ export const ReleaseCreator: React.FC<Props> = ({
                           disabled={!ownerRepo || releaseSubmitting}
                         />
                         <span className="release-option-copy">
-                          <strong>{tr('Pre-Release', 'Pre-release')}</strong>
-                          <small>{tr('Kennzeichnet die Version als Vorabstatus (beta/rc).', 'Marks this version as an early preview (beta/rc).')}</small>
+                          <strong>{t('generated.components.layout.sidebar.githubconnectedcontent.pre_release_4bb763f1')}</strong>
+                          <small>{t('generated.components.releasecreator.marks_this_version_as_an_early_preview_beta_rc_02a7aae9')}</small>
                         </span>
                       </label>
                     </div>
@@ -491,7 +479,7 @@ export const ReleaseCreator: React.FC<Props> = ({
                       disabled={!canCreateRelease}
                     >
                       <Check size={14} />
-                      {releaseSubmitting ? tr('Erstelle Release...', 'Creating release...') : tr('Release erstellen', 'Create release')}
+                      {releaseSubmitting ? t('generated.components.releasecreator.creating_release_8650d060') : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
                     </button>
 
                     <p className={`release-inline ${canCreateRelease ? 'release-inline--muted' : 'release-inline--warning'}`}>
@@ -503,20 +491,20 @@ export const ReleaseCreator: React.FC<Props> = ({
 
                 <div className="release-notes-editor-pane">
                   <label className="release-field release-field--full release-field--editor">
-                    <span className="release-field-label">{tr('Release Notes (Markdown)', 'Release notes (Markdown)')}</span>
+                    <span className="release-field-label">{t('generated.components.releasecreator.release_notes_markdown_3ec01efd')}</span>
                     <textarea
                       className="release-textarea release-textarea--editor"
                       value={releaseForm.body || ''}
                       onChange={(event) => setReleaseForm((prev) => ({ ...prev, body: event.target.value }))}
                       rows={20}
                       disabled={!ownerRepo || releaseSubmitting}
-                      placeholder={tr('- Added\n- Changed\n- Fixed', '- Added\n- Changed\n- Fixed')}
+                      placeholder={t('generated.components.releasecreator.added_changed_fixed_4361f5e9')}
                     />
                   </label>
 
                   <div className="release-notes-meta">
-                    <span>{tr('Zeilen', 'Lines')}: {bodyLineCount}</span>
-                    <span>{tr('Zeichen', 'Characters')}: {bodyCharCount}</span>
+                    <span>{t('generated.components.releasecreator.lines_ec6b4722')}: {bodyLineCount}</span>
+                    <span>{t('generated.components.releasecreator.characters_f141ff5c')}: {bodyCharCount}</span>
                   </div>
                 </div>
               </div>
@@ -527,24 +515,24 @@ export const ReleaseCreator: React.FC<Props> = ({
         <aside className="release-history-panel">
           <div className="release-history-toolbar">
             <div className="release-history-toolbar-copy">
-              <span className="release-eyebrow">{tr('History', 'History')}</span>
-              <strong>{tr('Commits seit letztem Release', 'Commits since last release')}</strong>
+              <span className="release-eyebrow">{t('generated.components.releasecreator.history_0b0610f3')}</span>
+              <strong>{t('generated.components.releasecreator.commits_since_last_release_405f45df')}</strong>
             </div>
             <button
               className="staging-tool-btn"
               onClick={() => void onRefreshContext()}
               disabled={!ownerRepo || contextLoading || releaseSubmitting}
-              title={tr('Daten aktualisieren', 'Refresh data')}
+              title={t('generated.components.releasecreator.refresh_data_a356c350')}
             >
               <RefreshCw size={12} className={contextLoading ? 'spin' : ''} />
-              {contextLoading ? tr('Aktualisiere...', 'Refreshing...') : tr('Aktualisieren', 'Refresh')}
+              {contextLoading ? t('generated.components.releasecreator.refreshing_3a1f234f') : t('generated.components.layout.apimcpsettingspanel.refresh_4825b0d7')}
             </button>
           </div>
           <div className="release-history-scroll">
             {commitsCount === 0 && (
               <div className="release-empty-state">
                 <GitBranch size={16} />
-                {tr('Keine Commits gefunden.', 'No commits found.')}
+                {t('generated.components.commit_graph.commitgraph.no_commits_found_c43024aa')}
               </div>
             )}
             {commits.map((commit) => (

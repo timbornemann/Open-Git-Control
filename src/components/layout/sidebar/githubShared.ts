@@ -1,12 +1,12 @@
-type TranslateFn = (de: string, en: string) => string;
+import type { CatalogTranslateFn } from '../../../i18n';
 
-export const getCiBadgeStyles = (badge: string, tr: TranslateFn) => {
+export const getCiBadgeStyles = (badge: string, t: CatalogTranslateFn) => {
   if (badge === 'success') {
     return {
       color: 'var(--status-success)',
       backgroundColor: 'var(--status-success-soft)',
       borderColor: 'var(--status-success-border)',
-      label: tr('CI: Erfolgreich', 'CI: Success'),
+      label: t('github.ci.success'),
     };
   }
   if (badge === 'failure') {
@@ -14,7 +14,7 @@ export const getCiBadgeStyles = (badge: string, tr: TranslateFn) => {
       color: 'var(--status-danger)',
       backgroundColor: 'var(--status-danger-soft)',
       borderColor: 'var(--status-danger-border)',
-      label: tr('CI: Fehlgeschlagen', 'CI: Failed'),
+      label: t('github.ci.failed'),
     };
   }
   if (badge === 'pending') {
@@ -22,14 +22,14 @@ export const getCiBadgeStyles = (badge: string, tr: TranslateFn) => {
       color: 'var(--status-warning)',
       backgroundColor: 'var(--status-warning-soft)',
       borderColor: 'var(--status-warning-border)',
-      label: tr('CI: Ausstehend', 'CI: Pending'),
+      label: t('github.ci.pending'),
     };
   }
   return {
     color: 'var(--text-secondary)',
     backgroundColor: 'var(--bg-dark)',
     borderColor: 'var(--border-color)',
-    label: tr('CI: Unbekannt', 'CI: Unknown'),
+    label: t('github.ci.unknown'),
   };
 };
 

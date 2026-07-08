@@ -126,7 +126,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   onCreateGithubRepoForCurrent,
   isAuthenticated,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -214,13 +214,13 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
           >
             <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
               {hasRemoteOrigin === false
-                ? tr('Noch nicht mit GitHub verbunden.', 'Not connected to GitHub yet.')
-                : tr('Remote ist nicht mehr gueltig.', 'Remote is no longer valid.')}
+                ? t('generated.components.layout.sidebar.reposidebarcontent.not_connected_to_github_yet_9a7afeaa')
+                : t('generated.components.layout.sidebar.reposidebarcontent.remote_is_no_longer_valid_6ffdf83b')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <input
                 type="text"
-                placeholder={tr('Repository-Name auf GitHub', 'Repository name on GitHub')}
+                placeholder={t('generated.components.layout.sidebar.reposidebarcontent.repository_name_on_github_9ca29e86')}
                 value={newRepoName}
                 onChange={e => setNewRepoName(e.target.value)}
                 style={{
@@ -235,7 +235,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
                 }}
               />
               <textarea
-                placeholder={tr('Beschreibung (optional)', 'Description (optional)')}
+                placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.description_optional_30003d39')}
                 value={newRepoDescription}
                 onChange={e => setNewRepoDescription(e.target.value)}
                 rows={2}
@@ -265,7 +265,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
                   checked={newRepoPrivate}
                   onChange={e => setNewRepoPrivate(e.target.checked)}
                 />
-                {tr('Privat', 'Private')}
+                {t('generated.components.layout.sidebar.reposidebarcontent.private_d6902471')}
               </label>
             </div>
             {connectError && (
@@ -292,11 +292,11 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
               }}
             >
               <Github size={14} />
-              {isConnectingGithubRepo ? tr('Verbinde...', 'Connecting...') : tr('GitHub-Repo erstellen & verbinden', 'Create & connect GitHub repo')}
+              {isConnectingGithubRepo ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1') : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
             </button>
             {!isAuthenticated && (
               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                {tr('Hinweis: Bitte zuerst im GitHub-Tab anmelden.', 'Note: Please sign in first in the GitHub tab.')}
+                {t('generated.components.layout.sidebar.reposidebarcontent.note_please_sign_in_first_in_the_github_tab_a84a54c9')}
               </div>
             )}
           </div>

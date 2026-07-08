@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FileTimelineCommitDto } from '../../../global';
+import type { CatalogTranslateFn } from '../../../i18n';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
 import { gitClient } from '../../../services/gitClient';
 
@@ -7,14 +8,14 @@ type UseMainViewTimelineParams = {
   activeRepo: string | null;
   setActiveTab: (tab: AppTabId) => void;
   onCloseReleaseCreator: () => void;
-  tr: (de: string, en: string) => string;
+  t: CatalogTranslateFn;
 };
 
 export const useMainViewTimeline = ({
   activeRepo,
   setActiveTab,
   onCloseReleaseCreator,
-  tr,
+  t,
 }: UseMainViewTimelineParams) => {
   const [showTimeline, setShowTimeline] = useState(false);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
@@ -31,14 +32,14 @@ export const useMainViewTimeline = ({
         setActiveTab('repo');
         setShowTimeline(true);
       } else {
-        alert(result.error || tr('Timeline-Daten konnten nicht geladen werden.', 'Could not load timeline data.'));
+        alert(result.error || t('timeline.errors.loadDataFailed'));
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : tr('Fehler beim Laden der Zeitleiste.', 'Error loading timeline.'));
+      alert(err instanceof Error ? err.message : t('timeline.errors.loadFailed'));
     } finally {
       setIsTimelineLoading(false);
     }
-  }, [activeRepo, onCloseReleaseCreator, setActiveTab, tr]);
+  }, [activeRepo, onCloseReleaseCreator, setActiveTab, t]);
 
   useEffect(() => {
     setShowTimeline(false);

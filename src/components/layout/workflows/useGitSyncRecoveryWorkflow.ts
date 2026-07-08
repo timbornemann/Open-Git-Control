@@ -1,5 +1,5 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import {
   isNonFastForwardPushError,
   isPullBlockedByLocalChangesError,
@@ -52,6 +52,7 @@ export const useGitSyncRecoveryWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(language, deText, enText);
   }, [language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
 
   const runRemoteAheadQuickFix = useCallback(async ({
     command,
@@ -71,8 +72,8 @@ export const useGitSyncRecoveryWorkflow = ({
 
     const stashed = await runGitCommand(
       ['stash', 'push', '-u', '-m', quickFixStashMessage],
-      tr('Quick-Fix: Aenderungen wurden im Stash gesichert.', 'Quick fix: saved changes to stash.'),
-      tr('Quick-Fix: stash wird erstellt...', 'Quick fix: creating stash...'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_saved_changes_to_stash_5cd00a52'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_creating_stash_3adb0717'),
       quickFixOptions,
     );
     if (!stashed) {
@@ -81,16 +82,13 @@ export const useGitSyncRecoveryWorkflow = ({
 
     const pulled = await runGitCommand(
       ['pull', '--rebase'],
-      tr('Quick-Fix: pull --rebase abgeschlossen.', 'Quick fix: pull --rebase completed.'),
-      tr('Quick-Fix: pull --rebase wird ausgefuehrt...', 'Quick fix: running pull --rebase...'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_pull_rebase_completed_acf1dc5f'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_running_pull_rebase_394092f9'),
       quickFixOptions,
     );
     if (!pulled) {
       setGitActionToast({
-        msg: tr(
-          'Quick-Fix gestoppt: Pull/Rebase ist fehlgeschlagen. Deine Aenderungen bleiben im neuesten Stash gesichert.',
-          'Quick fix stopped: pull/rebase failed. Your changes remain safe in the latest stash.',
-        ),
+        msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_stopped_pull_rebase_failed_your_changes_remain_72fa5cc7'),
         isError: true,
       });
       return;
@@ -98,16 +96,13 @@ export const useGitSyncRecoveryWorkflow = ({
 
     const popped = await runGitCommand(
       ['stash', 'pop'],
-      tr('Quick-Fix: Stash wurde wieder angewendet.', 'Quick fix: stash reapplied.'),
-      tr('Quick-Fix: Stash wird wieder angewendet...', 'Quick fix: reapplying stash...'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_stash_reapplied_5491de8e'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_reapplying_stash_3a51c601'),
       quickFixOptions,
     );
     if (!popped) {
       setGitActionToast({
-        msg: tr(
-          'Quick-Fix fast fertig: Pull/Rebase war erfolgreich, aber Stash-Pop braucht manuelle Aufloesung.',
-          'Quick fix nearly finished: pull/rebase succeeded, but stash pop needs manual resolution.',
-        ),
+        msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_nearly_finished_pull_rebase_succeeded_but_stas_ebdc2090'),
         isError: true,
       });
       return;
@@ -146,8 +141,8 @@ export const useGitSyncRecoveryWorkflow = ({
 
     const stashed = await runGitCommand(
       ['stash', 'push', '-u', '-m', stashMessage],
-      tr('Autostash: Aenderungen wurden im Stash gesichert.', 'Autostash: saved local changes to stash.'),
-      tr('Autostash: stash wird erstellt...', 'Autostash: creating stash...'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_saved_local_changes_to_stash_eb2082e8'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_creating_stash_126e4d4f'),
       autostashOptions,
     );
     if (!stashed) {
@@ -157,10 +152,7 @@ export const useGitSyncRecoveryWorkflow = ({
     const pulled = await runGitCommand(args, successMsg, actionLabel, autostashOptions);
     if (!pulled) {
       setGitActionToast({
-        msg: tr(
-          'Autostash gestoppt: Pull ist fehlgeschlagen. Deine Aenderungen bleiben im neuesten Stash gesichert.',
-          'Autostash stopped: pull failed. Your changes remain safe in the latest stash.',
-        ),
+        msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_stopped_pull_failed_your_changes_remain_safe_i_480071f0'),
         isError: true,
       });
       return;
@@ -168,26 +160,20 @@ export const useGitSyncRecoveryWorkflow = ({
 
     const popped = await runGitCommand(
       ['stash', 'pop'],
-      tr('Autostash: Stash wurde wieder angewendet.', 'Autostash: stash reapplied.'),
-      tr('Autostash: Stash wird wieder angewendet...', 'Autostash: reapplying stash...'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_stash_reapplied_34ac5813'),
+      t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_reapplying_stash_ebfb337f'),
       autostashOptions,
     );
     if (!popped) {
       setGitActionToast({
-        msg: tr(
-          'Autostash fast fertig: Pull war erfolgreich, aber Stash-Pop braucht manuelle Aufloesung.',
-          'Autostash nearly finished: pull succeeded, but stash pop needs manual resolution.',
-        ),
+        msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_nearly_finished_pull_succeeded_but_stash_pop_n_10cc91d3'),
         isError: true,
       });
       return;
     }
 
     setGitActionToast({
-      msg: tr(
-        'Autostash-Pull erfolgreich abgeschlossen (stash -> pull -> stash pop).',
-        'Autostash pull completed successfully (stash -> pull -> stash pop).',
-      ),
+      msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_pull_completed_successfully_stash_pull_stash_p_a5a5ffa3'),
       isError: false,
     });
   }, [runGitCommandRef, setGitActionToast, tr]);
@@ -207,10 +193,7 @@ export const useGitSyncRecoveryWorkflow = ({
     if (command === 'push' && isNonFastForwardPushError(failureMessage)) {
       setActiveTab('repo');
       setGitActionToast({
-        msg: tr(
-          'Push abgelehnt: Remote ist neuer als lokal. Bitte zuerst committen/stashen, dann pull (oder pull --rebase) und danach erneut pushen.',
-          'Push rejected: remote is newer than local. Commit or stash first, then pull (or pull --rebase), and push again.',
-        ),
+        msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.push_rejected_remote_is_newer_than_local_commit_or_stash_25113636'),
         isError: true,
       });
       return true;
@@ -220,27 +203,18 @@ export const useGitSyncRecoveryWorkflow = ({
       setActiveTab('repo');
       setConfirmDialog({
         variant: 'danger',
-        title: tr('Pull durch uncommitted Aenderungen blockiert', 'Pull blocked by uncommitted changes'),
-        message: tr(
-          'Der Pull wurde abgebrochen, da uncommitted Aenderungen ueberschrieben werden koennten. Moechtest du ein Autostash ausfuehren (lokale uncommitted Aenderungen stashen, pullen und Stash wieder anwenden)?',
-          'The pull was aborted because uncommitted changes would be overwritten. Do you want to perform an autostash (stash changes, pull, and reapply stash)?',
-        ),
+        title: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.pull_blocked_by_uncommitted_changes_5d82ef95'),
+        message: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.the_pull_was_aborted_because_uncommitted_changes_would_b_b29d9079'),
         contextItems: [
-          { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+          { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git ${args.join(' ')}` },
           {
-            label: tr('Hinweis', 'Hint'),
-            value: tr(
-              'Deine lokalen uncommitted Aenderungen werden voruebergehend gesichert.',
-              'Your local uncommitted changes will be stashed temporarily.',
-            ),
+            label: t('generated.components.layout.workflows.usegitcommandguardworkflow.hint_5628c320'),
+            value: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.your_local_uncommitted_changes_will_be_stashed_temporari_315cb6b7'),
           },
         ],
         irreversible: false,
-        consequences: tr(
-          'Falls beim Wiederanwenden des Stashs Konflikte entstehen, wird der Konflikt-Resolver geoeffnet.',
-          'If conflicts occur when reapplying the stash, the conflict resolver will open.',
-        ),
-        confirmLabel: tr('Mit Autostash ausfuehren', 'Run with autostash'),
+        consequences: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.if_conflicts_occur_when_reapplying_the_stash_the_conflic_7a3c5c90'),
+        confirmLabel: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.run_with_autostash_8a0fb6ae'),
         onConfirm: async () => {
           await runAutostashPullFlow({ args, successMsg, actionLabel, options });
         },

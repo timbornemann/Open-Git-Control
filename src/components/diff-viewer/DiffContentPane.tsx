@@ -64,7 +64,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   blameMap,
   onNavigateToCommit,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const { highlightLine } = useDiffSyntaxHighlighting();
 
   const renderBlameCell = (line: ParsedLine, prevLine?: ParsedLine, side: 'left' | 'right' = 'right') => (
@@ -199,7 +199,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   }
 
   if (!diffText.trim()) {
-    return <div className="diff-empty-state">{tr('Keine Unterschiede vorhanden.', 'No differences found.')}</div>;
+    return <div className="diff-empty-state">{t('generated.components.diff_viewer.diffcontentpane.no_differences_found_e10fb9f5')}</div>;
   }
 
   if (!canRenderText) {
@@ -208,8 +208,8 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
         <FileWarning size={18} />
         <span>
           {isBinaryDiff || looksBinaryByExt
-            ? tr('Binaerdatei erkannt. Text-Diff wird nicht dargestellt.', 'Binary file detected. Text diff is not shown.')
-            : tr('Diese Datei kann nicht als Text-Diff dargestellt werden.', 'This file cannot be shown as text diff.')}
+            ? t('generated.components.diff_viewer.diffcontentpane.binary_file_detected_text_diff_is_not_shown_bcfe2843')
+            : t('generated.components.diff_viewer.diffcontentpane.this_file_cannot_be_shown_as_text_diff_e0948ac7')}
         </span>
       </div>
     );
@@ -229,9 +229,9 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
             <button
               className="diff-large-warning-copy"
               onClick={() => navigator.clipboard.writeText(diffText)}
-              title={tr('Vollstaendigen Diff in Zwischenablage kopieren', 'Copy full diff to clipboard')}
+              title={t('generated.components.diff_viewer.diffcontentpane.copy_full_diff_to_clipboard_b6bbbdde')}
             >
-              {tr('Vollstaendig kopieren', 'Copy full diff')}
+              {t('generated.components.diff_viewer.diffcontentpane.copy_full_diff_5abd77b2')}
             </button>
           )}
         </div>
@@ -246,7 +246,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       )}
 
       {parsed.hunks.length === 0 && (
-        <div className="diff-empty-state">{tr('Keine Hunk-Daten verfuegbar.', 'No hunk data available.')}</div>
+        <div className="diff-empty-state">{t('generated.components.diff_viewer.diffcontentpane.no_hunk_data_available_3c3c1467')}</div>
       )}
 
       {hunkOpError && (
@@ -273,16 +273,16 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                       <button
                         className="diff-hunk-action-btn"
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'stage')}
-                        title={tr('Diesen Hunk stagen', 'Stage this hunk')}
+                        title={t('generated.components.diff_viewer.diffcontentpane.stage_this_hunk_c97d4d48')}
                       >
-                        {tr('Stage', 'Stage')}
+                        {t('generated.components.diff_viewer.diffcontentpane.stage_a304b800')}
                       </button>
                       <button
                         className="diff-hunk-action-btn diff-hunk-action-btn--danger"
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'discard')}
-                        title={tr('Aenderungen in diesem Hunk verwerfen', 'Discard changes in this hunk')}
+                        title={t('generated.components.diff_viewer.diffcontentpane.discard_changes_in_this_hunk_b3969326')}
                       >
-                        {tr('Verwerfen', 'Discard')}
+                        {t('generated.components.diff_viewer.diffcontentpane.discard_23504c1c')}
                       </button>
                     </>
                   )}
@@ -290,9 +290,9 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                     <button
                       className="diff-hunk-action-btn"
                       onClick={() => applyHunk(hunk, parsed.fileHeader, 'unstage')}
-                      title={tr('Diesen Hunk unstagen', 'Unstage this hunk')}
+                      title={t('generated.components.diff_viewer.diffcontentpane.unstage_this_hunk_0ac01911')}
                     >
-                      {tr('Unstage', 'Unstage')}
+                      {t('generated.components.diff_viewer.diffcontentpane.unstage_80442576')}
                     </button>
                   )}
                 </div>

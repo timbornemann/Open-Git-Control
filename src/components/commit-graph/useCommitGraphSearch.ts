@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CatalogTranslateFn } from '../../i18n';
 import type { GraphLayout } from '../../utils/graphLayout';
 import type { SearchPanel } from './ForensicSearchPanel';
 
@@ -8,14 +9,14 @@ type UseCommitGraphSearchParams = {
   layout: GraphLayout | null;
   selectedHash?: string | null;
   onSelectCommit?: (hash: string | null) => void;
-  tr: (deText: string, enText: string) => string;
+  t: CatalogTranslateFn;
 };
 
 export const useCommitGraphSearch = ({
   layout,
   selectedHash,
   onSelectCommit,
-  tr,
+  t,
 }: UseCommitGraphSearchParams) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
@@ -23,12 +24,12 @@ export const useCommitGraphSearch = ({
   const [matchCursor, setMatchCursor] = useState(0);
 
   const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
-    all: tr('Alles', 'All'),
-    subject: tr('Nachricht', 'Message'),
-    author: tr('Autor', 'Author'),
-    hash: tr('Hash', 'Hash'),
-    refs: tr('Refs', 'Refs'),
-  }), [tr]);
+    all: t('generated.components.commit_graph.usecommitgraphsearch.all_54b2bb75'),
+    subject: t('generated.components.commit_graph.usecommitgraphsearch.message_e56e225d'),
+    author: t('generated.components.commitdetails.author_7f609ec0'),
+    hash: t('generated.components.commit_graph.usecommitgraphsearch.hash_293b8257'),
+    refs: t('generated.components.commit_graph.usecommitgraphsearch.refs_0530bfc7'),
+  }), [t]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 

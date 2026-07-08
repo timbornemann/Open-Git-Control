@@ -7,7 +7,7 @@ import {
   PullRequestDto,
 } from '../global';
 import { useRef } from 'react';
-import { trByLanguage, type AppLanguage } from '../i18n';
+import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '../i18n';
 import { gitClient } from '../services/gitClient';
 import { githubClient } from '../services/githubClient';
 import { RepoOwnerRef } from '../types/git';
@@ -371,11 +371,11 @@ export const submitPullRequest = async (
   language: AppLanguage,
   deps?: PullRequestClientDeps,
 ): Promise<{ success: true; number: number } | { success: false; error: string }> => {
-  const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
+  const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
   const { github } = getPullRequestClients(deps);
 
   if (!github.isAvailable() || !prOwnerRepo || !input.title.trim()) {
-    return { success: false, error: tr('Fehler beim Erstellen des PR.', 'Error creating PR.') };
+    return { success: false, error: t('generated.hooks.usepullrequests.error_creating_pr_a90b6ac1') };
   }
 
   try {
@@ -389,14 +389,14 @@ export const submitPullRequest = async (
     });
 
     if (!result.success) {
-      return { success: false, error: result.error || tr('Fehler beim Erstellen des PR.', 'Error creating PR.') };
+      return { success: false, error: result.error || t('generated.hooks.usepullrequests.error_creating_pr_a90b6ac1') };
     }
 
     return { success: true, number: result.data.number };
   } catch (error: unknown) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : tr('Fehler beim Erstellen des PR.', 'Error creating PR.'),
+      error: error instanceof Error ? error.message : t('generated.hooks.usepullrequests.error_creating_pr_a90b6ac1'),
     };
   }
 };

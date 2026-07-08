@@ -70,19 +70,19 @@ export const RemotePanel: React.FC<Props> = ({
   const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && !remoteSync.lastFetchError && remoteSync.hasUpstream;
   const statusVariant: 'success' | 'warning' | 'danger' =
     remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream ? 'warning' : 'success';
-  const { tr } = useI18n();
+  const { t } = useI18n();
 
   return (
     <RepoCard>
       <RepoCardHeader
-        title={tr('Remotes', 'Remotes')}
+        title={t('generated.components.sidebar.remotepanel.remotes_339488fe')}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        toggleTitle={collapsed ? tr('Remotes anzeigen', 'Show remotes') : tr('Remotes einklappen', 'Collapse remotes')}
+        toggleTitle={collapsed ? t('generated.components.sidebar.remotepanel.show_remotes_dc296466') : t('generated.components.sidebar.remotepanel.collapse_remotes_7e486557')}
         actions={(
           <>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onAddRemote} title={tr('Remote hinzufuegen', 'Add remote')}><Plus size={13} /></button>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onRefreshRemote} title={tr('Remote aktualisieren', 'Refresh remote')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onAddRemote} title={t('generated.components.sidebar.remotepanel.add_remote_e2bcff09')}><Plus size={13} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onRefreshRemote} title={t('generated.components.sidebar.remotepanel.refresh_remote_e97c388d')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
           </>
         )}
       />
@@ -98,7 +98,7 @@ export const RemotePanel: React.FC<Props> = ({
               </span>
               {!remoteSync.hasUpstream && (
                 <button className="staging-tool-btn remote-overview-action" onClick={onSetUpstreamForCurrentBranch}>
-                  {tr('Upstream setzen', 'Set upstream')}
+                  {t('generated.components.sidebar.remotepanel.set_upstream_18b707c4')}
                 </button>
               )}
             </div>
@@ -124,15 +124,15 @@ export const RemotePanel: React.FC<Props> = ({
                         <span className="remote-row-url">{compactUrl}</span>
                       </span>
                       <span className="remote-row-actions">
-                        <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn remote-row-action" title={tr('Remote bearbeiten', 'Edit remote')}><Edit2 size={11} /></button>
-                        <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn remote-row-action" title={tr('Remote entfernen', 'Remove remote')}><X size={11} /></button>
+                        <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn remote-row-action" title={t('generated.components.sidebar.remotepanel.edit_remote_df039292')}><Edit2 size={11} /></button>
+                        <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn remote-row-action" title={t('generated.components.sidebar.remotepanel.remove_remote_7e7dee87')}><X size={11} /></button>
                       </span>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="repo-state-text">{tr('Keine Remotes konfiguriert.', 'No remotes configured.')}</div>
+              <div className="repo-state-text">{t('generated.components.sidebar.remotepanel.no_remotes_configured_95a4103d')}</div>
             )}
           </div>
 
@@ -149,36 +149,36 @@ export const RemotePanel: React.FC<Props> = ({
                 </div>
                 <button
                   className="ctx-menu-item"
-                  title={tr('Benennt diesen Remote-Eintrag um.', 'Renames this remote entry.')}
+                  title={t('generated.components.sidebar.remotepanel.renames_this_remote_entry_a234cf05')}
                   onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRenameRemote(r.name); }}
                 >
                   <span className="ctx-menu-icon">RN</span>
                   <MenuLabel
-                    label={tr('Umbenennen', 'Rename')}
-                    help={tr('Aendert nur den lokalen Namen wie origin oder upstream.', 'Changes only the local name like origin or upstream.')}
+                    label={t('generated.components.layout.branchcontextmenu.rename_cd5280ff')}
+                    help={t('generated.components.sidebar.remotepanel.changes_only_the_local_name_like_origin_or_upstream_7a662b12')}
                   />
                 </button>
                 <button
                   className="ctx-menu-item"
-                  title={tr('Aendert die URL, zu der dieser Remote zeigt.', 'Changes the URL this remote points to.')}
+                  title={t('generated.components.sidebar.remotepanel.changes_the_url_this_remote_points_to_704788ac')}
                   onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onSetRemoteUrl(r.name, r.url); }}
                 >
                   <span className="ctx-menu-icon">URL</span>
                   <MenuLabel
-                    label={tr('URL aendern', 'Change URL')}
-                    help={tr('Wechselt das Ziel fuer Fetch, Pull und Push dieses Remotes.', 'Changes the target for fetch, pull, and push for this remote.')}
+                    label={t('generated.components.sidebar.remotepanel.change_url_0b212601')}
+                    help={t('generated.components.sidebar.remotepanel.changes_the_target_for_fetch_pull_and_push_for_this_remo_ac8ea662')}
                   />
                 </button>
                 <div className="ctx-menu-sep" />
                 <button
                   className="ctx-menu-item danger"
-                  title={tr('Entfernt diesen Remote aus der lokalen Repository-Konfiguration.', 'Removes this remote from the local repository configuration.')}
+                  title={t('generated.components.sidebar.remotepanel.removes_this_remote_from_the_local_repository_configurat_dd7d558f')}
                   onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRemoveRemote(r.name); }}
                 >
                   <span className="ctx-menu-icon">DEL</span>
                   <MenuLabel
-                    label={tr('Entfernen', 'Remove')}
-                    help={tr('Loescht nur den Remote-Eintrag lokal. Das entfernte Repository bleibt bestehen.', 'Deletes only the local remote entry. The remote repository remains untouched.')}
+                    label={t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}
+                    help={t('generated.components.sidebar.remotepanel.deletes_only_the_local_remote_entry_the_remote_repositor_49a1b70d')}
                   />
                 </button>
               </div>

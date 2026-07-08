@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import { githubClient } from '../../../services/githubClient';
 import type { RepoOwnerRef } from '../../../types/git';
@@ -59,6 +59,7 @@ export const usePullRequestWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(language, deText, enText);
   }, [language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
 
   const handleCreatePR = useCallback(async () => {
     await createPullRequest({
@@ -78,9 +79,9 @@ export const usePullRequestWorkflow = ({
   const handleCopyPRUrl = useCallback(async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      setGitActionToast({ msg: tr('PR-URL kopiert.', 'Copied PR URL.'), isError: false });
+      setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.copied_pr_url_5326d67e'), isError: false });
     } catch {
-      setGitActionToast({ msg: tr('PR-URL konnte nicht kopiert werden.', 'Could not copy PR URL.'), isError: true });
+      setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.could_not_copy_pr_url_15ef5c92'), isError: true });
     }
   }, [setGitActionToast, tr]);
 
@@ -100,7 +101,7 @@ export const usePullRequestWorkflow = ({
         });
 
         if (!result.success) {
-          setGitActionToast({ msg: result.error || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
+          setGitActionToast({ msg: result.error || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'), isError: true });
           return;
         }
 
@@ -108,7 +109,7 @@ export const usePullRequestWorkflow = ({
         refreshRemoteState(true);
         triggerRefresh();
       } catch (error: any) {
-        setGitActionToast({ msg: error?.message || tr('PR konnte nicht gemergt werden.', 'Could not merge PR.'), isError: true });
+        setGitActionToast({ msg: error?.message || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'), isError: true });
       }
     };
 
@@ -121,15 +122,12 @@ export const usePullRequestWorkflow = ({
           `This will merge PR #${prNumber} with ${mergeMethod} into ${ownerRepo.owner}/${ownerRepo.repo}.`,
         ),
         contextItems: [
-          { label: tr('Repository', 'Repository'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
-          { label: tr('Methode', 'Method'), value: mergeMethod },
+          { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
+          { label: t('generated.components.layout.workflows.usepullrequestworkflow.method_bde313dd'), value: mergeMethod },
         ],
         irreversible: true,
-        consequences: tr(
-          'Der Remote-PR wird auf GitHub abgeschlossen und der Ziel-Branch verandert.',
-          'The remote PR will be completed on GitHub and the target branch will change.',
-        ),
-        confirmLabel: tr('PR mergen', 'Merge PR'),
+        consequences: t('generated.components.layout.workflows.usepullrequestworkflow.the_remote_pr_will_be_completed_on_github_and_the_target_b6cc8731'),
+        confirmLabel: t('generated.components.layout.sidebar.githubconnectedcontent.merge_pr_4b999c62'),
         onConfirm: executeMerge,
       });
       return;

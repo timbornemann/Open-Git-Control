@@ -21,7 +21,7 @@ export const StagingToolbar: React.FC<StagingToolbarProps> = ({
   mutationElapsedMs,
   visibleTotal,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   return (
     <div className="staging-toolbar">
@@ -30,19 +30,19 @@ export const StagingToolbar: React.FC<StagingToolbarProps> = ({
           className="staging-search-input"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={tr('Datei suchen...', 'Search file...')}
+          placeholder={t('generated.components.staging_area.stagingtoolbar.search_file_be8954bd')}
         />
       </div>
       <div className="staging-toolbar-stats">
-        <span className="staging-stat-chip" title={tr('Staged Diff-Statistik', 'Staged diff stats')}>
-          {tr('Staged', 'Staged')} {formatDiffStats(stagedStats)}
+        <span className="staging-stat-chip" title={t('generated.components.staging_area.stagingtoolbar.staged_diff_stats_80752927')}>
+          {t('generated.components.staging_area.stagingtoolbar.staged_62fac16f')} {formatDiffStats(stagedStats)}
         </span>
-        <span className="staging-stat-chip" title={tr('Unstaged Diff-Statistik', 'Unstaged diff stats')}>
-          {tr('Unstaged', 'Unstaged')} {formatDiffStats(unstagedStats)}
+        <span className="staging-stat-chip" title={t('generated.components.staging_area.stagingtoolbar.unstaged_diff_stats_274a22bb')}>
+          {t('generated.components.staging_area.stagingtoolbar.unstaged_5eac5a01')} {formatDiffStats(unstagedStats)}
         </span>
         {isMutating && (
           <span className="staging-stat-chip">
-            {tr('Git arbeitet', 'Git is working')} {(mutationElapsedMs / 1000).toFixed(1)}s
+            {t('generated.components.staging_area.stagingtoolbar.git_is_working_700e9c35')} {(mutationElapsedMs / 1000).toFixed(1)}s
           </span>
         )}
         {visibleTotal > 0 && (

@@ -7,9 +7,10 @@ import {
   getCommitMessageStyleLabel,
   getCommitMessageStyleOptions,
 } from '../commitMessagePreferences';
+import { translateFromCatalog, type CatalogTranslateFn } from '../../i18n';
 
-const de = (deText: string) => deText;
-const en = (_deText: string, enText: string) => enText;
+const de: CatalogTranslateFn = (key, variables) => translateFromCatalog('de', key, variables);
+const en: CatalogTranslateFn = (key, variables) => translateFromCatalog('en', key, variables);
 
 describe('commitMessagePreferences', () => {
   it('returns localized style labels with a conventional fallback', () => {
@@ -52,8 +53,10 @@ describe('commitMessagePreferences', () => {
   it('formats examples with or without descriptions', () => {
     expect(formatCommitMessageStyleExample('detailed', 'en', en)).toContain('\n\nShows Receiving');
 
-    const withoutDescription = formatCommitMessageStyleExample('plain', 'en', (_deText, enText) => (
-      enText.startsWith('Description usually empty') ? '' : enText
+    const withoutDescription = formatCommitMessageStyleExample('plain', 'en', (key, variables) => (
+      key === 'commitMessage.examples.plainDescriptionHint'
+        ? ''
+        : translateFromCatalog('en', key, variables)
     ));
     expect(withoutDescription).toBe('improve clone progress');
   });

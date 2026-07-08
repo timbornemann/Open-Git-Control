@@ -4,7 +4,7 @@ import type {
   GitHubReleaseContextDto,
   GitHubReleaseDto,
 } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { githubClient } from '../../../services/githubClient';
 import type { ReleaseNotesOptions } from '../../../types/releaseNotes';
 import type { RepoOwnerRef } from '../../../types/git';
@@ -75,6 +75,7 @@ export const useReleaseWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(language, deText, enText);
   }, [language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
 
   const setReleaseForm = useCallback((updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => {
     setReleaseFormState(prev => {
@@ -132,7 +133,7 @@ export const useReleaseWorkflow = ({
   const refreshReleaseContext = useCallback(async (targetCommitishOverride?: string) => {
     if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
       setReleaseContext(null);
-      setReleaseContextError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      setReleaseContextError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
       return;
     }
 
@@ -149,7 +150,7 @@ export const useReleaseWorkflow = ({
 
       if (!result.success) {
         setReleaseContext(null);
-        setReleaseContextError(result.error || tr('Release-Kontext konnte nicht geladen werden.', 'Could not load release context.'));
+        setReleaseContextError(result.error || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
         return;
       }
 
@@ -179,7 +180,7 @@ export const useReleaseWorkflow = ({
       });
     } catch (error: any) {
       setReleaseContext(null);
-      setReleaseContextError(error?.message || tr('Release-Kontext konnte nicht geladen werden.', 'Could not load release context.'));
+      setReleaseContextError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
     } finally {
       setReleaseContextLoading(false);
     }
@@ -197,7 +198,7 @@ export const useReleaseWorkflow = ({
 
   const handleCreateRelease = useCallback(async (confirmedEmptyReleaseNotes = false) => {
     if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
-      setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
       return;
     }
 
@@ -210,54 +211,51 @@ export const useReleaseWorkflow = ({
 
     if (!validation.valid) {
       if (validation.errors.tagName === 'release.validation.tagRequired') {
-        setReleaseError(tr('Tag-Name darf nicht leer sein.', 'Tag name must not be empty.'));
+        setReleaseError(t('generated.components.releasecreator.tag_name_must_not_be_empty_370b7b0d'));
         return;
       }
       if (validation.errors.tagName === 'release.validation.tagInvalid') {
-        setReleaseError(tr('Tag-Name enthaelt ungueltige Zeichen oder Leerzeichen.', 'Tag name contains invalid characters or whitespace.'));
+        setReleaseError(t('generated.components.releasecreator.tag_name_contains_invalid_characters_or_whitespace_ca817c36'));
         return;
       }
       if (validation.errors.releaseName === 'release.validation.nameRequired') {
-        setReleaseError(tr('Release-Name darf nicht leer sein.', 'Release name must not be empty.'));
+        setReleaseError(t('generated.components.layout.sidebar.githubconnectedcontent.release_name_must_not_be_empty_453809c9'));
         return;
       }
-      setReleaseError(tr('Release-Name ist zu kurz (mind. 3 Zeichen).', 'Release name is too short (min. 3 chars).'));
+      setReleaseError(t('generated.components.releasecreator.release_name_is_too_short_min_3_chars_c39377d1'));
       return;
     }
 
     if (normalizedTag && existingTags.has(normalizedTag)) {
-      setReleaseError(tr('Dieser Tag existiert bereits. Waehle einen anderen Tag.', 'This tag already exists. Choose a different tag.'));
+      setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.this_tag_already_exists_choose_a_different_tag_d5563f8a'));
       return;
     }
 
     const releaseNotes = (releaseForm.body || '').trim();
     if (!releaseNotes && !confirmedEmptyReleaseNotes) {
       const releaseMode = releaseForm.draft
-        ? tr('Entwurf', 'Draft')
-        : tr('Veroeffentlicht', 'Published');
+        ? t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')
+        : t('generated.components.layout.workflows.usereleaseworkflow.published_adbe9c8a');
 
       setConfirmDialog({
         variant: 'confirm',
         title: releaseForm.draft
-          ? tr('Release-Entwurf ohne Notes erstellen?', 'Create draft release without notes?')
-          : tr('Release ohne Notes veroeffentlichen?', 'Publish release without notes?'),
+          ? t('generated.components.layout.workflows.usereleaseworkflow.create_draft_release_without_notes_248f5d5f')
+          : t('generated.components.layout.workflows.usereleaseworkflow.publish_release_without_notes_280a3a1c'),
         message: releaseForm.draft
-          ? tr('Der Release-Entwurf enthaelt keine Release Notes. Moechtest du ihn trotzdem erstellen?', 'This draft release has no release notes. Do you still want to create it?')
-          : tr('Dieser Release enthaelt keine Release Notes. Moechtest du ihn wirklich veroeffentlichen?', 'This release has no release notes. Do you really want to publish it?'),
+          ? t('generated.components.layout.workflows.usereleaseworkflow.this_draft_release_has_no_release_notes_do_you_still_wan_6a9f65c2')
+          : t('generated.components.layout.workflows.usereleaseworkflow.this_release_has_no_release_notes_do_you_really_want_to_43efa5f1'),
         contextItems: [
-          { label: tr('Repository', 'Repository'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
-          { label: tr('Tag', 'Tag'), value: releaseForm.tagName.trim() },
-          { label: tr('Name', 'Name'), value: releaseForm.releaseName.trim() },
-          { label: tr('Status', 'Status'), value: releaseMode },
+          { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
+          { label: t('generated.components.layout.hooks.userepositorydomain.tag_d509084a'), value: releaseForm.tagName.trim() },
+          { label: t('generated.components.layout.workflows.usereleaseworkflow.name_605563c5'), value: releaseForm.releaseName.trim() },
+          { label: t('generated.components.layout.apimcpsettingspanel.status_b853ab43'), value: releaseMode },
         ],
         irreversible: false,
-        consequences: tr(
-          'Der GitHub-Release wird ohne Beschreibung angelegt. Du kannst die Notes spaeter auf GitHub nachtragen.',
-          'The GitHub release will be created without a description. You can add notes later on GitHub.',
-        ),
+        consequences: t('generated.components.layout.workflows.usereleaseworkflow.the_github_release_will_be_created_without_a_description_0c5b5547'),
         confirmLabel: releaseForm.draft
-          ? tr('Ohne Notes erstellen', 'Create without notes')
-          : tr('Ohne Notes veroeffentlichen', 'Publish without notes'),
+          ? t('generated.components.layout.workflows.usereleaseworkflow.create_without_notes_b0c349a2')
+          : t('generated.components.layout.workflows.usereleaseworkflow.publish_without_notes_7e45885a'),
         onConfirm: async () => { await handleCreateRelease(true); },
       });
       return;
@@ -284,21 +282,21 @@ export const useReleaseWorkflow = ({
         const normalized = errorText.toLowerCase();
 
         if (normalized.includes('tag existiert bereits') || normalized.includes('already_exists')) {
-          setReleaseError(tr('Dieser Tag existiert bereits. Waehle einen anderen Tag oder verwende den bestehenden Tag.', 'This tag already exists. Choose a different tag or use the existing tag.'));
+          setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.this_tag_already_exists_choose_a_different_tag_or_use_th_31f19d6a'));
           return;
         }
 
         if (normalized.includes('berechtigung') || normalized.includes('permission') || normalized.includes('forbidden')) {
-          setReleaseError(tr('Fehlende Berechtigung fuer das Repository. Pruefe Token-Scopes und Repo-Zugriff.', 'Missing repository permission. Check token scopes and repo access.'));
+          setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.missing_repository_permission_check_token_scopes_and_rep_695cc307'));
           return;
         }
 
         if (normalized.includes('targetcommitish') || normalized.includes('target_commitish')) {
-          setReleaseError(tr('Ziel-Branch/Ziel-Commit ist ungueltig. Bitte Branch oder SHA pruefen.', 'Target branch/commit is invalid. Please verify branch or SHA.'));
+          setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.target_branch_commit_is_invalid_please_verify_branch_or_0f08d8ef'));
           return;
         }
 
-        setReleaseError(errorText || tr('Release konnte nicht erstellt werden.', 'Could not create release.'));
+        setReleaseError(errorText || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0'));
         return;
       }
 
@@ -311,7 +309,7 @@ export const useReleaseWorkflow = ({
       resetReleaseDraft({ clearContext: true, clearSuccess: false });
       await refreshReleaseContext(currentBranch || undefined);
     } catch (error: any) {
-      setReleaseError(error?.message || tr('Release konnte nicht erstellt werden.', 'Could not create release.'));
+      setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0'));
     } finally {
       setReleaseSubmitting(false);
     }
@@ -335,13 +333,13 @@ export const useReleaseWorkflow = ({
   const generateReleaseNotesWithAI = useCallback(async (versionBump: ReleaseVersionBump) => {
     if (!githubClient.isAvailable()) return;
     if (!isGithubAuthenticated || !ownerRepo) {
-      setReleaseError(tr('GitHub-Verbindung oder Repository-Zuordnung fehlt.', 'GitHub connection or repository mapping is missing.'));
+      setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
       return;
     }
 
     const sourceCommits = releaseContext?.commitsSinceLastRelease || [];
     if (sourceCommits.length === 0) {
-      setReleaseError(tr('Keine Commit-Basis fuer KI vorhanden.', 'No commit base for AI generation available.'));
+      setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.no_commit_base_for_ai_generation_available_9a0535af'));
       return;
     }
     const commits = filterCommitsForReleaseNotes(sourceCommits, releaseNotesOptions);
@@ -350,7 +348,7 @@ export const useReleaseWorkflow = ({
     const tagName = (releaseForm.tagName || '').trim();
     const releaseName = (releaseForm.releaseName || '').trim() || `Release ${tagName || 'next'}`;
     if (!tagName) {
-      setReleaseError(tr('Bitte zuerst einen Tag-Namen setzen.', 'Please set a tag name first.'));
+      setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.please_set_a_tag_name_first_9512c3ad'));
       return;
     }
 
@@ -370,7 +368,7 @@ export const useReleaseWorkflow = ({
       });
 
       if (!result.success) {
-        setReleaseError(result.error || tr('KI Release Notes konnten nicht erstellt werden.', 'Could not generate AI release notes.'));
+        setReleaseError(result.error || t('generated.components.layout.workflows.usereleaseworkflow.could_not_generate_ai_release_notes_0402ba88'));
         return;
       }
 
@@ -391,9 +389,9 @@ export const useReleaseWorkflow = ({
         releaseName: prev.releaseName || releaseName,
         body: markdown,
       }));
-      setGitActionToast({ msg: tr('Release Notes mit KI erstellt.', 'AI release notes generated.'), isError: false });
+      setGitActionToast({ msg: t('generated.components.layout.workflows.usereleaseworkflow.ai_release_notes_generated_c784fbf3'), isError: false });
     } catch (error: any) {
-      setReleaseError(error?.message || tr('KI Release Notes konnten nicht erstellt werden.', 'Could not generate AI release notes.'));
+      setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_generate_ai_release_notes_0402ba88'));
     } finally {
       setReleaseNotesGenerating(false);
     }

@@ -1,6 +1,6 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '../../../global';
-import { trByLanguage, type AppLanguage } from '../../../i18n';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
 import { gitClient } from '../../../services/gitClient';
 import {
   countChangedEntriesFromPorcelainV2,
@@ -42,6 +42,7 @@ export const useGitCommandGuardWorkflow = ({
   const tr = useCallback((deText: string, enText: string) => {
     return trByLanguage(settings.language as AppLanguage, deText, enText);
   }, [settings.language]);
+  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables), [settings.language]);
 
   const runWithOptions = useCallback(async (
     args: string[],
@@ -77,24 +78,18 @@ export const useGitCommandGuardWorkflow = ({
     if (shouldGuardForcePush) {
       setConfirmDialog({
         variant: 'danger',
-        title: tr('Force-Push bestaetigen', 'Confirm force push'),
-        message: tr(
-          'Dieser Push verwendet Force-Optionen und kann Commits auf dem Remote ueberschreiben.',
-          'This push uses force options and can overwrite commits on the remote.',
-        ),
+        title: t('generated.components.layout.workflows.usegitcommandguardworkflow.confirm_force_push_dd412d80'),
+        message: t('generated.components.layout.workflows.usegitcommandguardworkflow.this_push_uses_force_options_and_can_overwrite_commits_o_86651249'),
         contextItems: [
-          { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
+          { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git ${args.join(' ')}` },
           {
-            label: tr('Schutz', 'Guard'),
-            value: tr('confirmDangerousOps ist aktiv', 'confirmDangerousOps is enabled'),
+            label: t('generated.components.layout.workflows.usegitcommandguardworkflow.guard_85f78727'),
+            value: t('generated.components.layout.workflows.usegitcommandguardworkflow.confirmdangerousops_is_enabled_75a70e35'),
           },
         ],
         irreversible: true,
-        consequences: tr(
-          'Andere Branches und lokale Aenderungen bleiben unveraendert, aber Remote-Historie kann ersetzt werden.',
-          'Other branches and local changes stay unchanged, but remote history can be replaced.',
-        ),
-        confirmLabel: tr('Force-Push ausfuehren', 'Run force push'),
+        consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.other_branches_and_local_changes_stay_unchanged_but_remo_06759649'),
+        confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_force_push_5ddf4b4d'),
         onConfirm: async () => {
           await runWithOptions(args, successMsg, actionLabel, {
             ...options,
@@ -133,10 +128,10 @@ export const useGitCommandGuardWorkflow = ({
                 : `Remote is ahead by ${behindCount} commit${behindCount === 1 ? '' : 's'} and local changes are still uncommitted. Pull may fail or create conflicts in this state.`,
             ),
             contextItems: [
-              { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
-              { label: tr('Remote voraus', 'Remote ahead'), value: String(behindCount) },
+              { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git ${args.join(' ')}` },
+              { label: t('generated.components.layout.workflows.usegitcommandguardworkflow.remote_ahead_040a92ca'), value: String(behindCount) },
               {
-                label: tr('Lokale Aenderungen', 'Local changes'),
+                label: t('generated.components.layout.workflows.usegitcommandguardworkflow.local_changes_fc4435ff'),
                 value: tr(
                   `${changedFiles} Datei${changedFiles === 1 ? '' : 'en'} uncommitted`,
                   `${changedFiles} file${changedFiles === 1 ? '' : 's'} uncommitted`,
@@ -144,15 +139,12 @@ export const useGitCommandGuardWorkflow = ({
               },
             ],
             irreversible: false,
-            consequences: tr(
-              'Empfohlen: zuerst committen oder stashen, dann pull (ggf. --rebase), danach push.',
-              'Recommended: commit or stash first, then pull (optionally --rebase), then push.',
-            ),
+            consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.recommended_commit_or_stash_first_then_pull_optionally_r_53cb75a1'),
             confirmLabel: tr(
               isPushGuard ? 'Trotzdem pushen' : 'Trotzdem pullen',
               isPushGuard ? 'Push anyway' : 'Pull anyway',
             ),
-            secondaryActionLabel: tr('Quick-Fix ausfuehren', 'Run quick fix'),
+            secondaryActionLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_quick_fix_3c2a62d8'),
             secondaryActionVariant: 'default',
             onSecondaryAction: async () => {
               await runRemoteAheadQuickFix({ command, options });
@@ -178,15 +170,15 @@ export const useGitCommandGuardWorkflow = ({
         if (hasLocalChanges) {
           setConfirmDialog({
             variant: 'danger',
-            title: tr('Ungesicherte Aenderungen erkannt', 'Uncommitted changes detected'),
+            title: t('generated.components.layout.workflows.usegitcommandguardworkflow.uncommitted_changes_detected_833713ea'),
             message: tr(`Vor "git ${args.join(' ')}" wurden lokale Aenderungen gefunden.`, `Local changes were found before "git ${args.join(' ')}".`),
             contextItems: [
-              { label: tr('Befehl', 'Command'), value: `git ${args.join(' ')}` },
-              { label: tr('Hinweis', 'Hint'), value: tr('Working Tree ist nicht sauber', 'Working tree is dirty') },
+              { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git ${args.join(' ')}` },
+              { label: t('generated.components.layout.workflows.usegitcommandguardworkflow.hint_5628c320'), value: t('generated.components.layout.workflows.usegitcommandguardworkflow.working_tree_is_dirty_72dcc487') },
             ],
             irreversible: false,
-            consequences: tr('Je nach Operation koennen unstaged oder staged Aenderungen betroffen sein.', 'Depending on the operation, unstaged or staged changes may be affected.'),
-            confirmLabel: tr('Trotzdem ausfuehren', 'Run anyway'),
+            consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.depending_on_the_operation_unstaged_or_staged_changes_ma_9d5cf90f'),
+            confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_anyway_bc5dff81'),
             onConfirm: async () => {
               await runWithOptions(args, successMsg, actionLabel, { ...options, skipDirtyGuard: true });
             },
@@ -213,18 +205,12 @@ export const useGitCommandGuardWorkflow = ({
             await gitClient.cancelSecretScan();
             setConfirmDialog({
               variant: 'danger',
-              title: tr('Secret-Scan Timeout', 'Secret scan timed out'),
-              message: tr(
-                'Der Secret-Scan hat zu lange gedauert (>15s) und wurde abgebrochen. Trotzdem pushen?',
-                'The secret scan took too long (>15s) and was cancelled. Push anyway?',
-              ),
+              title: t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_timed_out_307b8b8c'),
+              message: t('generated.components.layout.workflows.usegitcommandguardworkflow.the_secret_scan_took_too_long_15s_and_was_cancelled_push_a1137d02'),
               contextItems: [],
               irreversible: false,
-              consequences: tr(
-                'Ohne Secret-Scan koennten vertrauliche Daten gepusht werden.',
-                'Without a secret scan, sensitive data could be pushed.',
-              ),
-              confirmLabel: tr('Trotzdem pushen', 'Push anyway'),
+              consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.without_a_secret_scan_sensitive_data_could_be_pushed_eda26acb'),
+              confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
               onConfirm: async () => {
                 await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
               },
@@ -237,7 +223,7 @@ export const useGitCommandGuardWorkflow = ({
         }
         if (!scanResult.success) {
           setGitActionToast({
-            msg: scanResult.error || tr('Secret-Scan vor Push fehlgeschlagen.', 'Secret scan before push failed.'),
+            msg: scanResult.error || t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_before_push_failed_a33eb357'),
             isError: true,
           });
           return true;
@@ -252,18 +238,15 @@ export const useGitCommandGuardWorkflow = ({
 
           setConfirmDialog({
             variant: 'danger',
-            title: tr('Moegliche Secrets vor Push erkannt', 'Potential secrets detected before push'),
+            title: t('generated.components.layout.workflows.usegitcommandguardworkflow.potential_secrets_detected_before_push_deeb3751'),
             message: tr(
               `${findings.length} moegliche Secret-Treffer wurden in den zu veroeffentlichenden Aenderungen gefunden.`,
               `${findings.length} potential secret hit(s) were found in changes that would be published.`,
             ),
             contextItems,
             irreversible: true,
-            consequences: tr(
-              'Bitte pruefe die Treffer. Ein Push kann vertrauliche Werte unwiderruflich veroeffentlichen.',
-              'Please review these findings. Pushing can irreversibly publish sensitive values.',
-            ),
-            confirmLabel: tr('Trotzdem pushen', 'Push anyway'),
+            consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.please_review_these_findings_pushing_can_irreversibly_pu_fb7def03'),
+            confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
             onConfirm: async () => {
               await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
             },
@@ -272,7 +255,7 @@ export const useGitCommandGuardWorkflow = ({
         }
       } catch (error: any) {
         setGitActionToast({
-          msg: error?.message || tr('Secret-Scan vor Push fehlgeschlagen.', 'Secret scan before push failed.'),
+          msg: error?.message || t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_before_push_failed_a33eb357'),
           isError: true,
         });
         return true;

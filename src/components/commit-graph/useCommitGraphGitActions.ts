@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { GitCommandNameDto } from '../../global';
+import type { CatalogTranslateFn } from '../../i18n';
 import type { ToastMessage } from '../../types/git';
 import {
   isMergeInProgressError,
@@ -13,7 +14,7 @@ type UseCommitGraphGitActionsParams = {
   refreshCommits: () => Promise<void> | void;
   refreshWorkingTreeStatus: () => Promise<void> | void;
   setToast: (toast: ToastMessage | null) => void;
-  tr: (deText: string, enText: string) => string;
+  t: CatalogTranslateFn;
 };
 
 export const useCommitGraphGitActions = ({
@@ -22,7 +23,7 @@ export const useCommitGraphGitActions = ({
   refreshCommits,
   refreshWorkingTreeStatus,
   setToast,
-  tr,
+  t,
 }: UseCommitGraphGitActionsParams) => {
   const openConflictResolverFromFailure = useCallback(async (message: string | undefined) => {
     try {
@@ -66,10 +67,7 @@ export const useCommitGraphGitActions = ({
 
       if (mergeInProgress) {
         setToast({
-          msg: tr(
-            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
-            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-          ),
+          msg: t('commitGraph.gitActions.mergeAlreadyActive'),
           isError: true,
         });
         return;
@@ -84,10 +82,7 @@ export const useCommitGraphGitActions = ({
 
       if (mergeInProgress) {
         setToast({
-          msg: tr(
-            'Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.',
-            'A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.',
-          ),
+          msg: t('commitGraph.gitActions.mergeAlreadyActive'),
           isError: true,
         });
         return;
@@ -100,6 +95,6 @@ export const useCommitGraphGitActions = ({
     refreshCommits,
     refreshWorkingTreeStatus,
     setToast,
-    tr,
+    t,
   ]);
 };

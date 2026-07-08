@@ -45,7 +45,7 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({
   toasts,
   onDismiss,
 }) => {
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const handleCopy = useCallback((message: string) => {
     void copyMessage(message);
   }, []);
@@ -70,9 +70,9 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({
                 type="button"
                 className="toast-action-btn"
                 onClick={() => handleCopy(toast.msg)}
-                title={tr('Fehlermeldung kopieren', 'Copy error message')}
+                title={t('generated.components.actiontoastviewport.copy_error_message_6863792c')}
               >
-                {tr('Kopieren', 'Copy')}
+                {t('generated.components.actiontoastviewport.copy_5c2a9afe')}
               </button>
             )}
             {onDismiss && (
@@ -80,9 +80,9 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({
                 type="button"
                 className="toast-action-btn toast-action-btn-close"
                 onClick={() => onDismiss(toast.id)}
-                title={tr('Meldung schliessen', 'Close message')}
+                title={t('generated.components.actiontoastviewport.close_message_73bd3641')}
               >
-                {tr('Schliessen', 'Close')}
+                {t('generated.components.actiontoastviewport.close_181764fa')}
               </button>
             )}
           </div>

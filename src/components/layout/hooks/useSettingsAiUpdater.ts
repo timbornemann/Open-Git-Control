@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppSettingsDto, UpdaterStatusDto } from '../../../global';
+import type { TranslationVariables } from '../../../i18n';
 import { aiClient } from '../../../services/aiClient';
 import { appClient } from '../../../services/appClient';
 
 type TranslateFn = (deText: string, enText: string) => string;
+type CatalogTranslateFn = (key: string, variables?: TranslationVariables) => string;
 
 type Params = {
   settings: AppSettingsDto;
   onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  t: CatalogTranslateFn;
   tr: TranslateFn;
 };
 
-export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params) => {
+export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Params) => {
   const [isTestingAi, setIsTestingAi] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
@@ -31,37 +34,37 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
   }, [modelOptions, selectedModel]);
 
   const updaterStatusLabel = useMemo(() => {
-    if (!updaterStatus) return tr('Lade Update-Status...', 'Loading updater status...');
+    if (!updaterStatus) return t('generated.components.layout.hooks.usesettingsaiupdater.loading_updater_status_6a392297');
 
     switch (updaterStatus.state) {
       case 'checking':
-        return tr('Suche nach Updates...', 'Checking for updates...');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.checking_for_updates_67d1a534');
       case 'update-available':
-        return tr('Update verfuegbar', 'Update available');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.update_available_7d5009e4');
       case 'no-update':
-        return tr('App ist aktuell', 'App is up to date');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.app_is_up_to_date_a8f83489');
       case 'downloading':
-        return tr('Update wird heruntergeladen...', 'Downloading update...');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.downloading_update_b2499c0b');
       case 'downloaded':
-        return tr('Update bereit zur Installation', 'Update ready to install');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.update_ready_to_install_adfcba43');
       case 'error':
-        return tr('Update-Fehler', 'Updater error');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.updater_error_36334f65');
       case 'idle':
       default:
-        return tr('Bereit', 'Ready');
+        return t('generated.components.layout.hooks.usesettingsaiupdater.ready_544f4b02');
     }
   }, [updaterStatus, tr]);
 
   const updaterSupported = Boolean(updaterStatus?.isSupported);
-  const installedVersion = appVersion || updaterStatus?.currentVersion || tr('unbekannt', 'unknown');
+  const installedVersion = appVersion || updaterStatus?.currentVersion || t('generated.components.layout.hooks.usesettingsaiupdater.unknown_3f835544');
 
   const oneClickUpdateLabel = useMemo(() => {
-    if (isInstallingUpdate) return tr('Installiere Update...', 'Installing update...');
-    if (isRunningUpdate || updaterStatus?.state === 'checking') return tr('Suche nach Updates...', 'Checking for updates...');
-    if (updaterStatus?.state === 'downloading') return tr('Update wird heruntergeladen...', 'Downloading update...');
-    if (updaterStatus?.state === 'downloaded') return tr('Update installieren', 'Install update');
-    if (updaterStatus?.state === 'update-available') return tr('Update herunterladen', 'Download update');
-    return tr('Nach Updates suchen', 'Check for updates');
+    if (isInstallingUpdate) return t('generated.components.layout.hooks.usesettingsaiupdater.installing_update_b4260e49');
+    if (isRunningUpdate || updaterStatus?.state === 'checking') return t('generated.components.layout.hooks.usesettingsaiupdater.checking_for_updates_67d1a534');
+    if (updaterStatus?.state === 'downloading') return t('generated.components.layout.hooks.usesettingsaiupdater.downloading_update_b2499c0b');
+    if (updaterStatus?.state === 'downloaded') return t('generated.components.layout.hooks.usesettingsaiupdater.install_update_f3aa2988');
+    if (updaterStatus?.state === 'update-available') return t('generated.components.layout.hooks.usesettingsaiupdater.download_update_8917c04f');
+    return t('generated.components.layout.hooks.usesettingsaiupdater.check_for_updates_a131e2c5');
   }, [isInstallingUpdate, isRunningUpdate, updaterStatus?.state, tr]);
 
   const oneClickUpdateDisabled =
@@ -103,7 +106,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
       }
       setAiStatus(tr(`Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`, `Connected: ${result.data.provider} / ${result.data.model} (${result.data.detail})`));
     } catch (error: unknown) {
-      setAiStatus(error instanceof Error ? error.message : tr('Verbindung fehlgeschlagen.', 'Connection failed.'));
+      setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.connection_failed_8780a183'));
     } finally {
       setIsTestingAi(false);
     }
@@ -125,7 +128,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
       }
       setAiStatus(tr(`${result.data.length} Modell(e) geladen.`, `${result.data.length} model(s) loaded.`));
     } catch (error: unknown) {
-      setAiStatus(error instanceof Error ? error.message : tr('Modelle konnten nicht geladen werden.', 'Could not load models.'));
+      setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_models_c6582ed1'));
     } finally {
       setIsLoadingModels(false);
     }
@@ -140,12 +143,12 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
       try {
         const result = await appClient.installAppUpdate();
         if (!result.success) {
-          setUpdaterMessage(result.error || tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+          setUpdaterMessage(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'));
           return;
         }
-        setUpdaterMessage(tr('App wird fuer das Update neu gestartet...', 'Restarting app to install update...'));
+        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.restarting_app_to_install_update_f142b007'));
       } catch (error: unknown) {
-        setUpdaterMessage(error instanceof Error ? error.message : tr('Update-Installation konnte nicht gestartet werden.', 'Could not start update installation.'));
+        setUpdaterMessage(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'));
       } finally {
         setIsInstallingUpdate(false);
       }
@@ -157,20 +160,20 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
     try {
       const result = await appClient.runOneClickAppUpdate();
       if (!result.success) {
-        setUpdaterMessage(result.error || tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
+        setUpdaterMessage(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'));
         return;
       }
       if (result.action === 'downloaded') {
-        setUpdaterMessage(tr('Update heruntergeladen und bereit zur Installation.', 'Update downloaded and ready to install.'));
+        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.update_downloaded_and_ready_to_install_06156b66'));
         return;
       }
       if (result.action === 'no-update') {
-        setUpdaterMessage(tr('App ist bereits aktuell.', 'App is already up to date.'));
+        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.app_is_already_up_to_date_0f3d23f1'));
         return;
       }
-      setUpdaterMessage(tr('Update-Pruefung abgeschlossen.', 'Update check completed.'));
+      setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.update_check_completed_bde0b1e8'));
     } catch (error: unknown) {
-      setUpdaterMessage(error instanceof Error ? error.message : tr('Update konnte nicht gestartet werden.', 'Could not start update.'));
+      setUpdaterMessage(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'));
     } finally {
       setIsRunningUpdate(false);
     }
@@ -185,7 +188,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
         const version = await appClient.getAppVersion();
         if (active) setAppVersion(version);
       } catch {
-        if (active) setUpdaterMessage(tr('App-Version konnte nicht geladen werden.', 'Could not load app version.'));
+        if (active) setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_app_version_417cc507'));
       }
 
       try {
@@ -195,7 +198,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, tr }: Params)
         if (status.currentVersion) setAppVersion((current) => current || status.currentVersion);
       } catch {
         if (!active) return;
-        setUpdaterMessage((current) => current || tr('Update-Status konnte nicht geladen werden.', 'Could not load updater status.'));
+        setUpdaterMessage((current) => current || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_updater_status_2df70231'));
       }
     };
 

@@ -21,7 +21,7 @@ type Params = {
 };
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings }: Params) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
   const [commitMsg, setCommitMsgState] = useState(() => (
     getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg
   ));
@@ -78,12 +78,12 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     if (isCommittingRef.current || !commitMsg.trim() || !gitClient.isAvailable() || !status) return;
 
     if (status.conflicts.length > 0) {
-      setToast({ msg: tr('Bitte zuerst alle Konflikte aufloesen.', 'Please resolve all conflicts first.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.useaicommit.please_resolve_all_conflicts_first_9e29c688'), isError: true });
       return;
     }
 
     if (status.staged.length === 0 && !amendCommit) {
-      setToast({ msg: tr('Bitte zuerst Dateien stagen.', 'Please stage files first.'), isError: true });
+      setToast({ msg: t('generated.components.staging_area.usecommitform.please_stage_files_first_51f233fa'), isError: true });
       return;
     }
 
@@ -102,12 +102,12 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
         const nextDraft = resetCommitFormDraft(repoPath, settings.commitTemplate || '');
         setCommitMsgState(nextDraft.commitMsg);
         setCommitDescriptionState(nextDraft.commitDescription);
-        setToast({ msg: tr('Commit erfolgreich!', 'Commit successful!'), isError: false });
+        setToast({ msg: t('generated.components.staging_area.usecommitform.commit_successful_155eebd2'), isError: false });
         if (onCommitsCreated) onCommitsCreated();
         else if (onRepoChanged) onRepoChanged();
         await refresh();
       } else {
-        setToast({ msg: r.error || tr('Commit fehlgeschlagen', 'Commit failed'), isError: true });
+        setToast({ msg: r.error || t('generated.components.staging_area.usecommitform.commit_failed_5c16676c'), isError: true });
       }
     } catch (e: any) {
       setToast({ msg: e.message, isError: true });

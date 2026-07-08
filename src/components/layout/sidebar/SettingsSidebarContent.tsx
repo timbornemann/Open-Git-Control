@@ -23,7 +23,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
   onClearJobs,
 }) => {
   const sortedJobs = [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
-  const { tr, locale } = useI18n();
+  const { t, tr, locale } = useI18n();
   const {
     isTestingAi,
     isLoadingModels,
@@ -44,7 +44,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     testConnection,
     loadModels,
     handleRunOneClickUpdate,
-  } = useSettingsAiUpdater({ settings, onUpdateSettings, tr });
+  } = useSettingsAiUpdater({ settings, onUpdateSettings, t, tr });
   const [diagnosticsState, setDiagnosticsState] = React.useState<{
     loading: boolean;
     message: string | null;
@@ -55,7 +55,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     if (!appClient.isAvailable()) {
       setDiagnosticsState({
         loading: false,
-        message: tr('Diagnose-Report ist in diesem Build nicht verfuegbar.', 'Diagnostics report is not available in this build.'),
+        message: t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_report_is_not_available_in_this_build_1da3b3a7'),
         isError: true,
       });
       return;
@@ -63,7 +63,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     if (!navigator.clipboard?.writeText) {
       setDiagnosticsState({
         loading: false,
-        message: tr('Zwischenablage ist nicht verfuegbar.', 'Clipboard is not available.'),
+        message: t('generated.components.layout.sidebar.settingssidebarcontent.clipboard_is_not_available_a62a50d3'),
         isError: true,
       });
       return;
@@ -83,7 +83,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       if (!result.data.report) {
         setDiagnosticsState({
           loading: false,
-          message: tr('Diagnose-Report konnte nicht erstellt werden.', 'Could not create diagnostics report.'),
+          message: t('generated.components.layout.sidebar.settingssidebarcontent.could_not_create_diagnostics_report_34e4b708'),
           isError: true,
         });
         return;
@@ -92,13 +92,13 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       await navigator.clipboard.writeText(result.data.report);
       setDiagnosticsState({
         loading: false,
-        message: tr('Diagnose-Report kopiert.', 'Diagnostics report copied.'),
+        message: t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_report_copied_c5edd6fd'),
         isError: false,
       });
     } catch (error: any) {
       setDiagnosticsState({
         loading: false,
-        message: error?.message || tr('Diagnose-Report konnte nicht kopiert werden.', 'Could not copy diagnostics report.'),
+        message: error?.message || t('generated.components.layout.sidebar.settingssidebarcontent.could_not_copy_diagnostics_report_90e044b2'),
         isError: true,
       });
     }
@@ -108,10 +108,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
     <div className="ssc-root">
       {/* ── Allgemein ───────────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('Allgemein', 'General')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.sidebar.containers.settingssidebarnav.general_c71a04d3')}</div>
 
         <label className="ssc-label">
-          {tr('Theme', 'Theme')}
+          {t('generated.components.layout.settingsmaincontent.theme_60c4ba00')}
           <select
             className="ssc-input"
             value={settings.theme}
@@ -122,7 +122,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label className="ssc-label">
-          {tr('Sprache', 'Language')}
+          {t('generated.components.layout.settingsmaincontent.language_738d5882')}
           <select
             className="ssc-input"
             value={settings.language}
@@ -134,7 +134,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label className="ssc-label">
-          {tr('Auto-Fetch Intervall (Sekunden)', 'Auto-fetch interval (seconds)')}
+          {t('generated.components.layout.settingsmaincontent.auto_fetch_interval_seconds_af13e47c')}
           <input
             className="ssc-input"
             type="number"
@@ -149,7 +149,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label className="ssc-label">
-          {tr('Default Branch', 'Default branch')}
+          {t('generated.components.layout.settingsmaincontent.default_branch_889997a3')}
           <input
             className="ssc-input"
             type="text"
@@ -164,7 +164,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.showSecondaryHistory}
             onChange={(e) => onUpdateSettings({ showSecondaryHistory: e.target.checked })}
           />
-          {tr('Sekundäre Historie anzeigen', 'Show secondary history')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.show_secondary_history_d3e9e815')}
         </label>
 
         <label className="ssc-label-inline">
@@ -173,11 +173,11 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.commitSignoffByDefault}
             onChange={(e) => onUpdateSettings({ commitSignoffByDefault: e.target.checked })}
           />
-          {tr('Commit Signoff standardmäßig', 'Commit signoff by default')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.commit_signoff_by_default_e423bed1')}
         </label>
 
         <label className="ssc-label">
-          {tr('Commit Template', 'Commit template')}
+          {t('generated.components.layout.settingsmaincontent.commit_template_c4f13929')}
           <textarea
             className="ssc-input"
             rows={3}
@@ -190,7 +190,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
       {/* ── Sicherheit ──────────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('Sicherheit', 'Security')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.sidebar.containers.settingssidebarnav.security_5d4ed0ec')}</div>
 
         <label className="ssc-label-inline">
           <input
@@ -198,7 +198,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.confirmDangerousOps}
             onChange={(e) => onUpdateSettings({ confirmDangerousOps: e.target.checked })}
           />
-          {tr('Gefährliche Ops bestätigen', 'Confirm dangerous ops')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.confirm_dangerous_ops_f820c096')}
         </label>
 
         <label className="ssc-label-inline">
@@ -207,30 +207,30 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.secretScanBeforePushEnabled}
             onChange={(e) => onUpdateSettings({ secretScanBeforePushEnabled: e.target.checked })}
           />
-          {tr('Secret-Scan vor Push', 'Secret scan before push')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.secret_scan_before_push_27689746')}
         </label>
 
         <label className="ssc-label">
-          {tr('Strengegrad', 'Strictness')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.strictness_abada95e')}
           <select
             className="ssc-input"
             value={settings.secretScanStrictness}
             onChange={(e) => onUpdateSettings({ secretScanStrictness: e.target.value as 'low' | 'medium' | 'high' })}
           >
-            <option value="low">{tr('Niedrig', 'Low')}</option>
-            <option value="medium">{tr('Mittel', 'Medium')}</option>
-            <option value="high">{tr('Hoch', 'High')}</option>
+            <option value="low">{t('generated.components.layout.sidebar.settingssidebarcontent.low_2022a61e')}</option>
+            <option value="medium">{t('generated.components.layout.sidebar.settingssidebarcontent.medium_6e6180fd')}</option>
+            <option value="high">{t('generated.components.layout.sidebar.settingssidebarcontent.high_6d0c6aff')}</option>
           </select>
         </label>
 
         <label className="ssc-label">
-          {tr('Allowlist', 'Allowlist')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.allowlist_c0b9c2b4')}
           <textarea
             className="ssc-input"
             rows={3}
             value={settings.secretScanAllowlist}
             onChange={(e) => onUpdateSettings({ secretScanAllowlist: e.target.value })}
-            placeholder={tr('path:... / regex:...', 'path:... / regex:...')}
+            placeholder={t('generated.components.layout.sidebar.settingssidebarcontent.path_regex_da8488ca')}
             style={{ resize: 'vertical' }}
           />
         </label>
@@ -238,10 +238,10 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
       {/* ── Integrationen ───────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('Integrationen', 'Integrations')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.sidebar.containers.settingssidebarnav.integrations_872375c4')}</div>
 
         <label className="ssc-label">
-          {tr('GitHub OAuth Client ID (Device Flow)', 'GitHub OAuth Client ID (Device flow)')}
+          {t('generated.components.layout.settingsmaincontent.github_oauth_client_id_device_flow_f6e1ae7f')}
           <input
             className="ssc-input"
             type="text"
@@ -251,13 +251,13 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           />
         </label>
         <div className="ssc-hint">
-          {tr('Nur für Methode 2 (Device Flow). Methode 3 (1-Klick) braucht keine eigene Client ID.', 'Only for Method 2 (Device flow). Method 3 (one-click) does not need your own client ID.')}
+          {t('generated.components.layout.sidebar.settingssidebarcontent.only_for_method_2_device_flow_method_3_one_click_does_no_fc1b81d4')}
         </div>
       </div>
 
       {/* ── KI Auto-Commit ──────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('KI', 'AI')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.settingsmaincontent.ai_294e8d00')}</div>
 
         <label className="ssc-label-inline">
           <input
@@ -265,11 +265,11 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
             checked={settings.aiAutoCommitEnabled}
             onChange={(e) => onUpdateSettings({ aiAutoCommitEnabled: e.target.checked })}
           />
-          {tr('KI Auto-Commit aktivieren', 'Enable AI auto-commit')}
+          {t('generated.components.layout.settingsmaincontent.enable_ai_auto_commit_0468df6a')}
         </label>
 
         <label className="ssc-label">
-          {tr('Provider', 'Provider')}
+          {t('generated.components.layout.settingsmaincontent.provider_e52086d7')}
           <select
             className="ssc-input"
             value={settings.aiProvider}
@@ -302,23 +302,23 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
                 type="password"
                 value={geminiApiKeyInput}
                 onChange={(e) => setGeminiApiKeyInput(e.target.value)}
-                placeholder={settings.hasGeminiApiKey ? tr('Bereits gespeichert', 'Already saved') : 'AIza...'}
+                placeholder={settings.hasGeminiApiKey ? t('generated.components.layout.sidebar.settingssidebarcontent.already_saved_2fd8aac0') : 'AIza...'}
               />
             </label>
             <div className="ssc-row">
               <button className="staging-tool-btn" onClick={async () => { if (!appClient.isAvailable()) return; await appClient.setGeminiApiKey(geminiApiKeyInput); setGeminiApiKeyInput(''); await onUpdateSettings({}); }}>
-                {tr('API Key speichern', 'Save API key')}
+                {t('generated.components.layout.settingsmaincontent.save_api_key_5cb25ffc')}
               </button>
               <button className="staging-tool-btn" onClick={async () => { if (!appClient.isAvailable()) return; await appClient.clearGeminiApiKey(); setGeminiApiKeyInput(''); await onUpdateSettings({}); }} disabled={!settings.hasGeminiApiKey}>
-                {tr('Entfernen', 'Remove')}
+                {t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}
               </button>
             </div>
-            <div className="ssc-hint">{tr('Status', 'Status')}: {settings.hasGeminiApiKey ? tr('gespeichert', 'saved') : tr('nicht gespeichert', 'not saved')}</div>
+            <div className="ssc-hint">{t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}: {settings.hasGeminiApiKey ? t('generated.components.layout.settingsmaincontent.saved_e74d9834') : t('generated.components.layout.settingsmaincontent.not_saved_d99fcb70')}</div>
           </>
         )}
 
         <label className="ssc-label">
-          {tr('Modell', 'Model')}
+          {t('generated.components.layout.settingsmaincontent.model_83e8c02e')}
           <input
             className="ssc-input"
             list="ai-model-list-sc"
@@ -333,42 +333,42 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         </label>
 
         <label className="ssc-label">
-          {tr('Commit-Message Stil', 'Commit message style')}
+          {t('generated.components.layout.settingsmaincontent.commit_message_style_7c33ede9')}
           <select
             className="ssc-input"
             value={settings.aiCommitMessageStyle}
             onChange={(e) => onUpdateSettings({ aiCommitMessageStyle: e.target.value as SettingsSidebarContentProps['settings']['aiCommitMessageStyle'] })}
           >
-            {getCommitMessageStyleOptions(tr).map((option) => (
+            {getCommitMessageStyleOptions(t).map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
 
         <label className="ssc-label">
-          {tr('Commit-Message Sprache', 'Commit message language')}
+          {t('generated.components.layout.settingsmaincontent.commit_message_language_5815363d')}
           <select
             className="ssc-input"
             value={settings.aiCommitMessageLanguage}
             onChange={(e) => onUpdateSettings({ aiCommitMessageLanguage: e.target.value as SettingsSidebarContentProps['settings']['aiCommitMessageLanguage'] })}
           >
-            {getCommitMessageLanguageOptions(tr).map((option) => (
+            {getCommitMessageLanguageOptions(t).map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
 
         <div className="ssc-example-block">
-          <span>{tr('Beispiel', 'Example')}</span>
-          <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, tr)}</pre>
+          <span>{t('generated.components.layout.sidebar.settingssidebarcontent.example_54306967')}</span>
+          <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, t)}</pre>
         </div>
 
         <div className="ssc-row">
           <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
-            {isTestingAi ? tr('Teste...', 'Testing...') : tr('Verbindung testen', 'Test connection')}
+            {isTestingAi ? t('generated.components.layout.settingsmaincontent.testing_cead0ff0') : t('generated.components.layout.settingsmaincontent.test_connection_c981b874')}
           </button>
           <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
-            {isLoadingModels ? tr('Lade...', 'Loading...') : tr('Modelle laden', 'Load models')}
+            {isLoadingModels ? t('generated.components.layout.sidebar.settingssidebarcontent.loading_7f8a8587') : t('generated.components.layout.settingsmaincontent.load_models_a363b3f8')}
           </button>
         </div>
 
@@ -377,23 +377,23 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
 
       {/* ── App-Updates ─────────────────────────────────────── */}
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('App-Updates', 'App updates')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.settingsmaincontent.app_updates_c9f65ab0')}</div>
 
-        <div className="ssc-hint">{tr('Version', 'Version')}: {installedVersion}</div>
-        <div className="ssc-hint">{tr('Status', 'Status')}: {updaterStatusLabel}</div>
+        <div className="ssc-hint">{t('generated.components.layout.sidebar.settingssidebarcontent.version_10b7f1cc')}: {installedVersion}</div>
+        <div className="ssc-hint">{t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}: {updaterStatusLabel}</div>
 
         {updaterStatus?.availableVersion && (
-          <div className="ssc-hint">{tr('Verfügbar', 'Available')}: {updaterStatus.availableVersion}</div>
+          <div className="ssc-hint">{t('generated.components.layout.sidebar.settingssidebarcontent.available_d7ca5b14')}: {updaterStatus.availableVersion}</div>
         )}
         {updaterStatus?.lastCheckedAt && (
-          <div className="ssc-hint">{tr('Geprüft', 'Checked')}: {new Date(updaterStatus.lastCheckedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+          <div className="ssc-hint">{t('generated.components.layout.sidebar.settingssidebarcontent.checked_16535227')}: {new Date(updaterStatus.lastCheckedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
         )}
         {updaterStatus?.state === 'downloading' && (
-          <div className="ssc-hint">{tr('Download', 'Download')}: {(updaterStatus.downloadPercent || 0).toFixed(1)}% ({formatBytes(updaterStatus.transferred)} / {formatBytes(updaterStatus.total)})</div>
+          <div className="ssc-hint">{t('generated.components.layout.settingsmaincontent.download_d9eb7f3e')}: {(updaterStatus.downloadPercent || 0).toFixed(1)}% ({formatBytes(updaterStatus.transferred)} / {formatBytes(updaterStatus.total)})</div>
         )}
         {updaterStatus?.releaseNotes && (
           <details>
-            <summary style={{ cursor: 'pointer', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{tr('Release Notes', 'Release notes')}</summary>
+            <summary style={{ cursor: 'pointer', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.settingsmaincontent.release_notes_0b482d7f')}</summary>
             <div style={{ marginTop: '6px' }}>
               <ReleaseNotesContent className="ssc-hint ssc-release-notes" releaseNotes={updaterStatus.releaseNotes} />
             </div>
@@ -401,7 +401,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
         )}
         {updaterStatus?.error && <div className="ssc-hint" style={{ color: 'var(--status-danger)' }}>{updaterStatus.error}</div>}
         {updaterMessage && <div className="ssc-hint" style={{ whiteSpace: 'pre-wrap' }}>{updaterMessage}</div>}
-        {!updaterSupported && <div className="ssc-hint">{tr('Nur in installierten Builds verfügbar.', 'Only available in installed builds.')}</div>}
+        {!updaterSupported && <div className="ssc-hint">{t('generated.components.layout.sidebar.settingssidebarcontent.only_available_in_installed_builds_eacd8bec')}</div>}
         <label className="settings-switch-row settings-switch-row--compact">
           <input
             className="settings-switch-input"
@@ -412,7 +412,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
           <span className="settings-switch-track" aria-hidden="true">
             <span className="settings-switch-thumb" />
           </span>
-          <span className="settings-switch-label">{tr('Updates automatisch suchen und herunterladen', 'Automatically check and download updates')}</span>
+          <span className="settings-switch-label">{t('generated.components.layout.sidebar.settingssidebarcontent.automatically_check_and_download_updates_6ffcd411')}</span>
         </label>
 
         <div className="ssc-row">
@@ -423,12 +423,12 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       </div>
 
       <div className="ssc-section">
-        <div className="ssc-section-title">{tr('Diagnose', 'Diagnostics')}</div>
+        <div className="ssc-section-title">{t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_b0b2e360')}</div>
         <div className="ssc-row">
           <button className="staging-tool-btn" onClick={copyDiagnosticsReport} disabled={diagnosticsState.loading}>
             {diagnosticsState.loading
-              ? tr('Kopiere...', 'Copying...')
-              : tr('Diagnose-Report kopieren', 'Copy diagnostics report')}
+              ? t('generated.components.layout.sidebar.settingssidebarcontent.copying_097f00a2')
+              : t('generated.components.layout.sidebar.settingssidebarcontent.copy_diagnostics_report_428a213f')}
           </button>
         </div>
         {diagnosticsState.message && (
@@ -444,12 +444,12 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({
       {/* ── Job Center ──────────────────────────────────────── */}
       <div className="ssc-section">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="ssc-section-title">{tr('Job Center', 'Job center')}</div>
-          <button className="staging-tool-btn" onClick={onClearJobs}>{tr('Leeren', 'Clear')}</button>
+          <div className="ssc-section-title">{t('generated.components.layout.settingsmaincontent.job_center_a5f9bea9')}</div>
+          <button className="staging-tool-btn" onClick={onClearJobs}>{t('generated.components.layout.settingsmaincontent.clear_156e0575')}</button>
         </div>
 
         {sortedJobs.length === 0 && (
-          <div className="ssc-hint">{tr('Keine Jobs vorhanden.', 'No jobs available.')}</div>
+          <div className="ssc-hint">{t('generated.components.layout.settingsmaincontent.no_jobs_available_87989fb1')}</div>
         )}
 
         {sortedJobs.map((job) => (

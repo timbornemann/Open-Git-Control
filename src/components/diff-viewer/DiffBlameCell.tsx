@@ -22,7 +22,7 @@ export const DiffBlameCell: React.FC<DiffBlameCellProps> = ({
   blameMap,
   onNavigateToCommit,
 }) => {
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   if (!showBlame) return null;
 
@@ -66,8 +66,8 @@ export const DiffBlameCell: React.FC<DiffBlameCellProps> = ({
   }
 
   const displayHash = isUncommitted ? '' : blame.abbrevHash || blame.commitHash.substring(0, 8);
-  const displayAuthor = isUncommitted ? tr('Nicht committet', 'Not committed yet') : blame.author;
-  const displayDate = isUncommitted ? '' : formatBlameDate(blame.authorTime, tr);
+  const displayAuthor = isUncommitted ? t('generated.components.diff_viewer.diffblamecell.not_committed_yet_2c5ac479') : blame.author;
+  const displayDate = isUncommitted ? '' : formatBlameDate(blame.authorTime, t, tr);
 
   return (
     <div className={cellClass} onClick={handleClick} title={`${blame.author} - ${blame.summary}`}>

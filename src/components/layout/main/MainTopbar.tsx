@@ -30,7 +30,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const repository = useRepositoryContext();
   const github = useGithubContext();
   const workflow = useWorkflowContext();
-  const { tr } = useI18n();
+  const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
 
   return (
@@ -54,7 +54,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
         </div>
         <span className="topbar-repo-title">
           {isPlannerView
-            ? tr('Projektplanung', 'Project planning')
+            ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
             : repository.activeRepo ? repository.activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
         </span>
         {!isPlannerView && repository.currentBranch && (
@@ -106,8 +106,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
           <button
             className="icon-btn topbar-panel-toggle"
             onClick={onToggleInspectorPane}
-            title={showInspectorPane ? tr('Rechten Inspector schliessen', 'Close right inspector') : tr('Rechten Inspector oeffnen', 'Open right inspector')}
-            aria-label={showInspectorPane ? tr('Rechten Inspector schliessen', 'Close right inspector') : tr('Rechten Inspector oeffnen', 'Open right inspector')}
+            title={showInspectorPane ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5') : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')}
+            aria-label={showInspectorPane ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5') : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')}
           >
             {showInspectorPane ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
           </button>

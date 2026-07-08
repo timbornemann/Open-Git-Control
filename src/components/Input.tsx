@@ -45,7 +45,7 @@ export const Input: React.FC<InputProps> = ({
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-  const { tr } = useI18n();
+  const { t, tr } = useI18n();
 
   const initialValues = useMemo(() => {
     const nextValues: Record<string, string> = {};
@@ -86,8 +86,8 @@ export const Input: React.FC<InputProps> = ({
       onClose={onCancel}
       onConfirm={handleSubmit}
       onEnter={handleSubmit}
-      confirmLabel={confirmLabel ?? tr('Speichern', 'Save')}
-      cancelLabel={cancelLabel ?? tr('Abbrechen', 'Cancel')}
+      confirmLabel={confirmLabel ?? t('generated.components.input.save_b6a0ea4a')}
+      cancelLabel={cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
       confirmDisabled={Boolean(validationError)}
       initialFocusRef={firstInputRef as React.RefObject<HTMLElement | null>}
     >
@@ -130,7 +130,7 @@ export const Input: React.FC<InputProps> = ({
       {validationError && <div className="dialog-validation">{validationError}</div>}
       <div className="dialog-impact">
         <span>
-          {tr('Irreversibel', 'Irreversible')}: <strong>{irreversible ? tr('Ja', 'Yes') : tr('Nein', 'No')}</strong>
+          {t('generated.components.confirm.irreversible_6920e2ad')}: <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
         </span>
         {consequences && <span>{consequences}</span>}
       </div>
