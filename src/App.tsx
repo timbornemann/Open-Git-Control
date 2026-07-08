@@ -1,18 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
-import { BranchContextMenu } from './components/layout/BranchContextMenu';
-import { CloneProgressModal } from './components/layout/CloneProgressModal';
-import { GitTransferProgressOverlay } from './components/layout/GitTransferProgressOverlay';
-import { Confirm } from './components/Confirm';
-import { DangerConfirm } from './components/DangerConfirm';
-import { Input } from './components/Input';
+import { OverlayManager } from './components/layout/OverlayManager';
 import { useAppState } from './components/layout/useAppState';
 import { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
 import { I18nProvider, translateFromCatalog, type TranslationVariables } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
-import { CommandPalette, PaletteCommand } from './components/CommandPalette';
-import { ActionToastViewport } from './components/ActionToastViewport';
+import { useRepoSwitcherKeyboard } from './hooks/useRepoSwitcherKeyboard';
+import { useResizableSidebar } from './hooks/useResizableSidebar';
+import type { PaletteCommand } from './components/CommandPalette';
 import {
   AppStateSlicesProvider,
   createAppStateSlices,
@@ -20,41 +16,6 @@ import {
 } from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import './index.css';
-
-const SIDEBAR_MIN_WIDTH = 180;
-const SIDEBAR_MAX_WIDTH = 560;
-const SIDEBAR_DEFAULT_WIDTH = 260;
-const APP_RESIZER_WIDTH = 8;
-const MIN_MAIN_VIEW_WIDTH = 608;
-const COMPACT_LAYOUT_MAX_WIDTH = 900;
-const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
-const SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.sidebar-manually-collapsed';
-const REPO_SWITCH_EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"], select';
-
-const getSidebarMaxWidthForViewport = (viewportWidth: number): number => {
-  if (viewportWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
-    return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, viewportWidth - 44));
-  }
-  const maxFromWindow = Math.max(SIDEBAR_MIN_WIDTH, viewportWidth - MIN_MAIN_VIEW_WIDTH - APP_RESIZER_WIDTH);
-  return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
-};
-
-const clampSidebarWidthForViewport = (width: number, viewportWidth: number): number => (
-  Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidthForViewport(viewportWidth), width))
-);
-
-const readInitialSidebarWidth = (): number => {
-  const storedWidthValue = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  const width = Number.isFinite(storedWidthValue) ? Math.round(storedWidthValue) : SIDEBAR_DEFAULT_WIDTH;
-  return clampSidebarWidthForViewport(width, window.innerWidth);
-};
-
-const isRepoSwitchEditableTarget = (target: EventTarget | null): boolean => {
-  const element = target instanceof HTMLElement ? target : document.activeElement;
-  return Boolean(element?.closest(REPO_SWITCH_EDITABLE_SELECTOR));
-};
-
-const getRepoDisplayName = (repoPath: string) => repoPath.split(/[\\/]/).filter(Boolean).pop() || repoPath;
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -66,194 +27,20 @@ const App: React.FC = () => {
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
-  const sidebarManuallyCollapsedRef = useRef(
-    window.localStorage.getItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
-  );
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH || sidebarManuallyCollapsedRef.current;
+  const {
+    sidebarWidth,
+    isSidebarCollapsed,
+    isSidebarResizing,
+    resetLayout,
+    handleToggleSidebar,
+    handleSidebarResizeStart,
+  } = useResizableSidebar();
+  const { repoSwitcherIndex, repoSwitcherListRef } = useRepoSwitcherKeyboard({
+    openRepos: state.openRepos,
+    activeRepo: state.activeRepo,
+    onSwitchRepo: state.handleSwitchRepo,
+    onRepositoryCommitted: () => state.setActiveTab('repo'),
   });
-  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
-  const [repoSwitcherIndex, setRepoSwitcherIndex] = useState<number | null>(null);
-  const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
-  const repoSwitcherIndexRef = useRef<number | null>(null);
-  const repoSwitcherListRef = useRef<HTMLDivElement | null>(null);
-
-  const getSidebarMaxWidth = useCallback(() => {
-    return getSidebarMaxWidthForViewport(window.innerWidth);
-  }, []);
-
-  const clampSidebarWidth = useCallback((width: number) => {
-    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), width));
-  }, [getSidebarMaxWidth]);
-
-  const resetLayout = useCallback(() => {
-    setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
-    sidebarManuallyCollapsedRef.current = false;
-    window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, 'false');
-    setIsSidebarCollapsed(false);
-  }, [clampSidebarWidth]);
-
-  const handleToggleSidebar = useCallback(() => {
-    setIsSidebarCollapsed((previous) => {
-      const next = !previous;
-      sidebarManuallyCollapsedRef.current = next;
-      window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, String(next));
-      return next;
-    });
-  }, []);
-
-  const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    sidebarResizeStateRef.current = { startX: event.clientX, startWidth: sidebarWidth };
-    setIsSidebarResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const dragState = sidebarResizeStateRef.current;
-      if (!dragState) return;
-
-      const delta = event.clientX - dragState.startX;
-      const nextWidth = Math.round(dragState.startWidth + delta);
-      const clampedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), nextWidth));
-      setSidebarWidth(clampedWidth);
-    };
-
-    const stopResize = () => {
-      if (!sidebarResizeStateRef.current) return;
-      sidebarResizeStateRef.current = null;
-      setIsSidebarResizing(false);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopResize);
-    window.addEventListener('pointercancel', stopResize);
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopResize);
-      window.removeEventListener('pointercancel', stopResize);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [getSidebarMaxWidth]);
-
-  useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    const compactViewport = window.matchMedia(`(max-width: ${COMPACT_LAYOUT_MAX_WIDTH}px)`);
-    const syncSidebarWithViewport = (event: MediaQueryListEvent | MediaQueryList) => {
-      setIsSidebarCollapsed(event.matches || sidebarManuallyCollapsedRef.current);
-    };
-
-    syncSidebarWithViewport(compactViewport);
-    compactViewport.addEventListener('change', syncSidebarWithViewport);
-    return () => compactViewport.removeEventListener('change', syncSidebarWithViewport);
-  }, []);
-
-  useEffect(() => {
-    const clampToViewport = () => {
-      const maxWidth = getSidebarMaxWidth();
-      setSidebarWidth((previous) => Math.max(SIDEBAR_MIN_WIDTH, Math.min(previous, maxWidth)));
-    };
-
-    clampToViewport();
-    window.addEventListener('resize', clampToViewport);
-    return () => window.removeEventListener('resize', clampToViewport);
-  }, [getSidebarMaxWidth]);
-
-  useEffect(() => {
-    repoSwitcherIndexRef.current = repoSwitcherIndex;
-  }, [repoSwitcherIndex]);
-
-  useEffect(() => {
-    if (repoSwitcherIndex === null) return;
-
-    const listElement = repoSwitcherListRef.current;
-    const selectedElement = listElement?.querySelector<HTMLElement>(`#repo-switcher-item-${repoSwitcherIndex}`);
-    selectedElement?.scrollIntoView({ block: 'nearest' });
-  }, [repoSwitcherIndex, state.openRepos.length]);
-
-  const closeRepoSwitcher = useCallback(() => {
-    repoSwitcherIndexRef.current = null;
-    setRepoSwitcherIndex(null);
-  }, []);
-
-  const moveRepoSwitcherSelection = useCallback((delta: number) => {
-    const repos = state.openRepos;
-    if (repos.length === 0) return;
-
-    setRepoSwitcherIndex((previous) => {
-      const activeIndex = state.activeRepo ? repos.indexOf(state.activeRepo) : -1;
-      const fallbackIndex = activeIndex >= 0 ? activeIndex : (delta > 0 ? -1 : 0);
-      const baseIndex = previous ?? fallbackIndex;
-      const nextIndex = repos.length <= 1
-        ? 0
-        : (baseIndex + delta + repos.length) % repos.length;
-
-      repoSwitcherIndexRef.current = nextIndex;
-      return nextIndex;
-    });
-  }, [state.activeRepo, state.openRepos]);
-
-  const commitRepoSwitcherSelection = useCallback(() => {
-    const selectedIndex = repoSwitcherIndexRef.current;
-    if (selectedIndex === null) return;
-
-    const targetRepo = state.openRepos[selectedIndex];
-    closeRepoSwitcher();
-
-    if (!targetRepo) return;
-    void state.handleSwitchRepo(targetRepo);
-    state.setActiveTab('repo');
-  }, [closeRepoSwitcher, state]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && repoSwitcherIndexRef.current !== null) {
-        event.preventDefault();
-        closeRepoSwitcher();
-        return;
-      }
-
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-      if (!event.ctrlKey && !event.metaKey) return;
-      if (event.altKey || event.shiftKey) return;
-      if (isRepoSwitchEditableTarget(event.target)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      moveRepoSwitcherSelection(event.key === 'ArrowDown' ? 1 : -1);
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (repoSwitcherIndexRef.current === null) return;
-
-      const isModifierRelease = event.key === 'Control' || event.key === 'Meta';
-      const isArrowReleaseWithoutModifier = (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.ctrlKey && !event.metaKey;
-      if (!isModifierRelease && !isArrowReleaseWithoutModifier) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      commitRepoSwitcherSelection();
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('keyup', handleKeyUp, true);
-    window.addEventListener('blur', closeRepoSwitcher);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('keyup', handleKeyUp, true);
-      window.removeEventListener('blur', closeRepoSwitcher);
-    };
-  }, [closeRepoSwitcher, commitRepoSwitcherSelection, moveRepoSwitcherSelection]);
 
   const paletteCommands: PaletteCommand[] = [
     // Navigation
@@ -309,6 +96,17 @@ const App: React.FC = () => {
       .reverse();
   }, [activeTransferCommand, state.jobs]);
   const showGitTransferProgress = Boolean(activeTransferCommand && state.isGitActionRunning && !state.isCloning);
+  const handleBranchMenuCheckout = useCallback((branch: string) => {
+    if (branch.startsWith('remotes/')) {
+      void state.handleCheckoutRemoteBranch(branch);
+      return;
+    }
+    void state.runGitCommand(['checkout', branch], tr(`Ausgecheckt: ${branch}`, `Checked out: ${branch}`));
+  }, [state, tr]);
+  const handleCloneProgressClose = useCallback(() => {
+    state.closeCloneProgress();
+    state.triggerRefresh();
+  }, [state]);
 
   const ctxValue: AppContextValue = {
     // ── AppSidebarProps ────────────────────────────────────────────────────
@@ -556,136 +354,52 @@ const App: React.FC = () => {
 
           <MainView />
 
-          {repoSwitcherIndex !== null && state.openRepos.length > 0 && (
-            <div className="repo-switcher-backdrop">
-              <div className="repo-switcher-modal" role="dialog" aria-label={t('generated.app.switch_repository_84935354')}>
-                <div className="repo-switcher-title">{t('generated.app.switch_repository_84935354')}</div>
-                <div
-                  ref={repoSwitcherListRef}
-                  className="repo-switcher-list"
-                  role="listbox"
-                  aria-activedescendant={`repo-switcher-item-${repoSwitcherIndex}`}
-                >
-                  {state.openRepos.map((repoPath, index) => {
-                    const isSelected = index === repoSwitcherIndex;
-                    const isActive = repoPath === state.activeRepo;
-
-                    return (
-                      <div
-                        key={repoPath}
-                        id={`repo-switcher-item-${index}`}
-                        className={`repo-switcher-item${isSelected ? ' selected' : ''}`}
-                        role="option"
-                        aria-selected={isSelected}
-                      >
-                        <div className="repo-switcher-copy">
-                          <span className="repo-switcher-name">{getRepoDisplayName(repoPath)}</span>
-                          <span className="repo-switcher-path">{repoPath}</span>
-                        </div>
-                        {isActive && <span className="repo-switcher-active">{t('generated.app.active_28dac35a')}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <ActionToastViewport
-            toasts={state.gitActionToasts}
-            onDismiss={state.dismissToast}
-          />
-
-          <BranchContextMenu
-            branchContextMenu={state.branchContextMenu}
-            setBranchContextMenu={state.setBranchContextMenu}
-            onCheckout={(branch) => {
-              if (branch.startsWith('remotes/')) {
-                void state.handleCheckoutRemoteBranch(branch);
-                return;
-              }
-              void state.runGitCommand(['checkout', branch], tr(`Ausgecheckt: ${branch}`, `Checked out: ${branch}`));
+          <OverlayManager
+            repoSwitcher={{
+              selectedIndex: repoSwitcherIndex,
+              listRef: repoSwitcherListRef,
+              openRepos: state.openRepos,
+              activeRepo: state.activeRepo,
             }}
-            onMerge={state.handleMergeBranch}
-            onRename={state.handleRenameBranch}
-            onDelete={state.handleDeleteBranch}
-          />
-
-          {state.confirmDialog && state.confirmDialog.variant === 'confirm' && (
-            <Confirm
-              open={true}
-              title={state.confirmDialog.title}
-              message={state.confirmDialog.message}
-              contextItems={state.confirmDialog.contextItems}
-              irreversible={state.confirmDialog.irreversible}
-              consequences={state.confirmDialog.consequences}
-              confirmLabel={state.confirmDialog.confirmLabel}
-              onConfirm={state.executeConfirmDialog}
-              secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
-              secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-              onSecondaryAction={state.confirmDialog.onSecondaryAction
-                ? state.executeConfirmDialogSecondary
-                : undefined}
-              onCancel={state.closeConfirmDialog}
-            />
-          )}
-
-          {state.confirmDialog && state.confirmDialog.variant === 'danger' && (
-            <DangerConfirm
-              open={true}
-              title={state.confirmDialog.title}
-              message={state.confirmDialog.message}
-              contextItems={state.confirmDialog.contextItems}
-              irreversible={state.confirmDialog.irreversible}
-              consequences={state.confirmDialog.consequences}
-              confirmLabel={state.confirmDialog.confirmLabel}
-              onConfirm={state.executeConfirmDialog}
-              secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
-              secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-              onSecondaryAction={state.confirmDialog.onSecondaryAction
-                ? state.executeConfirmDialogSecondary
-                : undefined}
-              onCancel={state.closeConfirmDialog}
-            />
-          )}
-
-          {state.inputDialog && (
-            <Input
-              open={true}
-              title={state.inputDialog.title}
-              message={state.inputDialog.message}
-              fields={state.inputDialog.fields}
-              contextItems={state.inputDialog.contextItems}
-              irreversible={state.inputDialog.irreversible}
-              consequences={state.inputDialog.consequences}
-              confirmLabel={state.inputDialog.confirmLabel}
-              onSubmit={state.executeInputDialog}
-              onCancel={state.closeInputDialog}
-            />
-          )}
-
-          <GitTransferProgressOverlay
-            open={showGitTransferProgress}
-            title={state.activeGitActionLabel}
-            events={activeTransferEvents}
-          />
-
-          <CloneProgressModal
-            isCloning={state.isCloning}
-            cloneRepoName={state.cloneRepoName}
-            cloneFinished={state.cloneFinished}
-            cloneError={state.cloneError}
-            cloneLog={state.cloneLog}
-            onClose={() => {
-              state.closeCloneProgress();
-              state.triggerRefresh();
+            toasts={{
+              items: state.gitActionToasts,
+              onDismiss: state.dismissToast,
             }}
-          />
-
-          <CommandPalette
-            open={isPaletteOpen}
-            commands={paletteCommands}
-            onClose={() => setIsPaletteOpen(false)}
+            branchMenu={{
+              menu: state.branchContextMenu,
+              setMenu: state.setBranchContextMenu,
+              onCheckout: handleBranchMenuCheckout,
+              onMerge: state.handleMergeBranch,
+              onRename: state.handleRenameBranch,
+              onDelete: state.handleDeleteBranch,
+            }}
+            dialogs={{
+              confirmDialog: state.confirmDialog,
+              inputDialog: state.inputDialog,
+              onConfirm: state.executeConfirmDialog,
+              onSecondaryConfirm: state.executeConfirmDialogSecondary,
+              onCancelConfirm: state.closeConfirmDialog,
+              onSubmitInput: state.executeInputDialog,
+              onCancelInput: state.closeInputDialog,
+            }}
+            gitTransfer={{
+              open: showGitTransferProgress,
+              title: state.activeGitActionLabel,
+              events: activeTransferEvents,
+            }}
+            cloneProgress={{
+              isCloning: state.isCloning,
+              cloneRepoName: state.cloneRepoName,
+              cloneFinished: state.cloneFinished,
+              cloneError: state.cloneError,
+              cloneLog: state.cloneLog,
+              onClose: handleCloneProgressClose,
+            }}
+            commandPalette={{
+              open: isPaletteOpen,
+              commands: paletteCommands,
+              onClose: () => setIsPaletteOpen(false),
+            }}
           />
         </div>
         </ProjectPlannerProvider>
