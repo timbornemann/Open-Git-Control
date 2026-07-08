@@ -1,3 +1,15 @@
+import type { IpcRendererEvent } from 'electron';
+import type {
+  AppSettingsDto,
+  CommitStatsUpdateDto,
+  ElectronAPI,
+  GitJobEventDto,
+  PlanningApiTokenLifetimeDto,
+  StoredRepoData,
+  UpdaterStatusDto,
+} from '../src/global';
+import type { PlannerItemInput, PlannerProjectInput } from '../src/types/projectPlanner';
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 type RepoUnavailablePayload = {
@@ -50,7 +62,7 @@ const invokeGitCommand = async (commandName: string, ...args: any[]) => {
   return result;
 };
 
-const invokeGitMutation = async (ipcChannel: string, commandName: string, payload: any) => {
+const invokeGitMutation = async (ipcChannel: string, commandName: string, payload: unknown) => {
   const result = await ipcRenderer.invoke(ipcChannel, payload);
   if (result && !result.success && isRepoUnavailableError(result.error)) {
     notifyRepoUnavailable({
@@ -61,7 +73,7 @@ const invokeGitMutation = async (ipcChannel: string, commandName: string, payloa
   return result;
 };
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const electronAPI: ElectronAPI = {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
   selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
   selectProjectParentDirectory: () => ipcRenderer.invoke('dialog:selectProjectParentDirectory'),
@@ -77,8 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     hashes: string[],
     priority?: 'selected' | 'visible' | 'background',
   ) => ipcRenderer.invoke('git:requestCommitStats', hashes, priority),
-  onCommitStats: (callback: (update: any) => void) => {
-    const handler = (_event: any, update: any) => callback(update);
+  onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => {
+    const handler = (_event: IpcRendererEvent, update: CommitStatsUpdateDto) => callback(update);
     ipcRenderer.on('git:commitStats', handler);
     return () => ipcRenderer.removeListener('git:commitStats', handler);
   },
@@ -122,34 +134,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke('git:writeRepoFile', filePath, content),
   openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),
   onCloneProgress: (callback: (line: string) => void) => {
-    const handler = (_event: any, line: string) => callback(line);
+    const handler = (_event: IpcRendererEvent, line: string) => callback(line);
     ipcRenderer.on('clone:progress', handler);
     return () => ipcRenderer.removeListener('clone:progress', handler);
   },
-  onJobEvent: (callback: (event: any) => void) => {
-    const handler = (_event: any, payload: any) => callback(payload);
+  onJobEvent: (callback: (event: GitJobEventDto) => void) => {
+    const handler = (_event: IpcRendererEvent, payload: GitJobEventDto) => callback(payload);
     ipcRenderer.on('job:event', handler);
     return () => ipcRenderer.removeListener('job:event', handler);
   },
   getStoredRepos: () => ipcRenderer.invoke('repos:getStored'),
-  setStoredRepos: (data: any) => ipcRenderer.invoke('repos:setStored', data),
+  setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke('repos:setStored', data),
   plannerGetData: () => ipcRenderer.invoke('planner:getData'),
   plannerEnsureRepositoryProject: (repoPath: string) => ipcRenderer.invoke('planner:ensureRepositoryProject', repoPath),
-  plannerCreateProject: (input: any) => ipcRenderer.invoke('planner:createProject', input),
-  plannerUpdateProject: (projectId: string, input: any) => ipcRenderer.invoke('planner:updateProject', projectId, input),
+  plannerCreateProject: (input: PlannerProjectInput) => ipcRenderer.invoke('planner:createProject', input),
+  plannerUpdateProject: (projectId: string, input: Partial<PlannerProjectInput>) => ipcRenderer.invoke('planner:updateProject', projectId, input),
   plannerDeleteProject: (projectId: string) => ipcRenderer.invoke('planner:deleteProject', projectId),
   plannerDeleteRepositoryProjectByPath: (repoPath: string) => ipcRenderer.invoke('planner:deleteRepositoryProjectByPath', repoPath),
-  plannerCreateItem: (projectId: string, input: any) => ipcRenderer.invoke('planner:createItem', projectId, input),
-  plannerUpdateItem: (itemId: string, input: any) => ipcRenderer.invoke('planner:updateItem', itemId, input),
+  plannerCreateItem: (projectId: string, input: PlannerItemInput) => ipcRenderer.invoke('planner:createItem', projectId, input),
+  plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => ipcRenderer.invoke('planner:updateItem', itemId, input),
   plannerDeleteItem: (itemId: string) => ipcRenderer.invoke('planner:deleteItem', itemId),
   plannerMaterializeProject: (projectId: string, parentDirectory: string, folderName: string) =>
     ipcRenderer.invoke('planner:materializeProject', projectId, parentDirectory, folderName),
   getSettings: () => ipcRenderer.invoke('settings:get'),
-  setSettings: (partial: any) => ipcRenderer.invoke('settings:set', partial),
+  setSettings: (partial: Partial<AppSettingsDto>) => ipcRenderer.invoke('settings:set', partial),
   setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),
   clearGeminiApiKey: () => ipcRenderer.invoke('settings:clearGeminiApiKey'),
   getPlanningApiInfo: () => ipcRenderer.invoke('planning-api:getInfo'),
-  generatePlanningApiToken: (lifetime: string) => ipcRenderer.invoke('planning-api:generateToken', lifetime),
+  generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => ipcRenderer.invoke('planning-api:generateToken', lifetime),
   clearPlanningApiToken: () => ipcRenderer.invoke('planning-api:clearSavedToken'),
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getUpdaterStatus: () => ipcRenderer.invoke('updater:getStatus'),
@@ -157,8 +169,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   runOneClickAppUpdate: () => ipcRenderer.invoke('updater:runOneClick'),
   downloadAppUpdate: () => ipcRenderer.invoke('updater:download'),
   installAppUpdate: () => ipcRenderer.invoke('updater:install'),
-  onUpdaterEvent: (callback: (event: any) => void) => {
-    const handler = (_event: any, payload: any) => callback(payload);
+  onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => {
+    const handler = (_event: IpcRendererEvent, payload: UpdaterStatusDto) => callback(payload);
     ipcRenderer.on('updater:event', handler);
     return () => ipcRenderer.removeListener('updater:event', handler);
   },
@@ -208,5 +220,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   githubMergePR: (params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) =>
     ipcRenderer.invoke('github:mergePR', params),
   getDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:report'),
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 

@@ -6,17 +6,14 @@ import {
   isMissingRemotePushError,
   isNoLocalCommitPushError,
   isRemoteRepositoryMissingError,
-  isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
 } from '../../../utils/gitPushRecovery';
 import type { AppTabId } from '../sidebar/AppSidebar.types';
 import type { ConfirmDialogState } from '../layoutTypes';
 import type { RunGitCommandOptions } from '../state/appStateShared';
-import {
-  normalizeRepoPointer,
-  splitRepoPath,
-  stripGitSuffix,
-} from './repoWorkflowUtils';
+import { stripGitSuffix } from './repoWorkflowUtils';
+import { useBareRepoRecoveryWorkflow } from './useBareRepoRecoveryWorkflow';
+import { useInitialCommitRecoveryWorkflow } from './useInitialCommitRecoveryWorkflow';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -71,334 +68,23 @@ export const useRemoteRecoveryWorkflow = ({
     setForceGithubRepoCreationPrompt(false);
   }, [workspace.activeRepo]);
 
-  const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
-    if (!window.electronAPI || !workspace.activeRepo) return false;
+  const { recoverBareRepoForPush } = useBareRepoRecoveryWorkflow({
+    workspace,
+    settings,
+    triggerRefresh,
+    setGitActionToast,
+  });
 
-    const sourceRepoPath = workspace.activeRepo;
-    const { parentDir, baseName } = splitRepoPath(sourceRepoPath);
-    const preferredNameBase = stripGitSuffix(baseName) || `${baseName}-worktree`;
-    const candidateNames = Array.from(new Set([
-      preferredNameBase,
-      `${preferredNameBase}-worktree`,
-      ...Array.from({ length: 24 }, (_value, index) => `${preferredNameBase}-worktree-${index + 2}`),
-    ]));
-
-    let existingOriginUrl: string | null = null;
-    try {
-      const originResult = await window.electronAPI.runGitCommand('remote', 'get-url', 'origin');
-      if (originResult.success) {
-        const rawOrigin = String(originResult.data || '').trim();
-        existingOriginUrl = rawOrigin || null;
-      }
-    } catch {
-      existingOriginUrl = null;
-    }
-
-    let cloneResult: { success: boolean; repoPath: string; error?: string } | null = null;
-    let lastCloneError = '';
-
-    for (const candidateName of candidateNames) {
-      const nextResult = await window.electronAPI.gitClone(sourceRepoPath, parentDir, candidateName);
-      if (nextResult.success) {
-        cloneResult = nextResult;
-        break;
-      }
-
-      lastCloneError = String(nextResult.error || '').trim();
-      const alreadyExists = (
-        /destination path.*already exists/i.test(lastCloneError)
-        || /already exists and is not an empty directory/i.test(lastCloneError)
-      );
-      if (!alreadyExists) {
-        break;
-      }
-    }
-
-    if (!cloneResult) {
-      workspace.setActiveTab('repo');
-      setGitActionToast({
-        msg: lastCloneError || tr(
-          'Bare-Repository konnte nicht automatisch in ein Arbeitsverzeichnis ueberfuehrt werden.',
-          'Could not automatically convert bare repository into a working directory.',
-        ),
-        isError: true,
-      });
-      return false;
-    }
-
-    const switchedPath = cloneResult.repoPath;
-    const ensureRecoveredRepoSelected = async () => {
-      await window.electronAPI.setRepoPath(switchedPath);
-      workspace.setActiveRepo(switchedPath);
-    };
-
-    await workspace.addOpenRepo(switchedPath);
-    await ensureRecoveredRepoSelected();
-    // Keep the original bare repo open to avoid a close/switch race that could
-    // accidentally redirect follow-up commands to an unrelated repository.
-    triggerRefresh();
-
-    await ensureRecoveredRepoSelected();
-
-    const headAfterCloneResult = await window.electronAPI.runGitCommand('show', '--quiet', '--format=%H', 'HEAD');
-    const hasLocalCommit = Boolean(headAfterCloneResult.success && String(headAfterCloneResult.data || '').trim());
-    if (!hasLocalCommit) {
-      const remoteBranchesResult = await window.electronAPI.runGitCommand('branch', '-r');
-      const remoteBranches = remoteBranchesResult.success
-        ? String(remoteBranchesResult.data || '')
-          .split('\n')
-          .map((line: string) => line.replace(/^\*\s*/, '').trim())
-          .filter((line: string) => line.startsWith('origin/'))
-          .filter((line: string) => !/^origin\/head\b/i.test(line))
-        : [];
-
-      const preferredRemoteBranch = [
-        `origin/${(settings.defaultBranch || '').trim()}`,
-        'origin/main',
-        'origin/master',
-      ].find((candidate) => remoteBranches.includes(candidate)) || remoteBranches[0];
-
-      if (preferredRemoteBranch) {
-        const localBranchName = preferredRemoteBranch.replace(/^origin\//, '').trim();
-        await ensureRecoveredRepoSelected();
-        const checkoutTracked = await window.electronAPI.runGitCommand(
-          'checkout',
-          '-b',
-          localBranchName,
-          '--track',
-          preferredRemoteBranch,
-        );
-
-        if (!checkoutTracked.success) {
-          await ensureRecoveredRepoSelected();
-          const checkoutForced = await window.electronAPI.runGitCommand(
-            'checkout',
-            '-B',
-            localBranchName,
-            preferredRemoteBranch,
-          );
-          if (!checkoutForced.success) {
-            workspace.setActiveTab('repo');
-            setGitActionToast({
-              msg: checkoutForced.error || checkoutTracked.error || tr(
-                'Arbeitsverzeichnis wurde erstellt, aber ein Start-Branch konnte nicht automatisch ausgecheckt werden.',
-                'Working directory was created, but a starter branch could not be checked out automatically.',
-              ),
-              isError: true,
-            });
-            return false;
-          }
-        }
-      }
-    }
-
-    const sourcePointer = normalizeRepoPointer(sourceRepoPath);
-    const currentOriginPointer = normalizeRepoPointer(existingOriginUrl || '');
-    const originPointsToSource = Boolean(existingOriginUrl) && currentOriginPointer === sourcePointer;
-
-    if (!existingOriginUrl || originPointsToSource) {
-      await ensureRecoveredRepoSelected();
-      const removeOriginResult = await window.electronAPI.runGitCommand('remote', 'remove', 'origin');
-      if (!removeOriginResult.success) {
-        workspace.setActiveTab('repo');
-        setGitActionToast({
-          msg: removeOriginResult.error || tr(
-            'Arbeitsverzeichnis wurde erstellt, aber lokales origin-Remote konnte nicht entfernt werden.',
-            'Working directory was created, but local origin remote could not be removed.',
-          ),
-          isError: true,
-        });
-        return false;
-      }
-    } else {
-      await ensureRecoveredRepoSelected();
-      const setUrlResult = await window.electronAPI.runGitCommand('remote', 'set-url', 'origin', existingOriginUrl);
-      if (!setUrlResult.success) {
-        workspace.setActiveTab('repo');
-        setGitActionToast({
-          msg: setUrlResult.error || tr(
-            'Arbeitsverzeichnis wurde erstellt, aber origin-Remote konnte nicht auf die vorherige URL gesetzt werden.',
-            'Working directory was created, but origin remote could not be set to the previous URL.',
-          ),
-          isError: true,
-        });
-        return false;
-      }
-    }
-
-    workspace.setActiveTab('repo');
-    setGitActionToast({
-      msg: tr(
-        'Bare-Repository erkannt: automatisch in ein Arbeitsverzeichnis geklont und umgeschaltet.',
-        'Bare repository detected: automatically cloned to a working directory and switched.',
-      ),
-      isError: false,
-    });
-    triggerRefresh();
-    return true;
-  }, [setGitActionToast, settings.defaultBranch, tr, triggerRefresh, workspace]);
-
-  const ensureInitialCommitForPush = useCallback(async (
-    options: { skipBareRepoRecovery?: boolean } = {},
-  ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
-
-    const commitMessage = tr('Initial commit', 'Initial commit');
-    const isIdentityMissingError = (message: string) => (
-      /please tell me who you are/i.test(message)
-      || /unable to auto-detect email address/i.test(message)
-      || /user\.name/i.test(message)
-      || /user\.email/i.test(message)
-    );
-    const isNothingToCommitError = (message: string) => (
-      /nothing to commit/i.test(message)
-      || /working tree clean/i.test(message)
-    );
-
-    const statusResult = await window.electronAPI.runGitCommand('statusPorcelain');
-    const hasChanges = Boolean(statusResult.success && String(statusResult.data || '').trim().length > 0);
-
-    if (hasChanges) {
-      const addResult = await window.electronAPI.runGitCommand('add', '-A');
-      if (!addResult.success) {
-        setGitActionToast({
-          msg: addResult.error || tr('Konnte Aenderungen nicht automatisch stagen.', 'Could not stage changes automatically.'),
-          isError: true,
-        });
-        return false;
-      }
-    }
-
-    const commitArgs = hasChanges
-      ? ['commit', '-m', commitMessage]
-      : ['commit', '--allow-empty', '-m', commitMessage];
-
-    const commitResult = await window.electronAPI.runGitCommand(commitArgs[0], ...commitArgs.slice(1));
-    if (commitResult.success) {
-      return true;
-    }
-
-    const commitError = String(commitResult.error || '');
-    if (isNothingToCommitError(commitError)) {
-      const emptyCommitResult = await window.electronAPI.runGitCommand('commit', '--allow-empty', '-m', commitMessage);
-      if (emptyCommitResult.success) {
-        return true;
-      }
-      const emptyCommitError = String(emptyCommitResult.error || '');
-      if (!options.skipBareRepoRecovery && isWorkTreeRequiredError(emptyCommitError)) {
-        const recovered = await recoverBareRepoForPush();
-        if (!recovered) {
-          return false;
-        }
-        return ensureInitialCommitForPush({ skipBareRepoRecovery: true });
-      }
-      if (isIdentityMissingError(String(emptyCommitResult.error || ''))) {
-        workspace.setActiveTab('repo');
-        setGitActionToast({
-          msg: tr(
-            'Push konnte nicht automatisch vorbereitet werden: Git user.name/user.email fehlt. Bitte Git-Identity konfigurieren.',
-            'Could not auto-prepare push: missing Git user.name/user.email. Please configure your Git identity.',
-          ),
-          isError: true,
-        });
-        return false;
-      }
-      setGitActionToast({
-        msg: emptyCommitResult.error || tr('Automatischer Initial-Commit fehlgeschlagen.', 'Automatic initial commit failed.'),
-        isError: true,
-      });
-      return false;
-    }
-
-    if (!options.skipBareRepoRecovery && isWorkTreeRequiredError(commitError)) {
-      const recovered = await recoverBareRepoForPush();
-      if (!recovered) {
-        return false;
-      }
-      return ensureInitialCommitForPush({ skipBareRepoRecovery: true });
-    }
-
-    if (isIdentityMissingError(commitError)) {
-      workspace.setActiveTab('repo');
-      setGitActionToast({
-        msg: tr(
-          'Push konnte nicht automatisch vorbereitet werden: Git user.name/user.email fehlt. Bitte Git-Identity konfigurieren.',
-          'Could not auto-prepare push: missing Git user.name/user.email. Please configure your Git identity.',
-        ),
-        isError: true,
-      });
-      return false;
-    }
-
-    setGitActionToast({
-      msg: commitResult.error || tr('Automatischer Initial-Commit fehlgeschlagen.', 'Automatic initial commit failed.'),
-      isError: true,
-    });
-    return false;
-  }, [recoverBareRepoForPush, setGitActionToast, tr, workspace]);
-
-  const requestInitialCommitConfirmationIfNeeded = useCallback(async (
-    params: {
-      commandLabel: string;
-      confirmLabel: string;
-      onConfirm: () => Promise<void>;
-    },
-  ): Promise<boolean> => {
-    if (!window.electronAPI) return false;
-
-    let changedFiles: number | null = null;
-    try {
-      const statusResult = await window.electronAPI.runGitCommand('statusPorcelain');
-      if (statusResult.success) {
-        changedFiles = String(statusResult.data || '')
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .length;
-      }
-    } catch {
-      changedFiles = null;
-    }
-
-    if (changedFiles === 0) {
-      return false;
-    }
-
-    workspace.setActiveTab('repo');
-    setConfirmDialog({
-      variant: 'danger',
-      title: tr('Initial-Commit mit allen lokalen Aenderungen?', 'Initial commit with all local changes?'),
-      message: tr(
-        'Dieses Repository hat noch keinen lokalen Commit. Zum Pushen muessten jetzt alle lokalen Aenderungen inklusive untracked Dateien gestaged und als Initial-Commit gespeichert werden.',
-        'This repository has no local commit yet. To push it now, all local changes including untracked files would be staged and saved as the initial commit.',
-      ),
-      contextItems: [
-        { label: tr('Befehl', 'Command'), value: params.commandLabel },
-        {
-          label: tr('Lokale Aenderungen', 'Local changes'),
-          value: changedFiles === null
-            ? tr('Status konnte nicht gelesen werden', 'Status could not be read')
-            : tr(
-              `${changedFiles} Datei${changedFiles === 1 ? '' : 'en'} betroffen`,
-              `${changedFiles} file${changedFiles === 1 ? '' : 's'} affected`,
-            ),
-        },
-        {
-          label: tr('Automatischer Schritt', 'Automatic step'),
-          value: 'git add -A && git commit -m "Initial commit"',
-        },
-      ],
-      irreversible: false,
-      consequences: tr(
-        'Bitte pruefe vorher, ob keine lokalen Artefakte, Secrets oder versehentlich erzeugten Dateien im Working Tree liegen.',
-        'Please check first that the working tree does not contain local artifacts, secrets, or accidentally generated files.',
-      ),
-      confirmLabel: params.confirmLabel,
-      onConfirm: params.onConfirm,
-    });
-    return true;
-  }, [setConfirmDialog, tr, workspace]);
-
+  const {
+    ensureInitialCommitForPush,
+    requestInitialCommitConfirmationIfNeeded,
+  } = useInitialCommitRecoveryWorkflow({
+    recoverBareRepoForPush,
+    setActiveTab: workspace.setActiveTab,
+    setConfirmDialog,
+    setGitActionToast,
+    language: settings.language,
+  });
   const openGithubRepoCreationRecovery = useCallback((failureMessage: unknown) => {
     const activeRepoPath = workspace.activeRepo || '';
     const suggestedName = stripGitSuffix(activeRepoPath.split(/[\\/]/).pop() || '') || 'repository';

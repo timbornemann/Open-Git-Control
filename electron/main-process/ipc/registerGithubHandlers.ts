@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { GitService } from '../../GitService';
 import { GitHubService } from '../../GitHubService';
 import { AppSettings } from '../../settings';
@@ -15,6 +15,37 @@ type RegisterGithubHandlersDeps = {
   githubService: GitHubService;
   readSettingsWithMigration: () => AppSettings;
 };
+
+type GithubPrState = 'open' | 'closed' | 'all';
+
+type GithubApiErrorLike = {
+  status?: unknown;
+  message?: unknown;
+  response?: {
+    data?: {
+      message?: unknown;
+    };
+  };
+};
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function getGithubApiErrorDetails(error: unknown): { status: number; apiMessage: string; message: string } {
+  const candidate = error as GithubApiErrorLike;
+  return {
+    status: Number(candidate?.status),
+    apiMessage: typeof candidate?.response?.data?.message === 'string'
+      ? candidate.response.data.message
+      : '',
+    message: typeof candidate?.message === 'string' ? candidate.message : '',
+  };
+}
+
+function normalizePrState(state: string): GithubPrState {
+  return state === 'closed' || state === 'all' ? state : 'open';
+}
 
 function buildGithubRepositoryUrl(host: string, owner: string, repo: string): string {
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
@@ -37,7 +68,7 @@ export function registerGithubHandlers({
   githubService,
   readSettingsWithMigration,
 }: RegisterGithubHandlersDeps): void {
-  ipcMain.handle('github:auth', async (_event: any, token: string, host?: string) => {
+  ipcMain.handle('github:auth', async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
     const settings = readSettingsWithMigration();
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
     const success = await githubService.authenticate(token, normalizedHost);
@@ -113,7 +144,7 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:devicePoll', async (_event: any, deviceCode: string) => {
+  ipcMain.handle('github:devicePoll', async (_event: IpcMainInvokeEvent, deviceCode: string) => {
     try {
       const normalizedDeviceCode = (deviceCode || '').trim();
       if (!normalizedDeviceCode) {
@@ -156,7 +187,7 @@ export function registerGithubHandlers({
         },
       };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Device Flow Polling fehlgeschlagen.';
+      const message = toErrorMessage(error, 'Device Flow Polling fehlgeschlagen.');
       return { success: false, error: message };
     }
   });
@@ -185,13 +216,13 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:getRepos', async (_event: any, params: { page?: number; perPage?: number; search?: string } = {}) => {
+  ipcMain.handle('github:getRepos', async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string } = {}) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
       const repos = await githubService.getMyRepositories(params.page, params.perPage, params.search || '');
       return { success: true, data: repos };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Repositories could not be loaded.') };
     }
   });
 
@@ -209,7 +240,7 @@ export function registerGithubHandlers({
       const repo = await githubService.createRepository(name, params?.description || '', Boolean(params?.isPrivate));
       return { success: true, data: repo };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to create repository';
+      const message = toErrorMessage(error, 'Failed to create repository');
       return { success: false, error: message };
     }
   });
@@ -238,12 +269,9 @@ export function registerGithubHandlers({
         defaultBranchOnly: typeof params?.defaultBranchOnly === 'boolean' ? params.defaultBranchOnly : undefined,
       });
       return { success: true, data: fork };
-    } catch (error: any) {
-      const status = Number(error?.status);
-      const apiMessage = typeof error?.response?.data?.message === 'string'
-        ? error.response.data.message
-        : '';
-      const fallback = error?.message || 'Failed to fork repository.';
+    } catch (error: unknown) {
+      const { status, apiMessage, message } = getGithubApiErrorDetails(error);
+      const fallback = message || 'Failed to fork repository.';
 
       if (status === 404) {
         return { success: false, error: 'Repository not found or no permission to fork it.' };
@@ -274,10 +302,10 @@ export function registerGithubHandlers({
   ipcMain.handle('github:getPRs', async (_event, owner: string, repo: string, state: string) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
-      const prs = await githubService.getPullRequests(owner, repo, state as any);
+      const prs = await githubService.getPullRequests(owner, repo, normalizePrState(state));
       return { success: true, data: prs };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Pull requests could not be loaded.') };
     }
   });
 
@@ -300,8 +328,8 @@ export function registerGithubHandlers({
         params.base,
       );
       return { success: true, data: pr };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Pull request could not be created.') };
     }
   });
 
@@ -340,8 +368,8 @@ export function registerGithubHandlers({
         prerelease: Boolean(params.prerelease),
       });
       return { success: true, data: release };
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Release konnte nicht erstellt werden.' };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
     }
   });
 
@@ -423,8 +451,8 @@ export function registerGithubHandlers({
           fallbackUsed,
         },
       };
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Release-Kontext konnte nicht geladen werden.' };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Release-Kontext konnte nicht geladen werden.') };
     }
   });
 
@@ -443,8 +471,8 @@ export function registerGithubHandlers({
         perPage: params.perPage,
       });
       return { success: true, data: runs };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Workflow runs could not be loaded.') };
     }
   });
 
@@ -453,8 +481,8 @@ export function registerGithubHandlers({
     try {
       const checks = await githubService.getStatusChecks(params.owner, params.repo, params.ref);
       return { success: true, data: checks };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Status checks could not be loaded.') };
     }
   });
 
@@ -483,8 +511,8 @@ export function registerGithubHandlers({
       );
 
       return { success: true, data: result };
-    } catch (e: any) {
-      return { success: false, error: e.message };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Pull request could not be merged.') };
     }
   });
 }

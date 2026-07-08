@@ -1,4 +1,11 @@
-﻿const DEVICE_CODE_PATH = '/login/device/code';
+import type {
+  GithubCheckRunDto,
+  GithubStatusContextDto,
+  GithubWorkflowRunDto,
+  GitHubRepositoryDto,
+  PullRequestDto,
+} from '../src/global';
+const DEVICE_CODE_PATH = '/login/device/code';
 const ACCESS_TOKEN_PATH = '/login/oauth/access_token';
 
 type DeviceFlowStartResult = {
@@ -65,6 +72,86 @@ type WorkflowRunConclusion =
 
 type CheckRunStatus = 'queued' | 'in_progress' | 'completed' | 'waiting' | 'requested' | 'pending';
 type CheckRunConclusion = WorkflowRunConclusion;
+
+type GithubRepositoryApi = {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  clone_url: string;
+  html_url: string;
+  description?: string | null;
+  updated_at?: string;
+};
+
+type PullRequestApi = {
+  number: number;
+  title: string;
+  state: string;
+  user?: { login?: string | null } | null;
+  created_at: string;
+  updated_at: string;
+  head?: { ref?: string | null; sha?: string | null } | null;
+  base?: { ref?: string | null } | null;
+  merged_at?: string | null;
+  html_url: string;
+  draft?: boolean;
+};
+
+type WorkflowRunApi = {
+  id: number;
+  name?: string | null;
+  display_title?: string | null;
+  status?: string | null;
+  conclusion?: string | null;
+  event?: string | null;
+  html_url: string;
+  head_branch?: string | null;
+  head_sha?: string | null;
+  created_at: string;
+  run_started_at?: string | null;
+  updated_at: string;
+};
+
+type CheckRunApi = {
+  id: number;
+  name?: string | null;
+  status?: string | null;
+  conclusion?: string | null;
+  details_url?: string | null;
+  html_url?: string | null;
+  app?: { name?: string | null } | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+type StatusContextApi = {
+  id: number;
+  context?: string | null;
+  state?: string | null;
+  description?: string | null;
+  target_url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type RepositoryTagApi = {
+  name?: string | null;
+};
+
+type RepositoryReleaseApi = {
+  tag_name?: string | null;
+};
+
+type GithubApiErrorLike = {
+  status?: unknown;
+  message?: unknown;
+  response?: {
+    data?: {
+      message?: unknown;
+    };
+  };
+};
 
 const DEFAULT_HOST = 'github.com';
 
@@ -369,7 +456,7 @@ export class GitHubService {
     const safePerPage = Number.isFinite(perPage) ? Math.max(10, Math.min(Math.floor(perPage), 100)) : 50;
     const normalizedSearch = (search || '').trim().toLowerCase();
 
-    const mapRepository = (repo: any) => ({
+    const mapRepository = (repo: GithubRepositoryApi): GitHubRepositoryDto => ({
       id: repo.id,
       name: repo.name,
       fullName: repo.full_name,
@@ -380,7 +467,7 @@ export class GitHubService {
       updatedAt: repo.updated_at,
     });
 
-    const matchesSearch = (repo: any) => {
+    const matchesSearch = (repo: GitHubRepositoryDto) => {
       if (!normalizedSearch) return true;
       const haystack = `${repo.name} ${repo.fullName} ${repo.description || ''}`.toLowerCase();
       return haystack.includes(normalizedSearch);
@@ -394,7 +481,7 @@ export class GitHubService {
       });
 
       return {
-        repos: data.map(mapRepository),
+        repos: (data as GithubRepositoryApi[]).map(mapRepository),
         nextPage: data.length === safePerPage ? safePage + 1 : null,
         hasMore: data.length === safePerPage,
         totalCount: null,
@@ -402,7 +489,7 @@ export class GitHubService {
     }
 
     const requiredMatches = safePage * safePerPage;
-    const matchedRepos: any[] = [];
+    const matchedRepos: GitHubRepositoryDto[] = [];
     let sourcePage = 1;
     let sourceHasMore = false;
 
@@ -413,7 +500,7 @@ export class GitHubService {
         page: sourcePage,
       });
 
-      const mapped = data.map(mapRepository);
+      const mapped = (data as GithubRepositoryApi[]).map(mapRepository);
       matchedRepos.push(...mapped.filter(matchesSearch));
 
       if (data.length < 100) {
@@ -501,7 +588,7 @@ export class GitHubService {
     if (!this.octokit) throw new Error('Not authenticated');
 
     const normalizedState = state === 'closed' || state === 'all' ? state : 'open';
-    const allPullRequests: any[] = [];
+    const allPullRequests: PullRequestApi[] = [];
     let page = 1;
 
     while (true) {
@@ -515,14 +602,14 @@ export class GitHubService {
         direction: 'desc',
       });
 
-      allPullRequests.push(...data);
+      allPullRequests.push(...(data as PullRequestApi[]));
       if (data.length < 100) {
         break;
       }
       page += 1;
     }
 
-    return allPullRequests.map((pr: any) => ({
+    return allPullRequests.map((pr): PullRequestDto => ({
       number: pr.number,
       title: pr.title,
       state: pr.state,
@@ -553,12 +640,13 @@ export class GitHubService {
       per_page: safePerPage,
     });
 
-    const runs = (data.workflow_runs || []).filter((run: any) => {
+    const workflowRuns = (data.workflow_runs || []) as WorkflowRunApi[];
+    const runs = workflowRuns.filter((run) => {
       if (!params.headSha) return true;
       return run.head_sha === params.headSha;
     });
 
-    return runs.map((run: any) => ({
+    return runs.map((run): GithubWorkflowRunDto => ({
       id: run.id,
       name: run.name || run.display_title || 'Workflow',
       status: (run.status || 'pending') as WorkflowRunState,
@@ -587,7 +675,7 @@ export class GitHubService {
       this.octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
     ]);
 
-    const checkRuns = (checksResponse.data.check_runs || []).map((run: any) => ({
+    const checkRuns = ((checksResponse.data.check_runs || []) as CheckRunApi[]).map((run): GithubCheckRunDto => ({
       id: run.id,
       name: run.name || run.app?.name || 'Check',
       status: (run.status || 'pending') as CheckRunStatus,
@@ -598,7 +686,7 @@ export class GitHubService {
       completedAt: run.completed_at || null,
     }));
 
-    const statusContexts = (statusesResponse.data.statuses || []).map((status: any) => ({
+    const statusContexts = ((statusesResponse.data.statuses || []) as StatusContextApi[]).map((status): GithubStatusContextDto => ({
       id: status.id,
       context: status.context || 'status',
       state: status.state || 'pending',
@@ -661,8 +749,8 @@ export class GitHubService {
         page,
       });
 
-      const pageTags = (data || [])
-        .map((tag: any) => String(tag?.name || '').trim())
+      const pageTags = ((data || []) as RepositoryTagApi[])
+        .map((tag) => String(tag?.name || '').trim())
         .filter(Boolean);
 
       tags.push(...pageTags);
@@ -682,7 +770,7 @@ export class GitHubService {
       page: 1,
     });
 
-    const first = (data || []).find((release: any) => Boolean(String(release?.tag_name || '').trim()));
+    const first = ((data || []) as RepositoryReleaseApi[]).find((release) => Boolean(String(release?.tag_name || '').trim()));
     if (!first) return null;
     const tag = String(first.tag_name || '').trim();
     return tag || null;
@@ -757,12 +845,14 @@ export class GitHubService {
         prerelease: Boolean(data.prerelease),
         publishedAt: data.published_at || null,
       };
-    } catch (error: any) {
-      const status = Number(error?.status);
-      const apiMessage = typeof error?.response?.data?.message === 'string'
-        ? error.response.data.message
+    } catch (error: unknown) {
+      const apiError = error as GithubApiErrorLike;
+      const status = Number(apiError?.status);
+      const apiMessage = typeof apiError?.response?.data?.message === 'string'
+        ? apiError.response.data.message
         : '';
-      const normalizedMessage = `${error?.message || ''} ${apiMessage}`.toLowerCase();
+      const fallbackMessage = typeof apiError?.message === 'string' ? apiError.message : '';
+      const normalizedMessage = `${fallbackMessage} ${apiMessage}`.toLowerCase();
 
       if (status === 422 && normalizedMessage.includes('already_exists')) {
         throw new Error('Tag existiert bereits. Bitte anderen Tag wählen oder bestehenden Tag verwenden.');
@@ -776,7 +866,7 @@ export class GitHubService {
         throw new Error('Keine Berechtigung für dieses Repository. Bitte Token-Rechte prüfen.');
       }
 
-      throw new Error(apiMessage || error?.message || 'Release konnte nicht erstellt werden.');
+      throw new Error(apiMessage || fallbackMessage || 'Release konnte nicht erstellt werden.');
     }
   }
 }
