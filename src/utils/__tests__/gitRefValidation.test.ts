@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isBranchNameValid, validateBranchName } from '../gitRefValidation';
+import { isBranchNameValid, validateBranchName } from '@/utils/gitRefValidation';
 
 describe('validateBranchName', () => {
   it('accepts valid branch names', () => {

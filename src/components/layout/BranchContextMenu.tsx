@@ -1,6 +1,6 @@
 import React from 'react';
-import { GitMergeMode } from '../../types/git';
-import { useI18n } from '../../i18n';
+import type { GitMergeMode } from '@/types/git';
+import { useI18n } from '@/i18n';
 
 type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
 
@@ -25,14 +25,7 @@ const MenuLabel: React.FC<MenuLabelProps> = ({ label, help }) => (
   </span>
 );
 
-export const BranchContextMenu: React.FC<Props> = ({
-  branchContextMenu,
-  setBranchContextMenu,
-  onCheckout,
-  onMerge,
-  onRename,
-  onDelete,
-}) => {
+export const BranchContextMenu: React.FC<Props> = ({ branchContextMenu, setBranchContextMenu, onCheckout, onMerge, onRename, onDelete }) => {
   const { t } = useI18n();
 
   if (!branchContextMenu) return null;
@@ -41,23 +34,21 @@ export const BranchContextMenu: React.FC<Props> = ({
   return (
     <div
       className="ctx-menu-backdrop"
-      onClick={e => {
+      onClick={(e) => {
         e.stopPropagation();
         setBranchContextMenu(null);
       }}
     >
-      <div
-        className="ctx-menu"
-        style={{ left: branchContextMenu.x, top: branchContextMenu.y }}
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="ctx-menu" style={{ left: branchContextMenu.x, top: branchContextMenu.y }} onClick={(e) => e.stopPropagation()}>
         <div className="ctx-menu-header">{branchContextMenu.branch}</div>
         {!branchContextMenu.isHead && (
           <button
             className="ctx-menu-item"
-            title={isRemoteBranch
-              ? t('generated.components.layout.branchcontextmenu.creates_or_opens_a_local_tracking_branch_for_this_remote_fb70f9fa')
-              : t('generated.components.layout.branchcontextmenu.switches_to_this_local_branch_ad1a868d')}
+            title={
+              isRemoteBranch
+                ? t('generated.components.layout.branchcontextmenu.creates_or_opens_a_local_tracking_branch_for_this_remote_fb70f9fa')
+                : t('generated.components.layout.branchcontextmenu.switches_to_this_local_branch_ad1a868d')
+            }
             onClick={() => {
               const b = branchContextMenu.branch;
               setBranchContextMenu(null);
@@ -66,12 +57,16 @@ export const BranchContextMenu: React.FC<Props> = ({
           >
             <span className="ctx-menu-icon">CO</span>
             <MenuLabel
-              label={isRemoteBranch
-                ? t('generated.components.layout.branchcontextmenu.checkout_tracking_branch_72fd20f4')
-                : t('generated.components.layout.branchcontextmenu.checkout_d9bc41ee')}
-              help={isRemoteBranch
-                ? t('generated.components.layout.branchcontextmenu.creates_a_local_branch_when_needed_and_tracks_the_remote_926cdb5d')
-                : t('generated.components.layout.branchcontextmenu.switches_your_working_tree_to_this_branch_447f4c22')}
+              label={
+                isRemoteBranch
+                  ? t('generated.components.layout.branchcontextmenu.checkout_tracking_branch_72fd20f4')
+                  : t('generated.components.layout.branchcontextmenu.checkout_d9bc41ee')
+              }
+              help={
+                isRemoteBranch
+                  ? t('generated.components.layout.branchcontextmenu.creates_a_local_branch_when_needed_and_tracks_the_remote_926cdb5d')
+                  : t('generated.components.layout.branchcontextmenu.switches_your_working_tree_to_this_branch_447f4c22')
+              }
             />
           </button>
         )}

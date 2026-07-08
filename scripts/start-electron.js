@@ -9,7 +9,7 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
 
 const child = spawn(electron, ['.'], {
   stdio: 'inherit',
-  env: process.env
+  env: process.env,
 });
 
 child.on('close', (code) => {

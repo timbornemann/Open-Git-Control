@@ -14,7 +14,9 @@ const createTempCache = () => {
 const waitFor = async (predicate: () => boolean) => {
   const deadline = Date.now() + 1000;
   while (!predicate() && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10);
+    });
   }
   expect(predicate()).toBe(true);
 };
@@ -118,9 +120,13 @@ describe('CommitStatsService', () => {
         calls.push(hash);
         if (hash === backgroundHash && calls.filter((value) => value === backgroundHash).length === 1) {
           await new Promise<void>((_resolve, reject) => {
-            signal.addEventListener('abort', () => {
-              reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
-            }, { once: true });
+            signal.addEventListener(
+              'abort',
+              () => {
+                reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+              },
+              { once: true },
+            );
           });
         }
         return { files: 1, additions: hash === selectedHash ? 2 : 1, deletions: 0 };
@@ -153,7 +159,9 @@ describe('CommitStatsService', () => {
       getCommitStatsAtPath: vi.fn(async (_repo: string, hash: string) => {
         active.add(hash);
         peakActive = Math.max(peakActive, active.size);
-        await new Promise<void>((resolve) => pending.set(hash, resolve));
+        await new Promise<void>((resolve) => {
+          pending.set(hash, resolve);
+        });
         active.delete(hash);
         return { files: 1, additions: 1, deletions: 0 };
       }),
@@ -183,7 +191,9 @@ describe('CommitStatsService', () => {
       getRepoPath: () => 'C:/repo',
       runCommandAtPath: vi.fn(async () => 'sha1'),
       getCommitStatsAtPath: vi.fn(async (_repo: string, hash: string) => {
-        await new Promise<void>((resolve) => pending.set(hash, resolve));
+        await new Promise<void>((resolve) => {
+          pending.set(hash, resolve);
+        });
         return { files: 1, additions: Number.parseInt(hash[0], 16), deletions: 0 };
       }),
     } as any;

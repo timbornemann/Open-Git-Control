@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommitDetails } from '../gitParsing';
+import { parseCommitDetails } from '@/utils/gitParsing';
 
 describe('parseCommitDetails', () => {
   it('parses normal status lines', () => {

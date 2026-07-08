@@ -1,22 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { normalizeMergeConflictFileContent } from '../../utils/conflictLineGutter';
-import type { ToastMessage } from '../../types/git';
-import { useI18n } from '../../i18n';
-import { gitClient } from '../../services/gitClient';
-import {
-  basename,
-  buildConflictResolution,
-  countConflictMarkerLines,
-  detectLineEnding,
-  parseConflictBlocks,
-  replaceConflictBlock,
-} from './utils';
-import type {
-  ConfirmDialogState,
-  ConflictEditorState,
-  ConflictResolutionChoice,
-  GitStatusWithConflicts,
-} from './types';
+import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
+import type { ToastMessage } from '@/types/git';
+import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
+import { basename, buildConflictResolution, countConflictMarkerLines, detectLineEnding, parseConflictBlocks, replaceConflictBlock } from './utils';
+import type { ConfirmDialogState, ConflictEditorState, ConflictResolutionChoice, GitStatusWithConflicts } from './types';
 
 type Params = {
   repoPath: string | null;
@@ -56,27 +44,30 @@ export const useConflictResolver = ({
   const autoScrollAnchorRef = useRef<string>('');
   const countedConflictPathsKeyRef = useRef<string>('');
 
-  const openConflictEditor = useCallback(async (filePath: string, initialBlockIndex = 0) => {
-    if (!gitClient.isAvailable()) return;
-    setIsConflictEditorLoading(true);
-    try {
-      const result = await gitClient.readRepoFile(filePath);
-      if (!result.success || typeof result.data !== 'string') {
-        setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
-        return;
+  const openConflictEditor = useCallback(
+    async (filePath: string, initialBlockIndex = 0) => {
+      if (!gitClient.isAvailable()) return;
+      setIsConflictEditorLoading(true);
+      try {
+        const result = await gitClient.readRepoFile(filePath);
+        if (!result.success || typeof result.data !== 'string') {
+          setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
+          return;
+        }
+        const normalized = normalizeMergeConflictFileContent(result.data);
+        const parsedBlocks = parseConflictBlocks(normalized);
+        const requestedIndex = Number.isFinite(initialBlockIndex) ? Math.max(0, Math.floor(initialBlockIndex)) : 0;
+        const boundedIndex = parsedBlocks.length > 0 ? Math.min(requestedIndex, parsedBlocks.length - 1) : 0;
+        setConflictEditor({ filePath, originalContent: normalized, content: normalized, isSaving: false });
+        setSelectedConflictBlockIndex(boundedIndex);
+      } catch (error: any) {
+        setToast({ msg: error?.message || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
+      } finally {
+        setIsConflictEditorLoading(false);
       }
-      const normalized = normalizeMergeConflictFileContent(result.data);
-      const parsedBlocks = parseConflictBlocks(normalized);
-      const requestedIndex = Number.isFinite(initialBlockIndex) ? Math.max(0, Math.floor(initialBlockIndex)) : 0;
-      const boundedIndex = parsedBlocks.length > 0 ? Math.min(requestedIndex, parsedBlocks.length - 1) : 0;
-      setConflictEditor({ filePath, originalContent: normalized, content: normalized, isSaving: false });
-      setSelectedConflictBlockIndex(boundedIndex);
-    } catch (error: any) {
-      setToast({ msg: error?.message || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
-    } finally {
-      setIsConflictEditorLoading(false);
-    }
-  }, [setToast, tr]);
+    },
+    [setToast, tr],
+  );
 
   const reloadActiveConflictEditor = useCallback(async () => {
     if (!conflictEditor) return;
@@ -100,13 +91,8 @@ export const useConflictResolver = ({
   }, [conflictEditor]);
 
   const hasRawConflictMarkers = conflictMarkerStats.starts + conflictMarkerStats.separators + conflictMarkerStats.ends > 0;
-  const hasBalancedConflictMarkers = (
-    conflictMarkerStats.starts === conflictMarkerStats.separators
-    && conflictMarkerStats.starts === conflictMarkerStats.ends
-  );
-  const isStructuredConflictViewLocked = hasRawConflictMarkers && (
-    !hasBalancedConflictMarkers || conflictBlocks.length !== conflictMarkerStats.starts
-  );
+  const hasBalancedConflictMarkers = conflictMarkerStats.starts === conflictMarkerStats.separators && conflictMarkerStats.starts === conflictMarkerStats.ends;
+  const isStructuredConflictViewLocked = hasRawConflictMarkers && (!hasBalancedConflictMarkers || conflictBlocks.length !== conflictMarkerStats.starts);
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
   useEffect(() => {
@@ -131,9 +117,7 @@ export const useConflictResolver = ({
         for (const path of paths) {
           const r = await gitClient.readRepoFile(path);
           if (cancelled) return;
-          next[path] = r.success && typeof r.data === 'string'
-            ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length
-            : 0;
+          next[path] = r.success && typeof r.data === 'string' ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length : 0;
         }
         if (!cancelled) {
           setConflictBlockCountsByPath((prev) => {
@@ -155,7 +139,9 @@ export const useConflictResolver = ({
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [repoPath, status]);
 
   useLayoutEffect(() => {
@@ -177,7 +163,9 @@ export const useConflictResolver = ({
       const scrollTop = Math.max(0, (line - 1) * lh - 56);
       el.scrollTop = scrollTop;
     };
-    requestAnimationFrame(() => { requestAnimationFrame(run); });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
   }, [selectedConflictBlockIndex, conflictEditor?.filePath, selectedConflictBlock, isStructuredConflictViewLocked]);
 
   useEffect(() => {
@@ -225,58 +213,75 @@ export const useConflictResolver = ({
     void openConflictEditor(initialConflictPath);
   }, [isConflictOnly, initialConflictPath, status, conflictEditor?.filePath, openConflictEditor]);
 
-  const applyConflictChoiceToSelected = useCallback((choice: ConflictResolutionChoice) => {
-    if (!conflictEditor) return;
-    const blocks = parseConflictBlocks(conflictEditor.content);
-    if (blocks.length === 0) return;
-    const blockIndex = Math.min(selectedConflictBlockIndex, blocks.length - 1);
-    const block = blocks[blockIndex];
-    if (!block) return;
-    const nextContent = replaceConflictBlock(conflictEditor.content, block, buildConflictResolution(block, choice, detectLineEnding(conflictEditor.content)));
-    setConflictEditor((prev) => {
-      if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
-      return { ...prev, content: nextContent };
-    });
-    const selectedLabel = choice === 'ours'
-      ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
-      : choice === 'theirs'
-      ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
-      : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
-    setToast({ msg: tr(`${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.`, `Applied ${selectedLabel} for block ${blockIndex + 1}.`), isError: false });
-  }, [conflictEditor, selectedConflictBlockIndex, setToast, tr]);
+  const applyConflictChoiceToSelected = useCallback(
+    (choice: ConflictResolutionChoice) => {
+      if (!conflictEditor) return;
+      const blocks = parseConflictBlocks(conflictEditor.content);
+      if (blocks.length === 0) return;
+      const blockIndex = Math.min(selectedConflictBlockIndex, blocks.length - 1);
+      const block = blocks[blockIndex];
+      if (!block) return;
+      const nextContent = replaceConflictBlock(conflictEditor.content, block, buildConflictResolution(block, choice, detectLineEnding(conflictEditor.content)));
+      setConflictEditor((prev) => {
+        if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+        return { ...prev, content: nextContent };
+      });
+      const selectedLabel =
+        choice === 'ours'
+          ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
+          : choice === 'theirs'
+            ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
+            : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
+      setToast({
+        msg: tr(`${selectedLabel} fuer Block ${blockIndex + 1} uebernommen.`, `Applied ${selectedLabel} for block ${blockIndex + 1}.`),
+        isError: false,
+      });
+    },
+    [conflictEditor, selectedConflictBlockIndex, setToast, tr],
+  );
 
-  const applyConflictChoiceToAll = useCallback((choice: ConflictResolutionChoice) => {
-    if (!conflictEditor) return;
-    const blocks = parseConflictBlocks(conflictEditor.content);
-    if (blocks.length === 0) return;
-    let nextContent = conflictEditor.content;
-    const lineEnding = detectLineEnding(conflictEditor.content);
-    for (let i = blocks.length - 1; i >= 0; i -= 1) {
-      nextContent = replaceConflictBlock(nextContent, blocks[i], buildConflictResolution(blocks[i], choice, lineEnding));
-    }
-    setConflictEditor((prev) => {
-      if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
-      return { ...prev, content: nextContent };
-    });
-    setSelectedConflictBlockIndex(0);
-    const selectedLabel = choice === 'ours'
-      ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
-      : choice === 'theirs'
-      ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
-      : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
-    setToast({ msg: tr(`${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, `Applied ${selectedLabel} for all conflict blocks.`), isError: false });
-  }, [conflictEditor, setToast, tr]);
-
-  const markConflictResolved = useCallback((filePath: string) => git(['conflictMarkResolved', filePath], tr(`${basename(filePath)} als geloest markiert`, `Marked ${basename(filePath)} as resolved`)), [git, tr]);
-
-  const markConflictResolvedAndSync = useCallback(async (filePath: string) => {
-    const didResolve = await markConflictResolved(filePath);
-    if (!didResolve) return;
-    if (conflictEditor?.filePath === filePath) {
-      setConflictEditor(null);
+  const applyConflictChoiceToAll = useCallback(
+    (choice: ConflictResolutionChoice) => {
+      if (!conflictEditor) return;
+      const blocks = parseConflictBlocks(conflictEditor.content);
+      if (blocks.length === 0) return;
+      let nextContent = conflictEditor.content;
+      const lineEnding = detectLineEnding(conflictEditor.content);
+      for (let i = blocks.length - 1; i >= 0; i -= 1) {
+        nextContent = replaceConflictBlock(nextContent, blocks[i], buildConflictResolution(blocks[i], choice, lineEnding));
+      }
+      setConflictEditor((prev) => {
+        if (!prev || prev.filePath !== conflictEditor.filePath) return prev;
+        return { ...prev, content: nextContent };
+      });
       setSelectedConflictBlockIndex(0);
-    }
-  }, [conflictEditor, markConflictResolved]);
+      const selectedLabel =
+        choice === 'ours'
+          ? t('generated.components.staging_area.conflictresolverpanel.current_version_5aeac7d3')
+          : choice === 'theirs'
+            ? t('generated.components.staging_area.conflictresolverpanel.incoming_version_321cfa46')
+            : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
+      setToast({ msg: tr(`${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, `Applied ${selectedLabel} for all conflict blocks.`), isError: false });
+    },
+    [conflictEditor, setToast, tr],
+  );
+
+  const markConflictResolved = useCallback(
+    (filePath: string) => git(['conflictMarkResolved', filePath], tr(`${basename(filePath)} als geloest markiert`, `Marked ${basename(filePath)} as resolved`)),
+    [git, tr],
+  );
+
+  const markConflictResolvedAndSync = useCallback(
+    async (filePath: string) => {
+      const didResolve = await markConflictResolved(filePath);
+      if (!didResolve) return;
+      if (conflictEditor?.filePath === filePath) {
+        setConflictEditor(null);
+        setSelectedConflictBlockIndex(0);
+      }
+    },
+    [conflictEditor, markConflictResolved],
+  );
 
   const resetConflictEditorDraft = useCallback(() => {
     if (!conflictEditor) return;
@@ -287,48 +292,58 @@ export const useConflictResolver = ({
     setToast({ msg: t('generated.components.staging_area.useconflictresolver.discarded_local_editor_changes_297514e3'), isError: false });
   }, [conflictEditor, setToast, tr]);
 
-  const saveConflictEditor = useCallback(async (markResolvedAfterSave: boolean) => {
-    if (!gitClient.isAvailable() || !conflictEditor) return;
-    const pendingBlocks = parseConflictBlocks(conflictEditor.content);
-    if (markResolvedAfterSave && pendingBlocks.length > 0) {
-      setToast({ msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'), isError: true });
-      return;
-    }
-    const targetPath = conflictEditor.filePath;
-    const targetContent = conflictEditor.content;
-    setConflictEditor((prev) => {
-      if (!prev || prev.filePath !== targetPath) return prev;
-      return { ...prev, isSaving: true };
-    });
-    try {
-      const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
-      if (!writeResult.success) throw new Error(writeResult.error || t('generated.components.staging_area.useconflictresolver.could_not_save_file_6d41241a'));
-      if (markResolvedAfterSave) {
-        const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
-        if (!stageResult.success) throw new Error(stageResult.error || t('generated.components.staging_area.useconflictresolver.could_not_mark_file_as_resolved_f7ee9c12'));
+  const saveConflictEditor = useCallback(
+    async (markResolvedAfterSave: boolean) => {
+      if (!gitClient.isAvailable() || !conflictEditor) return;
+      const pendingBlocks = parseConflictBlocks(conflictEditor.content);
+      if (markResolvedAfterSave && pendingBlocks.length > 0) {
+        setToast({
+          msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'),
+          isError: true,
+        });
+        return;
       }
+      const targetPath = conflictEditor.filePath;
+      const targetContent = conflictEditor.content;
       setConflictEditor((prev) => {
         if (!prev || prev.filePath !== targetPath) return prev;
-        return { ...prev, content: targetContent, originalContent: targetContent, isSaving: false };
+        return { ...prev, isSaving: true };
       });
-      setToast({
-        msg: markResolvedAfterSave
-          ? tr(`${basename(targetPath)} gespeichert + geloest`, `Saved ${basename(targetPath)} + resolved`)
-          : tr(`${basename(targetPath)} gespeichert`, `Saved ${basename(targetPath)}`),
-        isError: false,
-      });
-      if (onRepoChanged) onRepoChanged();
-      await refresh();
-    } catch (error: any) {
-      setConflictEditor((prev) => {
-        if (!prev || prev.filePath !== targetPath) return prev;
-        return { ...prev, isSaving: false };
-      });
-      setToast({ msg: error?.message || t('generated.components.staging_area.useconflictresolver.could_not_save_conflict_file_e9930739'), isError: true });
-    }
-  }, [conflictEditor, onRepoChanged, refresh, setToast, tr]);
+      try {
+        const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
+        if (!writeResult.success) throw new Error(writeResult.error || t('generated.components.staging_area.useconflictresolver.could_not_save_file_6d41241a'));
+        if (markResolvedAfterSave) {
+          const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
+          if (!stageResult.success)
+            throw new Error(stageResult.error || t('generated.components.staging_area.useconflictresolver.could_not_mark_file_as_resolved_f7ee9c12'));
+        }
+        setConflictEditor((prev) => {
+          if (!prev || prev.filePath !== targetPath) return prev;
+          return { ...prev, content: targetContent, originalContent: targetContent, isSaving: false };
+        });
+        setToast({
+          msg: markResolvedAfterSave
+            ? tr(`${basename(targetPath)} gespeichert + geloest`, `Saved ${basename(targetPath)} + resolved`)
+            : tr(`${basename(targetPath)} gespeichert`, `Saved ${basename(targetPath)}`),
+          isError: false,
+        });
+        if (onRepoChanged) onRepoChanged();
+        await refresh();
+      } catch (error: any) {
+        setConflictEditor((prev) => {
+          if (!prev || prev.filePath !== targetPath) return prev;
+          return { ...prev, isSaving: false };
+        });
+        setToast({ msg: error?.message || t('generated.components.staging_area.useconflictresolver.could_not_save_conflict_file_e9930739'), isError: true });
+      }
+    },
+    [conflictEditor, onRepoChanged, refresh, setToast, tr],
+  );
 
-  const mergeContinue = useCallback(() => git(['mergeContinue'], t('generated.components.staging_area.useconflictresolver.merge_continued_fc503f43'), true), [git, tr]);
+  const mergeContinue = useCallback(
+    () => git(['mergeContinue'], t('generated.components.staging_area.useconflictresolver.merge_continued_fc503f43'), true),
+    [git, tr],
+  );
   const mergeAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
@@ -344,7 +359,10 @@ export const useConflictResolver = ({
     });
   }, [setConfirmDialog, git, tr]);
 
-  const rebaseContinue = useCallback(() => git(['rebaseContinue'], t('generated.components.staging_area.useconflictresolver.rebase_continued_d91def08'), true), [git, tr]);
+  const rebaseContinue = useCallback(
+    () => git(['rebaseContinue'], t('generated.components.staging_area.useconflictresolver.rebase_continued_d91def08'), true),
+    [git, tr],
+  );
   const rebaseAbort = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
@@ -368,22 +386,14 @@ export const useConflictResolver = ({
   }, []);
 
   // Derived navigation values (need status + editor state)
-  const conflictPaths = useMemo(
-    () => status ? [...new Set(status.conflicts.map((e) => e.path))].sort((a, b) => a.localeCompare(b)) : [],
-    [status],
-  );
-  const safeSelectedConflictBlockIndex = conflictBlocks.length > 0
-    ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1)
-    : 0;
+  const conflictPaths = useMemo(() => (status ? [...new Set(status.conflicts.map((e) => e.path))].sort((a, b) => a.localeCompare(b)) : []), [status]);
+  const safeSelectedConflictBlockIndex = conflictBlocks.length > 0 ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1) : 0;
   const activeConflictFileIndex = conflictEditor ? conflictPaths.indexOf(conflictEditor.filePath) : -1;
   const canUseStructuredConflictNavigation = Boolean(conflictEditor) && !isStructuredConflictViewLocked && conflictBlocks.length > 0;
-  const hasPreviousConflictTarget = canUseStructuredConflictNavigation && (
-    safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0
-  );
-  const hasNextConflictTarget = canUseStructuredConflictNavigation && (
-    safeSelectedConflictBlockIndex < conflictBlocks.length - 1
-    || (activeConflictFileIndex >= 0 && activeConflictFileIndex < conflictPaths.length - 1)
-  );
+  const hasPreviousConflictTarget = canUseStructuredConflictNavigation && (safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0);
+  const hasNextConflictTarget =
+    canUseStructuredConflictNavigation &&
+    (safeSelectedConflictBlockIndex < conflictBlocks.length - 1 || (activeConflictFileIndex >= 0 && activeConflictFileIndex < conflictPaths.length - 1));
 
   const navigateToPreviousConflict = useCallback(async () => {
     if (!canUseStructuredConflictNavigation || !conflictEditor) return;
@@ -407,12 +417,23 @@ export const useConflictResolver = ({
     const nextPath = conflictPaths[activeConflictFileIndex + 1];
     if (!nextPath) return;
     await openConflictEditor(nextPath, 0);
-  }, [canUseStructuredConflictNavigation, conflictEditor, safeSelectedConflictBlockIndex, conflictBlocks.length, activeConflictFileIndex, conflictPaths, openConflictEditor]);
+  }, [
+    canUseStructuredConflictNavigation,
+    conflictEditor,
+    safeSelectedConflictBlockIndex,
+    conflictBlocks.length,
+    activeConflictFileIndex,
+    conflictPaths,
+    openConflictEditor,
+  ]);
 
-  const blockCountForPath = useCallback((path: string) => {
-    if (conflictEditor?.filePath === path) return conflictBlocks.length;
-    return conflictBlockCountsByPath[path] ?? 0;
-  }, [conflictEditor, conflictBlocks.length, conflictBlockCountsByPath]);
+  const blockCountForPath = useCallback(
+    (path: string) => {
+      if (conflictEditor?.filePath === path) return conflictBlocks.length;
+      return conflictBlockCountsByPath[path] ?? 0;
+    },
+    [conflictEditor, conflictBlocks.length, conflictBlockCountsByPath],
+  );
 
   return {
     conflictEditor,

@@ -1,28 +1,29 @@
 import { ipcMain } from 'electron';
-import { UpdaterManager } from '../updaterManager';
+import type { UpdaterManager } from '../updaterManager';
+import { IpcChannel } from '../../../src/types/ipcContract';
 
 type RegisterUpdaterHandlersDeps = {
   updaterManager: UpdaterManager;
 };
 
 export function registerUpdaterHandlers({ updaterManager }: RegisterUpdaterHandlersDeps): void {
-  ipcMain.handle('updater:getStatus', async () => {
+  ipcMain.handle(IpcChannel.UpdaterGetStatus, async () => {
     return updaterManager.getStatus();
   });
 
-  ipcMain.handle('updater:check', async () => {
+  ipcMain.handle(IpcChannel.UpdaterCheck, async () => {
     return updaterManager.checkForAppUpdates();
   });
 
-  ipcMain.handle('updater:runOneClick', async () => {
+  ipcMain.handle(IpcChannel.UpdaterRunOneClick, async () => {
     return updaterManager.runOneClickUpdate();
   });
 
-  ipcMain.handle('updater:download', async () => {
+  ipcMain.handle(IpcChannel.UpdaterDownload, async () => {
     return updaterManager.downloadAvailableUpdate();
   });
 
-  ipcMain.handle('updater:install', async () => {
+  ipcMain.handle(IpcChannel.UpdaterInstall, async () => {
     return updaterManager.installDownloadedUpdate();
   });
 }

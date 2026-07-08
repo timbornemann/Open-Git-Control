@@ -34,14 +34,14 @@ npm run dev
 
 Nuetzliche Scripts:
 
-| Script | Zweck |
-| --- | --- |
-| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren |
-| `npm run build` | TypeScript, Vite Build und Electron Build ausfuehren |
-| `npm run test` | Unit Tests ausfuehren |
-| `npm run test:coverage` | Tests mit Coverage-Gates ausfuehren |
-| `npm run test:ci` | CI-aehnlichen Compile-, Coverage- und Build-Flow ausfuehren |
-| `npm run dist` | Lokales Paket fuer die aktuelle Plattform bauen |
+| Script                   | Zweck                                                       |
+| ------------------------ | ----------------------------------------------------------- |
+| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren                   |
+| `npm run build`          | TypeScript, Vite Build und Electron Build ausfuehren        |
+| `npm run test`           | Unit Tests ausfuehren                                       |
+| `npm run test:coverage`  | Tests mit Coverage-Gates ausfuehren                         |
+| `npm run test:ci`        | CI-aehnlichen Compile-, Coverage- und Build-Flow ausfuehren |
+| `npm run dist`           | Lokales Paket fuer die aktuelle Plattform bauen             |
 
 ## Projektstruktur
 

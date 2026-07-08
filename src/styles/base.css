@@ -1,6 +1,6 @@
 :root {
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
 
   /* Core Colors */
   --bg-darker: #0f1214;
@@ -35,23 +35,23 @@
   --status-success-soft: rgba(90, 160, 141, 0.15);
   --status-success-border: rgba(90, 160, 141, 0.32);
   --status-warning-soft: rgba(188, 138, 93, 0.14);
-  --status-warning-border: rgba(188, 138, 93, 0.30);
+  --status-warning-border: rgba(188, 138, 93, 0.3);
   --status-danger-soft: rgba(201, 101, 104, 0.14);
   --status-danger-border: rgba(201, 101, 104, 0.32);
   --status-info-soft: rgba(111, 154, 178, 0.14);
-  --status-info-border: rgba(111, 154, 178, 0.30);
+  --status-info-border: rgba(111, 154, 178, 0.3);
   --status-merged-soft: rgba(120, 144, 161, 0.14);
-  --status-merged-border: rgba(120, 144, 161, 0.30);
+  --status-merged-border: rgba(120, 144, 161, 0.3);
   --status-untracked-soft: rgba(144, 138, 132, 0.14);
-  --status-untracked-border: rgba(144, 138, 132, 0.30);
+  --status-untracked-border: rgba(144, 138, 132, 0.3);
 
   /* Accent Tints */
   --accent-primary-soft: rgba(184, 117, 85, 0.14);
   --accent-primary-softer: rgba(184, 117, 85, 0.08);
-  --accent-primary-border: rgba(184, 117, 85, 0.30);
+  --accent-primary-border: rgba(184, 117, 85, 0.3);
   --accent-primary-strong: rgba(184, 117, 85, 0.45);
   --accent-secondary-soft: rgba(111, 135, 148, 0.14);
-  --accent-secondary-border: rgba(111, 135, 148, 0.30);
+  --accent-secondary-border: rgba(111, 135, 148, 0.3);
   --accent-complement-soft: rgba(87, 152, 145, 0.14);
   --accent-complement-border: rgba(87, 152, 145, 0.32);
 
@@ -78,8 +78,8 @@
   --main-view-min-width: 608px;
 
   /* Shadows & Effects */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
   --glass-bg: rgba(23, 27, 29, 0.74);
   --line-subtle: rgba(255, 255, 255, 0.04);
   --scrollbar-thumb-hover: rgba(179, 170, 162, 0.5);
@@ -100,7 +100,8 @@ body {
   overflow: hidden;
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--font-mono);
 }
 
@@ -136,7 +137,7 @@ code, pre {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-panel);
-  box-shadow: 0 18px 52px rgba(0,0,0,0.58);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.58);
 }
 
 .repo-switcher-title {
@@ -231,7 +232,8 @@ code, pre {
   justify-content: center;
 }
 
-.icon-btn:hover, .icon-btn.active {
+.icon-btn:hover,
+.icon-btn.active {
   color: var(--text-primary);
   background-color: var(--bg-hover);
 }
@@ -262,8 +264,12 @@ code, pre {
 }
 
 @keyframes icon-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sidebar {
@@ -551,7 +557,9 @@ code, pre {
   background: var(--border-color);
   transform: translateX(-50%);
   opacity: 0.7;
-  transition: opacity 0.12s ease, background-color 0.12s ease;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease;
 }
 
 .pane-resizer:hover::before,
@@ -832,5 +840,3 @@ code, pre {
     flex-basis: 40px;
   }
 }
-
-

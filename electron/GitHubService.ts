@@ -1,10 +1,4 @@
-import type {
-  GithubCheckRunDto,
-  GithubStatusContextDto,
-  GithubWorkflowRunDto,
-  GitHubRepositoryDto,
-  PullRequestDto,
-} from '../src/global';
+import type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto } from '../src/global';
 const DEVICE_CODE_PATH = '/login/device/code';
 const ACCESS_TOKEN_PATH = '/login/oauth/access_token';
 
@@ -59,16 +53,7 @@ export type GitHubReleaseDto = {
 };
 
 type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'requested' | 'waiting' | 'pending';
-type WorkflowRunConclusion =
-  | 'success'
-  | 'failure'
-  | 'cancelled'
-  | 'skipped'
-  | 'timed_out'
-  | 'action_required'
-  | 'neutral'
-  | 'stale'
-  | null;
+type WorkflowRunConclusion = 'success' | 'failure' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | 'neutral' | 'stale' | null;
 
 type CheckRunStatus = 'queued' | 'in_progress' | 'completed' | 'waiting' | 'requested' | 'pending';
 type CheckRunConclusion = WorkflowRunConclusion;
@@ -280,7 +265,7 @@ export class GitHubService {
       throw new Error(`Device Flow konnte nicht gestartet werden (${response.status}).`);
     }
 
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       device_code?: string;
       user_code?: string;
       verification_uri?: string;
@@ -341,7 +326,7 @@ export class GitHubService {
       };
     }
 
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       access_token?: string;
       token_type?: string;
       scope?: string;
@@ -412,7 +397,7 @@ export class GitHubService {
       throw new Error(`OAuth Token-Austausch fehlgeschlagen (${response.status}).`);
     }
 
-    const payload = await response.json() as {
+    const payload = (await response.json()) as {
       access_token?: string;
       token_type?: string;
       scope?: string;
@@ -567,9 +552,7 @@ export class GitHubService {
       owner: normalizedOwner,
       repo: normalizedRepo,
       ...(normalizedName ? { name: normalizedName } : {}),
-      ...(typeof options.defaultBranchOnly === 'boolean'
-        ? { default_branch_only: options.defaultBranchOnly }
-        : {}),
+      ...(typeof options.defaultBranchOnly === 'boolean' ? { default_branch_only: options.defaultBranchOnly } : {}),
     });
 
     return {
@@ -628,9 +611,7 @@ export class GitHubService {
   async getWorkflowRuns(owner: string, repo: string, params: { branch?: string; headSha?: string; perPage?: number } = {}) {
     if (!this.octokit) throw new Error('Not authenticated');
 
-    const safePerPage = Number.isFinite(params.perPage)
-      ? Math.max(1, Math.min(Math.floor(params.perPage as number), 100))
-      : 20;
+    const safePerPage = Number.isFinite(params.perPage) ? Math.max(1, Math.min(Math.floor(params.perPage as number), 100)) : 20;
 
     const { data } = await this.octokit.rest.actions.listWorkflowRunsForRepo({
       owner,
@@ -704,14 +685,7 @@ export class GitHubService {
     };
   }
 
-  async createPullRequest(
-    owner: string,
-    repo: string,
-    title: string,
-    body: string,
-    head: string,
-    base: string,
-  ) {
+  async createPullRequest(owner: string, repo: string, title: string, body: string, head: string, base: string) {
     if (!this.octokit) throw new Error('Not authenticated');
 
     const { data } = await this.octokit.rest.pulls.create({
@@ -733,9 +707,7 @@ export class GitHubService {
 
   async listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {
     if (!this.octokit) throw new Error('Not authenticated');
-    const safePerPage = Number.isFinite(perPage)
-      ? Math.max(1, Math.min(Math.floor(perPage), 300))
-      : 200;
+    const safePerPage = Number.isFinite(perPage) ? Math.max(1, Math.min(Math.floor(perPage), 300)) : 200;
 
     const tags: string[] = [];
     let page = 1;
@@ -749,9 +721,7 @@ export class GitHubService {
         page,
       });
 
-      const pageTags = ((data || []) as RepositoryTagApi[])
-        .map((tag) => String(tag?.name || '').trim())
-        .filter(Boolean);
+      const pageTags = ((data || []) as RepositoryTagApi[]).map((tag) => String(tag?.name || '').trim()).filter(Boolean);
 
       tags.push(...pageTags);
       if (!data || data.length < 100) break;
@@ -776,14 +746,7 @@ export class GitHubService {
     return tag || null;
   }
 
-  async mergePullRequest(
-    owner: string,
-    repo: string,
-    pullNumber: number,
-    mergeMethod: MergeMethod,
-    commitTitle?: string,
-    commitMessage?: string,
-  ) {
+  async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string) {
     if (!this.octokit) throw new Error('Not authenticated');
 
     const method: MergeMethod = mergeMethod === 'rebase' || mergeMethod === 'squash' ? mergeMethod : 'merge';
@@ -848,9 +811,7 @@ export class GitHubService {
     } catch (error: unknown) {
       const apiError = error as GithubApiErrorLike;
       const status = Number(apiError?.status);
-      const apiMessage = typeof apiError?.response?.data?.message === 'string'
-        ? apiError.response.data.message
-        : '';
+      const apiMessage = typeof apiError?.response?.data?.message === 'string' ? apiError.response.data.message : '';
       const fallbackMessage = typeof apiError?.message === 'string' ? apiError.message : '';
       const normalizedMessage = `${fallbackMessage} ${apiMessage}`.toLowerCase();
 
@@ -872,4 +833,3 @@ export class GitHubService {
 }
 
 export const githubService = new GitHubService();
-

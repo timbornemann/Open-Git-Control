@@ -1,12 +1,13 @@
 import { dialog, ipcMain } from 'electron';
-import { GitService } from '../../GitService';
+import type { GitService } from '../../GitService';
+import { IpcChannel } from '../../../src/types/ipcContract';
 
 type RegisterDialogHandlersDeps = {
   gitService: GitService;
 };
 
 export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDeps): void {
-  ipcMain.handle('dialog:openDirectory', async () => {
+  ipcMain.handle(IpcChannel.DialogOpenDirectory, async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory'],
     });
@@ -26,7 +27,7 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     return { path: selectedPath, isRepo };
   });
 
-  ipcMain.handle('dialog:selectDirectory', async () => {
+  ipcMain.handle(IpcChannel.DialogSelectDirectory, async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Zielordner fuer Clone auswaehlen',
@@ -35,7 +36,7 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     return filePaths[0];
   });
 
-  ipcMain.handle('dialog:selectProjectParentDirectory', async () => {
+  ipcMain.handle(IpcChannel.DialogSelectProjectParentDirectory, async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Speicherort fuer neues Projekt auswaehlen',

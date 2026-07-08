@@ -31,7 +31,10 @@ export const trByLanguage = (language: AppLanguage, deText: string, enText: stri
 };
 
 const lookupCatalogValue = (catalog: TranslationCatalog, key: string): string | null => {
-  const parts = key.split('.').map(part => part.trim()).filter(Boolean);
+  const parts = key
+    .split('.')
+    .map((part) => part.trim())
+    .filter(Boolean);
   let cursor: unknown = catalog;
 
   for (const part of parts) {
@@ -49,14 +52,8 @@ const interpolate = (template: string, variables: TranslationVariables = {}): st
   });
 };
 
-export const translateFromCatalog = (
-  language: AppLanguage,
-  key: string,
-  variables?: TranslationVariables,
-): string => {
-  const value = lookupCatalogValue(catalogs[language], key)
-    ?? lookupCatalogValue(catalogs[DEFAULT_LANGUAGE], key)
-    ?? key;
+export const translateFromCatalog = (language: AppLanguage, key: string, variables?: TranslationVariables): string => {
+  const value = lookupCatalogValue(catalogs[language], key) ?? lookupCatalogValue(catalogs[DEFAULT_LANGUAGE], key) ?? key;
   return interpolate(value, variables);
 };
 

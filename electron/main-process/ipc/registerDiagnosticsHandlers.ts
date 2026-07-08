@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { IpcChannel } from '../../../src/types/ipcContract';
 
 type RegisterDiagnosticsHandlersDeps = {
   buildDiagnosticsReport: () => Promise<{
@@ -11,7 +12,7 @@ type RegisterDiagnosticsHandlersDeps = {
 };
 
 export function registerDiagnosticsHandlers({ buildDiagnosticsReport }: RegisterDiagnosticsHandlersDeps): void {
-  ipcMain.handle('diagnostics:report', async () => {
+  ipcMain.handle(IpcChannel.DiagnosticsReport, async () => {
     try {
       const data = await buildDiagnosticsReport();
       return { success: true, data };

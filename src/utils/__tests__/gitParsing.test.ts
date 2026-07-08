@@ -14,30 +14,14 @@ import {
   parseGitStatusDetailed,
   parseFirstConflictPathFromPorcelain,
   parseGitSubmoduleStatus,
-} from '../gitParsing';
+} from '@/utils/gitParsing';
 
 const US = '\x1f';
 const NUL = '\x00';
 const GS = '\x1d';
 
-function makeRecord(fields: {
-  hash: string;
-  short: string;
-  author: string;
-  date: string;
-  subject?: string;
-  parents?: string;
-  refs?: string;
-}) {
-  return [
-    fields.hash,
-    fields.short,
-    fields.author,
-    fields.date,
-    fields.subject ?? '',
-    fields.parents ?? '',
-    fields.refs ?? '',
-  ].join(US) + NUL;
+function makeRecord(fields: { hash: string; short: string; author: string; date: string; subject?: string; parents?: string; refs?: string }) {
+  return [fields.hash, fields.short, fields.author, fields.date, fields.subject ?? '', fields.parents ?? '', fields.refs ?? ''].join(US) + NUL;
 }
 
 describe('parseGitLog', () => {
@@ -123,15 +107,18 @@ describe('parseGitLog', () => {
   });
 
   it('ignores numstat rows until the first commit header exists', () => {
-    const output = ['4 2 src/ignored.ts\x00', makeRecord({
-      hash: '4'.repeat(40),
-      short: '4444444',
-      author: 'Bot',
-      date: '2024-10-03 10:00:00 +0000',
-      subject: '',
-      parents: '',
-      refs: '',
-    })].join('');
+    const output = [
+      '4 2 src/ignored.ts\x00',
+      makeRecord({
+        hash: '4'.repeat(40),
+        short: '4444444',
+        author: 'Bot',
+        date: '2024-10-03 10:00:00 +0000',
+        subject: '',
+        parents: '',
+        refs: '',
+      }),
+    ].join('');
 
     const parsed = parseGitLog(output);
 
@@ -139,7 +126,6 @@ describe('parseGitLog', () => {
     expect(parsed[0].stats).toBeNull();
     expect(parsed[0].statsState).toBe('missing');
   });
-
 
   it('supports appending paged log chunks without losing earlier commits', () => {
     const firstPage = makeRecord({
@@ -164,10 +150,7 @@ describe('parseGitLog', () => {
 
     const combined = parseGitLog(firstPage + secondPage);
 
-    expect(combined.map(commit => commit.subject)).toEqual([
-      'first page commit',
-      'second page commit',
-    ]);
+    expect(combined.map((commit) => commit.subject)).toEqual(['first page commit', 'second page commit']);
   });
 
   it('parses multiple commits and tolerates blank lines before tokens', () => {
@@ -210,17 +193,13 @@ describe('parseGitStatusDetailed', () => {
 
     const parsed = parseGitStatusDetailed(output);
 
-    expect(parsed.staged.map(entry => entry.path)).toEqual(['src/staged.ts', 'src/both.ts', 'src/deleted.ts']);
-    expect(parsed.unstaged.map(entry => entry.path)).toEqual(['src/modified.ts', 'src/both.ts']);
-    expect(parsed.untracked.map(entry => entry.path)).toEqual(['src/new.ts']);
+    expect(parsed.staged.map((entry) => entry.path)).toEqual(['src/staged.ts', 'src/both.ts', 'src/deleted.ts']);
+    expect(parsed.unstaged.map((entry) => entry.path)).toEqual(['src/modified.ts', 'src/both.ts']);
+    expect(parsed.untracked.map((entry) => entry.path)).toEqual(['src/new.ts']);
   });
 
   it('decodes quoted and rename paths in porcelain output', () => {
-    const output = [
-      'R  "src/old name.ts" -> "src/new name.ts"',
-      '?? "docs/with spaces.md"',
-      ' M "src/\\303\\244\\303\\266\\303\\274.txt"',
-    ].join('\n');
+    const output = ['R  "src/old name.ts" -> "src/new name.ts"', '?? "docs/with spaces.md"', ' M "src/\\303\\244\\303\\266\\303\\274.txt"'].join('\n');
 
     const parsed = parseGitStatusDetailed(output);
     expect(parsed.staged.map((entry) => entry.path)).toEqual(['src/new name.ts']);

@@ -1,4 +1,4 @@
-import type { CatalogTranslateFn } from '../../../i18n';
+import type { CatalogTranslateFn } from '@/i18n';
 
 export const getCiBadgeStyles = (badge: string, t: CatalogTranslateFn) => {
   if (badge === 'success') {

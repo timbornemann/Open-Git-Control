@@ -1,39 +1,22 @@
-export const formatDateTime = (
-  value: string | number | Date,
-  locale: string,
-  options?: Intl.DateTimeFormatOptions,
-): string => {
+export const formatDateTime = (value: string | number | Date, locale: string, options?: Intl.DateTimeFormatOptions): string => {
   const parsed = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(parsed.getTime())) return '-';
   return parsed.toLocaleString(locale, options);
 };
 
-
-export const formatTime = (
-  value: string | number | Date,
-  locale: string,
-  options?: Intl.DateTimeFormatOptions,
-): string => {
+export const formatTime = (value: string | number | Date, locale: string, options?: Intl.DateTimeFormatOptions): string => {
   const parsed = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(parsed.getTime())) return '-';
   return parsed.toLocaleTimeString(locale, options);
 };
 
-export const formatDate = (
-  value: string | number | Date,
-  locale: string,
-  options?: Intl.DateTimeFormatOptions,
-): string => {
+export const formatDate = (value: string | number | Date, locale: string, options?: Intl.DateTimeFormatOptions): string => {
   const parsed = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(parsed.getTime())) return '-';
   return parsed.toLocaleDateString(locale, options);
 };
 
-export const formatRelativeTime = (
-  value: string | number | Date,
-  locale: string,
-  now: Date = new Date(),
-): string => {
+export const formatRelativeTime = (value: string | number | Date, locale: string, now: Date = new Date()): string => {
   const parsed = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(parsed.getTime())) return '-';
 

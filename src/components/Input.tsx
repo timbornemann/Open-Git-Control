@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { DialogContextItem } from './Confirm';
+import type { DialogContextItem } from './Confirm';
 import { DialogFrame } from './DialogFrame';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 
 export interface InputDialogField {
   id: string;
@@ -108,7 +108,7 @@ export const Input: React.FC<InputProps> = ({
             <span>{field.label}</span>
             {field.multiline ? (
               <textarea
-                ref={index === 0 ? firstInputRef as React.RefObject<HTMLTextAreaElement> : undefined}
+                ref={index === 0 ? (firstInputRef as React.RefObject<HTMLTextAreaElement>) : undefined}
                 placeholder={field.placeholder}
                 value={values[field.id] ?? ''}
                 onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
@@ -116,7 +116,7 @@ export const Input: React.FC<InputProps> = ({
               />
             ) : (
               <input
-                ref={index === 0 ? firstInputRef as React.RefObject<HTMLInputElement> : undefined}
+                ref={index === 0 ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
                 type={field.type ?? 'text'}
                 placeholder={field.placeholder}
                 value={values[field.id] ?? ''}
@@ -130,7 +130,8 @@ export const Input: React.FC<InputProps> = ({
       {validationError && <div className="dialog-validation">{validationError}</div>}
       <div className="dialog-impact">
         <span>
-          {t('generated.components.confirm.irreversible_6920e2ad')}: <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
+          {t('generated.components.confirm.irreversible_6920e2ad')}:{' '}
+          <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
         </span>
         {consequences && <span>{consequences}</span>}
       </div>

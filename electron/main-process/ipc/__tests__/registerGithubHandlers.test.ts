@@ -163,15 +163,7 @@ describe('registerGithubHandlers fork flow', () => {
     expect(result.data.fallbackUsed).toBe(true);
     expect(result.data.commitsSinceLastRelease[0].shortHash).toBe('def456');
     expect(gitService.runCommand).toHaveBeenCalledWith(['rev-parse', '--verify', '--quiet', 'v1.2.5^{commit}']);
-    expect(gitService.runCommand).toHaveBeenCalledWith([
-      'log',
-      'master',
-      '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad',
-      '--date=short',
-      '--max-count=150',
-    ]);
-    expect(gitService.runCommand.mock.calls.some((call: any[]) => (
-      Array.isArray(call[0]) && call[0][1] === 'v1.2.5..master'
-    ))).toBe(false);
+    expect(gitService.runCommand).toHaveBeenCalledWith(['log', 'master', '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad', '--date=short', '--max-count=150']);
+    expect(gitService.runCommand.mock.calls.some((call: any[]) => Array.isArray(call[0]) && call[0][1] === 'v1.2.5..master')).toBe(false);
   });
 });

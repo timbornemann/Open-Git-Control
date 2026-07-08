@@ -1,11 +1,5 @@
 import type { AppSettings } from '../../settings';
-import type {
-  AiConnectionResult,
-  AiConnectionTestRequest,
-  AiModelListRequest,
-  AiProvider,
-  AiTextRequest,
-} from './AiProvider';
+import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
 import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 type OpenAiSettings = AppSettings & {
@@ -73,20 +67,10 @@ export class OpenAiProvider implements AiProvider {
 
     const data = (await response.json()) as { data?: Array<{ id?: unknown }> };
     const models = Array.isArray(data.data) ? data.data : [];
-    return uniqueSorted(
-      models
-        .map(model => safeString(model.id).trim())
-        .filter(Boolean),
-    );
+    return uniqueSorted(models.map((model) => safeString(model.id).trim()).filter(Boolean));
   }
 
-  async generateText({
-    settings,
-    systemPrompt,
-    userPrompt,
-    shouldCancel,
-    timeoutMs,
-  }: AiTextRequest): Promise<string> {
+  async generateText({ settings, systemPrompt, userPrompt, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {
     const apiKey = getOpenAiApiKey(settings);
     if (!apiKey) {
       throw new Error('OpenAI API key fehlt.');

@@ -1,4 +1,4 @@
-import { useI18n } from '../../i18n';
+import { useI18n } from '@/i18n';
 import type { MarkdownPreviewState } from './useMarkdownPreview';
 
 type MarkdownPreviewPaneProps = {
@@ -6,10 +6,7 @@ type MarkdownPreviewPaneProps = {
   onPreviewClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 
-export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({
-  markdownPreview,
-  onPreviewClick,
-}) => {
+export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({ markdownPreview, onPreviewClick }) => {
   const { t } = useI18n();
 
   return (
@@ -29,15 +26,9 @@ export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({
           ))}
         </div>
       )}
-      {!markdownPreview.loading && markdownPreview.error && (
-        <div className="diff-empty-state error">{markdownPreview.error}</div>
-      )}
+      {!markdownPreview.loading && markdownPreview.error && <div className="diff-empty-state error">{markdownPreview.error}</div>}
       {!markdownPreview.loading && !markdownPreview.error && markdownPreview.html && (
-        <article
-          className="markdown-preview-content"
-          onClick={onPreviewClick}
-          dangerouslySetInnerHTML={{ __html: markdownPreview.html }}
-        />
+        <article className="markdown-preview-content" onClick={onPreviewClick} dangerouslySetInnerHTML={{ __html: markdownPreview.html }} />
       )}
       {!markdownPreview.loading && !markdownPreview.error && !markdownPreview.html && (
         <div className="diff-empty-state">{t('generated.components.diff_viewer.markdownpreviewpane.markdown_file_is_empty_4443e82a')}</div>

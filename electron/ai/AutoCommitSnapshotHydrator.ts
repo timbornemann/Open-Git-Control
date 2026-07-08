@@ -1,17 +1,7 @@
 import type { GitService } from '../GitService';
 import type { SnapshotFile } from './aiServiceTypes';
-import {
-  getExtension,
-  getTopDirectory,
-} from './gitStatusSnapshot';
-import {
-  buildStructuredDiffContext,
-  clipContextLine,
-  deriveStatsFromDiff,
-  parseNumstatLine,
-  parseNumstatReport,
-  readUntrackedSnippet,
-} from './diffContext';
+import { getExtension, getTopDirectory } from './gitStatusSnapshot';
+import { buildStructuredDiffContext, clipContextLine, deriveStatsFromDiff, parseNumstatLine, parseNumstatReport, readUntrackedSnippet } from './diffContext';
 
 const MAX_PREVIEW_CHARS = 220;
 
@@ -92,19 +82,13 @@ export class AutoCommitSnapshotHydrator {
       file.isBinary = stats?.isBinary ?? false;
 
       let keyChanges: string[] = [];
-      if (
-        contentPreviewBudget > 0
-        && !file.isBinary
-        && (file.changeType === 'untracked' || file.changeType === 'added')
-      ) {
+      if (contentPreviewBudget > 0 && !file.isBinary && (file.changeType === 'untracked' || file.changeType === 'added')) {
         keyChanges = await readUntrackedSnippet(this.repoPath, file.path);
         contentPreviewBudget -= 1;
       }
       if (keyChanges.length === 0) {
         keyChanges = [
-          clipContextLine(
-            `${file.changeType} in ${getTopDirectory(file.path)} (${getExtension(file.path)}) +${file.additions}/-${file.deletions}`,
-          ),
+          clipContextLine(`${file.changeType} in ${getTopDirectory(file.path)} (${getExtension(file.path)}) +${file.additions}/-${file.deletions}`),
         ];
       }
       file.keyChanges = keyChanges;

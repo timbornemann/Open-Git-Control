@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { DiffRequest } from '../../../types/diff';
+import type { DiffRequest } from '@/types/diff';
 
 type WorkingTreeSelection = {
   path: string;
@@ -81,13 +81,7 @@ export const useMainViewInspector = ({
       setCommitHistoryStack([]);
     }
     setSelectedCommit(commitNavigationRequest.hash);
-  }, [
-    commitNavigationRequest?.requestId,
-    commitNavigationRequest?.hash,
-    onCloseReleaseCreator,
-    onOpenRepoWorkspace,
-    setSelectedCommit,
-  ]);
+  }, [commitNavigationRequest?.requestId, commitNavigationRequest?.hash, onCloseReleaseCreator, onOpenRepoWorkspace, setSelectedCommit]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     setActiveDiffRequest(null);
@@ -98,82 +92,92 @@ export const useMainViewInspector = ({
   const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
     setActiveConflictPath(null);
     setActiveDiffRequest((previous) => {
-      if (
-        previous
-        && previous.source === diffRequest.source
-        && previous.path === diffRequest.path
-        && previous.commitHash === diffRequest.commitHash
-      ) {
+      if (previous && previous.source === diffRequest.source && previous.path === diffRequest.path && previous.commitHash === diffRequest.commitHash) {
         return previous;
       }
       return diffRequest;
     });
   }, []);
 
-  const handleOpenConflictResolver = useCallback((filePath: string) => {
-    setActiveDiffRequest(null);
-    setShowRecoveryCenter(false);
-    setActiveConflictPath(filePath);
-    setWorkingTreeSelection(null);
-    setCommitHistoryStack([]);
-    setSelectedCommit(null);
-  }, [setSelectedCommit]);
+  const handleOpenConflictResolver = useCallback(
+    (filePath: string) => {
+      setActiveDiffRequest(null);
+      setShowRecoveryCenter(false);
+      setActiveConflictPath(filePath);
+      setWorkingTreeSelection(null);
+      setCommitHistoryStack([]);
+      setSelectedCommit(null);
+    },
+    [setSelectedCommit],
+  );
 
-  const handleSelectCommitDirect = useCallback((hash: string | null) => {
-    const normalized = normalizeCommitHash(hash);
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setCommitHistoryStack([]);
-    setIsCommitInspectorOpen(Boolean(normalized));
-    setSelectedCommit(normalized);
-  }, [setSelectedCommit]);
+  const handleSelectCommitDirect = useCallback(
+    (hash: string | null) => {
+      const normalized = normalizeCommitHash(hash);
+      setWorkingTreeSelection(null);
+      setActiveConflictPath(null);
+      setCommitHistoryStack([]);
+      setIsCommitInspectorOpen(Boolean(normalized));
+      setSelectedCommit(normalized);
+    },
+    [setSelectedCommit],
+  );
 
-  const handleSelectCommitFromHistory = useCallback((hash: string, selectedCommit: string | null) => {
-    const normalized = normalizeCommitHash(hash);
-    if (!normalized) return;
+  const handleSelectCommitFromHistory = useCallback(
+    (hash: string, selectedCommit: string | null) => {
+      const normalized = normalizeCommitHash(hash);
+      if (!normalized) return;
 
-    if (!selectedCommit) {
+      if (!selectedCommit) {
+        setIsCommitInspectorOpen(true);
+        if (onNavigateToCommit) {
+          onNavigateToCommit(normalized);
+        } else {
+          setSelectedCommit(normalized);
+        }
+        return;
+      }
+
+      if (selectedCommit === normalized) return;
+
+      setCommitHistoryStack((prev) => [...prev, selectedCommit]);
+      setIsCommitInspectorOpen(true);
+      if (onNavigateToCommit) {
+        preserveNextNavigationHistoryRef.current = true;
+        onNavigateToCommit(normalized);
+      } else {
+        setSelectedCommit(normalized);
+      }
+    },
+    [onNavigateToCommit, setSelectedCommit],
+  );
+
+  const handleSelectWorkingTreeFile = useCallback(
+    (path: string, source: 'staged' | 'unstaged') => {
+      setCommitHistoryStack([]);
+      setActiveConflictPath(null);
+      setIsCommitInspectorOpen(false);
+      setSelectedCommit(null);
+      setWorkingTreeSelection({ path, source });
+    },
+    [setSelectedCommit],
+  );
+
+  const handleSelectCommitFromWorkingTree = useCallback(
+    (hash: string) => {
+      const normalized = normalizeCommitHash(hash);
+      if (!normalized) return;
+      setWorkingTreeSelection(null);
+      setActiveConflictPath(null);
       setIsCommitInspectorOpen(true);
       if (onNavigateToCommit) {
         onNavigateToCommit(normalized);
       } else {
         setSelectedCommit(normalized);
       }
-      return;
-    }
-
-    if (selectedCommit === normalized) return;
-
-    setCommitHistoryStack((prev) => [...prev, selectedCommit]);
-    setIsCommitInspectorOpen(true);
-    if (onNavigateToCommit) {
-      preserveNextNavigationHistoryRef.current = true;
-      onNavigateToCommit(normalized);
-    } else {
-      setSelectedCommit(normalized);
-    }
-  }, [onNavigateToCommit, setSelectedCommit]);
-
-  const handleSelectWorkingTreeFile = useCallback((path: string, source: 'staged' | 'unstaged') => {
-    setCommitHistoryStack([]);
-    setActiveConflictPath(null);
-    setIsCommitInspectorOpen(false);
-    setSelectedCommit(null);
-    setWorkingTreeSelection({ path, source });
-  }, [setSelectedCommit]);
-
-  const handleSelectCommitFromWorkingTree = useCallback((hash: string) => {
-    const normalized = normalizeCommitHash(hash);
-    if (!normalized) return;
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setIsCommitInspectorOpen(true);
-    if (onNavigateToCommit) {
-      onNavigateToCommit(normalized);
-    } else {
-      setSelectedCommit(normalized);
-    }
-  }, [onNavigateToCommit, setSelectedCommit]);
+    },
+    [onNavigateToCommit, setSelectedCommit],
+  );
 
   const handleCommitBack = useCallback(() => {
     setCommitHistoryStack((prev) => {

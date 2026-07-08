@@ -298,7 +298,9 @@
   padding: 7px 9px;
   font-size: 0.78rem;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .release-input:focus,
@@ -332,9 +334,7 @@
   gap: 10px;
   padding: 9px 10px;
   border-bottom: 1px solid var(--line-subtle);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent-primary-soft) 30%, transparent), transparent 65%),
-    var(--bg-panel);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary-soft) 30%, transparent), transparent 65%), var(--bg-panel);
 }
 
 .release-ai-headline {
@@ -380,7 +380,9 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .release-ai-generate-btn:hover:not(:disabled) {
@@ -411,7 +413,9 @@
   border: 1px solid var(--line-subtle);
   background: var(--bg-dark);
   min-height: 58px;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .release-ai-option--disabled {
@@ -466,14 +470,18 @@
   padding: 2px;
   border: 1px solid var(--border-color);
   background: var(--bg-dark);
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .release-switch-thumb {
   width: 16px;
   height: 16px;
   background: var(--text-secondary);
-  transition: transform 120ms ease, background-color 120ms ease;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
 }
 
 .release-switch-input:checked + .release-switch-track {

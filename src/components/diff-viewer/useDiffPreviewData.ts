@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DiffRequest } from '../../types/diff';
-import { parseDiff } from '../../utils/diffParser';
-import { gitClient } from '../../services/gitClient';
-import {
-  MAX_RENDER_CHARS,
-  MAX_RENDER_LINES,
-  looksBinaryByExtension,
-} from './diffViewerConstants';
-import type { CatalogTranslateFn } from '../../i18n';
+import type { DiffRequest } from '@/types/diff';
+import { parseDiff } from '@/utils/diffParser';
+import { gitClient } from '@/services/gitClient';
+import { MAX_RENDER_CHARS, MAX_RENDER_LINES, looksBinaryByExtension } from './diffViewerConstants';
+import type { CatalogTranslateFn } from '@/i18n';
 
 type UseDiffPreviewDataParams = {
   repoPath: string | null;
@@ -79,11 +75,7 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
 
   const clippedDiffText = useMemo(() => {
     if (!diffText) return '';
-    return diffText
-      .slice(0, MAX_RENDER_CHARS)
-      .split('\n')
-      .slice(0, MAX_RENDER_LINES)
-      .join('\n');
+    return diffText.slice(0, MAX_RENDER_CHARS).split('\n').slice(0, MAX_RENDER_LINES).join('\n');
   }, [diffText]);
 
   const parsed = useMemo(() => parseDiff(clippedDiffText), [clippedDiffText]);

@@ -1,8 +1,5 @@
-import {
-  mergeTargetFromDecoratedRef,
-  normalizeBranchRefForMerge,
-} from '../../utils/gitParsing';
-import type { GraphLayout, GraphNode } from '../../utils/graphLayout';
+import { mergeTargetFromDecoratedRef, normalizeBranchRefForMerge } from '@/utils/gitParsing';
+import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
 import { graphEdgeKey } from './CommitGraphSvg';
 
 export type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
@@ -24,10 +21,11 @@ const getRefPriority = (ref: string) => {
   return 4;
 };
 
-export const sortRefs = (refs: string[]) => [...refs].sort((a, b) => {
-  const prioDiff = getRefPriority(a) - getRefPriority(b);
-  return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
-});
+export const sortRefs = (refs: string[]) =>
+  [...refs].sort((a, b) => {
+    const prioDiff = getRefPriority(a) - getRefPriority(b);
+    return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
+  });
 
 export const resolveHighlightableBranchRef = (ref: string): string | null => {
   const target = mergeTargetFromDecoratedRef(ref);
@@ -37,16 +35,13 @@ export const resolveHighlightableBranchRef = (ref: string): string | null => {
   return normalized;
 };
 
-export const findCommitIndexByNavigationTarget = (
-  nodes: GraphNode[],
-  targetHash: string,
-): number => {
-  const normalizedTarget = String(targetHash || '').trim().toLowerCase();
+export const findCommitIndexByNavigationTarget = (nodes: GraphNode[], targetHash: string): number => {
+  const normalizedTarget = String(targetHash || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedTarget) return -1;
 
-  const exactIndex = nodes.findIndex((node) => (
-    node.commit.hash.toLowerCase() === normalizedTarget
-  ));
+  const exactIndex = nodes.findIndex((node) => node.commit.hash.toLowerCase() === normalizedTarget);
   if (exactIndex >= 0) return exactIndex;
 
   if (normalizedTarget.length < 7) return -1;
@@ -71,9 +66,7 @@ export const buildGraphHighlightData = (
 ) => {
   const nodes = layout?.nodes || [];
   const nodeByHash = new Map(nodes.map((node) => [node.commit.hash, node]));
-  const headNode = nodes.find((node) => (
-    node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')
-  )) ?? nodes[0];
+  const headNode = nodes.find((node) => node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')) ?? nodes[0];
   const reachableFromHead = new Set<string>();
 
   if (headNode) {
@@ -118,36 +111,28 @@ export const buildGraphHighlightData = (
     return path;
   };
 
-  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef)
-    ? highlightedBranchRef
-    : null;
+  const manualHighlightedBranch = highlightedBranchRef && branchTipByRef.has(highlightedBranchRef) ? highlightedBranchRef : null;
   const activeHighlightedBranch = manualHighlightedBranch;
   const requestedSelectedNode = selectedHash ? nodeByHash.get(selectedHash) : undefined;
-  const selectedNode = requestedSelectedNode?.commit.hash === headNode?.commit.hash
-    ? undefined
-    : requestedSelectedNode;
+  const selectedNode = requestedSelectedNode?.commit.hash === headNode?.commit.hash ? undefined : requestedSelectedNode;
   const hasSelectedCommitFocus = Boolean(selectedNode);
-  const currentPathStartNode = activeHighlightedBranch
-    ? branchTipByRef.get(activeHighlightedBranch)
-    : undefined;
-  const currentPathHashes = !hasSelectedCommitFocus && manualHighlightedBranch && currentPathStartNode
-    ? buildAncestorPath(currentPathStartNode)
-    : new Set<string>();
+  const currentPathStartNode = activeHighlightedBranch ? branchTipByRef.get(activeHighlightedBranch) : undefined;
+  const currentPathHashes =
+    !hasSelectedCommitFocus && manualHighlightedBranch && currentPathStartNode ? buildAncestorPath(currentPathStartNode) : new Set<string>();
   const selectedBranchTarget = selectedNode
     ? sortRefs(selectedNode.commit.refs)
-      .map(resolveHighlightableBranchRef)
-      .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
+        .map(resolveHighlightableBranchRef)
+        .find((target): target is string => Boolean(target && branchTipByRef.has(target)))
     : undefined;
   const selectedPathStartNode = selectedNode;
   const selectedPathHashes = buildAncestorPath(selectedPathStartNode);
   const hasCurrentPathHighlight = currentPathHashes.size > 0;
   const hasSelectedPathHighlight = selectedPathHashes.size > 0;
-  const currentPathColor = headNode && hasCurrentPathHighlight
-    ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
-    : headNode?.color ?? 'var(--accent-primary)';
-  const selectedPathColor = hasSelectedPathHighlight
-    ? (selectedPathStartNode?.color ?? currentPathColor)
-    : currentPathColor;
+  const currentPathColor =
+    headNode && hasCurrentPathHighlight
+      ? (branchTipByRef.get(activeHighlightedBranch || '')?.color ?? headNode.color)
+      : (headNode?.color ?? 'var(--accent-primary)');
+  const selectedPathColor = hasSelectedPathHighlight ? (selectedPathStartNode?.color ?? currentPathColor) : currentPathColor;
   const buildPathEdgeKeys = (pathHashes: Set<string>) => {
     const keys = new Set<string>();
     if (!layout || pathHashes.size === 0) return keys;

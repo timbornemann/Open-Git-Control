@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { CatalogTranslateFn } from '../../i18n';
-import type { GraphLayout } from '../../utils/graphLayout';
+import type { CatalogTranslateFn } from '@/i18n';
+import type { GraphLayout } from '@/utils/graphLayout';
 import type { SearchPanel } from './ForensicSearchPanel';
 
 export type SearchScope = 'all' | 'subject' | 'author' | 'hash' | 'refs';
@@ -12,36 +12,34 @@ type UseCommitGraphSearchParams = {
   t: CatalogTranslateFn;
 };
 
-export const useCommitGraphSearch = ({
-  layout,
-  selectedHash,
-  onSelectCommit,
-  t,
-}: UseCommitGraphSearchParams) => {
+export const useCommitGraphSearch = ({ layout, selectedHash, onSelectCommit, t }: UseCommitGraphSearchParams) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
   const [matchCursor, setMatchCursor] = useState(0);
 
-  const searchScopeLabels = useMemo<Record<SearchScope, string>>(() => ({
-    all: t('generated.components.commit_graph.usecommitgraphsearch.all_54b2bb75'),
-    subject: t('generated.components.commit_graph.usecommitgraphsearch.message_e56e225d'),
-    author: t('generated.components.commitdetails.author_7f609ec0'),
-    hash: t('generated.components.commit_graph.usecommitgraphsearch.hash_293b8257'),
-    refs: t('generated.components.commit_graph.usecommitgraphsearch.refs_0530bfc7'),
-  }), [t]);
+  const searchScopeLabels = useMemo<Record<SearchScope, string>>(
+    () => ({
+      all: t('generated.components.commit_graph.usecommitgraphsearch.all_54b2bb75'),
+      subject: t('generated.components.commit_graph.usecommitgraphsearch.message_e56e225d'),
+      author: t('generated.components.commitdetails.author_7f609ec0'),
+      hash: t('generated.components.commit_graph.usecommitgraphsearch.hash_293b8257'),
+      refs: t('generated.components.commit_graph.usecommitgraphsearch.refs_0530bfc7'),
+    }),
+    [t],
+  );
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
   const matchedNodes = useMemo(() => {
     if (!layout || !normalizedSearch) return [];
 
-    return layout.nodes.filter(node => {
+    return layout.nodes.filter((node) => {
       const { abbrevHash, hash, author, subject, refs } = node.commit;
       const inHash = abbrevHash.toLowerCase().includes(normalizedSearch) || hash.toLowerCase().includes(normalizedSearch);
       const inAuthor = author.toLowerCase().includes(normalizedSearch);
       const inSubject = subject.toLowerCase().includes(normalizedSearch);
-      const inRefs = refs.some(ref => ref.toLowerCase().includes(normalizedSearch));
+      const inRefs = refs.some((ref) => ref.toLowerCase().includes(normalizedSearch));
 
       if (searchScope === 'hash') return inHash;
       if (searchScope === 'author') return inAuthor;
@@ -52,7 +50,7 @@ export const useCommitGraphSearch = ({
     });
   }, [layout, normalizedSearch, searchScope]);
 
-  const matchedHashSet = useMemo(() => new Set(matchedNodes.map(node => node.commit.hash)), [matchedNodes]);
+  const matchedHashSet = useMemo(() => new Set(matchedNodes.map((node) => node.commit.hash)), [matchedNodes]);
 
   useEffect(() => {
     setMatchCursor(0);
@@ -60,26 +58,29 @@ export const useCommitGraphSearch = ({
 
   useEffect(() => {
     if (!selectedHash || matchedNodes.length === 0) return;
-    const idx = matchedNodes.findIndex(node => node.commit.hash === selectedHash);
+    const idx = matchedNodes.findIndex((node) => node.commit.hash === selectedHash);
     if (idx >= 0) {
       setMatchCursor(idx);
     }
   }, [selectedHash, matchedNodes]);
 
-  const jumpToMatch = useCallback((step: 1 | -1) => {
-    if (matchedNodes.length === 0) return;
+  const jumpToMatch = useCallback(
+    (step: 1 | -1) => {
+      if (matchedNodes.length === 0) return;
 
-    const nextIndex = (matchCursor + step + matchedNodes.length) % matchedNodes.length;
-    setMatchCursor(nextIndex);
+      const nextIndex = (matchCursor + step + matchedNodes.length) % matchedNodes.length;
+      setMatchCursor(nextIndex);
 
-    const hash = matchedNodes[nextIndex].commit.hash;
-    onSelectCommit?.(hash);
+      const hash = matchedNodes[nextIndex].commit.hash;
+      onSelectCommit?.(hash);
 
-    requestAnimationFrame(() => {
-      const row = document.querySelector('[data-commit-hash="' + hash + '"]') as HTMLElement | null;
-      row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-  }, [matchCursor, matchedNodes, onSelectCommit]);
+      requestAnimationFrame(() => {
+        const row = document.querySelector('[data-commit-hash="' + hash + '"]') as HTMLElement | null;
+        row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    },
+    [matchCursor, matchedNodes, onSelectCommit],
+  );
 
   return {
     searchQuery,

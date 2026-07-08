@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  clearCommitFormDraftsForTests,
-  getCommitFormDraft,
-  resetCommitFormDraft,
-  updateCommitFormDraft,
-} from '../commitFormDraft';
+import { clearCommitFormDraftsForTests, getCommitFormDraft, resetCommitFormDraft, updateCommitFormDraft } from '@/components/staging-area/commitFormDraft';
 
 describe('commitFormDraft', () => {
   beforeEach(() => {

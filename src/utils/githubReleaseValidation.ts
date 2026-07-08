@@ -8,12 +8,15 @@ export type ReleaseValidationResult = {
   };
 };
 
-export const validateGithubReleaseInput = (params: {
-  tagName: string;
-  releaseName: string;
-}, options?: {
-  minReleaseNameLength?: number;
-}) : ReleaseValidationResult => {
+export const validateGithubReleaseInput = (
+  params: {
+    tagName: string;
+    releaseName: string;
+  },
+  options?: {
+    minReleaseNameLength?: number;
+  },
+): ReleaseValidationResult => {
   const tagName = (params.tagName || '').trim();
   const releaseName = (params.releaseName || '').trim();
   const minReleaseNameLength = options?.minReleaseNameLength ?? 3;

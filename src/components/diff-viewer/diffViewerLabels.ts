@@ -1,5 +1,5 @@
-import type { DiffRequest } from '../../types/diff';
-import type { CatalogTranslateFn } from '../../i18n';
+import type { DiffRequest } from '@/types/diff';
+import type { CatalogTranslateFn } from '@/i18n';
 import { toShortHash } from './diffViewerConstants';
 
 export type TranslateFn = (deText: string, enText: string) => string;

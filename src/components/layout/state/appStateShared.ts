@@ -1,4 +1,4 @@
-import type { AppSettingsDto } from '../../../global';
+import type { AppSettingsDto } from '@/global';
 
 export const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',
@@ -39,16 +39,15 @@ export type RunGitCommandOptions = {
 export const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
 
 export const isForcePushCommand = (args: string[]): boolean => {
-  const command = String(args[0] || '').trim().toLowerCase();
+  const command = String(args[0] || '')
+    .trim()
+    .toLowerCase();
   if (command !== 'push') return false;
   return args.some((arg) => {
-    const normalized = String(arg || '').trim().toLowerCase();
-    return (
-      normalized === '-f'
-      || normalized === '--force'
-      || normalized === '--force-with-lease'
-      || normalized.startsWith('--force-with-lease=')
-    );
+    const normalized = String(arg || '')
+      .trim()
+      .toLowerCase();
+    return normalized === '-f' || normalized === '--force' || normalized === '--force-with-lease' || normalized.startsWith('--force-with-lease=');
   });
 };
 

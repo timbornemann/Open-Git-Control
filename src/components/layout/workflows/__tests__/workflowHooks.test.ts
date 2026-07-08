@@ -3,17 +3,17 @@ import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfirmDialogState } from '../../layoutTypes';
-import { useGitCommandGuardWorkflow } from '../useGitCommandGuardWorkflow';
-import { type GitCommandRunner, useGitSyncRecoveryWorkflow } from '../useGitSyncRecoveryWorkflow';
-import { useInitialCommitRecoveryWorkflow } from '../useInitialCommitRecoveryWorkflow';
+import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
+import { useGitCommandGuardWorkflow } from '@/components/layout/workflows/useGitCommandGuardWorkflow';
+import { type GitCommandRunner, useGitSyncRecoveryWorkflow } from '@/components/layout/workflows/useGitSyncRecoveryWorkflow';
+import { useInitialCommitRecoveryWorkflow } from '@/components/layout/workflows/useInitialCommitRecoveryWorkflow';
 
 type HookRender<T> = {
   readonly current: T;
   unmount: () => void;
 };
 
-const renderHook = <T,>(useHook: () => T): HookRender<T> => {
+const renderHook = <T>(useHook: () => T): HookRender<T> => {
   let current: T | undefined;
   const container = document.createElement('div');
   const root: Root = createRoot(container);
@@ -58,13 +58,15 @@ describe('workflow hooks', () => {
   it('fuehrt den Remote-ahead-Quick-Fix als stash, pull --rebase und stash pop aus', async () => {
     const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
     const setGitActionToast = vi.fn();
-    const hook = renderHook(() => useGitSyncRecoveryWorkflow({
-      runGitCommandRef: { current: runGitCommand },
-      setActiveTab: vi.fn(),
-      setConfirmDialog: vi.fn(),
-      setGitActionToast,
-      language: 'de',
-    }));
+    const hook = renderHook(() =>
+      useGitSyncRecoveryWorkflow({
+        runGitCommandRef: { current: runGitCommand },
+        setActiveTab: vi.fn(),
+        setConfirmDialog: vi.fn(),
+        setGitActionToast,
+        language: 'de',
+      }),
+    );
 
     await act(async () => {
       await hook.current.runRemoteAheadQuickFix({ command: 'push' });
@@ -99,13 +101,15 @@ describe('workflow hooks', () => {
   it('oeffnet bei pull-blocked-by-local-changes einen Autostash-Dialog', () => {
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();
-    const hook = renderHook(() => useGitSyncRecoveryWorkflow({
-      runGitCommandRef: { current: vi.fn<GitCommandRunner>() },
-      setActiveTab,
-      setConfirmDialog,
-      setGitActionToast: vi.fn(),
-      language: 'de',
-    }));
+    const hook = renderHook(() =>
+      useGitSyncRecoveryWorkflow({
+        runGitCommandRef: { current: vi.fn<GitCommandRunner>() },
+        setActiveTab,
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+        language: 'de',
+      }),
+    );
 
     const handled = hook.current.maybeHandleSyncMismatchFailure({
       command: 'pull',
@@ -116,11 +120,13 @@ describe('workflow hooks', () => {
 
     expect(handled).toBe(true);
     expect(setActiveTab).toHaveBeenCalledWith('repo');
-    expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'danger',
-      confirmLabel: expect.any(String),
-      onConfirm: expect.any(Function),
-    }));
+    expect(setConfirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: 'danger',
+        confirmLabel: expect.any(String),
+        onConfirm: expect.any(Function),
+      }),
+    );
 
     hook.unmount();
   });
@@ -128,17 +134,19 @@ describe('workflow hooks', () => {
   it('blockiert Force-Push per Guard und bestaetigt danach mit skipDirtyGuard', async () => {
     const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
     const setConfirmDialog = vi.fn();
-    const hook = renderHook(() => useGitCommandGuardWorkflow({
-      runGitCommandRef: { current: runGitCommand },
-      runRemoteAheadQuickFix: vi.fn(),
-      settings: {
-        confirmDangerousOps: true,
-        language: 'de',
-        secretScanBeforePushEnabled: false,
-      },
-      setConfirmDialog,
-      setGitActionToast: vi.fn(),
-    }));
+    const hook = renderHook(() =>
+      useGitCommandGuardWorkflow({
+        runGitCommandRef: { current: runGitCommand },
+        runRemoteAheadQuickFix: vi.fn(),
+        settings: {
+          confirmDangerousOps: true,
+          language: 'de',
+          secretScanBeforePushEnabled: false,
+        },
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+      }),
+    );
 
     const guarded = await hook.current.runGitCommandGuards({
       args: ['push', '--force'],
@@ -148,32 +156,31 @@ describe('workflow hooks', () => {
 
     expect(guarded).toBe(true);
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
-    expect(dialog).toEqual(expect.objectContaining({
-      variant: 'danger',
-      irreversible: true,
-      onConfirm: expect.any(Function),
-    }));
+    expect(dialog).toEqual(
+      expect.objectContaining({
+        variant: 'danger',
+        irreversible: true,
+        onConfirm: expect.any(Function),
+      }),
+    );
 
     await act(async () => {
       await dialog.onConfirm?.();
     });
 
-    expect(runGitCommand).toHaveBeenCalledWith(
-      ['push', '--force'],
-      'pushed',
-      undefined,
-      expect.objectContaining({ skipDirtyGuard: true }),
-    );
+    expect(runGitCommand).toHaveBeenCalledWith(['push', '--force'], 'pushed', undefined, expect.objectContaining({ skipDirtyGuard: true }));
 
     hook.unmount();
   });
 
   it('fragt vor automatischem Initial-Commit nach, wenn lokale Aenderungen vorhanden sind', async () => {
-    (window as unknown as {
-      electronAPI: {
-        runGitCommand: ReturnType<typeof vi.fn>;
-      };
-    }).electronAPI = {
+    (
+      window as unknown as {
+        electronAPI: {
+          runGitCommand: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).electronAPI = {
       runGitCommand: vi.fn().mockResolvedValue({
         success: true,
         data: '?? README.md\n M src/app.ts',
@@ -181,13 +188,15 @@ describe('workflow hooks', () => {
     };
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();
-    const hook = renderHook(() => useInitialCommitRecoveryWorkflow({
-      recoverBareRepoForPush: vi.fn().mockResolvedValue(false),
-      setActiveTab,
-      setConfirmDialog,
-      setGitActionToast: vi.fn(),
-      language: 'de',
-    }));
+    const hook = renderHook(() =>
+      useInitialCommitRecoveryWorkflow({
+        recoverBareRepoForPush: vi.fn().mockResolvedValue(false),
+        setActiveTab,
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+        language: 'de',
+      }),
+    );
 
     const opened = await hook.current.requestInitialCommitConfirmationIfNeeded({
       commandLabel: 'git push',
@@ -197,11 +206,13 @@ describe('workflow hooks', () => {
 
     expect(opened).toBe(true);
     expect(setActiveTab).toHaveBeenCalledWith('repo');
-    expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
-      variant: 'danger',
-      confirmLabel: 'Committen',
-      onConfirm: expect.any(Function),
-    }));
+    expect(setConfirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: 'danger',
+        confirmLabel: 'Committen',
+        onConfirm: expect.any(Function),
+      }),
+    );
 
     hook.unmount();
   });

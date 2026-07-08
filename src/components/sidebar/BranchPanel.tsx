@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GitBranch, Plus, Search } from 'lucide-react';
-import { BranchInfo } from '../../types/git';
-import { useI18n } from '../../i18n';
+import type { BranchInfo } from '@/types/git';
+import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 
 type ContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
@@ -41,12 +41,12 @@ export const BranchPanel: React.FC<Props> = ({
   const { localBranches, remoteBranches } = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const locals = branches
-      .filter(branch => branch.scope === 'local')
-      .filter(branch => !normalizedQuery || branch.name.toLowerCase().includes(normalizedQuery))
+      .filter((branch) => branch.scope === 'local')
+      .filter((branch) => !normalizedQuery || branch.name.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => a.name.localeCompare(b.name));
     const remotes = branches
-      .filter(branch => branch.scope === 'remote')
-      .filter(branch => !normalizedQuery || branch.name.toLowerCase().includes(normalizedQuery))
+      .filter((branch) => branch.scope === 'remote')
+      .filter((branch) => !normalizedQuery || branch.name.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { localBranches: locals, remoteBranches: remotes };
@@ -54,7 +54,7 @@ export const BranchPanel: React.FC<Props> = ({
 
   const renderBranchRow = (branch: BranchInfo) => {
     const isLocal = branch.scope === 'local';
-    const displayName = isLocal ? branch.name : (branch.name.split('/').filter(Boolean).pop() || branch.name);
+    const displayName = isLocal ? branch.name : branch.name.split('/').filter(Boolean).pop() || branch.name;
 
     return (
       <div
@@ -62,7 +62,7 @@ export const BranchPanel: React.FC<Props> = ({
         className={`repo-list-row branch-row ${isLocal ? 'branch-row-local' : 'branch-row-remote'} ${branch.isHead ? 'branch-row-current' : ''}`}
         title={branch.name}
         onClick={() => !branch.isHead && isLocal && onCheckoutBranch(branch.name)}
-        onContextMenu={event => {
+        onContextMenu={(event) => {
           event.preventDefault();
           onSetBranchContextMenu({ x: event.clientX, y: event.clientY, branch: branch.name, isHead: branch.isHead });
         }}
@@ -80,8 +80,12 @@ export const BranchPanel: React.FC<Props> = ({
         title={t('generated.components.sidebar.branchpanel.branches_4d013a68')}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        toggleTitle={collapsed ? t('generated.components.sidebar.branchpanel.show_branches_cfab3e39') : t('generated.components.sidebar.branchpanel.collapse_branches_b4d0333a')}
-        actions={(
+        toggleTitle={
+          collapsed
+            ? t('generated.components.sidebar.branchpanel.show_branches_cfab3e39')
+            : t('generated.components.sidebar.branchpanel.collapse_branches_b4d0333a')
+        }
+        actions={
           <button
             className="icon-btn sidebar-row-action-icon"
             onClick={() => {
@@ -91,7 +95,7 @@ export const BranchPanel: React.FC<Props> = ({
           >
             <Plus size={13} />
           </button>
-        )}
+        }
       />
 
       {!collapsed && (
@@ -102,7 +106,7 @@ export const BranchPanel: React.FC<Props> = ({
               <input
                 className="repo-filter-input sidebar-filter-input"
                 value={query}
-                onChange={event => setQuery(event.target.value)}
+                onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('generated.components.sidebar.branchpanel.filter_branches_d57dded7')}
               />
             </div>
@@ -115,8 +119,8 @@ export const BranchPanel: React.FC<Props> = ({
                 type="text"
                 placeholder="branch-name"
                 value={newBranchName}
-                onChange={event => setNewBranchName(event.target.value)}
-                onKeyDown={event => {
+                onChange={(event) => setNewBranchName(event.target.value)}
+                onKeyDown={(event) => {
                   if (event.key === 'Enter') onCreateBranch(newBranchName);
                   if (event.key === 'Escape') {
                     onSetCreatingBranch(false);
@@ -126,7 +130,17 @@ export const BranchPanel: React.FC<Props> = ({
                 onBlur={() => {
                   if (!newBranchName.trim()) onSetCreatingBranch(false);
                 }}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--accent-primary)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--accent-primary)',
+                  backgroundColor: 'var(--bg-dark)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                  fontFamily: 'monospace',
+                }}
               />
             </RepoCardContent>
           )}
@@ -139,7 +153,11 @@ export const BranchPanel: React.FC<Props> = ({
                 </div>
                 <div className="sidebar-group-stack">
                   {localBranches.map(renderBranchRow)}
-                  {localBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{t('generated.components.sidebar.branchpanel.no_local_branches_e65093da')}</span>}
+                  {localBranches.length === 0 && (
+                    <span className="repo-state-text" style={{ padding: '3px 8px' }}>
+                      {t('generated.components.sidebar.branchpanel.no_local_branches_e65093da')}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -149,7 +167,11 @@ export const BranchPanel: React.FC<Props> = ({
                 </div>
                 <div className="sidebar-group-stack">
                   {remoteBranches.map(renderBranchRow)}
-                  {remoteBranches.length === 0 && <span className="repo-state-text" style={{ padding: '3px 8px' }}>{t('generated.components.sidebar.branchpanel.no_remote_branches_595b2860')}</span>}
+                  {remoteBranches.length === 0 && (
+                    <span className="repo-state-text" style={{ padding: '3px 8px' }}>
+                      {t('generated.components.sidebar.branchpanel.no_remote_branches_595b2860')}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,26 +1,20 @@
-import {
-  createContext,
-  useContext,
-  type Context,
-  type Dispatch,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  type SetStateAction,
-} from 'react';
-import { AppSidebarProps, type BranchContextMenuState } from '../components/layout/sidebar/AppSidebar.types';
-import { GitHubReleaseContextDto } from '../global';
-import { ReleaseNotesOptions } from '../types/releaseNotes';
-import { ReleaseVersionBump } from '../utils/releaseTagSuggestion';
-import { GitMergeMode } from '../types/git';
-import type { RunGitCommandOptions } from '../components/layout/state/appStateShared';
-import type { ConfirmDialogState, InputDialogState } from '../components/layout/layoutTypes';
+import { createContext, useContext, type Context, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from 'react';
+import type { AppSidebarProps } from '@/components/layout/sidebar/AppSidebar.types';
+import { type BranchContextMenuState } from '@/components/layout/sidebar/AppSidebar.types';
+import type { GitHubReleaseContextDto } from '@/global';
+import type { ReleaseNotesOptions } from '@/types/releaseNotes';
+import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
+import type { GitMergeMode } from '@/types/git';
+import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 
 export type CommitNavigationRequest = {
   hash: string;
   requestId: number;
 };
 
-type BaseUIContextValue = Pick<AppSidebarProps,
+type BaseUIContextValue = Pick<
+  AppSidebarProps,
   | 'activeTab'
   | 'setActiveTab'
   | 'isRepoPanelCollapsed'
@@ -38,14 +32,10 @@ type BaseUIContextValue = Pick<AppSidebarProps,
   onResetLayout: () => void;
 };
 
-export type SettingsContextValue = Pick<AppSidebarProps,
-  | 'settings'
-  | 'onUpdateSettings'
-  | 'settingsTab'
-  | 'onSelectSettingsTab'
->;
+export type SettingsContextValue = Pick<AppSidebarProps, 'settings' | 'onUpdateSettings' | 'settingsTab' | 'onSelectSettingsTab'>;
 
-export type RepositoryContextValue = Pick<AppSidebarProps,
+export type RepositoryContextValue = Pick<
+  AppSidebarProps,
   | 'activeRepo'
   | 'openRepos'
   | 'repoMeta'
@@ -107,7 +97,8 @@ export type RepositoryContextValue = Pick<AppSidebarProps,
   onOpenRepoWorkspace: () => void;
 };
 
-export type GithubContextValue = Pick<AppSidebarProps,
+export type GithubContextValue = Pick<
+  AppSidebarProps,
   | 'isAuthenticated'
   | 'tokenInput'
   | 'setTokenInput'
@@ -181,19 +172,9 @@ export type GithubContextValue = Pick<AppSidebarProps,
   setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
 };
 
-export type WorkflowContextValue = Pick<AppSidebarProps,
-  | 'isGitActionRunning'
-  | 'onPushTags'
-  | 'jobs'
-  | 'onClearJobs'
-> & {
+export type WorkflowContextValue = Pick<AppSidebarProps, 'isGitActionRunning' | 'onPushTags' | 'jobs' | 'onClearJobs'> & {
   activeGitActionLabel: string | null;
-  runGitCommand: (
-    args: string[],
-    successMsg: string,
-    actionLabel?: string,
-    options?: RunGitCommandOptions,
-  ) => Promise<boolean>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   onFetch: () => void;
   onPull: () => void;
   onPullRebase: () => void;
@@ -232,12 +213,7 @@ export type UIContextValue = BaseUIContextValue & {
   executeInputDialog: (values: Record<string, string>) => Promise<void>;
 };
 
-export type AppContextValue =
-  & SettingsContextValue
-  & RepositoryContextValue
-  & GithubContextValue
-  & WorkflowContextValue
-  & BaseUIContextValue;
+export type AppContextValue = SettingsContextValue & RepositoryContextValue & GithubContextValue & WorkflowContextValue & BaseUIContextValue;
 
 export type AppStateSlicesValue = {
   settings: SettingsContextValue;
@@ -266,20 +242,12 @@ export const useWorkflowContext = () => useRequiredContext(WorkflowContext, 'use
 export const useUIContext = () => useRequiredContext(UIContext, 'useUIContext');
 export const useOptionalUIContext = () => useContext(UIContext);
 
-export const AppStateSlicesProvider = ({
-  value,
-  children,
-}: {
-  value: AppStateSlicesValue;
-  children: ReactNode;
-}) => (
+export const AppStateSlicesProvider = ({ value, children }: { value: AppStateSlicesValue; children: ReactNode }) => (
   <SettingsContext.Provider value={value.settings}>
     <RepositoryContext.Provider value={value.repository}>
       <GithubContext.Provider value={value.github}>
         <WorkflowContext.Provider value={value.workflow}>
-          <UIContext.Provider value={value.ui}>
-            {children}
-          </UIContext.Provider>
+          <UIContext.Provider value={value.ui}>{children}</UIContext.Provider>
         </WorkflowContext.Provider>
       </GithubContext.Provider>
     </RepositoryContext.Provider>
@@ -288,7 +256,8 @@ export const AppStateSlicesProvider = ({
 
 export const createAppStateSlices = (
   ctx: AppContextValue,
-  uiState: Pick<UIContextValue,
+  uiState: Pick<
+    UIContextValue,
     | 'sidebarWidth'
     | 'isSidebarCollapsed'
     | 'isSidebarResizing'

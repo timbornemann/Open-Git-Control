@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '../global';
+import type { ElectronAPI } from '@/global';
 import { getElectronApi, requireElectronApi } from './electronApi';
 
 export const aiClient = {

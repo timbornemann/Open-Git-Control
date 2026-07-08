@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../global';
-import { gitClient } from '../services/gitClient';
-import { parseGitStatusDetailed, type GitStatusDetailed } from '../utils/gitParsing';
-import { normalizeRepoPathKey } from '../utils/repoPath';
+import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/global';
+import { gitClient } from '@/services/gitClient';
+import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export type WorkingTreeState = {
   snapshot: WorkingTreeSnapshotDto | null;
@@ -12,10 +12,7 @@ export type WorkingTreeState = {
   refresh: () => Promise<void>;
 };
 
-export const useWorkingTreeSnapshot = (
-  repoPath: string | null,
-  refreshTrigger?: number,
-): WorkingTreeState => {
+export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?: number): WorkingTreeState => {
   const [snapshot, setSnapshot] = useState<WorkingTreeSnapshotDto | null>(null);
   const [status, setStatus] = useState<GitStatusDetailed | null>(null);
   const [stats, setStats] = useState<WorkingTreeStatsDto | null>(null);
@@ -35,10 +32,7 @@ export const useWorkingTreeSnapshot = (
       try {
         const result = await gitClient.getWorkingTreeSnapshot();
         if (generation !== generationRef.current) return;
-        if (
-          result.success
-          && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)
-        ) {
+        if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
           const nextSnapshot = result.data;
           snapshotRef.current = nextSnapshot;
           setSnapshot(nextSnapshot);
@@ -47,11 +41,7 @@ export const useWorkingTreeSnapshot = (
             statsRef.current = null;
             setStats(null);
             const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId);
-            if (
-              generation !== generationRef.current
-              || !statsResult.success
-              || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId
-            ) return;
+            if (generation !== generationRef.current || !statsResult.success || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId) return;
             statsRef.current = statsResult.data;
             setStats(statsResult.data);
           }

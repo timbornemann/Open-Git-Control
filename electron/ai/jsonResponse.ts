@@ -1,10 +1,6 @@
-export const isObjectRecord = (value: unknown): value is Record<string, unknown> => (
-  Boolean(value) && typeof value === 'object'
-);
+export const isObjectRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
-export const hasStringArrayPaths = (value: unknown): value is { paths: unknown[] } => (
-  isObjectRecord(value) && Array.isArray(value.paths)
-);
+export const hasStringArrayPaths = (value: unknown): value is { paths: unknown[] } => isObjectRecord(value) && Array.isArray(value.paths);
 
 export function safeString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;

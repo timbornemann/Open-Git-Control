@@ -1,12 +1,12 @@
 import React from 'react';
 import { Github } from 'lucide-react';
-import { RepoList } from '../../sidebar/RepoList';
-import { BranchPanel } from '../../sidebar/BranchPanel';
-import { TagPanel } from '../../sidebar/TagPanel';
-import { RemotePanel } from '../../sidebar/RemotePanel';
-import { SubmodulePanel } from '../../sidebar/SubmodulePanel';
-import { AppSidebarProps } from './AppSidebar.types';
-import { useI18n } from '../../../i18n';
+import { RepoList } from '@/components/sidebar/RepoList';
+import { BranchPanel } from '@/components/sidebar/BranchPanel';
+import { TagPanel } from '@/components/sidebar/TagPanel';
+import { RemotePanel } from '@/components/sidebar/RemotePanel';
+import { SubmodulePanel } from '@/components/sidebar/SubmodulePanel';
+import type { AppSidebarProps } from './AppSidebar.types';
+import { useI18n } from '@/i18n';
 
 type ReposSidebarContentProps = Pick<
   AppSidebarProps,
@@ -186,7 +186,6 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
         />
       )}
 
-
       {activeRepo && (
         <SubmodulePanel
           submodules={submodules}
@@ -222,7 +221,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
                 type="text"
                 placeholder={t('generated.components.layout.sidebar.reposidebarcontent.repository_name_on_github_9ca29e86')}
                 value={newRepoName}
-                onChange={e => setNewRepoName(e.target.value)}
+                onChange={(e) => setNewRepoName(e.target.value)}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -237,7 +236,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
               <textarea
                 placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.description_optional_30003d39')}
                 value={newRepoDescription}
-                onChange={e => setNewRepoDescription(e.target.value)}
+                onChange={(e) => setNewRepoDescription(e.target.value)}
                 rows={2}
                 style={{
                   width: '100%',
@@ -260,19 +259,11 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
                   color: 'var(--text-secondary)',
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={newRepoPrivate}
-                  onChange={e => setNewRepoPrivate(e.target.checked)}
-                />
+                <input type="checkbox" checked={newRepoPrivate} onChange={(e) => setNewRepoPrivate(e.target.checked)} />
                 {t('generated.components.layout.sidebar.reposidebarcontent.private_d6902471')}
               </label>
             </div>
-            {connectError && (
-              <div style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
-                {connectError}
-              </div>
-            )}
+            {connectError && <div style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>{connectError}</div>}
             <button
               onClick={onCreateGithubRepoForCurrent}
               disabled={isConnectingGithubRepo}
@@ -292,7 +283,9 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
               }}
             >
               <Github size={14} />
-              {isConnectingGithubRepo ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1') : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
+              {isConnectingGithubRepo
+                ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1')
+                : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
             </button>
             {!isAuthenticated && (
               <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>

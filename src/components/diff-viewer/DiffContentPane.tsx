@@ -1,19 +1,10 @@
 import { FileWarning } from 'lucide-react';
-import type { DiffRequest } from '../../types/diff';
-import type { GitFileBlameLineDto } from '../../types/git';
-import {
-  sideBySideRows,
-  type DiffViewMode,
-  type ParsedDiff,
-  type ParsedHunk,
-  type ParsedLine,
-} from '../../utils/diffParser';
-import { useDiffSyntaxHighlighting } from '../../hooks/useDiffSyntaxHighlighting';
-import { useI18n } from '../../i18n';
-import {
-  MAX_RENDER_LINES,
-  MAX_SINGLE_LINE_LENGTH,
-} from './diffViewerConstants';
+import type { DiffRequest } from '@/types/diff';
+import type { GitFileBlameLineDto } from '@/types/git';
+import { sideBySideRows, type DiffViewMode, type ParsedDiff, type ParsedHunk, type ParsedLine } from '@/utils/diffParser';
+import { useDiffSyntaxHighlighting } from '@/hooks/useDiffSyntaxHighlighting';
+import { useI18n } from '@/i18n';
+import { MAX_RENDER_LINES, MAX_SINGLE_LINE_LENGTH } from './diffViewerConstants';
 import { DiffBlameCell } from './DiffBlameCell';
 import type { HunkPatchOperation } from './useHunkPatchActions';
 
@@ -80,15 +71,9 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   );
 
   const renderUnifiedLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
-    const lineClass = line.type === 'add'
-      ? 'diff-line add'
-      : line.type === 'del'
-        ? 'diff-line del'
-        : 'diff-line ctx';
+    const lineClass = line.type === 'add' ? 'diff-line add' : line.type === 'del' ? 'diff-line del' : 'diff-line ctx';
 
-    const gridStyle = showBlame
-      ? { gridTemplateColumns: '220px 52px 52px minmax(0, 1fr)' }
-      : undefined;
+    const gridStyle = showBlame ? { gridTemplateColumns: '220px 52px 52px minmax(0, 1fr)' } : undefined;
 
     return (
       <div key={key} className={lineClass} style={gridStyle}>
@@ -104,9 +89,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
 
   const renderSideBySideLine = (line: ParsedLine, key: string, prevLine?: ParsedLine) => {
     const textStr = line.text || '';
-    const sbsGridStyle = showBlame
-      ? { gridTemplateColumns: '180px 52px minmax(0, 1fr)' }
-      : undefined;
+    const sbsGridStyle = showBlame ? { gridTemplateColumns: '180px 52px minmax(0, 1fr)' } : undefined;
 
     if (line.type === 'context') {
       const [leftText = '', rightText = leftText] = textStr.split('\x1f');
@@ -182,7 +165,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                 className="skeleton-line"
                 style={{
                   height: 9,
-                  width: `${30 + (index * 7) % 55}%`,
+                  width: `${30 + ((index * 7) % 55)}%`,
                   borderRadius: 3,
                   background: isAdd ? 'rgba(79,174,148,0.2)' : isDel ? 'rgba(211,93,105,0.2)' : undefined,
                 }}
@@ -240,7 +223,9 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       {parsed.fileHeader.length > 0 && (
         <div className="diff-file-header">
           {parsed.fileHeader.map((line, index) => (
-            <div key={`head-${index}`} className="diff-header-line">{line}</div>
+            <div key={`head-${index}`} className="diff-header-line">
+              {line}
+            </div>
           ))}
         </div>
       )}
@@ -249,19 +234,13 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
         <div className="diff-empty-state">{t('generated.components.diff_viewer.diffcontentpane.no_hunk_data_available_3c3c1467')}</div>
       )}
 
-      {hunkOpError && (
-        <div className="diff-hunk-op-error">{hunkOpError}</div>
-      )}
+      {hunkOpError && <div className="diff-hunk-op-error">{hunkOpError}</div>}
 
       {parsed.hunks.map((hunk, hunkIndex) => {
         const rows = viewMode === 'side-by-side' ? sideBySideRows(hunk.rows) : hunk.rows;
         const canStageHunks = !!onRepoChanged && !isTooLarge && (request.source === 'staged' || request.source === 'unstaged');
         return (
-          <div
-            key={hunk.id}
-            className={`diff-hunk ${activeHunkIndex === hunkIndex ? 'active' : ''}`}
-            ref={(element) => setHunkRef(hunkIndex, element)}
-          >
+          <div key={hunk.id} className={`diff-hunk ${activeHunkIndex === hunkIndex ? 'active' : ''}`} ref={(element) => setHunkRef(hunkIndex, element)}>
             <div className="diff-hunk-header-row">
               <button className="diff-hunk-header" onClick={() => scrollToHunk(hunkIndex)}>
                 {hunk.header}
@@ -301,15 +280,11 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
 
             <div className={viewMode === 'side-by-side' ? 'diff-sbs-wrap' : 'diff-unified-wrap'}>
               {rows.map((line, lineIndex) => {
-                const clippedText = line.text.length > MAX_SINGLE_LINE_LENGTH
-                  ? `${line.text.slice(0, MAX_SINGLE_LINE_LENGTH)} ...`
-                  : line.text;
+                const clippedText = line.text.length > MAX_SINGLE_LINE_LENGTH ? `${line.text.slice(0, MAX_SINGLE_LINE_LENGTH)} ...` : line.text;
                 const normalizedLine = { ...line, text: clippedText };
                 const key = `${hunk.id}-${lineIndex}`;
                 const prevLine = lineIndex > 0 ? rows[lineIndex - 1] : undefined;
-                return viewMode === 'side-by-side'
-                  ? renderSideBySideLine(normalizedLine, key, prevLine)
-                  : renderUnifiedLine(normalizedLine, key, prevLine);
+                return viewMode === 'side-by-side' ? renderSideBySideLine(normalizedLine, key, prevLine) : renderUnifiedLine(normalizedLine, key, prevLine);
               })}
             </div>
           </div>

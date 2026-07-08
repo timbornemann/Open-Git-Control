@@ -72,15 +72,12 @@ describe('GitScheduler', () => {
     const scheduler = new GitScheduler();
     const blockers = [deferred<void>(), deferred<void>(), deferred<void>(), deferred<void>()];
     const started: string[] = [];
-    const backgrounds = blockers.map((blocker, index) => scheduler.schedule(
-      'C:/repo',
-      'background',
-      `stats-${index}`,
-      async () => {
+    const backgrounds = blockers.map((blocker, index) =>
+      scheduler.schedule('C:/repo', 'background', `stats-${index}`, async () => {
         started.push(`background-${index}`);
         await blocker.promise;
-      },
-    ));
+      }),
+    );
 
     await vi.waitFor(() => {
       expect(started).toHaveLength(3);

@@ -1,27 +1,13 @@
-import { GitService, gitService } from './GitService';
-import { AiProvider, AppSettings } from './settings';
+import type { GitService } from './GitService';
+import { gitService } from './GitService';
+import type { AiProvider, AppSettings } from './settings';
 import { AiProviderClient, getSelectedAiModel } from './ai/AiProviderClient';
 import { AiAutoCommitRunner } from './ai/AiAutoCommitRunner';
-import {
-  buildFallbackCommitMessage,
-  generateCommitMessageFromUserNotes as generateCommitMessageFromUserNotesCore,
-} from './ai/commitMessageGenerator';
+import { buildFallbackCommitMessage, generateCommitMessageFromUserNotes as generateCommitMessageFromUserNotesCore } from './ai/commitMessageGenerator';
 import { generateReleaseNotes as generateReleaseNotesCore } from './ai/releaseNotesGenerator';
-import type {
-  AiAutoCommitResult,
-  AiProgressUpdate,
-  CommitMessage,
-  ReleaseCommitInput,
-  ReleaseVersionBump,
-} from './ai/aiServiceTypes';
+import type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
 
-export type {
-  AiAutoCommitResult,
-  AiProgressUpdate,
-  CommitMessage,
-  ReleaseCommitInput,
-  ReleaseVersionBump,
-} from './ai/aiServiceTypes';
+export type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
 
 export { buildFallbackCommitMessage };
 export { parseStatusPorcelain } from './ai/gitStatusSnapshot';
@@ -61,11 +47,7 @@ export class AiService {
     return this.providerClient.listModels(settings, getGeminiApiKey);
   }
 
-  async generateCommitMessageFromUserNotes(
-    settings: AppSettings,
-    getGeminiApiKey: () => string,
-    params: { notes: string },
-  ): Promise<CommitMessage> {
+  async generateCommitMessageFromUserNotes(settings: AppSettings, getGeminiApiKey: () => string, params: { notes: string }): Promise<CommitMessage> {
     assertGenerationConfigured(settings, getGeminiApiKey);
     return generateCommitMessageFromUserNotesCore(this.providerClient, settings, getGeminiApiKey, params);
   }

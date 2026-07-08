@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '../global';
+import type { ElectronAPI } from '@/global';
 import { getElectronApi, requireElectronApi } from './electronApi';
 
 export const appClient = {
@@ -14,7 +14,9 @@ export const appClient = {
     return requireElectronApi().selectDirectory(...args);
   },
 
-  async selectProjectParentDirectory(...args: Parameters<ElectronAPI['selectProjectParentDirectory']>): ReturnType<ElectronAPI['selectProjectParentDirectory']> {
+  async selectProjectParentDirectory(
+    ...args: Parameters<ElectronAPI['selectProjectParentDirectory']>
+  ): ReturnType<ElectronAPI['selectProjectParentDirectory']> {
     return requireElectronApi().selectProjectParentDirectory(...args);
   },
 

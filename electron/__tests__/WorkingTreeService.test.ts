@@ -6,7 +6,9 @@ import { WorkingTreeService } from '../WorkingTreeService';
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => { resolve = res; });
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
   return { promise, resolve };
 };
 
@@ -14,8 +16,7 @@ describe('WorkingTreeService', () => {
   it('coalesces overlapping status polls and caches stats by snapshot', async () => {
     const status = deferred<string>();
     const getStatusPorcelainAtPath = vi.fn(() => status.promise);
-    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) =>
-      args.includes('--cached') ? '3\t1\ta.ts' : '2\t4\tb.ts');
+    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) => (args.includes('--cached') ? '3\t1\ta.ts' : '2\t4\tb.ts'));
     const service = new WorkingTreeService({
       getRepoPath: () => 'C:/repo',
       getStatusPorcelainAtPath,
@@ -30,17 +31,10 @@ describe('WorkingTreeService', () => {
     expect(secondSnapshot.snapshotId).toBe(firstSnapshot.snapshotId);
     expect(firstSnapshot.changeCount).toBe(2);
 
-    const [firstStats, secondStats] = await Promise.all([
-      service.getStats(firstSnapshot.snapshotId),
-      service.getStats(firstSnapshot.snapshotId),
-    ]);
+    const [firstStats, secondStats] = await Promise.all([service.getStats(firstSnapshot.snapshotId), service.getStats(firstSnapshot.snapshotId)]);
     expect(firstStats).toEqual(secondStats);
     expect(runPollingCommandAtPath).toHaveBeenCalledTimes(3);
-    expect(runPollingCommandAtPath).toHaveBeenCalledWith(
-      'C:/repo',
-      ['diff', '--numstat', '--cached'],
-      `working-tree-stats:${firstSnapshot.snapshotId}:staged`,
-    );
+    expect(runPollingCommandAtPath).toHaveBeenCalledWith('C:/repo', ['diff', '--numstat', '--cached'], `working-tree-stats:${firstSnapshot.snapshotId}:staged`);
   });
 
   it('recomputes line stats when file contents change without changing porcelain status', async () => {
@@ -49,8 +43,7 @@ describe('WorkingTreeService', () => {
     fs.writeFileSync(filePath, 'first\n', 'utf8');
     const getStatusPorcelainAtPath = vi.fn(async () => 'M  a.ts');
     let additions = 1;
-    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) =>
-      args.includes('--cached') ? `${additions}\t0\ta.ts` : '');
+    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) => (args.includes('--cached') ? `${additions}\t0\ta.ts` : ''));
     const service = new WorkingTreeService({
       getRepoPath: () => repoPath,
       getStatusPorcelainAtPath,
@@ -80,8 +73,7 @@ describe('WorkingTreeService', () => {
     fs.writeFileSync(filePath, 'unchanged worktree\n', 'utf8');
     const getStatusPorcelainAtPath = vi.fn(async () => 'MM a.ts');
     let stagedRaw = '1\t0\ta.ts';
-    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) =>
-      args.includes('--cached') ? stagedRaw : '4\t0\ta.ts');
+    const runPollingCommandAtPath = vi.fn(async (_repo: string, args: string[]) => (args.includes('--cached') ? stagedRaw : '4\t0\ta.ts'));
     const service = new WorkingTreeService({
       getRepoPath: () => repoPath,
       getStatusPorcelainAtPath,
@@ -131,8 +123,7 @@ describe('WorkingTreeService', () => {
     const oldStatus = deferred<string>();
     const service = new WorkingTreeService({
       getRepoPath: () => repoPath,
-      getStatusPorcelainAtPath: vi.fn((requestedRepo: string) =>
-        requestedRepo === 'C:/old' ? oldStatus.promise : Promise.resolve('M  new.ts')),
+      getStatusPorcelainAtPath: vi.fn((requestedRepo: string) => (requestedRepo === 'C:/old' ? oldStatus.promise : Promise.resolve('M  new.ts'))),
       runPollingCommandAtPath: vi.fn(async () => ''),
     } as any);
 

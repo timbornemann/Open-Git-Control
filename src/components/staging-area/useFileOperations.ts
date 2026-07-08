@@ -1,24 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FileEntry, parseGitStatusDetailed, type GitStatusDetailed } from '../../utils/gitParsing';
-import type { GitCommandNameDto, WorkingTreeStatsDto } from '../../global';
-import type { DiffRequest } from '../../types/diff';
-import type { ToastMessage } from '../../types/git';
-import { useI18n } from '../../i18n';
-import { gitClient } from '../../services/gitClient';
-import {
-  EMPTY_DIFF_STATS,
-  basename,
-  parseConflictEntries,
-  parseNumstatStats,
-} from './utils';
-import type {
-  ConfirmDialogState,
-  DiffStats,
-  FileSection,
-  GitStatusWithConflicts,
-  InputDialogState,
-  StagingContextMenuState,
-} from './types';
+import type { FileEntry } from '@/utils/gitParsing';
+import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
+import type { GitCommandNameDto, WorkingTreeStatsDto } from '@/global';
+import type { DiffRequest } from '@/types/diff';
+import type { ToastMessage } from '@/types/git';
+import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
+import { EMPTY_DIFF_STATS, basename, parseConflictEntries, parseNumstatStats } from './utils';
+import type { ConfirmDialogState, DiffStats, FileSection, GitStatusWithConflicts, InputDialogState, StagingContextMenuState } from './types';
 
 type Params = {
   repoPath: string | null;
@@ -167,7 +156,9 @@ export const useFileOperations = ({
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setContextMenu(null); };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setContextMenu(null);
+    };
     window.addEventListener('click', close);
     window.addEventListener('contextmenu', close);
     window.addEventListener('keydown', onKeyDown);
@@ -178,30 +169,33 @@ export const useFileOperations = ({
     };
   }, [contextMenu]);
 
-  const git = useCallback(async (args: string[], msg: string, notify = false) => {
-    if (!gitClient.isAvailable() || args.length === 0) return false;
-    if (mutationInFlightRef.current) return false;
-    mutationInFlightRef.current = true;
-    setMutationStartedAt(Date.now());
-    try {
-      const r = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
-      if (r.success) {
-        setToast({ msg, isError: false });
-        if (notify && onRepoChanged) onRepoChanged();
-        await refresh();
-        return true;
-      } else {
-        setToast({ msg: r.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+  const git = useCallback(
+    async (args: string[], msg: string, notify = false) => {
+      if (!gitClient.isAvailable() || args.length === 0) return false;
+      if (mutationInFlightRef.current) return false;
+      mutationInFlightRef.current = true;
+      setMutationStartedAt(Date.now());
+      try {
+        const r = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+        if (r.success) {
+          setToast({ msg, isError: false });
+          if (notify && onRepoChanged) onRepoChanged();
+          await refresh();
+          return true;
+        } else {
+          setToast({ msg: r.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+          return false;
+        }
+      } catch (e: any) {
+        setToast({ msg: e.message, isError: true });
         return false;
+      } finally {
+        mutationInFlightRef.current = false;
+        setMutationStartedAt(null);
       }
-    } catch (e: any) {
-      setToast({ msg: e.message, isError: true });
-      return false;
-    } finally {
-      mutationInFlightRef.current = false;
-      setMutationStartedAt(null);
-    }
-  }, [setToast, onRepoChanged, refresh, tr]);
+    },
+    [setToast, onRepoChanged, refresh, tr],
+  );
 
   const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
     event.preventDefault();
@@ -209,31 +203,34 @@ export const useFileOperations = ({
     setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
   }, []);
 
-  const addIgnoreRule = useCallback(async (entry: FileEntry, section: FileSection, pattern: string) => {
-    if (!gitClient.isAvailable()) return;
-    const normalizedPattern = pattern.trim();
-    if (!normalizedPattern) return;
-    try {
-      const result = await gitClient.addIgnoreRule(normalizedPattern);
-      if (!result.success) {
-        setToast({ msg: result.error || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
-        return;
+  const addIgnoreRule = useCallback(
+    async (entry: FileEntry, section: FileSection, pattern: string) => {
+      if (!gitClient.isAvailable()) return;
+      const normalizedPattern = pattern.trim();
+      if (!normalizedPattern) return;
+      try {
+        const result = await gitClient.addIgnoreRule(normalizedPattern);
+        if (!result.success) {
+          setToast({ msg: result.error || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
+          return;
+        }
+        if (section === 'staged' && entry.x === 'A') {
+          await gitClient.runGitCommand('reset', 'HEAD', '--', entry.path);
+        }
+        setToast({
+          msg: result.added
+            ? tr(`Ignore-Regel hinzugefuegt: ${normalizedPattern}`, `Added ignore rule: ${normalizedPattern}`)
+            : tr(`Regel existiert bereits: ${normalizedPattern}`, `Rule already exists: ${normalizedPattern}`),
+          isError: false,
+        });
+        if (onRepoChanged) onRepoChanged();
+        await refresh();
+      } catch (e: any) {
+        setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
       }
-      if (section === 'staged' && entry.x === 'A') {
-        await gitClient.runGitCommand('reset', 'HEAD', '--', entry.path);
-      }
-      setToast({
-        msg: result.added
-          ? tr(`Ignore-Regel hinzugefuegt: ${normalizedPattern}`, `Added ignore rule: ${normalizedPattern}`)
-          : tr(`Regel existiert bereits: ${normalizedPattern}`, `Rule already exists: ${normalizedPattern}`),
-        isError: false,
-      });
-      if (onRepoChanged) onRepoChanged();
-      await refresh();
-    } catch (e: any) {
-      setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
-    }
-  }, [setToast, onRepoChanged, refresh, tr]);
+    },
+    [setToast, onRepoChanged, refresh, tr],
+  );
 
   const stageFile = useCallback((f: string) => git(['add', '--', f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)), [git, tr]);
   const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
@@ -250,10 +247,7 @@ export const useFileOperations = ({
       if (!result.success) throw new Error(result.error);
       const count = status.untracked.length;
       setToast({
-        msg: tr(
-          `${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`,
-          `Staged ${count} untracked file${count !== 1 ? 's' : ''}`,
-        ),
+        msg: tr(`${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, `Staged ${count} untracked file${count !== 1 ? 's' : ''}`),
         isError: false,
       });
       await refresh();
@@ -265,27 +259,45 @@ export const useFileOperations = ({
     }
   }, [status, setToast, refresh, tr]);
 
-  const discardFile = useCallback((f: string) => {
-    setConfirmDialog({
-      variant: 'danger',
-      title: t('generated.components.staging_area.usefileoperations.discard_file_changes_ba9a3d21'),
-      message: t('generated.components.staging_area.usefileoperations.all_unsaved_changes_in_this_file_will_be_discarded_8d5f1078'),
-      contextItems: [{ label: t('generated.components.commitdetails.file_9d811416'), value: f }, { label: t('generated.components.staging_area.usefileoperations.scope_9817b017'), value: t('generated.components.staging_area.usefileoperations.unstaged_working_tree_4bf6f78b') }],
-      irreversible: true,
-      consequences: t('generated.components.staging_area.usefileoperations.discarded_lines_cannot_be_restored_from_git_d40dd8f1'),
-      confirmLabel: t('generated.components.staging_area.conflictresolverpanel.discard_changes_b80ac3bd'),
-      onConfirm: async () => {
-        await git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true);
-      },
-    });
-  }, [setConfirmDialog, git, tr]);
+  const discardFile = useCallback(
+    (f: string) => {
+      setConfirmDialog({
+        variant: 'danger',
+        title: t('generated.components.staging_area.usefileoperations.discard_file_changes_ba9a3d21'),
+        message: t('generated.components.staging_area.usefileoperations.all_unsaved_changes_in_this_file_will_be_discarded_8d5f1078'),
+        contextItems: [
+          { label: t('generated.components.commitdetails.file_9d811416'), value: f },
+          {
+            label: t('generated.components.staging_area.usefileoperations.scope_9817b017'),
+            value: t('generated.components.staging_area.usefileoperations.unstaged_working_tree_4bf6f78b'),
+          },
+        ],
+        irreversible: true,
+        consequences: t('generated.components.staging_area.usefileoperations.discarded_lines_cannot_be_restored_from_git_d40dd8f1'),
+        confirmLabel: t('generated.components.staging_area.conflictresolverpanel.discard_changes_b80ac3bd'),
+        onConfirm: async () => {
+          await git(['checkout', '--', f], tr(`${basename(f)} verworfen`, `Discarded ${basename(f)}`), true);
+        },
+      });
+    },
+    [setConfirmDialog, git, tr],
+  );
 
   const discardAll = useCallback(() => {
     setConfirmDialog({
       variant: 'danger',
       title: t('generated.components.staging_area.usefileoperations.discard_all_unstaged_changes_aa3f4f05'),
       message: t('generated.components.staging_area.usefileoperations.all_local_unstaged_changes_will_be_reset_to_the_last_com_2a16eed6'),
-      contextItems: [{ label: t('generated.components.staging_area.usefileoperations.scope_7d90ed9d'), value: t('generated.components.staging_area.usefileoperations.entire_repository_3b268641') }, { label: t('generated.components.staging_area.usefileoperations.affects_80a8b1b0'), value: t('generated.components.staging_area.usefileoperations.only_unstaged_files_edd96f1c') }],
+      contextItems: [
+        {
+          label: t('generated.components.staging_area.usefileoperations.scope_7d90ed9d'),
+          value: t('generated.components.staging_area.usefileoperations.entire_repository_3b268641'),
+        },
+        {
+          label: t('generated.components.staging_area.usefileoperations.affects_80a8b1b0'),
+          value: t('generated.components.staging_area.usefileoperations.only_unstaged_files_edd96f1c'),
+        },
+      ],
       irreversible: true,
       consequences: t('generated.components.staging_area.usefileoperations.unsaved_changes_will_be_permanently_lost_7fed012c'),
       confirmLabel: t('generated.components.staging_area.usefileoperations.discard_all_5a080ac9'),
@@ -295,49 +307,63 @@ export const useFileOperations = ({
     });
   }, [setConfirmDialog, git, tr]);
 
-  const deleteUntracked = useCallback((f: string) => {
-    setConfirmDialog({
-      variant: 'danger',
-      title: t('generated.components.staging_area.usefileoperations.delete_untracked_file_bbf6e21c'),
-      message: t('generated.components.staging_area.usefileoperations.the_file_is_not_tracked_and_will_be_removed_from_the_fil_59ed3043'),
-      contextItems: [{ label: t('generated.components.commitdetails.file_9d811416'), value: f }, { label: t('generated.components.staging_area.usefileoperations.git_status_98e69c47'), value: t('generated.components.staging_area.stagingfilesections.untracked_d2518623') }],
-      irreversible: true,
-      consequences: t('generated.components.staging_area.usefileoperations.the_file_cannot_be_restored_without_backup_afterwards_cb997723'),
-      confirmLabel: t('generated.components.staging_area.usefileoperations.delete_file_67f7198d'),
-      onConfirm: async () => {
-        await git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true);
-      },
-    });
-  }, [setConfirmDialog, git, tr]);
+  const deleteUntracked = useCallback(
+    (f: string) => {
+      setConfirmDialog({
+        variant: 'danger',
+        title: t('generated.components.staging_area.usefileoperations.delete_untracked_file_bbf6e21c'),
+        message: t('generated.components.staging_area.usefileoperations.the_file_is_not_tracked_and_will_be_removed_from_the_fil_59ed3043'),
+        contextItems: [
+          { label: t('generated.components.commitdetails.file_9d811416'), value: f },
+          {
+            label: t('generated.components.staging_area.usefileoperations.git_status_98e69c47'),
+            value: t('generated.components.staging_area.stagingfilesections.untracked_d2518623'),
+          },
+        ],
+        irreversible: true,
+        consequences: t('generated.components.staging_area.usefileoperations.the_file_cannot_be_restored_without_backup_afterwards_cb997723'),
+        confirmLabel: t('generated.components.staging_area.usefileoperations.delete_file_67f7198d'),
+        onConfirm: async () => {
+          await git(['clean', '-f', '--', f], tr(`${basename(f)} geloescht`, `Deleted ${basename(f)}`), true);
+        },
+      });
+    },
+    [setConfirmDialog, git, tr],
+  );
 
-  const stashFile = useCallback((filePath: string, section: FileSection) => {
-    setInputDialog({
-      title: t('generated.components.staging_area.usefileoperations.stash_file_06bcc105'),
-      message: t('generated.components.staging_area.usefileoperations.optionally_add_a_message_for_the_new_file_stash_08b0ff6d'),
-      fields: [{ id: 'message', label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'), placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_single_file_f4ef1437') }],
-      contextItems: [
-        { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4') },
-        { label: t('generated.components.commitdetails.file_9d811416'), value: filePath },
-        { label: t('generated.components.staging_area.usefileoperations.section_254cebe4'), value: section },
-      ],
-      irreversible: false,
-      consequences: t('generated.components.staging_area.usefileoperations.only_this_file_is_moved_into_a_new_stash_untracked_files_fb0d5119'),
-      confirmLabel: t('generated.components.staging_area.usefileoperations.create_stash_ebe60340'),
-      onSubmit: async (values) => {
-        const msg = (values.message || '').trim();
-        const args = [
-          'stash',
-          'push',
-          ...(section === 'untracked' ? ['--include-untracked'] : []),
-          ...(msg ? ['-m', msg] : []),
-          '--',
-          filePath,
-        ];
-        const ok = await git(args, tr(`${basename(filePath)} gestasht`, `Stashed ${basename(filePath)}`), true);
-        if (ok) onStashChanged?.();
-      },
-    });
-  }, [setInputDialog, repoPath, git, onStashChanged, tr]);
+  const stashFile = useCallback(
+    (filePath: string, section: FileSection) => {
+      setInputDialog({
+        title: t('generated.components.staging_area.usefileoperations.stash_file_06bcc105'),
+        message: t('generated.components.staging_area.usefileoperations.optionally_add_a_message_for_the_new_file_stash_08b0ff6d'),
+        fields: [
+          {
+            id: 'message',
+            label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'),
+            placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_single_file_f4ef1437'),
+          },
+        ],
+        contextItems: [
+          {
+            label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'),
+            value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4'),
+          },
+          { label: t('generated.components.commitdetails.file_9d811416'), value: filePath },
+          { label: t('generated.components.staging_area.usefileoperations.section_254cebe4'), value: section },
+        ],
+        irreversible: false,
+        consequences: t('generated.components.staging_area.usefileoperations.only_this_file_is_moved_into_a_new_stash_untracked_files_fb0d5119'),
+        confirmLabel: t('generated.components.staging_area.usefileoperations.create_stash_ebe60340'),
+        onSubmit: async (values) => {
+          const msg = (values.message || '').trim();
+          const args = ['stash', 'push', ...(section === 'untracked' ? ['--include-untracked'] : []), ...(msg ? ['-m', msg] : []), '--', filePath];
+          const ok = await git(args, tr(`${basename(filePath)} gestasht`, `Stashed ${basename(filePath)}`), true);
+          if (ok) onStashChanged?.();
+        },
+      });
+    },
+    [setInputDialog, repoPath, git, onStashChanged, tr],
+  );
 
   const stashAll = useCallback(() => {
     const trackedCount = (status?.staged.length || 0) + (status?.unstaged.length || 0);
@@ -345,9 +371,18 @@ export const useFileOperations = ({
     setInputDialog({
       title: t('generated.components.staging_area.usefileoperations.stash_all_changes_48324425'),
       message: t('generated.components.staging_area.usefileoperations.optionally_add_a_message_for_the_new_stash_with_all_loca_3a612534'),
-      fields: [{ id: 'message', label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'), placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_larger_change_b8c378c4') }],
+      fields: [
+        {
+          id: 'message',
+          label: t('generated.components.staging_area.usefileoperations.stash_message_optional_cfb6ab56'),
+          placeholder: t('generated.components.staging_area.usefileoperations.e_g_wip_larger_change_b8c378c4'),
+        },
+      ],
       contextItems: [
-        { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4') },
+        {
+          label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'),
+          value: repoPath ? basename(repoPath) : t('generated.components.staging_area.usefileoperations.unknown_af8d7dc4'),
+        },
         { label: t('generated.components.staging_area.usefileoperations.tracked_8e161c2e'), value: String(trackedCount) },
         { label: t('generated.components.staging_area.stagingfilesections.untracked_d2518623'), value: String(untrackedCount) },
       ],
@@ -356,26 +391,26 @@ export const useFileOperations = ({
       confirmLabel: t('generated.components.staging_area.usefileoperations.stash_all_602ded33'),
       onSubmit: async (values) => {
         const msg = (values.message || '').trim();
-        const args = [
-          'stash',
-          'push',
-          '--include-untracked',
-          ...(msg ? ['-m', msg] : []),
-        ];
+        const args = ['stash', 'push', '--include-untracked', ...(msg ? ['-m', msg] : [])];
         const ok = await git(args, t('generated.components.staging_area.usefileoperations.stashed_all_changes_c28f9b06'), true);
         if (ok) onStashChanged?.();
       },
     });
   }, [setInputDialog, repoPath, status, git, onStashChanged, tr]);
 
-  const showDiff = useCallback((filePath: string, staged: boolean) => {
-    const request: DiffRequest = {
-      source: staged ? 'staged' : 'unstaged',
-      path: filePath,
-      title: staged ? t('generated.components.staging_area.usefileoperations.staged_diff_6db84f1e') : t('generated.components.staging_area.usefileoperations.unstaged_diff_a19af98a'),
-    };
-    onOpenDiff?.(request);
-  }, [onOpenDiff, tr]);
+  const showDiff = useCallback(
+    (filePath: string, staged: boolean) => {
+      const request: DiffRequest = {
+        source: staged ? 'staged' : 'unstaged',
+        path: filePath,
+        title: staged
+          ? t('generated.components.staging_area.usefileoperations.staged_diff_6db84f1e')
+          : t('generated.components.staging_area.usefileoperations.unstaged_diff_a19af98a'),
+      };
+      onOpenDiff?.(request);
+    },
+    [onOpenDiff, tr],
+  );
 
   return {
     status,

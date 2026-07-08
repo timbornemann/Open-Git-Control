@@ -33,13 +33,13 @@ Aktuell neuestes Release: [v1.3.0](https://github.com/timbornemann/Open-Git-Cont
 
 Badge und Latest-Release-Seite bleiben automatisch aktuell. Die direkten Binary-Links unten sind durch die GitHub-Asset-Namen versioniert und werden vom Release-Workflow nach einem neuen stabilen Release aktualisiert.
 
-| Plattform | Paket | Direkter GitHub-Download |
-| --- | --- | --- |
-| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-1.3.0-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-win-x64.exe) |
-| Linux x64 | AppImage | [Open-Git-Control-1.3.0-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-x86_64.AppImage) |
-| Linux amd64 | Debian-Paket `.deb` | [Open-Git-Control-1.3.0-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-amd64.deb) |
-| macOS x64 | Disk Image `.dmg` | [Open-Git-Control-1.3.0-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.dmg) |
-| macOS x64 | Zip-Archiv | [Open-Git-Control-1.3.0-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.zip) |
+| Plattform   | Paket                 | Direkter GitHub-Download                                                                                                                                               |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-1.3.0-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-win-x64.exe)                     |
+| Linux x64   | AppImage              | [Open-Git-Control-1.3.0-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-x86_64.AppImage) |
+| Linux amd64 | Debian-Paket `.deb`   | [Open-Git-Control-1.3.0-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-linux-amd64.deb)             |
+| macOS x64   | Disk Image `.dmg`     | [Open-Git-Control-1.3.0-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.dmg)                     |
+| macOS x64   | Zip-Archiv            | [Open-Git-Control-1.3.0-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v1.3.0/Open-Git-Control-1.3.0-mac-x64.zip)                     |
 
 Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
 
@@ -756,24 +756,24 @@ npm run test:ci
 
 Verfuegbare Skripte:
 
-| Skript | Zweck |
-| --- | --- |
-| `npm run dev` | Vite und Electron zusammen starten |
-| `npm run electron:dev` | Electron-Prozess bauen und Electron gegen Vite starten |
-| `npm run build` | TypeScript, Vite Build und Electron-Prozess bauen |
-| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren |
-| `npm run dist` | Paketierte App fuer aktuelle Plattform bauen |
-| `npm run dist:win` | Windows NSIS x64 Paket bauen |
-| `npm run dist:linux` | Linux AppImage und deb Pakete bauen |
-| `npm run dist:mac` | macOS dmg und zip Pakete bauen |
-| `npm run release:win` | Windows Release Assets bauen und publishen |
-| `npm run release:linux` | Linux Release Assets bauen und publishen |
-| `npm run release:mac` | macOS Release Assets bauen und publishen |
-| `npm run preview` | Vite Build previewen |
-| `npm run electron:start` | Electron nach gebautem Electron-Prozess starten |
-| `npm run test` | Unit Tests ausfuehren |
-| `npm run test:coverage` | Tests mit Coverage ausfuehren |
-| `npm run test:ci` | Kompilieren, Tests mit Coverage und Build ausfuehren |
+| Skript                   | Zweck                                                  |
+| ------------------------ | ------------------------------------------------------ |
+| `npm run dev`            | Vite und Electron zusammen starten                     |
+| `npm run electron:dev`   | Electron-Prozess bauen und Electron gegen Vite starten |
+| `npm run build`          | TypeScript, Vite Build und Electron-Prozess bauen      |
+| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren              |
+| `npm run dist`           | Paketierte App fuer aktuelle Plattform bauen           |
+| `npm run dist:win`       | Windows NSIS x64 Paket bauen                           |
+| `npm run dist:linux`     | Linux AppImage und deb Pakete bauen                    |
+| `npm run dist:mac`       | macOS dmg und zip Pakete bauen                         |
+| `npm run release:win`    | Windows Release Assets bauen und publishen             |
+| `npm run release:linux`  | Linux Release Assets bauen und publishen               |
+| `npm run release:mac`    | macOS Release Assets bauen und publishen               |
+| `npm run preview`        | Vite Build previewen                                   |
+| `npm run electron:start` | Electron nach gebautem Electron-Prozess starten        |
+| `npm run test`           | Unit Tests ausfuehren                                  |
+| `npm run test:coverage`  | Tests mit Coverage ausfuehren                          |
+| `npm run test:ci`        | Kompilieren, Tests mit Coverage und Build ausfuehren   |
 
 ## Release Builds
 

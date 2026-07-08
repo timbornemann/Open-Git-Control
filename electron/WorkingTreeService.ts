@@ -61,11 +61,7 @@ const decodeQuotedGitPath = (rawToken: string): string | null => {
     if (/[0-7]/.test(next)) {
       let octal = next;
       let consumedDigits = 1;
-      while (
-        consumedDigits < 3
-        && i + 1 + consumedDigits < escaped.length
-        && /[0-7]/.test(escaped[i + 1 + consumedDigits])
-      ) {
+      while (consumedDigits < 3 && i + 1 + consumedDigits < escaped.length && /[0-7]/.test(escaped[i + 1 + consumedDigits])) {
         octal += escaped[i + 1 + consumedDigits];
         consumedDigits += 1;
       }
@@ -132,17 +128,9 @@ export class WorkingTreeService {
       const startedAt = Date.now();
       const statusRaw = await this.gitService.getStatusPorcelainAtPath(repoPath);
       const durationMs = Date.now() - startedAt;
-      const changeCount = statusRaw
-        ? statusRaw.split(/\r?\n/).filter((line) => line.length >= 3).length
-        : 0;
+      const changeCount = statusRaw ? statusRaw.split(/\r?\n/).filter((line) => line.length >= 3).length : 0;
       const contentFingerprint = await this.getContentFingerprint(repoPath, statusRaw);
-      const snapshotId = createHash('sha1')
-        .update(repoPath)
-        .update('\0')
-        .update(statusRaw)
-        .update('\0')
-        .update(contentFingerprint)
-        .digest('hex');
+      const snapshotId = createHash('sha1').update(repoPath).update('\0').update(statusRaw).update('\0').update(contentFingerprint).digest('hex');
       const snapshot: WorkingTreeSnapshot = {
         snapshotId,
         repoPath,
@@ -179,16 +167,8 @@ export class WorkingTreeService {
 
     const promise = (async () => {
       const [stagedRaw, unstagedRaw] = await Promise.all([
-        this.gitService.runPollingCommandAtPath(
-          snapshot.repoPath,
-          ['diff', '--numstat', '--cached'],
-          `working-tree-stats:${snapshotId}:staged`,
-        ),
-        this.gitService.runPollingCommandAtPath(
-          snapshot.repoPath,
-          ['diff', '--numstat'],
-          `working-tree-stats:${snapshotId}:unstaged`,
-        ),
+        this.gitService.runPollingCommandAtPath(snapshot.repoPath, ['diff', '--numstat', '--cached'], `working-tree-stats:${snapshotId}:staged`),
+        this.gitService.runPollingCommandAtPath(snapshot.repoPath, ['diff', '--numstat'], `working-tree-stats:${snapshotId}:unstaged`),
       ]);
       const result: WorkingTreeStats = {
         snapshotId,
@@ -223,11 +203,7 @@ export class WorkingTreeService {
 
     const hash = createHash('sha1');
     if (hasStagedChanges(statusRaw)) {
-      const stagedNumstat = await this.gitService.runPollingCommandAtPath(
-        repoPath,
-        ['diff', '--numstat', '--cached'],
-        'working-tree-snapshot:staged-numstat',
-      );
+      const stagedNumstat = await this.gitService.runPollingCommandAtPath(repoPath, ['diff', '--numstat', '--cached'], 'working-tree-snapshot:staged-numstat');
       hash.update('staged-numstat').update('\0').update(stagedNumstat).update('\0');
     }
 
@@ -235,14 +211,16 @@ export class WorkingTreeService {
     const batchSize = 64;
     for (let offset = 0; offset < sortedPaths.length; offset += batchSize) {
       const batch = sortedPaths.slice(offset, offset + batchSize);
-      const entries = await Promise.all(batch.map(async (filePath) => {
-        try {
-          const stat = await fs.promises.stat(path.resolve(repoPath, filePath), { bigint: true });
-          return `${filePath}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0${stat.mode}`;
-        } catch {
-          return `${filePath}\0missing`;
-        }
-      }));
+      const entries = await Promise.all(
+        batch.map(async (filePath) => {
+          try {
+            const stat = await fs.promises.stat(path.resolve(repoPath, filePath), { bigint: true });
+            return `${filePath}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0${stat.mode}`;
+          } catch {
+            return `${filePath}\0missing`;
+          }
+        }),
+      );
       for (const entry of entries) hash.update(entry).update('\0');
     }
     return hash.digest('hex');

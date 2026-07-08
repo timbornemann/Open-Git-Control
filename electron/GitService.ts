@@ -10,13 +10,7 @@ import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource 
 export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
 export type { RepositoryFileDataUrl, RepositoryFileSource };
-const statusPorcelainArgs = (): string[] => [
-  '-c',
-  'core.quotepath=false',
-  'status',
-  '--porcelain=v1',
-  '--untracked-files=all',
-];
+const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'];
 
 export class GitService {
   private repoPath: string | null = null;
@@ -26,14 +20,9 @@ export class GitService {
   private readonly historyService: HistoryService;
   private readonly repositoryFiles: RepositoryFiles;
 
-  constructor(
-    execFileAsyncRunner: ExecFileAsyncRunner = defaultExecFileAsyncRunner,
-    scheduler: GitScheduler = new GitScheduler(),
-  ) {
+  constructor(execFileAsyncRunner: ExecFileAsyncRunner = defaultExecFileAsyncRunner, scheduler: GitScheduler = new GitScheduler()) {
     this.gitRunner = new GitRunner(execFileAsyncRunner, scheduler);
-    this.commitService = new CommitService(
-      (repoPath, args, envOverrides) => this.gitRunner.run(repoPath, args, { envOverrides }),
-    );
+    this.commitService = new CommitService((repoPath, args, envOverrides) => this.gitRunner.run(repoPath, args, { envOverrides }));
     this.historyService = new HistoryService(
       (args) => this.runCommand(args),
       (repoPath, args, signal) => this.runCommandAtPathWithSignal(repoPath, args, signal),
@@ -118,7 +107,9 @@ export class GitService {
 
   private shouldSuppressBareWorkTreeCommand(args: string[]): boolean {
     const commandArgs = args[0] === '-c' ? args.slice(2) : args;
-    const primary = String(commandArgs?.[0] || '').trim().toLowerCase();
+    const primary = String(commandArgs?.[0] || '')
+      .trim()
+      .toLowerCase();
     if (!primary) return false;
 
     if (primary === 'status') {
@@ -126,11 +117,18 @@ export class GitService {
     }
 
     if (primary === 'diff') {
-      return commandArgs.some((arg) => String(arg || '').trim().toLowerCase() === '--numstat');
+      return commandArgs.some(
+        (arg) =>
+          String(arg || '')
+            .trim()
+            .toLowerCase() === '--numstat',
+      );
     }
 
     if (primary === 'submodule') {
-      const secondary = String(commandArgs?.[1] || '').trim().toLowerCase();
+      const secondary = String(commandArgs?.[1] || '')
+        .trim()
+        .toLowerCase();
       return secondary === 'status';
     }
 
@@ -169,11 +167,7 @@ export class GitService {
     return this.gitRunner.run(normalizedPath, args);
   }
 
-  async runPollingCommandAtPath(
-    repoPath: string,
-    args: string[],
-    coalesceKey?: string,
-  ): Promise<string> {
+  async runPollingCommandAtPath(repoPath: string, args: string[], coalesceKey?: string): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
@@ -252,19 +246,11 @@ export class GitService {
     return this.repositoryFiles.readRepoFile(relativePath);
   }
 
-  async readRepositoryFileTextAtSource(
-    source: RepositoryFileSource,
-    relativePath: string,
-    commitHash?: string,
-  ): Promise<string> {
+  async readRepositoryFileTextAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
     return this.repositoryFiles.readRepositoryFileTextAtSource(source, relativePath, commitHash);
   }
 
-  async readRepositoryImageDataUrlAtSource(
-    source: RepositoryFileSource,
-    relativePath: string,
-    commitHash?: string,
-  ): Promise<RepositoryFileDataUrl> {
+  async readRepositoryImageDataUrlAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<RepositoryFileDataUrl> {
     return this.repositoryFiles.readRepositoryImageDataUrlAtSource(source, relativePath, commitHash);
   }
 
@@ -324,11 +310,7 @@ export class GitService {
       throw new Error('Base commit hash is required for interactive rebase.');
     }
 
-    const normalizedLines = Array.isArray(todoLines)
-      ? todoLines
-        .map((line) => String(line || '').trim())
-        .filter(Boolean)
-      : [];
+    const normalizedLines = Array.isArray(todoLines) ? todoLines.map((line) => String(line || '').trim()).filter(Boolean) : [];
 
     if (normalizedLines.length === 0) {
       throw new Error('At least one rebase todo line is required.');
@@ -339,8 +321,8 @@ export class GitService {
     const helperPath = path.join(tempDir, 'editor.js');
     const helperScript = [
       "const fs = require('fs');",
-      "const target = process.argv[2];",
-      "if (!target) process.exit(1);",
+      'const target = process.argv[2];',
+      'if (!target) process.exit(1);',
       "const raw = process.env.OGC_REBASE_TODO_B64 || '';",
       "const content = Buffer.from(raw, 'base64').toString('utf8');",
       "fs.writeFileSync(target, content, 'utf8');",
@@ -503,12 +485,7 @@ export class GitService {
     return this.historyService.getFileBlame(filePath, commitHash);
   }
 
-  async getFileBlameRange(
-    filePath: string,
-    commitHash: string | undefined,
-    startLine: number,
-    lineCount: number,
-  ): Promise<string> {
+  async getFileBlameRange(filePath: string, commitHash: string | undefined, startLine: number, lineCount: number): Promise<string> {
     return this.historyService.getFileBlameRange(filePath, commitHash, startLine, lineCount);
   }
 
@@ -528,28 +505,17 @@ export class GitService {
     return this.commitService.unstagePathsAtPath(repoPath, paths);
   }
 
-  async getDiffPreview(
-    args: string[],
-    limits: { maxBytes?: number; maxLines?: number } = {},
-  ): Promise<DiffPreviewResult> {
+  async getDiffPreview(args: string[], limits: { maxBytes?: number; maxLines?: number } = {}): Promise<DiffPreviewResult> {
     const repoPath = this.ensureRepoPath();
     return this.gitRunner.getDiffPreview(repoPath, args, limits);
   }
 
-  async streamCommandLines(
-    args: string[],
-    onLine: (line: string) => void,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  async streamCommandLines(args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<void> {
     const repoPath = this.ensureRepoPath();
     await this.gitRunner.streamLines(repoPath, args, onLine, signal);
   }
 
-  async streamCommandOutput(
-    args: string[],
-    onLine: (line: string) => void,
-    signal?: AbortSignal,
-  ): Promise<string> {
+  async streamCommandOutput(args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<string> {
     const repoPath = this.ensureRepoPath();
     return this.gitRunner.streamOutput(repoPath, args, onLine, signal);
   }
@@ -591,9 +557,7 @@ export class GitService {
       throw new Error(`Clone target is not a directory: ${resolvedTargetDir}`);
     }
 
-    const repoName = targetName
-      ? this.sanitizeCloneTargetName(targetName)
-      : this.deriveCloneRepoName(cloneSource);
+    const repoName = targetName ? this.sanitizeCloneTargetName(targetName) : this.deriveCloneRepoName(cloneSource);
     const repoPath = path.resolve(resolvedTargetDir, repoName);
     const relative = path.relative(resolvedTargetDir, repoPath);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {

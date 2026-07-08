@@ -1,8 +1,8 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
-import { gitClient } from '../../../services/gitClient';
-import { plannerClient } from '../../../services/plannerClient';
-import type { ConfirmDialogState } from '../layoutTypes';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
+import { plannerClient } from '@/services/plannerClient';
+import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -15,14 +15,7 @@ type Params = {
   language: AppLanguage;
 };
 
-export const useRepoUnavailableWorkflow = ({
-  activeRepo,
-  handleCloseRepo,
-  setPlannerRefreshSignal,
-  setConfirmDialog,
-  setGitActionToast,
-  language,
-}: Params) => {
+export const useRepoUnavailableWorkflow = ({ activeRepo, handleCloseRepo, setPlannerRefreshSignal, setConfirmDialog, setGitActionToast, language }: Params) => {
   const handlingRef = useRef<string | null>(null);
   const tr = (deText: string, enText: string) => trByLanguage(language, deText, enText);
   const t = (key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables);
@@ -69,18 +62,15 @@ export const useRepoUnavailableWorkflow = ({
             setGitActionToast({
               msg: plannerCleanupError
                 ? tr(
-                  `Repository entfernt, aber Planungsdaten konnten nicht geloescht werden: ${plannerCleanupError}`,
-                  `Repository was removed, but planning data could not be deleted: ${plannerCleanupError}`,
-                )
+                    `Repository entfernt, aber Planungsdaten konnten nicht geloescht werden: ${plannerCleanupError}`,
+                    `Repository was removed, but planning data could not be deleted: ${plannerCleanupError}`,
+                  )
                 : deletedPlanningItems > 0
                   ? tr(
-                    `Repository und ${deletedPlanningItems} Planungseintrag${deletedPlanningItems === 1 ? '' : 'e'} entfernt: ${repoName}`,
-                    `Repository and ${deletedPlanningItems} planning item${deletedPlanningItems === 1 ? '' : 's'} removed: ${repoName}`,
-                  )
-                  : tr(
-                    `Repository nicht mehr verfuegbar und entfernt: ${repoName}`,
-                    `Repository is no longer available and was removed: ${repoName}`,
-                  ),
+                      `Repository und ${deletedPlanningItems} Planungseintrag${deletedPlanningItems === 1 ? '' : 'e'} entfernt: ${repoName}`,
+                      `Repository and ${deletedPlanningItems} planning item${deletedPlanningItems === 1 ? '' : 's'} removed: ${repoName}`,
+                    )
+                  : tr(`Repository nicht mehr verfuegbar und entfernt: ${repoName}`, `Repository is no longer available and was removed: ${repoName}`),
               isError: Boolean(plannerCleanupError),
             });
           } finally {

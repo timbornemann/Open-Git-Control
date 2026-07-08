@@ -1,13 +1,13 @@
 import React from 'react';
 import { Github } from 'lucide-react';
-import { AppSidebarProps } from './AppSidebar.types';
-import { BranchPanel } from '../../sidebar/BranchPanel';
-import { TagPanel } from '../../sidebar/TagPanel';
-import { RemotePanel } from '../../sidebar/RemotePanel';
-import { SubmodulePanel } from '../../sidebar/SubmodulePanel';
-import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from '../../sidebar/RepoCard';
+import type { AppSidebarProps } from './AppSidebar.types';
+import { BranchPanel } from '@/components/sidebar/BranchPanel';
+import { TagPanel } from '@/components/sidebar/TagPanel';
+import { RemotePanel } from '@/components/sidebar/RemotePanel';
+import { SubmodulePanel } from '@/components/sidebar/SubmodulePanel';
+import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from '@/components/sidebar/RepoCard';
 import { RepoGithubActionsContent } from './RepoGithubActionsContent';
-import { useI18n } from '../../../i18n';
+import { useI18n } from '@/i18n';
 
 type RepoSidebarContentProps = Pick<
   AppSidebarProps,
@@ -125,8 +125,12 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
     <div className="repo-cockpit">
       <div className="repo-cockpit-header">
         <div className="repo-cockpit-kicker">{t('generated.components.layout.sidebar.reposidebarcontent.repository_workspace_4af6930f')}</div>
-        <div className="repo-cockpit-title" title={repoName}>{repoName}</div>
-        <div className="repo-cockpit-path" title={props.activeRepo}>{props.activeRepo}</div>
+        <div className="repo-cockpit-title" title={repoName}>
+          {repoName}
+        </div>
+        <div className="repo-cockpit-path" title={props.activeRepo}>
+          {props.activeRepo}
+        </div>
       </div>
 
       <RemotePanel
@@ -174,68 +178,78 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
       />
 
       {shouldShowGithubConnect && (
-          <RepoCard>
-            <RepoCardHeader title={t('generated.components.layout.sidebar.reposidebarcontent.github_connection_461ea598')} />
-            <RepoCardContent className="repo-form-stack">
-              <RepoCardStatus
-                variant="warning"
-                title={props.hasRemoteOrigin === false
+        <RepoCard>
+          <RepoCardHeader title={t('generated.components.layout.sidebar.reposidebarcontent.github_connection_461ea598')} />
+          <RepoCardContent className="repo-form-stack">
+            <RepoCardStatus
+              variant="warning"
+              title={
+                props.hasRemoteOrigin === false
                   ? t('generated.components.layout.sidebar.reposidebarcontent.not_connected_to_github_yet_9a7afeaa')
-                  : t('generated.components.layout.sidebar.reposidebarcontent.remote_is_no_longer_valid_6ffdf83b')}
-                detail={props.hasRemoteOrigin === false
+                  : t('generated.components.layout.sidebar.reposidebarcontent.remote_is_no_longer_valid_6ffdf83b')
+              }
+              detail={
+                props.hasRemoteOrigin === false
                   ? t('generated.components.layout.sidebar.reposidebarcontent.create_a_github_repository_and_connect_it_as_origin_83d10e69')
-                  : t('generated.components.layout.sidebar.reposidebarcontent.please_create_a_new_github_repository_origin_will_be_rep_882432c5')}
-              />
-              <div className="repo-form-stack">
+                  : t('generated.components.layout.sidebar.reposidebarcontent.please_create_a_new_github_repository_origin_will_be_rep_882432c5')
+              }
+            />
+            <div className="repo-form-stack">
               <input
                 className="repo-filter-input"
                 type="text"
                 placeholder={t('generated.components.layout.sidebar.reposidebarcontent.repository_name_on_github_9ca29e86')}
                 value={props.newRepoName}
-                onChange={e => props.setNewRepoName(e.target.value)}
+                onChange={(e) => props.setNewRepoName(e.target.value)}
               />
               <textarea
                 className="repo-filter-input"
                 placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.description_optional_30003d39')}
                 value={props.newRepoDescription}
-                onChange={e => props.setNewRepoDescription(e.target.value)}
+                onChange={(e) => props.setNewRepoDescription(e.target.value)}
                 rows={2}
                 style={{ resize: 'vertical' }}
               />
               <div className="repo-check-row">
                 <label>
-                  <input type="checkbox" checked={props.newRepoPrivate} onChange={e => props.setNewRepoPrivate(e.target.checked)} />
+                  <input type="checkbox" checked={props.newRepoPrivate} onChange={(e) => props.setNewRepoPrivate(e.target.checked)} />
                   {t('generated.components.layout.sidebar.reposidebarcontent.private_d6902471')}
                 </label>
               </div>
+            </div>
+            {props.connectError && (
+              <div className="repo-state-text" style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
+                {props.connectError}
               </div>
-              {props.connectError && <div className="repo-state-text" style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>{props.connectError}</div>}
-              <button
-                className="staging-tool-btn"
-                onClick={props.onCreateGithubRepoForCurrent}
-                disabled={props.isConnectingGithubRepo}
-                style={{
-                  padding: '6px 10px',
-                  backgroundColor: !props.isConnectingGithubRepo ? 'var(--accent-primary)' : 'var(--bg-dark)',
-                  color: !props.isConnectingGithubRepo ? 'var(--on-accent)' : 'var(--text-secondary)',
-                  borderColor: !props.isConnectingGithubRepo ? 'var(--accent-primary)' : 'var(--border-color)',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                }}
-              >
-                <Github size={14} />
-                {props.isConnectingGithubRepo ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1') : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
-              </button>
+            )}
+            <button
+              className="staging-tool-btn"
+              onClick={props.onCreateGithubRepoForCurrent}
+              disabled={props.isConnectingGithubRepo}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: !props.isConnectingGithubRepo ? 'var(--accent-primary)' : 'var(--bg-dark)',
+                color: !props.isConnectingGithubRepo ? 'var(--on-accent)' : 'var(--text-secondary)',
+                borderColor: !props.isConnectingGithubRepo ? 'var(--accent-primary)' : 'var(--border-color)',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <Github size={14} />
+              {props.isConnectingGithubRepo
+                ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1')
+                : t('generated.components.layout.sidebar.reposidebarcontent.create_connect_github_repo_68e77480')}
+            </button>
             {!props.isAuthenticated && (
               <div className="repo-state-text" style={{ fontSize: '0.78rem' }}>
                 {t('generated.components.layout.sidebar.reposidebarcontent.note_please_sign_in_first_in_the_github_tab_a84a54c9')}
               </div>
             )}
-            </RepoCardContent>
-          </RepoCard>
+          </RepoCardContent>
+        </RepoCard>
       )}
 
       {!props.isAuthenticated && (
@@ -254,9 +268,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         </RepoCard>
       )}
 
-      {props.isAuthenticated && (
-        <RepoGithubActionsContent {...props} />
-      )}
+      {props.isAuthenticated && <RepoGithubActionsContent {...props} />}
     </div>
   );
 };

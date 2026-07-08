@@ -72,7 +72,10 @@ export function parseGitLog(logOutput: string): GitCommit[] {
       const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(token);
       const parentHashes = parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [];
       const refs = refsRaw
-        ? refsRaw.split(LOG_REF_SEPARATOR).map(ref => ref.trim()).filter(Boolean)
+        ? refsRaw
+            .split(LOG_REF_SEPARATOR)
+            .map((ref) => ref.trim())
+            .filter(Boolean)
         : [];
 
       current = {
@@ -122,8 +125,8 @@ export interface FileEntry {
 }
 
 export interface GitStatusDetailed {
-  staged: FileEntry[];    // files with changes in the index (x !== ' ' && x !== '?')
-  unstaged: FileEntry[];  // files with changes in the working tree (y !== ' ' && y !== '?')
+  staged: FileEntry[]; // files with changes in the index (x !== ' ' && x !== '?')
+  unstaged: FileEntry[]; // files with changes in the working tree (y !== ' ' && y !== '?')
   untracked: FileEntry[]; // files that are '??'
 }
 
@@ -167,11 +170,7 @@ function decodePorcelainPathToken(rawToken: string): string {
     if (/[0-7]/.test(next)) {
       let octal = next;
       let consumedDigits = 1;
-      while (
-        consumedDigits < 3
-        && i + 1 + consumedDigits < escaped.length
-        && /[0-7]/.test(escaped[i + 1 + consumedDigits])
-      ) {
+      while (consumedDigits < 3 && i + 1 + consumedDigits < escaped.length && /[0-7]/.test(escaped[i + 1 + consumedDigits])) {
         octal += escaped[i + 1 + consumedDigits];
         consumedDigits += 1;
       }
@@ -284,8 +283,7 @@ export function countChangedEntriesFromPorcelainV2(statusOutput: string): number
   return statusOutput
     .split('\n')
     .map((line) => line.replace(/\r$/, '').trim())
-    .filter((line) => line.length > 0 && !line.startsWith('#'))
-    .length;
+    .filter((line) => line.length > 0 && !line.startsWith('#')).length;
 }
 
 export function parseGitStatusDetailed(statusOutput: string): GitStatusDetailed {
@@ -326,10 +324,15 @@ export function parseGitStatus(statusOutput: string): GitStatus {
     const xy = line.substring(0, 2);
     const file = parsePorcelainPath(line);
     if (!file) continue;
-    if (xy === '??') { result.untracked.push(file); }
-    else if (xy[0] === 'A' || xy[0] === 'M' || xy[0] === 'D' || xy[0] === 'R' || xy[0] === 'C') { result.staged.push(file); }
-    else if (xy[1] === 'M') { result.modified.push(file); }
-    else if (xy[1] === 'D') { result.deleted.push(file); }
+    if (xy === '??') {
+      result.untracked.push(file);
+    } else if (xy[0] === 'A' || xy[0] === 'M' || xy[0] === 'D' || xy[0] === 'R' || xy[0] === 'C') {
+      result.staged.push(file);
+    } else if (xy[1] === 'M') {
+      result.modified.push(file);
+    } else if (xy[1] === 'D') {
+      result.deleted.push(file);
+    }
   }
   return result;
 }
@@ -353,14 +356,13 @@ export function parseCommitDetails(showOutput: string): CommitFileDetail[] {
     if (match) {
       files.push({
         status: match[1],
-        path: match[2]
+        path: match[2],
       });
     }
   }
 
   return files;
 }
-
 
 export interface GitSubmoduleStatusEntry {
   path: string;
@@ -387,15 +389,7 @@ export function parseGitSubmoduleStatus(statusOutput: string): GitSubmoduleStatu
       const submodulePath = (summaryMatch?.[1] || pathAndSummary).trim();
       if (!submodulePath) return null;
 
-      const stateCode = flag === ' '
-        ? 'clean'
-        : flag === '-'
-          ? 'uninitialized'
-          : flag === '+'
-            ? 'dirty'
-            : flag === 'U'
-              ? 'conflicted'
-              : 'unknown';
+      const stateCode = flag === ' ' ? 'clean' : flag === '-' ? 'uninitialized' : flag === '+' ? 'dirty' : flag === 'U' ? 'conflicted' : 'unknown';
 
       return {
         path: submodulePath,
@@ -408,8 +402,7 @@ export function parseGitSubmoduleStatus(statusOutput: string): GitSubmoduleStatu
     .filter((entry): entry is GitSubmoduleStatusEntry => entry !== null);
 }
 
-
-import type { GitReflogEntryDto } from '../types/git';
+import type { GitReflogEntryDto } from '@/types/git';
 
 export function parseGitReflog(reflogOutput: string): GitReflogEntryDto[] {
   if (!reflogOutput) return [];
@@ -450,7 +443,9 @@ export type ParsedRemoteBranchRef = {
  * into a merge/checkout-safe remote ref (`origin/feature/x`) and local branch name (`feature/x`).
  */
 export function parseRemoteBranchRef(branchName: string): ParsedRemoteBranchRef | null {
-  const normalized = String(branchName || '').trim().replace(/^remotes\//, '');
+  const normalized = String(branchName || '')
+    .trim()
+    .replace(/^remotes\//, '');
   if (!normalized) return null;
 
   const firstSlash = normalized.indexOf('/');
@@ -527,8 +522,7 @@ export function parseFirstConflictPathFromPorcelain(statusOutput: string): strin
  */
 export function parseFirstConflictPathFromGitError(errorText: string | null | undefined): string | null {
   if (!errorText) return null;
-  const m = errorText.match(/Merge conflict in\s+([^\r\n]+?)(?:\s*Automatic|\s*Git Output:|$)/i)
-    ?? errorText.match(/Merge conflict in\s+([^\r\n]+)/i);
+  const m = errorText.match(/Merge conflict in\s+([^\r\n]+?)(?:\s*Automatic|\s*Git Output:|$)/i) ?? errorText.match(/Merge conflict in\s+([^\r\n]+)/i);
   if (!m) return null;
   return m[1].trim().replace(/\s+$/, '');
 }
@@ -546,10 +540,7 @@ export function isRepoUnavailableError(errorText: string | null | undefined): bo
 }
 
 /** Prefer porcelain; if missing, parse from error message (merge/cherry-pick/rebase failures). */
-export function resolveConflictPathAfterGitFailure(
-  porcelainData: string | null | undefined,
-  errorText: string | null | undefined,
-): string | null {
+export function resolveConflictPathAfterGitFailure(porcelainData: string | null | undefined, errorText: string | null | undefined): string | null {
   const fromPorcelain = porcelainData ? parseFirstConflictPathFromPorcelain(porcelainData) : null;
   if (fromPorcelain) return fromPorcelain;
   return parseFirstConflictPathFromGitError(errorText);

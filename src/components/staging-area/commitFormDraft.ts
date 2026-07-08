@@ -1,4 +1,4 @@
-import { normalizeRepoPathKey } from '../../utils/repoPath';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export type CommitFormDraft = {
   commitMsg: string;
@@ -7,19 +7,14 @@ export type CommitFormDraft = {
 
 const commitFormDraftsByRepo = new Map<string, CommitFormDraft>();
 
-const getRepoDraftKey = (repoPath: string | null): string => (
-  repoPath ? normalizeRepoPathKey(repoPath) : ''
-);
+const getRepoDraftKey = (repoPath: string | null): string => (repoPath ? normalizeRepoPathKey(repoPath) : '');
 
 const createDefaultDraft = (commitTemplate: string): CommitFormDraft => ({
   commitMsg: commitTemplate || '',
   commitDescription: '',
 });
 
-export const getCommitFormDraft = (
-  repoPath: string | null,
-  commitTemplate: string,
-): CommitFormDraft => {
+export const getCommitFormDraft = (repoPath: string | null, commitTemplate: string): CommitFormDraft => {
   const key = getRepoDraftKey(repoPath);
   if (!key) return createDefaultDraft(commitTemplate);
 
@@ -31,26 +26,16 @@ export const getCommitFormDraft = (
   return draft;
 };
 
-export const updateCommitFormDraft = (
-  repoPath: string | null,
-  patch: Partial<CommitFormDraft>,
-  commitTemplate = '',
-): CommitFormDraft => {
+export const updateCommitFormDraft = (repoPath: string | null, patch: Partial<CommitFormDraft>, commitTemplate = ''): CommitFormDraft => {
   const key = getRepoDraftKey(repoPath);
-  const current = key
-    ? commitFormDraftsByRepo.get(key) || createDefaultDraft(commitTemplate)
-    : createDefaultDraft(commitTemplate);
+  const current = key ? commitFormDraftsByRepo.get(key) || createDefaultDraft(commitTemplate) : createDefaultDraft(commitTemplate);
   const next = { ...current, ...patch };
   if (key) commitFormDraftsByRepo.set(key, next);
   return next;
 };
 
-export const resetCommitFormDraft = (
-  repoPath: string | null,
-  commitTemplate: string,
-): CommitFormDraft => (
-  updateCommitFormDraft(repoPath, createDefaultDraft(commitTemplate), commitTemplate)
-);
+export const resetCommitFormDraft = (repoPath: string | null, commitTemplate: string): CommitFormDraft =>
+  updateCommitFormDraft(repoPath, createDefaultDraft(commitTemplate), commitTemplate);
 
 export const clearCommitFormDraftsForTests = () => {
   commitFormDraftsByRepo.clear();

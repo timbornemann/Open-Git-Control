@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useI18n } from '../../i18n';
+import { useI18n } from '@/i18n';
 import type { InputDialogState } from './types';
 import type { useAiCommit } from './useAiCommit';
 import type { useCommitForm } from './useCommitForm';
@@ -10,11 +10,7 @@ type UseAiCommitMessageDialogParams = {
   setInputDialog: (dialog: InputDialogState | null) => void;
 };
 
-export const useAiCommitMessageDialog = ({
-  aiCommit,
-  commitForm,
-  setInputDialog,
-}: UseAiCommitMessageDialogParams) => {
+export const useAiCommitMessageDialog = ({ aiCommit, commitForm, setInputDialog }: UseAiCommitMessageDialogParams) => {
   const { t, tr } = useI18n();
 
   return useCallback(() => {

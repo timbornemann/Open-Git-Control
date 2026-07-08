@@ -54,11 +54,7 @@ export class RepositoryFiles {
     return fs.readFileSync(resolvedPath, 'utf8');
   }
 
-  async readRepositoryFileTextAtSource(
-    source: RepositoryFileSource,
-    relativePath: string,
-    commitHash?: string,
-  ): Promise<string> {
+  async readRepositoryFileTextAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     if (source === 'unstaged') {
       return this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES).toString('utf8');
@@ -68,19 +64,13 @@ export class RepositoryFiles {
     return (await this.readGitFileBuffer(revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).toString('utf8');
   }
 
-  async readRepositoryImageDataUrlAtSource(
-    source: RepositoryFileSource,
-    relativePath: string,
-    commitHash?: string,
-  ): Promise<RepositoryFileDataUrl> {
+  async readRepositoryImageDataUrlAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<RepositoryFileDataUrl> {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     const mimeType = this.getImageMimeType(normalizedRelativePath);
-    const buffer = source === 'unstaged'
-      ? this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
-      : await this.readGitFileBuffer(
-        this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash),
-        MAX_MARKDOWN_PREVIEW_ASSET_BYTES,
-      );
+    const buffer =
+      source === 'unstaged'
+        ? this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
+        : await this.readGitFileBuffer(this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash), MAX_MARKDOWN_PREVIEW_ASSET_BYTES);
 
     return {
       dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
@@ -124,12 +114,12 @@ export class RepositoryFiles {
     const normalizedForCheck = rawPath.replace(/\\/g, '/');
     const segments = normalizedForCheck.split('/');
     if (
-      path.isAbsolute(rawPath)
-      || path.win32.isAbsolute(rawPath)
-      || normalizedForCheck.startsWith('/')
-      || normalizedForCheck.startsWith(':(')
-      || segments.includes('..')
-      || /[\0\r\n]/.test(rawPath)
+      path.isAbsolute(rawPath) ||
+      path.win32.isAbsolute(rawPath) ||
+      normalizedForCheck.startsWith('/') ||
+      normalizedForCheck.startsWith(':(') ||
+      segments.includes('..') ||
+      /[\0\r\n]/.test(rawPath)
     ) {
       throw new Error('File path must be repository-relative.');
     }

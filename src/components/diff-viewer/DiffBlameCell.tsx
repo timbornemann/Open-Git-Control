@@ -1,6 +1,6 @@
-import type { GitFileBlameLineDto } from '../../types/git';
-import type { ParsedLine } from '../../utils/diffParser';
-import { useI18n } from '../../i18n';
+import type { GitFileBlameLineDto } from '@/types/git';
+import type { ParsedLine } from '@/utils/diffParser';
+import { useI18n } from '@/i18n';
 import { formatBlameDate } from './diffViewerLabels';
 
 type DiffBlameCellProps = {
@@ -13,15 +13,7 @@ type DiffBlameCellProps = {
   onNavigateToCommit?: (hash: string) => void;
 };
 
-export const DiffBlameCell: React.FC<DiffBlameCellProps> = ({
-  line,
-  prevLine,
-  side = 'right',
-  showBlame,
-  isBlameLoading,
-  blameMap,
-  onNavigateToCommit,
-}) => {
+export const DiffBlameCell: React.FC<DiffBlameCellProps> = ({ line, prevLine, side = 'right', showBlame, isBlameLoading, blameMap, onNavigateToCommit }) => {
   const { t, tr } = useI18n();
 
   if (!showBlame) return null;
@@ -32,11 +24,7 @@ export const DiffBlameCell: React.FC<DiffBlameCellProps> = ({
 
   const blame = blameMap.get(line.rightNo);
   if (!blame) {
-    return (
-      <div className="diff-blame-cell empty">
-        {isBlameLoading && <span className="spinner-mini" />}
-      </div>
-    );
+    return <div className="diff-blame-cell empty">{isBlameLoading && <span className="spinner-mini" />}</div>;
   }
 
   const isUncommitted = blame.commitHash.startsWith('00000000');

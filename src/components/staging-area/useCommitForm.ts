@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettingsDto } from '../../global';
-import type { ToastMessage } from '../../types/git';
-import { useI18n } from '../../i18n';
-import { gitClient } from '../../services/gitClient';
+import type { AppSettingsDto } from '@/global';
+import type { ToastMessage } from '@/types/git';
+import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
-import {
-  getCommitFormDraft,
-  resetCommitFormDraft,
-  updateCommitFormDraft,
-} from './commitFormDraft';
+import { getCommitFormDraft, resetCommitFormDraft, updateCommitFormDraft } from './commitFormDraft';
 
 type Params = {
   repoPath: string | null;
@@ -22,26 +18,28 @@ type Params = {
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings }: Params) => {
   const { t, tr } = useI18n();
-  const [commitMsg, setCommitMsgState] = useState(() => (
-    getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg
-  ));
-  const [commitDescription, setCommitDescriptionState] = useState(() => (
-    getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription
-  ));
+  const [commitMsg, setCommitMsgState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg);
+  const [commitDescription, setCommitDescriptionState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription);
   const [amendCommit, setAmendCommit] = useState(false);
   const [signoffCommit, setSignoffCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const isCommittingRef = useRef(false);
 
-  const setCommitMsg = useCallback((value: string) => {
-    setCommitMsgState(value);
-    updateCommitFormDraft(repoPath, { commitMsg: value }, settings.commitTemplate);
-  }, [repoPath, settings.commitTemplate]);
+  const setCommitMsg = useCallback(
+    (value: string) => {
+      setCommitMsgState(value);
+      updateCommitFormDraft(repoPath, { commitMsg: value }, settings.commitTemplate);
+    },
+    [repoPath, settings.commitTemplate],
+  );
 
-  const setCommitDescription = useCallback((value: string) => {
-    setCommitDescriptionState(value);
-    updateCommitFormDraft(repoPath, { commitDescription: value }, settings.commitTemplate);
-  }, [repoPath, settings.commitTemplate]);
+  const setCommitDescription = useCallback(
+    (value: string) => {
+      setCommitDescriptionState(value);
+      updateCommitFormDraft(repoPath, { commitDescription: value }, settings.commitTemplate);
+    },
+    [repoPath, settings.commitTemplate],
+  );
 
   useEffect(() => {
     const draft = getCommitFormDraft(repoPath, settings.commitTemplate);
@@ -115,13 +113,30 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       isCommittingRef.current = false;
       setIsCommitting(false);
     }
-  }, [repoPath, commitMsg, commitDescription, amendCommit, signoffCommit, status, settings.commitTemplate, setToast, refresh, onRepoChanged, onCommitsCreated, tr]);
+  }, [
+    repoPath,
+    commitMsg,
+    commitDescription,
+    amendCommit,
+    signoffCommit,
+    status,
+    settings.commitTemplate,
+    setToast,
+    refresh,
+    onRepoChanged,
+    onCommitsCreated,
+    tr,
+  ]);
 
   return {
-    commitMsg, setCommitMsg,
-    commitDescription, setCommitDescription,
-    amendCommit, setAmendCommit,
-    signoffCommit, setSignoffCommit,
+    commitMsg,
+    setCommitMsg,
+    commitDescription,
+    setCommitDescription,
+    amendCommit,
+    setAmendCommit,
+    signoffCommit,
+    setSignoffCommit,
     isCommitting,
     handleCommit,
   };

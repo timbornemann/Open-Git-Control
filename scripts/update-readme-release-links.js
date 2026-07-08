@@ -8,10 +8,7 @@ const PRODUCT_NAME = 'Open-Git-Control';
 const GITHUB_RELEASES_URL = `https://github.com/${REPOSITORY}/releases`;
 const GITHUB_LATEST_RELEASE_URL = `${GITHUB_RELEASES_URL}/latest`;
 
-const getLatestReleaseApiUrl = () => (
-  process.env.OPEN_GIT_CONTROL_LATEST_RELEASE_API
-  || `https://api.github.com/repos/${REPOSITORY}/releases/latest`
-);
+const getLatestReleaseApiUrl = () => process.env.OPEN_GIT_CONTROL_LATEST_RELEASE_API || `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
 
 const formatDate = (value) => {
   if (!value) return '';
@@ -101,9 +98,7 @@ const getDownloadRows = (release) => {
 const buildEnglishDownloadsSection = (release, rows) => {
   const published = formatDate(release.published_at);
   const releaseLine = `Current latest release: [${release.tag_name}](${release.html_url})${published ? `, published ${published}` : ''}.`;
-  const tableRows = rows
-    .map((row) => `| ${row.platformEn} | ${row.packageEn} | [${row.asset.name}](${row.asset.url}) |`)
-    .join('\n');
+  const tableRows = rows.map((row) => `| ${row.platformEn} | ${row.packageEn} | [${row.asset.name}](${row.asset.url}) |`).join('\n');
 
   return `## Downloads
 
@@ -126,9 +121,7 @@ The \`latest*.yml\` and \`.blockmap\` files in GitHub Releases are update metada
 const buildGermanDownloadsSection = (release, rows) => {
   const published = formatDate(release.published_at);
   const releaseLine = `Aktuell neuestes Release: [${release.tag_name}](${release.html_url})${published ? `, veroeffentlicht am ${published}` : ''}.`;
-  const tableRows = rows
-    .map((row) => `| ${row.platformDe} | ${row.packageDe} | [${row.asset.name}](${row.asset.url}) |`)
-    .join('\n');
+  const tableRows = rows.map((row) => `| ${row.platformDe} | ${row.packageDe} | [${row.asset.name}](${row.asset.url}) |`).join('\n');
 
   return `## Downloads
 
@@ -176,18 +169,8 @@ const main = async () => {
   const rootDir = path.resolve(__dirname, '..');
 
   const changed = [
-    updateFile(
-      path.join(rootDir, 'README.md'),
-      '## Downloads',
-      '## Requirements',
-      buildEnglishDownloadsSection(release, rows),
-    ),
-    updateFile(
-      path.join(rootDir, 'README.de.md'),
-      '## Downloads',
-      '## Voraussetzungen',
-      buildGermanDownloadsSection(release, rows),
-    ),
+    updateFile(path.join(rootDir, 'README.md'), '## Downloads', '## Requirements', buildEnglishDownloadsSection(release, rows)),
+    updateFile(path.join(rootDir, 'README.de.md'), '## Downloads', '## Voraussetzungen', buildGermanDownloadsSection(release, rows)),
   ].some(Boolean);
 
   console.log(`${changed ? 'Updated' : 'No changes for'} README release links to ${release.tag_name}.`);

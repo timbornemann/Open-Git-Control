@@ -136,15 +136,9 @@ export class CommitStatsService {
 
     this.sortQueue();
     const lowerPriorityActive = [...this.active.values()]
-      .filter(({ entry }) => (
-        PRIORITY[priority] < PRIORITY[entry.priority]
-        && !requestedKeys.has(entry.key)
-      ))
+      .filter(({ entry }) => PRIORITY[priority] < PRIORITY[entry.priority] && !requestedKeys.has(entry.key))
       .sort((a, b) => PRIORITY[b.entry.priority] - PRIORITY[a.entry.priority])[0];
-    if (
-      lowerPriorityActive
-      && this.active.size >= this.maxConcurrent()
-    ) {
+    if (lowerPriorityActive && this.active.size >= this.maxConcurrent()) {
       lowerPriorityActive.controller.abort();
     }
     this.pumpProcessing();
@@ -193,11 +187,7 @@ export class CommitStatsService {
         if (!line.trim()) continue;
         try {
           const entry = JSON.parse(line) as CacheEntry;
-          if (
-            entry.schema !== CACHE_SCHEMA
-            || !/^[0-9a-f]{7,64}$/i.test(entry.hash)
-            || !entry.stats
-          ) {
+          if (entry.schema !== CACHE_SCHEMA || !/^[0-9a-f]{7,64}$/i.test(entry.hash) || !entry.stats) {
             malformed = true;
             break;
           }
@@ -238,11 +228,7 @@ export class CommitStatsService {
 
     try {
       this.emit({ repoPath: entry.repoPath, hash: entry.hash, stats: null, state: 'loading' });
-      const stats = await this.gitService.getCommitStatsAtPath(
-        entry.repoPath,
-        entry.hash,
-        controller.signal,
-      );
+      const stats = await this.gitService.getCommitStatsAtPath(entry.repoPath, entry.hash, controller.signal);
       const cacheEntry: CacheEntry = {
         schema: CACHE_SCHEMA,
         objectFormat: entry.objectFormat,
@@ -296,9 +282,7 @@ export class CommitStatsService {
 
   private compact(): void {
     const cachePath = this.getCachePath();
-    const retained = [...this.cache.values()]
-      .sort((a, b) => b.accessedAt - a.accessedAt)
-      .slice(0, this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES);
+    const retained = [...this.cache.values()].sort((a, b) => b.accessedAt - a.accessedAt).slice(0, this.limits.compactedEntries ?? COMPACTED_CACHE_ENTRIES);
     const tempPath = `${cachePath}.tmp`;
     const backupPath = `${cachePath}.bak`;
     fs.writeFileSync(tempPath, `${retained.map((entry) => JSON.stringify(entry)).join('\n')}\n`, 'utf8');
@@ -314,9 +298,7 @@ export class CommitStatsService {
       }
       throw error;
     }
-    this.cache = new Map(
-      retained.map((entry) => [this.cacheKey(entry.objectFormat, entry.hash), entry]),
-    );
+    this.cache = new Map(retained.map((entry) => [this.cacheKey(entry.objectFormat, entry.hash), entry]));
   }
 
   private emit(update: CommitStatsUpdate): void {

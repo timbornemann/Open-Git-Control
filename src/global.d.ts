@@ -1,11 +1,5 @@
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from './types/git';
-import type {
-  PlannerItem,
-  PlannerItemInput,
-  PlannerProject,
-  PlannerProjectInput,
-  ProjectPlannerData,
-} from './types/projectPlanner';
+import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from './types/projectPlanner';
 
 export interface StoredRepoEntryDto {
   path: string;
@@ -125,14 +119,7 @@ export interface GitJobEventDto {
   timestamp: number;
 }
 
-export type UpdaterStateDto =
-  | 'idle'
-  | 'checking'
-  | 'update-available'
-  | 'no-update'
-  | 'downloading'
-  | 'downloaded'
-  | 'error';
+export type UpdaterStateDto = 'idle' | 'checking' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
 export interface UpdaterStatusDto {
   isSupported: boolean;
@@ -158,7 +145,18 @@ export interface UpdaterOneClickResultDto {
 export type AiProviderDto = 'ollama' | 'gemini';
 export type AiCommitMessageStyleDto = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguageDto = 'auto' | 'de' | 'en';
-export type AppThemeDto = 'copper-night' | 'midnight-teal' | 'graphite-blue' | 'forest-copper' | 'porcelain-light' | 'ember-slate' | 'arctic-mint' | 'mono-dark-red' | 'mono-light-red' | 'mono-dark-green' | 'mono-light-green';
+export type AppThemeDto =
+  | 'copper-night'
+  | 'midnight-teal'
+  | 'graphite-blue'
+  | 'forest-copper'
+  | 'porcelain-light'
+  | 'ember-slate'
+  | 'arctic-mint'
+  | 'mono-dark-red'
+  | 'mono-light-red'
+  | 'mono-dark-green'
+  | 'mono-light-green';
 export type SecretScanStrictnessDto = 'low' | 'medium' | 'high';
 export type SecretScanSourceDto = 'staged' | 'to-push' | 'tag';
 export type PlanningApiTokenLifetimeDto = 'day' | 'month' | 'year' | 'forever';
@@ -211,8 +209,6 @@ export interface PlanningApiInfoDto {
   authTokenStorageAvailable: boolean;
   error?: string;
 }
-
-
 
 export interface GitHubCreateReleaseParamsDto {
   owner: string;
@@ -267,7 +263,6 @@ export interface PullRequestDto {
   htmlUrl: string;
   draft: boolean;
 }
-
 
 export type CiBadgeStateDto = 'success' | 'failure' | 'pending' | 'neutral' | 'unknown';
 
@@ -489,13 +484,7 @@ export interface ElectronAPI {
   clearRepoPath: () => Promise<boolean>;
   openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
   runGitCommand: (command: GitCommandNameDto, ...args: string[]) => Promise<GitCommandResultDto>;
-  createCommit: (params: {
-    title: string;
-    description?: string;
-    amend?: boolean;
-    signoff?: boolean;
-    allowEmpty?: boolean;
-  }) => Promise<IpcResult<string>>;
+  createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) => Promise<IpcResult<string>>;
   getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (
     hashes: string[],
@@ -506,12 +495,7 @@ export interface ElectronAPI {
   getWorkingTreeStats: (snapshotId: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
   stagePaths: (paths: string[]) => Promise<IpcResult<string>>;
   getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) => Promise<IpcResult<DiffPreviewDto>>;
-  getFileBlameRange: (
-    filePath: string,
-    commitHash: string | undefined,
-    startLine: number,
-    lineCount: number,
-  ) => Promise<IpcResult<GitFileBlameLineDto[]>>;
+  getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onRepoUnavailable: (callback: (payload: { command: string; error: string }) => void) => () => void;
   startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<IpcResult<string>>;
   applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => Promise<IpcResult<string>>;
@@ -530,16 +514,8 @@ export interface ElectronAPI {
   getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   getFileTimelineData: (limit?: number) => Promise<IpcResult<FileTimelineCommitDto[]>>;
   readRepoFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
-  getMarkdownPreviewFile: (params: {
-    source: RepositoryFileSourceDto;
-    path: string;
-    commitHash?: string;
-  }) => Promise<IpcResult<MarkdownPreviewFileDto>>;
-  getRepoFileDataUrl: (params: {
-    source: RepositoryFileSourceDto;
-    path: string;
-    commitHash?: string;
-  }) => Promise<IpcResult<RepoFileDataUrlDto>>;
+  getMarkdownPreviewFile: (params: { source: RepositoryFileSourceDto; path: string; commitHash?: string }) => Promise<IpcResult<MarkdownPreviewFileDto>>;
+  getRepoFileDataUrl: (params: { source: RepositoryFileSourceDto; path: string; commitHash?: string }) => Promise<IpcResult<RepoFileDataUrlDto>>;
   writeRepoFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   openSubmodule: (submodulePath: string) => Promise<{ success: boolean; error?: string }>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
@@ -549,14 +525,9 @@ export interface ElectronAPI {
   plannerGetData: () => Promise<IpcResult<ProjectPlannerData>>;
   plannerEnsureRepositoryProject: (repoPath: string) => Promise<IpcResult<PlannerProject>>;
   plannerCreateProject: (input: PlannerProjectInput) => Promise<IpcResult<PlannerProject>>;
-  plannerUpdateProject: (
-    projectId: string,
-    input: Partial<PlannerProjectInput>,
-  ) => Promise<IpcResult<PlannerProject>>;
+  plannerUpdateProject: (projectId: string, input: Partial<PlannerProjectInput>) => Promise<IpcResult<PlannerProject>>;
   plannerDeleteProject: (projectId: string) => Promise<IpcResult<boolean>>;
-  plannerDeleteRepositoryProjectByPath: (
-    repoPath: string,
-  ) => Promise<IpcResult<{ deletedProjectCount: number; deletedItemCount: number }>>;
+  plannerDeleteRepositoryProjectByPath: (repoPath: string) => Promise<IpcResult<{ deletedProjectCount: number; deletedItemCount: number }>>;
   plannerCreateItem: (projectId: string, input: PlannerItemInput) => Promise<IpcResult<PlannerItem>>;
   plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => Promise<IpcResult<PlannerItem>>;
   plannerDeleteItem: (itemId: string) => Promise<IpcResult<boolean>>;
@@ -599,14 +570,7 @@ export interface ElectronAPI {
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
-  githubCreatePR: (params: {
-    owner: string;
-    repo: string;
-    title: string;
-    body: string;
-    head: string;
-    base: string;
-  }) => Promise<
+  githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) => Promise<
     IpcResult<{
       number: number;
       title: string;
@@ -628,7 +592,13 @@ export interface ElectronAPI {
     hints?: string[];
   }) => Promise<IpcResult<{ markdown: string }>>;
 
-  githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
+  githubGetWorkflowRuns: (params: {
+    owner: string;
+    repo: string;
+    branch?: string;
+    headSha?: string;
+    perPage?: number;
+  }) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
   githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => Promise<IpcResult<GithubStatusChecksDto>>;
   githubMergePR: (params: {
     owner: string;
@@ -648,6 +618,3 @@ declare global {
 }
 
 export {};
-
-
-

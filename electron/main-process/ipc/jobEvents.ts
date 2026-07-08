@@ -1,3 +1,4 @@
+import { IpcChannel } from '../../../src/types/ipcContract';
 export type JobEventStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 
 export type JobEventPayload = {
@@ -11,5 +12,5 @@ export type JobEventPayload = {
 };
 
 export function emitJobEvent(webContents: Electron.WebContents, event: JobEventPayload): void {
-  webContents.send('job:event', event);
+  webContents.send(IpcChannel.JobEvent, event);
 }

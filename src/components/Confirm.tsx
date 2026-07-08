@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { DialogFrame } from './DialogFrame';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 
 export interface DialogContextItem {
   label: string;
@@ -69,7 +69,8 @@ export const Confirm: React.FC<ConfirmProps> = ({
       )}
       <div className="dialog-impact">
         <span>
-          {t('generated.components.confirm.irreversible_6920e2ad')}: <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
+          {t('generated.components.confirm.irreversible_6920e2ad')}:{' '}
+          <strong>{irreversible ? t('generated.components.confirm.yes_f3b8387d') : t('generated.components.confirm.no_52682a7b')}</strong>
         </span>
         {consequences && <span>{consequences}</span>}
       </div>

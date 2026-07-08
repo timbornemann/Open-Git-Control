@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraphHighlightData, findCommitIndexByNavigationTarget } from '..';
-import { computeGraphLayout } from '../../../utils/graphLayout';
-import type { GitCommit } from '../../../utils/gitParsing';
+import { computeGraphLayout } from '@/utils/graphLayout';
+import type { GitCommit } from '@/utils/gitParsing';
 
 function commit(hash: string, parentHashes: string[] = [], refs: string[] = []): GitCommit {
   return {
@@ -43,11 +43,7 @@ describe('buildGraphHighlightData', () => {
     const layout = computeGraphLayout(commits);
     const highlight = buildGraphHighlightData(layout, 'main', undefined, 'feature/demo');
 
-    expect(highlight.currentPathHashes).toEqual(new Set([
-      'feature2',
-      'feature1',
-      'base000',
-    ]));
+    expect(highlight.currentPathHashes).toEqual(new Set(['feature2', 'feature1', 'base000']));
     expect(highlight.selectedPathHashes.size).toBe(0);
   });
 
@@ -56,13 +52,7 @@ describe('buildGraphHighlightData', () => {
     const highlight = buildGraphHighlightData(layout, 'main', 'merge02', null);
 
     expect(highlight.currentPathHashes.size).toBe(0);
-    expect(highlight.selectedPathHashes).toEqual(new Set([
-      'merge02',
-      'main001',
-      'feature2',
-      'feature1',
-      'base000',
-    ]));
+    expect(highlight.selectedPathHashes).toEqual(new Set(['merge02', 'main001', 'feature2', 'feature1', 'base000']));
   });
 
   it('does not expand the selected path when the selected commit is the head commit', () => {
@@ -81,26 +71,22 @@ describe('buildGraphHighlightData', () => {
     const mergeEdge = layout.edges.find((edge) => edge.kind === 'merge' && edge.fromRow === mergeNode?.row);
 
     expect(mergeEdge).toBeDefined();
-    expect(highlight.selectedPathEdgeKeys.has(`${mergeEdge!.fromRow}:${mergeEdge!.fromLane}->${mergeEdge!.toRow}:${mergeEdge!.toLane}:${mergeEdge!.kind}`)).toBe(true);
+    expect(
+      highlight.selectedPathEdgeKeys.has(`${mergeEdge!.fromRow}:${mergeEdge!.fromLane}->${mergeEdge!.toRow}:${mergeEdge!.toLane}:${mergeEdge!.kind}`),
+    ).toBe(true);
   });
 });
 
 describe('findCommitIndexByNavigationTarget', () => {
   it('finds commits by full or unique abbreviated hash', () => {
-    const layout = computeGraphLayout([
-      commit('abcdef1234567890'),
-      commit('1234567890abcdef'),
-    ]);
+    const layout = computeGraphLayout([commit('abcdef1234567890'), commit('1234567890abcdef')]);
 
     expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1234567890')).toBe(0);
     expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1')).toBe(0);
   });
 
   it('does not navigate abbreviated hashes when the target is ambiguous', () => {
-    const layout = computeGraphLayout([
-      commit('abcdef1234567890'),
-      commit('abcdef1987654320'),
-    ]);
+    const layout = computeGraphLayout([commit('abcdef1234567890'), commit('abcdef1987654320')]);
 
     expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef1')).toBe(-1);
     expect(findCommitIndexByNavigationTarget(layout.nodes, 'abcdef12')).toBe(0);

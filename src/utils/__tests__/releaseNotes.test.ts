@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ReleaseCommitDto } from '../../global';
-import {
-  buildAlgorithmicChangeListMarkdown,
-  buildReleaseNotesPromptHints,
-  filterCommitsForReleaseNotes,
-  isLikelyMergeCommit,
-} from '../releaseNotes';
+import type { ReleaseCommitDto } from '@/global';
+import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes, isLikelyMergeCommit } from '@/utils/releaseNotes';
 
 type TestOptions = {
   omitMergeCommits: boolean;
@@ -25,13 +20,7 @@ const DEFAULT_OPTIONS: TestOptions = {
   includeHashesInAlgorithmicList: true,
 };
 
-const commit = (
-  shortHash: string,
-  subject: string,
-  author = 'Tim',
-  date = '2026-03-26',
-  htmlUrl?: string | null,
-): ReleaseCommitDto => ({
+const commit = (shortHash: string, subject: string, author = 'Tim', date = '2026-03-26', htmlUrl?: string | null): ReleaseCommitDto => ({
   hash: `${shortHash}-full`,
   shortHash,
   subject,
@@ -56,10 +45,7 @@ describe('releaseNotes utilities', () => {
 
   describe('filterCommitsForReleaseNotes', () => {
     it('returns source untouched when merge filtering is disabled', () => {
-      const source = [
-        commit('a1', 'Merge branch main into feature'),
-        commit('a2', 'feat: add release notes'),
-      ];
+      const source = [commit('a1', 'Merge branch main into feature'), commit('a2', 'feat: add release notes')];
       const options = { ...DEFAULT_OPTIONS, omitMergeCommits: false };
       const result = filterCommitsForReleaseNotes(source, options);
       expect(result).toBe(source);
@@ -67,20 +53,13 @@ describe('releaseNotes utilities', () => {
     });
 
     it('filters merge commits when enabled', () => {
-      const source = [
-        commit('b1', 'Merge pull request #9 from branch'),
-        commit('b2', 'feat: add release UI'),
-        commit('b3', 'fix: handle validation'),
-      ];
+      const source = [commit('b1', 'Merge pull request #9 from branch'), commit('b2', 'feat: add release UI'), commit('b3', 'fix: handle validation')];
       const result = filterCommitsForReleaseNotes(source, DEFAULT_OPTIONS);
       expect(result.map((entry) => entry.shortHash)).toEqual(['b2', 'b3']);
     });
 
     it('falls back to original source when filtering would remove all commits', () => {
-      const source = [
-        commit('c1', 'Merge branch feature/a'),
-        commit('c2', 'Merge pull request #10 from user/branch'),
-      ];
+      const source = [commit('c1', 'Merge branch feature/a'), commit('c2', 'Merge pull request #10 from user/branch')];
       const result = filterCommitsForReleaseNotes(source, DEFAULT_OPTIONS);
       expect(result).toBe(source);
     });

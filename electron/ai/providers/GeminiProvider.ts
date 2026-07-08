@@ -1,11 +1,5 @@
 import type { AppSettings } from '../../settings';
-import type {
-  AiConnectionResult,
-  AiConnectionTestRequest,
-  AiModelListRequest,
-  AiProvider,
-  AiTextRequest,
-} from './AiProvider';
+import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
 import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 export function normalizeGeminiModel(model: string): string {
@@ -57,23 +51,16 @@ export class GeminiProvider implements AiProvider {
     const models = Array.isArray(data.models) ? data.models : [];
     return uniqueSorted(
       models
-        .filter(model => {
+        .filter((model) => {
           const methods = Array.isArray(model.supportedGenerationMethods) ? model.supportedGenerationMethods : [];
           return methods.includes('generateContent');
         })
-        .map(model => normalizeGeminiModel(safeString(model.name)))
+        .map((model) => normalizeGeminiModel(safeString(model.name)))
         .filter(Boolean),
     );
   }
 
-  async generateText({
-    settings,
-    systemPrompt,
-    userPrompt,
-    getGeminiApiKey,
-    shouldCancel,
-    timeoutMs,
-  }: AiTextRequest): Promise<string> {
+  async generateText({ settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {
     const apiKey = getGeminiApiKey().trim();
     if (!apiKey) {
       throw new Error('Gemini API key fehlt.');

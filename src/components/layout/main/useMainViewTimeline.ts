@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { FileTimelineCommitDto } from '../../../global';
-import type { CatalogTranslateFn } from '../../../i18n';
-import type { AppTabId } from '../sidebar/AppSidebar.types';
-import { gitClient } from '../../../services/gitClient';
+import type { FileTimelineCommitDto } from '@/global';
+import type { CatalogTranslateFn } from '@/i18n';
+import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import { gitClient } from '@/services/gitClient';
 
 type UseMainViewTimelineParams = {
   activeRepo: string | null;
@@ -11,12 +11,7 @@ type UseMainViewTimelineParams = {
   t: CatalogTranslateFn;
 };
 
-export const useMainViewTimeline = ({
-  activeRepo,
-  setActiveTab,
-  onCloseReleaseCreator,
-  t,
-}: UseMainViewTimelineParams) => {
+export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCreator, t }: UseMainViewTimelineParams) => {
   const [showTimeline, setShowTimeline] = useState(false);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [timelineCommits, setTimelineCommits] = useState<FileTimelineCommitDto[]>([]);

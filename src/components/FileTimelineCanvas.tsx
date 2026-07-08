@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 
 type FileNode = {
   name: string;
@@ -87,7 +87,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
     const buildLayoutTree = (node: FileNode, depth: number): LayoutNode => {
       if (depth > maxDepth) maxDepth = depth;
-      
+
       const childrenNodes: LayoutNode[] = [];
       const isCollapsed = collapsedPaths.has(node.path);
       const hasChildren = !!node.children && node.children.size > 0;
@@ -123,7 +123,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         width: logicalHeight,
         children: childrenNodes,
         hasChildren,
-        isCollapsed
+        isCollapsed,
       };
     };
 
@@ -132,13 +132,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const vSpacing = 24; // Vertical spacing very tight (24px) for massive compression
     const totalLeaves = tree.width;
     const naturalHeight = totalLeaves * vSpacing;
-    
+
     // Calculate required scale to fit vertically (with some margin)
     const requiredScaleY = (dimensions.height * 0.85) / Math.max(naturalHeight, 150);
-    
+
     // Calculate target natural width to fill horizontal space at that scale
     const targetNaturalWidth = (dimensions.width * 0.75) / requiredScaleY;
-    
+
     // Dynamic horizontal spacing so that it stretches perfectly to fill the screen width
     const dynamicHSpacing = Math.max(350, targetNaturalWidth / Math.max(1, maxDepth));
 
@@ -220,13 +220,13 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const scaleX = (dimensions.width * 0.85) / Math.max(treeWidth, 150);
     const scaleY = (dimensions.height * 0.85) / Math.max(treeHeight, 150);
     // Remove the 0.05 minimum limit so it truly scales down to fit any size repository
-    const newScale = Math.min(scaleX, scaleY, 1.5); 
+    const newScale = Math.min(scaleX, scaleY, 1.5);
 
     const centerY = (minY + maxY) / 2;
 
     // Place root on the left
     setTranslateX(Math.max(40, dimensions.width * 0.05));
-    
+
     // Center vertically
     setTranslateY(dimensions.height / 2 - centerY * newScale);
     setScale(newScale);
@@ -241,46 +241,49 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
   }, [flatNodes, dimensions]);
 
   // Helper to check hover target on demand (only when mouse moves or zooms)
-  const checkHover = useCallback((mouseX: number, mouseY: number, tx: number, ty: number, s: number, nodes: LayoutNode[]) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const checkHover = useCallback(
+    (mouseX: number, mouseY: number, tx: number, ty: number, s: number, nodes: LayoutNode[]) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    // Convert screen mouse coordinates to world space coordinates
-    const worldX = (mouseX - tx) / s;
-    const worldY = (mouseY - ty) / s;
+      // Convert screen mouse coordinates to world space coordinates
+      const worldX = (mouseX - tx) / s;
+      const worldY = (mouseY - ty) / s;
 
-    let match: LayoutNode | null = null;
-    for (const node of nodes) {
-      const radius = node.type === 'folder' ? 16 : 12;
+      let match: LayoutNode | null = null;
+      for (const node of nodes) {
+        const radius = node.type === 'folder' ? 16 : 12;
 
-      // 1. Circle collision check first (extremely fast)
-      const dist = Math.hypot(worldX - node.x, worldY - node.y);
-      if (dist <= radius + 5) {
-        match = node;
-        break;
-      }
-
-      // 2. Spatial bounding box check before calling the expensive measureText
-      const isNearX = worldX >= node.x + radius && worldX <= node.x + radius + 250;
-      const isNearY = worldY >= node.y - 12 && worldY <= node.y + 12;
-
-      if (isNearX && isNearY) {
-        // Only run measureText if we are actually near the node's text label
-        const textWidth = ctx.measureText(node.name).width;
-        if (worldX <= node.x + radius + 10 + textWidth) {
+        // 1. Circle collision check first (extremely fast)
+        const dist = Math.hypot(worldX - node.x, worldY - node.y);
+        if (dist <= radius + 5) {
           match = node;
           break;
         }
-      }
-    }
 
-    if (match?.path !== hoveredNode?.path) {
-      setHoveredNode(match);
-    }
-  }, [hoveredNode]);
+        // 2. Spatial bounding box check before calling the expensive measureText
+        const isNearX = worldX >= node.x + radius && worldX <= node.x + radius + 250;
+        const isNearY = worldY >= node.y - 12 && worldY <= node.y + 12;
+
+        if (isNearX && isNearY) {
+          // Only run measureText if we are actually near the node's text label
+          const textWidth = ctx.measureText(node.name).width;
+          if (worldX <= node.x + radius + 10 + textWidth) {
+            match = node;
+            break;
+          }
+        }
+      }
+
+      if (match?.path !== hoveredNode?.path) {
+        setHoveredNode(match);
+      }
+    },
+    [hoveredNode],
+  );
 
   // Mouse / Wheel Event Handlers for Panning & Zooming
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -309,10 +312,10 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
   const handleMouseUp = () => {
     isDraggingRef.current = false;
-    
+
     // If it was a click (not a drag) on a folder, toggle collapse
     if (!dragMovedRef.current && hoveredNode && hoveredNode.type === 'folder') {
-      setCollapsedPaths(prev => {
+      setCollapsedPaths((prev) => {
         const next = new Set(prev);
         if (next.has(hoveredNode.path)) {
           next.delete(hoveredNode.path);
@@ -361,7 +364,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const centerY = dimensions.height / 2;
     const worldX = (centerX - translateX) / scale;
     const worldY = (centerY - translateY) / scale;
-    
+
     setTranslateX(centerX - worldX * newScale);
     setTranslateY(centerY - worldY * newScale);
     setScale(newScale);
@@ -478,11 +481,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
           // Bezier S-Curve horizontally
           const midX = (node.x + child.x) / 2;
-          ctx.bezierCurveTo(
-            midX, node.y,
-            midX, child.y,
-            child.x, child.y
-          );
+          ctx.bezierCurveTo(midX, node.y, midX, child.y, child.x, child.y);
 
           if (child.status === 'added') {
             ctx.strokeStyle = 'rgba(79, 174, 148, 1.0)'; // Solid green
@@ -556,10 +555,16 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         ctx.stroke();
 
         // Render Folder / File Icon (using hex colors)
-        const iconColor = node.status === 'added' ? '#4fae94' :
-                          node.status === 'modified' ? '#5f9ec2' :
-                          node.status === 'renamed' ? '#7890a1' :
-                          isFolder ? '#d09a72' : '#b3aaa2';
+        const iconColor =
+          node.status === 'added'
+            ? '#4fae94'
+            : node.status === 'modified'
+              ? '#5f9ec2'
+              : node.status === 'renamed'
+                ? '#7890a1'
+                : isFolder
+                  ? '#d09a72'
+                  : '#b3aaa2';
 
         if (isFolder) {
           drawFolderIcon(ctx, node.x, node.y, 20, iconColor);
@@ -571,7 +576,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         if (isFolder && node.hasChildren) {
           const badgeX = node.x + radius * 0.7;
           const badgeY = node.y - radius * 0.7;
-          
+
           ctx.beginPath();
           ctx.arc(badgeX, badgeY, 6, 0, Math.PI * 2);
           ctx.fillStyle = '#0f1214'; // var(--bg-darker)
@@ -598,7 +603,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           // Stronger Backdrop shadow for crisp readability
           ctx.strokeStyle = 'rgba(15, 18, 20, 1.0)';
           ctx.lineWidth = 5;
-          
+
           const textOffsetX = node.x + radius + 12;
           ctx.strokeText(node.name, textOffsetX, node.y);
           ctx.fillText(node.name, textOffsetX, node.y);
@@ -626,7 +631,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const radius = hoveredNode.type === 'folder' ? 16 : 12;
     return {
       x: hoveredNode.x * scale + translateX,
-      y: hoveredNode.y * scale + translateY - radius - 14 // slightly higher due to horizontal layout
+      y: hoveredNode.y * scale + translateY - radius - 14, // slightly higher due to horizontal layout
     };
   }, [hoveredNode, scale, translateX, translateY]);
 
@@ -638,7 +643,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
         height: '100%',
         position: 'relative',
         background: 'var(--bg-darker)',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}
     >
       <canvas
@@ -649,7 +654,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           width: dimensions.width,
           height: dimensions.height,
           display: 'block',
-          cursor: isDraggingRef.current ? 'grabbing' : (hoveredNode?.type === 'folder' ? 'pointer' : 'grab')
+          cursor: isDraggingRef.current ? 'grabbing' : hoveredNode?.type === 'folder' ? 'pointer' : 'grab',
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -680,12 +685,10 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
             flexDirection: 'column',
             gap: '6px',
             backdropFilter: 'blur(3px)',
-            transition: 'top 0.08s ease-out, left 0.08s ease-out'
+            transition: 'top 0.08s ease-out, left 0.08s ease-out',
           }}
         >
-          <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-            {hoveredNode.path}
-          </div>
+          <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{hoveredNode.path}</div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span
               style={{
@@ -695,10 +698,12 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
                 padding: '2px 6px',
                 borderRadius: '3px',
                 background: hoveredNode.type === 'folder' ? 'var(--bg-hover)' : 'rgba(255,255,255,0.06)',
-                color: hoveredNode.type === 'folder' ? 'var(--text-accent)' : 'var(--text-secondary)'
+                color: hoveredNode.type === 'folder' ? 'var(--text-accent)' : 'var(--text-secondary)',
               }}
             >
-              {hoveredNode.type === 'folder' ? t('generated.components.filetimelinecanvas.folder_3dd8aff0') : t('generated.components.commitdetails.file_9d811416')}
+              {hoveredNode.type === 'folder'
+                ? t('generated.components.filetimelinecanvas.folder_3dd8aff0')
+                : t('generated.components.commitdetails.file_9d811416')}
             </span>
 
             {hoveredNode.status !== 'unchanged' && (
@@ -709,27 +714,49 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
                   textTransform: 'uppercase',
                   padding: '2px 6px',
                   borderRadius: '3px',
-                  background: hoveredNode.status === 'added' ? 'var(--status-success-soft)' :
-                              hoveredNode.status === 'modified' ? 'var(--status-info-soft)' :
-                              'var(--status-merged-soft)',
-                  color: hoveredNode.status === 'added' ? 'var(--status-success)' :
-                         hoveredNode.status === 'modified' ? 'var(--status-info)' :
-                         'var(--status-merged)',
-                  border: hoveredNode.status === 'added' ? '1px solid var(--status-success-border)' :
-                          hoveredNode.status === 'modified' ? '1px solid var(--status-info-border)' :
-                          '1px solid var(--status-merged-border)'
+                  background:
+                    hoveredNode.status === 'added'
+                      ? 'var(--status-success-soft)'
+                      : hoveredNode.status === 'modified'
+                        ? 'var(--status-info-soft)'
+                        : 'var(--status-merged-soft)',
+                  color:
+                    hoveredNode.status === 'added'
+                      ? 'var(--status-success)'
+                      : hoveredNode.status === 'modified'
+                        ? 'var(--status-info)'
+                        : 'var(--status-merged)',
+                  border:
+                    hoveredNode.status === 'added'
+                      ? '1px solid var(--status-success-border)'
+                      : hoveredNode.status === 'modified'
+                        ? '1px solid var(--status-info-border)'
+                        : '1px solid var(--status-merged-border)',
                 }}
               >
-                {hoveredNode.status === 'added' ? t('generated.components.filetimelinecanvas.added_577df313') :
-                 hoveredNode.status === 'modified' ? t('generated.components.filetimelinecanvas.modified_e02f778a') :
-                 t('generated.components.filetimelinecanvas.renamed_732ebae5')}
+                {hoveredNode.status === 'added'
+                  ? t('generated.components.filetimelinecanvas.added_577df313')
+                  : hoveredNode.status === 'modified'
+                    ? t('generated.components.filetimelinecanvas.modified_e02f778a')
+                    : t('generated.components.filetimelinecanvas.renamed_732ebae5')}
               </span>
             )}
           </div>
 
           {hoveredNode.status !== 'unchanged' && activeCommit && (
-            <div style={{ marginTop: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div
+              style={{ marginTop: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}
+            >
+              <div
+                style={{
+                  fontSize: '0.74rem',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {activeCommit.subject}
               </div>
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
@@ -737,7 +764,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
               </div>
             </div>
           )}
-          
+
           {hoveredNode.type === 'folder' && (
             <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '4px', fontStyle: 'italic' }}>
               {hoveredNode.isCollapsed ? 'Klicken zum Ausklappen' : 'Klicken zum Einklappen'}
@@ -755,7 +782,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
           display: 'flex',
           flexDirection: 'column',
           gap: '6px',
-          zIndex: 10
+          zIndex: 10,
         }}
       >
         <button
@@ -772,7 +799,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            borderRadius: '4px'
+            borderRadius: '4px',
           }}
         >
           <ZoomIn size={15} />
@@ -791,7 +818,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            borderRadius: '4px'
+            borderRadius: '4px',
           }}
         >
           <ZoomOut size={15} />
@@ -810,7 +837,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            borderRadius: '4px'
+            borderRadius: '4px',
           }}
         >
           <Maximize2 size={14} />

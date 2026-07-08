@@ -1,12 +1,9 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { AppSettings, DEFAULT_SETTINGS, normalizeSettings } from '../settings';
-import {
-  normalizeGeminiApiKey,
-  readSavedGeminiApiKey,
-  saveGeminiApiKeySecurely,
-} from './secureStore';
+import type { AppSettings } from '../settings';
+import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
+import { normalizeGeminiApiKey, readSavedGeminiApiKey, saveGeminiApiKeySecurely } from './secureStore';
 
 export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };
 

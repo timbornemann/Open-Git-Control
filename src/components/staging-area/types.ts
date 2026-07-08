@@ -1,10 +1,7 @@
-import type { AppSettingsDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '../../global';
-import type { FileEntry, GitStatusDetailed } from '../../utils/gitParsing';
-import type { DiffRequest } from '../../types/diff';
-import type {
-  ConfirmDialogState,
-  InputDialogState,
-} from '../layout/layoutTypes';
+import type { AppSettingsDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/global';
+import type { FileEntry, GitStatusDetailed } from '@/utils/gitParsing';
+import type { DiffRequest } from '@/types/diff';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 
 export type { ConfirmDialogState, InputDialogState };
 

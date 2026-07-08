@@ -6,7 +6,9 @@ export const stripGitSuffix = (name: string): string => {
 };
 
 export const splitRepoPath = (repoPath: string): { parentDir: string; baseName: string } => {
-  const normalized = String(repoPath || '').trim().replace(/[\\/]+$/, '');
+  const normalized = String(repoPath || '')
+    .trim()
+    .replace(/[\\/]+$/, '');
   if (!normalized) {
     return { parentDir: '.', baseName: 'repository' };
   }
@@ -25,14 +27,13 @@ export const splitRepoPath = (repoPath: string): { parentDir: string; baseName: 
   };
 };
 
-export const normalizeRepoPointer = (value: string): string => (
+export const normalizeRepoPointer = (value: string): string =>
   String(value || '')
     .trim()
     .replace(/^file:\/\//i, '')
     .replace(/[\\]+/g, '/')
     .replace(/\/+$/, '')
-    .toLowerCase()
-);
+    .toLowerCase();
 
 export type ParsedGithubRepoReference = {
   host: string;
@@ -41,7 +42,9 @@ export type ParsedGithubRepoReference = {
 };
 
 export const normalizeGitHost = (value: string): string => {
-  const trimmed = String(value || '').trim().toLowerCase();
+  const trimmed = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!trimmed) return 'github.com';
   const withoutProtocol = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
   return withoutProtocol.startsWith('www.') ? withoutProtocol.slice(4) : withoutProtocol;
@@ -68,7 +71,10 @@ export const isCloneSourceLikelyRemote = (cloneSource: string): boolean => {
 };
 
 export const parseGithubRepoReference = (cloneSource: string): ParsedGithubRepoReference | null => {
-  const normalizedSource = String(cloneSource || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  const normalizedSource = String(cloneSource || '')
+    .trim()
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '');
   if (!normalizedSource) return null;
 
   const fromHostAndPath = (hostRaw: string, pathRaw: string): ParsedGithubRepoReference | null => {

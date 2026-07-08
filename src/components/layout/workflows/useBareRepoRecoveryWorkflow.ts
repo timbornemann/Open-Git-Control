@@ -1,14 +1,10 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto } from '../../../global';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
-import { getElectronApi } from '../../../services/electronApi';
-import { gitClient } from '../../../services/gitClient';
-import type { AppTabId } from '../sidebar/AppSidebar.types';
-import {
-  normalizeRepoPointer,
-  splitRepoPath,
-  stripGitSuffix,
-} from './repoWorkflowUtils';
+import type { AppSettingsDto } from '@/global';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { getElectronApi } from '@/services/electronApi';
+import { gitClient } from '@/services/gitClient';
+import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import { normalizeRepoPointer, splitRepoPath, stripGitSuffix } from './repoWorkflowUtils';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -26,16 +22,17 @@ type Params = {
   setGitActionToast: (toast: Toast) => void;
 };
 
-export const useBareRepoRecoveryWorkflow = ({
-  workspace,
-  settings,
-  triggerRefresh,
-  setGitActionToast,
-}: Params) => {
-  const tr = useCallback((deText: string, enText: string) => {
-    return trByLanguage(settings.language as AppLanguage, deText, enText);
-  }, [settings.language]);
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables), [settings.language]);
+export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefresh, setGitActionToast }: Params) => {
+  const tr = useCallback(
+    (deText: string, enText: string) => {
+      return trByLanguage(settings.language as AppLanguage, deText, enText);
+    },
+    [settings.language],
+  );
+  const t = useCallback(
+    (key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language as AppLanguage, key, variables),
+    [settings.language],
+  );
   const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
     const electronApi = getElectronApi();
     if (!electronApi || !gitClient.isAvailable() || !workspace.activeRepo) return false;
@@ -43,11 +40,13 @@ export const useBareRepoRecoveryWorkflow = ({
     const sourceRepoPath = workspace.activeRepo;
     const { parentDir, baseName } = splitRepoPath(sourceRepoPath);
     const preferredNameBase = stripGitSuffix(baseName) || `${baseName}-worktree`;
-    const candidateNames = Array.from(new Set([
-      preferredNameBase,
-      `${preferredNameBase}-worktree`,
-      ...Array.from({ length: 24 }, (_value, index) => `${preferredNameBase}-worktree-${index + 2}`),
-    ]));
+    const candidateNames = Array.from(
+      new Set([
+        preferredNameBase,
+        `${preferredNameBase}-worktree`,
+        ...Array.from({ length: 24 }, (_value, index) => `${preferredNameBase}-worktree-${index + 2}`),
+      ]),
+    );
 
     let existingOriginUrl: string | null = null;
     try {
@@ -71,10 +70,7 @@ export const useBareRepoRecoveryWorkflow = ({
       }
 
       lastCloneError = String(nextResult.error || '').trim();
-      const alreadyExists = (
-        /destination path.*already exists/i.test(lastCloneError)
-        || /already exists and is not an empty directory/i.test(lastCloneError)
-      );
+      const alreadyExists = /destination path.*already exists/i.test(lastCloneError) || /already exists and is not an empty directory/i.test(lastCloneError);
       if (!alreadyExists) {
         break;
       }
@@ -83,7 +79,9 @@ export const useBareRepoRecoveryWorkflow = ({
     if (!cloneResult) {
       workspace.setActiveTab('repo');
       setGitActionToast({
-        msg: lastCloneError || t('generated.components.layout.workflows.usebarereporecoveryworkflow.could_not_automatically_convert_bare_repository_into_a_w_ebc84e9d'),
+        msg:
+          lastCloneError ||
+          t('generated.components.layout.workflows.usebarereporecoveryworkflow.could_not_automatically_convert_bare_repository_into_a_w_ebc84e9d'),
         isError: true,
       });
       return false;
@@ -109,17 +107,15 @@ export const useBareRepoRecoveryWorkflow = ({
       const remoteBranchesResult = await gitClient.runGitCommand('branch', '-r');
       const remoteBranches = remoteBranchesResult.success
         ? String(remoteBranchesResult.data || '')
-          .split('\n')
-          .map((line: string) => line.replace(/^\*\s*/, '').trim())
-          .filter((line: string) => line.startsWith('origin/'))
-          .filter((line: string) => !/^origin\/head\b/i.test(line))
+            .split('\n')
+            .map((line: string) => line.replace(/^\*\s*/, '').trim())
+            .filter((line: string) => line.startsWith('origin/'))
+            .filter((line: string) => !/^origin\/head\b/i.test(line))
         : [];
 
-      const preferredRemoteBranch = [
-        `origin/${(settings.defaultBranch || '').trim()}`,
-        'origin/main',
-        'origin/master',
-      ].find((candidate) => remoteBranches.includes(candidate)) || remoteBranches[0];
+      const preferredRemoteBranch =
+        [`origin/${(settings.defaultBranch || '').trim()}`, 'origin/main', 'origin/master'].find((candidate) => remoteBranches.includes(candidate)) ||
+        remoteBranches[0];
 
       if (preferredRemoteBranch) {
         const localBranchName = preferredRemoteBranch.replace(/^origin\//, '').trim();
@@ -128,16 +124,14 @@ export const useBareRepoRecoveryWorkflow = ({
 
         if (!checkoutTracked.success) {
           await ensureRecoveredRepoSelected();
-          const checkoutForced = await gitClient.runGitCommand(
-            'checkout',
-            '-B',
-            localBranchName,
-            preferredRemoteBranch,
-          );
+          const checkoutForced = await gitClient.runGitCommand('checkout', '-B', localBranchName, preferredRemoteBranch);
           if (!checkoutForced.success) {
             workspace.setActiveTab('repo');
             setGitActionToast({
-              msg: checkoutForced.error || checkoutTracked.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_a_starter_branch_could_ae6fb2c4'),
+              msg:
+                checkoutForced.error ||
+                checkoutTracked.error ||
+                t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_a_starter_branch_could_ae6fb2c4'),
               isError: true,
             });
             return false;
@@ -156,7 +150,9 @@ export const useBareRepoRecoveryWorkflow = ({
       if (!removeOriginResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: removeOriginResult.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_local_origin_remote_co_c12936a4'),
+          msg:
+            removeOriginResult.error ||
+            t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_local_origin_remote_co_c12936a4'),
           isError: true,
         });
         return false;
@@ -167,7 +163,9 @@ export const useBareRepoRecoveryWorkflow = ({
       if (!setUrlResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
-          msg: setUrlResult.error || t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_origin_remote_could_no_a615df20'),
+          msg:
+            setUrlResult.error ||
+            t('generated.components.layout.workflows.usebarereporecoveryworkflow.working_directory_was_created_but_origin_remote_could_no_a615df20'),
           isError: true,
         });
         return false;
@@ -182,7 +180,6 @@ export const useBareRepoRecoveryWorkflow = ({
     triggerRefresh();
     return true;
   }, [setGitActionToast, settings.defaultBranch, tr, triggerRefresh, workspace]);
-
 
   return { recoverBareRepoForPush };
 };

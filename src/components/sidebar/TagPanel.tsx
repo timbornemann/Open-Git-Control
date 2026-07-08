@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowUpCircle, Plus, Search, Tag, X } from 'lucide-react';
-import { useI18n } from '../../i18n';
+import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 
 type Props = {
@@ -19,7 +19,7 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
 
   const filteredTags = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return tags.filter(tag => !normalized || tag.toLowerCase().includes(normalized));
+    return tags.filter((tag) => !normalized || tag.toLowerCase().includes(normalized));
   }, [query, tags]);
 
   return (
@@ -28,13 +28,19 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
         title={t('generated.components.project_planner.plannerdialogs.tags_d3c9e52d')}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        toggleTitle={collapsed ? t('generated.components.sidebar.tagpanel.show_tags_be3fb392') : t('generated.components.sidebar.tagpanel.collapse_tags_fc0681fa')}
-        actions={(
+        toggleTitle={
+          collapsed ? t('generated.components.sidebar.tagpanel.show_tags_be3fb392') : t('generated.components.sidebar.tagpanel.collapse_tags_fc0681fa')
+        }
+        actions={
           <>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onCreateTag} title={t('generated.components.sidebar.tagpanel.create_tag_9d35faa7')}><Plus size={13} /></button>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onPushTags} title={t('generated.components.sidebar.tagpanel.push_tags_13e7b4c8')}><ArrowUpCircle size={13} /></button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onCreateTag} title={t('generated.components.sidebar.tagpanel.create_tag_9d35faa7')}>
+              <Plus size={13} />
+            </button>
+            <button className="icon-btn sidebar-row-action-icon" onClick={onPushTags} title={t('generated.components.sidebar.tagpanel.push_tags_13e7b4c8')}>
+              <ArrowUpCircle size={13} />
+            </button>
           </>
-        )}
+        }
       />
 
       {!collapsed && (
@@ -54,7 +60,7 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
           <RepoCardContent className="repo-card-scroll">
             {filteredTags.length > 0 ? (
               <div className="tag-grid">
-                {filteredTags.map(tag => (
+                {filteredTags.map((tag) => (
                   <div
                     key={tag}
                     className="tag-card"
@@ -86,7 +92,9 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
               </div>
             ) : (
               <div className="repo-state-text">
-                {query.trim() ? t('generated.components.sidebar.tagpanel.no_tags_for_this_filter_033ccd17') : t('generated.components.sidebar.tagpanel.no_tags_available_7758d8e7')}
+                {query.trim()
+                  ? t('generated.components.sidebar.tagpanel.no_tags_for_this_filter_033ccd17')
+                  : t('generated.components.sidebar.tagpanel.no_tags_available_7758d8e7')}
               </div>
             )}
           </RepoCardContent>

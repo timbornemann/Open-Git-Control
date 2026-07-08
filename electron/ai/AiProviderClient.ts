@@ -1,9 +1,5 @@
-import { AppSettings } from '../settings';
-import type {
-  AiConnectionResult,
-  AiProvider,
-  AiTextRequest,
-} from './providers/AiProvider';
+import type { AppSettings } from '../settings';
+import type { AiConnectionResult, AiProvider, AiTextRequest } from './providers/AiProvider';
 import { GeminiProvider, normalizeGeminiModel } from './providers/GeminiProvider';
 import { OllamaProvider } from './providers/OllamaProvider';
 import { OpenAiProvider } from './providers/OpenAiProvider';

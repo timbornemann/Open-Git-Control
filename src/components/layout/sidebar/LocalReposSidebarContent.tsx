@@ -1,6 +1,6 @@
 import React from 'react';
-import { AppSidebarProps } from './AppSidebar.types';
-import { RepoList } from '../../sidebar/RepoList';
+import type { AppSidebarProps } from './AppSidebar.types';
+import { RepoList } from '@/components/sidebar/RepoList';
 
 type LocalReposSidebarContentProps = Pick<
   AppSidebarProps,
@@ -52,4 +52,3 @@ export const LocalReposSidebarContent: React.FC<LocalReposSidebarContentProps> =
     onToggleCollapsed={onToggleRepoPanelCollapsed}
   />
 );
-

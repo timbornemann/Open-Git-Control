@@ -1,6 +1,7 @@
 ﻿import React from 'react';
-import { Confirm, DialogContextItem } from './Confirm';
-import { useI18n } from '../i18n';
+import type { DialogContextItem } from './Confirm';
+import { Confirm } from './Confirm';
+import { useI18n } from '@/i18n';
 
 interface DangerConfirmProps {
   open: boolean;

@@ -5,8 +5,14 @@ describe('normalizeDiffPreviewArgs', () => {
   it('allows the supported staged, unstaged, and commit preview commands', () => {
     expect(normalizeDiffPreviewArgs(['diff', '--', 'src/app.ts'])).toEqual(['diff', '--', 'src/app.ts']);
     expect(normalizeDiffPreviewArgs(['diff', '--cached', '--', 'src/app.ts'])).toEqual(['diff', '--cached', '--', 'src/app.ts']);
-    expect(normalizeDiffPreviewArgs(['show', '--format=', '--binary', 'a'.repeat(40), '--', 'src/app.ts']))
-      .toEqual(['show', '--format=', '--binary', 'a'.repeat(40), '--', 'src/app.ts']);
+    expect(normalizeDiffPreviewArgs(['show', '--format=', '--binary', 'a'.repeat(40), '--', 'src/app.ts'])).toEqual([
+      'show',
+      '--format=',
+      '--binary',
+      'a'.repeat(40),
+      '--',
+      'src/app.ts',
+    ]);
   });
 
   it('rejects arbitrary diff options and paths outside the repository', () => {

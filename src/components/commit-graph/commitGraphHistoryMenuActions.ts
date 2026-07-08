@@ -1,7 +1,7 @@
-import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
-import type { ToastMessage } from '../../types/git';
-import type { GraphLayout, GraphNode } from '../../utils/graphLayout';
-import { gitClient } from '../../services/gitClient';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
+import type { ToastMessage } from '@/types/git';
+import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
+import { gitClient } from '@/services/gitClient';
 import type { MenuAction } from './CommitContextMenu';
 
 type BuildCommitHistoryMenuActionsParams = {
@@ -31,7 +31,10 @@ export const buildCommitHistoryMenuActions = ({
   const shortHash = node.commit.abbrevHash;
   const actions: MenuAction[] = [
     {
-      label: '', icon: '', separator: true, action: () => {},
+      label: '',
+      icon: '',
+      separator: true,
+      action: () => {},
     },
     {
       label: `Cherry-Pick ${shortHash}`,
@@ -44,7 +47,10 @@ export const buildCommitHistoryMenuActions = ({
       action: () => runGitAction(['revert', '--no-edit', hash], `Revert von ${shortHash} erfolgreich.`),
     },
     {
-      label: '', icon: '', separator: true, action: () => {},
+      label: '',
+      icon: '',
+      separator: true,
+      action: () => {},
     },
     {
       label: `Reset --soft auf ${shortHash}`,
@@ -116,7 +122,7 @@ export const buildCommitHistoryMenuActions = ({
       action: () => {
         if (!layout) return;
 
-        const selectedNode = layout.nodes.find(candidate => candidate.commit.hash === hash);
+        const selectedNode = layout.nodes.find((candidate) => candidate.commit.hash === hash);
         if (!selectedNode) {
           setToast({ msg: 'Ausgewaehlter Commit wurde nicht gefunden.', isError: true });
           return;
@@ -127,23 +133,21 @@ export const buildCommitHistoryMenuActions = ({
           return;
         }
 
-        const headPath = layout.nodes.filter(candidate => reachableFromHead.has(candidate.commit.hash));
-        const selectedIndex = headPath.findIndex(candidate => candidate.commit.hash === hash);
+        const headPath = layout.nodes.filter((candidate) => reachableFromHead.has(candidate.commit.hash));
+        const selectedIndex = headPath.findIndex((candidate) => candidate.commit.hash === hash);
         if (selectedIndex < 0) {
           setToast({ msg: 'Commit liegt nicht auf dem aktuellen HEAD-Pfad.', isError: true });
           return;
         }
 
         const rangeNewestFirst = headPath.slice(0, selectedIndex + 1);
-        if (rangeNewestFirst.some(candidate => candidate.isMerge)) {
+        if (rangeNewestFirst.some((candidate) => candidate.isMerge)) {
           setToast({ msg: 'Interaktiver Rebase mit Merge-Commits wird hier nicht unterstuetzt.', isError: true });
           return;
         }
 
         const rangeOldestFirst = [...rangeNewestFirst].reverse();
-        const defaultTodo = rangeOldestFirst
-          .map(candidate => `pick ${candidate.commit.hash} ${candidate.commit.subject}`)
-          .join('\n');
+        const defaultTodo = rangeOldestFirst.map((candidate) => `pick ${candidate.commit.hash} ${candidate.commit.subject}`).join('\n');
 
         const baseHash = selectedNode.commit.parentHashes[0];
 
@@ -170,7 +174,7 @@ export const buildCommitHistoryMenuActions = ({
           onSubmit: async (values) => {
             const lines = (values.todo || '')
               .split(/\r?\n/)
-              .map(line => line.trim())
+              .map((line) => line.trim())
               .filter(Boolean);
 
             if (lines.length === 0 || !gitClient.isAvailable()) return;
@@ -189,7 +193,10 @@ export const buildCommitHistoryMenuActions = ({
       },
     },
     {
-      label: '', icon: '', separator: true, action: () => {},
+      label: '',
+      icon: '',
+      separator: true,
+      action: () => {},
     },
     {
       label: 'Commit-Hash kopieren',

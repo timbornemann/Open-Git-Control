@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RepoSortByDto } from '../../../global';
-import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '../../../i18n';
-import { appClient } from '../../../services/appClient';
-import { gitClient } from '../../../services/gitClient';
-import { ConfirmDialogState } from '../layoutTypes';
-import { AppTabId } from '../sidebar/AppSidebar.types';
+import type { RepoSortByDto } from '@/global';
+import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { appClient } from '@/services/appClient';
+import { gitClient } from '@/services/gitClient';
+import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
+import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
 
 type Params = {
   triggerRefresh: () => void;
@@ -31,9 +31,7 @@ type SortableRepo = {
 
 const DEFAULT_REPO_SORT_BY: RepoSortByDto = 'lastOpenedDesc';
 
-const toRepoName = (repoPath: string): string => (
-  (repoPath.split(/[\\/]/).pop() || repoPath).toLowerCase()
-);
+const toRepoName = (repoPath: string): string => (repoPath.split(/[\\/]/).pop() || repoPath).toLowerCase();
 
 const normalizeTimestamp = (value: unknown, fallback: number): number => {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
@@ -73,11 +71,7 @@ const compareBySortPreference = (a: SortableRepo, b: SortableRepo, sortBy: RepoS
   return a.path.localeCompare(b.path);
 };
 
-const sortRepoPaths = (
-  repoPaths: string[],
-  metaMap: Record<string, RepoMetaEntry>,
-  sortBy: RepoSortByDto,
-): string[] => {
+const sortRepoPaths = (repoPaths: string[], metaMap: Record<string, RepoMetaEntry>, sortBy: RepoSortByDto): string[] => {
   const withMeta: SortableRepo[] = repoPaths.map((repoPath) => {
     const now = Date.now();
     const repoMeta = metaMap[repoPath];
@@ -96,14 +90,7 @@ const sortRepoPaths = (
   return withMeta.map((entry) => entry.path);
 };
 
-export const useWorkspaceDomain = ({
-  triggerRefresh,
-  setConfirmDialog,
-  setGitActionToast,
-  onRepoActivated,
-  onNoActiveRepo,
-  language,
-}: Params) => {
+export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitActionToast, onRepoActivated, onNoActiveRepo, language }: Params) => {
   const [activeTab, setActiveTab] = useState<AppTabId>('localRepos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
@@ -287,7 +274,10 @@ export const useWorkspaceDomain = ({
               setGitActionToast({ msg: t('generated.components.layout.hooks.useworkspacedomain.initialized_new_git_repository_058c91a4'), isError: false });
               triggerRefresh();
             } else {
-              setGitActionToast({ msg: initResult.error || t('generated.components.layout.hooks.useworkspacedomain.error_during_git_init_0313550f'), isError: true });
+              setGitActionToast({
+                msg: initResult.error || t('generated.components.layout.hooks.useworkspacedomain.error_during_git_init_0313550f'),
+                isError: true,
+              });
             }
           },
         });

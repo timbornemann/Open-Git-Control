@@ -1,15 +1,9 @@
-import type {
-  AiCommitMessageLanguageDto,
-  AiCommitMessageStyleDto,
-} from '../global';
-import type { CatalogTranslateFn } from '../i18n';
+import type { AiCommitMessageLanguageDto, AiCommitMessageStyleDto } from '@/global';
+import type { CatalogTranslateFn } from '@/i18n';
 
 type Translate = CatalogTranslateFn;
 
-export const getCommitMessageStyleLabel = (
-  style: AiCommitMessageStyleDto,
-  t: Translate,
-): string => {
+export const getCommitMessageStyleLabel = (style: AiCommitMessageStyleDto, t: Translate): string => {
   switch (style) {
     case 'plain':
       return t('commitMessage.styles.plain');
@@ -21,10 +15,7 @@ export const getCommitMessageStyleLabel = (
   }
 };
 
-export const getCommitMessageLanguageLabel = (
-  language: AiCommitMessageLanguageDto,
-  t: Translate,
-): string => {
+export const getCommitMessageLanguageLabel = (language: AiCommitMessageLanguageDto, t: Translate): string => {
   switch (language) {
     case 'de':
       return t('commitMessage.languages.german');
@@ -58,46 +49,40 @@ export const getCommitMessageStyleExample = (
   if (style === 'plain') {
     return useGerman
       ? {
-        title: 'verbessere Clone-Fortschritt',
-        description: t('commitMessage.examples.plainDescriptionHint'),
-      }
+          title: 'verbessere Clone-Fortschritt',
+          description: t('commitMessage.examples.plainDescriptionHint'),
+        }
       : {
-        title: 'improve clone progress',
-        description: t('commitMessage.examples.plainDescriptionHint'),
-      };
+          title: 'improve clone progress',
+          description: t('commitMessage.examples.plainDescriptionHint'),
+        };
   }
 
   if (style === 'detailed') {
     return useGerman
       ? {
-        title: 'verbessere Fortschritt fuer Clone und Pull',
-        description: 'Zeigt Receiving und Resolving als getrennte Ladezustaende.\nReduziert die rohe Git-Ausgabe auf relevante Statusdetails.',
-      }
+          title: 'verbessere Fortschritt fuer Clone und Pull',
+          description: 'Zeigt Receiving und Resolving als getrennte Ladezustaende.\nReduziert die rohe Git-Ausgabe auf relevante Statusdetails.',
+        }
       : {
-        title: 'improve clone and pull progress feedback',
-        description: 'Shows Receiving and Resolving as separate loading states.\nReduces raw git output to relevant status details.',
-      };
+          title: 'improve clone and pull progress feedback',
+          description: 'Shows Receiving and Resolving as separate loading states.\nReduces raw git output to relevant status details.',
+        };
   }
 
   return useGerman
     ? {
-      title: 'feat(git): zeige Transfer-Fortschritt',
-      description: 'Stellt Receiving und Resolving als eigene Fortschrittsphasen dar.',
-    }
+        title: 'feat(git): zeige Transfer-Fortschritt',
+        description: 'Stellt Receiving und Resolving als eigene Fortschrittsphasen dar.',
+      }
     : {
-      title: 'feat(git): show transfer progress phases',
-      description: 'Shows Receiving and Resolving as separate progress phases.',
-    };
+        title: 'feat(git): show transfer progress phases',
+        description: 'Shows Receiving and Resolving as separate progress phases.',
+      };
 };
 
-export const formatCommitMessageStyleExample = (
-  style: AiCommitMessageStyleDto,
-  language: AiCommitMessageLanguageDto,
-  t: Translate,
-): string => {
+export const formatCommitMessageStyleExample = (style: AiCommitMessageStyleDto, language: AiCommitMessageLanguageDto, t: Translate): string => {
   const example = getCommitMessageStyleExample(style, language, t);
   const description = example.description.trim();
-  return description
-    ? `${example.title}\n\n${description}`
-    : example.title;
+  return description ? `${example.title}\n\n${description}` : example.title;
 };

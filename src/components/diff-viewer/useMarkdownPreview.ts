@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DiffRequest } from '../../types/diff';
-import { appClient } from '../../services/appClient';
-import { gitClient } from '../../services/gitClient';
+import type { DiffRequest } from '@/types/diff';
+import { appClient } from '@/services/appClient';
+import { gitClient } from '@/services/gitClient';
 import {
   applyMarkdownPreviewImageDataUrls,
   collectMarkdownPreviewImageSources,
   isExternalMarkdownUrl,
   renderMarkdownToSanitizedHtml,
   resolveMarkdownPreviewAssetPath,
-} from '../../utils/markdownPreview';
-import type { CatalogTranslateFn } from '../../i18n';
+} from '@/utils/markdownPreview';
+import type { CatalogTranslateFn } from '@/i18n';
 
 export type MarkdownPreviewState = {
   loading: boolean;
@@ -66,27 +66,29 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
         const imageSources = collectMarkdownPreviewImageSources(initialHtml);
         const dataUrlsBySource: Record<string, string> = {};
 
-        await Promise.all(imageSources.map(async (imageSource) => {
-          const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
-          if (!assetPath || !gitClient.isAvailable()) return;
+        await Promise.all(
+          imageSources.map(async (imageSource) => {
+            const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
+            if (!assetPath || !gitClient.isAvailable()) return;
 
-          let assetResult = await gitClient.getRepoFileDataUrl({
-            source: request.source,
-            path: assetPath,
-            commitHash: request.commitHash,
-          });
-
-          if (!assetResult.success && request.source === 'staged') {
-            assetResult = await gitClient.getRepoFileDataUrl({
-              source: 'unstaged',
+            let assetResult = await gitClient.getRepoFileDataUrl({
+              source: request.source,
               path: assetPath,
+              commitHash: request.commitHash,
             });
-          }
 
-          if (assetResult.success) {
-            dataUrlsBySource[imageSource] = assetResult.data.dataUrl;
-          }
-        }));
+            if (!assetResult.success && request.source === 'staged') {
+              assetResult = await gitClient.getRepoFileDataUrl({
+                source: 'unstaged',
+                path: assetPath,
+              });
+            }
+
+            if (assetResult.success) {
+              dataUrlsBySource[imageSource] = assetResult.data.dataUrl;
+            }
+          }),
+        );
 
         const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource);
         if (!cancelled) {
@@ -94,9 +96,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
         }
       } catch (previewError: unknown) {
         if (!cancelled) {
-          const message = previewError instanceof Error
-            ? previewError.message
-            : t('diffViewer.errors.markdownPreviewLoadFailed');
+          const message = previewError instanceof Error ? previewError.message : t('diffViewer.errors.markdownPreviewLoadFailed');
           setMarkdownPreview({ loading: false, error: message, html: '' });
         }
       }

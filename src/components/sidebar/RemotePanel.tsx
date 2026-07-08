@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Edit2, Globe, Plus, RefreshCw, X } from 'lucide-react';
-import { RemoteInfo, RemoteSyncState } from '../../types/git';
-import { useI18n } from '../../i18n';
+import type { RemoteInfo, RemoteSyncState } from '@/types/git';
+import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader } from './RepoCard';
 
 type RemoteStatus = {
@@ -34,7 +34,10 @@ type Props = {
 };
 
 const toCompactRemoteUrl = (url: string) => {
-  const trimmed = url.trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  const trimmed = url
+    .trim()
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '');
   const sshMatch = trimmed.match(/^git@([^:]+):(.+)$/);
   if (sshMatch) return `${sshMatch[1]}/${sshMatch[2]}`;
 
@@ -67,9 +70,9 @@ export const RemotePanel: React.FC<Props> = ({
   onToggleCollapsed,
 }) => {
   const [remoteCtxMenu, setRemoteCtxMenu] = useState<RemoteContextMenu>(null);
-  const isHealthy = (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && !remoteSync.lastFetchError && remoteSync.hasUpstream;
-  const statusVariant: 'success' | 'warning' | 'danger' =
-    remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream ? 'warning' : 'success';
+  const isHealthy =
+    (remoteStatus.title === 'Remote ist aktuell' || remoteStatus.title === 'Remote is up to date') && !remoteSync.lastFetchError && remoteSync.hasUpstream;
+  const statusVariant: 'success' | 'warning' | 'danger' = remoteSync.lastFetchError ? 'danger' : !remoteSync.hasUpstream ? 'warning' : 'success';
   const { t } = useI18n();
 
   return (
@@ -78,13 +81,30 @@ export const RemotePanel: React.FC<Props> = ({
         title={t('generated.components.sidebar.remotepanel.remotes_339488fe')}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        toggleTitle={collapsed ? t('generated.components.sidebar.remotepanel.show_remotes_dc296466') : t('generated.components.sidebar.remotepanel.collapse_remotes_7e486557')}
-        actions={(
+        toggleTitle={
+          collapsed
+            ? t('generated.components.sidebar.remotepanel.show_remotes_dc296466')
+            : t('generated.components.sidebar.remotepanel.collapse_remotes_7e486557')
+        }
+        actions={
           <>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onAddRemote} title={t('generated.components.sidebar.remotepanel.add_remote_e2bcff09')}><Plus size={13} /></button>
-            <button className="icon-btn sidebar-row-action-icon" onClick={onRefreshRemote} title={t('generated.components.sidebar.remotepanel.refresh_remote_e97c388d')} disabled={remoteSync.isFetching}><RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} /></button>
+            <button
+              className="icon-btn sidebar-row-action-icon"
+              onClick={onAddRemote}
+              title={t('generated.components.sidebar.remotepanel.add_remote_e2bcff09')}
+            >
+              <Plus size={13} />
+            </button>
+            <button
+              className="icon-btn sidebar-row-action-icon"
+              onClick={onRefreshRemote}
+              title={t('generated.components.sidebar.remotepanel.refresh_remote_e97c388d')}
+              disabled={remoteSync.isFetching}
+            >
+              <RefreshCw size={13} className={remoteSync.isFetching ? 'spin' : ''} />
+            </button>
           </>
-        )}
+        }
       />
 
       {!collapsed && (
@@ -102,13 +122,12 @@ export const RemotePanel: React.FC<Props> = ({
                 </button>
               )}
             </div>
-
           </div>
 
           <div className="repo-card-scroll repo-scroll-sm remote-list-scroll">
             {remotes.length > 0 ? (
               <div className="remote-list">
-                {remotes.map(remote => {
+                {remotes.map((remote) => {
                   const compactUrl = toCompactRemoteUrl(remote.url);
 
                   return (
@@ -116,7 +135,10 @@ export const RemotePanel: React.FC<Props> = ({
                       key={remote.name}
                       className="repo-list-row remote-row"
                       title={remote.url}
-                      onContextMenu={e => { e.preventDefault(); setRemoteCtxMenu({ x: e.clientX, y: e.clientY, remote }); }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setRemoteCtxMenu({ x: e.clientX, y: e.clientY, remote });
+                      }}
                     >
                       <Globe size={13} className="remote-row-icon" />
                       <span className="remote-row-copy">
@@ -124,8 +146,20 @@ export const RemotePanel: React.FC<Props> = ({
                         <span className="remote-row-url">{compactUrl}</span>
                       </span>
                       <span className="remote-row-actions">
-                        <button onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })} className="icon-btn repo-close-btn remote-row-action" title={t('generated.components.sidebar.remotepanel.edit_remote_df039292')}><Edit2 size={11} /></button>
-                        <button onClick={() => onRemoveRemote(remote.name)} className="icon-btn repo-close-btn remote-row-action" title={t('generated.components.sidebar.remotepanel.remove_remote_7e7dee87')}><X size={11} /></button>
+                        <button
+                          onClick={() => setRemoteCtxMenu({ x: 0, y: 0, remote })}
+                          className="icon-btn repo-close-btn remote-row-action"
+                          title={t('generated.components.sidebar.remotepanel.edit_remote_df039292')}
+                        >
+                          <Edit2 size={11} />
+                        </button>
+                        <button
+                          onClick={() => onRemoveRemote(remote.name)}
+                          className="icon-btn repo-close-btn remote-row-action"
+                          title={t('generated.components.sidebar.remotepanel.remove_remote_7e7dee87')}
+                        >
+                          <X size={11} />
+                        </button>
                       </span>
                     </div>
                   );
@@ -141,7 +175,7 @@ export const RemotePanel: React.FC<Props> = ({
               <div
                 className="ctx-menu"
                 style={remoteCtxMenu.x > 0 ? { left: remoteCtxMenu.x, top: remoteCtxMenu.y } : { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }}
-                onClick={e => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
               >
                 <div className="ctx-menu-header remote-menu-header" title={remoteCtxMenu.remote.url}>
                   <span className="remote-menu-name">{remoteCtxMenu.remote.name}</span>
@@ -150,7 +184,11 @@ export const RemotePanel: React.FC<Props> = ({
                 <button
                   className="ctx-menu-item"
                   title={t('generated.components.sidebar.remotepanel.renames_this_remote_entry_a234cf05')}
-                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRenameRemote(r.name); }}
+                  onClick={() => {
+                    const r = remoteCtxMenu.remote;
+                    setRemoteCtxMenu(null);
+                    onRenameRemote(r.name);
+                  }}
                 >
                   <span className="ctx-menu-icon">RN</span>
                   <MenuLabel
@@ -161,7 +199,11 @@ export const RemotePanel: React.FC<Props> = ({
                 <button
                   className="ctx-menu-item"
                   title={t('generated.components.sidebar.remotepanel.changes_the_url_this_remote_points_to_704788ac')}
-                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onSetRemoteUrl(r.name, r.url); }}
+                  onClick={() => {
+                    const r = remoteCtxMenu.remote;
+                    setRemoteCtxMenu(null);
+                    onSetRemoteUrl(r.name, r.url);
+                  }}
                 >
                   <span className="ctx-menu-icon">URL</span>
                   <MenuLabel
@@ -173,7 +215,11 @@ export const RemotePanel: React.FC<Props> = ({
                 <button
                   className="ctx-menu-item danger"
                   title={t('generated.components.sidebar.remotepanel.removes_this_remote_from_the_local_repository_configurat_dd7d558f')}
-                  onClick={() => { const r = remoteCtxMenu.remote; setRemoteCtxMenu(null); onRemoveRemote(r.name); }}
+                  onClick={() => {
+                    const r = remoteCtxMenu.remote;
+                    setRemoteCtxMenu(null);
+                    onRemoveRemote(r.name);
+                  }}
                 >
                   <span className="ctx-menu-icon">DEL</span>
                   <MenuLabel

@@ -55,15 +55,10 @@ export const PLANNER_STATUSES: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-
 const PRIORITIES = new Set<PlannerPriority>(PLANNER_PRIORITIES);
 const STATUSES = new Set<PlannerStatus>(PLANNER_STATUSES);
 
-const cleanText = (value: unknown, maxLength: number): string => (
-  typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
-);
+const cleanText = (value: unknown, maxLength: number): string => (typeof value === 'string' ? value.trim().slice(0, maxLength) : '');
 
-const cleanTimestamp = (value: unknown, fallback: number): number => (
-  typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : fallback
-);
+const cleanTimestamp = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 
 const normalizeRepoPath = (value: unknown): string | null => {
   const repoPath = cleanText(value, 4_096);
@@ -142,8 +137,8 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
       projectId,
       title,
       description: cleanText(source.description, 20_000),
-      priority: PRIORITIES.has(source.priority as PlannerPriority) ? source.priority as PlannerPriority : 'medium',
-      status: STATUSES.has(source.status as PlannerStatus) ? source.status as PlannerStatus : 'idea',
+      priority: PRIORITIES.has(source.priority as PlannerPriority) ? (source.priority as PlannerPriority) : 'medium',
+      status: STATUSES.has(source.status as PlannerStatus) ? (source.status as PlannerStatus) : 'idea',
       tags: normalizeTags(source.tags),
       createdAt,
       updatedAt: cleanTimestamp(source.updatedAt, createdAt),
@@ -182,9 +177,7 @@ export function ensureRepositoryProject(repoPath: string): PlannerProject {
   if (!resolvedPath) throw new Error('Repository path is required.');
   const data = readProjectPlannerData();
   const repoKey = getRepositoryProjectKey(resolvedPath);
-  const existing = data.projects.find((project) => (
-    project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey
-  ));
+  const existing = data.projects.find((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey);
   if (existing) return existing;
 
   const now = Date.now();
@@ -219,10 +212,7 @@ export function createPlannedProject(input: { name: string; description?: string
   return project;
 }
 
-export function updatePlannerProject(
-  projectId: string,
-  input: { name?: string; description?: string },
-): PlannerProject {
+export function updatePlannerProject(projectId: string, input: { name?: string; description?: string }): PlannerProject {
   const data = readProjectPlannerData();
   const index = data.projects.findIndex((project) => project.id === projectId);
   if (index < 0) throw new Error('Project not found.');
@@ -233,9 +223,7 @@ export function updatePlannerProject(
   const updated: PlannerProject = {
     ...current,
     name,
-    description: input.description === undefined
-      ? current.description
-      : cleanText(input.description, 8_000),
+    description: input.description === undefined ? current.description : cleanText(input.description, 8_000),
     updatedAt: Date.now(),
   };
   const projects = [...data.projects];
@@ -254,18 +242,14 @@ export function deletePlannerProject(projectId: string): void {
   });
 }
 
-export function deleteRepositoryPlannerProjectByPath(
-  repoPath: string,
-): { deletedProjectCount: number; deletedItemCount: number } {
+export function deleteRepositoryPlannerProjectByPath(repoPath: string): { deletedProjectCount: number; deletedItemCount: number } {
   const resolvedPath = normalizeRepoPath(repoPath);
   if (!resolvedPath) throw new Error('Repository path is required.');
 
   const data = readProjectPlannerData();
   const repoKey = getRepositoryProjectKey(resolvedPath);
   const projectIds = new Set(
-    data.projects
-      .filter((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey)
-      .map((project) => project.id),
+    data.projects.filter((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey).map((project) => project.id),
   );
 
   if (projectIds.size === 0) {
@@ -295,8 +279,8 @@ export function createPlannerItem(projectId: string, input: PlannerItemInput): P
     projectId,
     title,
     description: cleanText(input?.description, 20_000),
-    priority: PRIORITIES.has(input?.priority as PlannerPriority) ? input.priority as PlannerPriority : 'medium',
-    status: STATUSES.has(input?.status as PlannerStatus) ? input.status as PlannerStatus : 'idea',
+    priority: PRIORITIES.has(input?.priority as PlannerPriority) ? (input.priority as PlannerPriority) : 'medium',
+    status: STATUSES.has(input?.status as PlannerStatus) ? (input.status as PlannerStatus) : 'idea',
     tags: normalizeTags(input?.tags),
     createdAt: now,
     updatedAt: now,
@@ -328,10 +312,7 @@ export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInpu
   return updated;
 }
 
-export function movePlannerItem(
-  itemId: string,
-  input: { projectId?: string; status?: PlannerStatus },
-): PlannerItem {
+export function movePlannerItem(itemId: string, input: { projectId?: string; status?: PlannerStatus }): PlannerItem {
   const data = readProjectPlannerData();
   const index = data.items.findIndex((item) => item.id === itemId);
   if (index < 0) throw new Error('Item not found.');
@@ -372,11 +353,7 @@ export function convertProjectToRepository(projectId: string, repoPath: string):
   const resolvedPath = normalizeRepoPath(repoPath);
   if (!resolvedPath) throw new Error('Repository path is required.');
   const repoKey = getRepositoryProjectKey(resolvedPath);
-  if (data.projects.some((project, projectIndex) => (
-    projectIndex !== index
-    && project.repoPath
-    && getRepositoryProjectKey(project.repoPath) === repoKey
-  ))) {
+  if (data.projects.some((project, projectIndex) => projectIndex !== index && project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey)) {
     throw new Error('A planning project already exists for this repository.');
   }
 
@@ -395,6 +372,7 @@ export function convertProjectToRepository(projectId: string, repoPath: string):
 export function validateProjectFolderName(value: unknown): string {
   const folderName = cleanText(value, 100);
   if (!folderName) throw new Error('Project folder name is required.');
+  // eslint-disable-next-line no-control-regex -- Windows folder names must reject ASCII control characters.
   if (folderName === '.' || folderName === '..' || /[<>:"/\\|?*\u0000-\u001F]/.test(folderName)) {
     throw new Error('Project folder name contains invalid characters.');
   }

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import type { AppSettingsDto, GitCommandNameDto, SecretScanFindingDto } from '../global';
-import { gitClient } from '../services/gitClient';
+import type { AppSettingsDto, GitCommandNameDto, SecretScanFindingDto } from '@/global';
+import { gitClient } from '@/services/gitClient';
 
 type RunGitCommandOptions = {
   args: string[];
@@ -28,53 +28,56 @@ export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuc
     setIsGitActionRunning(value);
   }, []);
 
-  const runGitCommand = useCallback(async ({ args, successMsg, actionLabel, skipSecretScan }: RunGitCommandOptions) => {
-    if (!gitClient.isAvailable() || !activeRepo) return false;
-    const command = args[0] as GitCommandNameDto;
+  const runGitCommand = useCallback(
+    async ({ args, successMsg, actionLabel, skipSecretScan }: RunGitCommandOptions) => {
+      if (!gitClient.isAvailable() || !activeRepo) return false;
+      const command = args[0] as GitCommandNameDto;
 
-    const shouldScanPush = command === 'push' && settings?.secretScanBeforePushEnabled && !skipSecretScan;
-    if (shouldScanPush) {
-      const scanResult = await gitClient.scanPushSecrets({
-        includeTags: args.some((arg) => arg === '--tags'),
-      });
-      if (!scanResult.success) {
-        onError?.(scanResult.error || 'Secret-Scan vor Push fehlgeschlagen.');
-        return false;
-      }
-
-      if (scanResult.data.findings.length > 0) {
-        if (onSecretScanBlocked) {
-          onSecretScanBlocked(scanResult.data.findings, async () => {
-            await runGitCommand({ args, successMsg, actionLabel, skipSecretScan: true });
-          });
-        } else {
-          onError?.('Moegliche Secrets erkannt. Push wurde blockiert.');
+      const shouldScanPush = command === 'push' && settings?.secretScanBeforePushEnabled && !skipSecretScan;
+      if (shouldScanPush) {
+        const scanResult = await gitClient.scanPushSecrets({
+          includeTags: args.some((arg) => arg === '--tags'),
+        });
+        if (!scanResult.success) {
+          onError?.(scanResult.error || 'Secret-Scan vor Push fehlgeschlagen.');
+          return false;
         }
+
+        if (scanResult.data.findings.length > 0) {
+          if (onSecretScanBlocked) {
+            onSecretScanBlocked(scanResult.data.findings, async () => {
+              await runGitCommand({ args, successMsg, actionLabel, skipSecretScan: true });
+            });
+          } else {
+            onError?.('Moegliche Secrets erkannt. Push wurde blockiert.');
+          }
+          return false;
+        }
+      }
+
+      syncRunningRef(true);
+      setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
+
+      try {
+        const r = await gitClient.runGitCommand(command, ...args.slice(1));
+        if (r.success) {
+          onSuccessToast?.(successMsg);
+          onSuccess?.();
+          return true;
+        }
+        onError?.(r.error || 'Fehler beim Ausführen von git.');
         return false;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Fehler beim Ausführen von git.';
+        onError?.(message);
+        return false;
+      } finally {
+        syncRunningRef(false);
+        setActiveGitActionLabel(null);
       }
-    }
-
-    syncRunningRef(true);
-    setActiveGitActionLabel(actionLabel || `Git ${command} wird ausgefuehrt...`);
-
-    try {
-      const r = await gitClient.runGitCommand(command, ...args.slice(1));
-      if (r.success) {
-        onSuccessToast?.(successMsg);
-        onSuccess?.();
-        return true;
-      }
-      onError?.(r.error || 'Fehler beim Ausführen von git.');
-      return false;
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Fehler beim Ausführen von git.';
-      onError?.(message);
-      return false;
-    } finally {
-      syncRunningRef(false);
-      setActiveGitActionLabel(null);
-    }
-  }, [activeRepo, onError, onSecretScanBlocked, onSuccess, onSuccessToast, settings?.secretScanBeforePushEnabled, syncRunningRef]);
+    },
+    [activeRepo, onError, onSecretScanBlocked, onSuccess, onSuccessToast, settings?.secretScanBeforePushEnabled, syncRunningRef],
+  );
 
   return {
     isGitActionRunning,

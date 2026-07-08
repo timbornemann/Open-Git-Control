@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
+import type { SavedPlanningApiToken } from './secureStore';
 import {
-  SavedPlanningApiToken,
   clearSavedPlanningApiTokenSecurely,
   isPlanningApiTokenExpired,
   isSecureStorageAvailable,
@@ -26,9 +26,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 let activeState: Omit<PlanningApiAuthState, 'manageable' | 'storageAvailable'> | null = null;
 
-const cleanString = (value: unknown): string => (
-  typeof value === 'string' ? value.trim() : ''
-);
+const cleanString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const createToken = (): string => crypto.randomBytes(32).toString('base64url');
 
@@ -37,9 +35,7 @@ const getConfiguredToken = (): string | null => {
   return token.length >= MIN_TOKEN_LENGTH ? token : null;
 };
 
-const toState = (
-  state: Omit<PlanningApiAuthState, 'manageable' | 'storageAvailable'>,
-): PlanningApiAuthState => {
+const toState = (state: Omit<PlanningApiAuthState, 'manageable' | 'storageAvailable'>): PlanningApiAuthState => {
   const storageAvailable = isSecureStorageAvailable();
   return {
     ...state,
@@ -56,9 +52,7 @@ const createSessionState = (): Omit<PlanningApiAuthState, 'manageable' | 'storag
   persistent: false,
 });
 
-const fromSavedToken = (
-  saved: SavedPlanningApiToken,
-): Omit<PlanningApiAuthState, 'manageable' | 'storageAvailable'> => ({
+const fromSavedToken = (saved: SavedPlanningApiToken): Omit<PlanningApiAuthState, 'manageable' | 'storageAvailable'> => ({
   token: saved.token,
   source: 'saved',
   createdAt: saved.createdAt,

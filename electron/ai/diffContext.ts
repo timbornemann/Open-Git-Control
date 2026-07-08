@@ -30,7 +30,9 @@ export function parseNumstatLine(raw: string): Numstat {
 }
 
 export function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS): string {
-  const compact = String(line || '').replace(/\s+/g, ' ').trim();
+  const compact = String(line || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!compact) return '';
   return compact.length <= maxChars ? compact : `${compact.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 }
@@ -71,19 +73,19 @@ function pickRepresentativeItems<T>(values: T[], limit = 3): T[] {
 
 function isDiffMetadataLine(line: string): boolean {
   return (
-    /^diff --git /i.test(line)
-    || /^index /i.test(line)
-    || /^--- /i.test(line)
-    || /^\+\+\+ /i.test(line)
-    || /^new file mode /i.test(line)
-    || /^deleted file mode /i.test(line)
-    || /^similarity index /i.test(line)
-    || /^rename from /i.test(line)
-    || /^rename to /i.test(line)
-    || /^old mode /i.test(line)
-    || /^new mode /i.test(line)
-    || /^Binary files /i.test(line)
-    || /^GIT binary patch$/i.test(line)
+    /^diff --git /i.test(line) ||
+    /^index /i.test(line) ||
+    /^--- /i.test(line) ||
+    /^\+\+\+ /i.test(line) ||
+    /^new file mode /i.test(line) ||
+    /^deleted file mode /i.test(line) ||
+    /^similarity index /i.test(line) ||
+    /^rename from /i.test(line) ||
+    /^rename to /i.test(line) ||
+    /^old mode /i.test(line) ||
+    /^new mode /i.test(line) ||
+    /^Binary files /i.test(line) ||
+    /^GIT binary patch$/i.test(line)
   );
 }
 

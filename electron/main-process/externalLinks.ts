@@ -1,5 +1,6 @@
 import { ipcMain, shell } from 'electron';
 import type { BrowserWindow } from 'electron';
+import { IpcChannel } from '../../src/types/ipcContract';
 
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:']);
 const MAX_EXTERNAL_URL_LENGTH = 4096;
@@ -34,7 +35,7 @@ export async function openExternalUrl(value: unknown): Promise<{ success: boolea
 }
 
 export function registerExternalLinkHandlers(): void {
-  ipcMain.handle('external:open', async (_event: unknown, url: unknown) => openExternalUrl(url));
+  ipcMain.handle(IpcChannel.ExternalOpen, async (_event: unknown, url: unknown) => openExternalUrl(url));
 }
 
 export function installExternalWindowHandler(window: BrowserWindow): void {

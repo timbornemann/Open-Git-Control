@@ -9,11 +9,11 @@ function normalizeRepoRelativePath(value: unknown): string {
   const segments = normalizedForCheck.split('/');
 
   if (
-    path.isAbsolute(filePath)
-    || path.win32.isAbsolute(filePath)
-    || normalizedForCheck.startsWith('/')
-    || normalizedForCheck.startsWith(':(')
-    || segments.includes('..')
+    path.isAbsolute(filePath) ||
+    path.win32.isAbsolute(filePath) ||
+    normalizedForCheck.startsWith('/') ||
+    normalizedForCheck.startsWith(':(') ||
+    segments.includes('..')
   ) {
     throw new Error('Diff path must be repository-relative.');
   }
@@ -32,22 +32,13 @@ export function normalizeDiffPreviewArgs(args: unknown): string[] {
       return ['diff', '--', normalizeRepoRelativePath(args[2])];
     }
 
-    if (
-      args.length === 4
-      && sanitizeArg(args[1]) === '--cached'
-      && sanitizeArg(args[2]) === '--'
-    ) {
+    if (args.length === 4 && sanitizeArg(args[1]) === '--cached' && sanitizeArg(args[2]) === '--') {
       return ['diff', '--cached', '--', normalizeRepoRelativePath(args[3])];
     }
   }
 
   if (command === 'show') {
-    if (
-      args.length === 6
-      && sanitizeArg(args[1]) === '--format='
-      && sanitizeArg(args[2]) === '--binary'
-      && sanitizeArg(args[4]) === '--'
-    ) {
+    if (args.length === 6 && sanitizeArg(args[1]) === '--format=' && sanitizeArg(args[2]) === '--binary' && sanitizeArg(args[4]) === '--') {
       const commitHash = sanitizeArg(args[3]);
       if (!COMMIT_HASH_RE.test(commitHash)) {
         throw new Error('Invalid commit hash.');

@@ -17,9 +17,8 @@ const getSidebarMaxWidthForViewport = (viewportWidth: number): number => {
   return Math.min(SIDEBAR_MAX_WIDTH, maxFromWindow);
 };
 
-const clampSidebarWidthForViewport = (width: number, viewportWidth: number): number => (
-  Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidthForViewport(viewportWidth), width))
-);
+const clampSidebarWidthForViewport = (width: number, viewportWidth: number): number =>
+  Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidthForViewport(viewportWidth), width));
 
 const readInitialSidebarWidth = (): number => {
   const storedWidthValue = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
@@ -29,9 +28,7 @@ const readInitialSidebarWidth = (): number => {
 
 export const useResizableSidebar = () => {
   const [sidebarWidth, setSidebarWidth] = useState(readInitialSidebarWidth);
-  const sidebarManuallyCollapsedRef = useRef(
-    window.localStorage.getItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
-  );
+  const sidebarManuallyCollapsedRef = useRef(window.localStorage.getItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH || sidebarManuallyCollapsedRef.current;
   });
@@ -42,9 +39,12 @@ export const useResizableSidebar = () => {
     return getSidebarMaxWidthForViewport(window.innerWidth);
   }, []);
 
-  const clampSidebarWidth = useCallback((width: number) => {
-    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), width));
-  }, [getSidebarMaxWidth]);
+  const clampSidebarWidth = useCallback(
+    (width: number) => {
+      return Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), width));
+    },
+    [getSidebarMaxWidth],
+  );
 
   const resetLayout = useCallback(() => {
     setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
@@ -62,13 +62,16 @@ export const useResizableSidebar = () => {
     });
   }, []);
 
-  const handleSidebarResizeStart = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    sidebarResizeStateRef.current = { startX: event.clientX, startWidth: sidebarWidth };
-    setIsSidebarResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, [sidebarWidth]);
+  const handleSidebarResizeStart = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      sidebarResizeStateRef.current = { startX: event.clientX, startWidth: sidebarWidth };
+      setIsSidebarResizing(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [sidebarWidth],
+  );
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {

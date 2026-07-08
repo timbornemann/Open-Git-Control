@@ -23,27 +23,15 @@ if (!fs.existsSync(releaseDir)) {
 }
 
 const productName = 'Open-Git-Control';
-const releaseFiles = fs.readdirSync(releaseDir, { withFileTypes: true })
+const releaseFiles = fs
+  .readdirSync(releaseDir, { withFileTypes: true })
   .filter((entry) => entry.isFile())
   .map((entry) => entry.name);
 
 const requiredFilesByPlatform = {
-  windows: [
-    'latest.yml',
-    `${productName}-${version}-win-x64.exe`,
-    `${productName}-${version}-win-x64.exe.blockmap`,
-  ],
-  linux: [
-    'latest-linux.yml',
-    `${productName}-${version}-linux-x86_64.AppImage`,
-    `${productName}-${version}-linux-amd64.deb`,
-  ],
-  'macos': [
-    'latest-mac.yml',
-    `${productName}-${version}-mac-x64.zip`,
-    `${productName}-${version}-mac-x64.zip.blockmap`,
-    `${productName}-${version}-mac-x64.dmg`,
-  ],
+  windows: ['latest.yml', `${productName}-${version}-win-x64.exe`, `${productName}-${version}-win-x64.exe.blockmap`],
+  linux: ['latest-linux.yml', `${productName}-${version}-linux-x86_64.AppImage`, `${productName}-${version}-linux-amd64.deb`],
+  macos: ['latest-mac.yml', `${productName}-${version}-mac-x64.zip`, `${productName}-${version}-mac-x64.zip.blockmap`, `${productName}-${version}-mac-x64.dmg`],
 };
 
 const requiredFiles = requiredFilesByPlatform[platformLabel];

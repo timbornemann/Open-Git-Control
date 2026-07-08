@@ -1,12 +1,7 @@
 import React from 'react';
-import {
-  useGithubContext,
-  useRepositoryContext,
-  useUIContext,
-  useWorkflowContext,
-} from '../../contexts/AppStateContext';
-import { useI18n } from '../../i18n';
-import { useWorkingTreeSnapshot } from '../../hooks/useWorkingTreeSnapshot';
+import { useGithubContext, useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useI18n } from '@/i18n';
+import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
 import { useMainViewPaneResizer } from './hooks/useMainViewPaneResizer';
 import { MainInspectorPane } from './main/MainInspectorPane';
@@ -23,12 +18,7 @@ export const MainView: React.FC = () => {
   const { t } = useI18n();
   const workingTree = useWorkingTreeSnapshot(repository.activeRepo, repository.refreshTrigger);
 
-  const {
-    primaryPaneBasis,
-    isContentResizing,
-    contentAreaRef,
-    handleContentResizeStart,
-  } = useMainViewPaneResizer();
+  const { primaryPaneBasis, isContentResizing, contentAreaRef, handleContentResizeStart } = useMainViewPaneResizer();
 
   const {
     activeDiffRequest,
@@ -60,19 +50,9 @@ export const MainView: React.FC = () => {
     onNavigateToCommit: repository.onNavigateToCommit,
   });
 
-  const {
-    isInspectorPaneVisible,
-    toggleInspectorPane,
-    hideInspectorPane,
-  } = useInspectorPaneVisibility();
+  const { isInspectorPaneVisible, toggleInspectorPane, hideInspectorPane } = useInspectorPaneVisibility();
 
-  const {
-    showTimeline,
-    setShowTimeline,
-    isTimelineLoading,
-    timelineCommits,
-    openTimeline,
-  } = useMainViewTimeline({
+  const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
     activeRepo: repository.activeRepo,
     setActiveTab: ui.setActiveTab,
     onCloseReleaseCreator: github.onCloseReleaseCreator,

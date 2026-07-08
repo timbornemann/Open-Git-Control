@@ -18,31 +18,19 @@ type NavigationOptions = {
 
 type InstallSecurityOptions = NavigationOptions;
 
-const DEV_SERVER_ORIGINS = new Set([
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-]);
+const DEV_SERVER_ORIGINS = new Set(['http://localhost:5173', 'http://127.0.0.1:5173']);
 
-const UNSAFE_DEBUG_SWITCHES = [
-  '--remote-debugging-port',
-  '--remote-debugging-pipe',
-  '--inspect',
-  '--inspect-brk',
-];
+const UNSAFE_DEBUG_SWITCHES = ['--remote-debugging-port', '--remote-debugging-pipe', '--inspect', '--inspect-brk'];
 
 const normalizePathForCompare = (value: string): string => {
   const resolved = path.resolve(value);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 };
 
-const productionDistPath = (mainProcessDir: string): string => (
-  normalizePathForCompare(path.join(mainProcessDir, '../../dist'))
-);
+const productionDistPath = (mainProcessDir: string): string => normalizePathForCompare(path.join(mainProcessDir, '../../dist'));
 
 export function hasUnsafeDebugSwitch(argv: readonly string[] = process.argv): boolean {
-  return argv.some((arg) => UNSAFE_DEBUG_SWITCHES.some((switchName) => (
-    arg === switchName || arg.startsWith(`${switchName}=`)
-  )));
+  return argv.some((arg) => UNSAFE_DEBUG_SWITCHES.some((switchName) => arg === switchName || arg.startsWith(`${switchName}=`)));
 }
 
 export function isDevToolsAccelerator(input: ShortcutInput): boolean {

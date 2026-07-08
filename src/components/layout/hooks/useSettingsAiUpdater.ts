@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AppSettingsDto, UpdaterStatusDto } from '../../../global';
-import type { TranslationVariables } from '../../../i18n';
-import { aiClient } from '../../../services/aiClient';
-import { appClient } from '../../../services/appClient';
+import type { AppSettingsDto, UpdaterStatusDto } from '@/global';
+import type { TranslationVariables } from '@/i18n';
+import { aiClient } from '@/services/aiClient';
+import { appClient } from '@/services/appClient';
 
 type TranslateFn = (deText: string, enText: string) => string;
 type CatalogTranslateFn = (key: string, variables?: TranslationVariables) => string;
@@ -60,7 +60,8 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
 
   const oneClickUpdateLabel = useMemo(() => {
     if (isInstallingUpdate) return t('generated.components.layout.hooks.usesettingsaiupdater.installing_update_b4260e49');
-    if (isRunningUpdate || updaterStatus?.state === 'checking') return t('generated.components.layout.hooks.usesettingsaiupdater.checking_for_updates_67d1a534');
+    if (isRunningUpdate || updaterStatus?.state === 'checking')
+      return t('generated.components.layout.hooks.usesettingsaiupdater.checking_for_updates_67d1a534');
     if (updaterStatus?.state === 'downloading') return t('generated.components.layout.hooks.usesettingsaiupdater.downloading_update_b2499c0b');
     if (updaterStatus?.state === 'downloaded') return t('generated.components.layout.hooks.usesettingsaiupdater.install_update_f3aa2988');
     if (updaterStatus?.state === 'update-available') return t('generated.components.layout.hooks.usesettingsaiupdater.download_update_8917c04f');
@@ -68,11 +69,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
   }, [isInstallingUpdate, isRunningUpdate, updaterStatus?.state, tr]);
 
   const oneClickUpdateDisabled =
-    !updaterSupported
-    || isRunningUpdate
-    || isInstallingUpdate
-    || updaterStatus?.state === 'checking'
-    || updaterStatus?.state === 'downloading';
+    !updaterSupported || isRunningUpdate || isInstallingUpdate || updaterStatus?.state === 'checking' || updaterStatus?.state === 'downloading';
 
   const setSelectedModel = async (model: string) => {
     if (settings.aiProvider === 'gemini') {
@@ -104,7 +101,12 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
         setAiStatus(tr(`Verbindung fehlgeschlagen: ${result.error}`, `Connection failed: ${result.error}`));
         return;
       }
-      setAiStatus(tr(`Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`, `Connected: ${result.data.provider} / ${result.data.model} (${result.data.detail})`));
+      setAiStatus(
+        tr(
+          `Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`,
+          `Connected: ${result.data.provider} / ${result.data.model} (${result.data.detail})`,
+        ),
+      );
     } catch (error: unknown) {
       setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.connection_failed_8780a183'));
     } finally {
@@ -148,7 +150,9 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
         }
         setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.restarting_app_to_install_update_f142b007'));
       } catch (error: unknown) {
-        setUpdaterMessage(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'));
+        setUpdaterMessage(
+          error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'),
+        );
       } finally {
         setIsInstallingUpdate(false);
       }

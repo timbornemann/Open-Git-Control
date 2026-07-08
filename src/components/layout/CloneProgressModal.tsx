@@ -1,6 +1,6 @@
 import React from 'react';
 import { DownloadCloud } from 'lucide-react';
-import { useI18n } from '../../i18n';
+import { useI18n } from '@/i18n';
 import { GitTransferProgressPanel } from './GitTransferProgressPanel';
 
 type Props = {
@@ -12,14 +12,7 @@ type Props = {
   onClose: () => void;
 };
 
-export const CloneProgressModal: React.FC<Props> = ({
-  isCloning,
-  cloneRepoName,
-  cloneFinished,
-  cloneError,
-  cloneLog,
-  onClose,
-}) => {
+export const CloneProgressModal: React.FC<Props> = ({ isCloning, cloneRepoName, cloneFinished, cloneError, cloneLog, onClose }) => {
   const { t } = useI18n();
 
   if (!isCloning && !cloneFinished && !cloneError) return null;
@@ -28,11 +21,17 @@ export const CloneProgressModal: React.FC<Props> = ({
 
   return (
     <div className="git-transfer-backdrop">
-      <div className="git-transfer-modal" role="dialog" aria-modal="true" aria-label={t('generated.components.layout.cloneprogressmodal.clone_repository_25099131')}>
+      <div
+        className="git-transfer-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('generated.components.layout.cloneprogressmodal.clone_repository_25099131')}
+      >
         <div className="git-transfer-modal-header">
           <DownloadCloud size={18} className="git-transfer-header-icon" aria-hidden="true" />
           <span className="git-transfer-modal-title">
-            {t('generated.components.layout.cloneprogressmodal.cloning_7c6e2dc2')}: {cloneRepoName || t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb')}
+            {t('generated.components.layout.cloneprogressmodal.cloning_7c6e2dc2')}:{' '}
+            {cloneRepoName || t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb')}
           </span>
           <div className="git-transfer-header-spacer" />
           {isRunning && <div className="clone-spinner" />}

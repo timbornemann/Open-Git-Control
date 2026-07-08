@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Play, Pause, RotateCcw, FastForward } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 import { FileTimelineCanvas } from './FileTimelineCanvas';
 
 type FileNode = {
@@ -76,14 +76,14 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
 
     // Build the flat list of active files up to the current index
     const activeFiles = new Map<string, 'added' | 'modified' | 'deleted' | 'renamed' | 'unchanged'>();
-    
+
     for (let i = 0; i <= currentIndex; i++) {
       const commit = commits[i];
       if (!commit) continue;
 
       for (const change of commit.changes) {
         const isCurrent = i === currentIndex;
-        
+
         if (change.status === 'added') {
           activeFiles.set(change.path, isCurrent ? 'added' : 'unchanged');
         } else if (change.status === 'modified') {
@@ -155,20 +155,41 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
     return (
       <div className="diff-empty-state" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <span>{t('generated.components.filetimelineview.no_commits_found_in_repository_1449958f')}</span>
-        <button className="staging-btn-sm" onClick={onClose}>{t('generated.components.filetimelineview.back_4e004d2b')}</button>
+        <button className="staging-btn-sm" onClick={onClose}>
+          {t('generated.components.filetimelineview.back_4e004d2b')}
+        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-darker)', color: 'var(--text-primary)', overflow: 'hidden', userSelect: 'none' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        background: 'var(--bg-darker)',
+        color: 'var(--text-primary)',
+        overflow: 'hidden',
+        userSelect: 'none',
+      }}
+    >
       {/* Visual Canvas Area */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <FileTimelineCanvas fileTree={fileTree} activeCommit={activeCommit} />
       </div>
 
       {/* Control panel at the bottom */}
-      <div style={{ padding: '16px 20px', background: 'var(--bg-dark)', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div
+        style={{
+          padding: '16px 20px',
+          background: 'var(--bg-dark)',
+          borderTop: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}
+      >
         {/* Active Commit Information */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
           {activeCommit ? (
@@ -177,7 +198,16 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
                 <span className="topbar-chip topbar-chip-branch" style={{ fontFamily: 'monospace', fontSize: '0.75rem', padding: '1px 6px', margin: 0 }}>
                   {activeCommit.hash.substring(0, 8)}
                 </span>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {activeCommit.subject}
                 </span>
               </div>
@@ -212,7 +242,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
               background: 'var(--border-color)',
               outline: 'none',
               cursor: 'pointer',
-              accentColor: 'var(--text-accent)'
+              accentColor: 'var(--text-accent)',
             }}
           />
         </div>
@@ -231,7 +261,17 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
             <button
               onClick={handlePlayPause}
               className="diff-nav-btn"
-              style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--accent-primary-soft)', color: 'var(--text-accent)', border: '1px solid var(--accent-primary-border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'var(--accent-primary-soft)',
+                color: 'var(--text-accent)',
+                border: '1px solid var(--accent-primary-border)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
               title={isPlaying ? t('generated.components.filetimelineview.pause_a1839c38') : t('generated.components.filetimelineview.play_55b22fd2')}
             >
               {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
@@ -247,9 +287,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-              {t('generated.components.filetimelineview.speed_805e4a3b')}
-            </span>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{t('generated.components.filetimelineview.speed_805e4a3b')}</span>
             <select
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
@@ -261,7 +299,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
                 padding: '4px 8px',
                 fontSize: '0.75rem',
                 outline: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
             >
               <option value={1500}>{t('generated.components.filetimelineview.very_slow_1_5s_f46bec3e')}</option>

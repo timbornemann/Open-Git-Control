@@ -8,11 +8,9 @@ import {
   isMarkdownFilePath,
   renderMarkdownToSanitizedHtml,
   resolveMarkdownPreviewAssetPath,
-} from '../markdownPreview';
+} from '@/utils/markdownPreview';
 
-const parseBody = (html: string): HTMLElement => (
-  new DOMParser().parseFromString(html, 'text/html').body
-);
+const parseBody = (html: string): HTMLElement => new DOMParser().parseFromString(html, 'text/html').body;
 
 describe('markdown preview helpers', () => {
   afterEach(() => {
@@ -60,17 +58,19 @@ describe('markdown preview helpers', () => {
   });
 
   it('renders Markdown and sanitizes unsafe inline HTML', () => {
-    const html = renderMarkdownToSanitizedHtml([
-      '# Release Notes',
-      '',
-      '[External](https://example.test) [Local](./guide.md)',
-      '',
-      '- [x] shipped',
-      '',
-      '<script>alert("x")</script>',
-      '<form><input type="text" value="unsafe"></form>',
-      '<button>Do it</button>',
-    ].join('\n'));
+    const html = renderMarkdownToSanitizedHtml(
+      [
+        '# Release Notes',
+        '',
+        '[External](https://example.test) [Local](./guide.md)',
+        '',
+        '- [x] shipped',
+        '',
+        '<script>alert("x")</script>',
+        '<form><input type="text" value="unsafe"></form>',
+        '<button>Do it</button>',
+      ].join('\n'),
+    );
     const body = parseBody(html);
 
     expect(body.querySelector('h1')?.textContent).toBe('Release Notes');
@@ -125,11 +125,7 @@ describe('markdown preview helpers', () => {
   });
 
   it('applies resolved data URLs to matching Markdown images', () => {
-    const html = [
-      '<img src="./assets/screen.png">',
-      '<img src="./assets/other.png">',
-      '<img src="https://example.test/remote.png">',
-    ].join('');
+    const html = ['<img src="./assets/screen.png">', '<img src="./assets/other.png">', '<img src="https://example.test/remote.png">'].join('');
     const rewritten = applyMarkdownPreviewImageDataUrls(html, {
       './assets/screen.png': 'data:image/png;base64,AAAA',
     });
@@ -147,8 +143,10 @@ describe('markdown preview helpers', () => {
     vi.stubGlobal('DOMParser', undefined);
     const html = '<img src="./assets/screen.png">';
 
-    expect(applyMarkdownPreviewImageDataUrls(html, {
-      './assets/screen.png': 'data:image/png;base64,AAAA',
-    })).toBe(html);
+    expect(
+      applyMarkdownPreviewImageDataUrls(html, {
+        './assets/screen.png': 'data:image/png;base64,AAAA',
+      }),
+    ).toBe(html);
   });
 });

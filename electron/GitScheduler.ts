@@ -151,11 +151,8 @@ export class GitScheduler {
     }
 
     while (state.activeReads.size < MAX_CONCURRENT_READS) {
-      const activeBackgroundCount = [...state.activeReads]
-        .filter((entry) => entry.kind === 'background')
-        .length;
-      const hasActiveInteractiveRead = [...state.activeReads]
-        .some((entry) => entry.kind === 'interactive');
+      const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background').length;
+      const hasActiveInteractiveRead = [...state.activeReads].some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
         if (entry.kind === 'write') return false;
         if (entry.kind === 'background') {
@@ -170,12 +167,7 @@ export class GitScheduler {
     }
   }
 
-  private async execute(
-    repoPath: string,
-    state: RepoState,
-    entry: QueueEntry<unknown>,
-    isWrite: boolean,
-  ): Promise<void> {
+  private async execute(repoPath: string, state: RepoState, entry: QueueEntry<unknown>, isWrite: boolean): Promise<void> {
     const startedAt = Date.now();
     let aborted = false;
     let resultBytes = 0;

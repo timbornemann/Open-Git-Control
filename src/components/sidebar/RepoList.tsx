@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
-import { RepoSortByDto } from '../../global';
-import { useI18n } from '../../i18n';
+import type { RepoSortByDto } from '@/global';
+import { useI18n } from '@/i18n';
 
 type Props = {
   openRepos: string[];
@@ -58,16 +58,16 @@ export const RepoList: React.FC<Props> = ({
           className="icon-btn"
           onClick={onToggleCollapsed}
           style={{ padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '4px' }}
-          title={collapsed ? t('generated.components.sidebar.repolist.show_repos_2ba8eb08') : t('generated.components.sidebar.repolist.collapse_repos_388ced69')}
+          title={
+            collapsed ? t('generated.components.sidebar.repolist.show_repos_2ba8eb08') : t('generated.components.sidebar.repolist.collapse_repos_388ced69')
+          }
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
           <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
             {t('generated.components.sidebar.repolist.repos_6d1e0da7')}
           </span>
         </button>
-        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', paddingRight: '4px' }}>
-          {openRepos.length}
-        </span>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', paddingRight: '4px' }}>{openRepos.length}</span>
       </div>
 
       {!collapsed && (
@@ -113,7 +113,14 @@ export const RepoList: React.FC<Props> = ({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('generated.components.sidebar.repolist.search_repository_4f79edce')}
                 className="sidebar-filter-input"
-                style={{ padding: '7px 8px 7px 28px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                style={{
+                  padding: '7px 8px 7px 28px',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-panel)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                }}
               />
             </div>
           )}
@@ -141,14 +148,25 @@ export const RepoList: React.FC<Props> = ({
                     border: isActive ? '1px solid var(--accent-primary)' : '1px solid transparent',
                   }}
                 >
-                  <FolderGit2 size={14} style={{ opacity: isActive ? 1 : 0.6, flexShrink: 0, color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)' }} />
+                  <FolderGit2
+                    size={14}
+                    style={{ opacity: isActive ? 1 : 0.6, flexShrink: 0, color: isActive ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                  />
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: isActive ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        fontWeight: isActive ? 600 : 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                      }}
+                    >
                       {name}
                     </span>
                     <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
-                      {new Date(lastOpened).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}
-                      {' '}
+                      {new Date(lastOpened).toLocaleDateString(locale, { day: '2-digit', month: '2-digit' })}{' '}
                       {new Date(lastOpened).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -160,12 +178,24 @@ export const RepoList: React.FC<Props> = ({
                     }}
                     className="icon-btn sidebar-row-action-icon"
                     style={{ opacity: isPinned ? 1 : 0.7, color: isPinned ? 'var(--status-warning)' : 'var(--text-secondary)' }}
-                    title={isPinned ? t('generated.components.sidebar.repolist.remove_favorite_baff5f08') : t('generated.components.sidebar.repolist.mark_as_favorite_e3ba96ce')}
+                    title={
+                      isPinned
+                        ? t('generated.components.sidebar.repolist.remove_favorite_baff5f08')
+                        : t('generated.components.sidebar.repolist.mark_as_favorite_e3ba96ce')
+                    }
                   >
                     {isPinned ? <Pin size={12} /> : <PinOff size={12} />}
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); onCloseRepo(repoPath); }} className="icon-btn repo-close-btn sidebar-row-action-icon" style={{ opacity: 0 }} title={t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseRepo(repoPath);
+                    }}
+                    className="icon-btn repo-close-btn sidebar-row-action-icon"
+                    style={{ opacity: 0 }}
+                    title={t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}
+                  >
                     <X size={12} />
                   </button>
                 </div>
@@ -182,7 +212,22 @@ export const RepoList: React.FC<Props> = ({
               <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                 <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
                 {t('generated.components.sidebar.repolist.no_repository_opened_97f33d44')}
-                <button onClick={onOpenFolder} style={{ marginTop: '12px', display: 'block', width: '100%', padding: '8px 12px', backgroundColor: 'var(--accent-primary)', color: 'var(--on-accent)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                <button
+                  onClick={onOpenFolder}
+                  style={{
+                    marginTop: '12px',
+                    display: 'block',
+                    width: '100%',
+                    padding: '8px 12px',
+                    backgroundColor: 'var(--accent-primary)',
+                    color: 'var(--on-accent)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                  }}
+                >
                   {t('generated.components.sidebar.repolist.open_repository_82c17989')}
                 </button>
                 <button

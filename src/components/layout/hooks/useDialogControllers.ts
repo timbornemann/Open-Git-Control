@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ConfirmDialogState, InputDialogState } from '../layoutTypes';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 
 export const useDialogControllers = () => {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -32,12 +32,15 @@ export const useDialogControllers = () => {
 
   const closeInputDialog = useCallback(() => setInputDialog(null), []);
 
-  const executeInputDialog = useCallback(async (values: Record<string, string>) => {
-    if (!inputDialog) return;
-    const action = inputDialog.onSubmit;
-    setInputDialog(null);
-    await action(values);
-  }, [inputDialog]);
+  const executeInputDialog = useCallback(
+    async (values: Record<string, string>) => {
+      if (!inputDialog) return;
+      const action = inputDialog.onSubmit;
+      setInputDialog(null);
+      await action(values);
+    },
+    [inputDialog],
+  );
 
   return {
     confirmDialog,

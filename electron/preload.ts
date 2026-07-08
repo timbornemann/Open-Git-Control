@@ -1,4 +1,5 @@
 import type { IpcRendererEvent } from 'electron';
+import { IpcChannel } from '../src/types/ipcContract';
 import type {
   AppSettingsDto,
   CommitStatsUpdateDto,
@@ -19,146 +20,143 @@ type RepoUnavailablePayload = {
   error: string;
 };
 
-const invokeGitCommand = async (
-  commandName: GitCommandNameDto,
-  ...args: string[]
-): Promise<GitCommandResultDto> => {
-  return ipcRenderer.invoke('git:command', commandName, ...args);
+const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
+  return ipcRenderer.invoke(IpcChannel.GitCommand, commandName, ...args);
 };
 
-const invokeGitMutation = async (ipcChannel: string, commandName: string, payload: unknown) => {
+const invokeGitMutation = async (ipcChannel: IpcChannel, commandName: string, payload: unknown) => {
   void commandName;
   return ipcRenderer.invoke(ipcChannel, payload);
 };
 
 const electronAPI: ElectronAPI = {
-  openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
-  selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
-  selectProjectParentDirectory: () => ipcRenderer.invoke('dialog:selectProjectParentDirectory'),
-  setRepoPath: (repoPath: string) => ipcRenderer.invoke('git:setRepo', repoPath),
-  clearRepoPath: () => ipcRenderer.invoke('git:clearRepo'),
-  openExternalUrl: (url: string) => ipcRenderer.invoke('external:open', url),
+  openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpenDirectory),
+  selectDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectDirectory),
+  selectProjectParentDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectProjectParentDirectory),
+  setRepoPath: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitSetRepo, repoPath),
+  clearRepoPath: () => ipcRenderer.invoke(IpcChannel.GitClearRepo),
+  openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
   runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
   createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
-    invokeGitMutation('git:createCommit', 'commit', params),
-  getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) =>
-    ipcRenderer.invoke('git:commitLogPage', params),
-  requestCommitStats: (
-    hashes: string[],
-    priority?: 'selected' | 'visible' | 'background',
-  ) => ipcRenderer.invoke('git:requestCommitStats', hashes, priority),
+    invokeGitMutation(IpcChannel.GitCreateCommit, 'commit', params),
+  getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => ipcRenderer.invoke(IpcChannel.GitCommitLogPage, params),
+  requestCommitStats: (hashes: string[], priority?: 'selected' | 'visible' | 'background') =>
+    ipcRenderer.invoke(IpcChannel.GitRequestCommitStats, hashes, priority),
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => {
     const handler = (_event: IpcRendererEvent, update: CommitStatsUpdateDto) => callback(update);
-    ipcRenderer.on('git:commitStats', handler);
-    return () => ipcRenderer.removeListener('git:commitStats', handler);
+    ipcRenderer.on(IpcChannel.GitCommitStats, handler);
+    return () => ipcRenderer.removeListener(IpcChannel.GitCommitStats, handler);
   },
-  getWorkingTreeSnapshot: () => ipcRenderer.invoke('git:workingTreeSnapshot'),
-  getWorkingTreeStats: (snapshotId: string) => ipcRenderer.invoke('git:workingTreeStats', snapshotId),
-  stagePaths: (paths: string[]) => ipcRenderer.invoke('git:stagePaths', paths),
-  getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) =>
-    ipcRenderer.invoke('git:diffPreview', args, limits || {}),
+  getWorkingTreeSnapshot: () => ipcRenderer.invoke(IpcChannel.GitWorkingTreeSnapshot),
+  getWorkingTreeStats: (snapshotId: string) => ipcRenderer.invoke(IpcChannel.GitWorkingTreeStats, snapshotId),
+  stagePaths: (paths: string[]) => ipcRenderer.invoke(IpcChannel.GitStagePaths, paths),
+  getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) => ipcRenderer.invoke(IpcChannel.GitDiffPreview, args, limits || {}),
   getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
-    ipcRenderer.invoke('git:fileBlameRange', filePath, commitHash, startLine, lineCount),
+    ipcRenderer.invoke(IpcChannel.GitFileBlameRange, filePath, commitHash, startLine, lineCount),
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
     void callback;
     return () => undefined;
   },
-  startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke('git:interactiveRebase', baseHash, todoLines),
-  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke('git:applyPatch', patch, options || {}),
-  getStashes: () => ipcRenderer.invoke('git:stashes'),
-  gitStashBranch: (stashName: string, branchName: string) =>
-    invokeGitMutation('git:stashBranch', 'stash branch', { stashName, branchName }),
-  getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke('git:repoOriginUrl', repoPath),
-  addIgnoreRule: (pattern: string) => ipcRenderer.invoke('git:addIgnoreRule', pattern),
+  startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke(IpcChannel.GitInteractiveRebase, baseHash, todoLines),
+  applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke(IpcChannel.GitApplyPatch, patch, options || {}),
+  getStashes: () => ipcRenderer.invoke(IpcChannel.GitStashes),
+  gitStashBranch: (stashName: string, branchName: string) => invokeGitMutation(IpcChannel.GitStashBranch, 'stash branch', { stashName, branchName }),
+  getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitRepoOriginUrl, repoPath),
+  addIgnoreRule: (pattern: string) => ipcRenderer.invoke(IpcChannel.GitAddIgnoreRule, pattern),
   gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
   gitPull: () => invokeGitCommand('pull'),
   gitPush: () => invokeGitCommand('push'),
-  scanPushSecrets: (params?: { includeTags?: boolean }) => ipcRenderer.invoke('git:scanPushSecrets', params || {}),
-  cancelSecretScan: () => ipcRenderer.invoke('git:cancelSecretScan'),
-  gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke('git:clone', cloneUrl, targetDir, targetName),
-  gitInit: (repoPath: string) => ipcRenderer.invoke('git:init', repoPath),
-  getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
-    ipcRenderer.invoke('git:fileHistory', filePath, commitHash, limit),
-  getFileBlame: (filePath: string, commitHash?: string) =>
-    ipcRenderer.invoke('git:fileBlame', filePath, commitHash),
-  getFileTimelineData: (limit?: number) => ipcRenderer.invoke('git:getFileTimelineData', limit),
-  readRepoFile: (filePath: string) => ipcRenderer.invoke('git:readRepoFile', filePath),
+  scanPushSecrets: (params?: { includeTags?: boolean }) => ipcRenderer.invoke(IpcChannel.GitScanPushSecrets, params || {}),
+  cancelSecretScan: () => ipcRenderer.invoke(IpcChannel.GitCancelSecretScan),
+  gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke(IpcChannel.GitClone, cloneUrl, targetDir, targetName),
+  gitInit: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitInit, repoPath),
+  getFileHistory: (filePath: string, commitHash?: string, limit?: number) => ipcRenderer.invoke(IpcChannel.GitFileHistory, filePath, commitHash, limit),
+  getFileBlame: (filePath: string, commitHash?: string) => ipcRenderer.invoke(IpcChannel.GitFileBlame, filePath, commitHash),
+  getFileTimelineData: (limit?: number) => ipcRenderer.invoke(IpcChannel.GitGetFileTimelineData, limit),
+  readRepoFile: (filePath: string) => ipcRenderer.invoke(IpcChannel.GitReadRepoFile, filePath),
   getMarkdownPreviewFile: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
-    ipcRenderer.invoke('git:markdownPreviewFile', params),
+    ipcRenderer.invoke(IpcChannel.GitMarkdownPreviewFile, params),
   getRepoFileDataUrl: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
-    ipcRenderer.invoke('git:repoFileDataUrl', params),
-  writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke('git:writeRepoFile', filePath, content),
-  openSubmodule: (submodulePath: string) => ipcRenderer.invoke('git:openSubmodule', submodulePath),
+    ipcRenderer.invoke(IpcChannel.GitRepoFileDataUrl, params),
+  writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke(IpcChannel.GitWriteRepoFile, filePath, content),
+  openSubmodule: (submodulePath: string) => ipcRenderer.invoke(IpcChannel.GitOpenSubmodule, submodulePath),
   onCloneProgress: (callback: (line: string) => void) => {
     const handler = (_event: IpcRendererEvent, line: string) => callback(line);
-    ipcRenderer.on('clone:progress', handler);
-    return () => ipcRenderer.removeListener('clone:progress', handler);
+    ipcRenderer.on(IpcChannel.CloneProgress, handler);
+    return () => ipcRenderer.removeListener(IpcChannel.CloneProgress, handler);
   },
   onJobEvent: (callback: (event: GitJobEventDto) => void) => {
     const handler = (_event: IpcRendererEvent, payload: GitJobEventDto) => callback(payload);
-    ipcRenderer.on('job:event', handler);
-    return () => ipcRenderer.removeListener('job:event', handler);
+    ipcRenderer.on(IpcChannel.JobEvent, handler);
+    return () => ipcRenderer.removeListener(IpcChannel.JobEvent, handler);
   },
-  getStoredRepos: () => ipcRenderer.invoke('repos:getStored'),
-  setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke('repos:setStored', data),
-  plannerGetData: () => ipcRenderer.invoke('planner:getData'),
-  plannerEnsureRepositoryProject: (repoPath: string) => ipcRenderer.invoke('planner:ensureRepositoryProject', repoPath),
-  plannerCreateProject: (input: PlannerProjectInput) => ipcRenderer.invoke('planner:createProject', input),
-  plannerUpdateProject: (projectId: string, input: Partial<PlannerProjectInput>) => ipcRenderer.invoke('planner:updateProject', projectId, input),
-  plannerDeleteProject: (projectId: string) => ipcRenderer.invoke('planner:deleteProject', projectId),
-  plannerDeleteRepositoryProjectByPath: (repoPath: string) => ipcRenderer.invoke('planner:deleteRepositoryProjectByPath', repoPath),
-  plannerCreateItem: (projectId: string, input: PlannerItemInput) => ipcRenderer.invoke('planner:createItem', projectId, input),
-  plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => ipcRenderer.invoke('planner:updateItem', itemId, input),
-  plannerDeleteItem: (itemId: string) => ipcRenderer.invoke('planner:deleteItem', itemId),
+  getStoredRepos: () => ipcRenderer.invoke(IpcChannel.ReposGetStored),
+  setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke(IpcChannel.ReposSetStored, data),
+  plannerGetData: () => ipcRenderer.invoke(IpcChannel.PlannerGetData),
+  plannerEnsureRepositoryProject: (repoPath: string) => ipcRenderer.invoke(IpcChannel.PlannerEnsureRepositoryProject, repoPath),
+  plannerCreateProject: (input: PlannerProjectInput) => ipcRenderer.invoke(IpcChannel.PlannerCreateProject, input),
+  plannerUpdateProject: (projectId: string, input: Partial<PlannerProjectInput>) => ipcRenderer.invoke(IpcChannel.PlannerUpdateProject, projectId, input),
+  plannerDeleteProject: (projectId: string) => ipcRenderer.invoke(IpcChannel.PlannerDeleteProject, projectId),
+  plannerDeleteRepositoryProjectByPath: (repoPath: string) => ipcRenderer.invoke(IpcChannel.PlannerDeleteRepositoryProjectByPath, repoPath),
+  plannerCreateItem: (projectId: string, input: PlannerItemInput) => ipcRenderer.invoke(IpcChannel.PlannerCreateItem, projectId, input),
+  plannerUpdateItem: (itemId: string, input: Partial<PlannerItemInput>) => ipcRenderer.invoke(IpcChannel.PlannerUpdateItem, itemId, input),
+  plannerDeleteItem: (itemId: string) => ipcRenderer.invoke(IpcChannel.PlannerDeleteItem, itemId),
   plannerMaterializeProject: (projectId: string, parentDirectory: string, folderName: string) =>
-    ipcRenderer.invoke('planner:materializeProject', projectId, parentDirectory, folderName),
-  getSettings: () => ipcRenderer.invoke('settings:get'),
-  setSettings: (partial: Partial<AppSettingsDto>) => ipcRenderer.invoke('settings:set', partial),
-  setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke('settings:setGeminiApiKey', apiKey),
-  clearGeminiApiKey: () => ipcRenderer.invoke('settings:clearGeminiApiKey'),
-  getPlanningApiInfo: () => ipcRenderer.invoke('planning-api:getInfo'),
-  generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => ipcRenderer.invoke('planning-api:generateToken', lifetime),
-  clearPlanningApiToken: () => ipcRenderer.invoke('planning-api:clearSavedToken'),
-  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
-  getUpdaterStatus: () => ipcRenderer.invoke('updater:getStatus'),
-  checkForAppUpdates: () => ipcRenderer.invoke('updater:check'),
-  runOneClickAppUpdate: () => ipcRenderer.invoke('updater:runOneClick'),
-  downloadAppUpdate: () => ipcRenderer.invoke('updater:download'),
-  installAppUpdate: () => ipcRenderer.invoke('updater:install'),
+    ipcRenderer.invoke(IpcChannel.PlannerMaterializeProject, projectId, parentDirectory, folderName),
+  getSettings: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
+  setSettings: (partial: Partial<AppSettingsDto>) => ipcRenderer.invoke(IpcChannel.SettingsSet, partial),
+  setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke(IpcChannel.SettingsSetGeminiApiKey, apiKey),
+  clearGeminiApiKey: () => ipcRenderer.invoke(IpcChannel.SettingsClearGeminiApiKey),
+  getPlanningApiInfo: () => ipcRenderer.invoke(IpcChannel.PlanningApiGetInfo),
+  generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => ipcRenderer.invoke(IpcChannel.PlanningApiGenerateToken, lifetime),
+  clearPlanningApiToken: () => ipcRenderer.invoke(IpcChannel.PlanningApiClearSavedToken),
+  getAppVersion: () => ipcRenderer.invoke(IpcChannel.AppGetVersion),
+  getUpdaterStatus: () => ipcRenderer.invoke(IpcChannel.UpdaterGetStatus),
+  checkForAppUpdates: () => ipcRenderer.invoke(IpcChannel.UpdaterCheck),
+  runOneClickAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterRunOneClick),
+  downloadAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterDownload),
+  installAppUpdate: () => ipcRenderer.invoke(IpcChannel.UpdaterInstall),
   onUpdaterEvent: (callback: (event: UpdaterStatusDto) => void) => {
     const handler = (_event: IpcRendererEvent, payload: UpdaterStatusDto) => callback(payload);
-    ipcRenderer.on('updater:event', handler);
-    return () => ipcRenderer.removeListener('updater:event', handler);
+    ipcRenderer.on(IpcChannel.UpdaterEvent, handler);
+    return () => ipcRenderer.removeListener(IpcChannel.UpdaterEvent, handler);
   },
-  aiTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
-  aiListModels: () => ipcRenderer.invoke('ai:listModels'),
-  ollamaTestConnection: () => ipcRenderer.invoke('ai:testConnection'),
-  ollamaListModels: () => ipcRenderer.invoke('ai:listModels'),
-  runAiAutoCommit: () => ipcRenderer.invoke('git:aiAutoCommit'),
-  cancelAiAutoCommit: () => ipcRenderer.invoke('git:cancelAiAutoCommit'),
-  getAiAutoCommitState: () => ipcRenderer.invoke('git:getAiAutoCommitState'),
-  aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke('ai:generateCommitMessage', params),
-  githubAuth: (token: string, host?: string) => ipcRenderer.invoke('github:auth', token, host),
-  githubDeviceStart: () => ipcRenderer.invoke('github:deviceStart'),
-  githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke('github:devicePoll', deviceCode),
-  githubWebLogin: () => ipcRenderer.invoke('github:webLogin'),
-  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => ipcRenderer.invoke('github:getRepos', params || {}),
-  githubGetSavedAuthStatus: () => ipcRenderer.invoke('github:getSavedAuthStatus'),
-  githubLoginWithSavedToken: () => ipcRenderer.invoke('github:loginWithSavedToken'),
-  githubCheckAuthStatus: () => ipcRenderer.invoke('github:checkAuthStatus'),
-  githubLogout: () => ipcRenderer.invoke('github:logout'),
+  aiTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
+  aiListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
+  ollamaTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
+  ollamaListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
+  runAiAutoCommit: () => ipcRenderer.invoke(IpcChannel.GitAiAutoCommit),
+  cancelAiAutoCommit: () => ipcRenderer.invoke(IpcChannel.GitCancelAiAutoCommit),
+  getAiAutoCommitState: () => ipcRenderer.invoke(IpcChannel.GitGetAiAutoCommitState),
+  aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke(IpcChannel.AiGenerateCommitMessage, params),
+  githubAuth: (token: string, host?: string) => ipcRenderer.invoke(IpcChannel.GithubAuth, token, host),
+  githubDeviceStart: () => ipcRenderer.invoke(IpcChannel.GithubDeviceStart),
+  githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke(IpcChannel.GithubDevicePoll, deviceCode),
+  githubWebLogin: () => ipcRenderer.invoke(IpcChannel.GithubWebLogin),
+  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => ipcRenderer.invoke(IpcChannel.GithubGetRepos, params || {}),
+  githubGetSavedAuthStatus: () => ipcRenderer.invoke(IpcChannel.GithubGetSavedAuthStatus),
+  githubLoginWithSavedToken: () => ipcRenderer.invoke(IpcChannel.GithubLoginWithSavedToken),
+  githubCheckAuthStatus: () => ipcRenderer.invoke(IpcChannel.GithubCheckAuthStatus),
+  githubLogout: () => ipcRenderer.invoke(IpcChannel.GithubLogout),
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) =>
-    ipcRenderer.invoke('github:createRepo', { name, description, isPrivate }),
+    ipcRenderer.invoke(IpcChannel.GithubCreateRepo, { name, description, isPrivate }),
   githubForkRepo: (params: { owner: string; repo: string; name?: string; defaultBranchOnly?: boolean }) =>
-    ipcRenderer.invoke('github:forkRepo', params),
-  githubGetPRs: (owner: string, repo: string, state: string) =>
-    ipcRenderer.invoke('github:getPRs', owner, repo, state),
+    ipcRenderer.invoke(IpcChannel.GithubForkRepo, params),
+  githubGetPRs: (owner: string, repo: string, state: string) => ipcRenderer.invoke(IpcChannel.GithubGetPrs, owner, repo, state),
   githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
-    ipcRenderer.invoke('github:createPR', params),
-  githubCreateRelease: (params: { owner: string; repo: string; tagName: string; targetCommitish?: string; releaseName: string; body?: string; draft?: boolean; prerelease?: boolean }) =>
-    ipcRenderer.invoke('github:createRelease', params),
+    ipcRenderer.invoke(IpcChannel.GithubCreatePr, params),
+  githubCreateRelease: (params: {
+    owner: string;
+    repo: string;
+    tagName: string;
+    targetCommitish?: string;
+    releaseName: string;
+    body?: string;
+    draft?: boolean;
+    prerelease?: boolean;
+  }) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
   githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string }) =>
-    ipcRenderer.invoke('github:getReleaseContext', params),
+    ipcRenderer.invoke(IpcChannel.GithubGetReleaseContext, params),
   aiGenerateReleaseNotes: (params: {
     tagName: string;
     releaseName: string;
@@ -168,15 +166,19 @@ const electronAPI: ElectronAPI = {
     language: 'de' | 'en';
     versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];
-  }) => ipcRenderer.invoke('ai:generateReleaseNotes', params),
+  }) => ipcRenderer.invoke(IpcChannel.AiGenerateReleaseNotes, params),
   githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) =>
-    ipcRenderer.invoke('github:getWorkflowRuns', params),
-  githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) =>
-    ipcRenderer.invoke('github:getStatusChecks', params),
-  githubMergePR: (params: { owner: string; repo: string; pullNumber: number; mergeMethod: 'merge' | 'squash' | 'rebase'; commitTitle?: string; commitMessage?: string }) =>
-    ipcRenderer.invoke('github:mergePR', params),
-  getDiagnosticsReport: () => ipcRenderer.invoke('diagnostics:report'),
+    ipcRenderer.invoke(IpcChannel.GithubGetWorkflowRuns, params),
+  githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => ipcRenderer.invoke(IpcChannel.GithubGetStatusChecks, params),
+  githubMergePR: (params: {
+    owner: string;
+    repo: string;
+    pullNumber: number;
+    mergeMethod: 'merge' | 'squash' | 'rebase';
+    commitTitle?: string;
+    commitMessage?: string;
+  }) => ipcRenderer.invoke(IpcChannel.GithubMergePr, params),
+  getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-

@@ -1,4 +1,4 @@
-import type { AppSettingsDto } from '../../global';
+import type { AppSettingsDto } from '@/global';
 
 export const THEME_OPTIONS: Array<{
   value: AppSettingsDto['theme'];

@@ -17,9 +17,7 @@ type UseSidebarCollapseStateParams = {
 
 export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateParams) => {
   const [sidebarCollapseByRepo, setSidebarCollapseByRepo] = useState<SidebarCollapseByRepo>({});
-  const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(
-    DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE,
-  );
+  const [sidebarGeneralCollapseState, setSidebarGeneralCollapseState] = useState<SidebarGeneralCollapseState>(DEFAULT_SIDEBAR_GENERAL_COLLAPSE_STATE);
 
   useEffect(() => {
     try {
@@ -65,25 +63,26 @@ export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateP
   }, [sidebarGeneralCollapseState]);
 
   const activeSidebarCollapseState = useMemo(() => {
-    return activeRepo
-      ? ({ ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(sidebarCollapseByRepo[activeRepo] || {}) })
-      : DEFAULT_SIDEBAR_COLLAPSE_STATE;
+    return activeRepo ? { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(sidebarCollapseByRepo[activeRepo] || {}) } : DEFAULT_SIDEBAR_COLLAPSE_STATE;
   }, [activeRepo, sidebarCollapseByRepo]);
 
-  const updateActiveRepoSidebarCollapse = useCallback((partial: Partial<SidebarCollapseState>) => {
-    if (!activeRepo) return;
+  const updateActiveRepoSidebarCollapse = useCallback(
+    (partial: Partial<SidebarCollapseState>) => {
+      if (!activeRepo) return;
 
-    setSidebarCollapseByRepo((prev) => {
-      const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[activeRepo] || {}) };
-      return {
-        ...prev,
-        [activeRepo]: {
-          ...current,
-          ...partial,
-        },
-      };
-    });
-  }, [activeRepo]);
+      setSidebarCollapseByRepo((prev) => {
+        const current = { ...DEFAULT_SIDEBAR_COLLAPSE_STATE, ...(prev[activeRepo] || {}) };
+        return {
+          ...prev,
+          [activeRepo]: {
+            ...current,
+            ...partial,
+          },
+        };
+      });
+    },
+    [activeRepo],
+  );
 
   const toggleBranchPanelCollapsed = useCallback(() => {
     updateActiveRepoSidebarCollapse({
@@ -126,4 +125,3 @@ export const useSidebarCollapseState = ({ activeRepo }: UseSidebarCollapseStateP
     toggleRepoPanelCollapsed,
   };
 };
-

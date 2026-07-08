@@ -10,7 +10,7 @@ import {
   isRemoteRepositoryMissingError,
   isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
-} from '../gitPushRecovery';
+} from '@/utils/gitPushRecovery';
 
 describe('gitPushRecovery', () => {
   it('detects missing upstream errors', () => {

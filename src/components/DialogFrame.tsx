@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useRef } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 import './dialog.css';
 
 interface DialogFrameProps {
@@ -60,9 +60,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
   useEffect(() => {
     if (!open) return;
 
-    previousFocusRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusDialog = window.setTimeout(() => {
       const preferred = initialFocusRef?.current;
@@ -131,14 +129,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
         if (closeOnBackdrop) onClose();
       }}
     >
-      <div
-        ref={dialogRef}
-        className="dialog-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
+      <div ref={dialogRef} className="dialog-modal" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => event.stopPropagation()}>
         <div className="dialog-header">
           <h3>{title}</h3>
         </div>
@@ -148,10 +139,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
             {cancelLabel ?? t('generated.components.confirm.cancel_035b7526')}
           </button>
           {onSecondaryAction && (
-            <button
-              className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
-              onClick={onSecondaryAction}
-            >
+            <button className={`dialog-btn ${secondaryActionVariant === 'danger' ? 'dialog-btn-danger' : 'dialog-btn-primary'}`} onClick={onSecondaryAction}>
               {secondaryActionLabel ?? t('generated.components.dialogframe.run_alternative_fd1645c6')}
             </button>
           )}

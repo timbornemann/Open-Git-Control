@@ -1,17 +1,8 @@
 import React from 'react';
-import { GraphEdge, GraphNode } from '../../utils/graphLayout';
-import {
-  GRAPH_PADDING,
-  LANE_WIDTH,
-  MERGE_NODE_RADIUS,
-  NODE_RADIUS,
-  ROW_HEIGHT,
-  SECONDARY_GRAPH_ACCENT,
-} from './commitGraphConstants';
+import type { GraphEdge, GraphNode } from '@/utils/graphLayout';
+import { GRAPH_PADDING, LANE_WIDTH, MERGE_NODE_RADIUS, NODE_RADIUS, ROW_HEIGHT, SECONDARY_GRAPH_ACCENT } from './commitGraphConstants';
 
-export const graphEdgeKey = (edge: GraphEdge) => (
-  `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`
-);
+export const graphEdgeKey = (edge: GraphEdge) => `${edge.fromRow}:${edge.fromLane}->${edge.toRow}:${edge.toLane}:${edge.kind}`;
 
 type CommitGraphSvgProps = {
   maxLane: number;
@@ -134,24 +125,10 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
   };
 
   return (
-    <svg
-      width={graphWidth}
-      height={totalHeight}
-      className="commit-graph-svg"
-    >
+    <svg width={graphWidth} height={totalHeight} className="commit-graph-svg">
       {Array.from({ length: maxLane + 1 }).map((_, lane) => {
         const x = laneX(lane);
-        return (
-          <line
-            key={`lane-${lane}`}
-            x1={x}
-            y1={0}
-            x2={x}
-            y2={totalHeight}
-            stroke="var(--line-subtle)"
-            strokeWidth={1}
-          />
-        );
+        return <line key={`lane-${lane}`} x1={x} y1={0} x2={x} y2={totalHeight} stroke="var(--line-subtle)" strokeWidth={1} />;
       })}
       {hasWorkingTreeChanges && headNode && (
         <>
@@ -171,14 +148,7 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
             fill="none"
             strokeLinecap="round"
           />
-          <circle
-            cx={laneX(headNode.lane)}
-            cy={ROW_HEIGHT / 2}
-            r={NODE_RADIUS + 2}
-            fill="var(--bg-darker)"
-            stroke="var(--status-warning)"
-            strokeWidth={2.2}
-          />
+          <circle cx={laneX(headNode.lane)} cy={ROW_HEIGHT / 2} r={NODE_RADIUS + 2} fill="var(--bg-darker)" stroke="var(--status-warning)" strokeWidth={2.2} />
         </>
       )}
       {visibleEdges.map((edge, i) => (
@@ -217,45 +187,13 @@ export const CommitGraphSvg: React.FC<CommitGraphSvgProps> = ({
         const fillColor = node.color;
         const focusColor = isSelected ? selectedPathColor : fillColor;
         const baseOpacity = hasAnyPathHighlight && !isOnAnyFocusedPath && !isSelected ? 0.72 : 1;
-        const pathStroke = isOnSelectedPath
-          ? selectedPathColor
-          : isOnCurrentPath
-            ? currentPathColor
-            : fillColor;
+        const pathStroke = isOnSelectedPath ? selectedPathColor : isOnCurrentPath ? currentPathColor : fillColor;
 
         return (
           <g key={node.commit.hash}>
-            {isSelected && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={r + 10}
-                fill={focusColor}
-                opacity={0.22}
-              />
-            )}
-            {isSelected && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={r + 6}
-                fill="none"
-                stroke={focusColor}
-                strokeWidth={2.7}
-                opacity={0.9}
-              />
-            )}
-            {isLatestCommitFocus && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={r + 5}
-                fill="none"
-                stroke={fillColor}
-                strokeWidth={1.8}
-                opacity={0.68}
-              />
-            )}
+            {isSelected && <circle cx={cx} cy={cy} r={r + 10} fill={focusColor} opacity={0.22} />}
+            {isSelected && <circle cx={cx} cy={cy} r={r + 6} fill="none" stroke={focusColor} strokeWidth={2.7} opacity={0.9} />}
+            {isLatestCommitFocus && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke={fillColor} strokeWidth={1.8} opacity={0.68} />}
             {isOnAnyFocusedPath && !isSelected && (
               <circle
                 cx={cx}

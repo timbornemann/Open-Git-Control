@@ -1,9 +1,9 @@
 import { app } from 'electron';
-import { GitService } from '../GitService';
-import { GitHubService } from '../GitHubService';
-import { AppSettings } from '../settings';
+import type { GitService } from '../GitService';
+import type { GitHubService } from '../GitHubService';
+import type { AppSettings } from '../settings';
 import { sanitizeRemoteUrl } from './parsing';
-import { UpdaterStatusPayload } from './updaterManager';
+import type { UpdaterStatusPayload } from './updaterManager';
 
 type BuildDiagnosticsReportDependencies = {
   gitService: GitService;
@@ -19,13 +19,7 @@ type BuildDiagnosticsReportDependencies = {
 };
 
 export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDependencies) {
-  const {
-    gitService,
-    githubService,
-    readSettingsWithMigration,
-    getUpdaterStatus,
-    getCommitStatsDiagnostics,
-  } = deps;
+  const { gitService, githubService, readSettingsWithMigration, getUpdaterStatus, getCommitStatsDiagnostics } = deps;
 
   return async function buildDiagnosticsReport(): Promise<{
     generatedAt: string;
@@ -56,7 +50,9 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`showSecondaryHistory=${settings.showSecondaryHistory}`);
     lines.push(`secretScanBeforePushEnabled=${settings.secretScanBeforePushEnabled}`);
     lines.push(`secretScanStrictness=${settings.secretScanStrictness}`);
-    lines.push(`secretScanAllowlistEntries=${settings.secretScanAllowlist.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('#')).length}`);
+    lines.push(
+      `secretScanAllowlistEntries=${settings.secretScanAllowlist.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('#')).length}`,
+    );
     lines.push(`aiProvider=${settings.aiProvider}`);
     lines.push(`githubHost=${settings.githubHost}`);
     lines.push(`oauthConfigured=${githubService.isDeviceFlowConfigured(settings.githubOauthClientId, settings.githubHost)}`);

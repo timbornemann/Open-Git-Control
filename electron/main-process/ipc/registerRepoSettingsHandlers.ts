@@ -1,34 +1,32 @@
 import { app, ipcMain } from 'electron';
-import { AppSettings, normalizeSettings } from '../../settings';
-import { StoredData, readStoreData, writeStoreData } from '../repoStore';
-import {
-  clearSavedGeminiApiKeySecurely,
-  clearSavedGithubTokenSecurely,
-  normalizeGeminiApiKey,
-  saveGeminiApiKeySecurely,
-} from '../secureStore';
+import type { AppSettings } from '../../settings';
+import { normalizeSettings } from '../../settings';
+import type { StoredData } from '../repoStore';
+import { readStoreData, writeStoreData } from '../repoStore';
+import { IpcChannel } from '../../../src/types/ipcContract';
+import { clearSavedGeminiApiKeySecurely, clearSavedGithubTokenSecurely, normalizeGeminiApiKey, saveGeminiApiKeySecurely } from '../secureStore';
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
-import { UpdaterManager } from '../updaterManager';
+import type { UpdaterManager } from '../updaterManager';
 
 type RegisterRepoSettingsHandlersDeps = {
   updaterManager: UpdaterManager;
 };
 
 export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSettingsHandlersDeps): void {
-  ipcMain.handle('repos:getStored', async () => {
+  ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
   });
 
-  ipcMain.handle('repos:setStored', async (_event: any, data: StoredData) => {
+  ipcMain.handle(IpcChannel.ReposSetStored, async (_event: any, data: StoredData) => {
     writeStoreData(data);
     return true;
   });
 
-  ipcMain.handle('settings:get', async () => {
+  ipcMain.handle(IpcChannel.SettingsGet, async () => {
     return readSettingsWithMigration();
   });
 
-  ipcMain.handle('settings:set', async (_event: any, partial: Partial<AppSettings>) => {
+  ipcMain.handle(IpcChannel.SettingsSet, async (_event: any, partial: Partial<AppSettings>) => {
     const current = readSettingsWithMigration();
     const partialWithoutSecrets = { ...partial } as Partial<AppSettings> & {
       geminiApiKey?: unknown;
@@ -53,7 +51,7 @@ export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSet
     return next;
   });
 
-  ipcMain.handle('settings:setGeminiApiKey', async (_event: any, apiKey: unknown) => {
+  ipcMain.handle(IpcChannel.SettingsSetGeminiApiKey, async (_event: any, apiKey: unknown) => {
     const normalized = normalizeGeminiApiKey(apiKey);
     const current = readSettingsWithMigration();
     const saved = saveGeminiApiKeySecurely(normalized);
@@ -65,7 +63,7 @@ export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSet
     return next;
   });
 
-  ipcMain.handle('settings:clearGeminiApiKey', async () => {
+  ipcMain.handle(IpcChannel.SettingsClearGeminiApiKey, async () => {
     const current = readSettingsWithMigration();
     clearSavedGeminiApiKeySecurely();
     const next = normalizeSettings({ ...current, hasGeminiApiKey: false });
@@ -73,7 +71,7 @@ export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSet
     return next;
   });
 
-  ipcMain.handle('app:getVersion', async () => {
+  ipcMain.handle(IpcChannel.AppGetVersion, async () => {
     return app.getVersion();
   });
 }

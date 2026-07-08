@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatRelativeTime, formatTime } from '../dateTime';
+import { formatDate, formatDateTime, formatRelativeTime, formatTime } from '@/utils/dateTime';
 
 describe('dateTime utilities', () => {
   it('returns fallback for invalid date values', () => {

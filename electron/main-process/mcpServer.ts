@@ -8,12 +8,8 @@ import {
   readProjectPlannerData,
   updatePlannerItem,
 } from './projectPlannerStore';
-import {
-  MCP_PROTOCOL_VERSION,
-  SERVER_NAME,
-  JsonObject,
-  ApiError,
-} from './planningApiTypes';
+import type { JsonObject } from './planningApiTypes';
+import { MCP_PROTOCOL_VERSION, SERVER_NAME, ApiError } from './planningApiTypes';
 import {
   cleanString,
   enrichTodos,
@@ -187,8 +183,7 @@ export const MCP_TOOLS = [
 
 export const handleMcpRpc = async (payload: unknown): Promise<unknown> => {
   if (Array.isArray(payload)) {
-    const responses = (await Promise.all(payload.map((entry) => handleMcpMessage(entry))))
-      .filter((entry) => entry !== null);
+    const responses = (await Promise.all(payload.map((entry) => handleMcpMessage(entry)))).filter((entry) => entry !== null);
     return responses.length > 0 ? responses : null;
   }
   return handleMcpMessage(payload);
@@ -227,10 +222,7 @@ function todoMutationSchema(required: string[]): JsonObject {
       status: { type: 'string', enum: PLANNER_STATUSES },
       tab: { type: 'string' },
       tags: {
-        oneOf: [
-          { type: 'array', items: { type: 'string' } },
-          { type: 'string' },
-        ],
+        oneOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }],
       },
     },
     required,
@@ -244,7 +236,7 @@ const handleMcpMessage = async (message: unknown): Promise<unknown> => {
   const request = message as JsonObject;
   const id = Object.prototype.hasOwnProperty.call(request, 'id') ? request.id : undefined;
   const method = cleanString(request.method);
-  const params = request.params && typeof request.params === 'object' ? request.params as JsonObject : {};
+  const params = request.params && typeof request.params === 'object' ? (request.params as JsonObject) : {};
 
   if (!method) return jsonRpcError(id ?? null, -32600, 'Invalid Request');
 
@@ -273,9 +265,7 @@ const handleMcpMessage = async (message: unknown): Promise<unknown> => {
         return jsonRpcResult(id, { tools: MCP_TOOLS });
       case 'tools/call': {
         const toolName = cleanString(params.name);
-        const args = params.arguments && typeof params.arguments === 'object'
-          ? params.arguments as JsonObject
-          : {};
+        const args = params.arguments && typeof params.arguments === 'object' ? (params.arguments as JsonObject) : {};
         const structuredContent = await callMcpTool(toolName, args);
         return jsonRpcResult(id, {
           content: [{ type: 'text', text: JSON.stringify(structuredContent, null, 2) }],

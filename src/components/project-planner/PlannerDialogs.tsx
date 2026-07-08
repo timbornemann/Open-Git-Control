@@ -1,14 +1,7 @@
 import React from 'react';
-import { DialogFrame } from '../DialogFrame';
-import { useI18n } from '../../i18n';
-import {
-  PlannerItem,
-  PlannerItemInput,
-  PlannerPriority,
-  PlannerProject,
-  PlannerProjectInput,
-  PlannerStatus,
-} from '../../types/projectPlanner';
+import { DialogFrame } from '@/components/DialogFrame';
+import { useI18n } from '@/i18n';
+import type { PlannerItem, PlannerItemInput, PlannerPriority, PlannerProject, PlannerProjectInput, PlannerStatus } from '@/types/projectPlanner';
 
 export const PRIORITY_OPTIONS: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
 export const STATUS_OPTIONS: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
@@ -42,14 +35,7 @@ type ProjectDialogProps = {
   onDelete?: () => void;
 };
 
-export const ProjectDialog: React.FC<ProjectDialogProps> = ({
-  open,
-  project,
-  busy,
-  onClose,
-  onSubmit,
-  onDelete,
-}) => {
+export const ProjectDialog: React.FC<ProjectDialogProps> = ({ open, project, busy, onClose, onSubmit, onDelete }) => {
   const { t } = useI18n();
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
@@ -68,16 +54,22 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({
   return (
     <DialogFrame
       open={open}
-      title={project ? t('generated.components.project_planner.plannerdialogs.edit_project_624b2ea6') : t('generated.components.project_planner.plannerdialogs.create_future_project_293a417d')}
+      title={
+        project
+          ? t('generated.components.project_planner.plannerdialogs.edit_project_624b2ea6')
+          : t('generated.components.project_planner.plannerdialogs.create_future_project_293a417d')
+      }
       onClose={onClose}
       onConfirm={submit}
       onEnter={submit}
       confirmLabel={project ? t('generated.components.input.save_b6a0ea4a') : t('generated.components.project_planner.plannerdialogs.create_project_244f58ca')}
       confirmDisabled={!name.trim() || busy}
       onSecondaryAction={project && onDelete ? onDelete : undefined}
-      secondaryActionLabel={project?.kind === 'planned'
-        ? t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')
-        : t('generated.components.project_planner.plannerdialogs.delete_planning_data_2c761284')}
+      secondaryActionLabel={
+        project?.kind === 'planned'
+          ? t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')
+          : t('generated.components.project_planner.plannerdialogs.delete_planning_data_2c761284')
+      }
       secondaryActionVariant="danger"
     >
       <div className="planner-dialog-form">
@@ -114,14 +106,7 @@ type ItemDialogProps = {
   onSubmit: (input: PlannerItemInput) => Promise<void>;
 };
 
-export const ItemDialog: React.FC<ItemDialogProps> = ({
-  open,
-  item,
-  defaultStatus = 'idea',
-  busy,
-  onClose,
-  onSubmit,
-}) => {
+export const ItemDialog: React.FC<ItemDialogProps> = ({ open, item, defaultStatus = 'idea', busy, onClose, onSubmit }) => {
   const { t } = useI18n();
   const labels = usePlannerLabels();
   const [title, setTitle] = React.useState('');
@@ -156,7 +141,11 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
   return (
     <DialogFrame
       open={open}
-      title={item ? t('generated.components.project_planner.plannerdialogs.edit_item_5d102720') : t('generated.components.project_planner.plannerdialogs.create_item_9a1874f7')}
+      title={
+        item
+          ? t('generated.components.project_planner.plannerdialogs.edit_item_5d102720')
+          : t('generated.components.project_planner.plannerdialogs.create_item_9a1874f7')
+      }
       onClose={onClose}
       onConfirm={submit}
       onEnter={submit}
@@ -188,7 +177,9 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
             {t('generated.components.project_planner.plannerdialogs.priority_f20eedda')}
             <select value={priority} onChange={(event) => setPriority(event.target.value as PlannerPriority)}>
               {PRIORITY_OPTIONS.map((option) => (
-                <option key={option} value={option}>{labels.priority[option]}</option>
+                <option key={option} value={option}>
+                  {labels.priority[option]}
+                </option>
               ))}
             </select>
           </label>
@@ -196,18 +187,16 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
             {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}
             <select value={status} onChange={(event) => setStatus(event.target.value as PlannerStatus)}>
               {STATUS_OPTIONS.map((option) => (
-                <option key={option} value={option}>{labels.status[option]}</option>
+                <option key={option} value={option}>
+                  {labels.status[option]}
+                </option>
               ))}
             </select>
           </label>
         </div>
         <label>
           {t('generated.components.project_planner.plannerdialogs.tags_d3c9e52d')}
-          <input
-            value={tags}
-            onChange={(event) => setTags(event.target.value)}
-            placeholder="Bug, Feature, UI"
-          />
+          <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Bug, Feature, UI" />
           <small>{t('generated.components.project_planner.plannerdialogs.separate_multiple_tags_with_commas_94bb76c8')}</small>
         </label>
       </div>
@@ -224,24 +213,17 @@ type MaterializeDialogProps = {
   onSubmit: (folderName: string) => Promise<void>;
 };
 
-const suggestedFolderName = (name: string): string => (
+const suggestedFolderName = (name: string): string =>
   name
     .trim()
+    // eslint-disable-next-line no-control-regex -- Windows folder names must reject ASCII control characters.
     .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '-')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^[.-]+|[. -]+$/g, '')
-    .slice(0, 100)
-);
+    .slice(0, 100);
 
-export const MaterializeDialog: React.FC<MaterializeDialogProps> = ({
-  open,
-  project,
-  parentDirectory,
-  busy,
-  onClose,
-  onSubmit,
-}) => {
+export const MaterializeDialog: React.FC<MaterializeDialogProps> = ({ open, project, parentDirectory, busy, onClose, onSubmit }) => {
   const { t } = useI18n();
   const [folderName, setFolderName] = React.useState('');
 
@@ -271,11 +253,7 @@ export const MaterializeDialog: React.FC<MaterializeDialogProps> = ({
         </div>
         <label>
           {t('generated.components.project_planner.plannerdialogs.new_project_folder_933846ff')}
-          <input
-            value={folderName}
-            onChange={(event) => setFolderName(event.target.value)}
-            maxLength={100}
-          />
+          <input value={folderName} onChange={(event) => setFolderName(event.target.value)} maxLength={100} />
         </label>
         <p className="planner-dialog-note">
           {t('generated.components.project_planner.plannerdialogs.the_folder_will_be_created_and_git_initialized_inside_it_b120d566')}

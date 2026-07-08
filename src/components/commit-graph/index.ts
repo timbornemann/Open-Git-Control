@@ -1,5 +1,1 @@
-export {
-  CommitGraph,
-  buildGraphHighlightData,
-  findCommitIndexByNavigationTarget,
-} from './CommitGraph';
+export { CommitGraph, buildGraphHighlightData, findCommitIndexByNavigationTarget } from './CommitGraph';

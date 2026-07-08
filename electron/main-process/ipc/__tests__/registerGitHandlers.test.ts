@@ -66,9 +66,7 @@ describe('registerGitHandlers', () => {
     const result = await commandHandler!({ sender: { send } }, 'push');
     expect(result).toEqual({ success: false, error: 'push failed' });
 
-    const jobEvents = send.mock.calls
-      .filter((call) => call[0] === 'job:event')
-      .map((call) => call[1]);
+    const jobEvents = send.mock.calls.filter((call) => call[0] === 'job:event').map((call) => call[1]);
 
     expect(jobEvents).toHaveLength(2);
     expect(jobEvents[0].status).toBe('start');
@@ -166,24 +164,23 @@ describe('registerGitHandlers', () => {
 
     const result = await commandHandler!({ sender: { send } }, 'pull', '--rebase');
     expect(result).toEqual({ success: true, data: 'pull ok' });
-    expect(gitService.streamCommandOutput).toHaveBeenCalledWith(
-      ['pull', '--progress', '--rebase'],
-      expect.any(Function),
-    );
+    expect(gitService.streamCommandOutput).toHaveBeenCalledWith(['pull', '--progress', '--rebase'], expect.any(Function));
 
-    const jobEvents = send.mock.calls
-      .filter((call) => call[0] === 'job:event')
-      .map((call) => call[1]);
+    const jobEvents = send.mock.calls.filter((call) => call[0] === 'job:event').map((call) => call[1]);
 
     expect(jobEvents.map((event) => event.status)).toEqual(['start', 'progress', 'progress', 'done']);
-    expect(jobEvents[1]).toEqual(expect.objectContaining({
-      operation: 'git:pull',
-      message: 'Receiving objects: 50% (5/10), 1.00 MiB | 2.00 MiB/s',
-    }));
-    expect(jobEvents[2]).toEqual(expect.objectContaining({
-      operation: 'git:pull',
-      message: 'Resolving deltas: 25% (2/8)',
-    }));
+    expect(jobEvents[1]).toEqual(
+      expect.objectContaining({
+        operation: 'git:pull',
+        message: 'Receiving objects: 50% (5/10), 1.00 MiB | 2.00 MiB/s',
+      }),
+    );
+    expect(jobEvents[2]).toEqual(
+      expect.objectContaining({
+        operation: 'git:pull',
+        message: 'Resolving deltas: 25% (2/8)',
+      }),
+    );
     expect(new Set(jobEvents.map((event) => event.id)).size).toBe(1);
   });
 });

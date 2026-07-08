@@ -1,11 +1,8 @@
 import React, { useMemo } from 'react';
 import { Check, Loader2 } from 'lucide-react';
-import { useI18n, type CatalogTranslateFn } from '../../i18n';
-import { summarizeGitTransferProgress } from '../../utils/gitTransferProgress';
-import type {
-  GitTransferPhaseKey,
-  GitTransferPhaseProgress,
-} from '../../utils/gitTransferProgress';
+import { useI18n, type CatalogTranslateFn } from '@/i18n';
+import { summarizeGitTransferProgress } from '@/utils/gitTransferProgress';
+import type { GitTransferPhaseKey, GitTransferPhaseProgress } from '@/utils/gitTransferProgress';
 
 type Props = {
   lines: string[];
@@ -38,10 +35,7 @@ const getPhaseLabel = (key: GitTransferPhaseKey, t: CatalogTranslateFn): string 
   }
 };
 
-const formatPhaseMeta = (
-  phase: GitTransferPhaseProgress,
-  t: CatalogTranslateFn,
-): string => {
+const formatPhaseMeta = (phase: GitTransferPhaseProgress, t: CatalogTranslateFn): string => {
   if (!phase.observed) return t('generated.components.layout.gittransferprogresspanel.waiting_729a8a6c');
 
   const parts: string[] = [];
@@ -51,20 +45,16 @@ const formatPhaseMeta = (
   if (phase.speed) parts.push(phase.speed);
   if (parts.length > 0) return parts.join(' | ');
 
-  return phase.done ? t('generated.components.layout.cloneprogressmodal.done_724fd90c') : t('generated.components.layout.gittransferprogresspanel.running_c78d46de');
+  return phase.done
+    ? t('generated.components.layout.cloneprogressmodal.done_724fd90c')
+    : t('generated.components.layout.gittransferprogresspanel.running_c78d46de');
 };
 
-export const GitTransferProgressPanel: React.FC<Props> = ({
-  lines,
-  isRunning,
-  isComplete = false,
-  error = null,
-  emptyText,
-}) => {
+export const GitTransferProgressPanel: React.FC<Props> = ({ lines, isRunning, isComplete = false, error = null, emptyText }) => {
   const { t } = useI18n();
   const summary = useMemo(() => summarizeGitTransferProgress(lines), [lines]);
-  const statusText = error
-    || (isComplete ? t('generated.components.layout.gittransferprogresspanel.repository_is_ready_c46ad14f') : summary.latestLine || emptyText);
+  const statusText =
+    error || (isComplete ? t('generated.components.layout.gittransferprogresspanel.repository_is_ready_c46ad14f') : summary.latestLine || emptyText);
 
   return (
     <div className="git-transfer-panel">
@@ -74,26 +64,16 @@ export const GitTransferProgressPanel: React.FC<Props> = ({
           const fillWidth = phase.percent === null ? 0 : phase.percent;
 
           return (
-            <div
-              key={phase.key}
-              className={`git-transfer-phase git-transfer-phase-${phase.state}${phase.observed ? '' : ' git-transfer-phase-unseen'}`}
-            >
+            <div key={phase.key} className={`git-transfer-phase git-transfer-phase-${phase.state}${phase.observed ? '' : ' git-transfer-phase-unseen'}`}>
               <div className="git-transfer-phase-topline">
                 <div className="git-transfer-phase-title">
-                  {phase.state === 'done' ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : (
-                    <Loader2 size={14} aria-hidden="true" />
-                  )}
+                  {phase.state === 'done' ? <Check size={14} aria-hidden="true" /> : <Loader2 size={14} aria-hidden="true" />}
                   <span>{getPhaseLabel(phase.key, t)}</span>
                 </div>
                 <span className="git-transfer-phase-meta">{formatPhaseMeta(phase, t)}</span>
               </div>
               <div className={`git-transfer-bar${isIndeterminate ? ' indeterminate' : ''}`}>
-                <div
-                  className="git-transfer-bar-fill"
-                  style={{ width: isIndeterminate ? '42%' : `${fillWidth}%` }}
-                />
+                <div className="git-transfer-bar-fill" style={{ width: isIndeterminate ? '42%' : `${fillWidth}%` }} />
               </div>
             </div>
           );

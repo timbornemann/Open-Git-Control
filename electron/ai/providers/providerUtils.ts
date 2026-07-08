@@ -1,22 +1,11 @@
-export const safeString = (value: unknown, fallback = ''): string => (
-  typeof value === 'string' ? value : fallback
-);
+export const safeString = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
 
-export const uniqueSorted = (values: string[]): string[] => (
-  [...new Set(values)].sort((a, b) => a.localeCompare(b))
-);
+export const uniqueSorted = (values: string[]): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));
 
-export async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  shouldCancel?: () => boolean,
-): Promise<Response> {
+export async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number, shouldCancel?: () => boolean): Promise<Response> {
   const controller = new AbortController();
-  let abortedByTimeout = false;
   let abortedByCancel = false;
   const timeout = setTimeout(() => {
-    abortedByTimeout = true;
     controller.abort();
   }, timeoutMs);
   const cancelPoll = setInterval(() => {

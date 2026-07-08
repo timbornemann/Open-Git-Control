@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { gitClient } from '../../services/gitClient';
-import {
-  isRepoUnavailableError,
-  parseGitStatusDetailed,
-  type GitStatusDetailed,
-} from '../../utils/gitParsing';
+import { gitClient } from '@/services/gitClient';
+import { isRepoUnavailableError, parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
 
 type UseCommitGraphWorkingTreeStatusParams = {
   repoPath: string | null;
@@ -12,11 +8,7 @@ type UseCommitGraphWorkingTreeStatusParams = {
   onRefreshWorkingTree?: () => Promise<void>;
 };
 
-export const useCommitGraphWorkingTreeStatus = ({
-  repoPath,
-  externalWorkingTreeStatus,
-  onRefreshWorkingTree,
-}: UseCommitGraphWorkingTreeStatusParams) => {
+export const useCommitGraphWorkingTreeStatus = ({ repoPath, externalWorkingTreeStatus, onRefreshWorkingTree }: UseCommitGraphWorkingTreeStatusParams) => {
   const [internalWorkingTreeStatus, setInternalWorkingTreeStatus] = useState<GitStatusDetailed | null>(null);
 
   const clearWorkingTreeStatus = useCallback(() => {
@@ -79,9 +71,7 @@ export const useCommitGraphWorkingTreeStatus = ({
   }, [refreshWorkingTreeStatus, onRefreshWorkingTree, repoPath]);
 
   return {
-    workingTreeStatus: externalWorkingTreeStatus === undefined
-      ? internalWorkingTreeStatus
-      : externalWorkingTreeStatus,
+    workingTreeStatus: externalWorkingTreeStatus === undefined ? internalWorkingTreeStatus : externalWorkingTreeStatus,
     refreshWorkingTreeStatus,
     clearWorkingTreeStatus,
   };

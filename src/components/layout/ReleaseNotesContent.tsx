@@ -5,46 +5,11 @@ type ReleaseNotesContentProps = {
   className?: string;
 };
 
-type ParsedReleaseNotes =
-  | { type: 'html'; html: string }
-  | { type: 'text'; text: string };
+type ParsedReleaseNotes = { type: 'html'; html: string } | { type: 'text'; text: string };
 
-const ALLOWED_TAGS = new Set([
-  'a',
-  'blockquote',
-  'br',
-  'code',
-  'em',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'hr',
-  'li',
-  'ol',
-  'p',
-  'pre',
-  'strong',
-  'ul',
-]);
+const ALLOWED_TAGS = new Set(['a', 'blockquote', 'br', 'code', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'ol', 'p', 'pre', 'strong', 'ul']);
 
-const BLOCKED_TAGS = new Set([
-  'button',
-  'embed',
-  'form',
-  'iframe',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'object',
-  'script',
-  'style',
-  'svg',
-  'template',
-]);
+const BLOCKED_TAGS = new Set(['button', 'embed', 'form', 'iframe', 'img', 'input', 'link', 'meta', 'object', 'script', 'style', 'svg', 'template']);
 
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const SANITIZE_BASE_URL = 'https://github.com';
@@ -158,19 +123,11 @@ function parseReleaseNotes(input: string): ParsedReleaseNotes {
   return { type: 'html', html: sanitizedHtml };
 }
 
-export const ReleaseNotesContent: React.FC<ReleaseNotesContentProps> = ({
-  releaseNotes,
-  className,
-}) => {
+export const ReleaseNotesContent: React.FC<ReleaseNotesContentProps> = ({ releaseNotes, className }) => {
   const parsed = useMemo(() => parseReleaseNotes(releaseNotes), [releaseNotes]);
 
   if (parsed.type === 'html') {
-    return (
-      <div
-        className={className}
-        dangerouslySetInnerHTML={{ __html: parsed.html }}
-      />
-    );
+    return <div className={className} dangerouslySetInnerHTML={{ __html: parsed.html }} />;
   }
 
   return <div className={`${className || ''} release-notes-plain`.trim()}>{parsed.text}</div>;

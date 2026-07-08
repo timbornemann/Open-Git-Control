@@ -1,9 +1,6 @@
 import React from 'react';
-import {
-  useRepositoryContext,
-  useUIContext,
-} from '../../../../contexts/AppStateContext';
-import { LocalReposSidebarContent } from '../LocalReposSidebarContent';
+import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
+import { LocalReposSidebarContent } from '@/components/layout/sidebar/LocalReposSidebarContent';
 
 export const LocalReposSidebarContainer: React.FC = React.memo(() => {
   const ui = useUIContext();

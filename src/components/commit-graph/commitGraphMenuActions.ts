@@ -1,7 +1,7 @@
-import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
-import type { CatalogTranslateFn } from '../../i18n';
-import type { ToastMessage, BranchInfo } from '../../types/git';
-import type { GraphLayout, GraphNode } from '../../utils/graphLayout';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
+import type { CatalogTranslateFn } from '@/i18n';
+import type { ToastMessage, BranchInfo } from '@/types/git';
+import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
 import type { MenuAction } from './CommitContextMenu';
 import { buildCommitHistoryMenuActions } from './commitGraphHistoryMenuActions';
 import { buildCommitRefMenuActions } from './commitGraphRefMenuActions';

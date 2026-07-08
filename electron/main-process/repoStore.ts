@@ -65,16 +65,12 @@ export function normalizeStoredData(input: Partial<StoredData> | null | undefine
       seen.add(pathValue);
       const lastOpened = Number.isFinite(repo?.lastOpened) ? Number(repo.lastOpened) : Date.now();
       const pinned = typeof repo?.pinned === 'boolean' ? repo.pinned : false;
-      const createdAt = Number.isFinite(repo?.createdAt)
-        ? Math.floor(Number(repo.createdAt))
-        : resolveRepoCreatedAt(pathValue, lastOpened);
+      const createdAt = Number.isFinite(repo?.createdAt) ? Math.floor(Number(repo.createdAt)) : resolveRepoCreatedAt(pathValue, lastOpened);
       return { path: pathValue, lastOpened, pinned, createdAt };
     })
     .filter((repo: StoredRepoEntry | null): repo is StoredRepoEntry => repo !== null);
 
-  const activeRepo = typeof input?.activeRepo === 'string' && input.activeRepo.trim().length > 0
-    ? input.activeRepo
-    : null;
+  const activeRepo = typeof input?.activeRepo === 'string' && input.activeRepo.trim().length > 0 ? input.activeRepo : null;
 
   return { repos, activeRepo, sortBy };
 }

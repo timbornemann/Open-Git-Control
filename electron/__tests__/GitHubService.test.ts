@@ -29,7 +29,8 @@ const pullRequest = (number: number) => ({
 describe('GitHubService pagination', () => {
   it('searches authenticated repositories beyond the currently requested source page', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => repo(index + 1, `repo-${index + 1}`));
-    const listForAuthenticatedUser = vi.fn()
+    const listForAuthenticatedUser = vi
+      .fn()
       .mockResolvedValueOnce({ data: firstPage })
       .mockResolvedValueOnce({ data: [repo(101, 'target-repo', 'needle')] });
     const service = new GitHubService();
@@ -44,18 +45,18 @@ describe('GitHubService pagination', () => {
     expect(result.repos).toHaveLength(1);
     expect(result.repos[0].fullName).toBe('octo/target-repo');
     expect(listForAuthenticatedUser).toHaveBeenCalledTimes(2);
-    expect(listForAuthenticatedUser).toHaveBeenLastCalledWith(expect.objectContaining({
-      page: 2,
-      per_page: 100,
-    }));
+    expect(listForAuthenticatedUser).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        page: 2,
+        per_page: 100,
+      }),
+    );
   });
 
   it('loads pull requests across all result pages', async () => {
     const firstPage = Array.from({ length: 100 }, (_, index) => pullRequest(index + 1));
     const secondPage = [pullRequest(101), pullRequest(102)];
-    const list = vi.fn()
-      .mockResolvedValueOnce({ data: firstPage })
-      .mockResolvedValueOnce({ data: secondPage });
+    const list = vi.fn().mockResolvedValueOnce({ data: firstPage }).mockResolvedValueOnce({ data: secondPage });
     const service = new GitHubService();
     (service as any).octokit = {
       rest: {
@@ -121,12 +122,14 @@ describe('GitHubService workflow runs', () => {
       perPage: 50,
     });
 
-    expect(listWorkflowRunsForRepo).toHaveBeenCalledWith(expect.objectContaining({
-      owner: 'octo',
-      repo: 'repo',
-      head_sha: 'abc1234',
-      per_page: 50,
-    }));
+    expect(listWorkflowRunsForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'octo',
+        repo: 'repo',
+        head_sha: 'abc1234',
+        per_page: 50,
+      }),
+    );
     expect(listWorkflowRunsForRepo.mock.calls[0][0]).not.toHaveProperty('branch');
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ id: 1, headSha: 'abc1234' });

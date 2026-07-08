@@ -1,16 +1,9 @@
-import type { GitJobEventDto } from '../../../global';
-import { parseGitTransferProgressLine } from '../../../utils/gitTransferProgress';
+import type { GitJobEventDto } from '@/global';
+import { parseGitTransferProgressLine } from '@/utils/gitTransferProgress';
 
-const isTransferProgressOperation = (operation: string): boolean => (
-  operation === 'git:clone'
-  || operation === 'git:fetch'
-  || operation === 'git:pull'
-);
+const isTransferProgressOperation = (operation: string): boolean => operation === 'git:clone' || operation === 'git:fetch' || operation === 'git:pull';
 
-export const compactTransferProgressJobs = (
-  jobs: GitJobEventDto[],
-  event: GitJobEventDto,
-): GitJobEventDto[] => {
+export const compactTransferProgressJobs = (jobs: GitJobEventDto[], event: GitJobEventDto): GitJobEventDto[] => {
   if (event.status !== 'progress' || !isTransferProgressOperation(event.operation)) {
     return [event, ...jobs].slice(0, 200);
   }

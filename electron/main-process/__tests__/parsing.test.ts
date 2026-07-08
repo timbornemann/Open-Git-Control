@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  parseFileHistory,
-  parseReleaseCommits,
-  parseStashList,
-  sanitizeRemoteUrl,
-} from '../parsing';
+import { parseFileHistory, parseReleaseCommits, parseStashList, sanitizeRemoteUrl } from '../parsing';
 
 describe('main-process parsing helpers', () => {
   it('parses release commits from x1f separated rows', () => {

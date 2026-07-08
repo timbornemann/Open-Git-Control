@@ -1,16 +1,9 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  CiBadgeStateDto,
-  GithubStatusChecksDto,
-  GithubWorkflowRunDto,
-  PullRequestCiDto,
-  PullRequestDto,
-} from '../global';
-import { useRef } from 'react';
-import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '../i18n';
-import { gitClient } from '../services/gitClient';
-import { githubClient } from '../services/githubClient';
-import { RepoOwnerRef } from '../types/git';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/global';
+import { translateFromCatalog, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
+import type { RepoOwnerRef } from '@/types/git';
 
 type CreatePRInput = {
   title: string;
@@ -31,17 +24,16 @@ type Params = {
 };
 
 type PullRequestGitClient = Pick<typeof gitClient, 'isAvailable' | 'getRepoOriginUrl'>;
-type PullRequestGithubClient = Pick<
-  typeof githubClient,
-  'isAvailable' | 'getPullRequests' | 'getWorkflowRuns' | 'getStatusChecks' | 'createPullRequest'
->;
+type PullRequestGithubClient = Pick<typeof githubClient, 'isAvailable' | 'getPullRequests' | 'getWorkflowRuns' | 'getStatusChecks' | 'createPullRequest'>;
 
 type PullRequestClientDeps = {
   git?: PullRequestGitClient;
   github?: PullRequestGithubClient;
 };
 
-const getPullRequestClients = (deps?: PullRequestClientDeps): {
+const getPullRequestClients = (
+  deps?: PullRequestClientDeps,
+): {
   git: PullRequestGitClient;
   github: PullRequestGithubClient;
 } => ({
@@ -77,10 +69,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       }
 
       setPrOwnerRepo((previous) => {
-        if (
-          previous?.owner === ownerRepo?.owner
-          && previous?.repo === ownerRepo?.repo
-        ) {
+        if (previous?.owner === ownerRepo?.owner && previous?.repo === ownerRepo?.repo) {
           return previous;
         }
         return ownerRepo;
@@ -118,7 +107,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     };
   }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
 
-  const openPrs = useMemo(() => pullRequests.filter(pr => pr.state === 'open'), [pullRequests]);
+  const openPrs = useMemo(() => pullRequests.filter((pr) => pr.state === 'open'), [pullRequests]);
 
   useEffect(() => {
     if (!githubClient.isAvailable() || !prOwnerRepo || !isAuthenticated || openPrs.length === 0) {
@@ -169,25 +158,32 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     };
   }, [isAuthenticated, openPrs, prOwnerRepo]);
 
-  const createPR = useCallback(async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
-    if (!title.trim()) return false;
+  const createPR = useCallback(
+    async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
+      if (!title.trim()) return false;
 
-    const result = await submitPullRequest(prOwnerRepo, {
-      title,
-      body,
-      head,
-      base,
-      currentBranch,
-    }, language);
+      const result = await submitPullRequest(
+        prOwnerRepo,
+        {
+          title,
+          body,
+          head,
+          base,
+          currentBranch,
+        },
+        language,
+      );
 
-    if (result.success) {
-      onCreated?.(result.number);
-      return true;
-    }
+      if (result.success) {
+        onCreated?.(result.number);
+        return true;
+      }
 
-    onError?.(result.error);
-    return false;
-  }, [language, onCreated, onError, prOwnerRepo]);
+      onError?.(result.error);
+      return false;
+    },
+    [language, onCreated, onError, prOwnerRepo],
+  );
 
   return {
     pullRequests,
@@ -252,12 +248,7 @@ export const resolvePrOwnerRepo = async (
   githubHost: string = 'github.com',
   deps?: PullRequestClientDeps,
 ): Promise<RepoOwnerRef | null> => {
-  const resolution = await resolvePrOwnerRepoForRefresh(
-    activeRepo,
-    isAuthenticated,
-    githubHost,
-    deps,
-  );
+  const resolution = await resolvePrOwnerRepoForRefresh(activeRepo, isAuthenticated, githubHost, deps);
   return resolution.resolved ? resolution.ownerRepo : null;
 };
 
@@ -334,9 +325,9 @@ export const loadPullRequestCi = async (
 };
 
 function computeCiBadge(workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): CiBadgeStateDto {
-  const conclusions = workflows.map(w => w.conclusion).filter(Boolean);
-  const hasFailure = conclusions.some(c => c === 'failure' || c === 'cancelled' || c === 'timed_out' || c === 'action_required');
-  const hasPendingWorkflow = workflows.some(w => w.status !== 'completed' || !w.conclusion);
+  const conclusions = workflows.map((w) => w.conclusion).filter(Boolean);
+  const hasFailure = conclusions.some((c) => c === 'failure' || c === 'cancelled' || c === 'timed_out' || c === 'action_required');
+  const hasPendingWorkflow = workflows.some((w) => w.status !== 'completed' || !w.conclusion);
 
   if (hasFailure) return 'failure';
 
@@ -346,17 +337,13 @@ function computeCiBadge(workflows: GithubWorkflowRunDto[], checks: GithubStatusC
   }
 
   if (hasPendingWorkflow) return 'pending';
-  if (conclusions.some(c => c === 'success')) return 'success';
+  if (conclusions.some((c) => c === 'success')) return 'success';
   if (checks?.state === 'success') return 'success';
 
   return workflows.length === 0 && !checks ? 'unknown' : 'neutral';
 }
 
-function buildCiSummary(
-  badge: CiBadgeStateDto,
-  workflows: GithubWorkflowRunDto[],
-  checks: GithubStatusChecksDto | null,
-): string {
+function buildCiSummary(badge: CiBadgeStateDto, workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): string {
   const checkCount = checks?.checkRuns.length || 0;
   const statusCount = checks?.statusContexts.length || 0;
   if (badge === 'success') return `CI passed (${workflows.length} workflows, ${checkCount + statusCount} checks)`;

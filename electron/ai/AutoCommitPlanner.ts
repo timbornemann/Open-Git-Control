@@ -27,7 +27,7 @@ export class AutoCommitPlanner {
     }
 
     return [...groups.values()]
-      .map(group => group.sort((a, b) => a.path.localeCompare(b.path)))
+      .map((group) => group.sort((a, b) => a.path.localeCompare(b.path)))
       .sort((a, b) => {
         const aSpecial = a[0]?.groupKey.startsWith('special:') ? 0 : 1;
         const bSpecial = b[0]?.groupKey.startsWith('special:') ? 0 : 1;
@@ -36,15 +36,8 @@ export class AutoCommitPlanner {
       });
   }
 
-  pickWindow<TFile extends Pick<AutoCommitPlanningFile, 'additions' | 'deletions'>>(
-    group: TFile[],
-    mode: AutoCommitPlanningMode,
-  ): TFile[] {
-    const maxFiles = mode === 'fallback'
-      ? this.limits.maxFilesFallback
-      : mode === 'retry'
-        ? this.limits.maxFilesRetry
-        : this.limits.maxFilesNormal;
+  pickWindow<TFile extends Pick<AutoCommitPlanningFile, 'additions' | 'deletions'>>(group: TFile[], mode: AutoCommitPlanningMode): TFile[] {
+    const maxFiles = mode === 'fallback' ? this.limits.maxFilesFallback : mode === 'retry' ? this.limits.maxFilesRetry : this.limits.maxFilesNormal;
 
     const selected: TFile[] = [];
     let netLines = 0;

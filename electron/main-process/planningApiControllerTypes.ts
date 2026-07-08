@@ -1,9 +1,11 @@
-export type RouteHandlerResult = {
-  handled: true;
-  value: unknown;
-} | {
-  handled: false;
-};
+export type RouteHandlerResult =
+  | {
+      handled: true;
+      value: unknown;
+    }
+  | {
+      handled: false;
+    };
 
 export const routeHandled = (value: unknown): RouteHandlerResult => ({
   handled: true,

@@ -1,4 +1,4 @@
-import { useI18n } from '../../i18n';
+import { useI18n } from '@/i18n';
 import { formatDiffStats } from './utils';
 import type { DiffStats } from './types';
 
@@ -45,11 +45,7 @@ export const StagingToolbar: React.FC<StagingToolbarProps> = ({
             {t('generated.components.staging_area.stagingtoolbar.git_is_working_700e9c35')} {(mutationElapsedMs / 1000).toFixed(1)}s
           </span>
         )}
-        {visibleTotal > 0 && (
-          <span className="staging-visible-count">
-            {tr(`${visibleTotal} sichtbar`, `${visibleTotal} visible`)}
-          </span>
-        )}
+        {visibleTotal > 0 && <span className="staging-visible-count">{tr(`${visibleTotal} sichtbar`, `${visibleTotal} visible`)}</span>}
       </div>
     </div>
   );

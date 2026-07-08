@@ -1,10 +1,5 @@
-import {
-  createPlannerItem,
-  deletePlannerItem,
-  readProjectPlannerData,
-  updatePlannerItem,
-} from './projectPlannerStore';
-import { RequestContext } from './planningApiTypes';
+import { createPlannerItem, deletePlannerItem, readProjectPlannerData, updatePlannerItem } from './projectPlannerStore';
+import type { RequestContext } from './planningApiTypes';
 import {
   cleanString,
   enrichTodos,
@@ -16,11 +11,8 @@ import {
   queryOptionsFromUrl,
   resolveProjectLocator,
 } from './planningApiDomain';
-import {
-  RouteHandlerResult,
-  routeHandled,
-  routeNotHandled,
-} from './planningApiControllerTypes';
+import type { RouteHandlerResult } from './planningApiControllerTypes';
+import { routeHandled, routeNotHandled } from './planningApiControllerTypes';
 
 export const handleTodosRoute = async (ctx: RequestContext): Promise<RouteHandlerResult> => {
   const [, resource, idOrAction, nested] = ctx.segments;

@@ -70,12 +70,7 @@ export function parseSavedGithubTokenPayload(raw: string): SavedGithubToken | nu
 
   try {
     const parsed = JSON.parse(value) as Partial<SavedGithubToken> & { version?: unknown };
-    if (
-      parsed
-      && parsed.version === GITHUB_TOKEN_PAYLOAD_VERSION
-      && typeof parsed.token === 'string'
-      && parsed.token.trim()
-    ) {
+    if (parsed && parsed.version === GITHUB_TOKEN_PAYLOAD_VERSION && typeof parsed.token === 'string' && parsed.token.trim()) {
       return {
         token: parsed.token.trim(),
         host: typeof parsed.host === 'string' && parsed.host.trim() ? parsed.host.trim().toLowerCase() : null,
@@ -90,7 +85,9 @@ export function parseSavedGithubTokenPayload(raw: string): SavedGithubToken | nu
 
 export function serializeGithubTokenPayload(token: string, host: string): string {
   const normalizedToken = String(token || '').trim();
-  const normalizedHost = String(host || '').trim().toLowerCase();
+  const normalizedHost = String(host || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedToken) {
     throw new Error('GitHub token is required.');
   }
@@ -189,12 +186,12 @@ export function parseSavedPlanningApiTokenPayload(raw: string): SavedPlanningApi
     const createdAt = normalizeEpochMillis(parsed.createdAt);
     const expiresAt = parsed.expiresAt === null ? null : normalizeEpochMillis(parsed.expiresAt);
     if (
-      parsed
-      && parsed.version === PLANNING_API_TOKEN_PAYLOAD_VERSION
-      && typeof parsed.token === 'string'
-      && parsed.token.trim().length >= 16
-      && createdAt
-      && (parsed.expiresAt === null || expiresAt)
+      parsed &&
+      parsed.version === PLANNING_API_TOKEN_PAYLOAD_VERSION &&
+      typeof parsed.token === 'string' &&
+      parsed.token.trim().length >= 16 &&
+      createdAt &&
+      (parsed.expiresAt === null || expiresAt)
     ) {
       return {
         token: parsed.token.trim(),

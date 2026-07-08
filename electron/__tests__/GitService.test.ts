@@ -13,12 +13,7 @@ describe('GitService.getLog pagination', () => {
     await service.getLog(120, false, 40);
 
     expect(runCommandSpy).toHaveBeenCalledTimes(1);
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
-      'log',
-      '--topo-order',
-      '-120',
-      '--skip=40',
-    ]));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '--topo-order', '-120', '--skip=40']));
     const args = runCommandSpy.mock.calls[0][0];
     expect(args).not.toContain('--all');
     expect(args).not.toContain('--numstat');
@@ -39,47 +34,27 @@ describe('GitService.getLog pagination', () => {
 describe('GitService commit statistics', () => {
   it('loads root commit statistics with one first-parent show command', async () => {
     const service = new GitService();
-    const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
-      .mockResolvedValueOnce('10\t2\tsrc/root.ts');
+    const run = vi.spyOn(service, 'runCommandAtPathWithSignal').mockResolvedValueOnce('10\t2\tsrc/root.ts');
 
-    await expect(service.getCommitStatsAtPath('C:/repo', 'a'.repeat(40), new AbortController().signal))
-      .resolves.toEqual({ files: 1, additions: 10, deletions: 2 });
+    await expect(service.getCommitStatsAtPath('C:/repo', 'a'.repeat(40), new AbortController().signal)).resolves.toEqual({
+      files: 1,
+      additions: 10,
+      deletions: 2,
+    });
     expect(run).toHaveBeenCalledTimes(1);
-    expect(run.mock.calls[0][1]).toEqual([
-      'show',
-      '--root',
-      '--first-parent',
-      '--format=',
-      '--numstat',
-      '-r',
-      '-M',
-      'a'.repeat(40),
-    ]);
+    expect(run.mock.calls[0][1]).toEqual(['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', 'a'.repeat(40)]);
   });
 
   it('uses only the first parent for normal and merge commits', async () => {
     const service = new GitService();
     const hash = 'c'.repeat(40);
-    const run = vi.spyOn(service, 'runCommandAtPathWithSignal')
-      .mockResolvedValueOnce('1\t1\tnormal.ts')
-      .mockResolvedValueOnce('2\t3\tmerge.ts');
+    const run = vi.spyOn(service, 'runCommandAtPathWithSignal').mockResolvedValueOnce('1\t1\tnormal.ts').mockResolvedValueOnce('2\t3\tmerge.ts');
     const signal = new AbortController().signal;
 
-    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal))
-      .resolves.toEqual({ files: 1, additions: 1, deletions: 1 });
-    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal))
-      .resolves.toEqual({ files: 1, additions: 2, deletions: 3 });
+    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal)).resolves.toEqual({ files: 1, additions: 1, deletions: 1 });
+    await expect(service.getCommitStatsAtPath('C:/repo', hash, signal)).resolves.toEqual({ files: 1, additions: 2, deletions: 3 });
     expect(run).toHaveBeenCalledTimes(2);
-    expect(run.mock.calls[1][1]).toEqual([
-      'show',
-      '--root',
-      '--first-parent',
-      '--format=',
-      '--numstat',
-      '-r',
-      '-M',
-      hash,
-    ]);
+    expect(run.mock.calls[1][1]).toEqual(['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', hash]);
   });
 });
 
@@ -90,34 +65,36 @@ describe('GitService file timeline data', () => {
     const fieldSeparator = '\x1f';
     const nullSeparator = '\x00';
     const hash = 'a'.repeat(40);
-    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue([
-      `${recordSeparator}${hash}${fieldSeparator}Alice${fieldSeparator}2026-01-01 12:00:00 +0000${fieldSeparator}feat: keep | pipe`,
-      'M',
-      'src/with spaces/file name.ts',
-      'R100',
-      'src/old name.ts',
-      'src/new name.ts',
-    ].join(nullSeparator));
+    const runCommandSpy = vi
+      .spyOn(service, 'runCommand')
+      .mockResolvedValue(
+        [
+          `${recordSeparator}${hash}${fieldSeparator}Alice${fieldSeparator}2026-01-01 12:00:00 +0000${fieldSeparator}feat: keep | pipe`,
+          'M',
+          'src/with spaces/file name.ts',
+          'R100',
+          'src/old name.ts',
+          'src/new name.ts',
+        ].join(nullSeparator),
+      );
 
     const timeline = await service.getFileTimelineData(50);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
-      '-z',
-      '--name-status',
-    ]));
-    expect(timeline).toEqual([{
-      hash,
-      author: 'Alice',
-      date: '2026-01-01 12:00:00 +0000',
-      subject: 'feat: keep | pipe',
-      changes: [
-        { status: 'modified', path: 'src/with spaces/file name.ts' },
-        { status: 'renamed', oldPath: 'src/old name.ts', path: 'src/new name.ts' },
-      ],
-    }]);
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['-z', '--name-status']));
+    expect(timeline).toEqual([
+      {
+        hash,
+        author: 'Alice',
+        date: '2026-01-01 12:00:00 +0000',
+        subject: 'feat: keep | pipe',
+        changes: [
+          { status: 'modified', path: 'src/with spaces/file name.ts' },
+          { status: 'renamed', oldPath: 'src/old name.ts', path: 'src/new name.ts' },
+        ],
+      },
+    ]);
   });
 });
-
 
 describe('GitService forensic history commands', () => {
   it('builds -S search command with path separator', async () => {
@@ -126,14 +103,7 @@ describe('GitService forensic history commands', () => {
 
     await service.getForensicHistoryByString('needle', 'src/main.ts', 120);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
-      'log',
-      '-S',
-      'needle',
-      '--',
-      'src/main.ts',
-      '-120',
-    ]));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-S', 'needle', '--', 'src/main.ts', '-120']));
   });
 
   it('builds -G regex search command with path separator', async () => {
@@ -142,14 +112,7 @@ describe('GitService forensic history commands', () => {
 
     await service.getForensicHistoryByRegex('foo.*bar', 'src/App.tsx', 80);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
-      'log',
-      '-G',
-      'foo.*bar',
-      '--',
-      'src/App.tsx',
-      '-80',
-    ]));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-G', 'foo.*bar', '--', 'src/App.tsx', '-80']));
   });
 
   it('builds -L line range search command', async () => {
@@ -158,11 +121,7 @@ describe('GitService forensic history commands', () => {
 
     await service.getForensicHistoryByLineRange('src/App.tsx', 10, 30, 60);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining([
-      'log',
-      '-60',
-      '-L10,30:src/App.tsx',
-    ]));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-60', '-L10,30:src/App.tsx']));
   });
 });
 
@@ -208,24 +167,16 @@ describe('GitService Markdown preview reads', () => {
       const service = new GitService();
       service.setRepoPath(repoDir);
 
-      await expect(service.readRepositoryFileTextAtSource('unstaged', 'docs/README.md'))
-        .resolves.toContain('# Preview');
-      await expect(service.readRepositoryImageDataUrlAtSource('unstaged', 'docs/images/logo.png'))
-        .resolves.toMatchObject({ mimeType: 'image/png' });
+      await expect(service.readRepositoryFileTextAtSource('unstaged', 'docs/README.md')).resolves.toContain('# Preview');
+      await expect(service.readRepositoryImageDataUrlAtSource('unstaged', 'docs/images/logo.png')).resolves.toMatchObject({ mimeType: 'image/png' });
 
       execFileSync('git', ['add', 'docs/README.md', 'docs/images/logo.png'], { cwd: repoDir, stdio: 'ignore' });
-      await expect(service.readRepositoryFileTextAtSource('staged', 'docs/README.md'))
-        .resolves.toContain('![Logo]');
+      await expect(service.readRepositoryFileTextAtSource('staged', 'docs/README.md')).resolves.toContain('![Logo]');
 
-      execFileSync(
-        'git',
-        ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs'],
-        { cwd: repoDir, stdio: 'ignore' },
-      );
+      execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs'], { cwd: repoDir, stdio: 'ignore' });
       const commitHash = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, encoding: 'utf8' }).trim();
 
-      await expect(service.readRepositoryFileTextAtSource('commit', 'docs/README.md', commitHash))
-        .resolves.toContain('# Preview');
+      await expect(service.readRepositoryFileTextAtSource('commit', 'docs/README.md', commitHash)).resolves.toContain('# Preview');
       const image = await service.readRepositoryImageDataUrlAtSource('commit', 'docs/images/logo.png', commitHash);
       expect(image.dataUrl).toMatch(/^data:image\/png;base64,/);
     } finally {
@@ -241,11 +192,7 @@ describe('GitService stale index.lock recovery', () => {
       execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
       fs.writeFileSync(path.join(repoDir, 'README.md'), 'test\n', 'utf8');
       execFileSync('git', ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
-      execFileSync(
-        'git',
-        ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'],
-        { cwd: repoDir, stdio: 'ignore' },
-      );
+      execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'], { cwd: repoDir, stdio: 'ignore' });
       fs.writeFileSync(path.join(repoDir, 'CHANGE.txt'), 'change\n', 'utf8');
 
       const lockPath = path.join(repoDir, '.git', 'index.lock');
@@ -283,20 +230,16 @@ describe('GitService commitWithMessage', () => {
     (service as any).repoIsBare = false;
 
     try {
-      await expect(service.commitWithMessage({
-        title: 'Long commit title',
-        description: longDescription,
-        amend: true,
-        signoff: true,
-      })).resolves.toBe('committed');
+      await expect(
+        service.commitWithMessage({
+          title: 'Long commit title',
+          description: longDescription,
+          amend: true,
+          signoff: true,
+        }),
+      ).resolves.toBe('committed');
 
-      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining([
-        'commit',
-        '--amend',
-        '--signoff',
-        '-F',
-        messageFilePath,
-      ]), expect.any(Object));
+      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining(['commit', '--amend', '--signoff', '-F', messageFilePath]), expect.any(Object));
       expect(fs.existsSync(messageFilePath)).toBe(false);
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
@@ -323,17 +266,9 @@ describe('GitService commitWithMessage', () => {
     (service as any).repoIsBare = false;
 
     try {
-      await expect(service.commitWithMessageForPaths(
-        { title: 'Batch commit' },
-        ['src/app.ts', 'docs/read me.md'],
-      )).resolves.toBe('committed');
+      await expect(service.commitWithMessageForPaths({ title: 'Batch commit' }, ['src/app.ts', 'docs/read me.md'])).resolves.toBe('committed');
 
-      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining([
-        'commit',
-        '-F',
-        messageFilePath,
-        '--pathspec-file-nul',
-      ]), expect.any(Object));
+      expect(runner).toHaveBeenCalledWith('git', expect.arrayContaining(['commit', '-F', messageFilePath, '--pathspec-file-nul']), expect.any(Object));
       expect(fs.existsSync(messageFilePath)).toBe(false);
       expect(fs.existsSync(pathspecFilePath)).toBe(false);
     } finally {
@@ -353,13 +288,7 @@ describe('GitService status and stash helpers', () => {
     try {
       await expect(service.getStatusPorcelain()).resolves.toBe(' M ä.txt');
 
-      expect(runner).toHaveBeenCalledWith('git', [
-        '-c',
-        'core.quotepath=false',
-        'status',
-        '--porcelain=v1',
-        '--untracked-files=all',
-      ], expect.any(Object));
+      expect(runner).toHaveBeenCalledWith('git', ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'], expect.any(Object));
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
@@ -376,20 +305,10 @@ describe('GitService status and stash helpers', () => {
     (service as any).repoIsBare = false;
 
     try {
-      await expect(service.createBranchFromStash('stash@{0}', 'feature/stashed'))
-        .resolves.toBe('Switched to a new branch feature/stashed');
+      await expect(service.createBranchFromStash('stash@{0}', 'feature/stashed')).resolves.toBe('Switched to a new branch feature/stashed');
 
-      expect(runner).toHaveBeenNthCalledWith(1, 'git', [
-        'check-ref-format',
-        '--branch',
-        'feature/stashed',
-      ], expect.any(Object));
-      expect(runner).toHaveBeenNthCalledWith(2, 'git', [
-        'stash',
-        'branch',
-        'feature/stashed',
-        'stash@{0}',
-      ], expect.any(Object));
+      expect(runner).toHaveBeenNthCalledWith(1, 'git', ['check-ref-format', '--branch', 'feature/stashed'], expect.any(Object));
+      expect(runner).toHaveBeenNthCalledWith(2, 'git', ['stash', 'branch', 'feature/stashed', 'stash@{0}'], expect.any(Object));
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
@@ -427,7 +346,9 @@ describe('GitService command queue', () => {
     const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 30);
+      });
       inFlight -= 1;
       return { stdout: '', stderr: '' };
     });
@@ -436,11 +357,7 @@ describe('GitService command queue', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      await Promise.all([
-        service.runCommand(['add', '--', 'a.txt']),
-        service.runCommand(['add', '--', 'b.txt']),
-        service.runCommand(['commit', '-m', 'test']),
-      ]);
+      await Promise.all([service.runCommand(['add', '--', 'a.txt']), service.runCommand(['add', '--', 'b.txt']), service.runCommand(['commit', '-m', 'test'])]);
 
       expect(fakeExec).toHaveBeenCalledTimes(3);
       expect(maxInFlight).toBe(1);
@@ -482,7 +399,9 @@ describe('GitService command queue', () => {
     const fakeExec = vi.fn(async (_file: string, _args: string[], _options: any) => {
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 30);
+      });
       inFlight -= 1;
       return { stdout: '', stderr: '' };
     });
@@ -491,11 +410,7 @@ describe('GitService command queue', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      await Promise.all([
-        service.runCommand(['status', '--short']),
-        service.runCommand(['diff', '--name-only']),
-        service.runCommand(['log', '-1']),
-      ]);
+      await Promise.all([service.runCommand(['status', '--short']), service.runCommand(['diff', '--name-only']), service.runCommand(['log', '-1'])]);
 
       expect(fakeExec).toHaveBeenCalledTimes(3);
       expect(maxInFlight).toBeGreaterThan(1);
@@ -518,13 +433,7 @@ describe('GitService scheduler classification', () => {
       await service.runCommandAtPath(repoPath, ['submodule', 'status', '--recursive']);
       await service.runCommandAtPath(repoPath, ['branch', '-d', 'old-branch']);
 
-      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual([
-        'polling',
-        'polling',
-        'polling',
-        'polling',
-        'write',
-      ]);
+      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual(['polling', 'polling', 'polling', 'polling', 'write']);
     } finally {
       fs.rmSync(repoPath, { recursive: true, force: true });
     }
@@ -610,9 +519,7 @@ describe('GitService expected non-fatal git errors', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      await expect(
-        service.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
-      ).rejects.toThrow(/no such branch/i);
+      await expect(service.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])).rejects.toThrow(/no such branch/i);
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
@@ -635,9 +542,7 @@ describe('GitService expected non-fatal git errors', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      await expect(
-        service.runCommand(['rev-parse', '--verify', '--quiet', 'v1.2.5^{commit}']),
-      ).rejects.toThrow(/Needed a single revision/i);
+      await expect(service.runCommand(['rev-parse', '--verify', '--quiet', 'v1.2.5^{commit}'])).rejects.toThrow(/Needed a single revision/i);
 
       expect(consoleErrorSpy).not.toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
@@ -660,9 +565,7 @@ describe('GitService expected non-fatal git errors', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      await expect(
-        service.runCommand(['log', 'missing..main', '--pretty=format:%H%x1f%h%x1f%s']),
-      ).rejects.toThrow(/bad revision/i);
+      await expect(service.runCommand(['log', 'missing..main', '--pretty=format:%H%x1f%h%x1f%s'])).rejects.toThrow(/bad revision/i);
 
       expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
       const [message] = consoleErrorSpy.mock.calls[0];

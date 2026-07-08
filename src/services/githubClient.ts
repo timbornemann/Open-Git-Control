@@ -14,7 +14,7 @@ import type {
   PullRequestDto,
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
-} from '../global';
+} from '@/global';
 import { getElectronApi, requireElectronApi } from './electronApi';
 
 export const githubClient = {
@@ -62,11 +62,7 @@ export const githubClient = {
     return requireElectronApi().githubLogout();
   },
 
-  async createRepository(
-    name: string,
-    description: string,
-    isPrivate: boolean,
-  ): Promise<IpcResult<GitHubRepositoryDto>> {
+  async createRepository(name: string, description: string, isPrivate: boolean): Promise<IpcResult<GitHubRepositoryDto>> {
     return requireElectronApi().githubCreateRepo(name, description, isPrivate);
   },
 
@@ -82,7 +78,13 @@ export const githubClient = {
     return requireElectronApi().githubCreatePR(...args);
   },
 
-  async getWorkflowRuns(params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }): Promise<IpcResult<GithubWorkflowRunDto[]>> {
+  async getWorkflowRuns(params: {
+    owner: string;
+    repo: string;
+    branch?: string;
+    headSha?: string;
+    perPage?: number;
+  }): Promise<IpcResult<GithubWorkflowRunDto[]>> {
     return requireElectronApi().githubGetWorkflowRuns(params);
   },
 
@@ -99,11 +101,7 @@ export const githubClient = {
     return requireElectronApi().githubMergePR(params);
   },
 
-  async getReleaseContext(params: {
-    owner: string;
-    repo: string;
-    targetCommitish?: string;
-  }): Promise<IpcResult<GitHubReleaseContextDto>> {
+  async getReleaseContext(params: { owner: string; repo: string; targetCommitish?: string }): Promise<IpcResult<GitHubReleaseContextDto>> {
     return requireElectronApi().githubGetReleaseContext(params);
   },
 

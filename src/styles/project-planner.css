@@ -173,9 +173,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 15% 0%, var(--accent-secondary-soft), transparent 30%),
-    var(--bg-darker);
+  background: radial-gradient(circle at 15% 0%, var(--accent-secondary-soft), transparent 30%), var(--bg-darker);
 }
 
 .planner-loading {
@@ -416,12 +414,24 @@
   cursor: wait;
 }
 
-.planner-column-idea .planner-column-header span { color: var(--text-accent); }
-.planner-column-bug .planner-column-header span { color: var(--status-warning); }
-.planner-column-planned .planner-column-header span { color: var(--status-info); }
-.planner-column-in-progress .planner-column-header span { color: var(--accent-primary); }
-.planner-column-blocked .planner-column-header span { color: var(--status-danger); }
-.planner-column-done .planner-column-header span { color: var(--status-success); }
+.planner-column-idea .planner-column-header span {
+  color: var(--text-accent);
+}
+.planner-column-bug .planner-column-header span {
+  color: var(--status-warning);
+}
+.planner-column-planned .planner-column-header span {
+  color: var(--status-info);
+}
+.planner-column-in-progress .planner-column-header span {
+  color: var(--accent-primary);
+}
+.planner-column-blocked .planner-column-header span {
+  color: var(--status-danger);
+}
+.planner-column-done .planner-column-header span {
+  color: var(--status-success);
+}
 
 .planner-column-list {
   flex: 1;
@@ -452,10 +462,18 @@
   transform: translateY(-1px);
 }
 
-.planner-card.planner-priority-low { border-left-color: var(--status-untracked); }
-.planner-card.planner-priority-medium { border-left-color: var(--status-info); }
-.planner-card.planner-priority-high { border-left-color: var(--status-warning); }
-.planner-card.planner-priority-urgent { border-left-color: var(--status-danger); }
+.planner-card.planner-priority-low {
+  border-left-color: var(--status-untracked);
+}
+.planner-card.planner-priority-medium {
+  border-left-color: var(--status-info);
+}
+.planner-card.planner-priority-high {
+  border-left-color: var(--status-warning);
+}
+.planner-card.planner-priority-urgent {
+  border-left-color: var(--status-danger);
+}
 
 .planner-card-header {
   display: flex;

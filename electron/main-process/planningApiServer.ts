@@ -1,18 +1,6 @@
-import {
-  PLANNER_PRIORITIES,
-  PLANNER_STATUSES,
-  createPlannerItem,
-  ensureRepositoryProject,
-} from './projectPlannerStore';
-import {
-  AUTH_HEADER_NAME,
-  ApiError,
-  JsonObject,
-  PlanningApiServerOptions,
-  RequestContext,
-  SERVER_NAME,
-} from './planningApiTypes';
-import type { PlanningApiServerHandle } from './planningApiTypes';
+import { PLANNER_PRIORITIES, PLANNER_STATUSES, createPlannerItem, ensureRepositoryProject } from './projectPlannerStore';
+import { AUTH_HEADER_NAME, ApiError, SERVER_NAME } from './planningApiTypes';
+import type { PlanningApiServerHandle, JsonObject, PlanningApiServerOptions, RequestContext } from './planningApiTypes';
 import {
   getRepositories,
   getTabs,
@@ -103,9 +91,7 @@ const routeApi = async (ctx: RequestContext): Promise<unknown> => {
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 };
 
-export async function startPlanningApiServer(
-  options: PlanningApiServerOptions = {},
-): Promise<PlanningApiServerHandle> {
+export async function startPlanningApiServer(options: PlanningApiServerOptions = {}): Promise<PlanningApiServerHandle> {
   return startPlanningApiHost(options, {
     routeApi,
     handleMcpRpc,
@@ -189,10 +175,7 @@ const openApiSpec = (baseUrl: string): JsonObject => ({
       PlannerPriority: { type: 'string', enum: PLANNER_PRIORITIES },
     },
   },
-  security: [
-    { openGitControlToken: [] },
-    { bearerToken: [] },
-  ],
+  security: [{ openGitControlToken: [] }, { bearerToken: [] }],
   paths: {
     '/health': { get: { summary: 'API health and planner metadata', security: [] } },
     '/projects': {

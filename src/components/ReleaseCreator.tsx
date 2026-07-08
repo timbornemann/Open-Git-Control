@@ -1,25 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  Clock3,
-  ExternalLink,
-  GitBranch,
-  RefreshCw,
-  Sparkles,
-  Tag,
-  XCircle,
-} from 'lucide-react';
-import { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '../global';
-import { useI18n } from '../i18n';
-import { ReleaseNotesOptions } from '../types/releaseNotes';
-import { validateGithubReleaseInput } from '../utils/githubReleaseValidation';
-import {
-  detectReleaseVersionBump,
-  ReleaseVersionBump,
-  suggestNextReleaseTag,
-} from '../utils/releaseTagSuggestion';
+import { AlertCircle, Check, CheckCircle2, Clock3, ExternalLink, GitBranch, RefreshCw, Sparkles, Tag, XCircle } from 'lucide-react';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/global';
+import { useI18n } from '@/i18n';
+import type { ReleaseNotesOptions } from '@/types/releaseNotes';
+import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
+import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
+import { detectReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 
 type AiOptionToggleProps = {
   label: string;
@@ -29,26 +15,14 @@ type AiOptionToggleProps = {
   onChange: (next: boolean) => void;
 };
 
-const AiOptionToggle: React.FC<AiOptionToggleProps> = ({
-  label,
-  description,
-  checked,
-  disabled,
-  onChange,
-}) => (
+const AiOptionToggle: React.FC<AiOptionToggleProps> = ({ label, description, checked, disabled, onChange }) => (
   <label className={`release-ai-option ${disabled ? 'release-ai-option--disabled' : ''}`}>
     <span className="release-ai-option-text">
       <strong>{label}</strong>
       <small>{description}</small>
     </span>
     <span className="release-switch">
-      <input
-        type="checkbox"
-        className="release-switch-input"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        disabled={disabled}
-      />
+      <input type="checkbox" className="release-switch-input" checked={checked} onChange={(event) => onChange(event.target.checked)} disabled={disabled} />
       <span className="release-switch-track">
         <span className="release-switch-thumb" />
       </span>
@@ -102,25 +76,20 @@ export const ReleaseCreator: React.FC<Props> = ({
   const trimmedTagName = (releaseForm.tagName || '').trim();
   const trimmedTarget = (releaseForm.targetCommitish || '').trim();
 
-  const existingTagSet = useMemo(
-    () => new Set((context?.existingTags || []).map((tag) => tag.toLowerCase())),
-    [context?.existingTags],
-  );
+  const existingTagSet = useMemo(() => new Set((context?.existingTags || []).map((tag) => tag.toLowerCase())), [context?.existingTags]);
   const tagAlreadyExists = Boolean(normalizedTag && existingTagSet.has(normalizedTag));
-  const suggestedTag = useMemo(
-    () => suggestNextReleaseTag(context?.existingTags || [], versionBump),
-    [context?.existingTags, versionBump],
-  );
+  const suggestedTag = useMemo(() => suggestNextReleaseTag(context?.existingTags || [], versionBump), [context?.existingTags, versionBump]);
   const effectiveVersionBump = useMemo(
     () => detectReleaseVersionBump(context?.lastReleaseTag, trimmedTagName) || versionBump,
     [context?.lastReleaseTag, trimmedTagName, versionBump],
   );
 
   const validation = useMemo(
-    () => validateGithubReleaseInput({
-      tagName: releaseForm.tagName || '',
-      releaseName: releaseForm.releaseName || '',
-    }),
+    () =>
+      validateGithubReleaseInput({
+        tagName: releaseForm.tagName || '',
+        releaseName: releaseForm.releaseName || '',
+      }),
     [releaseForm.releaseName, releaseForm.tagName],
   );
 
@@ -145,9 +114,7 @@ export const ReleaseCreator: React.FC<Props> = ({
   const bodyLineCount = (releaseForm.body || '').split(/\r?\n/g).length;
   const bodyCharCount = (releaseForm.body || '').length;
   const targetForContext = trimmedTarget || context?.commitsTarget || t('generated.components.releasecreator.unknown_e814b0a7');
-  const repositoryLabel = ownerRepo
-    ? `${ownerRepo.owner}/${ownerRepo.repo}`
-    : t('generated.components.releasecreator.no_github_repository_mapping_65df7317');
+  const repositoryLabel = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : t('generated.components.releasecreator.no_github_repository_mapping_65df7317');
 
   const canGenerateNotes = Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName) && commitsCount > 0;
   const canCreateRelease = Boolean(ownerRepo) && !releaseSubmitting && !tagAlreadyExists && validation.valid;
@@ -156,10 +123,7 @@ export const ReleaseCreator: React.FC<Props> = ({
     setReleaseForm((prev) => {
       const currentTag = (prev.tagName || '').trim();
       const currentReleaseName = (prev.releaseName || '').trim();
-      const shouldUpdateReleaseName = (
-        !currentReleaseName
-        || currentReleaseName === `Release ${currentTag}`
-      );
+      const shouldUpdateReleaseName = !currentReleaseName || currentReleaseName === `Release ${currentTag}`;
 
       return {
         ...prev,
@@ -199,7 +163,9 @@ export const ReleaseCreator: React.FC<Props> = ({
                 {t('generated.components.releasecreator.define_version_create_release_notes_and_publish_in_one_f_4f23c303')}
               </p>
             </div>
-            <div className="release-repo-chip" title={repositoryLabel}>{repositoryLabel}</div>
+            <div className="release-repo-chip" title={repositoryLabel}>
+              {repositoryLabel}
+            </div>
           </header>
 
           <section className="release-info-bar">
@@ -222,9 +188,7 @@ export const ReleaseCreator: React.FC<Props> = ({
               <AlertCircle size={16} />
               <div>
                 <strong>{t('generated.components.releasecreator.github_mapping_missing_9975f757')}</strong>
-                <p>
-                  {t('generated.components.releasecreator.open_a_local_repository_connected_to_github_to_create_re_f178cf2f')}
-                </p>
+                <p>{t('generated.components.releasecreator.open_a_local_repository_connected_to_github_to_create_re_f178cf2f')}</p>
               </div>
             </div>
           )}
@@ -237,9 +201,7 @@ export const ReleaseCreator: React.FC<Props> = ({
           {context?.fallbackUsed && (
             <div className="release-alert release-alert--warning">
               <AlertCircle size={16} />
-              <div>
-                {t('generated.components.releasecreator.latest_release_tag_was_not_found_locally_showing_recent_b17316f0')}
-              </div>
+              <div>{t('generated.components.releasecreator.latest_release_tag_was_not_found_locally_showing_recent_b17316f0')}</div>
             </div>
           )}
           {releaseError && (
@@ -269,15 +231,9 @@ export const ReleaseCreator: React.FC<Props> = ({
               <div className="release-version-bump">
                 <div className="release-version-bump-copy">
                   <span className="release-field-label">{t('generated.components.releasecreator.version_bump_3bda5018')}</span>
-                  <small>
-                    {t('generated.components.releasecreator.controls_which_component_is_increased_and_how_ai_notes_c_d39c7dfa')}
-                  </small>
+                  <small>{t('generated.components.releasecreator.controls_which_component_is_increased_and_how_ai_notes_c_d39c7dfa')}</small>
                 </div>
-                <div
-                  className="release-version-bump-options"
-                  role="group"
-                  aria-label={t('generated.components.releasecreator.select_version_bump_16edfafd')}
-                >
+                <div className="release-version-bump-options" role="group" aria-label={t('generated.components.releasecreator.select_version_bump_16edfafd')}>
                   {(['major', 'minor', 'patch'] as ReleaseVersionBump[]).map((bump) => (
                     <button
                       key={bump}
@@ -326,7 +282,9 @@ export const ReleaseCreator: React.FC<Props> = ({
                   />
                 </label>
                 <label className="release-field release-field--full">
-                  <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}</span>
+                  <span className="release-field-label">
+                    {t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}
+                  </span>
                   <input
                     type="text"
                     className="release-input"
@@ -430,13 +388,11 @@ export const ReleaseCreator: React.FC<Props> = ({
                     </div>
 
                     <div className="release-ai-main-actions">
-                      <button
-                        className="release-ai-generate-btn"
-                        onClick={() => void onGenerateNotes(effectiveVersionBump)}
-                        disabled={!canGenerateNotes}
-                      >
+                      <button className="release-ai-generate-btn" onClick={() => void onGenerateNotes(effectiveVersionBump)} disabled={!canGenerateNotes}>
                         <Sparkles size={16} />
-                        {notesGenerating ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32') : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
+                        {notesGenerating
+                          ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32')
+                          : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
                       </button>
                     </div>
                   </div>
@@ -475,11 +431,15 @@ export const ReleaseCreator: React.FC<Props> = ({
 
                     <button
                       className="release-primary-btn"
-                      onClick={() => { void onCreateRelease(); }}
+                      onClick={() => {
+                        void onCreateRelease();
+                      }}
                       disabled={!canCreateRelease}
                     >
                       <Check size={14} />
-                      {releaseSubmitting ? t('generated.components.releasecreator.creating_release_8650d060') : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
+                      {releaseSubmitting
+                        ? t('generated.components.releasecreator.creating_release_8650d060')
+                        : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
                     </button>
 
                     <p className={`release-inline ${canCreateRelease ? 'release-inline--muted' : 'release-inline--warning'}`}>
@@ -503,8 +463,12 @@ export const ReleaseCreator: React.FC<Props> = ({
                   </label>
 
                   <div className="release-notes-meta">
-                    <span>{t('generated.components.releasecreator.lines_ec6b4722')}: {bodyLineCount}</span>
-                    <span>{t('generated.components.releasecreator.characters_f141ff5c')}: {bodyCharCount}</span>
+                    <span>
+                      {t('generated.components.releasecreator.lines_ec6b4722')}: {bodyLineCount}
+                    </span>
+                    <span>
+                      {t('generated.components.releasecreator.characters_f141ff5c')}: {bodyCharCount}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -525,7 +489,9 @@ export const ReleaseCreator: React.FC<Props> = ({
               title={t('generated.components.releasecreator.refresh_data_a356c350')}
             >
               <RefreshCw size={12} className={contextLoading ? 'spin' : ''} />
-              {contextLoading ? t('generated.components.releasecreator.refreshing_3a1f234f') : t('generated.components.layout.apimcpsettingspanel.refresh_4825b0d7')}
+              {contextLoading
+                ? t('generated.components.releasecreator.refreshing_3a1f234f')
+                : t('generated.components.layout.apimcpsettingspanel.refresh_4825b0d7')}
             </button>
           </div>
           <div className="release-history-scroll">
@@ -541,7 +507,9 @@ export const ReleaseCreator: React.FC<Props> = ({
                 <div className="release-history-row-meta">
                   <code>{commit.shortHash}</code>
                   <span>{commit.author}</span>
-                  <span><Clock3 size={11} /> {commit.date}</span>
+                  <span>
+                    <Clock3 size={11} /> {commit.date}
+                  </span>
                 </div>
               </div>
             ))}

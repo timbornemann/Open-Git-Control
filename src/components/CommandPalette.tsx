@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 
 export type PaletteCommand = {
   id: string;
@@ -41,13 +41,19 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
     setActiveIdx(0);
   }, [query]);
 
-  const runCommand = useCallback((cmd: PaletteCommand) => {
-    cmd.action();
-    onClose();
-  }, [onClose]);
+  const runCommand = useCallback(
+    (cmd: PaletteCommand) => {
+      cmd.action();
+      onClose();
+    },
+    [onClose],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Escape') {
+      onClose();
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActiveIdx((i) => Math.min(i + 1, filtered.length - 1));
@@ -78,9 +84,7 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
           onChange={(e) => setQuery(e.target.value)}
         />
         <div ref={listRef} className="cmd-palette-list">
-          {filtered.length === 0 && (
-            <div className="cmd-palette-empty">{t('generated.components.commandpalette.no_matches_60e7ba98')}</div>
-          )}
+          {filtered.length === 0 && <div className="cmd-palette-empty">{t('generated.components.commandpalette.no_matches_60e7ba98')}</div>}
           {filtered.map((cmd, i) => (
             <button
               key={cmd.id}
@@ -94,9 +98,7 @@ export const CommandPalette: React.FC<Props> = ({ open, commands, onClose }) => 
             </button>
           ))}
         </div>
-        <div className="cmd-palette-footer">
-          {t('generated.components.commandpalette.arrows_navigate_enter_runs_esc_closes_73b4d914')}
-        </div>
+        <div className="cmd-palette-footer">{t('generated.components.commandpalette.arrows_navigate_enter_runs_esc_closes_73b4d914')}</div>
       </div>
     </div>
   );

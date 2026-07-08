@@ -230,7 +230,9 @@
   background: var(--bg-dark);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
 }
 
 .diff-hunk-action-btn:hover {
@@ -377,7 +379,9 @@
 
 .diff-blame-cell.clickable {
   cursor: pointer;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
 }
 
 .diff-blame-cell.clickable:hover {
@@ -443,7 +447,12 @@
 .markdown-preview-content {
   max-width: 980px;
   margin: 0 auto;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   font-size: 0.92rem;
   line-height: 1.65;
   color: var(--text-primary);
@@ -521,7 +530,7 @@
 }
 
 .markdown-preview-content code {
-  font-family: "JetBrains Mono", Consolas, monospace;
+  font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.86em;
   color: var(--text-primary);
   background: var(--bg-panel);
@@ -584,7 +593,7 @@
   margin: 1.4em 0;
 }
 
-.markdown-preview-content input[type="checkbox"] {
+.markdown-preview-content input[type='checkbox'] {
   margin-right: 0.45em;
   accent-color: var(--accent-primary);
 }

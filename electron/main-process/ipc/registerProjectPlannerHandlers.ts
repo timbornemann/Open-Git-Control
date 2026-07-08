@@ -1,8 +1,9 @@
 import { ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { GitService } from '../../GitService';
+import type { GitService } from '../../GitService';
 import { readStoreData, writeStoreData } from '../repoStore';
+import { IpcChannel } from '../../../src/types/ipcContract';
 import {
   convertProjectToRepository,
   createPlannedProject,
@@ -29,9 +30,9 @@ const failure = (error: unknown) => ({
 });
 
 export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPlannerHandlersDeps): void {
-  ipcMain.handle('planner:getData', async () => success(readProjectPlannerData()));
+  ipcMain.handle(IpcChannel.PlannerGetData, async () => success(readProjectPlannerData()));
 
-  ipcMain.handle('planner:ensureRepositoryProject', async (_event: unknown, repoPath: string) => {
+  ipcMain.handle(IpcChannel.PlannerEnsureRepositoryProject, async (_event: unknown, repoPath: string) => {
     try {
       return success(ensureRepositoryProject(repoPath));
     } catch (error) {
@@ -39,10 +40,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:createProject', async (
-    _event: unknown,
-    input: { name: string; description?: string },
-  ) => {
+  ipcMain.handle(IpcChannel.PlannerCreateProject, async (_event: unknown, input: { name: string; description?: string }) => {
     try {
       return success(createPlannedProject(input));
     } catch (error) {
@@ -50,11 +48,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:updateProject', async (
-    _event: unknown,
-    projectId: string,
-    input: { name?: string; description?: string },
-  ) => {
+  ipcMain.handle(IpcChannel.PlannerUpdateProject, async (_event: unknown, projectId: string, input: { name?: string; description?: string }) => {
     try {
       return success(updatePlannerProject(projectId, input));
     } catch (error) {
@@ -62,7 +56,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:deleteProject', async (_event: unknown, projectId: string) => {
+  ipcMain.handle(IpcChannel.PlannerDeleteProject, async (_event: unknown, projectId: string) => {
     try {
       deletePlannerProject(projectId);
       return success(true);
@@ -71,7 +65,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:deleteRepositoryProjectByPath', async (_event: unknown, repoPath: string) => {
+  ipcMain.handle(IpcChannel.PlannerDeleteRepositoryProjectByPath, async (_event: unknown, repoPath: string) => {
     try {
       return success(deleteRepositoryPlannerProjectByPath(repoPath));
     } catch (error) {
@@ -79,11 +73,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:createItem', async (
-    _event: unknown,
-    projectId: string,
-    input: Record<string, unknown>,
-  ) => {
+  ipcMain.handle(IpcChannel.PlannerCreateItem, async (_event: unknown, projectId: string, input: Record<string, unknown>) => {
     try {
       return success(createPlannerItem(projectId, input as never));
     } catch (error) {
@@ -91,11 +81,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:updateItem', async (
-    _event: unknown,
-    itemId: string,
-    input: Record<string, unknown>,
-  ) => {
+  ipcMain.handle(IpcChannel.PlannerUpdateItem, async (_event: unknown, itemId: string, input: Record<string, unknown>) => {
     try {
       return success(updatePlannerItem(itemId, input as never));
     } catch (error) {
@@ -103,7 +89,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:deleteItem', async (_event: unknown, itemId: string) => {
+  ipcMain.handle(IpcChannel.PlannerDeleteItem, async (_event: unknown, itemId: string) => {
     try {
       deletePlannerItem(itemId);
       return success(true);
@@ -112,12 +98,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
     }
   });
 
-  ipcMain.handle('planner:materializeProject', async (
-    _event: unknown,
-    projectId: string,
-    parentDirectory: string,
-    requestedFolderName: string,
-  ) => {
+  ipcMain.handle(IpcChannel.PlannerMaterializeProject, async (_event: unknown, projectId: string, parentDirectory: string, requestedFolderName: string) => {
     let targetPath: string | null = null;
     let createdDirectory = false;
     let repoStoreBeforeUpdate: ReturnType<typeof readStoreData> | null = null;
@@ -152,9 +133,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
         repos: repoData.repos.map((repo) => ({ ...repo })),
       };
       const now = Date.now();
-      if (!repoData.repos.some((repo) => (
-        getRepositoryProjectKey(repo.path) === getRepositoryProjectKey(repositoryPath)
-      ))) {
+      if (!repoData.repos.some((repo) => getRepositoryProjectKey(repo.path) === getRepositoryProjectKey(repositoryPath))) {
         repoData.repos.push({
           path: repositoryPath,
           lastOpened: now,

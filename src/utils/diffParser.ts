@@ -135,7 +135,7 @@ export const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
         const del = dels[idx] || null;
         const add = adds[idx] || null;
         output.push({
-          type: del && add ? 'context' : (del ? 'del' : 'add'),
+          type: del && add ? 'context' : del ? 'del' : 'add',
           text: `${del?.text || ''}\x1f${add?.text || ''}`,
           leftNo: del?.leftNo || null,
           rightNo: add?.rightNo || null,
@@ -156,8 +156,8 @@ export const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string =
   const rawHunkLines = hunk.rawLines.length
     ? hunk.rawLines
     : hunk.rows.map((row) => {
-      const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
-      return prefix + row.text;
-    });
+        const prefix = row.type === 'add' ? '+' : row.type === 'del' ? '-' : ' ';
+        return prefix + row.text;
+      });
   return [...header, hunk.header, ...rawHunkLines, ''].join('\n');
 };

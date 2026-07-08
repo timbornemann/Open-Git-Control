@@ -1,4 +1,4 @@
-import { GitCommit } from './gitParsing';
+import type { GitCommit } from './gitParsing';
 
 // Brand-aligned lane colors for branch graph readability
 export const LANE_COLORS = [
@@ -67,22 +67,18 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const edges: GraphEdge[] = [];
   const activeLanes: (string | null)[] = [];
   const laneFreedAtRow: number[] = [];
-  const visibleHashes = new Set(commits.map(c => c.hash));
-  const commitByHash = new Map(commits.map(commit => [commit.hash, commit]));
+  const visibleHashes = new Set(commits.map((c) => c.hash));
+  const commitByHash = new Map(commits.map((commit) => [commit.hash, commit]));
 
-  const headCommitCandidate = commits.find(commit => (
-    commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD')
-  )) ?? commits[0];
+  const headCommitCandidate = commits.find((commit) => commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD')) ?? commits[0];
 
-  const anchorRef = DEFAULT_TRUNK_REFS.find((targetRef) => (
-    commits.some((commit) => commit.refs.some((ref) => refMatchesTarget(ref, targetRef)))
-  ));
+  const anchorRef = DEFAULT_TRUNK_REFS.find((targetRef) => commits.some((commit) => commit.refs.some((ref) => refMatchesTarget(ref, targetRef))));
   const trunkStartCommit = anchorRef
     ? (commits.find((commit) => commit.refs.some((ref) => refMatchesTarget(ref, anchorRef))) ?? headCommitCandidate)
     : headCommitCandidate;
 
   const trunkHashes = new Set<string>();
-  for (let current = trunkStartCommit; current; ) {
+  for (let current = trunkStartCommit; current;) {
     trunkHashes.add(current.hash);
     const firstParent = current.parentHashes[0];
     if (!firstParent || !visibleHashes.has(firstParent)) break;
@@ -128,13 +124,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     return activeLanes.length - 1;
   };
 
-  const reserveHashInLane = (
-    hash: string,
-    preferredLane: number,
-    startLane: number,
-    row: number,
-    allowRecentlyFreed = false,
-  ) => {
+  const reserveHashInLane = (hash: string, preferredLane: number, startLane: number, row: number, allowRecentlyFreed = false) => {
     const existingLane = activeLanes.indexOf(hash);
     if (existingLane !== -1) {
       if (preferredLane >= 0 && existingLane !== preferredLane) {
@@ -177,7 +167,7 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     const isMerge = commit.parentHashes.length > 1;
     nodes.push({ commit, row, lane: myLane, color, isMerge });
 
-    const parents = commit.parentHashes.filter(h => h.length > 0);
+    const parents = commit.parentHashes.filter((h) => h.length > 0);
     if (parents.length > 0) {
       const primaryLane = commitOnTrunk ? 0 : myLane;
       reserveHashInLane(parents[0], primaryLane, primaryLane, row);
@@ -200,9 +190,9 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
     }
   }
 
-  const nodeByHash = new Map(nodes.map(node => [node.commit.hash, node]));
+  const nodeByHash = new Map(nodes.map((node) => [node.commit.hash, node]));
   for (const node of nodes) {
-    const parents = node.commit.parentHashes.filter(h => h.length > 0);
+    const parents = node.commit.parentHashes.filter((h) => h.length > 0);
     for (let pi = 0; pi < parents.length; pi++) {
       const parentHash = parents[pi];
       const parentNode = nodeByHash.get(parentHash);
@@ -231,4 +221,3 @@ export function computeGraphLayout(commits: GitCommit[]): GraphLayout {
   const maxLane = nodes.reduce((max, node) => Math.max(max, node.lane), 0);
   return { nodes, edges, maxLane };
 }
-

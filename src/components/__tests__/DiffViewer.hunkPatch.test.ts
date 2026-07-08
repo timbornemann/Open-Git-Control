@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHunkPatch, parseDiff, sideBySideRows, type ParsedHunk } from '../../utils/diffParser';
+import { buildHunkPatch, parseDiff, sideBySideRows, type ParsedHunk } from '@/utils/diffParser';
 
 describe('DiffViewer hunk patch reconstruction', () => {
   it('preserves file metadata and no-newline markers for new-file hunks', () => {
@@ -48,24 +48,22 @@ describe('DiffViewer hunk patch reconstruction', () => {
   });
 
   it('parses additions, deletions, context rows, and no-newline markers', () => {
-    const parsed = parseDiff([
-      'diff --git a/app.ts b/app.ts',
-      '--- a/app.ts',
-      '+++ b/app.ts',
-      '@@ -3,3 +3,4 @@',
-      ' keep',
-      '-oldCall()',
-      '+newCall()',
-      '+extraCall()',
-      ' trailing',
-      '\\ No newline at end of file',
-    ].join('\n'));
+    const parsed = parseDiff(
+      [
+        'diff --git a/app.ts b/app.ts',
+        '--- a/app.ts',
+        '+++ b/app.ts',
+        '@@ -3,3 +3,4 @@',
+        ' keep',
+        '-oldCall()',
+        '+newCall()',
+        '+extraCall()',
+        ' trailing',
+        '\\ No newline at end of file',
+      ].join('\n'),
+    );
 
-    expect(parsed.fileHeader).toEqual([
-      'diff --git a/app.ts b/app.ts',
-      '--- a/app.ts',
-      '+++ b/app.ts',
-    ]);
+    expect(parsed.fileHeader).toEqual(['diff --git a/app.ts b/app.ts', '--- a/app.ts', '+++ b/app.ts']);
     expect(parsed.hunks[0]?.rows).toEqual([
       { type: 'context', text: 'keep', leftNo: 3, rightNo: 3 },
       { type: 'del', text: 'oldCall()', leftNo: 4, rightNo: null },
@@ -76,15 +74,7 @@ describe('DiffViewer hunk patch reconstruction', () => {
   });
 
   it('pairs adjacent deletion and addition blocks for side-by-side rendering', () => {
-    const parsed = parseDiff([
-      '@@ -1,4 +1,4 @@',
-      ' context',
-      '-old one',
-      '-old two',
-      '+new one',
-      ' unchanged',
-      '+added later',
-    ].join('\n'));
+    const parsed = parseDiff(['@@ -1,4 +1,4 @@', ' context', '-old one', '-old two', '+new one', ' unchanged', '+added later'].join('\n'));
 
     const rows = sideBySideRows(parsed.hunks[0]!.rows);
     expect(rows).toEqual([
@@ -108,24 +98,11 @@ describe('DiffViewer hunk patch reconstruction', () => {
       ],
     };
 
-    expect(buildHunkPatch(['diff --git a/a b/a', ''], hunk)).toBe([
-      'diff --git a/a b/a',
-      '@@ -1,2 +1,2 @@',
-      ' same',
-      '-old',
-      '+new',
-      '',
-    ].join('\n'));
+    expect(buildHunkPatch(['diff --git a/a b/a', ''], hunk)).toBe(['diff --git a/a b/a', '@@ -1,2 +1,2 @@', ' same', '-old', '+new', ''].join('\n'));
   });
 
   it('ignores malformed hunk headers without corrupting the following hunk', () => {
-    const parsed = parseDiff([
-      'diff --git a/a b/a',
-      '@@ malformed @@',
-      '@@ -1 +1 @@',
-      '-before',
-      '+after',
-    ].join('\n'));
+    const parsed = parseDiff(['diff --git a/a b/a', '@@ malformed @@', '@@ -1 +1 @@', '-before', '+after'].join('\n'));
 
     expect(parsed.fileHeader).toEqual(['diff --git a/a b/a']);
     expect(parsed.hunks).toHaveLength(1);

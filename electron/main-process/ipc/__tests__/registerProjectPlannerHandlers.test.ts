@@ -14,12 +14,7 @@ vi.mock('electron', () => ({
 }));
 
 import { registerProjectPlannerHandlers } from '../registerProjectPlannerHandlers';
-import {
-  createPlannedProject,
-  createPlannerItem,
-  ensureRepositoryProject,
-  readProjectPlannerData,
-} from '../../projectPlannerStore';
+import { createPlannedProject, createPlannerItem, ensureRepositoryProject, readProjectPlannerData } from '../../projectPlannerStore';
 import { readStoreData } from '../../repoStore';
 
 describe('registerProjectPlannerHandlers', () => {
@@ -51,10 +46,13 @@ describe('registerProjectPlannerHandlers', () => {
     expect(createHandler).toBeTruthy();
     expect(getDataHandler).toBeTruthy();
 
-    const createResult = await createHandler!({}, {
-      name: 'Future Desktop App',
-      description: 'Collect product ideas before creating a repository.',
-    });
+    const createResult = await createHandler!(
+      {},
+      {
+        name: 'Future Desktop App',
+        description: 'Collect product ideas before creating a repository.',
+      },
+    );
     expect(createResult).toMatchObject({
       success: true,
       data: {

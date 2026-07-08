@@ -16,11 +16,11 @@ import {
   XCircle,
   Clock3,
 } from 'lucide-react';
-import { AppSidebarProps } from './AppSidebar.types';
-import { useI18n } from '../../../i18n';
-import { EmptyState } from '../../EmptyState';
-import { gitClient } from '../../../services/gitClient';
-import { validateGithubReleaseInput } from '../../../utils/githubReleaseValidation';
+import type { AppSidebarProps } from './AppSidebar.types';
+import { useI18n } from '@/i18n';
+import { EmptyState } from '@/components/EmptyState';
+import { gitClient } from '@/services/gitClient';
+import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
 import { formatDuration, getCiBadgeStyles } from './githubShared';
 
 type GithubConnectedContentProps = Pick<
@@ -72,7 +72,10 @@ type GithubConnectedContentProps = Pick<
 >;
 
 const toRepoIdentity = (remoteUrl: string): string | null => {
-  const trimmed = (remoteUrl || '').trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+  const trimmed = (remoteUrl || '')
+    .trim()
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '');
   if (!trimmed) return null;
 
   const sshMatch = trimmed.match(/^git@([^:]+):(.+)$/i);
@@ -224,9 +227,16 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Github size={16} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{githubUser || t('generated.components.layout.sidebar.githubconnectedcontent.connected_64357a97')}</span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+            {githubUser || t('generated.components.layout.sidebar.githubconnectedcontent.connected_64357a97')}
+          </span>
         </div>
-        <button onClick={onLogout} className="icon-btn" style={{ padding: '4px' }} title={t('generated.components.layout.sidebar.githubconnectedcontent.sign_out_2e3efcd4')}>
+        <button
+          onClick={onLogout}
+          className="icon-btn"
+          style={{ padding: '4px' }}
+          title={t('generated.components.layout.sidebar.githubconnectedcontent.sign_out_2e3efcd4')}
+        >
           <LogOut size={14} />
         </button>
       </div>
@@ -237,7 +247,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           <input
             type="text"
             value={repoSearch}
-            onChange={e => setRepoSearch(e.target.value)}
+            onChange={(e) => setRepoSearch(e.target.value)}
             placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.search_github_repositories_6886fc19')}
             style={{
               width: '100%',
@@ -251,16 +261,29 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             }}
           />
         </div>
-        <button className="icon-btn" style={{ padding: '6px' }} onClick={() => refreshGithubRepos(repoSearch)} title={t('generated.components.layout.sidebar.githubconnectedcontent.refresh_list_4d33cd9b')}>
+        <button
+          className="icon-btn"
+          style={{ padding: '6px' }}
+          onClick={() => refreshGithubRepos(repoSearch)}
+          title={t('generated.components.layout.sidebar.githubconnectedcontent.refresh_list_4d33cd9b')}
+        >
           <RefreshCw size={14} className={isLoadingGithubRepos ? 'spin' : ''} />
         </button>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-        <button className="staging-btn-sm" onClick={onCloneByUrl} title={t('generated.components.layout.sidebar.githubconnectedcontent.clone_any_repository_via_http_ssh_url_a4c092a4')}>
+        <button
+          className="staging-btn-sm"
+          onClick={onCloneByUrl}
+          title={t('generated.components.layout.sidebar.githubconnectedcontent.clone_any_repository_via_http_ssh_url_a4c092a4')}
+        >
           <DownloadCloud size={12} /> {t('generated.components.layout.sidebar.githubconnectedcontent.clone_via_url_2a8ca14d')}
         </button>
-        <button className="staging-btn-sm" onClick={onForkByUrl} title={t('generated.components.layout.sidebar.githubconnectedcontent.fork_and_clone_a_github_repository_from_url_6d14f3d1')}>
+        <button
+          className="staging-btn-sm"
+          onClick={onForkByUrl}
+          title={t('generated.components.layout.sidebar.githubconnectedcontent.fork_and_clone_a_github_repository_from_url_6d14f3d1')}
+        >
           <GitFork size={12} /> {t('generated.components.layout.sidebar.githubconnectedcontent.fork_via_url_37240822')}
         </button>
       </div>
@@ -271,83 +294,88 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
         </div>
       )}
 
-      {!isLoadingGithubRepos && githubRepos.map(repo => {
-        const repoIdentity = toRepoIdentity(repo.cloneUrl);
-        const localRepoPath = repoIdentity ? localRepoByIdentity.get(repoIdentity) : undefined;
-        const isLocallyAvailable = Boolean(localRepoPath);
-        const isActiveLocalRepo = Boolean(localRepoPath && localRepoPath === activeRepo);
+      {!isLoadingGithubRepos &&
+        githubRepos.map((repo) => {
+          const repoIdentity = toRepoIdentity(repo.cloneUrl);
+          const localRepoPath = repoIdentity ? localRepoByIdentity.get(repoIdentity) : undefined;
+          const isLocallyAvailable = Boolean(localRepoPath);
+          const isActiveLocalRepo = Boolean(localRepoPath && localRepoPath === activeRepo);
 
-        return (
-          <div
-            key={repo.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '8px',
-              backgroundColor: 'var(--bg-panel)',
-              borderRadius: '4px',
-              border: '1px solid var(--border-color)',
-              gap: '8px',
-            }}
-          >
-            <span
+          return (
+            <div
+              key={repo.id}
               style={{
-                fontSize: '0.85rem',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1,
-                minWidth: 0,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px',
+                backgroundColor: 'var(--bg-panel)',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                gap: '8px',
               }}
-              title={repo.fullName}
             >
-              {repo.fullName}
-            </span>
-
-            {isLocallyAvailable ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    color: 'var(--status-success)',
-                    backgroundColor: 'var(--status-success-soft)',
-                    border: '1px solid var(--status-success-border)',
-                    borderRadius: '999px',
-                    padding: '2px 8px',
-                  }}
-                  title={t('generated.components.layout.sidebar.githubconnectedcontent.already_available_locally_e6f1b562')}
-                >
-                  <CheckCircle2 size={12} /> {t('generated.components.layout.sidebar.githubconnectedcontent.local_0a3c619d')}
-                </span>
-                <button
-                  onClick={() => localRepoPath && onSwitchRepo(localRepoPath)}
-                  className="icon-btn"
-                  style={{ padding: '4px', opacity: isActiveLocalRepo ? 0.55 : 1 }}
-                  title={isActiveLocalRepo ? t('generated.components.layout.sidebar.githubconnectedcontent.already_active_27e8dc92') : t('generated.components.layout.sidebar.githubconnectedcontent.open_local_repository_a84c251c')}
-                  disabled={!localRepoPath || isActiveLocalRepo}
-                >
-                  <FolderOpen size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => onClone(repo.cloneUrl, repo.name)}
-                disabled={isCloning}
-                className="icon-btn"
-                style={{ padding: '4px' }}
-                title={t('generated.components.layout.cloneprogressmodal.clone_repository_25099131')}
+              <span
+                style={{
+                  fontSize: '0.85rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+                title={repo.fullName}
               >
-                <DownloadCloud size={14} />
-              </button>
-            )}
-          </div>
-        );
-      })}
+                {repo.fullName}
+              </span>
+
+              {isLocallyAvailable ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: 'var(--status-success)',
+                      backgroundColor: 'var(--status-success-soft)',
+                      border: '1px solid var(--status-success-border)',
+                      borderRadius: '999px',
+                      padding: '2px 8px',
+                    }}
+                    title={t('generated.components.layout.sidebar.githubconnectedcontent.already_available_locally_e6f1b562')}
+                  >
+                    <CheckCircle2 size={12} /> {t('generated.components.layout.sidebar.githubconnectedcontent.local_0a3c619d')}
+                  </span>
+                  <button
+                    onClick={() => localRepoPath && onSwitchRepo(localRepoPath)}
+                    className="icon-btn"
+                    style={{ padding: '4px', opacity: isActiveLocalRepo ? 0.55 : 1 }}
+                    title={
+                      isActiveLocalRepo
+                        ? t('generated.components.layout.sidebar.githubconnectedcontent.already_active_27e8dc92')
+                        : t('generated.components.layout.sidebar.githubconnectedcontent.open_local_repository_a84c251c')
+                    }
+                    disabled={!localRepoPath || isActiveLocalRepo}
+                  >
+                    <FolderOpen size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => onClone(repo.cloneUrl, repo.name)}
+                  disabled={isCloning}
+                  className="icon-btn"
+                  style={{ padding: '4px' }}
+                  title={t('generated.components.layout.cloneprogressmodal.clone_repository_25099131')}
+                >
+                  <DownloadCloud size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
 
       {!isLoadingGithubRepos && githubRepos.length === 0 && (
         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
@@ -356,13 +384,10 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
       )}
 
       {githubReposHasMore && (
-        <button
-          className="staging-tool-btn"
-          onClick={loadMoreGithubRepos}
-          disabled={isLoadingMoreGithubRepos}
-          style={{ alignSelf: 'center' }}
-        >
-          {isLoadingMoreGithubRepos ? t('generated.components.layout.sidebar.githubconnectedcontent.loading_more_b6e2cbcf') : t('generated.components.layout.sidebar.githubconnectedcontent.load_more_74d5e677')}
+        <button className="staging-tool-btn" onClick={loadMoreGithubRepos} disabled={isLoadingMoreGithubRepos} style={{ alignSelf: 'center' }}>
+          {isLoadingMoreGithubRepos
+            ? t('generated.components.layout.sidebar.githubconnectedcontent.loading_more_b6e2cbcf')
+            : t('generated.components.layout.sidebar.githubconnectedcontent.load_more_74d5e677')}
         </button>
       )}
 
@@ -402,7 +427,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-            {(['open', 'closed', 'all'] as const).map(filter => (
+            {(['open', 'closed', 'all'] as const).map((filter) => (
               <button
                 key={filter}
                 onClick={() => setPrFilter(filter)}
@@ -419,7 +444,11 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   textTransform: 'capitalize',
                 }}
               >
-                {filter === 'open' ? t('generated.components.layout.sidebar.githubconnectedcontent.open_3213d9d8') : filter === 'closed' ? t('generated.components.layout.sidebar.githubconnectedcontent.closed_ec5c60af') : t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
+                {filter === 'open'
+                  ? t('generated.components.layout.sidebar.githubconnectedcontent.open_3213d9d8')
+                  : filter === 'closed'
+                    ? t('generated.components.layout.sidebar.githubconnectedcontent.closed_ec5c60af')
+                    : t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff')}
               </button>
             ))}
           </div>
@@ -441,7 +470,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                 type="text"
                 placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.pr_title_67e768c0')}
                 value={newPRTitle}
-                onChange={e => setNewPRTitle(e.target.value)}
+                onChange={(e) => setNewPRTitle(e.target.value)}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -456,7 +485,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
               <textarea
                 placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.description_optional_30003d39')}
                 value={newPRBody}
-                onChange={e => setNewPRBody(e.target.value)}
+                onChange={(e) => setNewPRBody(e.target.value)}
                 rows={2}
                 style={{
                   width: '100%',
@@ -475,7 +504,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   type="text"
                   placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.head_branch_f25163c0')}
                   value={newPRHead}
-                  onChange={e => setNewPRHeadInput(e.target.value)}
+                  onChange={(e) => setNewPRHeadInput(e.target.value)}
                   style={{
                     flex: 1,
                     padding: '5px 8px',
@@ -486,14 +515,12 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                     fontSize: '0.78rem',
                   }}
                 />
-                <span style={{ color: 'var(--text-secondary)', alignSelf: 'center', fontSize: '0.8rem' }}>
-                  {'->'}
-                </span>
+                <span style={{ color: 'var(--text-secondary)', alignSelf: 'center', fontSize: '0.8rem' }}>{'->'}</span>
                 <input
                   type="text"
                   placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.base_branch_e03dac14')}
                   value={newPRBase}
-                  onChange={e => setNewPRBase(e.target.value)}
+                  onChange={(e) => setNewPRBase(e.target.value)}
                   style={{
                     flex: 1,
                     padding: '5px 8px',
@@ -560,40 +587,77 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
               type="text"
               placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.tag_name_required_f52acebf')}
               value={releaseForm.tagName || ''}
-              onChange={e => setReleaseForm(prev => ({ ...prev, tagName: e.target.value }))}
+              onChange={(e) => setReleaseForm((prev) => ({ ...prev, tagName: e.target.value }))}
               disabled={!prOwnerRepo || releaseSubmitting}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-dark)',
+                color: 'var(--text-primary)',
+                fontSize: '0.82rem',
+              }}
             />
             <input
               type="text"
               placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.release_name_required_cbead0c8')}
               value={releaseForm.releaseName || ''}
-              onChange={e => setReleaseForm(prev => ({ ...prev, releaseName: e.target.value }))}
+              onChange={(e) => setReleaseForm((prev) => ({ ...prev, releaseName: e.target.value }))}
               disabled={!prOwnerRepo || releaseSubmitting}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-dark)',
+                color: 'var(--text-primary)',
+                fontSize: '0.82rem',
+              }}
             />
             <input
               type="text"
               placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}
               value={releaseForm.targetCommitish || ''}
-              onChange={e => setReleaseForm(prev => ({ ...prev, targetCommitish: e.target.value }))}
+              onChange={(e) => setReleaseForm((prev) => ({ ...prev, targetCommitish: e.target.value }))}
               disabled={!prOwnerRepo || releaseSubmitting}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem' }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-dark)',
+                color: 'var(--text-primary)',
+                fontSize: '0.82rem',
+              }}
             />
             <textarea
               placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.release_notes_optional_4d1c1433')}
               value={releaseForm.body || ''}
-              onChange={e => setReleaseForm(prev => ({ ...prev, body: e.target.value }))}
+              onChange={(e) => setReleaseForm((prev) => ({ ...prev, body: e.target.value }))}
               rows={3}
               disabled={!prOwnerRepo || releaseSubmitting}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'var(--text-primary)', fontSize: '0.82rem', resize: 'vertical' }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '6px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-dark)',
+                color: 'var(--text-primary)',
+                fontSize: '0.82rem',
+                resize: 'vertical',
+              }}
             />
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
               <label style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <input
                   type="checkbox"
                   checked={Boolean(releaseForm.draft)}
-                  onChange={e => setReleaseForm(prev => ({ ...prev, draft: e.target.checked }))}
+                  onChange={(e) => setReleaseForm((prev) => ({ ...prev, draft: e.target.checked }))}
                   disabled={!prOwnerRepo || releaseSubmitting}
                 />
                 {t('generated.components.layout.sidebar.githubconnectedcontent.draft_03fcb5d9')}
@@ -602,7 +666,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                 <input
                   type="checkbox"
                   checked={Boolean(releaseForm.prerelease)}
-                  onChange={e => setReleaseForm(prev => ({ ...prev, prerelease: e.target.checked }))}
+                  onChange={(e) => setReleaseForm((prev) => ({ ...prev, prerelease: e.target.checked }))}
                   disabled={!prOwnerRepo || releaseSubmitting}
                 />
                 {t('generated.components.layout.sidebar.githubconnectedcontent.pre_release_4bb763f1')}
@@ -634,8 +698,15 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
 
             {releaseSuccess && (
               <div style={{ fontSize: '0.74rem', color: 'var(--status-success)', lineHeight: 1.35 }}>
-                {t('generated.components.layout.sidebar.githubconnectedcontent.release_created_successfully_3bde93c8')} {' '}
-                <a href={releaseSuccess.htmlUrl} onClick={(e) => { e.preventDefault(); onOpenPR(releaseSuccess.htmlUrl); }} style={{ color: 'inherit', textDecoration: 'underline' }}>
+                {t('generated.components.layout.sidebar.githubconnectedcontent.release_created_successfully_3bde93c8')}{' '}
+                <a
+                  href={releaseSuccess.htmlUrl}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onOpenPR(releaseSuccess.htmlUrl);
+                  }}
+                  style={{ color: 'inherit', textDecoration: 'underline' }}
+                >
                   {t('generated.components.layout.sidebar.githubconnectedcontent.open_release_76771d25')}
                 </a>
               </div>
@@ -643,7 +714,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => { void onCreateRelease(); }}
+                onClick={() => {
+                  void onCreateRelease();
+                }}
                 disabled={releaseSubmitDisabled}
                 style={{
                   padding: '5px 10px',
@@ -656,7 +729,9 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {releaseSubmitting ? t('generated.components.layout.sidebar.githubconnectedcontent.creating_95b39ce8') : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
+                {releaseSubmitting
+                  ? t('generated.components.layout.sidebar.githubconnectedcontent.creating_95b39ce8')
+                  : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
               </button>
             </div>
           </div>
@@ -668,7 +743,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           )}
 
           {!prLoading &&
-            pullRequests.map(pr => (
+            pullRequests.map((pr) => (
               <div
                 key={pr.number}
                 style={{
@@ -701,18 +776,14 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                       }}
                     >
                       {pr.title}
-                      {pr.draft && (
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>
-                          Draft
-                        </span>
-                      )}
+                      {pr.draft && <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginLeft: '4px' }}>Draft</span>}
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       #{pr.number} | {pr.head} {'->'} {pr.base} | {pr.user}
                     </div>
                     {(() => {
                       const ci = prCiByNumber[pr.number];
-                            const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown', t);
+                      const badgeStyles = getCiBadgeStyles(ci?.badge || 'unknown', t);
                       return (
                         <button
                           onClick={() => setSelectedPrNumber(selectedPrNumber === pr.number ? null : pr.number)}
@@ -751,7 +822,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                       gap: '6px',
                     }}
                   >
-                    {(prCiByNumber[pr.number]?.workflowRuns || []).slice(0, 5).map(run => (
+                    {(prCiByNumber[pr.number]?.workflowRuns || []).slice(0, 5).map((run) => (
                       <div
                         key={run.id}
                         style={{
@@ -767,10 +838,15 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                             {run.workflowName || run.name}
                           </div>
                           <div style={{ color: 'var(--text-secondary)' }}>
-                            <Clock3 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />Trigger: {run.event} • Duration: {formatDuration(run.startedAt, run.updatedAt, '—')}
+                            <Clock3 size={11} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                            Trigger: {run.event} • Duration: {formatDuration(run.startedAt, run.updatedAt, '—')}
                           </div>
                         </div>
-                        <button className="staging-btn-sm" onClick={() => onOpenPR(run.htmlUrl)} title={t('generated.components.layout.sidebar.githubconnectedcontent.open_in_browser_c818b475')}>
+                        <button
+                          className="staging-btn-sm"
+                          onClick={() => onOpenPR(run.htmlUrl)}
+                          title={t('generated.components.layout.sidebar.githubconnectedcontent.open_in_browser_c818b475')}
+                        >
                           <ExternalLink size={12} />
                         </button>
                       </div>
@@ -784,42 +860,63 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                 )}
 
                 {mergingPrNumber === pr.number && pr.state === 'open' && (
-                  <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', backgroundColor: 'var(--bg-dark)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div
+                    style={{
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '8px',
+                      backgroundColor: 'var(--bg-dark)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
                     <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '2px' }}>
                       {t('generated.components.layout.sidebar.githubconnectedcontent.choose_merge_method_b987ff1a')}
                     </div>
                     <button
                       className="staging-btn-sm"
                       style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
-                      onClick={() => { onMergePR(pr.number, 'merge'); setMergingPrNumber(null); }}
+                      onClick={() => {
+                        onMergePR(pr.number, 'merge');
+                        setMergingPrNumber(null);
+                      }}
                       title={t('generated.components.layout.sidebar.githubconnectedcontent.create_a_merge_commit_6773d040')}
                     >
                       <span style={{ fontWeight: 600, marginRight: '4px' }}>Merge</span>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{t('generated.components.layout.sidebar.githubconnectedcontent.create_merge_commit_db6ca958')}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>
+                        {t('generated.components.layout.sidebar.githubconnectedcontent.create_merge_commit_db6ca958')}
+                      </span>
                     </button>
                     <button
                       className="staging-btn-sm"
                       style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
-                      onClick={() => { onMergePR(pr.number, 'squash'); setMergingPrNumber(null); }}
+                      onClick={() => {
+                        onMergePR(pr.number, 'squash');
+                        setMergingPrNumber(null);
+                      }}
                       title={t('generated.components.layout.sidebar.githubconnectedcontent.squash_all_commits_into_one_3be4d005')}
                     >
                       <span style={{ fontWeight: 600, marginRight: '4px' }}>Squash</span>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{t('generated.components.layout.sidebar.githubconnectedcontent.squash_into_one_commit_3a17a5cc')}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>
+                        {t('generated.components.layout.sidebar.githubconnectedcontent.squash_into_one_commit_3a17a5cc')}
+                      </span>
                     </button>
                     <button
                       className="staging-btn-sm"
                       style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '5px 8px', width: '100%' }}
-                      onClick={() => { onMergePR(pr.number, 'rebase'); setMergingPrNumber(null); }}
+                      onClick={() => {
+                        onMergePR(pr.number, 'rebase');
+                        setMergingPrNumber(null);
+                      }}
                       title={t('generated.components.layout.sidebar.githubconnectedcontent.rebase_commits_onto_base_8ff66a8d')}
                     >
                       <span style={{ fontWeight: 600, marginRight: '4px' }}>Rebase</span>
-                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>{t('generated.components.layout.sidebar.githubconnectedcontent.rebase_commits_onto_base_19f6a769')}</span>
+                      <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>
+                        {t('generated.components.layout.sidebar.githubconnectedcontent.rebase_commits_onto_base_19f6a769')}
+                      </span>
                     </button>
-                    <button
-                      className="staging-btn-sm"
-                      style={{ width: '100%', marginTop: '2px', opacity: 0.7 }}
-                      onClick={() => setMergingPrNumber(null)}
-                    >
+                    <button className="staging-btn-sm" style={{ width: '100%', marginTop: '2px', opacity: 0.7 }} onClick={() => setMergingPrNumber(null)}>
                       {t('generated.components.confirm.cancel_035b7526')}
                     </button>
                   </div>
@@ -837,13 +934,25 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
                       {t('generated.components.layout.sidebar.githubconnectedcontent.merge_6b8e7542')}
                     </button>
                   )}
-                  <button className="staging-btn-sm" onClick={() => onOpenPR(pr.htmlUrl)} title={t('generated.components.layout.sidebar.githubconnectedcontent.open_in_browser_f9d00322')}>
+                  <button
+                    className="staging-btn-sm"
+                    onClick={() => onOpenPR(pr.htmlUrl)}
+                    title={t('generated.components.layout.sidebar.githubconnectedcontent.open_in_browser_f9d00322')}
+                  >
                     <ExternalLink size={12} />
                   </button>
-                  <button className="staging-btn-sm" onClick={() => onCopyPRUrl(pr.htmlUrl)} title={t('generated.components.layout.sidebar.githubconnectedcontent.copy_url_f6f31ab4')}>
+                  <button
+                    className="staging-btn-sm"
+                    onClick={() => onCopyPRUrl(pr.htmlUrl)}
+                    title={t('generated.components.layout.sidebar.githubconnectedcontent.copy_url_f6f31ab4')}
+                  >
                     <Copy size={12} />
                   </button>
-                  <button className="staging-btn-sm" onClick={() => onCheckoutPR(pr.number, pr.head)} title={t('generated.components.layout.sidebar.githubconnectedcontent.checkout_pr_branch_88da3791')}>
+                  <button
+                    className="staging-btn-sm"
+                    onClick={() => onCheckoutPR(pr.number, pr.head)}
+                    title={t('generated.components.layout.sidebar.githubconnectedcontent.checkout_pr_branch_88da3791')}
+                  >
                     <GitBranch size={12} />
                   </button>
                 </div>

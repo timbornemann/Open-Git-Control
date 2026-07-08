@@ -42,7 +42,9 @@ async function runGhCommand(args: string[], timeoutMs: number): Promise<{ stdout
 }
 
 function normalizeGithubHost(value: string | null | undefined): string {
-  const trimmed = String(value || '').trim().toLowerCase();
+  const trimmed = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!trimmed) return DEFAULT_GITHUB_HOST;
   return trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '') || DEFAULT_GITHUB_HOST;
 }
@@ -72,10 +74,7 @@ export async function runGithubCliOneClickLogin(githubHost?: string | null): Pro
   }
 
   try {
-    await runGhCommand(
-      ['auth', 'login', '--hostname', host, '--web', '--git-protocol', 'https', '--scopes', 'repo,read:user'],
-      GITHUB_CLI_LOGIN_TIMEOUT_MS,
-    );
+    await runGhCommand(['auth', 'login', '--hostname', host, '--web', '--git-protocol', 'https', '--scopes', 'repo,read:user'], GITHUB_CLI_LOGIN_TIMEOUT_MS);
   } catch (error: unknown) {
     const detail = formatExecError(error);
     throw new Error(`GitHub 1-Klick Login fehlgeschlagen (${host}). ${detail}`);

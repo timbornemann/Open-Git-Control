@@ -164,4 +164,3 @@ describe('normalizeSettings', () => {
     expect(normalizedLongHost).not.toContain('https://');
   });
 });
-

@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Columns, Eye, FileText, LayoutList, X } from 'lucide-react';
-import type { DiffRequest } from '../../types/diff';
-import type { DiffViewMode } from '../../utils/diffParser';
-import { useI18n } from '../../i18n';
+import type { DiffRequest } from '@/types/diff';
+import type { DiffViewMode } from '@/utils/diffParser';
+import { useI18n } from '@/i18n';
 import { readableSourceLabel } from './diffViewerLabels';
 
 type DiffToolbarProps = {
@@ -41,7 +41,9 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
     <div className="diff-viewer-toolbar">
       <div className="diff-title-wrap">
         <div className="diff-title">{request.title || request.path}</div>
-        <div className="diff-subtitle">{readableSourceLabel(request, t, tr)} | {request.path}</div>
+        <div className="diff-subtitle">
+          {readableSourceLabel(request, t, tr)} | {request.path}
+        </div>
       </div>
 
       <div className="diff-toolbar-actions">
@@ -88,7 +90,9 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
             <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex - 1)} disabled={hunkCount === 0}>
               <ChevronLeft size={14} />
             </button>
-            <span className="diff-nav-label">{t('generated.components.diff_viewer.difftoolbar.hunk_f10f3416')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}</span>
+            <span className="diff-nav-label">
+              {t('generated.components.diff_viewer.difftoolbar.hunk_f10f3416')} {hunkCount === 0 ? 0 : activeHunkIndex + 1}/{hunkCount}
+            </span>
             <button className="diff-nav-btn" onClick={() => scrollToHunk(activeHunkIndex + 1)} disabled={hunkCount === 0}>
               <ChevronRight size={14} />
             </button>

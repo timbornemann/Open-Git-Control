@@ -1,10 +1,6 @@
 import React from 'react';
-import {
-  useRepositoryContext,
-  useUIContext,
-  useWorkflowContext,
-} from '../../../../contexts/AppStateContext';
-import { SidebarHeader } from '../SidebarHeader';
+import { useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { SidebarHeader } from '@/components/layout/sidebar/SidebarHeader';
 
 export const SidebarHeaderContainer: React.FC = React.memo(() => {
   const ui = useUIContext();

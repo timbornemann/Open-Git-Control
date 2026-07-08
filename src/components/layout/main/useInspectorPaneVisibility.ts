@@ -3,9 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
 
 export const useInspectorPaneVisibility = () => {
-  const inspectorManuallyCollapsedRef = useRef(
-    window.localStorage.getItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true',
-  );
+  const inspectorManuallyCollapsedRef = useRef(window.localStorage.getItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true');
   const [isInspectorPaneVisible, setIsInspectorPaneVisible] = useState(() => {
     return window.innerWidth > 900 && !inspectorManuallyCollapsedRef.current;
   });

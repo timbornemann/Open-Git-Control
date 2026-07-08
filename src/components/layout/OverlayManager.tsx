@@ -1,12 +1,12 @@
 import React from 'react';
-import type { GitJobEventDto } from '../../global';
-import { useI18n } from '../../i18n';
-import type { GitMergeMode } from '../../types/git';
-import { ActionToastViewport, type ActionToastItem } from '../ActionToastViewport';
-import { CommandPalette, type PaletteCommand } from '../CommandPalette';
-import { Confirm } from '../Confirm';
-import { DangerConfirm } from '../DangerConfirm';
-import { Input } from '../Input';
+import type { GitJobEventDto } from '@/global';
+import { useI18n } from '@/i18n';
+import type { GitMergeMode } from '@/types/git';
+import { ActionToastViewport, type ActionToastItem } from '@/components/ActionToastViewport';
+import { CommandPalette, type PaletteCommand } from '@/components/CommandPalette';
+import { Confirm } from '@/components/Confirm';
+import { DangerConfirm } from '@/components/DangerConfirm';
+import { Input } from '@/components/Input';
 import { BranchContextMenu } from './BranchContextMenu';
 import { CloneProgressModal } from './CloneProgressModal';
 import { GitTransferProgressOverlay } from './GitTransferProgressOverlay';
@@ -85,12 +85,7 @@ const RepoSwitcherOverlay: React.FC<{ state: RepoSwitcherOverlayState }> = ({ st
     <div className="repo-switcher-backdrop">
       <div className="repo-switcher-modal" role="dialog" aria-label={t('generated.app.switch_repository_84935354')}>
         <div className="repo-switcher-title">{t('generated.app.switch_repository_84935354')}</div>
-        <div
-          ref={state.listRef}
-          className="repo-switcher-list"
-          role="listbox"
-          aria-activedescendant={`repo-switcher-item-${state.selectedIndex}`}
-        >
+        <div ref={state.listRef} className="repo-switcher-list" role="listbox" aria-activedescendant={`repo-switcher-item-${state.selectedIndex}`}>
           {state.openRepos.map((repoPath, index) => {
             const isSelected = index === state.selectedIndex;
             const isActive = repoPath === state.activeRepo;
@@ -131,9 +126,7 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
         onConfirm={state.onConfirm}
         secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
         secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-        onSecondaryAction={state.confirmDialog.onSecondaryAction
-          ? state.onSecondaryConfirm
-          : undefined}
+        onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
         onCancel={state.onCancelConfirm}
       />
     )}
@@ -150,9 +143,7 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
         onConfirm={state.onConfirm}
         secondaryActionLabel={state.confirmDialog.secondaryActionLabel}
         secondaryActionVariant={state.confirmDialog.secondaryActionVariant}
-        onSecondaryAction={state.confirmDialog.onSecondaryAction
-          ? state.onSecondaryConfirm
-          : undefined}
+        onSecondaryAction={state.confirmDialog.onSecondaryAction ? state.onSecondaryConfirm : undefined}
         onCancel={state.onCancelConfirm}
       />
     )}
@@ -174,22 +165,11 @@ const DialogOverlays: React.FC<{ state: DialogOverlayState }> = ({ state }) => (
   </>
 );
 
-export const OverlayManager: React.FC<OverlayManagerProps> = ({
-  repoSwitcher,
-  toasts,
-  branchMenu,
-  dialogs,
-  gitTransfer,
-  cloneProgress,
-  commandPalette,
-}) => (
+export const OverlayManager: React.FC<OverlayManagerProps> = ({ repoSwitcher, toasts, branchMenu, dialogs, gitTransfer, cloneProgress, commandPalette }) => (
   <>
     <RepoSwitcherOverlay state={repoSwitcher} />
 
-    <ActionToastViewport
-      toasts={toasts.items}
-      onDismiss={toasts.onDismiss}
-    />
+    <ActionToastViewport toasts={toasts.items} onDismiss={toasts.onDismiss} />
 
     <BranchContextMenu
       branchContextMenu={branchMenu.menu}
@@ -202,11 +182,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
 
     <DialogOverlays state={dialogs} />
 
-    <GitTransferProgressOverlay
-      open={gitTransfer.open}
-      title={gitTransfer.title}
-      events={gitTransfer.events}
-    />
+    <GitTransferProgressOverlay open={gitTransfer.open} title={gitTransfer.title} events={gitTransfer.events} />
 
     <CloneProgressModal
       isCloning={cloneProgress.isCloning}
@@ -217,10 +193,6 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({
       onClose={cloneProgress.onClose}
     />
 
-    <CommandPalette
-      open={commandPalette.open}
-      commands={commandPalette.commands}
-      onClose={commandPalette.onClose}
-    />
+    <CommandPalette open={commandPalette.open} commands={commandPalette.commands} onClose={commandPalette.onClose} />
   </>
 );

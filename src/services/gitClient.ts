@@ -1,15 +1,6 @@
-import type {
-  ElectronAPI,
-  GitCommandNameDto,
-  GitCommandResultDto,
-  IpcResult,
-  SecretScanResultDto,
-} from '../global';
+import type { ElectronAPI, GitCommandNameDto, GitCommandResultDto, IpcResult, SecretScanResultDto } from '@/global';
 import { getElectronApi, requireElectronApi } from './electronApi';
-import {
-  isRepoUnavailableError,
-  type RepoUnavailablePayload,
-} from './repoUnavailableClassifier';
+import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';
 
 export type GitCommandArgs = [GitCommandNameDto, ...string[]];
 
@@ -20,14 +11,9 @@ export type PushCurrentBranchOptions = {
   extraArgs?: string[];
 };
 
-const sanitizeBranchSuffix = (value: string): string => (
-  value.replace(/[^a-zA-Z0-9._-]/g, '-')
-);
+const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
-const command = <TCommand extends GitCommandNameDto>(
-  commandName: TCommand,
-  ...args: string[]
-): [TCommand, ...string[]] => [commandName, ...args];
+const command = <TCommand extends GitCommandNameDto>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
 const repoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
 let lastRepoUnavailableNotifyAt = 0;
@@ -43,10 +29,7 @@ const notifyRepoUnavailable = (payload: RepoUnavailablePayload) => {
   }
 };
 
-const notifyRepoUnavailableIfNeeded = (
-  result: { success?: boolean; error?: string } | null | undefined,
-  commandName: string,
-) => {
+const notifyRepoUnavailableIfNeeded = (result: { success?: boolean; error?: string } | null | undefined, commandName: string) => {
   if (result && result.success === false && isRepoUnavailableError(result.error)) {
     notifyRepoUnavailable({
       command: commandName,
@@ -110,9 +93,7 @@ export const gitClient = {
     const remote = options.remote ?? 'origin';
     const ref = options.ref ?? 'HEAD';
     const extraArgs = options.extraArgs ?? [];
-    return options.setUpstream === false
-      ? command('push', ...extraArgs, remote, ref)
-      : command('push', ...extraArgs, '-u', remote, ref);
+    return options.setUpstream === false ? command('push', ...extraArgs, remote, ref) : command('push', ...extraArgs, '-u', remote, ref);
   },
 
   async pushCurrentBranch(options: PushCurrentBranchOptions = {}): Promise<GitCommandResultDto> {
@@ -128,9 +109,7 @@ export const gitClient = {
   },
 
   buildCheckoutRemoteBranchArgs(remoteRef: string, localBranch?: string): GitCommandArgs {
-    return localBranch
-      ? command('checkout', '-b', localBranch, '--track', remoteRef)
-      : command('checkout', '--track', remoteRef);
+    return localBranch ? command('checkout', '-b', localBranch, '--track', remoteRef) : command('checkout', '--track', remoteRef);
   },
 
   async checkoutRemoteBranch(remoteRef: string, localBranch?: string): Promise<GitCommandResultDto> {
@@ -145,11 +124,7 @@ export const gitClient = {
     return command('fetch', remote, `pull/${prNumber}/head:${targetBranch}`);
   },
 
-  async fetchPullRequestBranch(
-    prNumber: number,
-    targetBranch: string,
-    remote = 'origin',
-  ): Promise<GitCommandResultDto> {
+  async fetchPullRequestBranch(prNumber: number, targetBranch: string, remote = 'origin'): Promise<GitCommandResultDto> {
     return this.runGitArgs(this.buildFetchPullRequestBranchArgs(prNumber, targetBranch, remote));
   },
 
@@ -159,9 +134,7 @@ export const gitClient = {
 
   async commitMessage(title: string, description?: string): Promise<GitCommandResultDto> {
     const trimmedDescription = (description || '').trim();
-    return trimmedDescription
-      ? this.runGitCommand('commit', '-m', title, '-m', trimmedDescription)
-      : this.runGitCommand('commit', '-m', title);
+    return trimmedDescription ? this.runGitCommand('commit', '-m', title, '-m', trimmedDescription) : this.runGitCommand('commit', '-m', title);
   },
 
   async commitAllowEmpty(message: string): Promise<GitCommandResultDto> {

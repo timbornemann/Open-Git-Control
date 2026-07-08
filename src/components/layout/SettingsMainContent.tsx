@@ -1,18 +1,14 @@
 import React, { useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
-import type { AppSettingsDto, GitJobEventDto } from '../../global';
-import { useI18n } from '../../i18n';
-import { SettingsTabId } from './sidebar/AppSidebar.types';
+import type { AppSettingsDto, GitJobEventDto } from '@/global';
+import { useI18n } from '@/i18n';
+import type { SettingsTabId } from './sidebar/AppSidebar.types';
 import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';
 import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
-import { appClient } from '../../services/appClient';
-import {
-  formatCommitMessageStyleExample,
-  getCommitMessageLanguageOptions,
-  getCommitMessageStyleOptions,
-} from '../../utils/commitMessagePreferences';
+import { appClient } from '@/services/appClient';
+import { formatCommitMessageStyleExample, getCommitMessageLanguageOptions, getCommitMessageStyleOptions } from '@/utils/commitMessagePreferences';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
@@ -23,14 +19,7 @@ type SettingsMainContentProps = {
   onResetLayout: () => void;
 };
 
-export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
-  settings,
-  onUpdateSettings,
-  jobs,
-  onClearJobs,
-  activeTab,
-  onResetLayout,
-}) => {
+export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({ settings, onUpdateSettings, jobs, onClearJobs, activeTab, onResetLayout }) => {
   const { t, tr, locale } = useI18n();
   const sortedJobs = useMemo(() => [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20), [jobs]);
 
@@ -70,7 +59,11 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 <label className="settings-field">
                   {t('generated.components.layout.settingsmaincontent.theme_60c4ba00')}
                   <select value={settings.theme} onChange={(e) => void onUpdateSettings({ theme: e.target.value as AppSettingsDto['theme'] })}>
-                    {THEME_OPTIONS.map((themeOption) => <option key={themeOption.value} value={themeOption.value}>{themeOption.label}</option>)}
+                    {THEME_OPTIONS.map((themeOption) => (
+                      <option key={themeOption.value} value={themeOption.value}>
+                        {themeOption.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="settings-field">
@@ -108,7 +101,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   <span className="settings-switch-track" aria-hidden="true">
                     <span className="settings-switch-thumb" />
                   </span>
-                  <span className="settings-switch-label">{t('generated.components.layout.settingsmaincontent.show_secondary_history_all_branches_e9193581')}</span>
+                  <span className="settings-switch-label">
+                    {t('generated.components.layout.settingsmaincontent.show_secondary_history_all_branches_e9193581')}
+                  </span>
                 </label>
                 <label className="settings-switch-row settings-general-switch settings-field--full">
                   <input
@@ -120,7 +115,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   <span className="settings-switch-track" aria-hidden="true">
                     <span className="settings-switch-thumb" />
                   </span>
-                  <span className="settings-switch-label">{t('generated.components.layout.settingsmaincontent.enable_commit_signoff_by_default_fc09a7fe')}</span>
+                  <span className="settings-switch-label">
+                    {t('generated.components.layout.settingsmaincontent.enable_commit_signoff_by_default_fc09a7fe')}
+                  </span>
                 </label>
                 <label className="settings-field settings-field--full">
                   {t('generated.components.layout.settingsmaincontent.commit_template_c4f13929')}
@@ -196,7 +193,11 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                       type="password"
                       value={geminiApiKeyInput}
                       onChange={(e) => setGeminiApiKeyInput(e.target.value)}
-                      placeholder={settings.hasGeminiApiKey ? t('generated.components.layout.settingsmaincontent.already_saved_enter_again_to_replace_fe7e9790') : 'AIza...'}
+                      placeholder={
+                        settings.hasGeminiApiKey
+                          ? t('generated.components.layout.settingsmaincontent.already_saved_enter_again_to_replace_fe7e9790')
+                          : 'AIza...'
+                      }
                     />
                   </label>
                   <div className="settings-inline-actions">
@@ -224,16 +225,25 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                       {t('generated.components.layout.settingsmaincontent.remove_api_key_fe7c209e')}
                     </button>
                   </div>
-                  <p>{t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}: {settings.hasGeminiApiKey ? t('generated.components.layout.settingsmaincontent.saved_e74d9834') : t('generated.components.layout.settingsmaincontent.not_saved_d99fcb70')}</p>
+                  <p>
+                    {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}:{' '}
+                    {settings.hasGeminiApiKey
+                      ? t('generated.components.layout.settingsmaincontent.saved_e74d9834')
+                      : t('generated.components.layout.settingsmaincontent.not_saved_d99fcb70')}
+                  </p>
                 </>
               )}
 
               <div className="settings-inline-actions">
                 <button className="staging-tool-btn" onClick={testConnection} disabled={isTestingAi}>
-                  {isTestingAi ? t('generated.components.layout.settingsmaincontent.testing_cead0ff0') : t('generated.components.layout.settingsmaincontent.test_connection_c981b874')}
+                  {isTestingAi
+                    ? t('generated.components.layout.settingsmaincontent.testing_cead0ff0')
+                    : t('generated.components.layout.settingsmaincontent.test_connection_c981b874')}
                 </button>
                 <button className="staging-tool-btn" onClick={loadModels} disabled={isLoadingModels}>
-                  {isLoadingModels ? t('generated.components.layout.settingsmaincontent.loading_models_5bd9bbf8') : t('generated.components.layout.settingsmaincontent.load_models_a363b3f8')}
+                  {isLoadingModels
+                    ? t('generated.components.layout.settingsmaincontent.loading_models_5bd9bbf8')
+                    : t('generated.components.layout.settingsmaincontent.load_models_a363b3f8')}
                 </button>
               </div>
               {aiStatus && <p>{aiStatus}</p>}
@@ -241,12 +251,17 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
               <label>
                 {t('generated.components.layout.settingsmaincontent.model_83e8c02e')}
                 {modelOptions.length > 0 ? (
-                  <select
-                    value={selectedModel || ''}
-                    onChange={(e) => void setSelectedModel(e.target.value)}
-                  >
-                    {!selectedModel && <option value="" disabled>{t('generated.components.layout.settingsmaincontent.select_a_model_315c6c35')}</option>}
-                    {mergedModelOptions.map((model) => <option key={model} value={model}>{model}</option>)}
+                  <select value={selectedModel || ''} onChange={(e) => void setSelectedModel(e.target.value)}>
+                    {!selectedModel && (
+                      <option value="" disabled>
+                        {t('generated.components.layout.settingsmaincontent.select_a_model_315c6c35')}
+                      </option>
+                    )}
+                    {mergedModelOptions.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
                   </select>
                 ) : (
                   <>
@@ -255,10 +270,16 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                       type="text"
                       value={selectedModel}
                       onChange={(e) => void setSelectedModel(e.target.value)}
-                      placeholder={settings.aiProvider === 'gemini' ? t('generated.components.layout.settingsmaincontent.e_g_gemini_3_flash_preview_a0298c24') : t('generated.components.layout.settingsmaincontent.e_g_llama3_1_8b_4b26492e')}
+                      placeholder={
+                        settings.aiProvider === 'gemini'
+                          ? t('generated.components.layout.settingsmaincontent.e_g_gemini_3_flash_preview_a0298c24')
+                          : t('generated.components.layout.settingsmaincontent.e_g_llama3_1_8b_4b26492e')
+                      }
                     />
                     <datalist id="ai-model-list-settings">
-                      {mergedModelOptions.map((model) => <option key={model} value={model} />)}
+                      {mergedModelOptions.map((model) => (
+                        <option key={model} value={model} />
+                      ))}
                     </datalist>
                   </>
                 )}
@@ -271,7 +292,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   onChange={(e) => void onUpdateSettings({ aiCommitMessageStyle: e.target.value as AppSettingsDto['aiCommitMessageStyle'] })}
                 >
                   {getCommitMessageStyleOptions(t).map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -283,7 +306,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                   onChange={(e) => void onUpdateSettings({ aiCommitMessageLanguage: e.target.value as AppSettingsDto['aiCommitMessageLanguage'] })}
                 >
                   {getCommitMessageLanguageOptions(t).map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -373,17 +398,27 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
           <div className="settings-grid">
             <section className="settings-card">
               <h3>{t('generated.components.layout.settingsmaincontent.app_updates_c9f65ab0')}</h3>
-              <p>{t('generated.components.layout.settingsmaincontent.installed_version_56ac4ebd')}: {installedVersion}</p>
-              <p>{t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}: {updaterStatusLabel}</p>
-              {updaterStatus?.availableVersion && <p>{t('generated.components.layout.settingsmaincontent.available_version_9754cbd3')}: {updaterStatus.availableVersion}</p>}
+              <p>
+                {t('generated.components.layout.settingsmaincontent.installed_version_56ac4ebd')}: {installedVersion}
+              </p>
+              <p>
+                {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}: {updaterStatusLabel}
+              </p>
+              {updaterStatus?.availableVersion && (
+                <p>
+                  {t('generated.components.layout.settingsmaincontent.available_version_9754cbd3')}: {updaterStatus.availableVersion}
+                </p>
+              )}
               {updaterStatus?.lastCheckedAt && (
                 <p>
-                  {t('generated.components.layout.settingsmaincontent.last_checked_bd036721')}: {new Date(updaterStatus.lastCheckedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  {t('generated.components.layout.settingsmaincontent.last_checked_bd036721')}:{' '}
+                  {new Date(updaterStatus.lastCheckedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </p>
               )}
               {updaterStatus?.state === 'downloading' && (
                 <p>
-                  {t('generated.components.layout.settingsmaincontent.download_d9eb7f3e')}: {(updaterStatus.downloadPercent || 0).toFixed(1)}% ({formatBytes(updaterStatus.transferred)} / {formatBytes(updaterStatus.total)})
+                  {t('generated.components.layout.settingsmaincontent.download_d9eb7f3e')}: {(updaterStatus.downloadPercent || 0).toFixed(1)}% (
+                  {formatBytes(updaterStatus.transferred)} / {formatBytes(updaterStatus.total)})
                 </p>
               )}
               {updaterStatus?.error && <p className="settings-danger">{updaterStatus.error}</p>}
@@ -401,7 +436,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
                 <span className="settings-switch-track" aria-hidden="true">
                   <span className="settings-switch-thumb" />
                 </span>
-                <span className="settings-switch-label">{t('generated.components.layout.settingsmaincontent.automatically_check_and_download_updates_in_the_backgrou_dbe47c67')}</span>
+                <span className="settings-switch-label">
+                  {t('generated.components.layout.settingsmaincontent.automatically_check_and_download_updates_in_the_backgrou_dbe47c67')}
+                </span>
               </label>
               <div className="settings-inline-actions">
                 <button className="staging-tool-btn" onClick={handleRunOneClickUpdate} disabled={oneClickUpdateDisabled}>
@@ -420,7 +457,9 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({
             <section className="settings-card settings-card-full">
               <div className="settings-card-header-row">
                 <h3>{t('generated.components.layout.settingsmaincontent.job_center_a5f9bea9')}</h3>
-                <button className="staging-tool-btn" onClick={onClearJobs}>{t('generated.components.layout.settingsmaincontent.clear_156e0575')}</button>
+                <button className="staging-tool-btn" onClick={onClearJobs}>
+                  {t('generated.components.layout.settingsmaincontent.clear_156e0575')}
+                </button>
               </div>
               {sortedJobs.length === 0 && <p>{t('generated.components.layout.settingsmaincontent.no_jobs_available_87989fb1')}</p>}
               {sortedJobs.map((job) => (

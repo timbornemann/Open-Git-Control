@@ -34,14 +34,14 @@ npm run dev
 
 Useful scripts:
 
-| Script | Purpose |
-| --- | --- |
-| `npm run build:electron` | Compile Electron main/preload process |
-| `npm run build` | Run TypeScript, Vite build, and Electron build |
-| `npm run test` | Run unit tests |
-| `npm run test:coverage` | Run tests with coverage gates |
-| `npm run test:ci` | Run the CI-style compile, coverage, and build flow |
-| `npm run dist` | Build a local package for the current platform |
+| Script                   | Purpose                                            |
+| ------------------------ | -------------------------------------------------- |
+| `npm run build:electron` | Compile Electron main/preload process              |
+| `npm run build`          | Run TypeScript, Vite build, and Electron build     |
+| `npm run test`           | Run unit tests                                     |
+| `npm run test:coverage`  | Run tests with coverage gates                      |
+| `npm run test:ci`        | Run the CI-style compile, coverage, and build flow |
+| `npm run dist`           | Build a local package for the current platform     |
 
 ## Project Layout
 

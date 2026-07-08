@@ -1,7 +1,7 @@
 name: Question / Frage
 description: Ask about current behavior, setup, usage, or project direction.
-title: "[Question]: "
-labels: ["question"]
+title: '[Question]: '
+labels: ['question']
 body:
   - type: markdown
     attributes:
@@ -49,7 +49,7 @@ body:
     id: app-version
     attributes:
       label: Open-Git-Control version, if relevant / Version, falls relevant
-      placeholder: "Example: v1.3.0"
+      placeholder: 'Example: v1.3.0'
   - type: checkboxes
     id: checklist
     attributes:

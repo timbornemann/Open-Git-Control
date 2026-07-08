@@ -10,12 +10,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: openExternalMock },
 }));
 
-import {
-  installExternalWindowHandler,
-  isAllowedExternalUrl,
-  openExternalUrl,
-  registerExternalLinkHandlers,
-} from '../externalLinks';
+import { installExternalWindowHandler, isAllowedExternalUrl, openExternalUrl, registerExternalLinkHandlers } from '../externalLinks';
 
 describe('external link handling', () => {
   beforeEach(() => {

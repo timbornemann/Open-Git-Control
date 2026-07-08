@@ -133,7 +133,10 @@
   background: color-mix(in srgb, var(--bg-dark) 84%, var(--bg-panel));
   color: var(--text-primary);
   font-size: 0.8rem;
-  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .settings-card textarea {
@@ -225,7 +228,10 @@
   background: color-mix(in srgb, var(--bg-dark) 84%, var(--bg-panel));
   color: var(--text-primary);
   font-size: 0.8rem;
-  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .settings-general-page textarea {
@@ -372,14 +378,18 @@
   padding: 2px;
   border: 1px solid var(--border-color);
   background: var(--bg-dark);
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .settings-switch-thumb {
   width: 16px;
   height: 16px;
   background: var(--text-secondary);
-  transition: transform 120ms ease, background-color 120ms ease;
+  transition:
+    transform 120ms ease,
+    background-color 120ms ease;
 }
 
 .settings-switch-input:checked + .settings-switch-track {
@@ -734,7 +744,11 @@
 }
 
 /* ── Settings Sidebar Compact Layout ─────────────────────────── */
-.ssc-root { display: flex; flex-direction: column; gap: 12px; }
+.ssc-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 .ssc-section {
   padding: 10px;
@@ -778,7 +792,9 @@
   font-size: 0.78rem;
 }
 
-.ssc-input:focus { outline: 1px solid var(--accent-primary); }
+.ssc-input:focus {
+  outline: 1px solid var(--accent-primary);
+}
 
 .ssc-hint {
   font-size: 0.72rem;
@@ -786,7 +802,11 @@
   line-height: 1.4;
 }
 
-.ssc-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ssc-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .ssc-job-item {
   border: 1px solid var(--border-color);
@@ -801,11 +821,29 @@
   gap: 8px;
 }
 
-.ssc-job-op { font-size: 0.76rem; color: var(--text-primary); }
-.ssc-job-status { font-size: 0.72rem; color: var(--text-secondary); }
-.ssc-job-status.failed { color: var(--status-danger); }
-.ssc-job-msg { margin-top: 4px; font-size: 0.72rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
-.ssc-job-time { margin-top: 4px; font-size: 0.68rem; color: var(--text-secondary); }
+.ssc-job-op {
+  font-size: 0.76rem;
+  color: var(--text-primary);
+}
+.ssc-job-status {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.ssc-job-status.failed {
+  color: var(--status-danger);
+}
+.ssc-job-msg {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ssc-job-time {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
 
 /* Repo Cockpit */
 .repo-cockpit {
@@ -1001,7 +1039,11 @@
   border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
   background: color-mix(in srgb, var(--bg-panel) 76%, transparent);
   color: var(--text-primary);
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .branch-row-local:not(.branch-row-current) {
@@ -1087,7 +1129,11 @@
   background: color-mix(in srgb, var(--status-warning) 11%, var(--bg-panel));
   color: color-mix(in srgb, var(--status-warning) 36%, var(--text-primary));
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .repo-cockpit .tag-card {
@@ -1171,7 +1217,7 @@
   border-radius: 999px;
   flex-shrink: 0;
   background: var(--text-secondary);
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.02);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.02);
 }
 
 .remote-overview-row-success .remote-overview-marker {
@@ -1231,7 +1277,9 @@
 .remote-row {
   min-height: 32px;
   border: 1px solid transparent;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .remote-row:hover {
@@ -1477,10 +1525,10 @@
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent; 
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-hover); 
+  background: var(--bg-hover);
   border-radius: 5px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -1618,7 +1666,9 @@
 }
 
 @keyframes clone-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .git-transfer-backdrop {
@@ -1785,8 +1835,12 @@
 }
 
 @keyframes git-transfer-slide {
-  from { transform: translateX(-130%); }
-  to { transform: translateX(260%); }
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(260%);
+  }
 }
 
 .git-transfer-status {
@@ -1857,7 +1911,6 @@
 .git-transfer-close-button:hover {
   filter: brightness(1.06);
 }
-
 
 /* Command Palette */
 .cmd-palette-overlay {

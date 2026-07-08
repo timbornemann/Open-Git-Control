@@ -68,9 +68,9 @@ export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
 
   return statusOutput
     .split('\n')
-    .map(line => line.trimEnd())
-    .filter(line => line.length >= 3)
-    .map(line => {
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length >= 3)
+    .map((line) => {
       const x = line[0];
       const y = line[1];
       const rawPath = line.slice(3).trim();
@@ -79,7 +79,7 @@ export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
       const path = decodePorcelainPath(targetPath);
       return { path, x, y, code: `${x}${y}` };
     })
-    .filter(entry => entry.path.length > 0);
+    .filter((entry) => entry.path.length > 0);
 }
 
 export function detectChangeType(entry: StatusEntry): FileChangeType {

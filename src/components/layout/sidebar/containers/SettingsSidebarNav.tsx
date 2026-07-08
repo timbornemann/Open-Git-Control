@@ -1,6 +1,6 @@
 import React from 'react';
-import { useSettingsContext } from '../../../../contexts/AppStateContext';
-import { useI18n } from '../../../../i18n';
+import { useSettingsContext } from '@/contexts/AppStateContext';
+import { useI18n } from '@/i18n';
 
 export const SettingsSidebarNav: React.FC = React.memo(() => {
   const settings = useSettingsContext();

@@ -1,11 +1,5 @@
 import type { AppSettings } from '../../settings';
-import type {
-  AiConnectionResult,
-  AiConnectionTestRequest,
-  AiModelListRequest,
-  AiProvider,
-  AiTextRequest,
-} from './AiProvider';
+import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
 import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 export class OllamaProvider implements AiProvider {
@@ -40,20 +34,10 @@ export class OllamaProvider implements AiProvider {
 
     const data = (await response.json()) as { models?: Array<{ name?: unknown; model?: unknown }> };
     const models = Array.isArray(data.models) ? data.models : [];
-    return uniqueSorted(
-      models
-        .map(model => safeString(model.name || model.model).trim())
-        .filter(Boolean),
-    );
+    return uniqueSorted(models.map((model) => safeString(model.name || model.model).trim()).filter(Boolean));
   }
 
-  async generateText({
-    settings,
-    systemPrompt,
-    userPrompt,
-    shouldCancel,
-    timeoutMs,
-  }: AiTextRequest): Promise<string> {
+  async generateText({ settings, systemPrompt, userPrompt, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {
     const response = await fetchWithTimeout(
       `${settings.ollamaBaseUrl}/api/chat`,
       {

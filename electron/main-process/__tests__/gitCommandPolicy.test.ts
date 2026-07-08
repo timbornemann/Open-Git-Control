@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assertAllowedGitCommand,
-  normalizeArgs,
-  validateCommandArgs,
-} from '../gitCommandPolicy';
+import { assertAllowedGitCommand, normalizeArgs, validateCommandArgs } from '../gitCommandPolicy';
 
 describe('gitCommandPolicy', () => {
   it('allows known command names', () => {
@@ -27,14 +23,7 @@ describe('gitCommandPolicy', () => {
   });
 
   it('allows commit args produced by amend/signoff/title/body UI combinations', () => {
-    expect(() => validateCommandArgs('commit', [
-      '--amend',
-      '--signoff',
-      '-m',
-      'Title',
-      '-m',
-      'Body',
-    ])).not.toThrow();
+    expect(() => validateCommandArgs('commit', ['--amend', '--signoff', '-m', 'Title', '-m', 'Body'])).not.toThrow();
   });
 
   it('validates forensic line range queries', () => {

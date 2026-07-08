@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import type { GitStatusDetailed } from '../../utils/gitParsing';
-import type { GraphLayout } from '../../utils/graphLayout';
+import type { GitStatusDetailed } from '@/utils/gitParsing';
+import type { GraphLayout } from '@/utils/graphLayout';
 import { ROW_HEIGHT } from './commitGraphConstants';
 import { findCommitIndexByNavigationTarget } from './commitGraphRefs';
 
@@ -55,12 +55,15 @@ export const useCommitGraphViewport = ({
     });
   }, []);
 
-  useEffect(() => () => {
-    if (navigationRetryFrameRef.current !== null) {
-      window.cancelAnimationFrame(navigationRetryFrameRef.current);
-      navigationRetryFrameRef.current = null;
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (navigationRetryFrameRef.current !== null) {
+        window.cancelAnimationFrame(navigationRetryFrameRef.current);
+        navigationRetryFrameRef.current = null;
+      }
+    },
+    [],
+  );
 
   const syncViewportMetrics = useCallback((container: HTMLElement) => {
     const nextTop = container.scrollTop;
@@ -208,11 +211,8 @@ export const useCommitGraphViewport = ({
         return;
       }
 
-      const workingTreeRowOffset = workingTreeStatus && (
-        workingTreeStatus.staged.length > 0
-        || workingTreeStatus.unstaged.length > 0
-        || workingTreeStatus.untracked.length > 0
-      ) ? 1 : 0;
+      const workingTreeRowOffset =
+        workingTreeStatus && (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0) ? 1 : 0;
       const rowTop = (nodeIndex + workingTreeRowOffset) * ROW_HEIGHT;
       const targetTop = Math.max(0, rowTop - Math.max(0, (container.clientHeight - ROW_HEIGHT) / 2));
       container.scrollTo({ top: targetTop, behavior: 'smooth' });

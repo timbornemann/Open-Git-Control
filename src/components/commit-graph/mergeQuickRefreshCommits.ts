@@ -1,9 +1,6 @@
-import type { GitCommit } from '../../utils/gitParsing';
+import type { GitCommit } from '@/utils/gitParsing';
 
-export const mergeQuickRefreshCommits = (
-  existing: GitCommit[],
-  refreshedHead: GitCommit[],
-): GitCommit[] => {
+export const mergeQuickRefreshCommits = (existing: GitCommit[], refreshedHead: GitCommit[]): GitCommit[] => {
   const existingIndexByHash = new Map(existing.map((commit, index) => [commit.hash, index]));
   let overlapIndex = -1;
 
@@ -15,9 +12,7 @@ export const mergeQuickRefreshCommits = (
     }
   }
 
-  const candidates = overlapIndex >= 0
-    ? [...refreshedHead, ...existing.slice(overlapIndex + 1)]
-    : refreshedHead;
+  const candidates = overlapIndex >= 0 ? [...refreshedHead, ...existing.slice(overlapIndex + 1)] : refreshedHead;
   const seen = new Set<string>();
 
   return candidates.filter((commit) => {

@@ -9,7 +9,10 @@ const markdownParser = new Marked({
 });
 
 const getExtension = (filePath: string): string => {
-  const fileName = String(filePath || '').split(/[\\/]/).pop() || '';
+  const fileName =
+    String(filePath || '')
+      .split(/[\\/]/)
+      .pop() || '';
   const lastDot = fileName.lastIndexOf('.');
   if (lastDot <= 0 || lastDot === fileName.length - 1) return '';
   return fileName.slice(lastDot + 1).toLowerCase();
@@ -45,19 +48,14 @@ const normalizeRepoRelativePath = (value: string): string | null => {
   return segments.length > 0 ? segments.join('/') : null;
 };
 
-export const isMarkdownFilePath = (filePath: string): boolean => (
-  MARKDOWN_EXTENSIONS.has(getExtension(filePath))
-);
+export const isMarkdownFilePath = (filePath: string): boolean => MARKDOWN_EXTENSIONS.has(getExtension(filePath));
 
 export const isExternalMarkdownUrl = (value: string): boolean => {
   const trimmed = String(value || '').trim();
   return /^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('//');
 };
 
-export const resolveMarkdownPreviewAssetPath = (
-  markdownFilePath: string,
-  rawAssetRef: string,
-): string | null => {
+export const resolveMarkdownPreviewAssetPath = (markdownFilePath: string, rawAssetRef: string): string | null => {
   const trimmedRef = String(rawAssetRef || '').trim();
   if (!trimmedRef || trimmedRef.startsWith('#') || isExternalMarkdownUrl(trimmedRef)) {
     return null;
@@ -69,9 +67,7 @@ export const resolveMarkdownPreviewAssetPath = (
   const markdownPath = String(markdownFilePath || '').replace(/\\/g, '/');
   const lastSlash = markdownPath.lastIndexOf('/');
   const markdownDir = lastSlash >= 0 ? markdownPath.slice(0, lastSlash) : '';
-  const joined = cleanRef.startsWith('/')
-    ? cleanRef.slice(1)
-    : `${markdownDir ? `${markdownDir}/` : ''}${cleanRef}`;
+  const joined = cleanRef.startsWith('/') ? cleanRef.slice(1) : `${markdownDir ? `${markdownDir}/` : ''}${cleanRef}`;
 
   return normalizeRepoRelativePath(joined);
 };
@@ -127,10 +123,7 @@ export const collectMarkdownPreviewImageSources = (html: string): string[] => {
   return [...sources];
 };
 
-export const applyMarkdownPreviewImageDataUrls = (
-  html: string,
-  dataUrlsBySource: Record<string, string>,
-): string => {
+export const applyMarkdownPreviewImageDataUrls = (html: string, dataUrlsBySource: Record<string, string>): string => {
   if (typeof DOMParser === 'undefined') return html;
 
   const document = new DOMParser().parseFromString(html, 'text/html');

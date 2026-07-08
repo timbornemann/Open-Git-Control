@@ -30,10 +30,7 @@ export interface ProjectPlannerData {
   items: PlannerItem[];
 }
 
-export type PlannerItemInput = Pick<
-  PlannerItem,
-  'title' | 'description' | 'priority' | 'status' | 'tags'
->;
+export type PlannerItemInput = Pick<PlannerItem, 'title' | 'description' | 'priority' | 'status' | 'tags'>;
 
 export type PlannerProjectInput = {
   name: string;

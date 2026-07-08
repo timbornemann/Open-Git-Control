@@ -1,31 +1,11 @@
 import React from 'react';
-import {
-  AlertTriangle,
-  Bug,
-  CheckCircle2,
-  CircleDot,
-  FolderGit2,
-  Lightbulb,
-  Pencil,
-  Plus,
-  Rocket,
-  Search,
-  Tag,
-  Trash2,
-} from 'lucide-react';
-import { EmptyState } from '../EmptyState';
-import { useProjectPlanner } from '../../contexts/ProjectPlannerContext';
-import { useI18n } from '../../i18n';
-import { PlannerItem, PlannerPriority, PlannerStatus } from '../../types/projectPlanner';
-import {
-  ItemDialog,
-  MaterializeDialog,
-  PRIORITY_OPTIONS,
-  ProjectDialog,
-  STATUS_OPTIONS,
-  usePlannerLabels,
-} from './PlannerDialogs';
-import { appClient } from '../../services/appClient';
+import { AlertTriangle, Bug, CheckCircle2, CircleDot, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Tag, Trash2 } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
+import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
+import { useI18n } from '@/i18n';
+import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
+import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
+import { appClient } from '@/services/appClient';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,
@@ -68,10 +48,7 @@ export const ProjectPlannerView: React.FC = () => {
   const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
 
   React.useEffect(() => {
-    if (
-      createProjectRequestId === 0
-      || createProjectRequestId === handledCreateProjectRequestRef.current
-    ) {
+    if (createProjectRequestId === 0 || createProjectRequestId === handledCreateProjectRequestRef.current) {
       return;
     }
     handledCreateProjectRequestRef.current = createProjectRequestId;
@@ -86,10 +63,10 @@ export const ProjectPlannerView: React.FC = () => {
     setTagFilter('all');
   }, [selectedProject?.id]);
 
-  const allTags = React.useMemo(() => (
-    Array.from(new Set(itemsForSelectedProject.flatMap((item) => item.tags)))
-      .sort((a, b) => a.localeCompare(b))
-  ), [itemsForSelectedProject]);
+  const allTags = React.useMemo(
+    () => Array.from(new Set(itemsForSelectedProject.flatMap((item) => item.tags))).sort((a, b) => a.localeCompare(b)),
+    [itemsForSelectedProject],
+  );
 
   const filteredItems = React.useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -98,8 +75,7 @@ export const ProjectPlannerView: React.FC = () => {
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
       if (tagFilter !== 'all' && !item.tags.includes(tagFilter)) return false;
       if (!query) return true;
-      return [item.title, item.description, ...item.tags]
-        .some((value) => value.toLocaleLowerCase().includes(query));
+      return [item.title, item.description, ...item.tags].some((value) => value.toLocaleLowerCase().includes(query));
     });
   }, [itemsForSelectedProject, priorityFilter, search, statusFilter, tagFilter]);
 
@@ -157,8 +133,8 @@ export const ProjectPlannerView: React.FC = () => {
           </div>
           <h1>{selectedProject.name}</h1>
           <p>
-            {selectedProject.description
-              || (selectedProject.repoPath
+            {selectedProject.description ||
+              (selectedProject.repoPath
                 ? selectedProject.repoPath
                 : t('generated.components.project_planner.projectplannerview.collect_ideas_and_turn_them_into_the_next_development_st_bef17224'))}
           </p>
@@ -196,18 +172,26 @@ export const ProjectPlannerView: React.FC = () => {
         <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as PlannerPriority | 'all')}>
           <option value="all">{t('generated.components.project_planner.projectplannerview.all_priorities_cd27ede5')}</option>
           {PRIORITY_OPTIONS.map((priority) => (
-            <option key={priority} value={priority}>{labels.priority[priority]}</option>
+            <option key={priority} value={priority}>
+              {labels.priority[priority]}
+            </option>
           ))}
         </select>
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as PlannerStatus | 'all')}>
           <option value="all">{t('generated.components.project_planner.projectplannerview.all_statuses_f6555111')}</option>
           {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>{labels.status[status]}</option>
+            <option key={status} value={status}>
+              {labels.status[status]}
+            </option>
           ))}
         </select>
         <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
           <option value="all">{t('generated.components.project_planner.projectplannerview.all_tags_ab4762d7')}</option>
-          {allTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+          {allTags.map((tag) => (
+            <option key={tag} value={tag}>
+              {tag}
+            </option>
+          ))}
         </select>
         <span className="planner-result-count">
           {filteredItems.length}/{itemsForSelectedProject.length}
@@ -222,7 +206,9 @@ export const ProjectPlannerView: React.FC = () => {
           return (
             <section key={status} className={`planner-column planner-column-${status}`}>
               <div className="planner-column-header">
-                <span>{statusIcons[status]} {labels.status[status]}</span>
+                <span>
+                  {statusIcons[status]} {labels.status[status]}
+                </span>
                 <div className="planner-column-header-actions">
                   <strong>{statusItems.length}</strong>
                   <button
@@ -247,9 +233,7 @@ export const ProjectPlannerView: React.FC = () => {
                     }}
                   >
                     <div className="planner-card-header">
-                      <span className={`planner-priority-badge ${item.priority}`}>
-                        {labels.priority[item.priority]}
-                      </span>
+                      <span className={`planner-priority-badge ${item.priority}`}>{labels.priority[item.priority]}</span>
                       <button
                         className="planner-card-delete"
                         title={t('generated.components.project_planner.projectplannerview.delete_item_afc7d611')}
@@ -265,7 +249,11 @@ export const ProjectPlannerView: React.FC = () => {
                     {item.description && <p>{item.description}</p>}
                     {item.tags.length > 0 && (
                       <div className="planner-card-tags">
-                        {item.tags.map((tag) => <span key={tag}><Tag size={10} /> {tag}</span>)}
+                        {item.tags.map((tag) => (
+                          <span key={tag}>
+                            <Tag size={10} /> {tag}
+                          </span>
+                        ))}
                       </div>
                     )}
                     <select
@@ -278,7 +266,9 @@ export const ProjectPlannerView: React.FC = () => {
                       }}
                     >
                       {STATUS_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{labels.status[option]}</option>
+                        <option key={option} value={option}>
+                          {labels.status[option]}
+                        </option>
                       ))}
                     </select>
                   </article>
@@ -299,16 +289,16 @@ export const ProjectPlannerView: React.FC = () => {
         project={editingProject ? selectedProject : null}
         busy={busy}
         onClose={() => setProjectDialogOpen(false)}
-        onDelete={editingProject
-          ? () => {
-            setProjectDialogOpen(false);
-            requestDeleteProject(selectedProject.id);
-          }
-          : undefined}
+        onDelete={
+          editingProject
+            ? () => {
+                setProjectDialogOpen(false);
+                requestDeleteProject(selectedProject.id);
+              }
+            : undefined
+        }
         onSubmit={async (input) => {
-          const ok = editingProject
-            ? await updateProject(selectedProject.id, input)
-            : Boolean(await createProject(input));
+          const ok = editingProject ? await updateProject(selectedProject.id, input) : Boolean(await createProject(input));
           if (ok) setProjectDialogOpen(false);
         }}
       />
@@ -320,9 +310,7 @@ export const ProjectPlannerView: React.FC = () => {
         busy={busy}
         onClose={() => setItemDialogOpen(false)}
         onSubmit={async (input) => {
-          const ok = editingItem
-            ? await updateItem(editingItem.id, input)
-            : await createItem(selectedProject.id, input);
+          const ok = editingItem ? await updateItem(editingItem.id, input) : await createItem(selectedProject.id, input);
           if (ok) setItemDialogOpen(false);
         }}
       />

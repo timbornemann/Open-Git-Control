@@ -1,26 +1,20 @@
 import React from 'react';
-import { DiffViewer } from '../../diff-viewer';
-import { FileTimelineView } from '../../FileTimelineView';
-import { CommitGraph } from '../../commit-graph';
-import { RecoveryCenter } from '../../RecoveryCenter';
-import { ReleaseCreator } from '../../ReleaseCreator';
-import { StagingArea } from '../../staging-area';
-import { ProjectPlannerView } from '../../project-planner';
-import { SettingsMainContent } from '../SettingsMainContent';
-import {
-  useGithubContext,
-  useRepositoryContext,
-  useSettingsContext,
-  useUIContext,
-  useWorkflowContext,
-} from '../../../contexts/AppStateContext';
-import { useI18n } from '../../../i18n';
-import type { DiffRequest } from '../../../types/diff';
-import type { FileTimelineCommitDto } from '../../../global';
-import type { WorkingTreeState } from '../../../hooks/useWorkingTreeSnapshot';
-import { PRIMARY_PANE_MIN_WIDTH } from '../hooks/useMainViewPaneResizer';
+import { DiffViewer } from '@/components/diff-viewer';
+import { FileTimelineView } from '@/components/FileTimelineView';
+import { CommitGraph } from '@/components/commit-graph';
+import { RecoveryCenter } from '@/components/RecoveryCenter';
+import { ReleaseCreator } from '@/components/ReleaseCreator';
+import { StagingArea } from '@/components/staging-area';
+import { ProjectPlannerView } from '@/components/project-planner';
+import { SettingsMainContent } from '@/components/layout/SettingsMainContent';
+import { useGithubContext, useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useI18n } from '@/i18n';
+import type { DiffRequest } from '@/types/diff';
+import type { FileTimelineCommitDto } from '@/global';
+import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
+import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { GithubAuthGuide } from './GithubAuthGuide';
-import type { GithubAuthHelpMethod } from '../sidebar/AppSidebar.types';
+import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -84,13 +78,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               : activeDiffRequest
                 ? t('generated.components.layout.main.mainprimarypane.diff_viewer_979e21a6')
                 : '';
-  const shouldShowPrimaryPaneHeader = isSettingsView
-    || isReleaseView
-    || isTimelineView
-    || showGithubGuide
-    || showRecoveryCenter
-    || Boolean(activeConflictPath)
-    || Boolean(activeDiffRequest);
+  const shouldShowPrimaryPaneHeader =
+    isSettingsView || isReleaseView || isTimelineView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
 
   return (
     <div
@@ -109,13 +98,41 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               <div className="conflict-global-actions-rail conflict-global-actions-rail--topbar">
                 <div className="conflict-action-group">
                   <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
-                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictMergeContinue} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.complete_merge_a4b16236')}>{t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}</button>
-                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictMergeAbort} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66')}>{t('generated.components.confirm.cancel_035b7526')}</button>
+                  <button
+                    className="staging-btn-sm conflict-action-btn"
+                    onClick={workflow.onConflictMergeContinue}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.complete_merge_a4b16236')}
+                  >
+                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+                  </button>
+                  <button
+                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+                    onClick={workflow.onConflictMergeAbort}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66')}
+                  >
+                    {t('generated.components.confirm.cancel_035b7526')}
+                  </button>
                 </div>
                 <div className="conflict-action-group">
                   <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.rebase_26c8effa')}</span>
-                  <button className="staging-btn-sm conflict-action-btn" onClick={workflow.onConflictRebaseContinue} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9')}>{t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}</button>
-                  <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={workflow.onConflictRebaseAbort} disabled={workflow.isGitActionRunning} title={t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71')}>{t('generated.components.confirm.cancel_035b7526')}</button>
+                  <button
+                    className="staging-btn-sm conflict-action-btn"
+                    onClick={workflow.onConflictRebaseContinue}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9')}
+                  >
+                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+                  </button>
+                  <button
+                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+                    onClick={workflow.onConflictRebaseAbort}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71')}
+                  >
+                    {t('generated.components.confirm.cancel_035b7526')}
+                  </button>
                 </div>
               </div>
             </div>
@@ -181,10 +198,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             setNotesOptions={github.setReleaseNotesOptions}
           />
         ) : isTimelineView ? (
-          <FileTimelineView
-            onClose={() => setShowTimeline(false)}
-            commits={timelineCommits}
-          />
+          <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}
@@ -245,16 +259,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             )}
           </>
         ) : showGithubGuide ? (
-          <GithubAuthGuide
-            method={github.selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>}
-            onClose={ui.onClearGithubAuthHelpMethod}
-          />
+          <GithubAuthGuide method={github.selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>} onClose={ui.onClearGithubAuthHelpMethod} />
         ) : showRecoveryCenter ? (
-          <RecoveryCenter
-            refreshTrigger={repository.refreshTrigger}
-            onRepoChanged={repository.triggerRefresh}
-            settings={settingsState.settings}
-          />
+          <RecoveryCenter refreshTrigger={repository.refreshTrigger} onRepoChanged={repository.triggerRefresh} settings={settingsState.settings} />
         ) : null}
       </div>
     </div>

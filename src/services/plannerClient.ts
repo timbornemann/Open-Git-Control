@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '../global';
+import type { ElectronAPI } from '@/global';
 import { getElectronApi, requireElectronApi } from './electronApi';
 
 export const plannerClient = {
@@ -26,7 +26,9 @@ export const plannerClient = {
     return requireElectronApi().plannerDeleteProject(...args);
   },
 
-  async deleteRepositoryProjectByPath(...args: Parameters<ElectronAPI['plannerDeleteRepositoryProjectByPath']>): ReturnType<ElectronAPI['plannerDeleteRepositoryProjectByPath']> {
+  async deleteRepositoryProjectByPath(
+    ...args: Parameters<ElectronAPI['plannerDeleteRepositoryProjectByPath']>
+  ): ReturnType<ElectronAPI['plannerDeleteRepositoryProjectByPath']> {
     return requireElectronApi().plannerDeleteRepositoryProjectByPath(...args);
   },
 

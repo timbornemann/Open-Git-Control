@@ -1,7 +1,7 @@
 import React from 'react';
 import { DownloadCloud } from 'lucide-react';
-import type { GitJobEventDto } from '../../global';
-import { useI18n } from '../../i18n';
+import type { GitJobEventDto } from '@/global';
+import { useI18n } from '@/i18n';
 import { GitTransferProgressPanel } from './GitTransferProgressPanel';
 
 type Props = {
@@ -10,18 +10,12 @@ type Props = {
   events: GitJobEventDto[];
 };
 
-export const GitTransferProgressOverlay: React.FC<Props> = ({
-  open,
-  title,
-  events,
-}) => {
+export const GitTransferProgressOverlay: React.FC<Props> = ({ open, title, events }) => {
   const { t } = useI18n();
 
   if (!open) return null;
 
-  const lines = events
-    .map((event) => event.message)
-    .filter((message): message is string => Boolean(message && message.trim()));
+  const lines = events.map((event) => event.message).filter((message): message is string => Boolean(message && message.trim()));
 
   return (
     <div className="git-transfer-backdrop" role="presentation">

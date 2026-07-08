@@ -1,12 +1,4 @@
-export type GitTransferPhaseKey =
-  | 'enumerating'
-  | 'counting'
-  | 'compressing'
-  | 'receiving'
-  | 'resolving'
-  | 'writing'
-  | 'updating'
-  | 'checkingOut';
+export type GitTransferPhaseKey = 'enumerating' | 'counting' | 'compressing' | 'receiving' | 'resolving' | 'writing' | 'updating' | 'checkingOut';
 
 export type GitTransferPhaseState = 'pending' | 'active' | 'done';
 
@@ -32,16 +24,7 @@ export type GitTransferProgressSummary = {
   hasObservedProgress: boolean;
 };
 
-const PHASE_ORDER: GitTransferPhaseKey[] = [
-  'enumerating',
-  'counting',
-  'compressing',
-  'receiving',
-  'resolving',
-  'writing',
-  'updating',
-  'checkingOut',
-];
+const PHASE_ORDER: GitTransferPhaseKey[] = ['enumerating', 'counting', 'compressing', 'receiving', 'resolving', 'writing', 'updating', 'checkingOut'];
 
 const DEFAULT_VISIBLE_PHASES: GitTransferPhaseKey[] = ['receiving', 'resolving'];
 
@@ -139,9 +122,7 @@ export const summarizeGitTransferProgress = (
   }
 
   const activeKey = latestOpenObservedKey ?? latestObservedKey;
-  const visibleKeys = PHASE_ORDER.filter((key) => (
-    phasesByKey.has(key) || visibleFallbackPhases.includes(key)
-  ));
+  const visibleKeys = PHASE_ORDER.filter((key) => phasesByKey.has(key) || visibleFallbackPhases.includes(key));
   const activeIndex = activeKey ? PHASE_ORDER.indexOf(activeKey) : -1;
 
   const phases = visibleKeys.map((key) => {

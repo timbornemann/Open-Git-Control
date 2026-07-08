@@ -15,11 +15,7 @@ export type FileTimelineCommit = {
 };
 
 export type RunGitCommand = (args: string[]) => Promise<string>;
-export type RunGitCommandAtPathWithSignal = (
-  repoPath: string,
-  args: string[],
-  signal: AbortSignal,
-) => Promise<string>;
+export type RunGitCommandAtPathWithSignal = (repoPath: string, args: string[], signal: AbortSignal) => Promise<string>;
 
 export class HistoryService {
   constructor(
@@ -46,35 +42,13 @@ export class HistoryService {
   async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
     const format = this.getStructuredLogFormat();
-    return this.runCommand([
-      'log',
-      '-z',
-      `-${safeLimit}`,
-      '--date=iso',
-      `--pretty=format:${format}`,
-      '--numstat',
-      '-S',
-      search,
-      '--',
-      filePath,
-    ]);
+    return this.runCommand(['log', '-z', `-${safeLimit}`, '--date=iso', `--pretty=format:${format}`, '--numstat', '-S', search, '--', filePath]);
   }
 
   async getForensicHistoryByRegex(regex: string, filePath: string, limit: number = 200): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
     const format = this.getStructuredLogFormat();
-    return this.runCommand([
-      'log',
-      '-z',
-      `-${safeLimit}`,
-      '--date=iso',
-      `--pretty=format:${format}`,
-      '--numstat',
-      '-G',
-      regex,
-      '--',
-      filePath,
-    ]);
+    return this.runCommand(['log', '-z', `-${safeLimit}`, '--date=iso', `--pretty=format:${format}`, '--numstat', '-G', regex, '--', filePath]);
   }
 
   async getForensicHistoryByLineRange(filePath: string, startLine: number, endLine: number, limit: number = 200): Promise<string> {
@@ -91,12 +65,7 @@ export class HistoryService {
   async getReflog(limit: number = 300): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 300;
     const format = '%H%x1f%h%x1f%gd%x1f%gs%x1f%cd%x00';
-    return this.runCommand([
-      'reflog',
-      '--date=iso',
-      `--max-count=${safeLimit}`,
-      '--pretty=format:' + format,
-    ]);
+    return this.runCommand(['reflog', '--date=iso', `--max-count=${safeLimit}`, '--pretty=format:' + format]);
   }
 
   async getCommitDetails(hash: string): Promise<string> {
@@ -106,14 +75,7 @@ export class HistoryService {
   async getFileHistory(filePath: string, limit: number = 100, commitHash?: string): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 100;
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x00';
-    const args = [
-      'log',
-      '--follow',
-      '-z',
-      `-${safeLimit}`,
-      `--pretty=format:${format}`,
-      '--date=iso',
-    ];
+    const args = ['log', '--follow', '-z', `-${safeLimit}`, `--pretty=format:${format}`, '--date=iso'];
 
     if (commitHash) {
       args.push(commitHash);
@@ -132,12 +94,7 @@ export class HistoryService {
     return this.runCommand(args);
   }
 
-  async getFileBlameRange(
-    filePath: string,
-    commitHash: string | undefined,
-    startLine: number,
-    lineCount: number,
-  ): Promise<string> {
+  async getFileBlameRange(filePath: string, commitHash: string | undefined, startLine: number, lineCount: number): Promise<string> {
     const safeStart = Number.isFinite(startLine) ? Math.max(1, Math.floor(startLine)) : 1;
     const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 500)) : 500;
     const endLine = safeStart + safeCount - 1;

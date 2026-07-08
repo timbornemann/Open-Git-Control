@@ -11,10 +11,7 @@ type PatternDefinition = {
   regex: RegExp;
 };
 
-type ParsedAllowlistRule =
-  | { kind: 'path'; value: string }
-  | { kind: 'text'; value: string }
-  | { kind: 'regex'; pattern: RegExp };
+type ParsedAllowlistRule = { kind: 'path'; value: string } | { kind: 'text'; value: string } | { kind: 'regex'; pattern: RegExp };
 
 type DiffCandidateLine = {
   filePath: string;
@@ -52,17 +49,7 @@ const STRICTNESS_RANK: Record<SecretScanStrictness, number> = {
   high: 3,
 };
 
-const DEFAULT_IGNORED_PATH_PARTS = [
-  'node_modules/',
-  'dist/',
-  'coverage/',
-  '.min.js',
-  '.min.css',
-  '.map',
-  'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-];
+const DEFAULT_IGNORED_PATH_PARTS = ['node_modules/', 'dist/', 'coverage/', '.min.js', '.min.css', '.map', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
 
 const SECRET_PATTERNS: PatternDefinition[] = [
   {
@@ -165,10 +152,7 @@ function parseAllowlist(rawAllowlist: string): ParsedAllowlistRule[] {
   return rules;
 }
 
-function isAllowlisted(
-  findingCandidate: { filePath: string; line: string; ruleId: string },
-  rules: ParsedAllowlistRule[],
-): boolean {
+function isAllowlisted(findingCandidate: { filePath: string; line: string; ruleId: string }, rules: ParsedAllowlistRule[]): boolean {
   if (rules.length === 0) {
     return false;
   }
@@ -182,11 +166,7 @@ function isAllowlisted(
       return normalizedPath.includes(rule.value);
     }
     if (rule.kind === 'text') {
-      return (
-        normalizedPath.includes(rule.value)
-        || normalizedLine.includes(rule.value)
-        || normalizedRuleId.includes(rule.value)
-      );
+      return normalizedPath.includes(rule.value) || normalizedLine.includes(rule.value) || normalizedRuleId.includes(rule.value);
     }
     return rule.pattern.test(findingCandidate.line) || rule.pattern.test(findingCandidate.filePath);
   });
@@ -197,10 +177,7 @@ function patternEnabledForStrictness(pattern: PatternDefinition, strictness: Sec
 }
 
 function sanitizeContextLine(line: string): string {
-  const replacedQuotedValues = line.replace(
-    /(["'])([^"'\\]{8,})(\1)/g,
-    (_full, quote: string) => `${quote}[REDACTED]${quote}`,
-  );
+  const replacedQuotedValues = line.replace(/(["'])([^"'\\]{8,})(\1)/g, (_full, quote: string) => `${quote}[REDACTED]${quote}`);
 
   return replacedQuotedValues
     .replace(/\bgh[pousr]_[A-Za-z0-9_]{20,255}\b/g, '[REDACTED_TOKEN]')
@@ -238,10 +215,7 @@ export class SecretScanService {
       for (const pattern of SECRET_PATTERNS) {
         if (!patternEnabledForStrictness(pattern, strictness)) continue;
         if (!pattern.regex.test(candidate.line)) continue;
-        if (isAllowlisted(
-          { filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id },
-          allowlistRules,
-        )) continue;
+        if (isAllowlisted({ filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id }, allowlistRules)) continue;
         if (findings.length >= 1000) {
           if (!findingLimitNoted) {
             notes.push('Secret scan finding limit reached (1000); additional findings were omitted.');
@@ -264,36 +238,40 @@ export class SecretScanService {
     const streamDiff = async (args: string[], source: SecretScanSource) => {
       let currentFile = '';
       let currentNewLineNumber = 0;
-      await this.gitService.streamCommandLines(args, (line) => {
-        const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-        if (diffFileMatch) {
-          currentFile = diffFileMatch[2] || diffFileMatch[1] || '';
-          currentNewLineNumber = 0;
-          return;
-        }
-        const plusFileMatch = line.match(/^\+\+\+ b\/(.+)$/);
-        if (plusFileMatch) {
-          currentFile = plusFileMatch[1] || currentFile;
-          return;
-        }
-        const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-        if (hunkMatch) {
-          currentNewLineNumber = Number(hunkMatch[1]) || 0;
-          return;
-        }
-        if (!currentFile || currentNewLineNumber <= 0) return;
-        if (line.startsWith('+') && !line.startsWith('+++')) {
-          scanCandidate({
-            filePath: currentFile,
-            lineNumber: currentNewLineNumber,
-            line: line.slice(1),
-            source,
-          });
-          currentNewLineNumber += 1;
-          return;
-        }
-        if (line.startsWith(' ')) currentNewLineNumber += 1;
-      }, options.signal);
+      await this.gitService.streamCommandLines(
+        args,
+        (line) => {
+          const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+          if (diffFileMatch) {
+            currentFile = diffFileMatch[2] || diffFileMatch[1] || '';
+            currentNewLineNumber = 0;
+            return;
+          }
+          const plusFileMatch = line.match(/^\+\+\+ b\/(.+)$/);
+          if (plusFileMatch) {
+            currentFile = plusFileMatch[1] || currentFile;
+            return;
+          }
+          const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+          if (hunkMatch) {
+            currentNewLineNumber = Number(hunkMatch[1]) || 0;
+            return;
+          }
+          if (!currentFile || currentNewLineNumber <= 0) return;
+          if (line.startsWith('+') && !line.startsWith('+++')) {
+            scanCandidate({
+              filePath: currentFile,
+              lineNumber: currentNewLineNumber,
+              line: line.slice(1),
+              source,
+            });
+            currentNewLineNumber += 1;
+            return;
+          }
+          if (line.startsWith(' ')) currentNewLineNumber += 1;
+        },
+        options.signal,
+      );
     };
 
     const scanCommits = async (commits: string[], source: SecretScanSource) => {
@@ -307,10 +285,11 @@ export class SecretScanService {
       }
     };
 
-    const parseCommitList = (raw: string) => raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => /^[0-9a-f]{40}$/i.test(line));
+    const parseCommitList = (raw: string) =>
+      raw
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => /^[0-9a-f]{40}$/i.test(line));
 
     await streamDiff(['diff', '--cached', '--no-color', '--unified=0'], 'staged');
     try {

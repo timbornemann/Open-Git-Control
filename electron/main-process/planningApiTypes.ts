@@ -1,10 +1,5 @@
 import type { URL } from 'url';
-import type {
-  PlannerItem,
-  PlannerPriority,
-  PlannerProject,
-  PlannerStatus,
-} from './projectPlannerStore';
+import type { PlannerItem, PlannerPriority, PlannerProject, PlannerStatus } from './projectPlannerStore';
 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 2990;
@@ -26,16 +21,18 @@ export type RequestContext = {
   baseUrl: string;
 };
 
-export type ApiEnvelope<T> = {
-  success: true;
-  data: T;
-} | {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-};
+export type ApiEnvelope<T> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: {
+        code: string;
+        message: string;
+      };
+    };
 
 export type TodoQueryOptions = {
   projectId?: string;

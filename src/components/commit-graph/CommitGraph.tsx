@@ -1,46 +1,28 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import {
-  mergeableDecoratedRefs,
-  normalizeBranchRefForMerge,
-  type GitStatusDetailed,
-} from '../../utils/gitParsing';
-import { GraphNode, GraphEdge } from '../../utils/graphLayout';
-import { useToastQueue } from '../../hooks/useToastQueue';
-import { ActionToastViewport } from '../ActionToastViewport';
-import { DiffRequest } from '../../types/diff';
-import { useI18n } from '../../i18n';
-import { formatDate, formatRelativeTime, formatTime } from '../../utils/dateTime';
-import { BranchInfo, GitMergeMode } from '../../types/git';
+import { mergeableDecoratedRefs, normalizeBranchRefForMerge, type GitStatusDetailed } from '@/utils/gitParsing';
+import type { GraphNode, GraphEdge } from '@/utils/graphLayout';
+import { useToastQueue } from '@/hooks/useToastQueue';
+import { ActionToastViewport } from '@/components/ActionToastViewport';
+import type { DiffRequest } from '@/types/diff';
+import { useI18n } from '@/i18n';
+import { formatDate, formatRelativeTime, formatTime } from '@/utils/dateTime';
+import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useCommitGraphData } from './useCommitGraphData';
 import { CommitGraphSvg } from './CommitGraphSvg';
 import { ForensicSearchPanel, type ForensicSearchType } from './ForensicSearchPanel';
 import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commitGraphConstants';
-import { EmptyState } from '../EmptyState';
-import {
-  buildGraphHighlightData,
-  getRefKind,
-  resolveHighlightableBranchRef,
-  sortRefs,
-} from './commitGraphRefs';
+import { EmptyState } from '@/components/EmptyState';
+import { buildGraphHighlightData, getRefKind, resolveHighlightableBranchRef, sortRefs } from './commitGraphRefs';
 import { useCommitGraphDialogs } from './useCommitGraphDialogs';
 import { useCommitGraphSearch } from './useCommitGraphSearch';
 import { useForensicSearch } from './useForensicSearch';
 import { CommitSearchToolbar } from './CommitSearchToolbar';
-import {
-  CommitContextMenu,
-  type ContextMenuPlacement,
-  type ContextMenuState,
-  type MenuAction,
-  type MergeContextPayload,
-} from './CommitContextMenu';
+import { CommitContextMenu, type ContextMenuPlacement, type ContextMenuState, type MenuAction, type MergeContextPayload } from './CommitContextMenu';
 import { useCommitGraphViewport } from './useCommitGraphViewport';
 import { buildCommitMenuActions } from './commitGraphMenuActions';
 import { useCommitGraphGitActions } from './useCommitGraphGitActions';
 
-export {
-  buildGraphHighlightData,
-  findCommitIndexByNavigationTarget,
-} from './commitGraphRefs';
+export { buildGraphHighlightData, findCommitIndexByNavigationTarget } from './commitGraphRefs';
 
 interface CommitGraphProps {
   repoPath: string | null;
@@ -87,49 +69,37 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
   const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toasts, setToast, dismiss } = useToastQueue(4000);
-  const {
-    setConfirmDialog,
-    setInputDialog,
-  } = useCommitGraphDialogs();
+  const { setConfirmDialog, setInputDialog } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const didRunInitialBranchEffectRef = useRef(false);
   const resetForensicStateRef = useRef<() => void>(() => {});
 
-  const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(() => ({
-    string: t('generated.components.commit_graph.commitgraph.s_string_0380d62c'),
-    regex: t('generated.components.commit_graph.commitgraph.g_regex_45e4b70c'),
-    line: t('generated.components.commit_graph.commitgraph.l_line_range_a736c2f1'),
-  }), [tr]);
+  const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(
+    () => ({
+      string: t('generated.components.commit_graph.commitgraph.s_string_0380d62c'),
+      regex: t('generated.components.commit_graph.commitgraph.g_regex_45e4b70c'),
+      line: t('generated.components.commit_graph.commitgraph.l_line_range_a736c2f1'),
+    }),
+    [tr],
+  );
 
   const handleRepoCleared = useCallback(() => {
     resetForensicStateRef.current();
   }, []);
   const logContainerRef = useRef<HTMLDivElement>(null);
-  const {
-    layout,
-    workingTreeStatus,
-    loading,
-    loadingMore,
-    hasMoreCommits,
-    refreshCommits,
-    loadMoreCommits,
-    refreshWorkingTreeStatus,
-    requestCommitStats,
-  } = useCommitGraphData({
-    repoPath,
-    showSecondaryHistory,
-    refreshTrigger,
-    commitRefreshTrigger,
-    logContainerRef,
-    onRepoCleared: handleRepoCleared,
-    externalWorkingTreeStatus,
-    onRefreshWorkingTree,
-  });
-  const {
-    scrollTop,
-    containerHeight,
-  } = useCommitGraphViewport({
+  const { layout, workingTreeStatus, loading, loadingMore, hasMoreCommits, refreshCommits, loadMoreCommits, refreshWorkingTreeStatus, requestCommitStats } =
+    useCommitGraphData({
+      repoPath,
+      showSecondaryHistory,
+      refreshTrigger,
+      commitRefreshTrigger,
+      logContainerRef,
+      onRepoCleared: handleRepoCleared,
+      externalWorkingTreeStatus,
+      onRefreshWorkingTree,
+    });
+  const { scrollTop, containerHeight } = useCommitGraphViewport({
     logContainerRef,
     layout,
     repoPath,
@@ -200,10 +170,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   useEffect(() => {
     if (!layout) return;
     const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 20);
-    const end = Math.min(
-      layout.nodes.length,
-      Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + 20,
-    );
+    const end = Math.min(layout.nodes.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + 20);
     const hashes = layout.nodes
       .slice(start, end)
       .filter((node) => node.commit.statsState === 'missing' || node.commit.statsState === 'error')
@@ -230,7 +197,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
     document.addEventListener('click', handleClick);
     document.addEventListener('keydown', handleKey);
     return () => {
@@ -257,13 +226,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     const top = Math.min(Math.max(margin, contextMenu.y), maxTop);
 
     setContextMenuPlacement((current) => {
-      if (
-        current
-        && current.left === left
-        && current.top === top
-        && current.maxHeight === maxHeight
-        && current.ready
-      ) {
+      if (current && current.left === left && current.top === top && current.maxHeight === maxHeight && current.ready) {
         return current;
       }
       return { left, top, maxHeight, ready: true };
@@ -306,9 +269,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     const refsHere = mergeableDecoratedRefs(node.commit.refs, currentBranch);
     const seen = new Set<string>(refsHere);
     const branchExtras = branches
-      .filter(b => !(b.scope === 'local' && b.name === currentBranch))
-      .filter(b => !seen.has(normalizeBranchRefForMerge(b.name)))
-      .map(b => ({ raw: b.name, label: normalizeBranchRefForMerge(b.name), scope: b.scope }))
+      .filter((b) => !(b.scope === 'local' && b.name === currentBranch))
+      .filter((b) => !seen.has(normalizeBranchRefForMerge(b.name)))
+      .map((b) => ({ raw: b.name, label: normalizeBranchRefForMerge(b.name), scope: b.scope }))
       .sort((a, b) => a.label.localeCompare(b.label));
     return {
       hash: node.commit.hash,
@@ -329,7 +292,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       }
       if (diffDays < 7) return formatRelativeTime(d, locale, now);
       return formatDate(d, locale, { day: '2-digit', month: 'short' });
-    } catch { return ''; }
+    } catch {
+      return '';
+    }
   };
 
   const formatCommitStats = (files: number, additions: number, deletions: number) => {
@@ -340,8 +305,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   };
 
   const hasWorkingTreeChanges = Boolean(
-    workingTreeStatus &&
-    (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0)
+    workingTreeStatus && (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0),
   );
   const workingTreeRowOffset = hasWorkingTreeChanges ? 1 : 0;
   const visibleWindow = useMemo(() => {
@@ -355,36 +319,20 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     }
 
     const overscan = 8;
-    const visibleStartIdx = Math.max(
-      0,
-      Math.floor(scrollTop / ROW_HEIGHT - workingTreeRowOffset) - overscan,
-    );
-    const visibleEndIdx = Math.min(
-      layout.nodes.length,
-      Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT - workingTreeRowOffset) + overscan,
-    );
+    const visibleStartIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT - workingTreeRowOffset) - overscan);
+    const visibleEndIdx = Math.min(layout.nodes.length, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT - workingTreeRowOffset) + overscan);
     return {
       visibleStartIdx,
       visibleEndIdx,
       visibleNodes: layout.nodes.slice(visibleStartIdx, visibleEndIdx),
-      visibleEdges: layout.edges.filter(
-        (edge) => (
-          Math.min(edge.fromRow, edge.toRow) <= visibleEndIdx &&
-          Math.max(edge.fromRow, edge.toRow) >= visibleStartIdx
-        ),
-      ),
+      visibleEdges: layout.edges.filter((edge) => Math.min(edge.fromRow, edge.toRow) <= visibleEndIdx && Math.max(edge.fromRow, edge.toRow) >= visibleStartIdx),
     };
   }, [containerHeight, layout, scrollTop, workingTreeRowOffset]);
   const highlightData = useMemo(
     () => buildGraphHighlightData(layout, currentBranch, selectedHash, highlightedBranchRef),
     [currentBranch, highlightedBranchRef, layout, selectedHash],
   );
-  const {
-    visibleStartIdx,
-    visibleEndIdx,
-    visibleNodes,
-    visibleEdges,
-  } = visibleWindow;
+  const { visibleStartIdx, visibleEndIdx, visibleNodes, visibleEdges } = visibleWindow;
   const {
     headNode: memoizedHeadNode,
     reachableFromHead,
@@ -400,35 +348,31 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     currentPathEdgeKeys,
     selectedPathEdgeKeys,
   } = highlightData;
-  const getMenuActions = useCallback((node: GraphNode): MenuAction[] => buildCommitMenuActions({
-    node,
-    branches,
-    currentBranch,
-    layout,
-    reachableFromHead,
-    runGitAction,
-    setConfirmDialog,
-    setInputDialog,
-    setToast,
-    refreshCommits,
-    refreshWorkingTreeStatus,
-    t,
-  }), [
-    branches,
-    currentBranch,
-    layout,
-    reachableFromHead,
-    refreshCommits,
-    refreshWorkingTreeStatus,
-    runGitAction,
-    setConfirmDialog,
-    setInputDialog,
-    setToast,
-    t,
-  ]);
+  const getMenuActions = useCallback(
+    (node: GraphNode): MenuAction[] =>
+      buildCommitMenuActions({
+        node,
+        branches,
+        currentBranch,
+        layout,
+        reachableFromHead,
+        runGitAction,
+        setConfirmDialog,
+        setInputDialog,
+        setToast,
+        refreshCommits,
+        refreshWorkingTreeStatus,
+        t,
+      }),
+    [branches, currentBranch, layout, reachableFromHead, refreshCommits, refreshWorkingTreeStatus, runGitAction, setConfirmDialog, setInputDialog, setToast, t],
+  );
 
   if (!repoPath) {
-    return <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>{t('generated.components.commit_graph.commitgraph.please_select_a_repository_to_view_the_graph_3653ac88')}</div>;
+    return (
+      <div style={{ color: 'var(--text-secondary)', padding: '2rem', textAlign: 'center' }}>
+        {t('generated.components.commit_graph.commitgraph.please_select_a_repository_to_view_the_graph_3653ac88')}
+      </div>
+    );
   }
   if (loading) {
     return (
@@ -457,12 +401,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const totalHeight = (layout.nodes.length + workingTreeRowOffset) * ROW_HEIGHT;
   const topSpacerHeight = visibleStartIdx * ROW_HEIGHT;
   const bottomSpacerHeight = Math.max(0, (layout.nodes.length - visibleEndIdx) * ROW_HEIGHT);
-  const workingTreeLabel = !workingTreeStatus ? ''
+  const workingTreeLabel = !workingTreeStatus
+    ? ''
     : workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0
       ? 'Uncommitted Changes'
       : 'Staged Changes';
-  const workingTreeCount = !workingTreeStatus ? 0
-    : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
+  const workingTreeCount = !workingTreeStatus ? 0 : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
   const hasPassiveHeadFocus = !hasWorkingTreeChanges && !selectedHash && !hasAnyPathHighlight;
 
@@ -489,7 +433,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         onJumpToNextMatch={() => jumpToMatch(1)}
         t={t}
       />
-
 
       <ForensicSearchPanel
         activeSearchPanel={activeSearchPanel}
@@ -559,21 +502,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               <span className="commit-hash">WORKDIR</span>
               <div className="commit-main">
                 <div className="commit-refs">
-                  {workingTreeStatus!.staged.length > 0 && (
-                    <span className="branch-label tag">
-                      {workingTreeStatus!.staged.length} staged
-                    </span>
-                  )}
-                  {workingTreeStatus!.unstaged.length > 0 && (
-                    <span className="branch-label working-tree">
-                      {workingTreeStatus!.unstaged.length} unstaged
-                    </span>
-                  )}
-                  {workingTreeStatus!.untracked.length > 0 && (
-                    <span className="branch-label remote">
-                      {workingTreeStatus!.untracked.length} untracked
-                    </span>
-                  )}
+                  {workingTreeStatus!.staged.length > 0 && <span className="branch-label tag">{workingTreeStatus!.staged.length} staged</span>}
+                  {workingTreeStatus!.unstaged.length > 0 && <span className="branch-label working-tree">{workingTreeStatus!.unstaged.length} unstaged</span>}
+                  {workingTreeStatus!.untracked.length > 0 && <span className="branch-label remote">{workingTreeStatus!.untracked.length} untracked</span>}
                 </div>
                 <div className="commit-subject-row">
                   <span className="commit-subject">{workingTreeLabel}</span>
@@ -594,7 +525,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
           const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
           const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
-          const isHeadCommit = node.commit.refs.some(ref => ref.startsWith('HEAD ->') || ref === 'HEAD');
+          const isHeadCommit = node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD');
           const resetsToDefaultFocus = node.commit.hash === headNode.commit.hash;
           const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
           const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
@@ -631,11 +562,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                       {sortedRefs.map((ref, ri) => {
                         const branchTarget = resolveHighlightableBranchRef(ref);
                         const isActiveBranchRef = Boolean(
-                          branchTarget && (
-                            hasSelectedCommitFocus
-                              ? selectedBranchTarget === branchTarget
-                              : activeHighlightedBranch === branchTarget
-                          ),
+                          branchTarget && (hasSelectedCommitFocus ? selectedBranchTarget === branchTarget : activeHighlightedBranch === branchTarget),
                         );
                         const branchFocusColor = branchTarget ? (branchTipByRef.get(branchTarget)?.color ?? 'var(--text-accent)') : 'var(--text-accent)';
 
@@ -671,13 +598,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
                       <span className="commit-author">{node.commit.author}</span>
                       <span
                         className="commit-stats"
-                        title={node.commit.stats
-                          ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
-                          : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683')}
+                        title={
+                          node.commit.stats
+                            ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
+                            : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683')
+                        }
                       >
-                        {node.commit.stats
-                          ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions)
-                          : '...'}
+                        {node.commit.stats ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions) : '...'}
                       </span>
                       <span className="commit-date">{formatCommitDate(node.commit.date)}</span>
                     </span>
@@ -720,7 +647,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           mergeContextPayload={mergeContextPayload}
           canMergeBranches={Boolean(onMergeBranch && currentBranch)}
           mergeCtxExpanded={mergeCtxExpanded}
-          onToggleMergeExpanded={() => setMergeCtxExpanded(v => !v)}
+          onToggleMergeExpanded={() => setMergeCtxExpanded((v) => !v)}
           onClose={() => setContextMenu(null)}
           onRunMenuAction={(item) => {
             setContextMenu(null);
@@ -740,10 +667,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               consequences: t('generated.components.commit_graph.commitgraph.if_conflicts_occur_resolve_them_in_the_working_tree_and_54357bae'),
               confirmLabel: t('generated.components.commit_graph.commitgraph.start_merge_516b5e37'),
               onConfirm: async () => {
-                await runGitAction(
-                  ['merge', hash],
-                  tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`),
-                );
+                await runGitAction(['merge', hash], tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`));
               },
             });
           }}

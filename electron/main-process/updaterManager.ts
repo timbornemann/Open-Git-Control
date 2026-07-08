@@ -1,15 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
+import { IpcChannel } from '../../src/types/ipcContract';
 
-export type UpdaterState =
-  | 'idle'
-  | 'checking'
-  | 'update-available'
-  | 'no-update'
-  | 'downloading'
-  | 'downloaded'
-  | 'error';
+export type UpdaterState = 'idle' | 'checking' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
 export type UpdaterStatusPayload = {
   isSupported: boolean;
@@ -116,7 +110,7 @@ export class UpdaterManager {
 
   private emitUpdaterEvent(): void {
     for (const browserWindow of BrowserWindow.getAllWindows()) {
-      browserWindow.webContents.send('updater:event', this.updaterStatus);
+      browserWindow.webContents.send(IpcChannel.UpdaterEvent, this.updaterStatus);
     }
   }
 
@@ -198,11 +192,7 @@ export class UpdaterManager {
     });
 
     try {
-      await withTimeout(
-        autoUpdater.checkForUpdates(),
-        UPDATER_CHECK_TIMEOUT_MS,
-        'Die Update-Pruefung hat das Zeitlimit ueberschritten.',
-      );
+      await withTimeout(autoUpdater.checkForUpdates(), UPDATER_CHECK_TIMEOUT_MS, 'Die Update-Pruefung hat das Zeitlimit ueberschritten.');
       return { success: true };
     } catch (error: unknown) {
       const message = formatUpdaterError(error);
@@ -238,11 +228,7 @@ export class UpdaterManager {
     });
 
     try {
-      await withTimeout(
-        autoUpdater.downloadUpdate(),
-        UPDATER_DOWNLOAD_TIMEOUT_MS,
-        'Der Update-Download hat das Zeitlimit ueberschritten.',
-      );
+      await withTimeout(autoUpdater.downloadUpdate(), UPDATER_DOWNLOAD_TIMEOUT_MS, 'Der Update-Download hat das Zeitlimit ueberschritten.');
       return { success: true };
     } catch (error: unknown) {
       const message = formatUpdaterError(error);
@@ -290,10 +276,7 @@ export class UpdaterManager {
       }
 
       try {
-        stateAfterCheck = await this.waitForUpdaterState(
-          ['no-update', 'update-available', 'downloaded', 'error'],
-          UPDATER_STATE_WAIT_TIMEOUT_MS,
-        );
+        stateAfterCheck = await this.waitForUpdaterState(['no-update', 'update-available', 'downloaded', 'error'], UPDATER_STATE_WAIT_TIMEOUT_MS);
       } catch (error: unknown) {
         const message = formatUpdaterError(error);
         this.setUpdaterStatus({

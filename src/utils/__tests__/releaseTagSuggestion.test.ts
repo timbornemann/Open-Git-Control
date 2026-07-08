@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  detectReleaseVersionBump,
-  suggestNextReleaseTag,
-} from '../releaseTagSuggestion';
+import { detectReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 
 describe('suggestNextReleaseTag', () => {
   it('returns default tag when no valid tags are available', () => {

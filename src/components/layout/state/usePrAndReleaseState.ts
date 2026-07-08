@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import type {
-  GitHubCreateReleaseParamsDto,
-  GitHubReleaseContextDto,
-  GitHubReleaseDto,
-} from '../../../global';
-import { DEFAULT_RELEASE_NOTES_OPTIONS, ReleaseNotesOptions } from '../../../types/releaseNotes';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/global';
+import type { ReleaseNotesOptions } from '@/types/releaseNotes';
+import { DEFAULT_RELEASE_NOTES_OPTIONS } from '@/types/releaseNotes';
 
 export const usePrAndReleaseState = () => {
   const [showCreatePR, setShowCreatePR] = useState(false);

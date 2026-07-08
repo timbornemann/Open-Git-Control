@@ -1,25 +1,16 @@
+import type { PlannerItem, PlannerItemInput, PlannerPriority, PlannerProject, PlannerStatus } from './projectPlannerStore';
 import {
   PLANNER_PRIORITIES,
   PLANNER_STATUSES,
-  PlannerItem,
-  PlannerItemInput,
-  PlannerPriority,
-  PlannerProject,
-  PlannerStatus,
   ensureRepositoryProject,
   getRepositoryProjectKey,
   movePlannerItem,
   readProjectPlannerData,
 } from './projectPlannerStore';
-import { StoredRepoEntry, readStoreData } from './repoStore';
-import {
-  ApiError,
-  EnrichedTodo,
-  JsonObject,
-  PlannerCounts,
-  ProjectSummary,
-  TodoQueryOptions,
-} from './planningApiTypes';
+import type { StoredRepoEntry } from './repoStore';
+import { readStoreData } from './repoStore';
+import type { EnrichedTodo, JsonObject, PlannerCounts, ProjectSummary, TodoQueryOptions } from './planningApiTypes';
+import { ApiError } from './planningApiTypes';
 
 const PRIORITY_RANK: Record<PlannerPriority, number> = {
   urgent: 4,
@@ -84,9 +75,7 @@ const emptyCounts = (): PlannerCounts => ({
   byPriority: Object.fromEntries(PLANNER_PRIORITIES.map((priority) => [priority, 0])) as Record<PlannerPriority, number>,
 });
 
-export const cleanString = (value: unknown): string => (
-  typeof value === 'string' ? value.trim() : ''
-);
+export const cleanString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 export const parseBoolean = (value: unknown): boolean | undefined => {
   if (typeof value === 'boolean') return value;
@@ -128,7 +117,10 @@ const normalizeTagsInput = (value: unknown): string[] | undefined => {
   if (value === undefined) return undefined;
   if (Array.isArray(value)) return value.map((entry) => cleanString(entry)).filter(Boolean);
   if (typeof value === 'string') {
-    return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
   }
   throw new ApiError(400, 'INVALID_TAGS', 'tags must be an array of strings or a comma separated string.');
 };
@@ -138,17 +130,10 @@ const calculateUrgencyRank = (item: PlannerItem): number => {
   return PRIORITY_RANK[item.priority] * 100 + STATUS_RANK[item.status];
 };
 
-const compareTodosByUrgency = (left: EnrichedTodo, right: EnrichedTodo): number => (
-  right.urgencyRank - left.urgencyRank
-  || left.updatedAt - right.updatedAt
-  || left.createdAt - right.createdAt
-  || left.title.localeCompare(right.title)
-);
+const compareTodosByUrgency = (left: EnrichedTodo, right: EnrichedTodo): number =>
+  right.urgencyRank - left.urgencyRank || left.updatedAt - right.updatedAt || left.createdAt - right.createdAt || left.title.localeCompare(right.title);
 
-const compareTodosByUpdated = (left: EnrichedTodo, right: EnrichedTodo): number => (
-  right.updatedAt - left.updatedAt
-  || compareTodosByUrgency(left, right)
-);
+const compareTodosByUpdated = (left: EnrichedTodo, right: EnrichedTodo): number => right.updatedAt - left.updatedAt || compareTodosByUrgency(left, right);
 
 const countItems = (items: PlannerItem[]): PlannerCounts => {
   const counts = emptyCounts();
@@ -238,13 +223,7 @@ export const getTodos = (options: TodoQueryOptions = {}): EnrichedTodo[] => {
     if (options.includeDone === false && item.status === 'done') return false;
     if (tag && !item.tags.some((candidate) => candidate.toLowerCase() === tag)) return false;
     if (query) {
-      const haystack = [
-        item.title,
-        item.description,
-        ...item.tags,
-        project.name,
-        project.repoPath || '',
-      ].join('\n').toLowerCase();
+      const haystack = [item.title, item.description, ...item.tags, project.name, project.repoPath || ''].join('\n').toLowerCase();
       if (!haystack.includes(query)) return false;
     }
     return true;
@@ -284,7 +263,7 @@ export const queryOptionsFromUrl = (url: URL, defaults: Partial<TodoQueryOptions
     priority: parsePriority(priorityValue) || defaults.priority,
     tag: url.searchParams.get('tag') || defaults.tag,
     query: url.searchParams.get('q') || url.searchParams.get('query') || defaults.query,
-    includeDone: openOnly === true ? false : includeDone ?? defaults.includeDone,
+    includeDone: openOnly === true ? false : (includeDone ?? defaults.includeDone),
     limit: parseLimit(url.searchParams.get('limit'), defaults.limit),
     sort: url.searchParams.get('sort') === 'updated' ? 'updated' : defaults.sort || 'urgency',
   };
@@ -314,11 +293,7 @@ export const itemUpdateFromBody = (body: JsonObject): Partial<PlannerItemInput> 
 
 export const moveTodoFromBody = (itemId: string, body: JsonObject): EnrichedTodo => {
   const status = parseStatus(body.status ?? body.tab);
-  const hasProjectLocator = Boolean(
-    cleanString(body.projectId)
-    || cleanString(body.repoPath)
-    || cleanString(body.projectName),
-  );
+  const hasProjectLocator = Boolean(cleanString(body.projectId) || cleanString(body.repoPath) || cleanString(body.projectName));
   const project = hasProjectLocator ? resolveProjectLocator(body) : null;
   if (!status && !project) {
     throw new ApiError(400, 'MOVE_TARGET_REQUIRED', 'Provide status/tab, projectId, repoPath, or projectName.');
@@ -343,9 +318,11 @@ export const getProjects = (url: URL): ProjectSummary[] => {
     .sort((left, right) => left.name.localeCompare(right.name));
 };
 
-export const getRepositories = (): Array<StoredRepoEntry & {
-  project: ProjectSummary | null;
-}> => {
+export const getRepositories = (): Array<
+  StoredRepoEntry & {
+    project: ProjectSummary | null;
+  }
+> => {
   const data = readProjectPlannerData();
   const store = readStoreData();
   const projectsByRepoKey = new Map<string, ProjectSummary>();
@@ -382,17 +359,16 @@ export const listProjectsForTool = (args: JsonObject) => {
     .filter((project) => !kindRaw || project.kind === kindRaw)
     .map((project) => ({
       ...summarizeProject(project, data.items),
-      ...(includeTodos ? {
-        todos: getTodos({ projectId: project.id, includeDone: parseBoolean(args.includeDone) }),
-      } : {}),
+      ...(includeTodos
+        ? {
+            todos: getTodos({ projectId: project.id, includeDone: parseBoolean(args.includeDone) }),
+          }
+        : {}),
     }));
   return { projects };
 };
 
-export const toolTodoOptions = (
-  args: JsonObject,
-  defaults: Partial<TodoQueryOptions> = {},
-): TodoQueryOptions => ({
+export const toolTodoOptions = (args: JsonObject, defaults: Partial<TodoQueryOptions> = {}): TodoQueryOptions => ({
   ...defaults,
   projectId: cleanString(args.projectId) || defaults.projectId,
   repoPath: cleanString(args.repoPath) || defaults.repoPath,

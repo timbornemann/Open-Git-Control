@@ -1,13 +1,10 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { GitService } from '../../GitService';
-import { GitHubService } from '../../GitHubService';
-import { AppSettings } from '../../settings';
+import type { GitService } from '../../GitService';
+import type { GitHubService } from '../../GitHubService';
+import type { AppSettings } from '../../settings';
 import { parseReleaseCommits } from '../parsing';
-import {
-  clearSavedGithubTokenSecurely,
-  readSavedGithubTokenWithHost,
-  saveGithubTokenSecurely,
-} from '../secureStore';
+import { IpcChannel } from '../../../src/types/ipcContract';
+import { clearSavedGithubTokenSecurely, readSavedGithubTokenWithHost, saveGithubTokenSecurely } from '../secureStore';
 import { runGithubCliOneClickLogin } from '../githubCliAuth';
 
 type RegisterGithubHandlersDeps = {
@@ -36,9 +33,7 @@ function getGithubApiErrorDetails(error: unknown): { status: number; apiMessage:
   const candidate = error as GithubApiErrorLike;
   return {
     status: Number(candidate?.status),
-    apiMessage: typeof candidate?.response?.data?.message === 'string'
-      ? candidate.response.data.message
-      : '',
+    apiMessage: typeof candidate?.response?.data?.message === 'string' ? candidate.response.data.message : '',
     message: typeof candidate?.message === 'string' ? candidate.message : '',
   };
 }
@@ -63,12 +58,8 @@ async function localCommitishExists(gitService: GitService, commitish: string): 
   }
 }
 
-export function registerGithubHandlers({
-  gitService,
-  githubService,
-  readSettingsWithMigration,
-}: RegisterGithubHandlersDeps): void {
-  ipcMain.handle('github:auth', async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
+export function registerGithubHandlers({ gitService, githubService, readSettingsWithMigration }: RegisterGithubHandlersDeps): void {
+  ipcMain.handle(IpcChannel.GithubAuth, async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
     const settings = readSettingsWithMigration();
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
     const success = await githubService.authenticate(token, normalizedHost);
@@ -78,7 +69,7 @@ export function registerGithubHandlers({
     return success;
   });
 
-  ipcMain.handle('github:getSavedAuthStatus', async () => {
+  ipcMain.handle(IpcChannel.GithubGetSavedAuthStatus, async () => {
     const savedToken = readSavedGithubTokenWithHost();
     const settings = readSettingsWithMigration();
     const normalizedHost = githubService.normalizeHost(settings.githubHost);
@@ -90,7 +81,7 @@ export function registerGithubHandlers({
     };
   });
 
-  ipcMain.handle('github:loginWithSavedToken', async () => {
+  ipcMain.handle(IpcChannel.GithubLoginWithSavedToken, async () => {
     const savedToken = readSavedGithubTokenWithHost();
     if (!savedToken?.token) {
       githubService.logout();
@@ -133,7 +124,7 @@ export function registerGithubHandlers({
     };
   });
 
-  ipcMain.handle('github:deviceStart', async () => {
+  ipcMain.handle(IpcChannel.GithubDeviceStart, async () => {
     try {
       const settings = readSettingsWithMigration();
       const flow = await githubService.startDeviceFlow(settings.githubOauthClientId, settings.githubHost);
@@ -144,7 +135,7 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:devicePoll', async (_event: IpcMainInvokeEvent, deviceCode: string) => {
+  ipcMain.handle(IpcChannel.GithubDevicePoll, async (_event: IpcMainInvokeEvent, deviceCode: string) => {
     try {
       const normalizedDeviceCode = (deviceCode || '').trim();
       if (!normalizedDeviceCode) {
@@ -153,11 +144,7 @@ export function registerGithubHandlers({
 
       const settings = readSettingsWithMigration();
       const normalizedHost = githubService.normalizeHost(settings.githubHost);
-      const result = await githubService.pollDeviceFlow(
-        normalizedDeviceCode,
-        settings.githubOauthClientId,
-        normalizedHost,
-      );
+      const result = await githubService.pollDeviceFlow(normalizedDeviceCode, settings.githubOauthClientId, normalizedHost);
       if (result.status === 'pending') {
         return { success: true, data: { status: 'pending', interval: result.interval || null } };
       }
@@ -192,7 +179,7 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:webLogin', async () => {
+  ipcMain.handle(IpcChannel.GithubWebLogin, async () => {
     try {
       const settings = readSettingsWithMigration();
       const normalizedHost = githubService.normalizeHost(settings.githubHost);
@@ -216,7 +203,7 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:getRepos', async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string } = {}) => {
+  ipcMain.handle(IpcChannel.GithubGetRepos, async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string } = {}) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
       const repos = await githubService.getMyRepositories(params.page, params.perPage, params.search || '');
@@ -226,7 +213,7 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:createRepo', async (_event, params: { name: string; description: string; isPrivate: boolean }) => {
+  ipcMain.handle(IpcChannel.GithubCreateRepo, async (_event, params: { name: string; description: string; isPrivate: boolean }) => {
     if (!githubService.isAuthenticated()) {
       return { success: false, error: 'Not authenticated' };
     }
@@ -245,61 +232,67 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:forkRepo', async (_event, params: {
-    owner: string;
-    repo: string;
-    name?: string;
-    defaultBranchOnly?: boolean;
-  }) => {
-    if (!githubService.isAuthenticated()) {
-      return { success: false, error: 'Not authenticated' };
-    }
-
-    const owner = String(params?.owner || '').trim();
-    const repo = String(params?.repo || '').trim();
-    const name = String(params?.name || '').trim();
-
-    if (!owner || !repo) {
-      return { success: false, error: 'Owner and repository are required.' };
-    }
-
-    try {
-      const fork = await githubService.forkRepository(owner, repo, {
-        name: name || undefined,
-        defaultBranchOnly: typeof params?.defaultBranchOnly === 'boolean' ? params.defaultBranchOnly : undefined,
-      });
-      return { success: true, data: fork };
-    } catch (error: unknown) {
-      const { status, apiMessage, message } = getGithubApiErrorDetails(error);
-      const fallback = message || 'Failed to fork repository.';
-
-      if (status === 404) {
-        return { success: false, error: 'Repository not found or no permission to fork it.' };
+  ipcMain.handle(
+    IpcChannel.GithubForkRepo,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        name?: string;
+        defaultBranchOnly?: boolean;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) {
+        return { success: false, error: 'Not authenticated' };
       }
-      if (status === 403) {
-        return { success: false, error: 'Forking forbidden for this repository or missing token scope.' };
-      }
-      if (status === 422 && /already exists/i.test(`${fallback} ${apiMessage}`)) {
-        return { success: false, error: 'A fork already exists for this repository.' };
-      }
-      return { success: false, error: apiMessage || fallback };
-    }
-  });
 
-  ipcMain.handle('github:logout', async () => {
+      const owner = String(params?.owner || '').trim();
+      const repo = String(params?.repo || '').trim();
+      const name = String(params?.name || '').trim();
+
+      if (!owner || !repo) {
+        return { success: false, error: 'Owner and repository are required.' };
+      }
+
+      try {
+        const fork = await githubService.forkRepository(owner, repo, {
+          name: name || undefined,
+          defaultBranchOnly: typeof params?.defaultBranchOnly === 'boolean' ? params.defaultBranchOnly : undefined,
+        });
+        return { success: true, data: fork };
+      } catch (error: unknown) {
+        const { status, apiMessage, message } = getGithubApiErrorDetails(error);
+        const fallback = message || 'Failed to fork repository.';
+
+        if (status === 404) {
+          return { success: false, error: 'Repository not found or no permission to fork it.' };
+        }
+        if (status === 403) {
+          return { success: false, error: 'Forking forbidden for this repository or missing token scope.' };
+        }
+        if (status === 422 && /already exists/i.test(`${fallback} ${apiMessage}`)) {
+          return { success: false, error: 'A fork already exists for this repository.' };
+        }
+        return { success: false, error: apiMessage || fallback };
+      }
+    },
+  );
+
+  ipcMain.handle(IpcChannel.GithubLogout, async () => {
     githubService.logout();
     clearSavedGithubTokenSecurely();
     return { success: true };
   });
 
-  ipcMain.handle('github:checkAuthStatus', async () => {
+  ipcMain.handle(IpcChannel.GithubCheckAuthStatus, async () => {
     return {
       authenticated: githubService.isAuthenticated(),
       username: githubService.getUsername(),
     };
   });
 
-  ipcMain.handle('github:getPRs', async (_event, owner: string, repo: string, state: string) => {
+  ipcMain.handle(IpcChannel.GithubGetPrs, async (_event, owner: string, repo: string, state: string) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
       const prs = await githubService.getPullRequests(owner, repo, normalizePrState(state));
@@ -309,174 +302,171 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:createPR', async (_event, params: {
-    owner: string;
-    repo: string;
-    title: string;
-    body: string;
-    head: string;
-    base: string;
-  }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
-    try {
-      const pr = await githubService.createPullRequest(
-        params.owner,
-        params.repo,
-        params.title,
-        params.body,
-        params.head,
-        params.base,
-      );
-      return { success: true, data: pr };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Pull request could not be created.') };
-    }
-  });
-
-  ipcMain.handle('github:createRelease', async (_event, params: {
-    owner: string;
-    repo: string;
-    tagName: string;
-    targetCommitish?: string;
-    releaseName: string;
-    body?: string;
-    draft?: boolean;
-    prerelease?: boolean;
-  }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
-
-    const tagName = (params?.tagName || '').trim();
-    const releaseName = (params?.releaseName || '').trim();
-
-    if (!tagName) {
-      return { success: false, error: 'Tag-Name ist erforderlich.' };
-    }
-
-    if (!releaseName) {
-      return { success: false, error: 'Release-Name ist erforderlich.' };
-    }
-
-    try {
-      const release = await githubService.createRelease({
-        owner: params.owner,
-        repo: params.repo,
-        tagName,
-        targetCommitish: params.targetCommitish,
-        releaseName,
-        body: params.body,
-        draft: Boolean(params.draft),
-        prerelease: Boolean(params.prerelease),
-      });
-      return { success: true, data: release };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
-    }
-  });
-
-  ipcMain.handle('github:getReleaseContext', async (_event, params: {
-    owner: string;
-    repo: string;
-    targetCommitish?: string;
-  }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
-
-    const owner = String(params?.owner || '').trim();
-    const repo = String(params?.repo || '').trim();
-    const targetCommitish = String(params?.targetCommitish || '').trim() || 'HEAD';
-
-    if (!owner || !repo) {
-      return { success: false, error: 'Owner und Repository sind erforderlich.' };
-    }
-
-    try {
-      const [existingTags, lastReleaseTag] = await Promise.all([
-        githubService.listRepositoryTags(owner, repo, 300),
-        githubService.getLatestReleaseTag(owner, repo),
-      ]);
-
-      const commitFormat = '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad';
-      let fallbackUsed = false;
-      let commitsRaw = '';
-
+  ipcMain.handle(
+    IpcChannel.GithubCreatePr,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        title: string;
+        body: string;
+        head: string;
+        base: string;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
       try {
-        const canUseLastReleaseTag = lastReleaseTag
-          ? await localCommitishExists(gitService, lastReleaseTag)
-          : false;
+        const pr = await githubService.createPullRequest(params.owner, params.repo, params.title, params.body, params.head, params.base);
+        return { success: true, data: pr };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Pull request could not be created.') };
+      }
+    },
+  );
 
-        if (lastReleaseTag && canUseLastReleaseTag) {
-          commitsRaw = await gitService.runCommand([
-            'log',
-            `${lastReleaseTag}..${targetCommitish}`,
-            commitFormat,
-            '--date=short',
-            '--max-count=400',
-          ]);
-        } else {
-          fallbackUsed = Boolean(lastReleaseTag);
-          commitsRaw = await gitService.runCommand([
-            'log',
-            targetCommitish,
-            commitFormat,
-            '--date=short',
-            '--max-count=150',
-          ]);
-        }
-      } catch {
-        fallbackUsed = true;
-        commitsRaw = await gitService.runCommand([
-          'log',
-          targetCommitish,
-          commitFormat,
-          '--date=short',
-          '--max-count=150',
-        ]);
+  ipcMain.handle(
+    IpcChannel.GithubCreateRelease,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        tagName: string;
+        targetCommitish?: string;
+        releaseName: string;
+        body?: string;
+        draft?: boolean;
+        prerelease?: boolean;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+
+      const tagName = (params?.tagName || '').trim();
+      const releaseName = (params?.releaseName || '').trim();
+
+      if (!tagName) {
+        return { success: false, error: 'Tag-Name ist erforderlich.' };
       }
 
-      const settings = readSettingsWithMigration();
-      const githubHost = githubService.normalizeHost(settings.githubHost);
-      const repositoryHtmlUrl = buildGithubRepositoryUrl(githubHost, owner, repo);
-      const commitsSinceLastRelease = parseReleaseCommits(commitsRaw).map((commit) => ({
-        ...commit,
-        htmlUrl: commit.hash ? `${repositoryHtmlUrl}/commit/${commit.hash}` : null,
-      }));
+      if (!releaseName) {
+        return { success: false, error: 'Release-Name ist erforderlich.' };
+      }
 
-      return {
-        success: true,
-        data: {
-          existingTags,
-          lastReleaseTag: lastReleaseTag || null,
-          repositoryHtmlUrl,
-          commitsSinceLastRelease,
-          commitsTarget: targetCommitish,
-          fallbackUsed,
-        },
-      };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Release-Kontext konnte nicht geladen werden.') };
-    }
-  });
+      try {
+        const release = await githubService.createRelease({
+          owner: params.owner,
+          repo: params.repo,
+          tagName,
+          targetCommitish: params.targetCommitish,
+          releaseName,
+          body: params.body,
+          draft: Boolean(params.draft),
+          prerelease: Boolean(params.prerelease),
+        });
+        return { success: true, data: release };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
+      }
+    },
+  );
 
-  ipcMain.handle('github:getWorkflowRuns', async (_event, params: {
-    owner: string;
-    repo: string;
-    branch?: string;
-    headSha?: string;
-    perPage?: number;
-  }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
-    try {
-      const runs = await githubService.getWorkflowRuns(params.owner, params.repo, {
-        branch: params.branch,
-        headSha: params.headSha,
-        perPage: params.perPage,
-      });
-      return { success: true, data: runs };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Workflow runs could not be loaded.') };
-    }
-  });
+  ipcMain.handle(
+    IpcChannel.GithubGetReleaseContext,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        targetCommitish?: string;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
 
-  ipcMain.handle('github:getStatusChecks', async (_event, params: { owner: string; repo: string; ref: string }) => {
+      const owner = String(params?.owner || '').trim();
+      const repo = String(params?.repo || '').trim();
+      const targetCommitish = String(params?.targetCommitish || '').trim() || 'HEAD';
+
+      if (!owner || !repo) {
+        return { success: false, error: 'Owner und Repository sind erforderlich.' };
+      }
+
+      try {
+        const [existingTags, lastReleaseTag] = await Promise.all([
+          githubService.listRepositoryTags(owner, repo, 300),
+          githubService.getLatestReleaseTag(owner, repo),
+        ]);
+
+        const commitFormat = '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad';
+        let fallbackUsed = false;
+        let commitsRaw = '';
+
+        try {
+          const canUseLastReleaseTag = lastReleaseTag ? await localCommitishExists(gitService, lastReleaseTag) : false;
+
+          if (lastReleaseTag && canUseLastReleaseTag) {
+            commitsRaw = await gitService.runCommand(['log', `${lastReleaseTag}..${targetCommitish}`, commitFormat, '--date=short', '--max-count=400']);
+          } else {
+            fallbackUsed = Boolean(lastReleaseTag);
+            commitsRaw = await gitService.runCommand(['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
+          }
+        } catch {
+          fallbackUsed = true;
+          commitsRaw = await gitService.runCommand(['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
+        }
+
+        const settings = readSettingsWithMigration();
+        const githubHost = githubService.normalizeHost(settings.githubHost);
+        const repositoryHtmlUrl = buildGithubRepositoryUrl(githubHost, owner, repo);
+        const commitsSinceLastRelease = parseReleaseCommits(commitsRaw).map((commit) => ({
+          ...commit,
+          htmlUrl: commit.hash ? `${repositoryHtmlUrl}/commit/${commit.hash}` : null,
+        }));
+
+        return {
+          success: true,
+          data: {
+            existingTags,
+            lastReleaseTag: lastReleaseTag || null,
+            repositoryHtmlUrl,
+            commitsSinceLastRelease,
+            commitsTarget: targetCommitish,
+            fallbackUsed,
+          },
+        };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Release-Kontext konnte nicht geladen werden.') };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.GithubGetWorkflowRuns,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        branch?: string;
+        headSha?: string;
+        perPage?: number;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+      try {
+        const runs = await githubService.getWorkflowRuns(params.owner, params.repo, {
+          branch: params.branch,
+          headSha: params.headSha,
+          perPage: params.perPage,
+        });
+        return { success: true, data: runs };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Workflow runs could not be loaded.') };
+      }
+    },
+  );
+
+  ipcMain.handle(IpcChannel.GithubGetStatusChecks, async (_event, params: { owner: string; repo: string; ref: string }) => {
     if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
     try {
       const checks = await githubService.getStatusChecks(params.owner, params.repo, params.ref);
@@ -486,33 +476,39 @@ export function registerGithubHandlers({
     }
   });
 
-  ipcMain.handle('github:mergePR', async (_event, params: {
-    owner: string;
-    repo: string;
-    pullNumber: number;
-    mergeMethod: 'merge' | 'squash' | 'rebase';
-    commitTitle?: string;
-    commitMessage?: string;
-  }) => {
-    if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
-    try {
-      const pullNumber = Number(params?.pullNumber);
-      if (!Number.isFinite(pullNumber) || pullNumber <= 0) {
-        return { success: false, error: 'Invalid pull request number.' };
+  ipcMain.handle(
+    IpcChannel.GithubMergePr,
+    async (
+      _event,
+      params: {
+        owner: string;
+        repo: string;
+        pullNumber: number;
+        mergeMethod: 'merge' | 'squash' | 'rebase';
+        commitTitle?: string;
+        commitMessage?: string;
+      },
+    ) => {
+      if (!githubService.isAuthenticated()) return { success: false, error: 'Not authenticated' };
+      try {
+        const pullNumber = Number(params?.pullNumber);
+        if (!Number.isFinite(pullNumber) || pullNumber <= 0) {
+          return { success: false, error: 'Invalid pull request number.' };
+        }
+
+        const result = await githubService.mergePullRequest(
+          params.owner,
+          params.repo,
+          pullNumber,
+          params.mergeMethod,
+          params.commitTitle,
+          params.commitMessage,
+        );
+
+        return { success: true, data: result };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Pull request could not be merged.') };
       }
-
-      const result = await githubService.mergePullRequest(
-        params.owner,
-        params.repo,
-        pullNumber,
-        params.mergeMethod,
-        params.commitTitle,
-        params.commitMessage,
-      );
-
-      return { success: true, data: result };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Pull request could not be merged.') };
-    }
-  });
+    },
+  );
 }

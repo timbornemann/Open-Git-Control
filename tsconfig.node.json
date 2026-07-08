@@ -8,8 +8,12 @@
     "esModuleInterop": true,
     "target": "ES2022",
     "outDir": "dist-electron",
-    "strict": true
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["electron"],
+  "include": ["electron", "src/types/ipcContract.ts"],
   "exclude": ["electron/__tests__/**"]
 }

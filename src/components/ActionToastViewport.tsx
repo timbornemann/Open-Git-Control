@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { useI18n } from '../i18n';
+import { useI18n } from '@/i18n';
 
 export type ActionToastItem = {
   id: number;
@@ -41,10 +41,7 @@ const copyMessage = async (message: string) => {
   }
 };
 
-export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({
-  toasts,
-  onDismiss,
-}) => {
+export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts, onDismiss }) => {
   const { t } = useI18n();
   const handleCopy = useCallback((message: string) => {
     void copyMessage(message);
@@ -55,11 +52,7 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({
   return (
     <div className="toast-container" aria-live="polite" aria-atomic="false">
       {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`action-toast ${toast.isError ? 'error' : 'success'}`}
-          role={toast.isError ? 'alert' : 'status'}
-        >
+        <div key={toast.id} className={`action-toast ${toast.isError ? 'error' : 'success'}`} role={toast.isError ? 'alert' : 'status'}>
           <div className="toast-main">
             <span className="toast-icon">{toast.isError ? 'x' : 'ok'}</span>
             <span className="toast-msg">{toast.msg}</span>

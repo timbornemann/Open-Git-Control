@@ -1,16 +1,13 @@
 import React from 'react';
 import { PanelRightClose } from 'lucide-react';
-import { CommitDetails } from '../../CommitDetails';
-import { StagingArea } from '../../staging-area';
-import { WorkingTreeFileDetails } from '../../WorkingTreeFileDetails';
-import {
-  useRepositoryContext,
-  useSettingsContext,
-} from '../../../contexts/AppStateContext';
-import { useI18n } from '../../../i18n';
-import type { DiffRequest } from '../../../types/diff';
-import type { WorkingTreeState } from '../../../hooks/useWorkingTreeSnapshot';
-import { INSPECTOR_PANE_MIN_WIDTH } from '../hooks/useMainViewPaneResizer';
+import { CommitDetails } from '@/components/CommitDetails';
+import { StagingArea } from '@/components/staging-area';
+import { WorkingTreeFileDetails } from '@/components/WorkingTreeFileDetails';
+import { useRepositoryContext, useSettingsContext } from '@/contexts/AppStateContext';
+import { useI18n } from '@/i18n';
+import type { DiffRequest } from '@/types/diff';
+import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
+import { INSPECTOR_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 
 type WorkingTreeSelection = {
   path: string;

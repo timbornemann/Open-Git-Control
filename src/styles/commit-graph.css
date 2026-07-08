@@ -1,7 +1,11 @@
 ﻿/* Skeleton loading animation */
 @keyframes skeleton-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
 }
 
 .skeleton-line,
@@ -96,13 +100,12 @@
 .commit-row.commit-click-focus.selected-branch-path,
 .commit-row.commit-click-focus.path-highlighted,
 .commit-row.commit-click-focus.head-current {
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 26%, transparent) 0%,
-      color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 14%, transparent) 54%,
-      color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 6%, transparent) 100%
-    );
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 26%, transparent) 0%,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 14%, transparent) 54%,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 6%, transparent) 100%
+  );
   border-left: 4px solid color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 88%, var(--text-accent));
   border-bottom-color: color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 52%, var(--border-color));
   box-shadow:
@@ -259,7 +262,10 @@
   cursor: pointer;
   line-height: 1.15;
   font-family: inherit;
-  transition: box-shadow 0.12s ease, transform 0.12s ease, border-color 0.12s ease;
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .branch-label.branch-toggle:hover {
@@ -379,14 +385,20 @@
   min-width: 220px;
   max-width: calc(100vw - 16px);
   padding: 4px 0;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(12px);
   animation: ctx-fade-in 0.1s ease;
 }
 
 @keyframes ctx-fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .ctx-menu-header {
@@ -541,7 +553,9 @@
   font-size: 0.78rem;
   font-family: 'JetBrains Mono', monospace;
   text-align: left;
-  transition: background-color 0.1s, border-color 0.1s;
+  transition:
+    background-color 0.1s,
+    border-color 0.1s;
 }
 
 .ctx-menu-merge-item:hover {
@@ -579,15 +593,17 @@
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 500;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   animation: toast-in 0.2s ease;
   max-width: min(560px, calc(100vw - 28px));
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .action-toast:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 32px rgba(0,0,0,0.54);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.54);
 }
 
 .toast-main {
@@ -629,7 +645,9 @@
   padding: 2px 8px;
   line-height: 1.35;
   cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .toast-action-btn:hover {
@@ -669,7 +687,12 @@
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
-

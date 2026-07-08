@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AiService, buildFallbackCommitMessage, buildStructuredDiffContext, parseStatusPorcelain } from '../AiService';
-import { AppSettings } from '../settings';
+import type { AppSettings } from '../settings';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -55,7 +55,11 @@ describe('AiService gemini secret access', () => {
 
   it('fails when secure key access throws', async () => {
     const service = new AiService(fakeGitService);
-    await expect(service.listModels(baseSettings, () => { throw new Error('secret backend unavailable'); })).rejects.toThrow('secret backend unavailable');
+    await expect(
+      service.listModels(baseSettings, () => {
+        throw new Error('secret backend unavailable');
+      }),
+    ).rejects.toThrow('secret backend unavailable');
   });
 
   it('uses secure key when present', async () => {
@@ -80,13 +84,17 @@ describe('AiService release notes', () => {
   });
 
   it('passes the semantic release classification to the AI prompt', async () => {
-    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
-      candidates: [{
-        content: {
-          parts: [{ text: '# Release v2.0.0\n\nThis major release adds the new workflow.' }],
-        },
-      }],
-    }));
+    const fetchMock = vi.fn(async (_url: string, _init: any) =>
+      okJsonResponse({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: '# Release v2.0.0\n\nThis major release adds the new workflow.' }],
+            },
+          },
+        ],
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
@@ -94,14 +102,16 @@ describe('AiService release notes', () => {
       tagName: 'v2.0.0',
       releaseName: 'Release v2.0.0',
       lastReleaseTag: 'v1.4.2',
-      commits: [{
-        hash: 'abc123',
-        shortHash: 'abc123',
-        subject: 'feat: add new workflow',
-        author: 'Tim',
-        date: '2026-06-14',
-        htmlUrl: 'https://github.com/acme/project/commit/abc123',
-      }],
+      commits: [
+        {
+          hash: 'abc123',
+          shortHash: 'abc123',
+          subject: 'feat: add new workflow',
+          author: 'Tim',
+          date: '2026-06-14',
+          htmlUrl: 'https://github.com/acme/project/commit/abc123',
+        },
+      ],
       repositoryHtmlUrl: 'https://github.com/acme/project',
       language: 'en',
       versionBump: 'major',
@@ -182,14 +192,16 @@ describe('AiService commit message from user notes', () => {
   });
 
   it('generates a commit message from notes without adding file context', async () => {
-    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
-      message: {
-        content: JSON.stringify({
-          title: 'feat(settings): add commit message styles',
-          description: 'Adds selectable styles for AI-generated commit messages.',
-        }),
-      },
-    }));
+    const fetchMock = vi.fn(async (_url: string, _init: any) =>
+      okJsonResponse({
+        message: {
+          content: JSON.stringify({
+            title: 'feat(settings): add commit message styles',
+            description: 'Adds selectable styles for AI-generated commit messages.',
+          }),
+        },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
@@ -217,9 +229,11 @@ describe('AiService commit message from user notes', () => {
   });
 
   it('uses the configured plain style instruction', async () => {
-    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
-      message: { content: '{"title":"update commit message generator","description":""}' },
-    }));
+    const fetchMock = vi.fn(async (_url: string, _init: any) =>
+      okJsonResponse({
+        message: { content: '{"title":"update commit message generator","description":""}' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
@@ -234,9 +248,11 @@ describe('AiService commit message from user notes', () => {
   });
 
   it('uses the selected commit message language for notes generation', async () => {
-    const fetchMock = vi.fn(async (_url: string, init: any) => okJsonResponse({
-      message: { content: '{"title":"fix(settings): preserve commit language","description":""}' },
-    }));
+    const fetchMock = vi.fn(async (_url: string, _init: any) =>
+      okJsonResponse({
+        message: { content: '{"title":"fix(settings): preserve commit language","description":""}' },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
@@ -312,13 +328,9 @@ describe('AiService context extraction and prompts', () => {
       commandLog.push(key);
       if (key === 'diff --numstat HEAD -- src/app.ts') return '5\t2\tsrc/app.ts';
       if (key === 'diff --no-color --unified=3 HEAD -- src/app.ts') {
-        return [
-          'diff --git a/src/app.ts b/src/app.ts',
-          '@@ -1,2 +1,3 @@',
-          '-const enabled = false;',
-          '+const enabled = true;',
-          '+logInfo("enabled");',
-        ].join('\n');
+        return ['diff --git a/src/app.ts b/src/app.ts', '@@ -1,2 +1,3 @@', '-const enabled = false;', '+const enabled = true;', '+logInfo("enabled");'].join(
+          '\n',
+        );
       }
       if (args[0] === 'add') return '';
       if (args[0] === 'commit') return '';
@@ -329,21 +341,17 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(' M src/app.ts\n')
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/app.ts\n').mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"selectedPaths":["src/app.ts"]}' } }))
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"title":"chore(src): adjust app behavior","description":""}' } }));
     vi.stubGlobal('fetch', fetchMock as any);
 
-    await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     expect(commandLog).toContain('diff --numstat HEAD -- src/app.ts');
     expect(commandLog).toContain('diff --no-color --unified=3 HEAD -- src/app.ts');
@@ -357,11 +365,7 @@ describe('AiService context extraction and prompts', () => {
     fs.mkdirSync(notesDir, { recursive: true });
     fs.writeFileSync(
       path.join(notesDir, 'todo.txt'),
-      [
-        'implement onboarding checklist',
-        'track completion events',
-        'add reminder email copy',
-      ].join('\n'),
+      ['implement onboarding checklist', 'track completion events', 'add reminder email copy'].join('\n'),
       'utf8',
     );
 
@@ -378,9 +382,7 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => tmpRoot,
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce('?? notes/todo.txt\n')
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce('?? notes/todo.txt\n').mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -396,10 +398,7 @@ describe('AiService context extraction and prompts', () => {
     });
     vi.stubGlobal('fetch', fetchMock as any);
 
-    await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     expect(choosePrompt).toContain('implement onboarding checklist');
   });
@@ -424,9 +423,7 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(' M src/app.ts\n M src/auth.ts\n')
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/app.ts\n M src/auth.ts\n').mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -445,14 +442,13 @@ describe('AiService context extraction and prompts', () => {
 
       commitSystemPrompt = systemPrompt;
       commitUserPrompt = userPrompt;
-      return okJsonResponse({ message: { content: '{"title":"chore(src): align app and auth flow","description":"Keeps behavior consistent across app and auth."}' } });
+      return okJsonResponse({
+        message: { content: '{"title":"chore(src): align app and auth flow","description":"Keeps behavior consistent across app and auth."}' },
+      });
     });
     vi.stubGlobal('fetch', fetchMock as any);
 
-    await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     expect(commitSystemPrompt).toContain('full batch');
     expect(commitUserPrompt).toContain('path: src/app.ts');
@@ -476,29 +472,28 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(' M src/app.ts\n')
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/app.ts\n').mockResolvedValueOnce(''),
       runCommand,
       stagePaths,
       commitWithMessageForPaths,
     } as any);
 
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"selectedPaths":["src/app.ts"]}' } }))
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"title":"chore(src): adjust app behavior","description":""}' } }));
     vi.stubGlobal('fetch', fetchMock as any);
 
-    await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     expect(stagePaths).toHaveBeenCalledWith(['src/app.ts']);
-    expect(commitWithMessageForPaths).toHaveBeenCalledWith({
-      title: expect.any(String),
-      description: '',
-    }, ['src/app.ts']);
+    expect(commitWithMessageForPaths).toHaveBeenCalledWith(
+      {
+        title: expect.any(String),
+        description: '',
+      },
+      ['src/app.ts'],
+    );
     expect(runCommand.mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] === 'commit')).toBe(false);
   });
 
@@ -528,21 +523,17 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(' M src/app.ts\n')
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/app.ts\n').mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"selectedPaths":["src/app.ts"]}' } }))
       .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"title":"chore(src): modernize app path","description":""}' } }));
     vi.stubGlobal('fetch', fetchMock as any);
 
-    await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     const diffCommands = runCommand.mock.calls
       .map((call) => (Array.isArray(call[0]) ? call[0].join(' ') : ''))
@@ -571,23 +562,24 @@ describe('AiService context extraction and prompts', () => {
     } as any);
 
     let abortCount = 0;
-    const fetchMock = vi.fn(async (_url: string, init: any) => (
-      new Promise((_resolve, reject) => {
-        const signal = init?.signal as AbortSignal | undefined;
-        if (signal?.aborted) {
-          const err: any = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-          return;
-        }
-        signal?.addEventListener('abort', () => {
-          abortCount += 1;
-          const err: any = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        });
-      })
-    ));
+    const fetchMock = vi.fn(
+      async (_url: string, init: any) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal as AbortSignal | undefined;
+          if (signal?.aborted) {
+            const err: any = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+            return;
+          }
+          signal?.addEventListener('abort', () => {
+            abortCount += 1;
+            const err: any = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     setTimeout(() => {
@@ -620,25 +612,16 @@ describe('AiService context extraction and prompts', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(' M src/app.ts\n')
-        .mockResolvedValueOnce(' M src/app.ts\n'),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(' M src/app.ts\n').mockResolvedValueOnce(' M src/app.ts\n'),
       runCommand,
     } as any);
 
-    const fetchMock = vi.fn(async () => (
-      okJsonResponse({ message: { content: '{"title":"chore(src): retry commit","description":""}' } })
-    ));
+    const fetchMock = vi.fn(async () => okJsonResponse({ message: { content: '{"title":"chore(src): retry commit","description":""}' } }));
     vi.stubGlobal('fetch', fetchMock as any);
 
-    const result = await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    const result = await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
-    const commitAttempts = runCommand.mock.calls
-      .map((call) => (Array.isArray(call[0]) ? call[0][0] : ''))
-      .filter((command) => command === 'commit').length;
+    const commitAttempts = runCommand.mock.calls.map((call) => (Array.isArray(call[0]) ? call[0][0] : '')).filter((command) => command === 'commit').length;
 
     expect(commitAttempts).toBeLessThanOrEqual(8);
     expect(result.commits).toHaveLength(0);
@@ -700,9 +683,7 @@ describe('AiService large hybrid strategy', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(createStatusForFiles(files))
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(createStatusForFiles(files)).mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -734,9 +715,7 @@ describe('AiService large hybrid strategy', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(createStatusForFiles(files))
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(createStatusForFiles(files)).mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -768,9 +747,7 @@ describe('AiService large hybrid strategy', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(createStatusForFiles(files))
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(createStatusForFiles(files)).mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -803,9 +780,7 @@ describe('AiService large hybrid strategy', () => {
 
     const service = new AiService({
       getRepoPath: () => '/tmp/repo',
-      getStatusPorcelain: vi.fn()
-        .mockResolvedValueOnce(createStatusForFiles(files))
-        .mockResolvedValueOnce(''),
+      getStatusPorcelain: vi.fn().mockResolvedValueOnce(createStatusForFiles(files)).mockResolvedValueOnce(''),
       runCommand,
     } as any);
 
@@ -824,10 +799,7 @@ describe('AiService large hybrid strategy', () => {
     });
     vi.stubGlobal('fetch', fetchMock as any);
 
-    const result = await service.runAutoCommit(
-      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
-      () => '',
-    );
+    const result = await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.warnings.some((warning) => warning.includes('KI-Budget erreicht'))).toBe(true);
@@ -845,23 +817,24 @@ describe('AiService large hybrid strategy', () => {
       runCommand,
     } as any);
 
-    const fetchMock = vi.fn(async (_url: string, init: any) => (
-      new Promise((_resolve, reject) => {
-        const signal = init?.signal as AbortSignal | undefined;
-        if (signal?.aborted) {
-          const err: any = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-          return;
-        }
-        signal?.addEventListener('abort', () => {
-          abortCount += 1;
-          const err: any = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        });
-      })
-    ));
+    const fetchMock = vi.fn(
+      async (_url: string, init: any) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal as AbortSignal | undefined;
+          if (signal?.aborted) {
+            const err: any = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+            return;
+          }
+          signal?.addEventListener('abort', () => {
+            abortCount += 1;
+            const err: any = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }),
+    );
     vi.stubGlobal('fetch', fetchMock as any);
 
     setTimeout(() => {
@@ -880,4 +853,3 @@ describe('AiService large hybrid strategy', () => {
     expect(abortCount).toBeGreaterThan(0);
   });
 });
-

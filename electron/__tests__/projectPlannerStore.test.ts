@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeProjectPlannerData,
-  validateProjectFolderName,
-} from '../main-process/projectPlannerStore';
+import { normalizeProjectPlannerData, validateProjectFolderName } from '../main-process/projectPlannerStore';
 
 describe('projectPlannerStore', () => {
   it('normalizes projects and items while removing invalid references and duplicate tags', () => {
@@ -64,13 +61,15 @@ describe('projectPlannerStore', () => {
   it('uses safe defaults for unknown priority and status values', () => {
     const normalized = normalizeProjectPlannerData({
       projects: [{ id: 'p', name: 'Project', kind: 'planned' }],
-      items: [{
-        id: 'i',
-        projectId: 'p',
-        title: 'Item',
-        priority: 'now',
-        status: 'later',
-      }],
+      items: [
+        {
+          id: 'i',
+          projectId: 'p',
+          title: 'Item',
+          priority: 'now',
+          status: 'later',
+        },
+      ],
     });
 
     expect(normalized.items[0]).toMatchObject({

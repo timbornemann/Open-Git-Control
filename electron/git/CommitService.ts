@@ -10,11 +10,7 @@ export type CommitMessageInput = {
   allowEmpty?: boolean;
 };
 
-export type ExecuteGitCommand = (
-  repoPath: string,
-  args: string[],
-  envOverrides?: NodeJS.ProcessEnv,
-) => Promise<string>;
+export type ExecuteGitCommand = (repoPath: string, args: string[], envOverrides?: NodeJS.ProcessEnv) => Promise<string>;
 
 const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
 
@@ -51,11 +47,7 @@ export class CommitService {
   }
 
   private normalizePathspecEntries(paths: string[]): string[] {
-    const normalized = [...new Set(
-      paths
-        .map((filePath) => String(filePath || '').trim())
-        .filter(Boolean),
-    )];
+    const normalized = [...new Set(paths.map((filePath) => String(filePath || '').trim()).filter(Boolean))];
     if (normalized.some((filePath) => /[\0\r\n]/.test(filePath))) {
       throw new Error('Pathspec entries must not contain control characters.');
     }
@@ -123,12 +115,7 @@ export class CommitService {
     return this.runPathspecCommand(repoPath, 'ogc-reset-pathspec-', 'reset', paths);
   }
 
-  private async runPathspecCommand(
-    repoPath: string,
-    tempPrefix: string,
-    commandName: 'add' | 'reset',
-    paths: string[],
-  ): Promise<string> {
+  private async runPathspecCommand(repoPath: string, tempPrefix: string, commandName: 'add' | 'reset', paths: string[]): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
@@ -139,11 +126,7 @@ export class CommitService {
 
     const pathspec = this.createPathspecFile(tempPrefix, normalized);
     try {
-      return await this.executeGit(normalizedPath, [
-        commandName,
-        `--pathspec-from-file=${pathspec.pathspecFile}`,
-        '--pathspec-file-nul',
-      ]);
+      return await this.executeGit(normalizedPath, [commandName, `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
     } finally {
       this.cleanupPrivateTempDir(pathspec.tempDir);
     }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DiffRequest } from '../../types/diff';
-import type { GitFileBlameLineDto } from '../../types/git';
-import { gitClient } from '../../services/gitClient';
+import type { DiffRequest } from '@/types/diff';
+import type { GitFileBlameLineDto } from '@/types/git';
+import { gitClient } from '@/services/gitClient';
 
 type UseDiffBlameParams = {
   repoPath: string | null;
@@ -24,9 +24,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
 
       setIsBlameLoading(true);
       try {
-        const commitHashForBlame = (request.source !== 'staged' && request.source !== 'unstaged')
-          ? request.commitHash
-          : undefined;
+        const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
 
         const result = await gitClient.getFileBlame(request.path, commitHashForBlame);
         if (result.success) {

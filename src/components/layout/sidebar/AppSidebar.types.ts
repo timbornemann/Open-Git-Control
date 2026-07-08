@@ -1,5 +1,15 @@
-import { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '../../../types/git';
-import { AppSettingsDto, DeviceFlowStartDto, GitHubCreateReleaseParamsDto, GitHubReleaseDto, GitHubRepositoryDto, GitJobEventDto, PullRequestCiDto, PullRequestDto, RepoSortByDto } from '../../../global';
+import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '@/types/git';
+import type {
+  AppSettingsDto,
+  DeviceFlowStartDto,
+  GitHubCreateReleaseParamsDto,
+  GitHubReleaseDto,
+  GitHubRepositoryDto,
+  GitJobEventDto,
+  PullRequestCiDto,
+  PullRequestDto,
+  RepoSortByDto,
+} from '@/global';
 
 export type RemoteStatus = {
   title: string;

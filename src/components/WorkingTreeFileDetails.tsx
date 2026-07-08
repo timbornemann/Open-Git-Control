@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../types/git';
-import { DiffRequest, DiffSource } from '../types/diff';
-import { useI18n } from '../i18n';
-import { gitClient } from '../services/gitClient';
+import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
+import type { DiffRequest, DiffSource } from '@/types/diff';
+import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -27,7 +27,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   const { t, tr, locale } = useI18n();
 
   const sourceLabel = useMemo(
-    () => source === 'staged' ? t('generated.components.workingtreefiledetails.staged_changes_2b2e99a1') : t('generated.components.workingtreefiledetails.unstaged_changes_898c9c1d'),
+    () =>
+      source === 'staged'
+        ? t('generated.components.workingtreefiledetails.staged_changes_2b2e99a1')
+        : t('generated.components.workingtreefiledetails.unstaged_changes_898c9c1d'),
     [source, tr],
   );
 
@@ -137,15 +140,36 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
         <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>{t('generated.components.layout.main.maininspectorpane.file_inspector_57b931aa')}</h4>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{sourceLabel}</span>
-        <code style={{ fontSize: '0.76rem', color: 'var(--text-primary)', backgroundColor: 'var(--bg-panel)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '6px 8px', overflowX: 'auto', whiteSpace: 'nowrap' }}>{path}</code>
+        <code
+          style={{
+            fontSize: '0.76rem',
+            color: 'var(--text-primary)',
+            backgroundColor: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 6,
+            padding: '6px 8px',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {path}
+        </code>
       </div>
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-        {(['history', 'blame', 'patch'] as const).map(tab => (
+        {(['history', 'blame', 'patch'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            style={{ fontSize: '0.78rem', padding: '5px 8px', borderRadius: '5px', border: '1px solid var(--border-color)', backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)', color: activeTab === tab ? 'var(--on-accent)' : 'var(--text-primary)', cursor: 'pointer' }}
+            style={{
+              fontSize: '0.78rem',
+              padding: '5px 8px',
+              borderRadius: '5px',
+              border: '1px solid var(--border-color)',
+              backgroundColor: activeTab === tab ? 'var(--accent-primary)' : 'var(--bg-panel)',
+              color: activeTab === tab ? 'var(--on-accent)' : 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
           >
             {tab === 'history' ? t('generated.components.commitdetails.history_83156612') : tab === 'blame' ? 'Blame' : 'Patch'}
           </button>
@@ -154,28 +178,48 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
 
       {activeTab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {historyLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_history_3ca2a3ab')}</span>}
+          {historyLoading && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_history_3ca2a3ab')}</span>
+          )}
           {historyError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{historyError}</span>}
           {!historyLoading && !historyError && historyEntries.length === 0 && (
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_history_found_a820bc27')}</span>
           )}
-          {!historyLoading && !historyError && historyEntries.map(entry => (
-            <button
-              key={`${entry.hash}-${entry.subject}`}
-              onClick={() => onSelectCommit?.(entry.hash)}
-              style={{ width: '100%', textAlign: 'left', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'var(--bg-panel)', padding: '8px 9px', cursor: onSelectCommit ? 'pointer' : 'default', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '4px' }}
-            >
-              <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.abbrevHash}</span>
-              <span style={{ fontSize: '0.84rem' }}>{entry.subject || t('generated.components.commitdetails.no_message_e74e94fd')}</span>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{entry.author || '-'} | {formatDate(entry.date)}</span>
-            </button>
-          ))}
+          {!historyLoading &&
+            !historyError &&
+            historyEntries.map((entry) => (
+              <button
+                key={`${entry.hash}-${entry.subject}`}
+                onClick={() => onSelectCommit?.(entry.hash)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--bg-panel)',
+                  padding: '8px 9px',
+                  cursor: onSelectCommit ? 'pointer' : 'default',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{entry.abbrevHash}</span>
+                <span style={{ fontSize: '0.84rem' }}>{entry.subject || t('generated.components.commitdetails.no_message_e74e94fd')}</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                  {entry.author || '-'} | {formatDate(entry.date)}
+                </span>
+              </button>
+            ))}
         </div>
       )}
 
       {activeTab === 'blame' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {blameLoading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>}
+          {blameLoading && (
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>
+          )}
           {blameError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{blameError}</span>}
           {!blameLoading && !blameError && blameLines.length === 0 && (
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_blame_data_found_e996f81f')}</span>
@@ -183,21 +227,42 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           {!blameLoading && !blameError && blameLines.length > 0 && (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
               <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
-                {blameLines.map(line => (
-                  <div key={`${line.lineNumber}-${line.commitHash}`} style={{ display: 'grid', gridTemplateColumns: '50px 72px 1fr', gap: '8px', alignItems: 'start', padding: '5px 8px', borderBottom: '1px solid var(--line-subtle)', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                {blameLines.map((line) => (
+                  <div
+                    key={`${line.lineNumber}-${line.commitHash}`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '50px 72px 1fr',
+                      gap: '8px',
+                      alignItems: 'start',
+                      padding: '5px 8px',
+                      borderBottom: '1px solid var(--line-subtle)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.75rem',
+                    }}
+                  >
                     <span style={{ color: 'var(--text-secondary)' }}>{line.lineNumber}</span>
-                    <button onClick={() => onSelectCommit?.(line.commitHash)} style={{ padding: 0, border: 'none', background: 'transparent', color: 'var(--accent-primary)', textAlign: 'left', cursor: onSelectCommit ? 'pointer' : 'default', fontFamily: 'monospace', fontSize: '0.75rem' }}>{line.abbrevHash}</button>
+                    <button
+                      onClick={() => onSelectCommit?.(line.commitHash)}
+                      style={{
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--accent-primary)',
+                        textAlign: 'left',
+                        cursor: onSelectCommit ? 'pointer' : 'default',
+                        fontFamily: 'monospace',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      {line.abbrevHash}
+                    </button>
                     <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: 'var(--text-primary)' }}>{line.content}</span>
                   </div>
                 ))}
               </div>
               {blameHasMore && (
-                <button
-                  className="staging-tool-btn"
-                  onClick={() => void loadMoreBlame()}
-                  disabled={blameLoading}
-                  style={{ margin: 8 }}
-                >
+                <button className="staging-tool-btn" onClick={() => void loadMoreBlame()} disabled={blameLoading} style={{ margin: 8 }}>
                   {t('generated.components.commitdetails.load_500_more_lines_16c0eb75')}
                 </button>
               )}
@@ -211,7 +276,10 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
             {t('generated.components.commitdetails.diff_opened_in_the_main_window_use_unified_side_by_side_87e4a2ac')}
           </span>
-          <button className="staging-tool-btn" onClick={() => onOpenDiff?.({ source, path, title: t('generated.components.workingtreefiledetails.working_tree_diff_c7f9bda9') })}>
+          <button
+            className="staging-tool-btn"
+            onClick={() => onOpenDiff?.({ source, path, title: t('generated.components.workingtreefiledetails.working_tree_diff_c7f9bda9') })}
+          >
             {t('generated.components.commitdetails.show_diff_again_in_main_window_d9b0309b')}
           </button>
         </div>
@@ -219,4 +287,3 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     </div>
   );
 };
-

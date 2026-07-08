@@ -1,7 +1,7 @@
 name: Feature request / Feature vorschlagen
 description: Suggest a new capability or workflow improvement.
-title: "[Feature]: "
-labels: ["enhancement"]
+title: '[Feature]: '
+labels: ['enhancement']
 body:
   - type: markdown
     attributes:

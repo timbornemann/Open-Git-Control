@@ -12,16 +12,14 @@ vi.mock('electron', () => ({
   app: { getPath: getPathMock },
 }));
 
-import { PlanningApiServerHandle, startPlanningApiServer } from '../planningApiServer';
+import type { PlanningApiServerHandle } from '../planningApiServer';
+import { startPlanningApiServer } from '../planningApiServer';
 
 describe('planningApiServer', () => {
   let tempDirectory = '';
   let server: PlanningApiServerHandle | null = null;
 
-  const requestJson = async (
-    route: string,
-    init: RequestInit = {},
-  ): Promise<any> => {
+  const requestJson = async (route: string, init: RequestInit = {}): Promise<any> => {
     if (!server) throw new Error('Server not started.');
     const response = await fetch(`${server.url}${route}`, {
       ...init,
@@ -149,11 +147,7 @@ describe('planningApiServer', () => {
     });
 
     const next = await requestJson('/api/agent/next?projectId=' + encodeURIComponent(projectId));
-    expect(next.data.todos.map((todo: any) => todo.title)).toEqual([
-      'Crash on startup',
-      'Release notes',
-      'Later cleanup',
-    ]);
+    expect(next.data.todos.map((todo: any) => todo.title)).toEqual(['Crash on startup', 'Release notes', 'Later cleanup']);
     expect(next.data.todos[0]).toMatchObject({
       projectId,
       projectName: 'Agent Project',

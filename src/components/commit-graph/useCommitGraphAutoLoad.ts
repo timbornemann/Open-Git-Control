@@ -11,13 +11,7 @@ type UseCommitGraphAutoLoadParams = {
   loadMoreCommits: () => Promise<void>;
 };
 
-export const useCommitGraphAutoLoad = ({
-  logContainerRef,
-  loading,
-  loadingMore,
-  hasMoreCommits,
-  loadMoreCommits,
-}: UseCommitGraphAutoLoadParams) => {
+export const useCommitGraphAutoLoad = ({ logContainerRef, loading, loadingMore, hasMoreCommits, loadMoreCommits }: UseCommitGraphAutoLoadParams) => {
   const autoLoadArmedRef = useRef(true);
 
   useEffect(() => {

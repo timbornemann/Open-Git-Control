@@ -53,10 +53,7 @@ export const useMainViewPaneResizer = () => {
       const rawPrimaryPx = event.clientX - rect.left;
       const clampedPrimaryPx = Math.min(maxPrimaryPx, Math.max(minPrimaryPx, rawPrimaryPx));
       const nextRatio = clampedPrimaryPx / rect.width;
-      const nextInspectorWidth = Math.max(
-        INSPECTOR_PANE_MIN_WIDTH,
-        Math.round(rect.width - clampedPrimaryPx - CONTENT_RESIZER_WIDTH),
-      );
+      const nextInspectorWidth = Math.max(INSPECTOR_PANE_MIN_WIDTH, Math.round(rect.width - clampedPrimaryPx - CONTENT_RESIZER_WIDTH));
 
       setPrimaryPaneRatio(clampPrimaryPaneRatio(nextRatio, rect.width));
       setPreferredInspectorWidth(nextInspectorWidth);
@@ -120,4 +117,3 @@ export const useMainViewPaneResizer = () => {
     handleContentResizeStart,
   };
 };
-

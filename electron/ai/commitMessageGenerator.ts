@@ -48,9 +48,7 @@ export function buildCommitMessageStyleInstruction(style: AiCommitMessageStyle, 
       'Style: detailed.',
       'Use a concise imperative title and a useful description with 1-4 short lines when the notes contain multiple concrete details.',
       'Do not pad the description.',
-      useGermanExamples
-        ? 'Example title: "verbessere Fortschritt fuer Clone und Pull".'
-        : 'Example title: "improve clone and pull progress feedback".',
+      useGermanExamples ? 'Example title: "verbessere Fortschritt fuer Clone und Pull".' : 'Example title: "improve clone and pull progress feedback".',
       useGermanExamples
         ? 'Example description: "Zeigt Receiving und Resolving als getrennte Ladezustaende. Reduziert die rohe Git-Ausgabe auf relevante Statusdetails."'
         : 'Example description: "Shows Receiving and Resolving as separate progress states. Keeps the latest git transfer details visible without a scrolling log."',
@@ -77,9 +75,7 @@ export function buildCommitMessageLanguageInstruction(language: AiCommitMessageL
   return 'Language: auto. Preserve the language of the user notes unless the notes are mixed; then prefer English.';
 }
 
-export function buildFallbackCommitMessage(
-  batch: Array<{ path: string; changeType: FileChangeType; additions: number; deletions: number }>,
-): CommitMessage {
+export function buildFallbackCommitMessage(batch: Array<{ path: string; changeType: FileChangeType; additions: number; deletions: number }>): CommitMessage {
   if (!Array.isArray(batch) || batch.length === 0) {
     return { title: 'chore: update files', description: '' };
   }
@@ -93,14 +89,10 @@ export function buildFallbackCommitMessage(
     typeCounts.set(file.changeType, (typeCounts.get(file.changeType) || 0) + 1);
   }
 
-  const sortedScopes = [...weightedScopeCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([scope]) => scope);
+  const sortedScopes = [...weightedScopeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([scope]) => scope);
   const primaryScope = sortedScopes[0] || 'repo';
 
-  const dominantType = [...typeCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([type]) => type)[0] || 'other';
+  const dominantType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1]).map(([type]) => type)[0] || 'other';
   const hasMixedTypes = typeCounts.size > 1;
 
   const action = hasMixedTypes
@@ -116,9 +108,7 @@ export function buildFallbackCommitMessage(
   const title = clipCommitTitle(`chore(${primaryScope}): ${action} ${batch.length} file${batch.length === 1 ? '' : 's'}`);
 
   const needsDescription = hasMixedTypes || sortedScopes.length > 1;
-  const description = needsDescription
-    ? `Covers ${sortedScopes.slice(0, 3).join(', ')}.`
-    : '';
+  const description = needsDescription ? `Covers ${sortedScopes.slice(0, 3).join(', ')}.` : '';
 
   return { title, description };
 }
@@ -134,9 +124,7 @@ export function buildFallbackCommitMessageFromNotes(notes: string, style: AiComm
     .replace(/\s+/g, ' ')
     .trim();
   const lowerSummary = summary ? summary.charAt(0).toLowerCase() + summary.slice(1) : 'update changes';
-  const title = style === 'conventional'
-    ? clipCommitTitle(`chore: ${lowerSummary}`)
-    : clipCommitTitle(lowerSummary);
+  const title = style === 'conventional' ? clipCommitTitle(`chore: ${lowerSummary}`) : clipCommitTitle(lowerSummary);
 
   const description = normalizeCommitDescription(notes);
   return {
@@ -215,11 +203,7 @@ export async function generateCommitMessageFromUserNotes(
     buildCommitMessageStyleInstruction(settings.aiCommitMessageStyle, commitLanguage),
   ].join(' ');
 
-  const userPrompt = [
-    'User change notes:',
-    notes,
-    'Return JSON only.',
-  ].join('\n');
+  const userPrompt = ['User change notes:', notes, 'Return JSON only.'].join('\n');
 
   const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey);
   const parsed = parseJsonFromText(raw) || {};

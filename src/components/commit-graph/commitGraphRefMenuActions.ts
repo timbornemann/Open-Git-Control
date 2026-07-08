@@ -1,12 +1,9 @@
-import type { ConfirmDialogState, InputDialogState } from '../layout/layoutTypes';
-import type { CatalogTranslateFn } from '../../i18n';
-import type { BranchInfo } from '../../types/git';
-import type { GraphNode } from '../../utils/graphLayout';
-import {
-  mergeTargetFromDecoratedRef,
-  parseRemoteBranchRef,
-} from '../../utils/gitParsing';
-import { validateBranchName } from '../../utils/gitRefValidation';
+import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
+import type { CatalogTranslateFn } from '@/i18n';
+import type { BranchInfo } from '@/types/git';
+import type { GraphNode } from '@/utils/graphLayout';
+import { mergeTargetFromDecoratedRef, parseRemoteBranchRef } from '@/utils/gitParsing';
+import { validateBranchName } from '@/utils/gitRefValidation';
 import type { MenuAction } from './CommitContextMenu';
 import { sortRefs } from './commitGraphRefs';
 
@@ -20,10 +17,7 @@ type BuildCommitRefMenuActionsParams = {
   t: CatalogTranslateFn;
 };
 
-const getBranchNameValidationMessage = (
-  value: string,
-  t: CatalogTranslateFn,
-) => {
+const getBranchNameValidationMessage = (value: string, t: CatalogTranslateFn) => {
   const errorCode = validateBranchName(value);
   if (!errorCode) return null;
 
@@ -45,11 +39,7 @@ export const buildCommitRefMenuActions = ({
 }: BuildCommitRefMenuActionsParams): MenuAction[] => {
   const hash = node.commit.hash;
   const shortHash = node.commit.abbrevHash;
-  const localBranchNames = new Set(
-    branches
-      .filter(branch => branch.scope === 'local')
-      .map(branch => branch.name),
-  );
+  const localBranchNames = new Set(branches.filter((branch) => branch.scope === 'local').map((branch) => branch.name));
   const checkoutCandidates: { label: string; args: string[]; successMessage: string }[] = [];
   const seenCheckoutTargets = new Set<string>();
 
@@ -97,7 +87,7 @@ export const buildCommitRefMenuActions = ({
     });
   }
 
-  const checkoutRefActions: MenuAction[] = checkoutCandidates.map(candidate => ({
+  const checkoutRefActions: MenuAction[] = checkoutCandidates.map((candidate) => ({
     label: `Branch auschecken: ${candidate.label}`,
     icon: 'CB',
     action: () => {
@@ -175,9 +165,7 @@ export const buildCommitRefMenuActions = ({
               validate: (value) => getBranchNameValidationMessage(value.trim(), t),
             },
           ],
-          contextItems: [
-            { label: 'Commit', value: shortHash },
-          ],
+          contextItems: [{ label: 'Commit', value: shortHash }],
           irreversible: false,
           consequences: 'Der Branch wird erstellt und direkt ausgecheckt.',
           confirmLabel: 'Branch erstellen',
@@ -209,9 +197,7 @@ export const buildCommitRefMenuActions = ({
               placeholder: 'Leer lassen fuer lightweight Tag',
             },
           ],
-          contextItems: [
-            { label: 'Commit', value: shortHash },
-          ],
+          contextItems: [{ label: 'Commit', value: shortHash }],
           irreversible: false,
           consequences: 'Der Tag markiert diesen Commit lokal. Push auf Remote erfolgt separat.',
           confirmLabel: 'Tag erstellen',

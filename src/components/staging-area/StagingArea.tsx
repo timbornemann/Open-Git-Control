@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useToastQueue } from '../../hooks/useToastQueue';
-import { useI18n } from '../../i18n';
-import { useUIContext } from '../../contexts/AppStateContext';
-import {
-  getCommitMessageStyleLabel,
-} from '../../utils/commitMessagePreferences';
-import { ActionToastViewport } from '../ActionToastViewport';
+import { useToastQueue } from '@/hooks/useToastQueue';
+import { useI18n } from '@/i18n';
+import { useUIContext } from '@/contexts/AppStateContext';
+import { getCommitMessageStyleLabel } from '@/utils/commitMessagePreferences';
+import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { ConflictResolverPanel } from './ConflictResolverPanel';
 import { StagingCommitPanel } from './StagingCommitPanel';
 import { StagingContextMenu } from './StagingContextMenu';
@@ -121,12 +119,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const status = fileOps.status;
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
-  const isCommitInputDisabled = hasOpenConflicts
-    || fileOps.isMutating
-    || commitForm.isCommitting
-    || aiCommit.isAiCommitting
-    || aiCommit.isAiJobRunning
-    || aiCommit.isAiMessageGenerating;
+  const isCommitInputDisabled =
+    hasOpenConflicts || fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || aiCommit.isAiMessageGenerating;
 
   const visibleStaged = visibleFiles.staged;
   const visibleUnstaged = visibleFiles.unstaged;
@@ -152,7 +146,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       <div className="staging-files">
         {totalChanges === 0 && (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            {isConflictOnly ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5') : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
+            {isConflictOnly
+              ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5')
+              : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
           </div>
         )}
 
@@ -197,14 +193,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         />
       </div>
 
-      {!isConflictOnly && (
-        <StashPanel
-          repoPath={repoPath}
-          onRepoChanged={onRepoChanged}
-          setInputDialog={setInputDialog}
-          refreshTrigger={stashRefreshTrigger}
-        />
-      )}
+      {!isConflictOnly && <StashPanel repoPath={repoPath} onRepoChanged={onRepoChanged} setInputDialog={setInputDialog} refreshTrigger={stashRefreshTrigger} />}
 
       {!isConflictOnly && (
         <StagingCommitPanel
@@ -221,10 +210,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
         />
       )}
 
-      <StagingContextMenu
-        contextMenu={fileOps.contextMenu}
-        fileOps={fileOps}
-      />
+      <StagingContextMenu contextMenu={fileOps.contextMenu} fileOps={fileOps} />
       <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
-import { BranchInfo, GitMergeMode } from '../../types/git';
-import { normalizeBranchRefForMerge } from '../../utils/gitParsing';
-import { useI18n } from '../../i18n';
+import type { BranchInfo, GitMergeMode } from '@/types/git';
+import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
+import { useI18n } from '@/i18n';
 
 type Props = {
   activeRepo: string | null;
@@ -63,23 +63,26 @@ export const TopbarActions: React.FC<Props> = ({
   const [mergeQuery, setMergeQuery] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const pullOptions = useMemo<SplitOption[]>(() => ([
-    {
-      label: t('generated.components.topbar.topbaractions.with_rebase_56cff35e'),
-      hint: t('generated.components.topbar.topbaractions.rebase_local_commits_on_top_of_remote_55a2835e'),
-      action: onPullRebase,
-    },
-    {
-      label: t('generated.components.topbar.topbaractions.no_fast_forward_no_ff_7e7bdf45'),
-      hint: t('generated.components.topbar.topbaractions.always_creates_a_merge_commit_31377986'),
-      action: onPullNoFf,
-    },
-    {
-      label: t('generated.components.topbar.topbaractions.fast_forward_only_b9d481fe'),
-      hint: t('generated.components.topbar.topbaractions.abort_if_a_merge_commit_would_be_required_b2a50e57'),
-      action: onPullFfOnly,
-    },
-  ]), [onPullFfOnly, onPullNoFf, onPullRebase, tr]);
+  const pullOptions = useMemo<SplitOption[]>(
+    () => [
+      {
+        label: t('generated.components.topbar.topbaractions.with_rebase_56cff35e'),
+        hint: t('generated.components.topbar.topbaractions.rebase_local_commits_on_top_of_remote_55a2835e'),
+        action: onPullRebase,
+      },
+      {
+        label: t('generated.components.topbar.topbaractions.no_fast_forward_no_ff_7e7bdf45'),
+        hint: t('generated.components.topbar.topbaractions.always_creates_a_merge_commit_31377986'),
+        action: onPullNoFf,
+      },
+      {
+        label: t('generated.components.topbar.topbaractions.fast_forward_only_b9d481fe'),
+        hint: t('generated.components.topbar.topbaractions.abort_if_a_merge_commit_would_be_required_b2a50e57'),
+        action: onPullFfOnly,
+      },
+    ],
+    [onPullFfOnly, onPullNoFf, onPullRebase, tr],
+  );
 
   const mergeCandidates = useMemo(() => {
     const q = mergeQuery.trim().toLowerCase();
@@ -97,30 +100,52 @@ export const TopbarActions: React.FC<Props> = ({
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [branches, currentBranch, mergeQuery]);
 
-  const mergeModeOptions = useMemo(() => ([
-    { mode: 'default' as const, label: t('generated.components.topbar.topbaractions.standard_merge_2335544a'), hint: t('generated.components.topbar.topbaractions.git_merge_branch_66dc3c45') },
-    { mode: 'noFf' as const, label: t('generated.components.topbar.topbaractions.no_fast_forward_d42c0eb4'), hint: t('generated.components.topbar.topbaractions.always_create_a_merge_commit_3982fc7e') },
-    { mode: 'squash' as const, label: t('generated.components.layout.sidebar.repogithubactionscontent.squash_52bce1bb'), hint: t('generated.components.topbar.topbaractions.squash_changes_into_one_commit_a985f7d8') },
-    { mode: 'ffOnly' as const, label: t('generated.components.topbar.topbaractions.fast_forward_only_b9d481fe'), hint: t('generated.components.topbar.topbaractions.abort_if_not_fast_forward_c6074964') },
-  ]), [tr]);
+  const mergeModeOptions = useMemo(
+    () => [
+      {
+        mode: 'default' as const,
+        label: t('generated.components.topbar.topbaractions.standard_merge_2335544a'),
+        hint: t('generated.components.topbar.topbaractions.git_merge_branch_66dc3c45'),
+      },
+      {
+        mode: 'noFf' as const,
+        label: t('generated.components.topbar.topbaractions.no_fast_forward_d42c0eb4'),
+        hint: t('generated.components.topbar.topbaractions.always_create_a_merge_commit_3982fc7e'),
+      },
+      {
+        mode: 'squash' as const,
+        label: t('generated.components.layout.sidebar.repogithubactionscontent.squash_52bce1bb'),
+        hint: t('generated.components.topbar.topbaractions.squash_changes_into_one_commit_a985f7d8'),
+      },
+      {
+        mode: 'ffOnly' as const,
+        label: t('generated.components.topbar.topbaractions.fast_forward_only_b9d481fe'),
+        hint: t('generated.components.topbar.topbaractions.abort_if_not_fast_forward_c6074964'),
+      },
+    ],
+    [tr],
+  );
 
-  const pushOptions = useMemo<SplitOption[]>(() => ([
-    {
-      label: t('generated.components.topbar.topbaractions.set_upstream_u_ae697a9c'),
-      hint: t('generated.components.topbar.topbaractions.first_push_set_remote_tracking_branch_670d2556'),
-      action: onPushSetUpstream,
-    },
-    {
-      label: t('generated.components.topbar.topbaractions.force_with_lease_6940465b'),
-      hint: t('generated.components.topbar.topbaractions.safer_force_push_with_lease_check_01d2b820'),
-      action: onPushForceWithLease,
-    },
-    {
-      label: t('generated.components.topbar.topbaractions.push_tags_too_d0a29da5'),
-      hint: t('generated.components.topbar.topbaractions.push_including_local_tags_bd03300d'),
-      action: onPushTags,
-    },
-  ]), [onPushForceWithLease, onPushSetUpstream, onPushTags, tr]);
+  const pushOptions = useMemo<SplitOption[]>(
+    () => [
+      {
+        label: t('generated.components.topbar.topbaractions.set_upstream_u_ae697a9c'),
+        hint: t('generated.components.topbar.topbaractions.first_push_set_remote_tracking_branch_670d2556'),
+        action: onPushSetUpstream,
+      },
+      {
+        label: t('generated.components.topbar.topbaractions.force_with_lease_6940465b'),
+        hint: t('generated.components.topbar.topbaractions.safer_force_push_with_lease_check_01d2b820'),
+        action: onPushForceWithLease,
+      },
+      {
+        label: t('generated.components.topbar.topbaractions.push_tags_too_d0a29da5'),
+        hint: t('generated.components.topbar.topbaractions.push_including_local_tags_bd03300d'),
+        action: onPushTags,
+      },
+    ],
+    [onPushForceWithLease, onPushSetUpstream, onPushTags, tr],
+  );
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -170,7 +195,11 @@ export const TopbarActions: React.FC<Props> = ({
             <div key={row.rawName} style={{ borderBottom: '1px solid var(--line-subtle)' }}>
               <div style={{ padding: '6px 10px 2px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
                 {row.label}
-                <span style={{ marginLeft: '6px', opacity: 0.75 }}>{row.scope === 'remote' ? t('generated.components.topbar.topbaractions.remote_c8b64c96') : t('generated.components.topbar.topbaractions.local_25e634a6')}</span>
+                <span style={{ marginLeft: '6px', opacity: 0.75 }}>
+                  {row.scope === 'remote'
+                    ? t('generated.components.topbar.topbaractions.remote_c8b64c96')
+                    : t('generated.components.topbar.topbaractions.local_25e634a6')}
+                </span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', padding: '4px 8px 8px' }}>
                 {mergeModeOptions.map((opt) => (
@@ -233,7 +262,12 @@ export const TopbarActions: React.FC<Props> = ({
         )}
       </div>
       <div className="topbar-split-wrap">
-        <button className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main" onClick={onPull} disabled={!activeRepo || isGitActionRunning} title={t('generated.components.topbar.topbaractions.default_action_pull_590eb177')}>
+        <button
+          className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"
+          onClick={onPull}
+          disabled={!activeRepo || isGitActionRunning}
+          title={t('generated.components.topbar.topbaractions.default_action_pull_590eb177')}
+        >
           <ArrowDownCircle size={16} className={isPullRunning ? 'spin' : ''} />
           <span className="topbar-action-label">Pull</span>
         </button>
@@ -267,7 +301,12 @@ export const TopbarActions: React.FC<Props> = ({
         )}
       </div>
       <div className="topbar-split-wrap">
-        <button className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main" onClick={onPush} disabled={!activeRepo || isGitActionRunning} title={t('generated.components.topbar.topbaractions.default_action_push_8196dfeb')}>
+        <button
+          className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"
+          onClick={onPush}
+          disabled={!activeRepo || isGitActionRunning}
+          title={t('generated.components.topbar.topbaractions.default_action_push_8196dfeb')}
+        >
           <ArrowUpCircle size={16} className={isPushRunning ? 'spin' : ''} />
           <span className="topbar-action-label">Push</span>
         </button>
@@ -314,7 +353,7 @@ export const TopbarActions: React.FC<Props> = ({
       <div className="topbar-split-wrap topbar-more-wrap">
         <button
           className="icon-btn topbar-action-btn topbar-more-toggle"
-          onClick={() => setOpenMenu((previous) => previous === 'more' || previous === 'moreMerge' ? null : 'more')}
+          onClick={() => setOpenMenu((previous) => (previous === 'more' || previous === 'moreMerge' ? null : 'more'))}
           aria-label={t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}
           title={t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}
         >
@@ -341,24 +380,57 @@ export const TopbarActions: React.FC<Props> = ({
             ) : (
               <>
                 <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}</div>
-                <button className="topbar-dropdown-item" onClick={() => { setOpenMenu(null); onStageCommit(); }} disabled={!activeRepo}>
+                <button
+                  className="topbar-dropdown-item"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    onStageCommit();
+                  }}
+                  disabled={!activeRepo}
+                >
                   <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.stage_commit_77275475')}</span>
                   <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.open_working_directory_48559e72')}</span>
                 </button>
-                <button className="topbar-dropdown-item" onClick={() => setOpenMenu('moreMerge')} disabled={!activeRepo || isGitActionRunning || branches.length === 0}>
+                <button
+                  className="topbar-dropdown-item"
+                  onClick={() => setOpenMenu('moreMerge')}
+                  disabled={!activeRepo || isGitActionRunning || branches.length === 0}
+                >
                   <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.merge_branch_8c3efbb0')}</span>
                   <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.choose_branch_and_merge_mode_9fea8d11')}</span>
                 </button>
-                <button className="topbar-dropdown-item" onClick={() => { setOpenMenu(null); onOpenTimeline?.(); }} disabled={!activeRepo || isTimelineLoading}>
+                <button
+                  className="topbar-dropdown-item"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    onOpenTimeline?.();
+                  }}
+                  disabled={!activeRepo || isTimelineLoading}
+                >
                   <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>
                 </button>
-                <button className="topbar-dropdown-item" onClick={() => { setOpenMenu(null); onOpenReleaseCreator(); }} disabled={!activeRepo}>
+                <button
+                  className="topbar-dropdown-item"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    onOpenReleaseCreator();
+                  }}
+                  disabled={!activeRepo}
+                >
                   <span className="topbar-dropdown-item-label">{t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}</span>
                 </button>
                 <div className="topbar-dropdown-sep" />
                 <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.pull_options_021c5024')}</div>
                 {pullOptions.map((option) => (
-                  <button key={`more-${option.label}`} className="topbar-dropdown-item" onClick={() => { setOpenMenu(null); option.action(); }} disabled={!activeRepo || isGitActionRunning}>
+                  <button
+                    key={`more-${option.label}`}
+                    className="topbar-dropdown-item"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      option.action();
+                    }}
+                    disabled={!activeRepo || isGitActionRunning}
+                  >
                     <span className="topbar-dropdown-item-label">{option.label}</span>
                     <span className="topbar-dropdown-item-hint">{option.hint}</span>
                   </button>
@@ -366,7 +438,15 @@ export const TopbarActions: React.FC<Props> = ({
                 <div className="topbar-dropdown-sep" />
                 <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.push_options_f825b016')}</div>
                 {pushOptions.map((option) => (
-                  <button key={`more-${option.label}`} className="topbar-dropdown-item" onClick={() => { setOpenMenu(null); option.action(); }} disabled={!activeRepo || isGitActionRunning}>
+                  <button
+                    key={`more-${option.label}`}
+                    className="topbar-dropdown-item"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      option.action();
+                    }}
+                    disabled={!activeRepo || isGitActionRunning}
+                  >
                     <span className="topbar-dropdown-item-label">{option.label}</span>
                     <span className="topbar-dropdown-item-hint">{option.hint}</span>
                   </button>

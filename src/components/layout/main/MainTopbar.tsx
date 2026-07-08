@@ -1,13 +1,8 @@
 import React from 'react';
 import { GitBranch, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
-import { TopbarActions } from '../../topbar/TopbarActions';
-import {
-  useGithubContext,
-  useRepositoryContext,
-  useUIContext,
-  useWorkflowContext,
-} from '../../../contexts/AppStateContext';
-import { useI18n } from '../../../i18n';
+import { TopbarActions } from '@/components/topbar/TopbarActions';
+import { useGithubContext, useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useI18n } from '@/i18n';
 
 type MainTopbarProps = {
   canShowInspectorPane: boolean;
@@ -55,7 +50,9 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
         <span className="topbar-repo-title">
           {isPlannerView
             ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
-            : repository.activeRepo ? repository.activeRepo.split(/[\\/]/).pop() : 'Open-Git-Control'}
+            : repository.activeRepo
+              ? repository.activeRepo.split(/[\\/]/).pop()
+              : 'Open-Git-Control'}
         </span>
         {!isPlannerView && repository.currentBranch && (
           <span className="topbar-chip topbar-chip-branch">
@@ -106,8 +103,16 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
           <button
             className="icon-btn topbar-panel-toggle"
             onClick={onToggleInspectorPane}
-            title={showInspectorPane ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5') : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')}
-            aria-label={showInspectorPane ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5') : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')}
+            title={
+              showInspectorPane
+                ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5')
+                : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')
+            }
+            aria-label={
+              showInspectorPane
+                ? t('generated.components.layout.main.maintopbar.close_right_inspector_e1b6b5a5')
+                : t('generated.components.layout.main.maintopbar.open_right_inspector_d885605a')
+            }
           >
             {showInspectorPane ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
           </button>

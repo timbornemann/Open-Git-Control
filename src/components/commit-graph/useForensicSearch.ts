@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { GitCommandNameDto } from '../../global';
-import type { CatalogTranslateFn } from '../../i18n';
-import type { GitStatusDetailed } from '../../utils/gitParsing';
-import { parseGitLog } from '../../utils/gitParsing';
-import type { GraphNode } from '../../utils/graphLayout';
-import { gitClient } from '../../services/gitClient';
+import type { GitCommandNameDto } from '@/global';
+import type { CatalogTranslateFn } from '@/i18n';
+import type { GitStatusDetailed } from '@/utils/gitParsing';
+import { parseGitLog } from '@/utils/gitParsing';
+import type { GraphNode } from '@/utils/graphLayout';
+import { gitClient } from '@/services/gitClient';
 import type { ForensicSearchType } from './ForensicSearchPanel';
 
 const FORENSIC_PATH_HISTORY_STORAGE_KEY = 'open-git-control:forensic-path-history:v1';
@@ -15,11 +15,7 @@ type UseForensicSearchParams = {
   t: CatalogTranslateFn;
 };
 
-export const useForensicSearch = ({
-  repoPath,
-  workingTreeStatus,
-  t,
-}: UseForensicSearchParams) => {
+export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensicSearchParams) => {
   const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
   const [forensicPath, setForensicPath] = useState('');
   const [forensicValue, setForensicValue] = useState('');
@@ -48,10 +44,7 @@ export const useForensicSearch = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        FORENSIC_PATH_HISTORY_STORAGE_KEY,
-        JSON.stringify(forensicPathHistory.slice(0, 30)),
-      );
+      localStorage.setItem(FORENSIC_PATH_HISTORY_STORAGE_KEY, JSON.stringify(forensicPathHistory.slice(0, 30)));
     } catch {
       // ignore write errors
     }
@@ -110,9 +103,11 @@ export const useForensicSearch = ({
     } else {
       const searchTerm = forensicValue.trim();
       if (!searchTerm) {
-        setForensicError(forensicType === 'regex'
-          ? t('generated.components.commit_graph.useforensicsearch.please_provide_a_regex_9d370edb')
-          : t('generated.components.commit_graph.useforensicsearch.please_provide_a_search_string_1b25a17f'));
+        setForensicError(
+          forensicType === 'regex'
+            ? t('generated.components.commit_graph.useforensicsearch.please_provide_a_regex_9d370edb')
+            : t('generated.components.commit_graph.useforensicsearch.please_provide_a_search_string_1b25a17f'),
+        );
         setForensicResults([]);
         return;
       }
@@ -127,15 +122,15 @@ export const useForensicSearch = ({
       if (!success) {
         const message = String(error || t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
         const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
-        setForensicError(invalidPattern
-          ? t('generated.components.commit_graph.useforensicsearch.invalid_regex_pattern_please_fix_the_expression_1ce435a7')
-          : message);
+        setForensicError(
+          invalidPattern ? t('generated.components.commit_graph.useforensicsearch.invalid_regex_pattern_please_fix_the_expression_1ce435a7') : message,
+        );
         setForensicResults([]);
         return;
       }
 
       const commits = parseGitLog(String(data || ''));
-      const nodes = commits.map(commit => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
+      const nodes = commits.map((commit) => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
       setForensicResults(nodes);
       if (commits.length === 0) {
         setForensicError(t('generated.components.commit_graph.useforensicsearch.no_matches_found_f24033f1'));

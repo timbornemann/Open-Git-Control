@@ -6,8 +6,8 @@ import {
   getCommitMessageStyleExample,
   getCommitMessageStyleLabel,
   getCommitMessageStyleOptions,
-} from '../commitMessagePreferences';
-import { translateFromCatalog, type CatalogTranslateFn } from '../../i18n';
+} from '@/utils/commitMessagePreferences';
+import { translateFromCatalog, type CatalogTranslateFn } from '@/i18n';
 
 const de: CatalogTranslateFn = (key, variables) => translateFromCatalog('de', key, variables);
 const en: CatalogTranslateFn = (key, variables) => translateFromCatalog('en', key, variables);
@@ -53,11 +53,9 @@ describe('commitMessagePreferences', () => {
   it('formats examples with or without descriptions', () => {
     expect(formatCommitMessageStyleExample('detailed', 'en', en)).toContain('\n\nShows Receiving');
 
-    const withoutDescription = formatCommitMessageStyleExample('plain', 'en', (key, variables) => (
-      key === 'commitMessage.examples.plainDescriptionHint'
-        ? ''
-        : translateFromCatalog('en', key, variables)
-    ));
+    const withoutDescription = formatCommitMessageStyleExample('plain', 'en', (key, variables) =>
+      key === 'commitMessage.examples.plainDescriptionHint' ? '' : translateFromCatalog('en', key, variables),
+    );
     expect(withoutDescription).toBe('improve clone progress');
   });
 });

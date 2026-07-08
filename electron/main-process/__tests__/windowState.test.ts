@@ -57,9 +57,7 @@ const makeTempStatePath = () => {
 
 describe('main window state persistence', () => {
   beforeEach(() => {
-    getAllDisplaysMock.mockReturnValue([
-      { workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
-    ]);
+    getAllDisplaysMock.mockReturnValue([{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]);
     appGetPathMock.mockReturnValue(os.tmpdir());
   });
 
@@ -69,17 +67,19 @@ describe('main window state persistence', () => {
   });
 
   it('sanitizes saved bounds and keeps visible window positions', () => {
-    expect(sanitizeMainWindowBounds(
-      { x: 10, y: 20, width: 500, height: 400 },
-      [{ x: 0, y: 0, width: 1920, height: 1080 }],
-    )).toEqual({ x: 10, y: 20, width: 900, height: 640 });
+    expect(sanitizeMainWindowBounds({ x: 10, y: 20, width: 500, height: 400 }, [{ x: 0, y: 0, width: 1920, height: 1080 }])).toEqual({
+      x: 10,
+      y: 20,
+      width: 900,
+      height: 640,
+    });
   });
 
   it('drops offscreen positions while preserving the saved size', () => {
-    expect(sanitizeMainWindowBounds(
-      { x: 9000, y: 9000, width: 1400, height: 900 },
-      [{ x: 0, y: 0, width: 1920, height: 1080 }],
-    )).toEqual({ width: 1400, height: 900 });
+    expect(sanitizeMainWindowBounds({ x: 9000, y: 9000, width: 1400, height: 900 }, [{ x: 0, y: 0, width: 1920, height: 1080 }])).toEqual({
+      width: 1400,
+      height: 900,
+    });
   });
 
   it('falls back to default bounds when the state file is missing or malformed', () => {
@@ -100,10 +100,13 @@ describe('main window state persistence', () => {
   it('writes and reads window bounds with maximized state', () => {
     const statePath = makeTempStatePath();
 
-    writeMainWindowState({
-      bounds: { x: 100, y: 120, width: 1500, height: 1000 },
-      isMaximized: true,
-    }, statePath);
+    writeMainWindowState(
+      {
+        bounds: { x: 100, y: 120, width: 1500, height: 1000 },
+        isMaximized: true,
+      },
+      statePath,
+    );
 
     expect(readMainWindowState(statePath)).toEqual({
       bounds: { x: 100, y: 120, width: 1500, height: 1000 },

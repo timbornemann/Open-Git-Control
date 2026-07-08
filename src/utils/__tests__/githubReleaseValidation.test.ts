@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateGithubReleaseInput } from '../githubReleaseValidation';
+import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
 
 describe('validateGithubReleaseInput', () => {
   it('returns required errors for empty tag and release name', () => {
@@ -11,10 +11,8 @@ describe('validateGithubReleaseInput', () => {
   });
 
   it('rejects tags with whitespace or invalid ref chars', () => {
-    expect(validateGithubReleaseInput({ tagName: 'release 1.0.0', releaseName: 'Release 1.0.0' }).errors.tagName)
-      .toBe('release.validation.tagInvalid');
-    expect(validateGithubReleaseInput({ tagName: 'release^1.0.0', releaseName: 'Release 1.0.0' }).errors.tagName)
-      .toBe('release.validation.tagInvalid');
+    expect(validateGithubReleaseInput({ tagName: 'release 1.0.0', releaseName: 'Release 1.0.0' }).errors.tagName).toBe('release.validation.tagInvalid');
+    expect(validateGithubReleaseInput({ tagName: 'release^1.0.0', releaseName: 'Release 1.0.0' }).errors.tagName).toBe('release.validation.tagInvalid');
   });
 
   it('enforces minimum release name length', () => {

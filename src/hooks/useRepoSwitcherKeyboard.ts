@@ -14,12 +14,7 @@ const isRepoSwitchEditableTarget = (target: EventTarget | null): boolean => {
   return Boolean(element?.closest(REPO_SWITCH_EDITABLE_SELECTOR));
 };
 
-export const useRepoSwitcherKeyboard = ({
-  openRepos,
-  activeRepo,
-  onSwitchRepo,
-  onRepositoryCommitted,
-}: UseRepoSwitcherKeyboardParams) => {
+export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, onRepositoryCommitted }: UseRepoSwitcherKeyboardParams) => {
   const [repoSwitcherIndex, setRepoSwitcherIndex] = useState<number | null>(null);
   const repoSwitcherIndexRef = useRef<number | null>(null);
   const repoSwitcherListRef = useRef<HTMLDivElement>(null);
@@ -54,21 +49,22 @@ export const useRepoSwitcherKeyboard = ({
     setRepoSwitcherIndex(null);
   }, []);
 
-  const moveRepoSwitcherSelection = useCallback((delta: number) => {
-    if (openRepos.length === 0) return;
+  const moveRepoSwitcherSelection = useCallback(
+    (delta: number) => {
+      if (openRepos.length === 0) return;
 
-    setRepoSwitcherIndex((previous) => {
-      const activeIndex = activeRepo ? openRepos.indexOf(activeRepo) : -1;
-      const fallbackIndex = activeIndex >= 0 ? activeIndex : (delta > 0 ? -1 : 0);
-      const baseIndex = previous ?? fallbackIndex;
-      const nextIndex = openRepos.length <= 1
-        ? 0
-        : (baseIndex + delta + openRepos.length) % openRepos.length;
+      setRepoSwitcherIndex((previous) => {
+        const activeIndex = activeRepo ? openRepos.indexOf(activeRepo) : -1;
+        const fallbackIndex = activeIndex >= 0 ? activeIndex : delta > 0 ? -1 : 0;
+        const baseIndex = previous ?? fallbackIndex;
+        const nextIndex = openRepos.length <= 1 ? 0 : (baseIndex + delta + openRepos.length) % openRepos.length;
 
-      repoSwitcherIndexRef.current = nextIndex;
-      return nextIndex;
-    });
-  }, [activeRepo, openRepos]);
+        repoSwitcherIndexRef.current = nextIndex;
+        return nextIndex;
+      });
+    },
+    [activeRepo, openRepos],
+  );
 
   const commitRepoSwitcherSelection = useCallback(() => {
     const selectedIndex = repoSwitcherIndexRef.current;

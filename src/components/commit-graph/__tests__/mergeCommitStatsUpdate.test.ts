@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { GitCommit } from '../../../utils/gitParsing';
-import { mergeCommitStatsUpdate } from '../mergeCommitStatsUpdate';
+import type { GitCommit } from '@/utils/gitParsing';
+import { mergeCommitStatsUpdate } from '@/components/commit-graph/mergeCommitStatsUpdate';
 
-const createCommit = (
-  statsState: GitCommit['statsState'],
-  stats: GitCommit['stats'] = null,
-): GitCommit => ({
+const createCommit = (statsState: GitCommit['statsState'], stats: GitCommit['stats'] = null): GitCommit => ({
   hash: 'a'.repeat(40),
   abbrevHash: 'aaaaaaa',
   author: 'Test',

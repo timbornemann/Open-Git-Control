@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ToastMessage } from '../types/git';
+import type { ToastMessage } from '@/types/git';
 
 type ToastEntry = ToastMessage & { id: number };
 type UseToastQueueOptions = {
@@ -23,7 +23,7 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   }, [toasts]);
 
   const dismiss = useCallback((id: number) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts((prev) => prev.filter((t) => t.id !== id));
     const timer = timersRef.current.get(id);
     if (timer) {
       clearTimeout(timer);
@@ -31,32 +31,35 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
     }
   }, []);
 
-  const setToast = useCallback((msg: ToastMessage | null) => {
-    if (!msg) {
-      setToasts([]);
-      timersRef.current.forEach(t => clearTimeout(t));
-      timersRef.current.clear();
-      return;
-    }
+  const setToast = useCallback(
+    (msg: ToastMessage | null) => {
+      if (!msg) {
+        setToasts([]);
+        timersRef.current.forEach((t) => clearTimeout(t));
+        timersRef.current.clear();
+        return;
+      }
 
-    const lastToast = latestToastsRef.current[latestToastsRef.current.length - 1];
-    if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError) {
-      return;
-    }
+      const lastToast = latestToastsRef.current[latestToastsRef.current.length - 1];
+      if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError) {
+        return;
+      }
 
-    const id = ++nextId;
-    setToasts(prev => [...prev.slice(-4), { ...msg, id }]);
-    const hideAfterMs = msg.isError ? errorAutoHideMs : autoHideMs;
-    if (typeof hideAfterMs === 'number' && hideAfterMs > 0) {
-      const timer = setTimeout(() => dismiss(id), hideAfterMs);
-      timersRef.current.set(id, timer);
-    }
-  }, [autoHideMs, dismiss, errorAutoHideMs]);
+      const id = ++nextId;
+      setToasts((prev) => [...prev.slice(-4), { ...msg, id }]);
+      const hideAfterMs = msg.isError ? errorAutoHideMs : autoHideMs;
+      if (typeof hideAfterMs === 'number' && hideAfterMs > 0) {
+        const timer = setTimeout(() => dismiss(id), hideAfterMs);
+        timersRef.current.set(id, timer);
+      }
+    },
+    [autoHideMs, dismiss, errorAutoHideMs],
+  );
 
   useEffect(() => {
     const timers = timersRef.current;
     return () => {
-      timers.forEach(t => clearTimeout(t));
+      timers.forEach((t) => clearTimeout(t));
       timers.clear();
     };
   }, []);

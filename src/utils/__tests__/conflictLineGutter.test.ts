@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getConflictLineGutterKinds,
-  normalizeMergeConflictFileContent,
-  splitContentLines,
-} from '../conflictLineGutter';
+import { getConflictLineGutterKinds, normalizeMergeConflictFileContent, splitContentLines } from '@/utils/conflictLineGutter';
 
 describe('getConflictLineGutterKinds', () => {
   it('returns neutral lines when no conflict markers are present', () => {
@@ -11,63 +7,19 @@ describe('getConflictLineGutterKinds', () => {
   });
 
   it('classifies a valid conflict block into marker/ours/theirs sections', () => {
-    const lines = [
-      'before',
-      '<<<<<<< HEAD   ',
-      'ours 1',
-      'ours 2',
-      '   =======',
-      'theirs 1',
-      '>>>>>>> branch-name',
-      'after',
-    ];
+    const lines = ['before', '<<<<<<< HEAD   ', 'ours 1', 'ours 2', '   =======', 'theirs 1', '>>>>>>> branch-name', 'after'];
 
-    expect(getConflictLineGutterKinds(lines)).toEqual([
-      'neutral',
-      'marker-start',
-      'ours',
-      'ours',
-      'marker-separator',
-      'theirs',
-      'marker-end',
-      'neutral',
-    ]);
+    expect(getConflictLineGutterKinds(lines)).toEqual(['neutral', 'marker-start', 'ours', 'ours', 'marker-separator', 'theirs', 'marker-end', 'neutral']);
   });
 
   it('marks malformed starts without separator as marker and continues at nested start', () => {
-    const lines = [
-      '<<<<<<< HEAD',
-      'ours line',
-      '<<<<<<< nested',
-      'nested ours',
-      '=======',
-      'nested theirs',
-      '>>>>>>> nested',
-    ];
+    const lines = ['<<<<<<< HEAD', 'ours line', '<<<<<<< nested', 'nested ours', '=======', 'nested theirs', '>>>>>>> nested'];
 
-    expect(getConflictLineGutterKinds(lines)).toEqual([
-      'marker-start',
-      'neutral',
-      'marker-start',
-      'ours',
-      'marker-separator',
-      'theirs',
-      'marker-end',
-    ]);
+    expect(getConflictLineGutterKinds(lines)).toEqual(['marker-start', 'neutral', 'marker-start', 'ours', 'marker-separator', 'theirs', 'marker-end']);
   });
 
   it('marks malformed blocks with separator but missing end marker', () => {
-    const lines = [
-      '<<<<<<< HEAD',
-      'ours line',
-      '=======',
-      'theirs line',
-      '<<<<<<< nested',
-      'nested ours',
-      '=======',
-      'nested theirs',
-      '>>>>>>> nested',
-    ];
+    const lines = ['<<<<<<< HEAD', 'ours line', '=======', 'theirs line', '<<<<<<< nested', 'nested ours', '=======', 'nested theirs', '>>>>>>> nested'];
 
     expect(getConflictLineGutterKinds(lines)).toEqual([
       'marker-start',

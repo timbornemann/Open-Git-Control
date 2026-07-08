@@ -1,11 +1,5 @@
-import {
-  createPlannedProject,
-  createPlannerItem,
-  deletePlannerProject,
-  readProjectPlannerData,
-  updatePlannerProject,
-} from './projectPlannerStore';
-import { RequestContext } from './planningApiTypes';
+import { createPlannedProject, createPlannerItem, deletePlannerProject, readProjectPlannerData, updatePlannerProject } from './projectPlannerStore';
+import type { RequestContext } from './planningApiTypes';
 import {
   cleanString,
   findProjectById,
@@ -16,11 +10,8 @@ import {
   queryOptionsFromUrl,
   summarizeProject,
 } from './planningApiDomain';
-import {
-  RouteHandlerResult,
-  routeHandled,
-  routeNotHandled,
-} from './planningApiControllerTypes';
+import type { RouteHandlerResult } from './planningApiControllerTypes';
+import { routeHandled, routeNotHandled } from './planningApiControllerTypes';
 
 export const handleProjectsRoute = async (ctx: RequestContext): Promise<RouteHandlerResult> => {
   const [, resource, idOrAction, nested] = ctx.segments;
@@ -28,10 +19,12 @@ export const handleProjectsRoute = async (ctx: RequestContext): Promise<RouteHan
 
   if (!idOrAction && ctx.method === 'GET') return routeHandled({ projects: getProjects(ctx.url) });
   if (!idOrAction && ctx.method === 'POST') {
-    return routeHandled(createPlannedProject({
-      name: cleanString(ctx.body.name),
-      description: cleanString(ctx.body.description),
-    }));
+    return routeHandled(
+      createPlannedProject({
+        name: cleanString(ctx.body.name),
+        description: cleanString(ctx.body.description),
+      }),
+    );
   }
   if (idOrAction && !nested && ctx.method === 'GET') {
     const data = readProjectPlannerData();
@@ -41,10 +34,12 @@ export const handleProjectsRoute = async (ctx: RequestContext): Promise<RouteHan
     });
   }
   if (idOrAction && !nested && ctx.method === 'PATCH') {
-    return routeHandled(updatePlannerProject(idOrAction, {
-      name: 'name' in ctx.body ? cleanString(ctx.body.name) : undefined,
-      description: 'description' in ctx.body ? cleanString(ctx.body.description) : undefined,
-    }));
+    return routeHandled(
+      updatePlannerProject(idOrAction, {
+        name: 'name' in ctx.body ? cleanString(ctx.body.name) : undefined,
+        description: 'description' in ctx.body ? cleanString(ctx.body.description) : undefined,
+      }),
+    );
   }
   if (idOrAction && !nested && ctx.method === 'DELETE') {
     deletePlannerProject(idOrAction);

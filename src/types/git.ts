@@ -59,7 +59,6 @@ export type ForensicHistoryQueryDto = {
   limit?: number;
 };
 
-
 export type GitSubmoduleStateCode = 'clean' | 'uninitialized' | 'dirty' | 'conflicted' | 'unknown';
 
 export type GitSubmoduleInfo = {

@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
-import { githubClient } from '../services/githubClient';
+import { githubClient } from '@/services/githubClient';
 
 type Params = {
   onAuthChanged?: (authenticated: boolean) => void;
@@ -117,4 +117,3 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     handleLogout,
   };
 };
-

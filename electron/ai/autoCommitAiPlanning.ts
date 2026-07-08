@@ -1,15 +1,8 @@
 import type { AppSettings } from '../settings';
 import type { AiProviderClient } from './AiProviderClient';
-import {
-  getExtension,
-  getTopDirectory,
-} from './gitStatusSnapshot';
+import { getExtension, getTopDirectory } from './gitStatusSnapshot';
 import type { SnapshotFile } from './aiServiceTypes';
-import {
-  hasStringArrayPaths,
-  parseJsonFromText,
-  uniqueSorted,
-} from './jsonResponse';
+import { hasStringArrayPaths, parseJsonFromText, uniqueSorted } from './jsonResponse';
 import { CHAT_TIMEOUT_MS, runProviderText } from './providerText';
 
 const MAX_COMMIT_FILES_NORMAL = 5;
@@ -23,7 +16,7 @@ export async function chooseFilesWithAi(
   timeoutMs = CHAT_TIMEOUT_MS,
 ): Promise<string[]> {
   if (candidateWindow.length <= 1) {
-    return candidateWindow.map(file => file.path);
+    return candidateWindow.map((file) => file.path);
   }
 
   const systemPrompt = [
@@ -51,12 +44,12 @@ export async function chooseFilesWithAi(
   const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
   const parsed = parseJsonFromText(raw) || {};
   const selectedRaw = Array.isArray(parsed.selectedPaths) ? parsed.selectedPaths : [];
-  const candidateSet = new Set(candidateWindow.map(file => file.path));
+  const candidateSet = new Set(candidateWindow.map((file) => file.path));
 
   const selected = selectedRaw
     .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    .map(item => item.trim())
-    .filter(item => candidateSet.has(item));
+    .map((item) => item.trim())
+    .filter((item) => candidateSet.has(item));
 
   const unique = uniqueSorted(selected);
   return unique.length > 0 ? unique.slice(0, MAX_COMMIT_FILES_NORMAL) : [candidateWindow[0].path];
@@ -88,9 +81,10 @@ export async function planGroupsWithAi(
 
   const userPrompt = [
     'Changed files:',
-    ...files.map((file, index) => (
-      `${index + 1}. path=${file.path}; type=${file.changeType}; stats=+${file.additions}/-${file.deletions}; area=${getTopDirectory(file.path)}; ext=${getExtension(file.path)}`
-    )),
+    ...files.map(
+      (file, index) =>
+        `${index + 1}. path=${file.path}; type=${file.changeType}; stats=+${file.additions}/-${file.deletions}; area=${getTopDirectory(file.path)}; ext=${getExtension(file.path)}`,
+    ),
     'Return JSON only.',
   ].join('\n');
 
@@ -108,12 +102,12 @@ export async function planGroupsWithAi(
       }
       return [];
     })
-    .map((group) => (
+    .map((group) =>
       group
         .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
         .map((item: string) => item.trim())
-        .filter((item: string) => candidateSet.has(item))
-    ))
+        .filter((item: string) => candidateSet.has(item)),
+    )
     .map((group) => uniqueSorted(group))
     .filter((group) => group.length > 0);
 

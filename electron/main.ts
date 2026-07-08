@@ -11,14 +11,12 @@ import { setupIPC } from './main-process/ipc/setupIPC';
 import { getGeminiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
 import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
-import { PlanningApiServerHandle, startPlanningApiServer } from './main-process/planningApiServer';
+import type { PlanningApiServerHandle } from './main-process/planningApiServer';
+import { startPlanningApiServer } from './main-process/planningApiServer';
 import { enforceProductionCommandLineSecurity, installAppSecurity } from './main-process/security';
-import {
-  PlanningApiTokenLifetime,
-  clearSavedPlanningApiAuthToken,
-  generateSavedPlanningApiAuthToken,
-  getPlanningApiAuthState,
-} from './main-process/planningApiAuth';
+import { IpcChannel } from '../src/types/ipcContract';
+import type { PlanningApiTokenLifetime } from './main-process/planningApiAuth';
+import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getPlanningApiAuthState } from './main-process/planningApiAuth';
 
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
@@ -38,10 +36,7 @@ const preferredPlanningApiPort = (() => {
 })();
 const secretScanService = new SecretScanService(gitService);
 const workingTreeService = new WorkingTreeService(gitService);
-const commitStatsService = new CommitStatsService(
-  gitService,
-  () => path.join(app.getPath('userData'), 'commit-stats-v1.jsonl'),
-);
+const commitStatsService = new CommitStatsService(gitService, () => path.join(app.getPath('userData'), 'commit-stats-v1.jsonl'));
 
 const buildDiagnosticsReport = buildDiagnosticsReportFactory({
   gitService,
@@ -51,9 +46,8 @@ const buildDiagnosticsReport = buildDiagnosticsReportFactory({
   getCommitStatsDiagnostics: () => commitStatsService.getDiagnostics(),
 });
 
-const isPlanningApiTokenLifetime = (value: unknown): value is PlanningApiTokenLifetime => (
-  value === 'day' || value === 'month' || value === 'year' || value === 'forever'
-);
+const isPlanningApiTokenLifetime = (value: unknown): value is PlanningApiTokenLifetime =>
+  value === 'day' || value === 'month' || value === 'year' || value === 'forever';
 
 const buildPlanningApiInfo = () => {
   const disabled = process.env.OPEN_GIT_CONTROL_API_DISABLED === 'true';
@@ -86,11 +80,11 @@ const buildPlanningApiInfo = () => {
   };
 };
 
-ipcMain.handle('planning-api:getInfo', async () => {
+ipcMain.handle(IpcChannel.PlanningApiGetInfo, async () => {
   return buildPlanningApiInfo();
 });
 
-ipcMain.handle('planning-api:generateToken', async (_event, lifetime: unknown) => {
+ipcMain.handle(IpcChannel.PlanningApiGenerateToken, async (_event, lifetime: unknown) => {
   if (!isPlanningApiTokenLifetime(lifetime)) {
     throw new Error('Invalid Planning API token lifetime.');
   }
@@ -98,7 +92,7 @@ ipcMain.handle('planning-api:generateToken', async (_event, lifetime: unknown) =
   return buildPlanningApiInfo();
 });
 
-ipcMain.handle('planning-api:clearSavedToken', async () => {
+ipcMain.handle(IpcChannel.PlanningApiClearSavedToken, async () => {
   clearSavedPlanningApiAuthToken();
   return buildPlanningApiInfo();
 });

@@ -3,36 +3,13 @@ import type { AppSettings } from '../settings';
 import { AutoCommitPlanner } from './AutoCommitPlanner';
 import type { AiProviderClient } from './AiProviderClient';
 import { getSelectedAiModel } from './AiProviderClient';
-import {
-  buildGroupKey,
-  detectChangeType,
-  parseStatusPorcelain,
-} from './gitStatusSnapshot';
-import {
-  buildFallbackCommitMessage,
-  generateCommitMessageWithAi,
-} from './commitMessageGenerator';
-import {
-  chooseFilesWithAi,
-  planGroupsWithAi,
-} from './autoCommitAiPlanning';
+import { buildGroupKey, detectChangeType, parseStatusPorcelain } from './gitStatusSnapshot';
+import { buildFallbackCommitMessage, generateCommitMessageWithAi } from './commitMessageGenerator';
+import { chooseFilesWithAi, planGroupsWithAi } from './autoCommitAiPlanning';
 import { AutoCommitSnapshotHydrator } from './AutoCommitSnapshotHydrator';
-import {
-  hasCommitWithMessage,
-  hasCommitWithMessageAtPath,
-  hasCommitWithMessageForPaths,
-  hasStagePaths,
-} from './autoCommitGitCapabilities';
+import { hasCommitWithMessage, hasCommitWithMessageAtPath, hasCommitWithMessageForPaths, hasStagePaths } from './autoCommitGitCapabilities';
 import { CHAT_TIMEOUT_MS } from './providerText';
-import type {
-  AiAutoCommitResult,
-  AiProgressUpdate,
-  AutoCommitStrategy,
-  CommitMessage,
-  ProgressMode,
-  ProgressPhase,
-  SnapshotFile,
-} from './aiServiceTypes';
+import type { AiAutoCommitResult, AiProgressUpdate, AutoCommitStrategy, CommitMessage, ProgressMode, ProgressPhase, SnapshotFile } from './aiServiceTypes';
 
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_COMMIT_FILES_NORMAL = 5;
@@ -161,7 +138,7 @@ export class AiAutoCommitRunner {
     ensureNotCancelled();
     const statusEntries = parseStatusPorcelain(initialStatus);
 
-    if (statusEntries.some(entry => CONFLICT_CODES.has(entry.code))) {
+    if (statusEntries.some((entry) => CONFLICT_CODES.has(entry.code))) {
       throw new Error('Repository hat Konflikte. Bitte zuerst aufloesen.');
     }
 
@@ -232,14 +209,7 @@ export class AiAutoCommitRunner {
           ensureNotCancelled();
           modelTurns += 1;
           const aiCallStartedAt = Date.now();
-          aiPlannedGroups = await planGroupsWithAi(
-            this.providerClient,
-            settings,
-            snapshotFiles,
-            getGeminiApiKey,
-            shouldCancel,
-            planTimeoutMs,
-          );
+          aiPlannedGroups = await planGroupsWithAi(this.providerClient, settings, snapshotFiles, getGeminiApiKey, shouldCancel, planTimeoutMs);
           consumeAiBudget(aiCallStartedAt, 'Gruppenplanung');
           ensureNotCancelled();
         } catch (error: unknown) {
@@ -262,7 +232,7 @@ export class AiAutoCommitRunner {
       }
     }
 
-    const groupQueues = groups.map(group => [...group]);
+    const groupQueues = groups.map((group) => [...group]);
 
     for (let groupIndex = 0; groupIndex < groupQueues.length; groupIndex += 1) {
       const queue = groupQueues[groupIndex];
@@ -316,9 +286,9 @@ export class AiAutoCommitRunner {
         let selectedPaths: string[] = [];
 
         if (mode === 'fallback') {
-          selectedPaths = windowFiles.map(file => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
+          selectedPaths = windowFiles.map((file) => file.path).slice(0, MAX_COMMIT_FILES_FALLBACK);
         } else if (strategy === 'large-hybrid' || aiBudgetExhausted) {
-          selectedPaths = windowFiles.map(file => file.path);
+          selectedPaths = windowFiles.map((file) => file.path);
           if (aiBudgetExhausted) {
             onProgress?.({
               phase: 'fallback',
@@ -346,17 +316,10 @@ export class AiAutoCommitRunner {
             const selectTimeoutMs = getAiTimeoutMs(LARGE_HYBRID_SELECT_TIMEOUT_MS);
             if (selectTimeoutMs == null) {
               markAiBudgetExhausted('Dateiauswahl');
-              selectedPaths = windowFiles.map(file => file.path);
+              selectedPaths = windowFiles.map((file) => file.path);
             } else {
               const aiCallStartedAt = Date.now();
-              selectedPaths = await chooseFilesWithAi(
-                this.providerClient,
-                settings,
-                windowFiles,
-                getGeminiApiKey,
-                shouldCancel,
-                selectTimeoutMs,
-              );
+              selectedPaths = await chooseFilesWithAi(this.providerClient, settings, windowFiles, getGeminiApiKey, shouldCancel, selectTimeoutMs);
               consumeAiBudget(aiCallStartedAt, 'Dateiauswahl');
             }
             ensureNotCancelled();
@@ -418,7 +381,7 @@ export class AiAutoCommitRunner {
         }
 
         const selectedSet = new Set(selectedPaths);
-        const batchFiles = queue.filter(file => selectedSet.has(file.path));
+        const batchFiles = queue.filter((file) => selectedSet.has(file.path));
 
         if (batchFiles.length === 0) {
           stallCycles += 1;
@@ -481,23 +444,14 @@ export class AiAutoCommitRunner {
               });
               ensureNotCancelled();
               modelTurns += 1;
-              const messageTimeoutMs = strategy === 'large-hybrid'
-                ? getAiTimeoutMs(LARGE_HYBRID_MESSAGE_TIMEOUT_MS)
-                : CHAT_TIMEOUT_MS;
+              const messageTimeoutMs = strategy === 'large-hybrid' ? getAiTimeoutMs(LARGE_HYBRID_MESSAGE_TIMEOUT_MS) : CHAT_TIMEOUT_MS;
 
               if (messageTimeoutMs == null) {
                 markAiBudgetExhausted('Commit-Message');
                 message = buildFallbackCommitMessage(batchFiles);
               } else {
                 const aiCallStartedAt = Date.now();
-                message = await generateCommitMessageWithAi(
-                  this.providerClient,
-                  settings,
-                  batchFiles,
-                  getGeminiApiKey,
-                  shouldCancel,
-                  messageTimeoutMs,
-                );
+                message = await generateCommitMessageWithAi(this.providerClient, settings, batchFiles, getGeminiApiKey, shouldCancel, messageTimeoutMs);
                 consumeAiBudget(aiCallStartedAt, 'Commit-Message');
               }
               ensureNotCancelled();
@@ -509,19 +463,26 @@ export class AiAutoCommitRunner {
 
           const batchPaths = batchFiles.map((file) => file.path);
           if (hasCommitWithMessageForPaths(gitCapabilities)) {
-            await gitCapabilities.commitWithMessageForPaths({
-              title: message.title,
-              description: message.description,
-            }, batchPaths);
+            await gitCapabilities.commitWithMessageForPaths(
+              {
+                title: message.title,
+                description: message.description,
+              },
+              batchPaths,
+            );
           } else if (hasCommitWithMessageAtPath(gitCapabilities)) {
             const repoPathForCommit = gitCapabilities.getRepoPath();
             if (!repoPathForCommit) {
               throw new Error('Repository path is required.');
             }
-            await gitCapabilities.commitWithMessageAtPath(repoPathForCommit, {
-              title: message.title,
-              description: message.description,
-            }, batchPaths);
+            await gitCapabilities.commitWithMessageAtPath(
+              repoPathForCommit,
+              {
+                title: message.title,
+                description: message.description,
+              },
+              batchPaths,
+            );
           } else if (hasCommitWithMessage(gitCapabilities) && batchPaths.length === 0) {
             await gitCapabilities.commitWithMessage({
               title: message.title,
@@ -541,7 +502,7 @@ export class AiAutoCommitRunner {
           const subject = (await this.gitService.runCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
           commits.push({ hash, subject });
 
-          const committedPaths = new Set(batchFiles.map(file => file.path));
+          const committedPaths = new Set(batchFiles.map((file) => file.path));
           for (let i = queue.length - 1; i >= 0; i -= 1) {
             if (committedPaths.has(queue[i].path)) {
               queue.splice(i, 1);
@@ -614,9 +575,7 @@ export class AiAutoCommitRunner {
     const remainingEntries = parseStatusPorcelain(finalStatus);
     const remainingFiles = remainingEntries.length;
 
-    const summary = commits.length === 0
-      ? 'Keine Commits erstellt.'
-      : `KI Auto-Commit abgeschlossen: ${commits.length} Commit(s) erstellt.`;
+    const summary = commits.length === 0 ? 'Keine Commits erstellt.' : `KI Auto-Commit abgeschlossen: ${commits.length} Commit(s) erstellt.`;
 
     onProgress?.({
       phase: 'done',

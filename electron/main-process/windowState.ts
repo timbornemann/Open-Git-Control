@@ -23,13 +23,9 @@ const MIN_VISIBLE_WIDTH = 120;
 const MIN_VISIBLE_HEIGHT = 80;
 const SAVE_DEBOUNCE_MS = 250;
 
-const isFiniteNumber = (value: unknown): value is number => (
-  typeof value === 'number' && Number.isFinite(value)
-);
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-export const getMainWindowStatePath = (): string => (
-  path.join(app.getPath('userData'), WINDOW_STATE_FILE_NAME)
-);
+export const getMainWindowStatePath = (): string => path.join(app.getPath('userData'), WINDOW_STATE_FILE_NAME);
 
 const coerceBounds = (value: unknown): MainWindowBounds | null => {
   if (!value || typeof value !== 'object') return null;
@@ -65,8 +61,7 @@ const isVisibleOnAnyDisplay = (bounds: MainWindowBounds, displays: Rectangle[]):
   if (!isFiniteNumber(bounds.x) || !isFiniteNumber(bounds.y)) return false;
   return displays.some((workArea) => {
     const visible = visibleIntersection(bounds, workArea);
-    return visible.width >= Math.min(MIN_VISIBLE_WIDTH, bounds.width)
-      && visible.height >= Math.min(MIN_VISIBLE_HEIGHT, bounds.height);
+    return visible.width >= Math.min(MIN_VISIBLE_WIDTH, bounds.width) && visible.height >= Math.min(MIN_VISIBLE_HEIGHT, bounds.height);
   });
 };
 
@@ -103,10 +98,7 @@ export const readMainWindowState = (statePath = getMainWindowStatePath()): MainW
   }
 };
 
-export const writeMainWindowState = (
-  state: MainWindowState,
-  statePath = getMainWindowStatePath(),
-): void => {
+export const writeMainWindowState = (state: MainWindowState, statePath = getMainWindowStatePath()): void => {
   const normalizedState: MainWindowState = {
     bounds: sanitizeMainWindowBounds(state.bounds) || DEFAULT_MAIN_WINDOW_BOUNDS,
     isMaximized: state.isMaximized === true,
@@ -120,10 +112,7 @@ const getPersistableBounds = (win: BrowserWindow): MainWindowBounds => {
   return sanitizeMainWindowBounds(bounds) || DEFAULT_MAIN_WINDOW_BOUNDS;
 };
 
-export const installMainWindowStatePersistence = (
-  win: BrowserWindow,
-  statePath = getMainWindowStatePath(),
-): void => {
+export const installMainWindowStatePersistence = (win: BrowserWindow, statePath = getMainWindowStatePath()): void => {
   let saveTimer: NodeJS.Timeout | null = null;
 
   const saveNow = () => {
@@ -132,10 +121,13 @@ export const installMainWindowStatePersistence = (
       saveTimer = null;
     }
     if (win.isDestroyed()) return;
-    writeMainWindowState({
-      bounds: getPersistableBounds(win),
-      isMaximized: win.isMaximized(),
-    }, statePath);
+    writeMainWindowState(
+      {
+        bounds: getPersistableBounds(win),
+        isMaximized: win.isMaximized(),
+      },
+      statePath,
+    );
   };
 
   const scheduleSave = () => {

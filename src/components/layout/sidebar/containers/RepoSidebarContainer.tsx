@@ -1,10 +1,6 @@
 import React from 'react';
-import {
-  useGithubContext,
-  useRepositoryContext,
-  useUIContext,
-} from '../../../../contexts/AppStateContext';
-import { RepoSidebarContent } from '../RepoSidebarContent';
+import { useGithubContext, useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
+import { RepoSidebarContent } from '@/components/layout/sidebar/RepoSidebarContent';
 
 export const RepoSidebarContainer: React.FC = React.memo(() => {
   const ui = useUIContext();

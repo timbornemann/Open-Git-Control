@@ -12,9 +12,8 @@ export const useVisibleStagingFiles = ({ status, searchQuery }: UseVisibleStagin
       return { staged: [], unstaged: [], untracked: [], conflicts: [] };
     }
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    const bySearch = <T extends { path: string }>(entries: T[]) => entries
-      .filter((entry) => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => a.path.localeCompare(b.path));
+    const bySearch = <T extends { path: string }>(entries: T[]) =>
+      entries.filter((entry) => !normalizedQuery || entry.path.toLowerCase().includes(normalizedQuery)).sort((a, b) => a.path.localeCompare(b.path));
     return {
       staged: bySearch(status.staged),
       unstaged: bySearch(status.unstaged),
@@ -23,17 +22,11 @@ export const useVisibleStagingFiles = ({ status, searchQuery }: UseVisibleStagin
     };
   }, [searchQuery, status]);
 
-  const visibleTotal = visibleFiles.staged.length
-    + visibleFiles.unstaged.length
-    + visibleFiles.untracked.length
-    + visibleFiles.conflicts.length;
+  const visibleTotal = visibleFiles.staged.length + visibleFiles.unstaged.length + visibleFiles.untracked.length + visibleFiles.conflicts.length;
 
-  const visibleSectionCount = [
-    visibleFiles.conflicts.length,
-    visibleFiles.staged.length,
-    visibleFiles.unstaged.length,
-    visibleFiles.untracked.length,
-  ].filter((count) => count > 0).length;
+  const visibleSectionCount = [visibleFiles.conflicts.length, visibleFiles.staged.length, visibleFiles.unstaged.length, visibleFiles.untracked.length].filter(
+    (count) => count > 0,
+  ).length;
 
   const maxListHeight = (itemCount: number) => {
     if (itemCount <= 0) return 0;

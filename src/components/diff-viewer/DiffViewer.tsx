@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useI18n } from '../../i18n';
-import type { DiffRequest } from '../../types/diff';
-import { isMarkdownFilePath } from '../../utils/markdownPreview';
-import type { DiffViewMode } from '../../utils/diffParser';
+import { useI18n } from '@/i18n';
+import type { DiffRequest } from '@/types/diff';
+import { isMarkdownFilePath } from '@/utils/markdownPreview';
+import type { DiffViewMode } from '@/utils/diffParser';
 import { DiffContentPane } from './DiffContentPane';
 import { DiffToolbar } from './DiffToolbar';
 import { MarkdownPreviewPane } from './MarkdownPreviewPane';
@@ -19,13 +19,7 @@ interface DiffViewerProps {
   onNavigateToCommit?: (hash: string) => void;
 }
 
-export const DiffViewer: React.FC<DiffViewerProps> = ({
-  repoPath,
-  request,
-  onClose,
-  onRepoChanged,
-  onNavigateToCommit,
-}) => {
+export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged, onNavigateToCommit }) => {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
@@ -55,12 +49,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     }
   }, [isMarkdownFile, viewMode]);
 
-  const scrollToHunk = useCallback((index: number) => {
-    if (diffData.hunkCount === 0) return;
-    const next = Math.max(0, Math.min(index, diffData.hunkCount - 1));
-    setActiveHunkIndex(next);
-    hunkRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [diffData.hunkCount]);
+  const scrollToHunk = useCallback(
+    (index: number) => {
+      if (diffData.hunkCount === 0) return;
+      const next = Math.max(0, Math.min(index, diffData.hunkCount - 1));
+      setActiveHunkIndex(next);
+      hunkRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    [diffData.hunkCount],
+  );
 
   const setHunkRef = useCallback((index: number, element: HTMLDivElement | null) => {
     hunkRefs.current[index] = element;
@@ -85,10 +82,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       />
 
       {isMarkdownPreviewMode ? (
-        <MarkdownPreviewPane
-          markdownPreview={markdownPreview}
-          onPreviewClick={handleMarkdownPreviewClick}
-        />
+        <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />
       ) : (
         <DiffContentPane
           request={request}

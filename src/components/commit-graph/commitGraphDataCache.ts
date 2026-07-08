@@ -1,5 +1,5 @@
-import type { GitCommit } from '../../utils/gitParsing';
-import { normalizeRepoPathKey } from '../../utils/repoPath';
+import type { GitCommit } from '@/utils/gitParsing';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export const LOG_PAGE_SIZE = 100;
 export const QUICK_REFRESH_LIMIT = 50;
@@ -33,15 +33,11 @@ export const storeGraphCache = (key: string, commits: GitCommit[], hasMore: bool
   if (oldest) graphCache.delete(oldest[0]);
 };
 
-export const applyCachedStats = (
-  commits: GitCommit[],
-  stats: Record<string, { files: number; additions: number; deletions: number }>,
-) => commits.map((commit) => {
-  const cached = stats[commit.hash];
-  return cached
-    ? { ...commit, stats: cached, statsState: 'ready' as const }
-    : commit;
-});
+export const applyCachedStats = (commits: GitCommit[], stats: Record<string, { files: number; additions: number; deletions: number }>) =>
+  commits.map((commit) => {
+    const cached = stats[commit.hash];
+    return cached ? { ...commit, stats: cached, statsState: 'ready' as const } : commit;
+  });
 
 export const mergeUniqueCommits = (base: GitCommit[], incoming: GitCommit[]): GitCommit[] => {
   const out: GitCommit[] = [];

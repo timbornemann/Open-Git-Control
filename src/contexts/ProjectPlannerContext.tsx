@@ -1,22 +1,8 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  PlannerItem,
-  PlannerItemInput,
-  PlannerProject,
-  PlannerProjectInput,
-  ProjectPlannerData,
-} from '../types/projectPlanner';
-import { ConfirmDialogState } from '../components/layout/layoutTypes';
-import { useI18n } from '../i18n';
-import { plannerClient } from '../services/plannerClient';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from '@/types/projectPlanner';
+import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
+import { useI18n } from '@/i18n';
+import { plannerClient } from '@/services/plannerClient';
 
 type ProjectPlannerContextValue = {
   data: ProjectPlannerData;
@@ -37,11 +23,7 @@ type ProjectPlannerContextValue = {
   createItem: (projectId: string, input: PlannerItemInput) => Promise<boolean>;
   updateItem: (itemId: string, input: Partial<PlannerItemInput>) => Promise<boolean>;
   deleteItem: (itemId: string) => Promise<boolean>;
-  materializeProject: (
-    projectId: string,
-    parentDirectory: string,
-    folderName: string,
-  ) => Promise<boolean>;
+  materializeProject: (projectId: string, parentDirectory: string, folderName: string) => Promise<boolean>;
   refresh: () => Promise<void>;
 };
 
@@ -83,9 +65,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
 
   const refresh = useCallback(async () => {
     if (!plannerClient.isAvailable()) {
-      throw new Error(
-        'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.',
-      );
+      throw new Error('Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.');
     }
     try {
       const result = await plannerClient.getData();
@@ -142,9 +122,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
 
   useEffect(() => {
     if (loading || selectedProjectId) return;
-    const activeProject = activeRepo
-      ? data.projects.find((project) => project.repoPath && repoKey(project.repoPath) === repoKey(activeRepo))
-      : null;
+    const activeProject = activeRepo ? data.projects.find((project) => project.repoPath && repoKey(project.repoPath) === repoKey(activeRepo)) : null;
     setSelectedProjectId(activeProject?.id || data.projects[0]?.id || null);
   }, [activeRepo, data.projects, loading, selectedProjectId]);
 
@@ -155,205 +133,226 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     }
   }, [data.projects, selectedProjectId]);
 
-  const runMutation = useCallback(async <T,>(
-    operation: () => Promise<{ success: true; data: T } | { success: false; error: string }>,
-  ): Promise<T | null> => {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await operation();
-      if (!result.success) {
-        setError(result.error);
-        onToast(result.error, true);
+  const runMutation = useCallback(
+    async <T,>(operation: () => Promise<{ success: true; data: T } | { success: false; error: string }>): Promise<T | null> => {
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await operation();
+        if (!result.success) {
+          setError(result.error);
+          onToast(result.error, true);
+          return null;
+        }
+        await refresh();
+        return result.data;
+      } catch (mutationError) {
+        const message = mutationError instanceof Error ? mutationError.message : String(mutationError);
+        setError(message);
+        onToast(message, true);
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onToast, refresh],
+  );
+
+  const createProject = useCallback(
+    async (input: PlannerProjectInput) => {
+      if (!plannerClient.isAvailable()) {
+        const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
+        setError(message);
+        onToast(message, true);
         return null;
       }
-      await refresh();
-      return result.data;
-    } catch (mutationError) {
-      const message = mutationError instanceof Error ? mutationError.message : String(mutationError);
-      setError(message);
-      onToast(message, true);
-      return null;
-    } finally {
-      setBusy(false);
-    }
-  }, [onToast, refresh]);
+      const project = await runMutation(() => plannerClient.createProject(input));
+      if (project) setSelectedProjectId(project.id);
+      return project;
+    },
+    [runMutation],
+  );
 
-  const createProject = useCallback(async (input: PlannerProjectInput) => {
-    if (!plannerClient.isAvailable()) {
-      const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
-      setError(message);
-      onToast(message, true);
-      return null;
-    }
-    const project = await runMutation(() => plannerClient.createProject(input));
-    if (project) setSelectedProjectId(project.id);
-    return project;
-  }, [runMutation]);
+  const updateProject = useCallback(
+    async (projectId: string, input: Partial<PlannerProjectInput>) => {
+      if (!plannerClient.isAvailable()) return false;
+      return Boolean(await runMutation(() => plannerClient.updateProject(projectId, input)));
+    },
+    [runMutation],
+  );
 
-  const updateProject = useCallback(async (projectId: string, input: Partial<PlannerProjectInput>) => {
-    if (!plannerClient.isAvailable()) return false;
-    return Boolean(await runMutation(() => plannerClient.updateProject(projectId, input)));
-  }, [runMutation]);
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      if (!plannerClient.isAvailable()) return false;
+      const result = await runMutation(() => plannerClient.deleteProject(projectId));
+      return Boolean(result);
+    },
+    [runMutation],
+  );
 
-  const deleteProject = useCallback(async (projectId: string) => {
-    if (!plannerClient.isAvailable()) return false;
-    const result = await runMutation(() => plannerClient.deleteProject(projectId));
-    return Boolean(result);
-  }, [runMutation]);
+  const createItem = useCallback(
+    async (projectId: string, input: PlannerItemInput) => {
+      if (!plannerClient.isAvailable()) return false;
+      return Boolean(await runMutation(() => plannerClient.createItem(projectId, input)));
+    },
+    [runMutation],
+  );
 
-  const createItem = useCallback(async (projectId: string, input: PlannerItemInput) => {
-    if (!plannerClient.isAvailable()) return false;
-    return Boolean(await runMutation(() => plannerClient.createItem(projectId, input)));
-  }, [runMutation]);
+  const updateItem = useCallback(
+    async (itemId: string, input: Partial<PlannerItemInput>) => {
+      if (!plannerClient.isAvailable()) return false;
+      return Boolean(await runMutation(() => plannerClient.updateItem(itemId, input)));
+    },
+    [runMutation],
+  );
 
-  const updateItem = useCallback(async (itemId: string, input: Partial<PlannerItemInput>) => {
-    if (!plannerClient.isAvailable()) return false;
-    return Boolean(await runMutation(() => plannerClient.updateItem(itemId, input)));
-  }, [runMutation]);
+  const deleteItem = useCallback(
+    async (itemId: string) => {
+      if (!plannerClient.isAvailable()) return false;
+      return Boolean(await runMutation(() => plannerClient.deleteItem(itemId)));
+    },
+    [runMutation],
+  );
 
-  const deleteItem = useCallback(async (itemId: string) => {
-    if (!plannerClient.isAvailable()) return false;
-    return Boolean(await runMutation(() => plannerClient.deleteItem(itemId)));
-  }, [runMutation]);
+  const requestDeleteProject = useCallback(
+    (projectId: string) => {
+      const project = data.projects.find((candidate) => candidate.id === projectId);
+      if (!project) return;
+      const itemCount = data.items.filter((item) => item.projectId === projectId).length;
+      const isPlannedProject = project.kind === 'planned';
 
-  const requestDeleteProject = useCallback((projectId: string) => {
-    const project = data.projects.find((candidate) => candidate.id === projectId);
-    if (!project) return;
-    const itemCount = data.items.filter((item) => item.projectId === projectId).length;
-    const isPlannedProject = project.kind === 'planned';
+      setConfirmDialog({
+        variant: 'danger',
+        title: isPlannedProject
+          ? t('generated.contexts.projectplannercontext.delete_project_idea_9116ddf5')
+          : t('generated.contexts.projectplannercontext.delete_planning_data_fa92b687'),
+        message: isPlannedProject
+          ? t('generated.contexts.projectplannercontext.the_future_project_and_all_related_ideas_will_be_removed_b6147253')
+          : t('generated.contexts.projectplannercontext.the_planning_data_will_be_removed_the_repository_and_its_64f80fc8'),
+        contextItems: [
+          { label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name },
+          { label: t('generated.contexts.projectplannercontext.items_334c7d10'), value: String(itemCount) },
+        ],
+        irreversible: true,
+        consequences: t('generated.contexts.projectplannercontext.deleted_planning_data_cannot_be_restored_c65a170b'),
+        confirmLabel: isPlannedProject
+          ? t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')
+          : t('generated.components.project_planner.plannerdialogs.delete_planning_data_2c761284'),
+        onConfirm: async () => {
+          await deleteProject(projectId);
+        },
+      });
+    },
+    [data.items, data.projects, deleteProject, setConfirmDialog, tr],
+  );
 
-    setConfirmDialog({
-      variant: 'danger',
-      title: isPlannedProject
-        ? t('generated.contexts.projectplannercontext.delete_project_idea_9116ddf5')
-        : t('generated.contexts.projectplannercontext.delete_planning_data_fa92b687'),
-      message: isPlannedProject
-        ? t('generated.contexts.projectplannercontext.the_future_project_and_all_related_ideas_will_be_removed_b6147253')
-        : t('generated.contexts.projectplannercontext.the_planning_data_will_be_removed_the_repository_and_its_64f80fc8'),
-      contextItems: [
-        { label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name },
-        { label: t('generated.contexts.projectplannercontext.items_334c7d10'), value: String(itemCount) },
-      ],
-      irreversible: true,
-      consequences: t('generated.contexts.projectplannercontext.deleted_planning_data_cannot_be_restored_c65a170b'),
-      confirmLabel: isPlannedProject
-        ? t('generated.components.project_planner.plannerdialogs.delete_project_idea_b471802f')
-        : t('generated.components.project_planner.plannerdialogs.delete_planning_data_2c761284'),
-      onConfirm: async () => {
-        await deleteProject(projectId);
-      },
-    });
-  }, [data.items, data.projects, deleteProject, setConfirmDialog, tr]);
+  const requestDeleteItem = useCallback(
+    (itemId: string) => {
+      const item = data.items.find((candidate) => candidate.id === itemId);
+      if (!item) return;
+      const project = data.projects.find((candidate) => candidate.id === item.projectId);
 
-  const requestDeleteItem = useCallback((itemId: string) => {
-    const item = data.items.find((candidate) => candidate.id === itemId);
-    if (!item) return;
-    const project = data.projects.find((candidate) => candidate.id === item.projectId);
+      setConfirmDialog({
+        variant: 'danger',
+        title: t('generated.contexts.projectplannercontext.delete_item_e3fbac1b'),
+        message: t('generated.contexts.projectplannercontext.the_selected_item_will_be_permanently_removed_from_proje_cf6c54ee'),
+        contextItems: [
+          { label: t('generated.contexts.projectplannercontext.item_177db219'), value: item.title },
+          ...(project ? [{ label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name }] : []),
+        ],
+        irreversible: true,
+        consequences: t('generated.contexts.projectplannercontext.the_deleted_item_cannot_be_restored_8ab41906'),
+        confirmLabel: t('generated.components.project_planner.projectplannerview.delete_item_afc7d611'),
+        onConfirm: async () => {
+          await deleteItem(itemId);
+        },
+      });
+    },
+    [data.items, data.projects, deleteItem, setConfirmDialog, tr],
+  );
 
-    setConfirmDialog({
-      variant: 'danger',
-      title: t('generated.contexts.projectplannercontext.delete_item_e3fbac1b'),
-      message: t('generated.contexts.projectplannercontext.the_selected_item_will_be_permanently_removed_from_proje_cf6c54ee'),
-      contextItems: [
-        { label: t('generated.contexts.projectplannercontext.item_177db219'), value: item.title },
-        ...(project ? [{ label: t('generated.contexts.projectplannercontext.project_fc877701'), value: project.name }] : []),
-      ],
-      irreversible: true,
-      consequences: t('generated.contexts.projectplannercontext.the_deleted_item_cannot_be_restored_8ab41906'),
-      confirmLabel: t('generated.components.project_planner.projectplannerview.delete_item_afc7d611'),
-      onConfirm: async () => {
-        await deleteItem(itemId);
-      },
-    });
-  }, [data.items, data.projects, deleteItem, setConfirmDialog, tr]);
+  const materializeProject = useCallback(
+    async (projectId: string, parentDirectory: string, folderName: string) => {
+      if (!plannerClient.isAvailable()) return false;
+      const result = await runMutation(() => plannerClient.materializeProject(projectId, parentDirectory, folderName));
+      if (!result) return false;
+      setSelectedProjectId(result.project.id);
+      await onRepositoryMaterialized(result.repoPath);
+      return true;
+    },
+    [onRepositoryMaterialized, runMutation],
+  );
 
-  const materializeProject = useCallback(async (
-    projectId: string,
-    parentDirectory: string,
-    folderName: string,
-  ) => {
-    if (!plannerClient.isAvailable()) return false;
-    const result = await runMutation(() => (
-      plannerClient.materializeProject(projectId, parentDirectory, folderName)
-    ));
-    if (!result) return false;
-    setSelectedProjectId(result.project.id);
-    await onRepositoryMaterialized(result.repoPath);
-    return true;
-  }, [onRepositoryMaterialized, runMutation]);
+  const selectedProject = useMemo(() => data.projects.find((project) => project.id === selectedProjectId) || null, [data.projects, selectedProjectId]);
 
-  const selectedProject = useMemo(() => (
-    data.projects.find((project) => project.id === selectedProjectId) || null
-  ), [data.projects, selectedProjectId]);
-
-  const selectProject = useCallback((projectId: string) => {
-    setSelectedProjectId(projectId);
-    const project = data.projects.find((candidate) => candidate.id === projectId);
-    if (project?.repoPath && (!activeRepo || repoKey(project.repoPath) !== repoKey(activeRepo))) {
-      void onRepositorySelected(project.repoPath);
-    }
-  }, [activeRepo, data.projects, onRepositorySelected]);
+  const selectProject = useCallback(
+    (projectId: string) => {
+      setSelectedProjectId(projectId);
+      const project = data.projects.find((candidate) => candidate.id === projectId);
+      if (project?.repoPath && (!activeRepo || repoKey(project.repoPath) !== repoKey(activeRepo))) {
+        void onRepositorySelected(project.repoPath);
+      }
+    },
+    [activeRepo, data.projects, onRepositorySelected],
+  );
 
   const requestCreateProject = useCallback(() => {
     setCreateProjectRequestId((current) => current + 1);
   }, []);
 
-  const itemsForSelectedProject = useMemo(() => (
-    selectedProjectId
-      ? data.items.filter((item) => item.projectId === selectedProjectId)
-      : []
-  ), [data.items, selectedProjectId]);
-
-  const value = useMemo<ProjectPlannerContextValue>(() => ({
-    data,
-    selectedProject,
-    selectedProjectId,
-    itemsForSelectedProject,
-    createProjectRequestId,
-    loading,
-    busy,
-    error,
-    requestCreateProject,
-    requestDeleteProject,
-    requestDeleteItem,
-    selectProject,
-    createProject,
-    updateProject,
-    deleteProject,
-    createItem,
-    updateItem,
-    deleteItem,
-    materializeProject,
-    refresh,
-  }), [
-    busy,
-    createItem,
-    createProject,
-    createProjectRequestId,
-    data,
-    deleteItem,
-    deleteProject,
-    error,
-    itemsForSelectedProject,
-    loading,
-    materializeProject,
-    refresh,
-    requestCreateProject,
-    requestDeleteItem,
-    requestDeleteProject,
-    selectedProject,
-    selectedProjectId,
-    selectProject,
-    updateItem,
-    updateProject,
-  ]);
-
-  return (
-    <ProjectPlannerContext.Provider value={value}>
-      {children}
-    </ProjectPlannerContext.Provider>
+  const itemsForSelectedProject = useMemo(
+    () => (selectedProjectId ? data.items.filter((item) => item.projectId === selectedProjectId) : []),
+    [data.items, selectedProjectId],
   );
+
+  const value = useMemo<ProjectPlannerContextValue>(
+    () => ({
+      data,
+      selectedProject,
+      selectedProjectId,
+      itemsForSelectedProject,
+      createProjectRequestId,
+      loading,
+      busy,
+      error,
+      requestCreateProject,
+      requestDeleteProject,
+      requestDeleteItem,
+      selectProject,
+      createProject,
+      updateProject,
+      deleteProject,
+      createItem,
+      updateItem,
+      deleteItem,
+      materializeProject,
+      refresh,
+    }),
+    [
+      busy,
+      createItem,
+      createProject,
+      createProjectRequestId,
+      data,
+      deleteItem,
+      deleteProject,
+      error,
+      itemsForSelectedProject,
+      loading,
+      materializeProject,
+      refresh,
+      requestCreateProject,
+      requestDeleteItem,
+      requestDeleteProject,
+      selectedProject,
+      selectedProjectId,
+      selectProject,
+      updateItem,
+      updateProject,
+    ],
+  );
+
+  return <ProjectPlannerContext.Provider value={value}>{children}</ProjectPlannerContext.Provider>;
 };
 
 export const useProjectPlanner = (): ProjectPlannerContextValue => {

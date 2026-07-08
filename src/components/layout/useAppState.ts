@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppSettingsDto, GitJobEventDto } from '../../global';
-import { useToastQueue } from '../../hooks/useToastQueue';
-import { translateFromCatalog, trByLanguage, type TranslationVariables } from '../../i18n';
+import type { AppSettingsDto, GitJobEventDto } from '@/global';
+import { useToastQueue } from '@/hooks/useToastQueue';
+import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
-import { usePullRequests } from '../../hooks/usePullRequests';
-import { aiClient } from '../../services/aiClient';
-import { appClient } from '../../services/appClient';
-import { githubClient } from '../../services/githubClient';
-import { parseRemoteBranchRef } from '../../utils/gitParsing';
+import { usePullRequests } from '@/hooks/usePullRequests';
+import { aiClient } from '@/services/aiClient';
+import { appClient } from '@/services/appClient';
+import { githubClient } from '@/services/githubClient';
+import { parseRemoteBranchRef } from '@/utils/gitParsing';
 import { DEFAULT_SETTINGS } from './state/appStateShared';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
 import { usePrAndReleaseState } from './state/usePrAndReleaseState';
@@ -20,12 +20,7 @@ import { useGitCommandWorkflow } from './workflows/useGitCommandWorkflow';
 import { usePullRequestWorkflow } from './workflows/usePullRequestWorkflow';
 import { useRepoUnavailableWorkflow } from './workflows/useRepoUnavailableWorkflow';
 import { useReleaseWorkflow } from './workflows/useReleaseWorkflow';
-import {
-  deriveRepoNameFromCloneSource,
-  isCloneSourceLikelyRemote,
-  normalizeGitHost,
-  parseGithubRepoReference,
-} from './workflows/repoWorkflowUtils';
+import { deriveRepoNameFromCloneSource, isCloneSourceLikelyRemote, normalizeGitHost, parseGithubRepoReference } from './workflows/repoWorkflowUtils';
 
 export const useAppState = () => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
@@ -37,7 +32,6 @@ export const useAppState = () => {
   }, []);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [commitRefreshTrigger, setCommitRefreshTrigger] = useState(0);
-
 
   const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
   const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
@@ -78,7 +72,12 @@ export const useAppState = () => {
     setReleaseNotesOptions,
   } = usePrAndReleaseState();
 
-  const { toast: gitActionToast, toasts: gitActionToasts, setToast: setGitActionToast, dismiss: dismissToast } = useToastQueue({
+  const {
+    toast: gitActionToast,
+    toasts: gitActionToasts,
+    setToast: setGitActionToast,
+    dismiss: dismissToast,
+  } = useToastQueue({
     autoHideMs: 3000,
     errorAutoHideMs: null,
   });
@@ -95,17 +94,20 @@ export const useAppState = () => {
     executeInputDialog,
   } = useDialogControllers();
 
-  const tr = useCallback((deText: string, enText: string) => {
-    return trByLanguage(settings.language, deText, enText);
-  }, [settings.language]);
+  const tr = useCallback(
+    (deText: string, enText: string) => {
+      return trByLanguage(settings.language, deText, enText);
+    },
+    [settings.language],
+  );
   const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language, key, variables), [settings.language]);
 
   const triggerRefresh = useCallback(() => {
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const triggerCommitRefresh = useCallback(() => {
-    setCommitRefreshTrigger(prev => prev + 1);
+    setCommitRefreshTrigger((prev) => prev + 1);
   }, []);
 
   const resetRepoScopedUi = useCallback(() => {
@@ -169,17 +171,20 @@ export const useAppState = () => {
     activeRepo: workspace.activeRepo,
   });
 
-  const handleUpdateSettings = useCallback(async (partial: Partial<AppSettingsDto>) => {
-    if (!appClient.isAvailable()) return;
+  const handleUpdateSettings = useCallback(
+    async (partial: Partial<AppSettingsDto>) => {
+      if (!appClient.isAvailable()) return;
 
-    try {
-      const next = await appClient.setSettings(partial);
-      setSettings(next);
-      setGitActionToast({ msg: t('generated.components.layout.useappstate.settings_saved_d81d1258'), isError: false });
-    } catch (e: any) {
-      setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
-    }
-  }, [setGitActionToast, tr]);
+      try {
+        const next = await appClient.setSettings(partial);
+        setSettings(next);
+        setGitActionToast({ msg: t('generated.components.layout.useappstate.settings_saved_d81d1258'), isError: false });
+      } catch (e: any) {
+        setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
+      }
+    },
+    [setGitActionToast, tr],
+  );
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -203,7 +208,7 @@ export const useAppState = () => {
     if (!aiClient.isAvailable()) return;
 
     const unsubscribe = aiClient.onJobEvent((event) => {
-      setJobs(prev => compactTransferProgressJobs(prev, event));
+      setJobs((prev) => compactTransferProgressJobs(prev, event));
     });
 
     return unsubscribe;
@@ -225,19 +230,22 @@ export const useAppState = () => {
     triggerRefresh,
     language: settings.language,
   });
-  const navigateToCommit = useCallback((hash: string) => {
-    const normalizedHash = String(hash || '').trim();
-    if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
+  const navigateToCommit = useCallback(
+    (hash: string) => {
+      const normalizedHash = String(hash || '').trim();
+      if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
 
-    workspace.setActiveTab('repo');
-    setShowReleaseCreator(false);
-    setSelectedCommit(normalizedHash);
-    commitNavigationSequenceRef.current += 1;
-    setCommitNavigationRequest({
-      hash: normalizedHash,
-      requestId: commitNavigationSequenceRef.current,
-    });
-  }, [setShowReleaseCreator, workspace.setActiveTab]);
+      workspace.setActiveTab('repo');
+      setShowReleaseCreator(false);
+      setSelectedCommit(normalizedHash);
+      commitNavigationSequenceRef.current += 1;
+      setCommitNavigationRequest({
+        hash: normalizedHash,
+        requestId: commitNavigationSequenceRef.current,
+      });
+    },
+    [setShowReleaseCreator, workspace.setActiveTab],
+  );
 
   const repository = useRepositoryDomain({
     activeRepo: workspace.activeRepo,
@@ -262,29 +270,29 @@ export const useAppState = () => {
     githubHost: settings.githubHost,
   });
 
-  const cloneFromRemoteSource = useCallback(async (
-    cloneSourceRaw: string,
-    targetNameRaw?: string,
-  ): Promise<boolean> => {
-    const cloneSource = String(cloneSourceRaw || '').trim();
-    if (!cloneSource) {
-      setGitActionToast({ msg: t('generated.components.layout.useappstate.clone_source_is_required_0f140f6c'), isError: true });
-      return false;
-    }
-    if (!isCloneSourceLikelyRemote(cloneSource)) {
-      setGitActionToast({
-        msg: t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_s_834268dc'),
-        isError: true,
-      });
-      return false;
-    }
+  const cloneFromRemoteSource = useCallback(
+    async (cloneSourceRaw: string, targetNameRaw?: string): Promise<boolean> => {
+      const cloneSource = String(cloneSourceRaw || '').trim();
+      if (!cloneSource) {
+        setGitActionToast({ msg: t('generated.components.layout.useappstate.clone_source_is_required_0f140f6c'), isError: true });
+        return false;
+      }
+      if (!isCloneSourceLikelyRemote(cloneSource)) {
+        setGitActionToast({
+          msg: t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_s_834268dc'),
+          isError: true,
+        });
+        return false;
+      }
 
-    const targetName = String(targetNameRaw || '').trim();
-    return github.cloneRepository(cloneSource, {
-      repoName: deriveRepoNameFromCloneSource(cloneSource),
-      targetName: targetName || undefined,
-    });
-  }, [github, setGitActionToast, tr]);
+      const targetName = String(targetNameRaw || '').trim();
+      return github.cloneRepository(cloneSource, {
+        repoName: deriveRepoNameFromCloneSource(cloneSource),
+        targetName: targetName || undefined,
+      });
+    },
+    [github, setGitActionToast, tr],
+  );
 
   const handleCloneByUrl = useCallback(() => {
     setInputDialog({
@@ -383,10 +391,7 @@ export const useAppState = () => {
         const configuredHost = normalizeGitHost(settings.githubHost);
         if (parsed.host !== configuredHost) {
           setGitActionToast({
-            msg: tr(
-              `Host passt nicht zum aktiven GitHub-Host (${configuredHost}).`,
-              `Host does not match the active GitHub host (${configuredHost}).`,
-            ),
+            msg: tr(`Host passt nicht zum aktiven GitHub-Host (${configuredHost}).`, `Host does not match the active GitHub host (${configuredHost}).`),
             isError: true,
           });
           return;
@@ -408,10 +413,7 @@ export const useAppState = () => {
         }
 
         setGitActionToast({
-          msg: tr(
-            `Fork erstellt: ${forkResult.data.fullName}. Starte Clone...`,
-            `Fork created: ${forkResult.data.fullName}. Starting clone...`,
-          ),
+          msg: tr(`Fork erstellt: ${forkResult.data.fullName}. Starte Clone...`, `Fork created: ${forkResult.data.fullName}. Starting clone...`),
           isError: false,
         });
 
@@ -455,44 +457,32 @@ export const useAppState = () => {
     await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });
   };
 
-  const {
-    closeReleaseCreator,
-    generateReleaseNotesWithAI,
-    handleCreateRelease,
-    openReleaseCreator,
-    refreshReleaseContext,
-    setReleaseForm,
-  } = useReleaseWorkflow({
-    isGithubAuthenticated: github.isAuthenticated,
-    ownerRepo: pullRequestDomain.prOwnerRepo,
-    currentBranch: repository.currentBranch,
-    releaseForm,
-    setReleaseFormState,
-    releaseContext,
-    setReleaseContext,
-    setReleaseContextError,
-    setReleaseContextLoading,
-    setReleaseError,
-    setReleaseSuccess,
-    setReleaseSubmitting,
-    showReleaseCreator,
-    setShowReleaseCreator,
-    setReleaseNotesGenerating,
-    releaseNotesLanguage,
-    releaseNotesOptions,
-    setConfirmDialog,
-    setGitActionToast,
-    setActiveTab: workspace.setActiveTab,
-    triggerRefresh,
-    language: settings.language,
-  });
-  const {
-    handleCheckoutPR,
-    handleCopyPRUrl,
-    handleCreatePR,
-    handleMergePR,
-    handleOpenPR,
-  } = usePullRequestWorkflow({
+  const { closeReleaseCreator, generateReleaseNotesWithAI, handleCreateRelease, openReleaseCreator, refreshReleaseContext, setReleaseForm } =
+    useReleaseWorkflow({
+      isGithubAuthenticated: github.isAuthenticated,
+      ownerRepo: pullRequestDomain.prOwnerRepo,
+      currentBranch: repository.currentBranch,
+      releaseForm,
+      setReleaseFormState,
+      releaseContext,
+      setReleaseContext,
+      setReleaseContextError,
+      setReleaseContextLoading,
+      setReleaseError,
+      setReleaseSuccess,
+      setReleaseSubmitting,
+      showReleaseCreator,
+      setShowReleaseCreator,
+      setReleaseNotesGenerating,
+      releaseNotesLanguage,
+      releaseNotesOptions,
+      setConfirmDialog,
+      setGitActionToast,
+      setActiveTab: workspace.setActiveTab,
+      triggerRefresh,
+      language: settings.language,
+    });
+  const { handleCheckoutPR, handleCopyPRUrl, handleCreatePR, handleMergePR, handleOpenPR } = usePullRequestWorkflow({
     ownerRepo: pullRequestDomain.prOwnerRepo,
     createPullRequest: pullRequestDomain.createPR,
     currentBranch: repository.currentBranch,
@@ -513,7 +503,10 @@ export const useAppState = () => {
 
     const setTracking = await runGitCommand(
       ['branch', '--set-upstream-to', `origin/${repository.currentBranch}`, repository.currentBranch],
-      tr(`Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`, `Tracking set: ${repository.currentBranch} -> origin/${repository.currentBranch}`),
+      tr(
+        `Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
+        `Tracking set: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
+      ),
     );
 
     if (!setTracking) {
@@ -524,38 +517,32 @@ export const useAppState = () => {
     }
   }, [repository.currentBranch, runGitCommand, workspace.activeRepo, tr]);
 
-  const handleCheckoutRemoteBranch = useCallback(async (remoteBranchName: string) => {
-    const normalized = (remoteBranchName || '').trim();
-    if (!normalized) return;
+  const handleCheckoutRemoteBranch = useCallback(
+    async (remoteBranchName: string) => {
+      const normalized = (remoteBranchName || '').trim();
+      if (!normalized) return;
 
-    const parsed = parseRemoteBranchRef(normalized);
-    if (!parsed) {
-      setGitActionToast({
-        msg: t('generated.components.layout.useappstate.invalid_remote_branch_3042f288'),
-        isError: true,
-      });
-      return;
-    }
+      const parsed = parseRemoteBranchRef(normalized);
+      if (!parsed) {
+        setGitActionToast({
+          msg: t('generated.components.layout.useappstate.invalid_remote_branch_3042f288'),
+          isError: true,
+        });
+        return;
+      }
 
-    const { remoteRef, localBranchName } = parsed;
-    const createdTrackingBranch = await runGitCommand(
-      ['checkout', '--track', remoteRef],
-      tr(
-        `Branch ${localBranchName} aus ${remoteRef} ausgecheckt.`,
-        `Checked out branch ${localBranchName} from ${remoteRef}.`,
-      ),
-    );
+      const { remoteRef, localBranchName } = parsed;
+      const createdTrackingBranch = await runGitCommand(
+        ['checkout', '--track', remoteRef],
+        tr(`Branch ${localBranchName} aus ${remoteRef} ausgecheckt.`, `Checked out branch ${localBranchName} from ${remoteRef}.`),
+      );
 
-    if (createdTrackingBranch) return;
+      if (createdTrackingBranch) return;
 
-    await runGitCommand(
-      ['checkout', localBranchName],
-      tr(
-        `Branch ${localBranchName} ausgecheckt.`,
-        `Checked out branch ${localBranchName}.`,
-      ),
-    );
-  }, [runGitCommand, setGitActionToast, tr]);
+      await runGitCommand(['checkout', localBranchName], tr(`Branch ${localBranchName} ausgecheckt.`, `Checked out branch ${localBranchName}.`));
+    },
+    [runGitCommand, setGitActionToast, tr],
+  );
 
   const clearJobs = () => setJobs([]);
 
@@ -644,8 +631,12 @@ export const useAppState = () => {
     githubReposHasMore: github.githubReposHasMore,
     isLoadingGithubRepos: github.isLoadingRepos,
     isLoadingMoreGithubRepos: github.isLoadingMoreRepos,
-    loadMoreGithubRepos: () => { void github.loadMoreRepos(); },
-    refreshGithubRepos: (search?: string) => { void github.refreshRepos(search); },
+    loadMoreGithubRepos: () => {
+      void github.loadMoreRepos();
+    },
+    refreshGithubRepos: (search?: string) => {
+      void github.refreshRepos(search);
+    },
     tokenInput: github.tokenInput,
     setTokenInput: github.setTokenInput,
     isAuthenticating: github.isAuthenticating,
@@ -742,5 +733,3 @@ export const useAppState = () => {
     executeInputDialog,
   };
 };
-
-

@@ -1,31 +1,23 @@
 import * as http from 'http';
 import * as crypto from 'crypto';
 import { URL } from 'url';
-import {
-  AUTH_BEARER_PREFIX,
-  AUTH_HEADER_NAME,
+import type {
   ApiEnvelope,
-  ApiError,
-  DEFAULT_HOST,
-  DEFAULT_PORT,
   HttpMethod,
   JsonObject,
-  MAX_BODY_BYTES,
   McpRpcHandler,
   PlanningApiServerHandle,
   PlanningApiServerOptions,
   PlanningRouteHandler,
-  PORT_SEARCH_LIMIT,
 } from './planningApiTypes';
+import { AUTH_BEARER_PREFIX, AUTH_HEADER_NAME, ApiError, DEFAULT_HOST, DEFAULT_PORT, MAX_BODY_BYTES, PORT_SEARCH_LIMIT } from './planningApiTypes';
 
 type PlanningApiHostDeps = {
   routeApi: PlanningRouteHandler;
   handleMcpRpc: McpRpcHandler;
 };
 
-const cleanString = (value: unknown): string => (
-  typeof value === 'string' ? value.trim() : ''
-);
+const cleanString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const createAuthToken = (configuredToken?: string): string => {
   const configured = cleanString(configuredToken ?? process.env.OPEN_GIT_CONTROL_API_TOKEN);
@@ -33,9 +25,7 @@ const createAuthToken = (configuredToken?: string): string => {
   return crypto.randomBytes(32).toString('base64url');
 };
 
-const headerValue = (value: string | string[] | undefined): string => (
-  Array.isArray(value) ? String(value[0] || '') : String(value || '')
-);
+const headerValue = (value: string | string[] | undefined): string => (Array.isArray(value) ? String(value[0] || '') : String(value || ''));
 
 const isAllowedCorsOrigin = (origin: string): boolean => {
   if (!origin) return false;
@@ -43,12 +33,7 @@ const isAllowedCorsOrigin = (origin: string): boolean => {
     const parsed = new URL(origin);
     const protocolAllowed = parsed.protocol === 'http:' || parsed.protocol === 'https:';
     const hostname = parsed.hostname.toLowerCase();
-    return protocolAllowed && (
-      hostname === 'localhost'
-      || hostname === '127.0.0.1'
-      || hostname === '::1'
-      || hostname === '[::1]'
-    );
+    return protocolAllowed && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]');
   } catch {
     return false;
   }
@@ -74,33 +59,18 @@ const getRequestAuthToken = (request: http.IncomingMessage): string => {
 
 const isPublicApiRequest = (url: URL, method: HttpMethod): boolean => {
   if (method !== 'GET') return false;
-  return (
-    url.pathname === '/'
-    || url.pathname === '/api'
-    || url.pathname === '/api/'
-    || url.pathname === '/api/health'
-    || url.pathname === '/api/openapi.json'
-  );
+  return url.pathname === '/' || url.pathname === '/api' || url.pathname === '/api/' || url.pathname === '/api/health' || url.pathname === '/api/openapi.json';
 };
 
-const requireAuthorizedRequest = (
-  request: http.IncomingMessage,
-  url: URL,
-  method: HttpMethod,
-  authToken: string,
-): void => {
+const requireAuthorizedRequest = (request: http.IncomingMessage, url: URL, method: HttpMethod, authToken: string): void => {
   if (isPublicApiRequest(url, method)) return;
   const token = getRequestAuthToken(request);
   if (!token || !timingSafeTokenEquals(token, authToken)) {
-    throw new ApiError(
-      401,
-      'UNAUTHORIZED',
-      `Missing or invalid API token. Provide it as ${AUTH_HEADER_NAME} or Authorization: Bearer <token>.`,
-    );
+    throw new ApiError(401, 'UNAUTHORIZED', `Missing or invalid API token. Provide it as ${AUTH_HEADER_NAME} or Authorization: Bearer <token>.`);
   }
 };
 
-const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> => (
+const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> =>
   new Promise((resolve, reject) => {
     const method = request.method || 'GET';
     if (method === 'GET' || method === 'DELETE' || method === 'OPTIONS') {
@@ -137,10 +107,9 @@ const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> 
       }
     });
     request.on('error', reject);
-  })
-);
+  });
 
-const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> => (
+const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> =>
   new Promise((resolve, reject) => {
     let total = 0;
     const chunks: Buffer[] = [];
@@ -170,85 +139,76 @@ const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> => (
       }
     });
     request.on('error', reject);
-  })
-);
+  });
 
-export const createPlanningApiRequestHandler = (
-  deps: PlanningApiHostDeps & { getAuthToken: () => string },
-) => async (
-  request: http.IncomingMessage,
-  response: http.ServerResponse,
-): Promise<void> => {
-  setCommonHeaders(response, request);
+export const createPlanningApiRequestHandler =
+  (deps: PlanningApiHostDeps & { getAuthToken: () => string }) =>
+  async (request: http.IncomingMessage, response: http.ServerResponse): Promise<void> => {
+    setCommonHeaders(response, request);
 
-  try {
-    const method = (request.method || 'GET').toUpperCase() as HttpMethod;
-    if (!['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)) {
-      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.');
-    }
-    if (method === 'OPTIONS') {
-      response.writeHead(204);
-      response.end();
-      return;
-    }
-
-    const url = new URL(request.url || '/', `http://${request.headers.host || `${DEFAULT_HOST}:${DEFAULT_PORT}`}`);
-    requireAuthorizedRequest(request, url, method, deps.getAuthToken());
-    if (url.pathname === '/') {
-      redirect(response, '/api/');
-      return;
-    }
-    if (url.pathname === '/api') {
-      redirect(response, '/api/');
-      return;
-    }
-    if (url.pathname === '/mcp') {
-      if (method !== 'POST') {
-        throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'MCP endpoint expects HTTP POST with JSON-RPC payloads.');
+    try {
+      const method = (request.method || 'GET').toUpperCase() as HttpMethod;
+      if (!['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)) {
+        throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed.');
       }
-      const payload = await readMcpBody(request);
-      if (payload && typeof payload === 'object' && 'jsonrpc' in payload && 'error' in payload) {
-        sendJson(response, 200, payload);
-        return;
-      }
-      const rpcResponse = await deps.handleMcpRpc(payload);
-      if (rpcResponse === null) {
+      if (method === 'OPTIONS') {
         response.writeHead(204);
         response.end();
         return;
       }
-      sendJson(response, 200, rpcResponse);
-      return;
+
+      const url = new URL(request.url || '/', `http://${request.headers.host || `${DEFAULT_HOST}:${DEFAULT_PORT}`}`);
+      requireAuthorizedRequest(request, url, method, deps.getAuthToken());
+      if (url.pathname === '/') {
+        redirect(response, '/api/');
+        return;
+      }
+      if (url.pathname === '/api') {
+        redirect(response, '/api/');
+        return;
+      }
+      if (url.pathname === '/mcp') {
+        if (method !== 'POST') {
+          throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'MCP endpoint expects HTTP POST with JSON-RPC payloads.');
+        }
+        const payload = await readMcpBody(request);
+        if (payload && typeof payload === 'object' && 'jsonrpc' in payload && 'error' in payload) {
+          sendJson(response, 200, payload);
+          return;
+        }
+        const rpcResponse = await deps.handleMcpRpc(payload);
+        if (rpcResponse === null) {
+          response.writeHead(204);
+          response.end();
+          return;
+        }
+        sendJson(response, 200, rpcResponse);
+        return;
+      }
+
+      const segments = url.pathname.split('/').filter(Boolean);
+      const baseUrl = `${url.protocol}//${url.host}`;
+      const body = await readJsonBody(request);
+      const result = await deps.routeApi({ method, url, segments, body, baseUrl });
+
+      if (typeof result === 'string' && result.startsWith('<!doctype html>')) {
+        sendHtml(response, 200, result);
+        return;
+      }
+      sendJson(response, 200, { success: true, data: result } satisfies ApiEnvelope<unknown>);
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : new ApiError(500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
+      sendJson(response, apiError.statusCode, {
+        success: false,
+        error: {
+          code: apiError.code,
+          message: apiError.message,
+        },
+      } satisfies ApiEnvelope<unknown>);
     }
+  };
 
-    const segments = url.pathname.split('/').filter(Boolean);
-    const baseUrl = `${url.protocol}//${url.host}`;
-    const body = await readJsonBody(request);
-    const result = await deps.routeApi({ method, url, segments, body, baseUrl });
-
-    if (typeof result === 'string' && result.startsWith('<!doctype html>')) {
-      sendHtml(response, 200, result);
-      return;
-    }
-    sendJson(response, 200, { success: true, data: result } satisfies ApiEnvelope<unknown>);
-  } catch (error) {
-    const apiError = error instanceof ApiError
-      ? error
-      : new ApiError(500, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error));
-    sendJson(response, apiError.statusCode, {
-      success: false,
-      error: {
-        code: apiError.code,
-        message: apiError.message,
-      },
-    } satisfies ApiEnvelope<unknown>);
-  }
-};
-
-export async function startPlanningApiHost(
-  options: PlanningApiServerOptions,
-  deps: PlanningApiHostDeps,
-): Promise<PlanningApiServerHandle> {
+export async function startPlanningApiHost(options: PlanningApiServerOptions, deps: PlanningApiHostDeps): Promise<PlanningApiServerHandle> {
   const host = options.host || DEFAULT_HOST;
   const preferredPort = normalizePreferredPort(options.preferredPort ?? getConfiguredPort());
   const maxPortSearch = options.maxPortSearch ?? PORT_SEARCH_LIMIT;
@@ -273,9 +233,10 @@ export async function startPlanningApiHost(
           return getAuthToken();
         },
         authHeaderName: AUTH_HEADER_NAME,
-        close: () => new Promise((resolve, reject) => {
-          server.close((error) => (error ? reject(error) : resolve()));
-        }),
+        close: () =>
+          new Promise((resolve, reject) => {
+            server.close((error) => (error ? reject(error) : resolve()));
+          }),
       };
     } catch (error) {
       if (!isAddressInUse(error) || preferredPort === 0 || offset === maxPortSearch) {
@@ -303,9 +264,7 @@ function listenOnPort(server: http.Server, host: string, port: number): Promise<
   });
 }
 
-const isAddressInUse = (error: unknown): boolean => (
-  Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'EADDRINUSE')
-);
+const isAddressInUse = (error: unknown): boolean => Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'EADDRINUSE');
 
 const normalizePreferredPort = (port: number): number => {
   if (!Number.isFinite(port)) return DEFAULT_PORT;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GitCommit } from '../../../utils/gitParsing';
-import { mergeQuickRefreshCommits } from '../mergeQuickRefreshCommits';
+import type { GitCommit } from '@/utils/gitParsing';
+import { mergeQuickRefreshCommits } from '@/components/commit-graph/mergeQuickRefreshCommits';
 
 const commit = (hash: string): GitCommit => ({
   hash,
@@ -24,23 +24,20 @@ describe('mergeQuickRefreshCommits', () => {
     const existing = ['a', 'b', 'c', 'd'].map(commit);
     const refreshedHead = ['new', 'a', 'b'].map(commit);
 
-    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead)))
-      .toEqual(['new', 'a', 'b', 'c', 'd']);
+    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead))).toEqual(['new', 'a', 'b', 'c', 'd']);
   });
 
   it('replaces the previous head after an amended commit', () => {
     const existing = ['old-head', 'b', 'c', 'd'].map(commit);
     const refreshedHead = ['amended-head', 'b', 'c'].map(commit);
 
-    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead)))
-      .toEqual(['amended-head', 'b', 'c', 'd']);
+    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead))).toEqual(['amended-head', 'b', 'c', 'd']);
   });
 
   it('uses the refreshed head when rewritten history has no overlap', () => {
     const existing = ['a', 'b', 'c'].map(commit);
     const refreshedHead = ['x', 'y'].map(commit);
 
-    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead)))
-      .toEqual(['x', 'y']);
+    expect(hashes(mergeQuickRefreshCommits(existing, refreshedHead))).toEqual(['x', 'y']);
   });
 });

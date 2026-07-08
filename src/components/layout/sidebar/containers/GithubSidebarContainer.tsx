@@ -1,10 +1,7 @@
 import React from 'react';
-import {
-  useGithubContext,
-  useRepositoryContext,
-} from '../../../../contexts/AppStateContext';
-import { GithubAuthContent } from '../GithubAuthContent';
-import { GithubConnectedContent } from '../GithubConnectedContent';
+import { useGithubContext, useRepositoryContext } from '@/contexts/AppStateContext';
+import { GithubAuthContent } from '@/components/layout/sidebar/GithubAuthContent';
+import { GithubConnectedContent } from '@/components/layout/sidebar/GithubConnectedContent';
 
 const GithubAuthSidebarContainer: React.FC = React.memo(() => {
   const github = useGithubContext();

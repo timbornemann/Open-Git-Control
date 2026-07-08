@@ -1,8 +1,8 @@
 import React from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
-import { useI18n } from '../../../i18n';
-import type { GithubAuthHelpMethod } from '../sidebar/AppSidebar.types';
-import { appClient } from '../../../services/appClient';
+import { useI18n } from '@/i18n';
+import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
+import { appClient } from '@/services/appClient';
 
 const linkStyle: React.CSSProperties = {
   display: 'inline-flex',
@@ -75,8 +75,13 @@ export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClos
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
-          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.pat_url_0653be9b')} value="https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control" />
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            {t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}
+          </div>
+          <CopyableValueRow
+            label={t('generated.components.layout.main.githubauthguide.pat_url_0653be9b')}
+            value="https://github.com/settings/tokens/new?scopes=repo,user&description=Open-Git-Control"
+          />
           <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.note_ea35c916')} value="Open-Git-Control" />
           <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.scopes_6897f833')} value="repo,read:user" />
         </div>
@@ -115,11 +120,16 @@ export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClos
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            {t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}
+          </div>
           <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.application_name_63a11e81')} value="Open-Git-Control Local" />
           <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.homepage_url_761e1021')} value="https://localhost" />
           <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.callback_url_5d702006')} value="http://localhost/callback" />
-          <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.settings_field_c180b6ff')} value="GitHub OAuth Client ID (Device Flow)" />
+          <CopyableValueRow
+            label={t('generated.components.layout.main.githubauthguide.settings_field_c180b6ff')}
+            value="GitHub OAuth Client ID (Device Flow)"
+          />
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -155,17 +165,25 @@ export const GithubAuthGuide: React.FC<GithubAuthGuideProps> = ({ method, onClos
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}</div>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          {t('generated.components.layout.main.githubauthguide.direct_copy_values_a47e037b')}
+        </div>
         <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.cli_url_385ee071')} value="https://cli.github.com/" />
         <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.scopes_6897f833')} value="repo,read:user" />
-        <CopyableValueRow label={t('generated.components.layout.main.githubauthguide.gh_command_d7dfde28')} value="gh auth login --hostname github.com --web --git-protocol https --scopes repo,read:user" />
+        <CopyableValueRow
+          label={t('generated.components.layout.main.githubauthguide.gh_command_d7dfde28')}
+          value="gh auth login --hostname github.com --web --git-protocol https --scopes repo,read:user"
+        />
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button style={linkStyle} onClick={() => openExternal('https://cli.github.com/')}>
           <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.download_github_cli_e1f1463c')}
         </button>
-        <button style={linkStyle} onClick={() => openExternal('https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps')}>
+        <button
+          style={linkStyle}
+          onClick={() => openExternal('https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/authorizing-oauth-apps')}
+        >
           <ExternalLink size={12} /> {t('generated.components.layout.main.githubauthguide.oauth_approval_help_d7d07c91')}
         </button>
       </div>

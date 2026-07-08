@@ -18,6 +18,8 @@
     "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/start-electron.js",
     "build": "tsc && vite build && npm run build:electron",
     "build:electron": "tsc --project tsconfig.node.json",
+    "lint": "eslint src electron",
+    "format:check": "prettier --check .",
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
     "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
@@ -30,7 +32,7 @@
     "test": "npm run test:unit",
     "test:unit": "node scripts/run-tests.js",
     "test:coverage": "node scripts/run-tests.js --coverage",
-    "test:ci": "npm run build:electron && npm run test:coverage && npm run build",
+    "test:ci": "npm run lint && npm run format:check && npm run build:electron && npm run test:coverage && npm run build",
     "docs:release-links": "node scripts/update-readme-release-links.js"
   },
   "dependencies": {
@@ -54,7 +56,9 @@
     "cross-env": "^7.0.3",
     "electron": "^42.4.1",
     "electron-builder": "^26.15.3",
+    "eslint": "^10.6.0",
     "jsdom": "^29.1.1",
+    "prettier": "^3.9.4",
     "typescript": "^5.2.2",
     "vite": "^8.0.16",
     "vitest": "^4.1.9",

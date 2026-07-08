@@ -1,5 +1,5 @@
-import { DialogContextItem } from '../Confirm';
-import { InputDialogField } from '../Input';
+import type { DialogContextItem } from '@/components/Confirm';
+import type { InputDialogField } from '@/components/Input';
 
 export type ConfirmDialogState = {
   variant: 'confirm' | 'danger';

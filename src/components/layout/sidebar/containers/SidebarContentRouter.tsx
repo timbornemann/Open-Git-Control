@@ -1,6 +1,6 @@
 import React from 'react';
-import { useUIContext } from '../../../../contexts/AppStateContext';
-import { ProjectPlannerSidebarContent } from '../../../project-planner/ProjectPlannerSidebarContent';
+import { useUIContext } from '@/contexts/AppStateContext';
+import { ProjectPlannerSidebarContent } from '@/components/project-planner/ProjectPlannerSidebarContent';
 import { GithubSidebarContainer } from './GithubSidebarContainer';
 import { LocalReposSidebarContainer } from './LocalReposSidebarContainer';
 import { RepoSidebarContainer } from './RepoSidebarContainer';

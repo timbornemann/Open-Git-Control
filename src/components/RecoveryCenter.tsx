@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { parseGitReflog } from '../utils/gitParsing';
-import type { AppSettingsDto, GitCommandNameDto } from '../global';
-import type { GitReflogEntryDto } from '../types/git';
-import { useI18n } from '../i18n';
-import { gitClient } from '../services/gitClient';
+import { parseGitReflog } from '@/utils/gitParsing';
+import type { AppSettingsDto, GitCommandNameDto } from '@/global';
+import type { GitReflogEntryDto } from '@/types/git';
+import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 import { DangerConfirm } from './DangerConfirm';
 
 type Props = {
@@ -38,7 +38,7 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
       }
       const parsed = parseGitReflog(String(result.data || ''));
       setEntries(parsed);
-      setSelectedHash((current) => current && parsed.some((e) => e.hash === current) ? current : (parsed[0]?.hash ?? null));
+      setSelectedHash((current) => (current && parsed.some((e) => e.hash === current) ? current : (parsed[0]?.hash ?? null)));
     } finally {
       setIsLoading(false);
     }
@@ -56,22 +56,28 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
 
   const selected = useMemo(() => filtered.find((e) => e.hash === selectedHash) ?? filtered[0] ?? null, [filtered, selectedHash]);
 
-  const runAction = useCallback(async (args: string[]) => {
-    if (!gitClient.isAvailable() || args.length === 0) return;
-    const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
-    if (result.success) {
-      onRepoChanged();
-      await loadReflog();
-    }
-  }, [loadReflog, onRepoChanged]);
+  const runAction = useCallback(
+    async (args: string[]) => {
+      if (!gitClient.isAvailable() || args.length === 0) return;
+      const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+      if (result.success) {
+        onRepoChanged();
+        await loadReflog();
+      }
+    },
+    [loadReflog, onRepoChanged],
+  );
 
-  const runDangerAware = useCallback(async (payload: Exclude<DangerAction, null>) => {
-    if (settings.confirmDangerousOps) {
-      setDangerAction(payload);
-      return;
-    }
-    await payload.run();
-  }, [settings.confirmDangerousOps]);
+  const runDangerAware = useCallback(
+    async (payload: Exclude<DangerAction, null>) => {
+      if (settings.confirmDangerousOps) {
+        setDangerAction(payload);
+        return;
+      }
+      await payload.run();
+    },
+    [settings.confirmDangerousOps],
+  );
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', height: '100%' }}>
@@ -86,15 +92,27 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
         </div>
         <div style={{ overflow: 'auto' }}>
           {isLoading && <div style={{ padding: 10 }}>{t('generated.components.recoverycenter.loading_reflog_305d6291')}</div>}
-          {!isLoading && filtered.length === 0 && <div style={{ padding: 10, color: 'var(--text-secondary)' }}>{t('generated.components.recoverycenter.no_reflog_entries_found_78f44a49')}</div>}
+          {!isLoading && filtered.length === 0 && (
+            <div style={{ padding: 10, color: 'var(--text-secondary)' }}>{t('generated.components.recoverycenter.no_reflog_entries_found_78f44a49')}</div>
+          )}
           {filtered.map((entry) => (
             <button
               key={`${entry.selector}-${entry.hash}`}
               className="icon-btn"
               onClick={() => setSelectedHash(entry.hash)}
-              style={{ display: 'block', width: '100%', textAlign: 'left', borderRadius: 0, borderBottom: '1px solid var(--border-color)', padding: '8px 10px', background: selected?.hash === entry.hash ? 'var(--bg-dark)' : 'transparent' }}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                borderRadius: 0,
+                borderBottom: '1px solid var(--border-color)',
+                padding: '8px 10px',
+                background: selected?.hash === entry.hash ? 'var(--bg-dark)' : 'transparent',
+              }}
             >
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{entry.selector} • {entry.date}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {entry.selector} • {entry.date}
+              </div>
               <div style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{entry.abbrevHash}</div>
               <div style={{ fontSize: '0.82rem' }}>{entry.subject || '-'}</div>
             </button>
@@ -129,12 +147,14 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
 
               <button
                 className="icon-btn"
-                onClick={() => void runDangerAware({
-                  title: t('generated.components.recoverycenter.detached_checkout_3c9fd080'),
-                  message: t('generated.components.recoverycenter.you_will_checkout_this_commit_directly_without_a_branch_153b7dd0'),
-                  confirmLabel: t('generated.components.recoverycenter.run_detached_checkout_b4ea704c'),
-                  run: async () => runAction(['checkout', selected.hash]),
-                })}
+                onClick={() =>
+                  void runDangerAware({
+                    title: t('generated.components.recoverycenter.detached_checkout_3c9fd080'),
+                    message: t('generated.components.recoverycenter.you_will_checkout_this_commit_directly_without_a_branch_153b7dd0'),
+                    confirmLabel: t('generated.components.recoverycenter.run_detached_checkout_b4ea704c'),
+                    run: async () => runAction(['checkout', selected.hash]),
+                  })
+                }
               >
                 {t('generated.components.recoverycenter.detached_checkout_04424e95')}
               </button>
@@ -142,12 +162,14 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
               <button
                 className="icon-btn"
                 style={{ borderColor: 'var(--status-danger-border)', color: 'var(--status-danger)' }}
-                onClick={() => void runDangerAware({
-                  title: t('generated.components.recoverycenter.run_hard_reset_77b9e84d'),
-                  message: t('generated.components.recoverycenter.resets_head_and_working_tree_to_this_reflog_commit_unsav_7ef0a45f'),
-                  confirmLabel: t('generated.components.recoverycenter.run_hard_reset_dadae533'),
-                  run: async () => runAction(['reset', '--hard', selected.hash]),
-                })}
+                onClick={() =>
+                  void runDangerAware({
+                    title: t('generated.components.recoverycenter.run_hard_reset_77b9e84d'),
+                    message: t('generated.components.recoverycenter.resets_head_and_working_tree_to_this_reflog_commit_unsav_7ef0a45f'),
+                    confirmLabel: t('generated.components.recoverycenter.run_hard_reset_dadae533'),
+                    run: async () => runAction(['reset', '--hard', selected.hash]),
+                  })
+                }
               >
                 {t('generated.components.recoverycenter.hard_reset_with_confirmation_b178e726')}
               </button>

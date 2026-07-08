@@ -10,7 +10,9 @@ type ParsedTag = {
 };
 
 function parseSemverTag(tag: string): ParsedTag | null {
-  const match = String(tag || '').trim().match(SEMVER_TAG_REGEX);
+  const match = String(tag || '')
+    .trim()
+    .match(SEMVER_TAG_REGEX);
   if (!match) return null;
 
   return {
@@ -21,34 +23,22 @@ function parseSemverTag(tag: string): ParsedTag | null {
   };
 }
 
-export function detectReleaseVersionBump(
-  previousTag: string | null | undefined,
-  nextTag: string,
-): ReleaseVersionBump | null {
+export function detectReleaseVersionBump(previousTag: string | null | undefined, nextTag: string): ReleaseVersionBump | null {
   const previous = parseSemverTag(previousTag || '');
   const next = parseSemverTag(nextTag);
   if (!previous || !next) return null;
 
   if (next.major > previous.major) return 'major';
   if (next.major === previous.major && next.minor > previous.minor) return 'minor';
-  if (
-    next.major === previous.major
-    && next.minor === previous.minor
-    && next.patch > previous.patch
-  ) {
+  if (next.major === previous.major && next.minor === previous.minor && next.patch > previous.patch) {
     return 'patch';
   }
 
   return null;
 }
 
-export function suggestNextReleaseTag(
-  tags: string[],
-  bump: ReleaseVersionBump = 'patch',
-): string {
-  const parsed = (Array.isArray(tags) ? tags : [])
-    .map(parseSemverTag)
-    .filter((item): item is ParsedTag => Boolean(item));
+export function suggestNextReleaseTag(tags: string[], bump: ReleaseVersionBump = 'patch'): string {
+  const parsed = (Array.isArray(tags) ? tags : []).map(parseSemverTag).filter((item): item is ParsedTag => Boolean(item));
 
   if (parsed.length === 0) {
     return bump === 'major' ? 'v1.0.0' : 'v0.1.0';

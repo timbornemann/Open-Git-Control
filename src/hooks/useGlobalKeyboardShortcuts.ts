@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { AppTabId } from '../components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
 
 type ShortcutHandlers = {
   setActiveTab: (tab: AppTabId) => void;
@@ -16,11 +16,7 @@ const isEditableFocused = (): boolean => {
   return el.matches(FOCUSABLE_TEXT_SELECTOR);
 };
 
-export const useGlobalKeyboardShortcuts = ({
-  setActiveTab,
-  onFetch,
-  onOpenCommandPalette,
-}: ShortcutHandlers) => {
+export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenCommandPalette }: ShortcutHandlers) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;

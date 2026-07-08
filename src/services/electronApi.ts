@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '../global';
+import type { ElectronAPI } from '@/global';
 
 export const getElectronApi = (): ElectronAPI | null => {
   if (typeof window === 'undefined') return null;

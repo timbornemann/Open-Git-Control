@@ -66,11 +66,13 @@ describe('registerAiHandlers', () => {
 
     const runningState = await getStateHandler!();
     expect(runningState.success).toBe(true);
-    expect(runningState.data).toEqual(expect.objectContaining({
-      operation: 'git:aiAutoCommit',
-      status: 'progress',
-      message: 'KI gruppiert Dateien...',
-    }));
+    expect(runningState.data).toEqual(
+      expect.objectContaining({
+        operation: 'git:aiAutoCommit',
+        status: 'progress',
+        message: 'KI gruppiert Dateien...',
+      }),
+    );
 
     const completeRun = runControl.resolve;
     expect(completeRun).toBeTruthy();

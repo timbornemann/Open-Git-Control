@@ -1,27 +1,16 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '../../../i18n';
-import { gitClient } from '../../../services/gitClient';
-import { githubClient } from '../../../services/githubClient';
-import type { RepoOwnerRef } from '../../../types/git';
-import type { RunGitCommandOptions } from '../state/appStateShared';
-import type { ConfirmDialogState } from '../layoutTypes';
+import { translateFromCatalog, trByLanguage, type AppLanguage, type TranslationVariables } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
+import type { RepoOwnerRef } from '@/types/git';
+import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
+import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 
 type Toast = { msg: string; isError: boolean };
 
-type CreatePullRequest = (input: {
-  title: string;
-  body: string;
-  head: string;
-  base: string;
-  currentBranch: string;
-}) => Promise<boolean>;
+type CreatePullRequest = (input: { title: string; body: string; head: string; base: string; currentBranch: string }) => Promise<boolean>;
 
-type RunGitCommand = (
-  args: string[],
-  successMsg: string,
-  actionLabel?: string,
-  options?: RunGitCommandOptions,
-) => Promise<boolean>;
+type RunGitCommand = (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
 
 type Params = {
   ownerRepo: RepoOwnerRef | null;
@@ -56,9 +45,12 @@ export const usePullRequestWorkflow = ({
   triggerRefresh,
   language,
 }: Params) => {
-  const tr = useCallback((deText: string, enText: string) => {
-    return trByLanguage(language, deText, enText);
-  }, [language]);
+  const tr = useCallback(
+    (deText: string, enText: string) => {
+      return trByLanguage(language, deText, enText);
+    },
+    [language],
+  );
   const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(language, key, variables), [language]);
 
   const handleCreatePR = useCallback(async () => {
@@ -76,88 +68,92 @@ export const usePullRequestWorkflow = ({
     void githubClient.openExternalUrl(url);
   }, []);
 
-  const handleCopyPRUrl = useCallback(async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.copied_pr_url_5326d67e'), isError: false });
-    } catch {
-      setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.could_not_copy_pr_url_15ef5c92'), isError: true });
-    }
-  }, [setGitActionToast, tr]);
-
-  const handleMergePR = useCallback(async (
-    prNumber: number,
-    mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge',
-  ) => {
-    if (!githubClient.isAvailable() || !ownerRepo) return;
-
-    const executeMerge = async () => {
+  const handleCopyPRUrl = useCallback(
+    async (url: string) => {
       try {
-        const result = await githubClient.mergePullRequest({
-          owner: ownerRepo.owner,
-          repo: ownerRepo.repo,
-          pullNumber: prNumber,
-          mergeMethod,
-        });
-
-        if (!result.success) {
-          setGitActionToast({ msg: result.error || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'), isError: true });
-          return;
-        }
-
-        setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
-        refreshRemoteState(true);
-        triggerRefresh();
-      } catch (error: any) {
-        setGitActionToast({ msg: error?.message || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'), isError: true });
+        await navigator.clipboard.writeText(url);
+        setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.copied_pr_url_5326d67e'), isError: false });
+      } catch {
+        setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.could_not_copy_pr_url_15ef5c92'), isError: true });
       }
-    };
+    },
+    [setGitActionToast, tr],
+  );
 
-    if (confirmDangerousOps) {
-      setConfirmDialog({
-        variant: 'danger',
-        title: tr(`Pull Request #${prNumber} mergen?`, `Merge pull request #${prNumber}?`),
-        message: tr(
-          `Dieser Vorgang merged PR #${prNumber} per ${mergeMethod} in ${ownerRepo.owner}/${ownerRepo.repo}.`,
-          `This will merge PR #${prNumber} with ${mergeMethod} into ${ownerRepo.owner}/${ownerRepo.repo}.`,
-        ),
-        contextItems: [
-          { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
-          { label: t('generated.components.layout.workflows.usepullrequestworkflow.method_bde313dd'), value: mergeMethod },
-        ],
-        irreversible: true,
-        consequences: t('generated.components.layout.workflows.usepullrequestworkflow.the_remote_pr_will_be_completed_on_github_and_the_target_b6cc8731'),
-        confirmLabel: t('generated.components.layout.sidebar.githubconnectedcontent.merge_pr_4b999c62'),
-        onConfirm: executeMerge,
-      });
-      return;
-    }
+  const handleMergePR = useCallback(
+    async (prNumber: number, mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge') => {
+      if (!githubClient.isAvailable() || !ownerRepo) return;
 
-    await executeMerge();
-  }, [
-    confirmDangerousOps,
-    ownerRepo,
-    refreshRemoteState,
-    setConfirmDialog,
-    setGitActionToast,
-    tr,
-    triggerRefresh,
-  ]);
+      const executeMerge = async () => {
+        try {
+          const result = await githubClient.mergePullRequest({
+            owner: ownerRepo.owner,
+            repo: ownerRepo.repo,
+            pullNumber: prNumber,
+            mergeMethod,
+          });
 
-  const handleCheckoutPR = useCallback(async (prNumber: number, headRef: string) => {
-    const targetBranch = gitClient.getPullRequestBranchName(prNumber, headRef);
-    const fetched = await runGitCommand(
-      gitClient.buildFetchPullRequestBranchArgs(prNumber, targetBranch),
-      tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
-      tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
-      { skipDirtyGuard: true },
-    );
-    if (!fetched) return;
-    await runGitCommand(
-      gitClient.buildCheckoutBranchArgs(targetBranch),
-      tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
-    );
-  }, [runGitCommand, tr]);
+          if (!result.success) {
+            setGitActionToast({
+              msg: result.error || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'),
+              isError: true,
+            });
+            return;
+          }
+
+          setGitActionToast({ msg: tr(`PR #${prNumber} wurde gemergt.`, `PR #${prNumber} merged.`), isError: false });
+          refreshRemoteState(true);
+          triggerRefresh();
+        } catch (error: any) {
+          setGitActionToast({
+            msg: error?.message || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'),
+            isError: true,
+          });
+        }
+      };
+
+      if (confirmDangerousOps) {
+        setConfirmDialog({
+          variant: 'danger',
+          title: tr(`Pull Request #${prNumber} mergen?`, `Merge pull request #${prNumber}?`),
+          message: tr(
+            `Dieser Vorgang merged PR #${prNumber} per ${mergeMethod} in ${ownerRepo.owner}/${ownerRepo.repo}.`,
+            `This will merge PR #${prNumber} with ${mergeMethod} into ${ownerRepo.owner}/${ownerRepo.repo}.`,
+          ),
+          contextItems: [
+            { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
+            { label: t('generated.components.layout.workflows.usepullrequestworkflow.method_bde313dd'), value: mergeMethod },
+          ],
+          irreversible: true,
+          consequences: t('generated.components.layout.workflows.usepullrequestworkflow.the_remote_pr_will_be_completed_on_github_and_the_target_b6cc8731'),
+          confirmLabel: t('generated.components.layout.sidebar.githubconnectedcontent.merge_pr_4b999c62'),
+          onConfirm: executeMerge,
+        });
+        return;
+      }
+
+      await executeMerge();
+    },
+    [confirmDangerousOps, ownerRepo, refreshRemoteState, setConfirmDialog, setGitActionToast, tr, triggerRefresh],
+  );
+
+  const handleCheckoutPR = useCallback(
+    async (prNumber: number, headRef: string) => {
+      const targetBranch = gitClient.getPullRequestBranchName(prNumber, headRef);
+      const fetched = await runGitCommand(
+        gitClient.buildFetchPullRequestBranchArgs(prNumber, targetBranch),
+        tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
+        tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
+        { skipDirtyGuard: true },
+      );
+      if (!fetched) return;
+      await runGitCommand(
+        gitClient.buildCheckoutBranchArgs(targetBranch),
+        tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
+      );
+    },
+    [runGitCommand, tr],
+  );
 
   return {
     handleCheckoutPR,

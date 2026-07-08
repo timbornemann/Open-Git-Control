@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { getConflictLineGutterKinds, splitContentLines, type ConflictGutterKind } from '../../utils/conflictLineGutter';
+import { getConflictLineGutterKinds, splitContentLines, type ConflictGutterKind } from '@/utils/conflictLineGutter';
 
 const gutterClassForKind = (kind: ConflictGutterKind): string => {
   switch (kind) {
@@ -38,11 +38,14 @@ export const ConflictSidePreview: React.FC<{ text: string; variant: 'ours' | 'th
   );
 };
 
-export const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
-  content: string;
-  disabled: boolean;
-  onChange: (next: string) => void;
-}>(({ content, disabled, onChange }, ref) => {
+export const ConflictManualEditor = React.forwardRef<
+  HTMLDivElement,
+  {
+    content: string;
+    disabled: boolean;
+    onChange: (next: string) => void;
+  }
+>(({ content, disabled, onChange }, ref) => {
   const lines = useMemo(() => splitContentLines(content), [content]);
   const gutterKinds = useMemo(() => getConflictLineGutterKinds(lines), [lines]);
   const textareaHeightPx = useMemo(() => {
@@ -69,9 +72,7 @@ export const ConflictManualEditor = React.forwardRef<HTMLDivElement, {
           <div className="conflict-manual-code-bg" aria-hidden>
             {lines.map((_, i) => {
               const kind = gutterKinds[i] || 'neutral';
-              return (
-                <div key={i} className={`conflict-manual-code-bg-line conflict-manual-code-bg-line--${kind}`} />
-              );
+              return <div key={i} className={`conflict-manual-code-bg-line conflict-manual-code-bg-line--${kind}`} />;
             })}
           </div>
           <textarea

@@ -1,5 +1,5 @@
 import type { ConflictBlock, ConflictEntry, ConflictResolutionChoice, DiffStats } from './types';
-import { parsePorcelainPath } from '../../utils/gitParsing';
+import { parsePorcelainPath } from '@/utils/gitParsing';
 
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
@@ -251,6 +251,5 @@ export const buildConflictResolution = (block: ConflictBlock, choice: ConflictRe
   return joinBothSides(block.ours, block.theirs, lineEnding);
 };
 
-export const replaceConflictBlock = (content: string, block: ConflictBlock, replacement: string): string => (
-  `${content.slice(0, block.start)}${replacement}${content.slice(block.end)}`
-);
+export const replaceConflictBlock = (content: string, block: ConflictBlock, replacement: string): string =>
+  `${content.slice(0, block.start)}${replacement}${content.slice(block.end)}`;

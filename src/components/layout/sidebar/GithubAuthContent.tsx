@@ -1,8 +1,8 @@
 import React from 'react';
 import { Key, ExternalLink, Github, ShieldCheck, Copy, Info } from 'lucide-react';
-import { AppSidebarProps, GithubAuthHelpMethod } from './AppSidebar.types';
-import { useI18n } from '../../../i18n';
-import { appClient } from '../../../services/appClient';
+import type { AppSidebarProps, GithubAuthHelpMethod } from './AppSidebar.types';
+import { useI18n } from '@/i18n';
+import { appClient } from '@/services/appClient';
 
 type GithubAuthContentProps = Pick<
   AppSidebarProps,
@@ -30,20 +30,12 @@ const HelpMethodButton: React.FC<{
   onClick: () => void;
   title: string;
 }> = ({ active, onClick, title }) => (
-  <button
-    className={`icon-btn sidebar-help-action ${active ? 'sidebar-help-action-active' : 'sidebar-help-action-inactive'}`}
-    onClick={onClick}
-    title={title}
-  >
+  <button className={`icon-btn sidebar-help-action ${active ? 'sidebar-help-action-active' : 'sidebar-help-action-inactive'}`} onClick={onClick} title={title}>
     <Info size={12} />
   </button>
 );
 
-const toggleMethod = (
-  current: GithubAuthHelpMethod,
-  next: Exclude<GithubAuthHelpMethod, null>,
-  onSelect: (method: GithubAuthHelpMethod) => void,
-) => {
+const toggleMethod = (current: GithubAuthHelpMethod, next: Exclude<GithubAuthHelpMethod, null>, onSelect: (method: GithubAuthHelpMethod) => void) => {
   onSelect(current === next ? null : next);
 };
 
@@ -91,9 +83,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             title={t('generated.components.layout.sidebar.githubauthcontent.show_step_by_step_guide_for_method_1_60a29ccc')}
           />
         </div>
-        <p className="sidebar-meta-text">
-          {t('generated.components.layout.sidebar.githubauthcontent.classic_sign_in_with_your_own_token_345eec09')}
-        </p>
+        <p className="sidebar-meta-text">{t('generated.components.layout.sidebar.githubauthcontent.classic_sign_in_with_your_own_token_345eec09')}</p>
         <a
           href="#"
           onClick={(e) => {
@@ -121,11 +111,11 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             type="password"
             placeholder="ghp_xxx"
             value={tokenInput}
-            onChange={e => {
+            onChange={(e) => {
               setTokenInput(e.target.value);
               setAuthError(null);
             }}
-            onKeyDown={e => {
+            onKeyDown={(e) => {
               if (e.key === 'Enter') onTokenLogin();
             }}
             className="sidebar-filter-input"
@@ -157,13 +147,17 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             fontWeight: 600,
           }}
         >
-          {isAuthenticating ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1') : t('generated.components.layout.sidebar.githubauthcontent.connect_with_token_85fe9356')}
+          {isAuthenticating
+            ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1')
+            : t('generated.components.layout.sidebar.githubauthcontent.connect_with_token_85fe9356')}
         </button>
       </div>
 
       <div className="sidebar-panel-block">
         <div className="sidebar-panel-row">
-          <div className="sidebar-panel-title">{t('generated.components.layout.sidebar.githubauthcontent.method_2_oauth_device_flow_alternative_b02d5009')}</div>
+          <div className="sidebar-panel-title">
+            {t('generated.components.layout.sidebar.githubauthcontent.method_2_oauth_device_flow_alternative_b02d5009')}
+          </div>
           <HelpMethodButton
             active={selectedGithubAuthHelpMethod === 'device'}
             onClick={() => toggleMethod(selectedGithubAuthHelpMethod, 'device', onSelectGithubAuthHelpMethod)}
@@ -187,10 +181,21 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         )}
 
         {deviceFlow && (
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', textAlign: 'left', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '8px', backgroundColor: 'var(--bg-dark)' }}>
+          <div
+            style={{
+              fontSize: '0.78rem',
+              color: 'var(--text-primary)',
+              textAlign: 'left',
+              border: '1px solid var(--border-color)',
+              borderRadius: '4px',
+              padding: '8px',
+              backgroundColor: 'var(--bg-dark)',
+            }}
+          >
             <div className="sidebar-panel-row">
               <ShieldCheck size={12} />
-              {t('generated.components.layout.sidebar.githubauthcontent.code_d1f8576a')}: <strong style={{ letterSpacing: '1px' }}>{deviceFlow.userCode}</strong>
+              {t('generated.components.layout.sidebar.githubauthcontent.code_d1f8576a')}:{' '}
+              <strong style={{ letterSpacing: '1px' }}>{deviceFlow.userCode}</strong>
               <button
                 className="icon-btn sidebar-row-action-icon"
                 style={{ marginLeft: 'auto' }}
@@ -221,7 +226,9 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
               fontWeight: 600,
             }}
           >
-            {isDeviceFlowRunning ? t('generated.components.layout.sidebar.githubauthcontent.waiting_for_authorization_3dfc6039') : t('generated.components.layout.sidebar.githubauthcontent.start_device_flow_867b47bb')}
+            {isDeviceFlowRunning
+              ? t('generated.components.layout.sidebar.githubauthcontent.waiting_for_authorization_3dfc6039')
+              : t('generated.components.layout.sidebar.githubauthcontent.start_device_flow_867b47bb')}
           </button>
           {isDeviceFlowRunning && (
             <button
@@ -273,7 +280,9 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             fontWeight: 600,
           }}
         >
-          {isWebFlowRunning ? t('generated.components.layout.sidebar.githubauthcontent.browser_login_in_progress_9cf3975c') : t('generated.components.layout.sidebar.githubauthcontent.sign_in_with_github_c275fc82')}
+          {isWebFlowRunning
+            ? t('generated.components.layout.sidebar.githubauthcontent.browser_login_in_progress_9cf3975c')
+            : t('generated.components.layout.sidebar.githubauthcontent.sign_in_with_github_c275fc82')}
         </button>
       </div>
     </div>
