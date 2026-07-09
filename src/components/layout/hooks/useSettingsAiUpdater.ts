@@ -245,3 +245,5 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     handleRunOneClickUpdate,
   };
 };
+
+export type SettingsAiUpdaterState = ReturnType<typeof useSettingsAiUpdater>;

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import type { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '@/types/githubDtos';
+import { useEffect, useRef, useState } from 'react';
+import type { DeviceFlowPollDto, DeviceFlowStartDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
-import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
+import { useGithubCloneWorkflow } from './github/useGithubCloneWorkflow';
+import { useGithubRepositoryPages } from './github/useGithubRepositoryPages';
 
 type Params = {
   onRepoCloned: (repoPath: string) => Promise<void>;
@@ -13,24 +14,9 @@ type Params = {
   githubHost: string;
 };
 
-const deriveRepoNameFromCloneSource = (cloneSource: string): string => {
-  const normalizedSource = String(cloneSource || '').trim();
-  if (!normalizedSource) return 'repository';
-
-  const withoutProtocol = normalizedSource.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
-  const normalizedPath = withoutProtocol
-    .replace(/^git@[^:]+:/i, '')
-    .replace(/\\/g, '/')
-    .replace(/\/+$/, '')
-    .replace(/\.git$/i, '');
-  const lastSegment = normalizedPath.split('/').pop() || 'repository';
-  return lastSegment || 'repository';
-};
-
 export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOauthClientId, githubHost }: Params) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubUser, setGithubUser] = useState<string | null>(null);
-  const [githubRepos, setGithubRepos] = useState<GitHubRepositoryDto[]>([]);
   const [tokenInput, setTokenInput] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -45,21 +31,11 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const pollingRef = useRef<number | null>(null);
   const stoppedRef = useRef(false);
   const initializedHostRef = useRef<string | null>(null);
-  const hasLoadedReposOnceRef = useRef(false);
-  const currentRepoSearchRef = useRef('');
-
-  const [isCloning, setIsCloning] = useState(false);
-  const [cloneLog, setCloneLog] = useState<string[]>([]);
-  const [cloneRepoName, setCloneRepoName] = useState<string | null>(null);
-  const [cloneFinished, setCloneFinished] = useState(false);
-  const [cloneError, setCloneError] = useState<string | null>(null);
-
-  const [nextRepoPage, setNextRepoPage] = useState<number | null>(1);
-  const [githubReposHasMore, setGithubReposHasMore] = useState(false);
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
-  const [isLoadingMoreRepos, setIsLoadingMoreRepos] = useState(false);
 
   const { t } = useLanguageTranslations(language);
+  const repositoryPages = useGithubRepositoryPages({ isAuthenticated, t });
+  const cloneWorkflow = useGithubCloneWorkflow({ onRepoCloned, setActiveTab, t });
+  const { resetRepositoryPages } = repositoryPages;
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {
@@ -67,72 +43,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       pollingRef.current = null;
     }
   };
-
-  const fetchReposPage = useCallback(
-    async (mode: 'reset' | 'append', page: number, search: string) => {
-      if (!githubClient.isAvailable() || !isAuthenticated) return;
-
-      const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-
-      if (mode === 'reset') {
-        setIsLoadingRepos(true);
-      } else {
-        setIsLoadingMoreRepos(true);
-      }
-
-      try {
-        const result = await githubClient.getRepositories({
-          page: safePage,
-          perPage: 50,
-          search,
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || t('generated.components.layout.hooks.usegithubdomain.could_not_load_repositories_cec34760'));
-        }
-
-        const payload = result.data;
-        const repos = payload?.repos || [];
-        setNextRepoPage(payload?.nextPage || null);
-        setGithubReposHasMore(Boolean(payload?.hasMore && payload?.nextPage));
-
-        if (mode === 'reset') {
-          setGithubRepos(repos);
-        } else {
-          setGithubRepos((prev) => {
-            const map = new Map<number, GitHubRepositoryDto>();
-            for (const repo of prev) map.set(repo.id, repo);
-            for (const repo of repos) map.set(repo.id, repo);
-            return [...map.values()];
-          });
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (mode === 'reset') {
-          setIsLoadingRepos(false);
-        } else {
-          setIsLoadingMoreRepos(false);
-        }
-      }
-    },
-    [isAuthenticated, t],
-  );
-
-  const refreshRepos = useCallback(
-    async (searchOverride?: string) => {
-      const search = typeof searchOverride === 'string' ? searchOverride : currentRepoSearchRef.current;
-      currentRepoSearchRef.current = search;
-      setNextRepoPage(1);
-      await fetchReposPage('reset', 1, search);
-    },
-    [fetchReposPage],
-  );
-
-  const loadMoreRepos = useCallback(async () => {
-    if (isLoadingMoreRepos || !githubReposHasMore || !nextRepoPage) return;
-    await fetchReposPage('append', nextRepoPage, currentRepoSearchRef.current);
-  }, [fetchReposPage, githubReposHasMore, isLoadingMoreRepos, nextRepoPage]);
 
   useEffect(() => {
     const normalizedHost = (githubHost || '').trim().toLowerCase() || 'github.com';
@@ -157,8 +67,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         if (loginResult.success && loginResult.authenticated) {
           setIsAuthenticated(true);
           setGithubUser(loginResult.username);
-          setNextRepoPage(1);
-          setGithubReposHasMore(false);
+          resetRepositoryPages();
         } else {
           setIsAuthenticated(false);
           setGithubUser(null);
@@ -172,7 +81,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     };
 
     void loginWithSavedToken();
-  }, [githubHost]);
+  }, [githubHost, resetRepositoryPages]);
 
   useEffect(() => {
     stoppedRef.current = false;
@@ -206,19 +115,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     void refreshOauthStatus();
   }, [githubOauthClientId, githubHost]);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      hasLoadedReposOnceRef.current = false;
-      currentRepoSearchRef.current = '';
-      return;
-    }
-
-    if (hasLoadedReposOnceRef.current) return;
-
-    hasLoadedReposOnceRef.current = true;
-    void refreshRepos('');
-  }, [isAuthenticated, refreshRepos]);
-
   const handleTokenLogin = async () => {
     if (!githubClient.isAvailable()) return;
     const token = tokenInput.trim();
@@ -240,8 +136,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         setTokenInput('');
         const status = await githubClient.checkAuthStatus();
         setGithubUser(status.username);
-        setNextRepoPage(1);
-        setGithubReposHasMore(false);
+        resetRepositoryPages();
       } else {
         setAuthError(t('generated.components.layout.hooks.usegithubdomain.invalid_token_please_check_permissions_73c7b36b'));
       }
@@ -283,8 +178,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           setDeviceFlowError(null);
           setIsAuthenticated(true);
           setGithubUser(data.username || null);
-          setNextRepoPage(1);
-          setGithubReposHasMore(false);
+          resetRepositoryPages();
         } catch (error: any) {
           setIsDeviceFlowRunning(false);
           setDeviceFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.device_flow_polling_failed_bbf5f761'));
@@ -337,8 +231,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       setIsAuthenticated(true);
       setGithubUser(loginResult.data.username || null);
       setTokenInput('');
-      setNextRepoPage(1);
-      setGithubReposHasMore(false);
+      resetRepositoryPages();
     } catch (error: any) {
       setWebFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));
     } finally {
@@ -368,104 +261,23 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     } finally {
       setIsAuthenticated(false);
       setGithubUser(null);
-      setGithubRepos([]);
       setTokenInput('');
-      setNextRepoPage(1);
-      setGithubReposHasMore(false);
-      setIsLoadingRepos(false);
-      setIsLoadingMoreRepos(false);
-      hasLoadedReposOnceRef.current = false;
-      currentRepoSearchRef.current = '';
+      resetRepositoryPages({ clearRepos: true });
     }
   };
-
-  const cloneRepository = useCallback(
-    async (
-      cloneUrl: string,
-      options: {
-        repoName?: string;
-        targetDir?: string | null;
-        targetName?: string;
-        switchToRepoTab?: boolean;
-      } = {},
-    ): Promise<boolean> => {
-      if (!gitClient.isAvailable() || !appClient.isAvailable()) return false;
-      const normalizedCloneUrl = String(cloneUrl || '').trim();
-      if (!normalizedCloneUrl) {
-        setCloneError(t('generated.components.layout.hooks.usegithubdomain.clone_url_is_required_f633ac79'));
-        return false;
-      }
-      const targetDir = options.targetDir ?? (await appClient.selectDirectory());
-      if (!targetDir) return false;
-
-      setIsCloning(true);
-      setCloneLog([]);
-      setCloneRepoName(options.repoName || options.targetName || deriveRepoNameFromCloneSource(normalizedCloneUrl));
-      setCloneFinished(false);
-      setCloneError(null);
-
-      const cleanup = gitClient.onCloneProgress((line: string) => {
-        setCloneLog((prev) => [...prev, line]);
-      });
-
-      try {
-        const result = await gitClient.gitClone(normalizedCloneUrl, targetDir, options.targetName);
-        if (result.success) {
-          setCloneFinished(true);
-          setCloneLog((prev) => [
-            ...prev,
-            `SUCCESS: ${t('generated.components.layout.hooks.usegithubdomain.repository_cloned_successfully_to_667ce18e')}: ${result.repoPath}`,
-          ]);
-          await onRepoCloned(result.repoPath);
-          if (options.switchToRepoTab !== false) {
-            setActiveTab('repo');
-          }
-          return true;
-        } else {
-          const errorMessage = result.error || t('generated.components.layout.hooks.usegithubdomain.unknown_error_2e5d0f05');
-          setCloneError(errorMessage);
-          setCloneLog((prev) => [...prev, `ERROR: ${errorMessage}`]);
-          return false;
-        }
-      } catch (e: any) {
-        setCloneError(e.message);
-        setCloneLog((prev) => [...prev, `ERROR: ${e.message}`]);
-        return false;
-      } finally {
-        cleanup();
-        setIsCloning(false);
-      }
-    },
-    [onRepoCloned, setActiveTab, t],
-  );
-
-  const handleClone = useCallback(
-    async (cloneUrl: string, repoName: string) => {
-      await cloneRepository(cloneUrl, { repoName });
-    },
-    [cloneRepository],
-  );
-
-  const closeCloneProgress = useCallback(() => {
-    setIsCloning(false);
-    setCloneFinished(false);
-    setCloneError(null);
-    setCloneLog([]);
-    setCloneRepoName(null);
-  }, []);
 
   return {
     isAuthenticated,
     setIsAuthenticated,
     githubUser,
     setGithubUser,
-    githubRepos,
-    setGithubRepos,
-    githubReposHasMore,
-    isLoadingRepos,
-    isLoadingMoreRepos,
-    loadMoreRepos,
-    refreshRepos,
+    githubRepos: repositoryPages.githubRepos,
+    setGithubRepos: repositoryPages.setGithubRepos,
+    githubReposHasMore: repositoryPages.githubReposHasMore,
+    isLoadingRepos: repositoryPages.isLoadingRepos,
+    isLoadingMoreRepos: repositoryPages.isLoadingMoreRepos,
+    loadMoreRepos: repositoryPages.loadMoreRepos,
+    refreshRepos: repositoryPages.refreshRepos,
     tokenInput,
     setTokenInput,
     isAuthenticating,
@@ -483,14 +295,14 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     handleStartWebFlowLogin,
     handleLogout,
 
-    isCloning,
-    setIsCloning,
-    closeCloneProgress,
-    cloneLog,
-    cloneRepoName,
-    cloneFinished,
-    cloneError,
-    cloneRepository,
-    handleClone,
+    isCloning: cloneWorkflow.isCloning,
+    setIsCloning: cloneWorkflow.setIsCloning,
+    closeCloneProgress: cloneWorkflow.closeCloneProgress,
+    cloneLog: cloneWorkflow.cloneLog,
+    cloneRepoName: cloneWorkflow.cloneRepoName,
+    cloneFinished: cloneWorkflow.cloneFinished,
+    cloneError: cloneWorkflow.cloneError,
+    cloneRepository: cloneWorkflow.cloneRepository,
+    handleClone: cloneWorkflow.handleClone,
   };
 };

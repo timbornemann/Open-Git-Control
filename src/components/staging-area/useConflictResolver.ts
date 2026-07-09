@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { basename, buildConflictResolution, countConflictMarkerLines, detectLineEnding, parseConflictBlocks, replaceConflictBlock } from './utils';
 import type { ConfirmDialogState, ConflictEditorState, ConflictResolutionChoice, GitStatusWithConflicts } from './types';
+import { useConflictAutoOpen } from './useConflictAutoOpen';
+import { useConflictBlockCounts } from './useConflictBlockCounts';
+import { useConflictNavigation } from './useConflictNavigation';
 
 type Params = {
   repoPath: string | null;
@@ -35,14 +38,9 @@ export const useConflictResolver = ({
   const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
   const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
-  const [conflictBlockCountsByPath, setConflictBlockCountsByPath] = useState<Record<string, number>>({});
-  const [isConflictBlockCountPending, setIsConflictBlockCountPending] = useState(false);
 
   const conflictManualScrollRef = useRef<HTMLDivElement>(null);
-  const autoOpenedConflictPathRef = useRef<string | null>(null);
-  const appliedInitialConflictPathRef = useRef<string | null>(null);
-  const autoScrollAnchorRef = useRef<string>('');
-  const countedConflictPathsKeyRef = useRef<string>('');
+  const { conflictBlockCountsByPath, isConflictBlockCountPending } = useConflictBlockCounts({ repoPath, status });
 
   const openConflictEditor = useCallback(
     async (filePath: string, initialBlockIndex = 0) => {
@@ -95,123 +93,16 @@ export const useConflictResolver = ({
   const isStructuredConflictViewLocked = hasRawConflictMarkers && (!hasBalancedConflictMarkers || conflictBlocks.length !== conflictMarkerStats.starts);
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
-  useEffect(() => {
-    if (!repoPath || !gitClient.isAvailable() || !status?.conflicts?.length) {
-      setConflictBlockCountsByPath({});
-      setIsConflictBlockCountPending(false);
-      countedConflictPathsKeyRef.current = '';
-      return;
-    }
-
-    let cancelled = false;
-    const paths = [...new Set(status.conflicts.map((c) => c.path))].sort();
-    const pathsKey = `${repoPath}::${paths.join('\u0001')}`;
-    const shouldShowPending = countedConflictPathsKeyRef.current !== pathsKey;
-    if (shouldShowPending) {
-      setIsConflictBlockCountPending(true);
-    }
-
-    (async () => {
-      const next: Record<string, number> = {};
-      try {
-        for (const path of paths) {
-          const r = await gitClient.readRepoFile(path);
-          if (cancelled) return;
-          next[path] = r.success && typeof r.data === 'string' ? parseConflictBlocks(normalizeMergeConflictFileContent(r.data)).length : 0;
-        }
-        if (!cancelled) {
-          setConflictBlockCountsByPath((prev) => {
-            const normalized: Record<string, number> = {};
-            let changed = Object.keys(prev).length !== paths.length;
-            for (const path of paths) {
-              const value = next[path] ?? 0;
-              normalized[path] = value;
-              if (prev[path] !== value) changed = true;
-            }
-            return changed ? normalized : prev;
-          });
-        }
-      } finally {
-        if (!cancelled) {
-          countedConflictPathsKeyRef.current = pathsKey;
-          setIsConflictBlockCountPending(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repoPath, status]);
-
-  useLayoutEffect(() => {
-    if (!selectedConflictBlock) return;
-    if (isStructuredConflictViewLocked) return;
-    if (!conflictEditor?.filePath) return;
-
-    const anchor = `${conflictEditor.filePath}::${selectedConflictBlockIndex}`;
-    if (autoScrollAnchorRef.current === anchor) return;
-    autoScrollAnchorRef.current = anchor;
-
-    const el = conflictManualScrollRef.current;
-    if (!el) return;
-    const line = selectedConflictBlock.startLine;
-    const run = () => {
-      const ta = el.querySelector('textarea.conflict-manual-textarea');
-      if (!(ta instanceof HTMLTextAreaElement)) return;
-      const lh = parseFloat(getComputedStyle(ta).lineHeight || '18');
-      const scrollTop = Math.max(0, (line - 1) * lh - 56);
-      el.scrollTop = scrollTop;
-    };
-    requestAnimationFrame(() => {
-      requestAnimationFrame(run);
-    });
-  }, [selectedConflictBlockIndex, conflictEditor?.filePath, selectedConflictBlock, isStructuredConflictViewLocked]);
-
-  useEffect(() => {
-    if (conflictBlocks.length === 0) {
-      if (selectedConflictBlockIndex !== 0) setSelectedConflictBlockIndex(0);
-      return;
-    }
-    if (selectedConflictBlockIndex > conflictBlocks.length - 1) {
-      setSelectedConflictBlockIndex(conflictBlocks.length - 1);
-    }
-  }, [conflictBlocks.length, selectedConflictBlockIndex]);
-
-  useEffect(() => {
-    if (onOpenConflictResolver && !isConflictOnly) return;
-    if (!status || status.conflicts.length === 0) {
-      autoOpenedConflictPathRef.current = null;
-      setConflictEditor(null);
-      setSelectedConflictBlockIndex(0);
-      return;
-    }
-    const activePath = conflictEditor?.filePath || null;
-    const activeStillConflicting = activePath ? status.conflicts.some((entry) => entry.path === activePath) : false;
-    if (activeStillConflicting) {
-      autoOpenedConflictPathRef.current = activePath;
-      return;
-    }
-    const nextPath = status.conflicts[0]?.path;
-    if (!nextPath) return;
-    if (!activePath && autoOpenedConflictPathRef.current === nextPath) return;
-    autoOpenedConflictPathRef.current = nextPath;
-    void openConflictEditor(nextPath);
-  }, [status, conflictEditor, openConflictEditor, onOpenConflictResolver, isConflictOnly]);
-
-  useEffect(() => {
-    if (!isConflictOnly) {
-      appliedInitialConflictPathRef.current = null;
-      return;
-    }
-    if (!initialConflictPath) return;
-    if (!status || status.conflicts.length === 0) return;
-    if (appliedInitialConflictPathRef.current === initialConflictPath) return;
-    if (!status.conflicts.some((entry) => entry.path === initialConflictPath)) return;
-    appliedInitialConflictPathRef.current = initialConflictPath;
-    if (conflictEditor?.filePath === initialConflictPath) return;
-    void openConflictEditor(initialConflictPath);
-  }, [isConflictOnly, initialConflictPath, status, conflictEditor?.filePath, openConflictEditor]);
+  useConflictAutoOpen({
+    status,
+    conflictEditor,
+    setConflictEditor,
+    setSelectedConflictBlockIndex,
+    openConflictEditor,
+    initialConflictPath,
+    isConflictOnly,
+    onOpenConflictResolver,
+  });
 
   const applyConflictChoiceToSelected = useCallback(
     (choice: ConflictResolutionChoice) => {
@@ -385,47 +276,17 @@ export const useConflictResolver = ({
     });
   }, []);
 
-  // Derived navigation values (need status + editor state)
-  const conflictPaths = useMemo(() => (status ? [...new Set(status.conflicts.map((e) => e.path))].sort((a, b) => a.localeCompare(b)) : []), [status]);
-  const safeSelectedConflictBlockIndex = conflictBlocks.length > 0 ? Math.min(selectedConflictBlockIndex, conflictBlocks.length - 1) : 0;
-  const activeConflictFileIndex = conflictEditor ? conflictPaths.indexOf(conflictEditor.filePath) : -1;
-  const canUseStructuredConflictNavigation = Boolean(conflictEditor) && !isStructuredConflictViewLocked && conflictBlocks.length > 0;
-  const hasPreviousConflictTarget = canUseStructuredConflictNavigation && (safeSelectedConflictBlockIndex > 0 || activeConflictFileIndex > 0);
-  const hasNextConflictTarget =
-    canUseStructuredConflictNavigation &&
-    (safeSelectedConflictBlockIndex < conflictBlocks.length - 1 || (activeConflictFileIndex >= 0 && activeConflictFileIndex < conflictPaths.length - 1));
-
-  const navigateToPreviousConflict = useCallback(async () => {
-    if (!canUseStructuredConflictNavigation || !conflictEditor) return;
-    if (safeSelectedConflictBlockIndex > 0) {
-      setSelectedConflictBlockIndex((prev) => Math.max(prev - 1, 0));
-      return;
-    }
-    if (activeConflictFileIndex <= 0) return;
-    const previousPath = conflictPaths[activeConflictFileIndex - 1];
-    if (!previousPath) return;
-    await openConflictEditor(previousPath, Number.MAX_SAFE_INTEGER);
-  }, [canUseStructuredConflictNavigation, conflictEditor, safeSelectedConflictBlockIndex, activeConflictFileIndex, conflictPaths, openConflictEditor]);
-
-  const navigateToNextConflict = useCallback(async () => {
-    if (!canUseStructuredConflictNavigation || !conflictEditor) return;
-    if (safeSelectedConflictBlockIndex < conflictBlocks.length - 1) {
-      setSelectedConflictBlockIndex((prev) => prev + 1);
-      return;
-    }
-    if (activeConflictFileIndex < 0 || activeConflictFileIndex >= conflictPaths.length - 1) return;
-    const nextPath = conflictPaths[activeConflictFileIndex + 1];
-    if (!nextPath) return;
-    await openConflictEditor(nextPath, 0);
-  }, [
-    canUseStructuredConflictNavigation,
+  const navigation = useConflictNavigation({
+    status,
     conflictEditor,
-    safeSelectedConflictBlockIndex,
-    conflictBlocks.length,
-    activeConflictFileIndex,
-    conflictPaths,
+    conflictBlocks,
+    selectedConflictBlock,
+    selectedConflictBlockIndex,
+    setSelectedConflictBlockIndex,
+    isStructuredConflictViewLocked,
+    conflictManualScrollRef,
     openConflictEditor,
-  ]);
+  });
 
   const blockCountForPath = useCallback(
     (path: string) => {
@@ -462,14 +323,14 @@ export const useConflictResolver = ({
     rebaseAbort,
     onConflictEditorContentChange,
     // Navigation
-    conflictPaths,
-    safeSelectedConflictBlockIndex,
-    activeConflictFileIndex,
-    canUseStructuredConflictNavigation,
-    hasPreviousConflictTarget,
-    hasNextConflictTarget,
-    navigateToPreviousConflict,
-    navigateToNextConflict,
+    conflictPaths: navigation.conflictPaths,
+    safeSelectedConflictBlockIndex: navigation.safeSelectedConflictBlockIndex,
+    activeConflictFileIndex: navigation.activeConflictFileIndex,
+    canUseStructuredConflictNavigation: navigation.canUseStructuredConflictNavigation,
+    hasPreviousConflictTarget: navigation.hasPreviousConflictTarget,
+    hasNextConflictTarget: navigation.hasNextConflictTarget,
+    navigateToPreviousConflict: navigation.navigateToPreviousConflict,
+    navigateToNextConflict: navigation.navigateToNextConflict,
     blockCountForPath,
   };
 };

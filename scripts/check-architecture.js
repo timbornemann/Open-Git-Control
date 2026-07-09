@@ -8,10 +8,7 @@ const ignoredDirs = new Set(['coverage', 'dist', 'dist-electron', 'node_modules'
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
 const importExtensions = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
-const maxLineExceptions = new Map([
-  ['electron/__tests__/AiService.test.ts', 'Large integration-style test fixture; split with the AI service test cleanup.'],
-  ['electron/__tests__/GitService.test.ts', 'Large service test suite; split by Git service capability groups.'],
-]);
+const maxLineExceptions = new Map([]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];
 const allowedElectronSrcPrefixes = ['src/shared/', 'src/types/'];
