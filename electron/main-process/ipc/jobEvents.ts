@@ -12,5 +12,11 @@ export type JobEventPayload = {
 };
 
 export function emitJobEvent(webContents: Electron.WebContents, event: JobEventPayload): void {
-  webContents.send(IpcChannel.JobEvent, event);
+  try {
+    if (!webContents || webContents.isDestroyed?.()) return;
+    webContents.send(IpcChannel.JobEvent, event);
+  } catch (error: any) {
+    if (/object has been destroyed/i.test(String(error?.message || ''))) return;
+    throw error;
+  }
 }

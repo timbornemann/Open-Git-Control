@@ -605,6 +605,9 @@ export class GitRunner {
     if (primary === 'submodule' && secondary === 'status') {
       return /no submodule mapping found in \.gitmodules for path/i.test(errorText);
     }
+    if (primary === 'remote' && secondary === 'get-url' && String(args?.[2] || '').trim() === 'origin') {
+      return /no such remote ['"]?origin['"]?/i.test(errorText);
+    }
     return false;
   }
 

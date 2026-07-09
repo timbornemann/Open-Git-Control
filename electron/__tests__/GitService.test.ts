@@ -552,6 +552,28 @@ describe('GitService expected non-fatal git errors', () => {
     }
   });
 
+  it('treats missing origin as a normal local repository state', async () => {
+    const error: any = new Error('Command failed');
+    error.stderr = "error: No such remote 'origin'";
+
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-local-only-origin-test-'));
+
+    try {
+      await expect(service.getRepoOriginUrl(repoDir)).resolves.toBeNull();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
   it('logs git format strings without treating %s as console placeholders', async () => {
     const error: any = new Error('Command failed');
     error.stderr = 'fatal: bad revision';
