@@ -5,10 +5,13 @@ import {
   type DeviceFlowPollResult,
   type DeviceFlowStartResult,
   type GitHubAuthSession,
+  type GitHubOctokit,
   type WebFlowExchangeParams,
   type WebFlowExchangeResult,
   oauthEndpointForHost,
 } from './types';
+
+type OctokitConstructor = new (options: { auth: string; baseUrl: string }) => GitHubOctokit;
 
 export class GitHubAuthService {
   private normalizeClientId(value: unknown): string | null {
@@ -68,7 +71,7 @@ export class GitHubAuthService {
 
       // Using new Function prevents TypeScript from compiling dynamic import into require().
       const _importDynamic = new Function('modulePath', 'return import(modulePath)');
-      const { Octokit } = await _importDynamic('octokit');
+      const { Octokit } = (await _importDynamic('octokit')) as { Octokit: OctokitConstructor };
       const octokit = new Octokit({ auth: token, baseUrl: this.getApiBaseUrl(host) });
 
       await octokit.rest.rateLimit.get();

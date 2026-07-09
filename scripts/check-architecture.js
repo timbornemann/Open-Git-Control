@@ -9,20 +9,9 @@ const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
 const importExtensions = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
 const maxLineExceptions = new Map([
-  ['src/styles/conflict-resolver.css', 'Legacy feature stylesheet; split when the conflict resolver UI is modularized.'],
   ['electron/__tests__/AiService.test.ts', 'Large integration-style test fixture; split with the AI service test cleanup.'],
-  ['src/styles/base.css', 'Legacy global stylesheet; keep shrinking into UI kit and feature CSS.'],
-  ['src/styles/settings.css', 'Legacy settings stylesheet; split along settings feature panels.'],
-  ['src/styles/release-creator.css', 'Legacy release feature stylesheet; split with release creator component cleanup.'],
-  ['src/styles/sidebar-repo.css', 'Legacy sidebar repository stylesheet; split with sidebar feature cleanup.'],
-  ['src/components/commit-graph/CommitGraph.tsx', 'Legacy complex feature component; split into rendering and interaction subcomponents.'],
-  ['src/styles/project-planner.css', 'Legacy project planner stylesheet; split with planner module cleanup.'],
-  ['src/styles/theme-palettes.css', 'Large generated palette surface; keep explicit until palette tokens are generated.'],
   ['electron/git/GitRunner.ts', 'Core Git process runner; requires dedicated refactor because it owns process policy.'],
-  ['src/styles/commit-graph.css', 'Legacy commit graph stylesheet; split with commit graph module cleanup.'],
-  ['electron/ai/AiAutoCommitRunner.ts', 'AI auto-commit orchestration hotspot; split as part of AI workflow refactor.'],
   ['src/utils/gitParsing.ts', 'Legacy parser collection; split into branch, status and conflict parsers.'],
-  ['src/styles/diff-viewer.css', 'Legacy diff viewer stylesheet; split with diff viewer module cleanup.'],
   ['electron/__tests__/GitService.test.ts', 'Large service test suite; split by Git service capability groups.'],
 ]);
 

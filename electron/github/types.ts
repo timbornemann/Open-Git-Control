@@ -1,3 +1,4 @@
+import type { Octokit } from 'octokit';
 import type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto } from '../../src/types/githubDtos';
 
 export const DEVICE_CODE_PATH = '/login/device/code';
@@ -32,7 +33,7 @@ export type WebFlowExchangeResult = {
 };
 
 export type GitHubAuthSession = {
-  octokit: any;
+  octokit: GitHubOctokit;
   token: string;
   username: string | null;
   host: string;
@@ -147,7 +148,8 @@ export type GithubApiErrorLike = {
   };
 };
 
-export type GitHubOctokitProvider = () => any;
+export type GitHubOctokit = Octokit;
+export type GitHubOctokitProvider = () => GitHubOctokit;
 
 export type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto };
 

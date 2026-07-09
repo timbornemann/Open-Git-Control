@@ -32,6 +32,8 @@ type Params = {
   onRefreshWorkingTree?: () => Promise<void>;
 };
 
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error || ''));
+
 export const useCommitGraphData = ({
   repoPath,
   showSecondaryHistory,
@@ -166,8 +168,8 @@ export const useCommitGraphData = ({
           }
           console.error('Failed to fetch commits:', result.error);
         }
-      } catch (e) {
-        if (isRepoUnavailableError(String((e as any)?.message || e || ''))) {
+      } catch (e: unknown) {
+        if (isRepoUnavailableError(errorMessage(e))) {
           setLayout(null);
           setCommitCount(0);
           commitCountRef.current = 0;

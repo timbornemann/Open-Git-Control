@@ -1,27 +1,29 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import { mergeableDecoratedRefs, normalizeBranchRefForMerge, type GitStatusDetailed } from '@/utils/gitParsing';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import type { GitStatusDetailed } from '@/utils/gitParsing';
 import type { GraphNode, GraphEdge } from '@/utils/graphLayout';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
-import { gitClient } from '@/services/gitClient';
 import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
-import { formatDate, formatRelativeTime, formatTime } from '@/utils/dateTime';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useCommitGraphData } from './useCommitGraphData';
 import { CommitGraphSvg } from './CommitGraphSvg';
 import { ForensicSearchPanel, type ForensicSearchType } from './ForensicSearchPanel';
 import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commitGraphConstants';
 import { EmptyState } from '@/components/EmptyState';
-import { buildGraphHighlightData, getRefKind, resolveHighlightableBranchRef, sortRefs } from './commitGraphRefs';
+import { buildGraphHighlightData } from './commitGraphRefs';
 import { useCommitGraphDialogs } from './useCommitGraphDialogs';
 import { useCommitGraphSearch } from './useCommitGraphSearch';
 import { useForensicSearch } from './useForensicSearch';
 import { CommitSearchToolbar } from './CommitSearchToolbar';
-import { CommitContextMenu, type ContextMenuPlacement, type ContextMenuState, type MenuAction, type MergeContextPayload } from './CommitContextMenu';
+import type { MenuAction } from './CommitContextMenu';
 import { useCommitGraphViewport } from './useCommitGraphViewport';
 import { buildCommitMenuActions } from './commitGraphMenuActions';
 import { useCommitGraphGitActions } from './useCommitGraphGitActions';
+import { useCommitGraphContextMenu } from './useCommitGraphContextMenu';
+import { CommitGraphContextMenuLayer } from './CommitGraphContextMenuLayer';
+import { CommitGraphRows } from './CommitGraphRows';
+import { formatCommitDate, formatCommitStats } from './commitGraphFormatters';
 import '@/styles/commit-graph.css';
 
 export { buildGraphHighlightData, findCommitIndexByNavigationTarget } from './commitGraphRefs';
@@ -67,15 +69,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   onRefreshWorkingTree,
 }) => {
   const { t, locale, tr } = useI18n();
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [contextMenuPlacement, setContextMenuPlacement] = useState<ContextMenuPlacement | null>(null);
-  const [mergeCtxExpanded, setMergeCtxExpanded] = useState(false);
   const { toasts, setToast, dismiss } = useToastQueue(4000);
   const { setConfirmDialog, setInputDialog } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
   const didRunInitialBranchEffectRef = useRef(false);
   const resetForensicStateRef = useRef<() => void>(() => {});
+  const { contextMenu, contextMenuRef, contextMenuPlacement, mergeCtxExpanded, mergeContextPayload, closeContextMenu, handleContextMenu, toggleMergeContext } =
+    useCommitGraphContextMenu({ branches, currentBranch, onMergeBranch });
 
   const forensicSearchTypeLabels = useMemo<Record<ForensicSearchType, string>>(
     () => ({
@@ -197,115 +197,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     void refreshWorkingTreeStatus();
   }, [currentBranch, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
-  useEffect(() => {
-    const handleClick = () => setContextMenu(null);
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null);
-    };
-    document.addEventListener('click', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('click', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, []);
-
-  const updateContextMenuPlacement = useCallback(() => {
-    if (!contextMenu || !contextMenuRef.current) return;
-
-    const margin = 8;
-    const menu = contextMenuRef.current;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const maxHeight = Math.max(160, viewportHeight - margin * 2);
-    const menuWidth = menu.offsetWidth;
-    const fullMenuHeight = Math.max(menu.scrollHeight, menu.offsetHeight);
-    const visibleMenuHeight = Math.min(fullMenuHeight, maxHeight);
-
-    const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
-    const maxTop = Math.max(margin, viewportHeight - visibleMenuHeight - margin);
-    const left = Math.min(Math.max(margin, contextMenu.x), maxLeft);
-    const top = Math.min(Math.max(margin, contextMenu.y), maxTop);
-
-    setContextMenuPlacement((current) => {
-      if (current && current.left === left && current.top === top && current.maxHeight === maxHeight && current.ready) {
-        return current;
-      }
-      return { left, top, maxHeight, ready: true };
-    });
-  }, [contextMenu]);
-
-  useLayoutEffect(() => {
-    if (!contextMenu) {
-      setContextMenuPlacement(null);
-      return;
-    }
-
-    updateContextMenuPlacement();
-    const frame = window.requestAnimationFrame(updateContextMenuPlacement);
-    return () => window.cancelAnimationFrame(frame);
-  }, [contextMenu, mergeCtxExpanded, updateContextMenuPlacement]);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    window.addEventListener('resize', updateContextMenuPlacement);
-    return () => window.removeEventListener('resize', updateContextMenuPlacement);
-  }, [contextMenu, updateContextMenuPlacement]);
-
-  const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMergeCtxExpanded(false);
-    setContextMenuPlacement({
-      left: e.clientX,
-      top: e.clientY,
-      maxHeight: Math.max(160, window.innerHeight - 16),
-      ready: false,
-    });
-    setContextMenu({ x: e.clientX, y: e.clientY, node });
-  };
-
-  const mergeContextPayload = useMemo<MergeContextPayload | null>(() => {
-    if (!contextMenu || !currentBranch || !onMergeBranch) return null;
-    const node = contextMenu.node;
-    const refsHere = mergeableDecoratedRefs(node.commit.refs, currentBranch);
-    const seen = new Set<string>(refsHere);
-    const branchExtras = branches
-      .filter((b) => !(b.scope === 'local' && b.name === currentBranch))
-      .filter((b) => !seen.has(normalizeBranchRefForMerge(b.name)))
-      .map((b) => ({ raw: b.name, label: normalizeBranchRefForMerge(b.name), scope: b.scope }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return {
-      hash: node.commit.hash,
-      shortHash: node.commit.abbrevHash,
-      refsHere,
-      branchExtras,
-    };
-  }, [branches, contextMenu, currentBranch, onMergeBranch]);
-
-  const formatCommitDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now.getTime() - d.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) {
-        return formatTime(d, locale, { hour: '2-digit', minute: '2-digit' });
-      }
-      if (diffDays < 7) return formatRelativeTime(d, locale, now);
-      return formatDate(d, locale, { day: '2-digit', month: 'short' });
-    } catch {
-      return '';
-    }
-  };
-
-  const formatCommitStats = (files: number, additions: number, deletions: number) => {
-    if (files === 0 && additions === 0 && deletions === 0) {
-      return '0f +0 -0';
-    }
-    return `${files}f +${additions} -${deletions}`;
-  };
-
   const hasWorkingTreeChanges = Boolean(
     workingTreeStatus && (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0),
   );
@@ -412,8 +303,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
   const hasPassiveHeadFocus = !hasWorkingTreeChanges && !selectedHash && !hasAnyPathHighlight;
 
-  const isSecondaryCommit = (hash: string) => !reachableFromHead.has(hash);
-
   return (
     <>
       <CommitSearchToolbar
@@ -490,196 +379,61 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           hasPassiveHeadFocus={hasPassiveHeadFocus}
         />
 
-        {hasWorkingTreeChanges && (
-          <div
-            className={`commit-row working-tree-row ${isWorkingTreeSelected ? 'selected' : ''}`}
-            onClick={() => onSelectCommit && onSelectCommit(null)}
-            style={{
-              height: ROW_HEIGHT,
-              paddingLeft: graphWidth,
-              ...(isWorkingTreeSelected ? ({ ['--commit-focus-color' as any]: 'var(--status-warning)' } as React.CSSProperties) : {}),
-            }}
-          >
-            <div className="commit-info">
-              <span className="commit-hash">WORKDIR</span>
-              <div className="commit-main">
-                <div className="commit-refs">
-                  {workingTreeStatus!.staged.length > 0 && <span className="branch-label tag">{workingTreeStatus!.staged.length} staged</span>}
-                  {workingTreeStatus!.unstaged.length > 0 && <span className="branch-label working-tree">{workingTreeStatus!.unstaged.length} unstaged</span>}
-                  {workingTreeStatus!.untracked.length > 0 && <span className="branch-label remote">{workingTreeStatus!.untracked.length} untracked</span>}
-                </div>
-                <div className="commit-subject-row">
-                  <span className="commit-subject">{workingTreeLabel}</span>
-                  <span className="commit-meta">
-                    <span className="commit-author">{t('generated.components.commit_graph.commitgraph.click_to_stage_commit_ed989f59')}</span>
-                    <span className="commit-date">{workingTreeCount}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {topSpacerHeight > 0 && <div style={{ height: topSpacerHeight }} aria-hidden="true" />}
-        {visibleNodes.map((node) => {
-          const isSelected = selectedHash === node.commit.hash;
-          const isSecondary = isSecondaryCommit(node.commit.hash);
-          const isSearchMatch = normalizedSearch ? matchedHashSet.has(node.commit.hash) : false;
-          const isOnCurrentPath = currentPathHashes.has(node.commit.hash);
-          const isOnSelectedPath = selectedPathHashes.has(node.commit.hash);
-          const isHeadCommit = node.commit.refs.some((ref) => ref.startsWith('HEAD ->') || ref === 'HEAD');
-          const resetsToDefaultFocus = node.commit.hash === headNode.commit.hash;
-          const isLatestCommitFocus = hasPassiveHeadFocus && node.commit.hash === headNode.commit.hash;
-          const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
-          const sortedRefs = sortRefs(node.commit.refs);
-          const rowStyle: React.CSSProperties = {
-            height: ROW_HEIGHT,
-            paddingLeft: graphWidth,
-            ...(isSearchMatch ? { boxShadow: 'inset 0 0 0 1px var(--accent-primary-strong)' } : {}),
-            ...(isOnCurrentPath ? ({ ['--path-highlight-color' as any]: currentPathColor } as React.CSSProperties) : {}),
-            ...(isOnSelectedPath ? ({ ['--selected-path-color' as any]: selectedPathColor } as React.CSSProperties) : {}),
-            ...(isSelected ? ({ ['--commit-focus-color' as any]: selectedPathColor } as React.CSSProperties) : {}),
-            ...(isLatestCommitFocus ? ({ ['--latest-focus-color' as any]: node.color } as React.CSSProperties) : {}),
-          };
-          return (
-            <div
-              key={node.commit.hash}
-              className={`commit-row ${isSelected ? 'selected commit-click-focus' : ''} ${showSecondaryHistory && isSecondary ? 'secondary-history' : ''} ${isOnCurrentPath ? 'path-highlighted' : ''} ${isOnSelectedPath ? 'selected-branch-path' : ''} ${isLatestCommitFocus ? 'latest-focus' : ''} ${isMutedByPathFocus ? 'path-muted' : ''} ${isHeadCommit && isOnCurrentPath ? 'head-current' : ''}`}
-              onClick={() => {
-                if (!onSelectCommit) return;
-                if (resetsToDefaultFocus) {
-                  setHighlightedBranchRef(null);
-                }
-                onSelectCommit(node.commit.hash);
-              }}
-              onContextMenu={(e) => handleContextMenu(e, node)}
-              style={rowStyle}
-              data-commit-hash={node.commit.hash}
-            >
-              <div className="commit-info">
-                <span className="commit-hash">{node.commit.abbrevHash}</span>
-                <div className="commit-main">
-                  {sortedRefs.length > 0 && (
-                    <div className="commit-refs">
-                      {sortedRefs.map((ref, ri) => {
-                        const branchTarget = resolveHighlightableBranchRef(ref);
-                        const isActiveBranchRef = Boolean(
-                          branchTarget && (hasSelectedCommitFocus ? selectedBranchTarget === branchTarget : activeHighlightedBranch === branchTarget),
-                        );
-                        const branchFocusColor = branchTarget ? (branchTipByRef.get(branchTarget)?.color ?? 'var(--text-accent)') : 'var(--text-accent)';
-
-                        if (!branchTarget) {
-                          return (
-                            <span key={ri} className={`branch-label ${getRefKind(ref)}`}>
-                              {ref}
-                            </span>
-                          );
-                        }
-
-                        return (
-                          <button
-                            key={ri}
-                            type="button"
-                            className={`branch-label ${getRefKind(ref)} branch-toggle ${isActiveBranchRef ? 'active' : ''}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setHighlightedBranchRef((previous) => (previous === branchTarget ? null : branchTarget));
-                            }}
-                            style={isActiveBranchRef ? ({ ['--branch-focus-color' as any]: branchFocusColor } as React.CSSProperties) : undefined}
-                            title={t('generated.components.commit_graph.commitgraph.highlight_branch_path_d8128078')}
-                          >
-                            {ref}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="commit-subject-row">
-                    <span className="commit-subject">{node.commit.subject}</span>
-                    <span className="commit-meta">
-                      <span className="commit-author">{node.commit.author}</span>
-                      <span
-                        className="commit-stats"
-                        title={
-                          node.commit.stats
-                            ? `${node.commit.stats.files} files changed, ${node.commit.stats.additions} additions, ${node.commit.stats.deletions} deletions`
-                            : t('generated.components.commit_graph.commitgraph.commit_statistics_are_loading_in_the_background_e5b6b683')
-                        }
-                      >
-                        {node.commit.stats ? formatCommitStats(node.commit.stats.files, node.commit.stats.additions, node.commit.stats.deletions) : '...'}
-                      </span>
-                      <span className="commit-date">{formatCommitDate(node.commit.date)}</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {bottomSpacerHeight > 0 && <div style={{ height: bottomSpacerHeight }} aria-hidden="true" />}
-        {(loadingMore || hasMoreCommits) && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 18px', paddingLeft: graphWidth }}>
-            <button
-              type="button"
-              onClick={() => loadMoreCommits()}
-              disabled={loadingMore}
-              style={{
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-panel)',
-                color: 'var(--text-primary)',
-                borderRadius: '6px',
-                padding: '6px 12px',
-                fontSize: '0.78rem',
-                cursor: loadingMore ? 'default' : 'pointer',
-                opacity: loadingMore ? 0.7 : 1,
-              }}
-            >
-              {loadingMore ? 'Lade weitere Commits...' : 'Mehr laden'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {contextMenu && (
-        <CommitContextMenu
-          contextMenu={contextMenu}
-          contextMenuRef={contextMenuRef}
-          contextMenuPlacement={contextMenuPlacement}
-          menuActions={getMenuActions(contextMenu.node)}
-          mergeContextPayload={mergeContextPayload}
-          canMergeBranches={Boolean(onMergeBranch && currentBranch)}
-          mergeCtxExpanded={mergeCtxExpanded}
-          onToggleMergeExpanded={() => setMergeCtxExpanded((v) => !v)}
-          onClose={() => setContextMenu(null)}
-          onRunMenuAction={(item) => {
-            setContextMenu(null);
-            item.action();
-          }}
-          onMergeCommit={(hash, shortHash) => {
-            setContextMenu(null);
-            setConfirmDialog({
-              variant: 'confirm',
-              title: t('generated.components.commit_graph.commitgraph.merge_commit_29707783'),
-              message: t('generated.components.commit_graph.commitgraph.git_merge_merges_this_commit_into_the_current_branch_may_a39118f2'),
-              contextItems: [
-                { label: t('generated.components.commit_graph.commitgraph.commit_b9ec78bd'), value: shortHash },
-                { label: t('generated.components.commit_graph.commitgraph.command_26cfbea8'), value: `git merge ${hash}` },
-              ],
-              irreversible: false,
-              consequences: t('generated.components.commit_graph.commitgraph.if_conflicts_occur_resolve_them_in_the_working_tree_and_54357bae'),
-              confirmLabel: t('generated.components.commit_graph.commitgraph.start_merge_516b5e37'),
-              onConfirm: async () => {
-                await runGitAction(gitClient.buildMergeBranchArgs(hash), tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`));
-              },
-            });
-          }}
-          onMergeBranchRef={(branchRef) => {
-            setContextMenu(null);
-            onMergeBranch?.(branchRef, 'default');
-          }}
+        <CommitGraphRows
+          graphWidth={graphWidth}
+          workingTreeStatus={workingTreeStatus}
+          hasWorkingTreeChanges={hasWorkingTreeChanges}
+          isWorkingTreeSelected={isWorkingTreeSelected}
+          workingTreeLabel={workingTreeLabel}
+          workingTreeCount={workingTreeCount}
+          topSpacerHeight={topSpacerHeight}
+          bottomSpacerHeight={bottomSpacerHeight}
+          visibleNodes={visibleNodes}
+          selectedHash={selectedHash}
+          showSecondaryHistory={showSecondaryHistory}
+          matchedHashSet={matchedHashSet}
+          normalizedSearch={normalizedSearch}
+          currentPathHashes={currentPathHashes}
+          selectedPathHashes={selectedPathHashes}
+          hasAnyPathHighlight={hasAnyPathHighlight}
+          currentPathColor={currentPathColor}
+          selectedPathColor={selectedPathColor}
+          branchTipByRef={branchTipByRef}
+          activeHighlightedBranch={activeHighlightedBranch}
+          selectedBranchTarget={selectedBranchTarget}
+          hasSelectedCommitFocus={hasSelectedCommitFocus}
+          headNode={headNode}
+          reachableFromHead={reachableFromHead}
+          hasPassiveHeadFocus={hasPassiveHeadFocus}
+          loadingMore={loadingMore}
+          hasMoreCommits={hasMoreCommits}
+          onLoadMoreCommits={loadMoreCommits}
+          onSelectCommit={onSelectCommit}
+          onContextMenu={handleContextMenu}
+          onToggleBranchHighlight={(branchTarget) => setHighlightedBranchRef((previous) => (previous === branchTarget ? null : branchTarget))}
+          onClearBranchHighlight={() => setHighlightedBranchRef(null)}
+          formatCommitDate={(dateStr) => formatCommitDate(dateStr, locale)}
+          formatCommitStats={formatCommitStats}
           t={t}
         />
-      )}
+      </div>
+
+      <CommitGraphContextMenuLayer
+        contextMenu={contextMenu}
+        contextMenuRef={contextMenuRef}
+        contextMenuPlacement={contextMenuPlacement}
+        getMenuActions={getMenuActions}
+        mergeContextPayload={mergeContextPayload}
+        canMergeBranches={Boolean(onMergeBranch && currentBranch)}
+        mergeCtxExpanded={mergeCtxExpanded}
+        onToggleMergeExpanded={toggleMergeContext}
+        onClose={closeContextMenu}
+        runGitAction={runGitAction}
+        setConfirmDialog={setConfirmDialog}
+        onMergeBranch={onMergeBranch}
+        t={t}
+        tr={tr}
+      />
 
       <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </>

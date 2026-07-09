@@ -1,0 +1,422 @@
+.conflict-section {
+  --conflict-version-current-color: color-mix(in srgb, var(--status-info) 78%, var(--accent-secondary));
+  --conflict-version-incoming-color: color-mix(in srgb, var(--status-warning) 78%, var(--accent-complement));
+  --conflict-code-current-color: color-mix(in srgb, var(--status-info) 64%, var(--accent-secondary));
+  --conflict-code-incoming-color: color-mix(in srgb, var(--status-warning) 68%, var(--accent-complement));
+  --conflict-marker-color: color-mix(in srgb, var(--status-danger) 78%, var(--accent-hover));
+  --conflict-marker-start-color: color-mix(in srgb, var(--conflict-marker-color) 82%, var(--conflict-version-current-color));
+  --conflict-marker-separator-color: var(--conflict-marker-color);
+  --conflict-marker-end-color: color-mix(in srgb, var(--conflict-marker-color) 82%, var(--conflict-version-incoming-color));
+  --conflict-version-current-surface: color-mix(in srgb, var(--conflict-version-current-color) 14%, var(--bg-dark));
+  --conflict-version-incoming-surface: color-mix(in srgb, var(--conflict-version-incoming-color) 14%, var(--bg-dark));
+  --conflict-code-current-surface: color-mix(in srgb, var(--conflict-code-current-color) 12%, var(--bg-dark));
+  --conflict-code-incoming-surface: color-mix(in srgb, var(--conflict-code-incoming-color) 12%, var(--bg-dark));
+  --conflict-marker-surface: color-mix(in srgb, var(--conflict-marker-color) 10%, var(--bg-dark));
+  --conflict-marker-start-surface: color-mix(in srgb, var(--conflict-marker-start-color) 12%, var(--bg-dark));
+  --conflict-marker-separator-surface: color-mix(in srgb, var(--conflict-marker-separator-color) 11%, var(--bg-dark));
+  --conflict-marker-end-surface: color-mix(in srgb, var(--conflict-marker-end-color) 11%, var(--bg-dark));
+  --conflict-version-current-surface-strong: color-mix(in srgb, var(--conflict-version-current-color) 22%, var(--bg-panel));
+  --conflict-version-incoming-surface-strong: color-mix(in srgb, var(--conflict-version-incoming-color) 22%, var(--bg-panel));
+  --conflict-code-current-surface-strong: color-mix(in srgb, var(--conflict-code-current-color) 17%, var(--bg-panel));
+  --conflict-code-incoming-surface-strong: color-mix(in srgb, var(--conflict-code-incoming-color) 17%, var(--bg-panel));
+  --conflict-marker-surface-strong: color-mix(in srgb, var(--conflict-marker-color) 16%, var(--bg-panel));
+  --conflict-marker-start-surface-strong: color-mix(in srgb, var(--conflict-marker-start-color) 17%, var(--bg-panel));
+  --conflict-marker-separator-surface-strong: color-mix(in srgb, var(--conflict-marker-separator-color) 16%, var(--bg-panel));
+  --conflict-marker-end-surface-strong: color-mix(in srgb, var(--conflict-marker-end-color) 16%, var(--bg-panel));
+  --conflict-version-current-border: color-mix(in srgb, var(--conflict-version-current-color) 44%, var(--border-color));
+  --conflict-version-incoming-border: color-mix(in srgb, var(--conflict-version-incoming-color) 44%, var(--border-color));
+  --conflict-code-current-border: color-mix(in srgb, var(--conflict-code-current-color) 38%, var(--border-color));
+  --conflict-code-incoming-border: color-mix(in srgb, var(--conflict-code-incoming-color) 38%, var(--border-color));
+  --conflict-marker-border: color-mix(in srgb, var(--conflict-marker-color) 38%, var(--border-color));
+  --conflict-marker-start-border: color-mix(in srgb, var(--conflict-marker-start-color) 40%, var(--border-color));
+  --conflict-marker-separator-border: color-mix(in srgb, var(--conflict-marker-separator-color) 38%, var(--border-color));
+  --conflict-marker-end-border: color-mix(in srgb, var(--conflict-marker-end-color) 40%, var(--border-color));
+  --conflict-version-current-text: color-mix(in srgb, var(--conflict-version-current-color) 74%, var(--text-primary));
+  --conflict-version-incoming-text: color-mix(in srgb, var(--conflict-version-incoming-color) 74%, var(--text-primary));
+  --conflict-code-current-text: color-mix(in srgb, var(--conflict-code-current-color) 70%, var(--text-primary));
+  --conflict-code-incoming-text: color-mix(in srgb, var(--conflict-code-incoming-color) 70%, var(--text-primary));
+  --conflict-marker-text: color-mix(in srgb, var(--conflict-marker-color) 70%, var(--text-primary));
+  --conflict-marker-start-text: color-mix(in srgb, var(--conflict-marker-start-color) 72%, var(--text-primary));
+  --conflict-marker-separator-text: color-mix(in srgb, var(--conflict-marker-separator-color) 70%, var(--text-primary));
+  --conflict-marker-end-text: color-mix(in srgb, var(--conflict-marker-end-color) 72%, var(--text-primary));
+  background: color-mix(in srgb, var(--status-danger) 4%, var(--bg-panel));
+}
+
+.conflict-section--compact {
+  border-left: 3px solid var(--status-danger);
+  background: color-mix(in srgb, var(--status-danger) 5%, var(--bg-panel));
+}
+
+.conflict-section--compact .conflict-summary-header {
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 8px 10px 7px;
+  background: transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--status-danger) 26%, var(--line-subtle));
+}
+
+.conflict-section--compact .staging-count {
+  background: color-mix(in srgb, var(--status-danger) 16%, var(--bg-hover));
+  color: color-mix(in srgb, var(--status-danger) 74%, var(--text-primary));
+}
+
+.conflict-section--compact .staging-stats-inline {
+  color: color-mix(in srgb, var(--status-danger) 42%, var(--text-secondary));
+}
+
+.conflict-resolver-header-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-panel) 100%);
+}
+
+.conflict-global-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px 12px;
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
+  flex-wrap: wrap;
+}
+
+.conflict-global-spacer {
+  flex: 1;
+}
+
+.conflict-section-header {
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+}
+
+.conflict-global-actions-rail {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-global-actions-rail--topbar {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group + .conflict-action-group {
+  margin-left: 0;
+  padding-left: 14px;
+  position: relative;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-group + .conflict-action-group::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--line-subtle);
+}
+
+.conflict-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.conflict-action-group-label {
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.82;
+  padding-right: 4px;
+}
+
+.conflict-action-btn {
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  padding: 4px 11px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.71rem;
+  font-weight: 600;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.conflict-global-actions-rail--topbar .conflict-action-btn {
+  border-color: var(--line-subtle);
+}
+
+.conflict-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  box-shadow: 0 0 0 1px var(--line-subtle) inset;
+}
+
+.conflict-action-btn--danger {
+  border-color: var(--status-danger-border);
+  color: var(--status-danger);
+  background: transparent;
+}
+
+.conflict-action-btn--danger:hover:not(:disabled) {
+  background: var(--status-danger-soft);
+  border-color: var(--status-danger-border);
+  box-shadow: 0 0 0 1px var(--status-danger-soft) inset;
+}
+
+.conflict-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.conflict-sidebar-list {
+  border-top: 1px solid var(--line-subtle);
+  padding: 6px 0;
+}
+
+.conflict-summary-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.conflict-summary-file {
+  width: 100%;
+  min-height: 42px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--status-danger) 17%, var(--line-subtle));
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 7px 10px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.conflict-summary-file:last-child {
+  border-bottom: 0;
+}
+
+.conflict-summary-file:hover {
+  background: color-mix(in srgb, var(--status-danger) 8%, var(--bg-hover));
+}
+
+.conflict-summary-file:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 2px 0 0 var(--status-danger),
+    inset 0 0 0 1px var(--status-danger-border);
+}
+
+.conflict-file-icon {
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: center;
+  width: 26px;
+  height: 22px;
+  border: 1px solid var(--status-danger-border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-danger) 12%, var(--bg-dark));
+  color: color-mix(in srgb, var(--status-danger) 82%, var(--text-primary));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conflict-summary-file .conflict-file-path {
+  min-width: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.conflict-summary-file .conflict-file-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--status-danger) 30%, var(--text-secondary));
+}
+
+.conflict-summary-action {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 2px 7px;
+  border: 1px solid var(--status-danger-border);
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--status-danger) 78%, var(--text-primary));
+  background: color-mix(in srgb, var(--status-danger) 9%, var(--bg-dark));
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.conflict-sidebar-file {
+  width: calc(100% - 16px);
+  margin: 0 8px 6px;
+  background: var(--bg-dark);
+  border: 1px solid var(--line-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 7px 8px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 8px;
+  cursor: pointer;
+}
+
+.conflict-sidebar-file:hover {
+  border-color: var(--border-color);
+  background: var(--bg-hover);
+}
+
+.conflict-sidebar-file:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent-primary-border);
+}
+
+.conflict-sidebar-hint {
+  margin: 0 10px 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--status-info-border);
+  background: var(--status-info-soft);
+  color: var(--status-info);
+  border-radius: 6px;
+  font-size: 0.72rem;
+}
+
+.conflict-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  min-height: 360px;
+}
+
+.conflict-file-list {
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.conflict-file-entry {
+  border-bottom: 1px solid var(--line-subtle);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.conflict-file-entry.active {
+  background: var(--status-danger-soft);
+}
+
+.conflict-file-main {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 6px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 2px 8px;
+  cursor: pointer;
+}
+
+.conflict-file-main:hover {
+  border-color: var(--border-color);
+  background: var(--bg-hover);
+}
+
+.conflict-file-path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-file-label {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.conflict-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 6px 2px;
+}
+
+.conflict-editor-panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-darker);
+  overflow: hidden;
+}
+
+/* Konflikt-Resolver Vollbild: volle Pane-Hoehe nutzen, kein kuenstlicher Scroll durch max-height */
+.staging-container--conflict {
+  min-height: 0;
+  flex: 1;
+}
+
+.staging-container--conflict .staging-files {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.staging-container--conflict .staging-section.conflict-section--resolve {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.staging-container--conflict .conflict-section--resolve > .staging-section-header {
+  flex-shrink: 0;
+}

@@ -1,0 +1,421 @@
+/* Commit Graph */
+.commit-graph-container {
+  position: relative;
+  padding: 0;
+  container-type: inline-size;
+}
+
+.commit-graph-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.commit-row {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line-subtle);
+  transition: background-color 0.12s ease;
+  padding-right: 12px;
+}
+
+.commit-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.commit-row.selected {
+  --commit-focus-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--commit-focus-color) 14%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--commit-focus-color) 42%, var(--border-color));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--commit-focus-color) 30%, transparent);
+}
+
+.commit-row.head-current {
+  background: color-mix(in srgb, var(--path-highlight-color, var(--status-success)) 7%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--path-highlight-color, var(--status-success)) 70%, transparent);
+}
+
+.commit-row.latest-focus {
+  background: color-mix(in srgb, var(--latest-focus-color, var(--accent-primary)) 7%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--latest-focus-color, var(--accent-primary)) 62%, transparent);
+}
+
+.commit-row.latest-focus .commit-hash {
+  color: color-mix(in srgb, var(--latest-focus-color, var(--accent-primary)) 58%, var(--text-accent));
+  text-shadow: none;
+}
+
+.commit-row.path-highlighted {
+  background: color-mix(in srgb, var(--path-highlight-color, var(--status-success)) 9%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--path-highlight-color, var(--status-success)) 76%, transparent);
+}
+
+.commit-row.path-highlighted .commit-hash {
+  color: color-mix(in srgb, var(--path-highlight-color, var(--status-success)) 62%, var(--text-accent));
+  text-shadow: none;
+}
+
+.commit-row.selected-branch-path {
+  background: color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 10%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 82%, transparent);
+}
+
+.commit-row.selected-branch-path .commit-hash {
+  color: color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 64%, var(--text-accent));
+  text-shadow: none;
+}
+
+.commit-row.path-muted {
+  opacity: 0.82;
+}
+
+.commit-row.selected.path-highlighted,
+.commit-row.selected.head-current,
+.commit-row.selected.selected-branch-path {
+  background: color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 13%, transparent);
+}
+
+.commit-row.commit-click-focus,
+.commit-row.commit-click-focus.selected-branch-path,
+.commit-row.commit-click-focus.path-highlighted,
+.commit-row.commit-click-focus.head-current {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 26%, transparent) 0%,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 14%, transparent) 54%,
+    color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 6%, transparent) 100%
+  );
+  border-left: 4px solid color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 88%, var(--text-accent));
+  border-bottom-color: color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 52%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 46%, transparent),
+    inset 9px 0 18px -14px color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 82%, transparent);
+}
+
+.commit-row.commit-click-focus .commit-hash {
+  color: color-mix(in srgb, var(--commit-focus-color, var(--accent-primary)) 76%, var(--text-primary));
+  font-weight: 700;
+  text-shadow: none;
+}
+
+.commit-row.commit-click-focus .commit-subject {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.commit-row.path-highlighted.selected-branch-path {
+  background: color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 11%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--selected-path-color, var(--accent-primary)) 80%, transparent);
+}
+
+.commit-row.secondary-history {
+  background: color-mix(in srgb, var(--accent-primary-softer) 45%, transparent);
+}
+
+.commit-row.secondary-history .commit-hash {
+  text-shadow: none;
+}
+.commit-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 3px 0 3px 4px;
+}
+
+.commit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.commit-subject-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, auto);
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.commit-hash {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--text-accent);
+  flex-shrink: 0;
+  width: 62px;
+}
+
+.commit-subject {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-meta {
+  --commit-author-width: 120px;
+  --commit-stats-width: 118px;
+  --commit-date-width: 88px;
+  display: grid;
+  grid-template-columns: var(--commit-author-width) var(--commit-stats-width) var(--commit-date-width);
+  align-items: center;
+  column-gap: 10px;
+  flex-shrink: 0;
+  justify-items: end;
+}
+
+.commit-author {
+  grid-column: 1;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  max-width: var(--commit-author-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.commit-stats {
+  grid-column: 2;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--status-info);
+  background: var(--status-info-soft);
+  border: 1px solid var(--status-info-border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  width: var(--commit-stats-width);
+  min-width: var(--commit-stats-width);
+  max-width: var(--commit-stats-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.commit-date {
+  grid-column: 3;
+  width: var(--commit-date-width);
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.commit-refs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.branch-label {
+  --ref-chip-color: var(--accent-secondary);
+  font-size: 0.71rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  line-height: 1.08;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ref-chip-color) 20%, var(--bg-panel));
+  color: color-mix(in srgb, var(--ref-chip-color) 76%, var(--text-primary));
+  border: 1px solid color-mix(in srgb, var(--ref-chip-color) 52%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 16%, transparent),
+    0 1px 0 rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.branch-label.branch-toggle {
+  appearance: none;
+  cursor: pointer;
+  line-height: 1.15;
+  font-family: inherit;
+  transition:
+    box-shadow 0.12s ease,
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.branch-label.branch-toggle:hover {
+  background: color-mix(in srgb, var(--ref-chip-color) 26%, var(--bg-panel));
+  border-color: color-mix(in srgb, var(--ref-chip-color) 66%, var(--border-color));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 20%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ref-chip-color) 26%, transparent);
+}
+
+.branch-label.branch-toggle.active {
+  border-color: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 58%, var(--border-color));
+  background: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 24%, var(--bg-panel));
+  color: color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 82%, var(--text-primary));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 40%, transparent),
+    0 0 10px color-mix(in srgb, var(--branch-focus-color, var(--status-success)) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.branch-label.head {
+  --ref-chip-color: var(--status-success);
+}
+
+.branch-label.local {
+  --ref-chip-color: var(--accent-primary);
+}
+
+.branch-label.remote {
+  --ref-chip-color: var(--status-info);
+}
+
+.branch-label.tag {
+  --ref-chip-color: var(--status-warning);
+}
+
+.branch-label.head-pointer {
+  --ref-chip-color: var(--status-merged);
+}
+
+.branch-label.working-tree {
+  --ref-chip-color: var(--status-warning);
+}
+
+.working-tree-row .commit-hash {
+  color: var(--status-warning);
+}
+
+@container (max-width: 760px) {
+  .commit-row {
+    padding-right: 8px;
+  }
+
+  .commit-info {
+    gap: 6px;
+  }
+
+  .commit-hash,
+  .commit-refs,
+  .commit-author,
+  .commit-stats {
+    display: none;
+  }
+
+  .commit-main {
+    gap: 0;
+  }
+
+  .commit-subject-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .commit-meta {
+    display: block;
+  }
+
+  .commit-date {
+    display: block;
+    width: 76px;
+    font-size: 0.75rem;
+  }
+}
+
+@container (max-width: 440px) {
+  .commit-row {
+    padding-right: 6px;
+  }
+
+  .commit-subject-row {
+    gap: 5px;
+  }
+
+  .commit-subject {
+    font-size: 0.8rem;
+  }
+
+  .commit-date {
+    width: 62px;
+    font-size: 0.7rem;
+  }
+}
+
+/* Context Menu */
+.ctx-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 2001;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 0;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  animation: ctx-fade-in 0.1s ease;
+}
+
+@keyframes ctx-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ctx-menu-header {
+  padding: 6px 12px 4px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  text-align: left;
+  transition: background-color 0.1s;
+}
+
+.ctx-menu-item:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
+.ctx-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

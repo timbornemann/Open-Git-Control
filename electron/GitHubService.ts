@@ -9,6 +9,7 @@ import {
   type DeviceFlowPollResult,
   type DeviceFlowStartResult,
   type GitHubReleaseDto,
+  type GitHubOctokit,
   type MergeMethod,
   type WebFlowExchangeParams,
   type WebFlowExchangeResult,
@@ -17,7 +18,7 @@ import {
 export type { CreateReleaseParams, DeviceFlowPollResult, DeviceFlowStartResult, GitHubReleaseDto, WebFlowExchangeParams, WebFlowExchangeResult };
 
 export class GitHubService {
-  private octokit: any | null = null;
+  private octokit: GitHubOctokit | null = null;
   private token: string | null = null;
   private username: string | null = null;
   private host: string = DEFAULT_HOST;
@@ -28,7 +29,7 @@ export class GitHubService {
   private readonly workflows = new GitHubWorkflowService(() => this.requireOctokit());
   private readonly releases = new GitHubReleaseService(() => this.requireOctokit());
 
-  private requireOctokit(): any {
+  private requireOctokit(): GitHubOctokit {
     if (!this.octokit) {
       throw new Error('Not authenticated');
     }
