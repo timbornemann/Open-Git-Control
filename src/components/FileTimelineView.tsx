@@ -2,30 +2,11 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Play, Pause, RotateCcw, FastForward } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { FileTimelineCanvas } from './FileTimelineCanvas';
-
-type FileNode = {
-  name: string;
-  path: string;
-  type: 'file' | 'folder';
-  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'unchanged';
-  children?: Map<string, FileNode>;
-};
-
-type CommitStep = {
-  hash: string;
-  author: string;
-  date: string;
-  subject: string;
-  changes: Array<{
-    status: 'added' | 'modified' | 'deleted' | 'renamed';
-    path: string;
-    oldPath?: string;
-  }>;
-};
+import type { FileTimelineCommit, FileTimelineNode } from './file-timeline/types';
 
 type FileTimelineViewProps = {
   onClose: () => void;
-  commits: CommitStep[];
+  commits: FileTimelineCommit[];
 };
 
 export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, commits }) => {
@@ -71,7 +52,7 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
 
   // Reconstruct the codebase file tree at the current commit index
   const fileTree = useMemo(() => {
-    const root: FileNode = { name: 'root', path: '', type: 'folder', status: 'unchanged', children: new Map() };
+    const root: FileTimelineNode = { name: 'root', path: '', type: 'folder', status: 'unchanged', children: new Map() };
     if (commits.length === 0) return root;
 
     // Build the flat list of active files up to the current index
