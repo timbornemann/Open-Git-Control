@@ -278,4 +278,138 @@ describe('workflow hooks', () => {
     hook.unmount();
     expect(unsubscribe).toHaveBeenCalled();
   });
+
+  it('ignoriert Repo-unavailable Events ohne aktives Repository oder Git-Client', () => {
+    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
+      repoUnavailableListener = callback;
+      return vi.fn();
+    });
+
+    const setConfirmDialog = vi.fn();
+    const hook = renderHook(() =>
+      useRepoUnavailableWorkflow({
+        activeRepo: null,
+        handleCloseRepo: vi.fn(),
+        setPlannerRefreshSignal: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+        language: 'de',
+      }),
+    );
+
+    act(() => {
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+    });
+
+    expect(setConfirmDialog).not.toHaveBeenCalled();
+    hook.unmount();
+
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(false);
+    const unavailableHook = renderHook(() =>
+      useRepoUnavailableWorkflow({
+        activeRepo: 'C:\\repos\\demo',
+        handleCloseRepo: vi.fn(),
+        setPlannerRefreshSignal: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+        language: 'de',
+      }),
+    );
+
+    expect(gitClient.onRepoUnavailable).toHaveBeenCalledTimes(1);
+    unavailableHook.unmount();
+  });
+
+  it('setzt den Repo-unavailable Guard bei Cancel zurueck und kann ohne Planner aufraeumen', async () => {
+    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
+      repoUnavailableListener = callback;
+      return vi.fn();
+    });
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(false);
+    const deleteRepositoryProjectByPath = vi.spyOn(plannerClient, 'deleteRepositoryProjectByPath');
+
+    const handleCloseRepo = vi.fn().mockResolvedValue(undefined);
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const hook = renderHook(() =>
+      useRepoUnavailableWorkflow({
+        activeRepo: 'C:\\repos\\demo',
+        handleCloseRepo,
+        setPlannerRefreshSignal: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast,
+        language: 'de',
+      }),
+    );
+
+    act(() => {
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+    });
+    const firstDialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    act(() => {
+      firstDialog.onCancel?.();
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] still missing' });
+    });
+
+    expect(setConfirmDialog).toHaveBeenCalledTimes(2);
+    const secondDialog = setConfirmDialog.mock.calls[1]?.[0] as ConfirmDialogState;
+    await act(async () => {
+      await secondDialog.onConfirm?.();
+    });
+
+    expect(deleteRepositoryProjectByPath).not.toHaveBeenCalled();
+    expect(handleCloseRepo).toHaveBeenCalledWith('C:\\repos\\demo');
+    expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
+
+    hook.unmount();
+  });
+
+  it('meldet Planner-Cleanup-Fehler beim Repo-unavailable Aufraeumen', async () => {
+    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
+      repoUnavailableListener = callback;
+      return vi.fn();
+    });
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'deleteRepositoryProjectByPath').mockResolvedValue({
+      success: false,
+      error: 'planner locked',
+    });
+
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const hook = renderHook(() =>
+      useRepoUnavailableWorkflow({
+        activeRepo: 'C:\\repos\\demo',
+        handleCloseRepo: vi.fn().mockResolvedValue(undefined),
+        setPlannerRefreshSignal: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast,
+        language: 'de',
+      }),
+    );
+
+    act(() => {
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+    });
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+
+    await act(async () => {
+      await dialog.onConfirm?.();
+    });
+
+    expect(setGitActionToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isError: true,
+        msg: expect.stringContaining('planner locked'),
+      }),
+    );
+
+    hook.unmount();
+  });
 });
