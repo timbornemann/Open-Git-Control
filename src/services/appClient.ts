@@ -1,5 +1,5 @@
 import type { ElectronAPI } from '@/global';
-import { getElectronApi, requireElectronApi } from './electronApi';
+import { getElectronApi, requireElectronAppApi, requireElectronReposApi, requireElectronSettingsApi } from './electronApi';
 
 export const appClient = {
   isAvailable(): boolean {
@@ -7,88 +7,88 @@ export const appClient = {
   },
 
   async openDirectory(...args: Parameters<ElectronAPI['openDirectory']>): ReturnType<ElectronAPI['openDirectory']> {
-    return requireElectronApi().openDirectory(...args);
+    return requireElectronAppApi().openDirectory(...args);
   },
 
   async selectDirectory(...args: Parameters<ElectronAPI['selectDirectory']>): ReturnType<ElectronAPI['selectDirectory']> {
-    return requireElectronApi().selectDirectory(...args);
+    return requireElectronAppApi().selectDirectory(...args);
   },
 
   async selectProjectParentDirectory(
     ...args: Parameters<ElectronAPI['selectProjectParentDirectory']>
   ): ReturnType<ElectronAPI['selectProjectParentDirectory']> {
-    return requireElectronApi().selectProjectParentDirectory(...args);
+    return requireElectronAppApi().selectProjectParentDirectory(...args);
   },
 
   async openExternalUrl(...args: Parameters<ElectronAPI['openExternalUrl']>): ReturnType<ElectronAPI['openExternalUrl']> {
-    return requireElectronApi().openExternalUrl(...args);
+    return requireElectronAppApi().openExternalUrl(...args);
   },
 
   async getSettings(...args: Parameters<ElectronAPI['getSettings']>): ReturnType<ElectronAPI['getSettings']> {
-    return requireElectronApi().getSettings(...args);
+    return requireElectronSettingsApi().getSettings(...args);
   },
 
   async setSettings(...args: Parameters<ElectronAPI['setSettings']>): ReturnType<ElectronAPI['setSettings']> {
-    return requireElectronApi().setSettings(...args);
+    return requireElectronSettingsApi().setSettings(...args);
   },
 
   async setGeminiApiKey(...args: Parameters<ElectronAPI['setGeminiApiKey']>): ReturnType<ElectronAPI['setGeminiApiKey']> {
-    return requireElectronApi().setGeminiApiKey(...args);
+    return requireElectronSettingsApi().setGeminiApiKey(...args);
   },
 
   async clearGeminiApiKey(...args: Parameters<ElectronAPI['clearGeminiApiKey']>): ReturnType<ElectronAPI['clearGeminiApiKey']> {
-    return requireElectronApi().clearGeminiApiKey(...args);
+    return requireElectronSettingsApi().clearGeminiApiKey(...args);
   },
 
   async getPlanningApiInfo(...args: Parameters<ElectronAPI['getPlanningApiInfo']>): ReturnType<ElectronAPI['getPlanningApiInfo']> {
-    return requireElectronApi().getPlanningApiInfo(...args);
+    return requireElectronAppApi().getPlanningApiInfo(...args);
   },
 
   async generatePlanningApiToken(...args: Parameters<ElectronAPI['generatePlanningApiToken']>): ReturnType<ElectronAPI['generatePlanningApiToken']> {
-    return requireElectronApi().generatePlanningApiToken(...args);
+    return requireElectronAppApi().generatePlanningApiToken(...args);
   },
 
   async clearPlanningApiToken(...args: Parameters<ElectronAPI['clearPlanningApiToken']>): ReturnType<ElectronAPI['clearPlanningApiToken']> {
-    return requireElectronApi().clearPlanningApiToken(...args);
+    return requireElectronAppApi().clearPlanningApiToken(...args);
   },
 
   async getAppVersion(...args: Parameters<ElectronAPI['getAppVersion']>): ReturnType<ElectronAPI['getAppVersion']> {
-    return requireElectronApi().getAppVersion(...args);
+    return requireElectronAppApi().getAppVersion(...args);
   },
 
   async getUpdaterStatus(...args: Parameters<ElectronAPI['getUpdaterStatus']>): ReturnType<ElectronAPI['getUpdaterStatus']> {
-    return requireElectronApi().getUpdaterStatus(...args);
+    return requireElectronAppApi().getUpdaterStatus(...args);
   },
 
   async runOneClickAppUpdate(...args: Parameters<ElectronAPI['runOneClickAppUpdate']>): ReturnType<ElectronAPI['runOneClickAppUpdate']> {
-    return requireElectronApi().runOneClickAppUpdate(...args);
+    return requireElectronAppApi().runOneClickAppUpdate(...args);
   },
 
   async installAppUpdate(...args: Parameters<ElectronAPI['installAppUpdate']>): ReturnType<ElectronAPI['installAppUpdate']> {
-    return requireElectronApi().installAppUpdate(...args);
+    return requireElectronAppApi().installAppUpdate(...args);
   },
 
   onUpdaterEvent(...args: Parameters<ElectronAPI['onUpdaterEvent']>): ReturnType<ElectronAPI['onUpdaterEvent']> {
-    return requireElectronApi().onUpdaterEvent(...args);
+    return requireElectronAppApi().onUpdaterEvent(...args);
   },
 
   async getStoredRepos(...args: Parameters<ElectronAPI['getStoredRepos']>): ReturnType<ElectronAPI['getStoredRepos']> {
-    return requireElectronApi().getStoredRepos(...args);
+    return requireElectronReposApi().getStoredRepos(...args);
   },
 
   async setStoredRepos(...args: Parameters<ElectronAPI['setStoredRepos']>): ReturnType<ElectronAPI['setStoredRepos']> {
-    return requireElectronApi().setStoredRepos(...args);
+    return requireElectronReposApi().setStoredRepos(...args);
   },
 
   async setRepoPath(...args: Parameters<ElectronAPI['setRepoPath']>): ReturnType<ElectronAPI['setRepoPath']> {
-    return requireElectronApi().setRepoPath(...args);
+    return requireElectronReposApi().setRepoPath(...args);
   },
 
   async clearRepoPath(...args: Parameters<ElectronAPI['clearRepoPath']>): ReturnType<ElectronAPI['clearRepoPath']> {
-    return requireElectronApi().clearRepoPath(...args);
+    return requireElectronReposApi().clearRepoPath(...args);
   },
 
   async getDiagnosticsReport(...args: Parameters<ElectronAPI['getDiagnosticsReport']>): ReturnType<ElectronAPI['getDiagnosticsReport']> {
-    return requireElectronApi().getDiagnosticsReport(...args);
+    return requireElectronAppApi().getDiagnosticsReport(...args);
   },
 };

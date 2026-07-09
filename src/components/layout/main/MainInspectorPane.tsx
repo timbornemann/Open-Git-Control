@@ -1,6 +1,6 @@
 import React from 'react';
 import { PanelRightClose } from 'lucide-react';
-import { CommitDetails } from '@/components/CommitDetails';
+import { CommitDetails } from '@/components/commit-details/CommitDetails';
 import { StagingArea } from '@/components/staging-area';
 import { WorkingTreeFileDetails } from '@/components/WorkingTreeFileDetails';
 import { useRepositoryContext, useSettingsContext } from '@/contexts/AppStateContext';

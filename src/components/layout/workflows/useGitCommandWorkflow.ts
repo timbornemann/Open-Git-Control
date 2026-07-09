@@ -103,6 +103,113 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         );
         return fallbackSuccess;
       };
+
+      const recoverFromGitCommandFailure = async (failureMessage: unknown, fallbackErrorMessage?: string): Promise<boolean> => {
+        const errorMessage =
+          typeof failureMessage === 'string' && failureMessage.trim()
+            ? failureMessage
+            : fallbackErrorMessage || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a');
+
+        if (command === 'push' && isNoLocalCommitPushError(errorMessage)) {
+          if (options?.skipAutoInitialCommitOnPushFailure) {
+            workspace.setActiveTab('repo');
+            setGitActionToast({
+              msg: t('generated.components.layout.workflows.usegitcommandworkflow.push_not_possible_there_is_no_local_commit_yet_please_co_7a8286f0'),
+              isError: true,
+            });
+            return false;
+          }
+
+          if (!options?.confirmedAutoInitialCommit) {
+            const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
+              commandLabel: `git ${args.join(' ')}`,
+              confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
+              onConfirm: async () => {
+                await runGitCommand(args, successMsg, actionLabel, {
+                  ...options,
+                  confirmedAutoInitialCommit: true,
+                });
+              },
+            });
+            if (confirmationOpened) {
+              return false;
+            }
+          }
+
+          const prepared = await ensureInitialCommitForPush();
+          if (!prepared) {
+            return false;
+          }
+
+          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream') ? args : ['push', '-u', 'origin', 'HEAD'];
+
+          return runGitCommand(
+            argsWithUpstream,
+            t('generated.components.layout.workflows.usegitcommandworkflow.initial_commit_created_and_pushed_295fbe68'),
+            t('generated.components.layout.workflows.usegitcommandworkflow.pushing_initial_commit_6b4afbb5'),
+            {
+              ...options,
+              confirmedAutoInitialCommit: true,
+              skipAutoInitialCommitOnPushFailure: true,
+              skipAutoSetUpstreamOnPushFailure: true,
+            },
+          );
+        }
+
+        const missingUpstream = isMissingUpstreamPushError(errorMessage);
+        if (await tryAutoSetUpstreamPush(errorMessage)) {
+          return true;
+        }
+        if (missingUpstream) {
+          return false;
+        }
+        if (await maybeRecoverRemoteSetup({ command, options, failureMessage: errorMessage })) {
+          return false;
+        }
+        if (maybeHandleSyncMismatchFailure({ command, failureMessage: errorMessage, args, successMsg, actionLabel, options })) {
+          return false;
+        }
+
+        const mergeInProgress = isMergeInProgressError(errorMessage);
+        triggerRefresh();
+        try {
+          const statusAfter = await gitClient.getStatusPorcelain();
+          const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
+          const conflictPath = resolveConflictPathAfterGitFailure(porcelain, errorMessage);
+          if (conflictPath) {
+            workspace.setActiveTab('repo');
+            setConflictResolverPath(conflictPath);
+            setGitActionToast({
+              msg: tr(
+                mergeInProgress
+                  ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
+                  : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+                mergeInProgress
+                  ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
+                  : 'Merge conflict: opening the conflict resolver.',
+              ),
+              isError: false,
+            });
+            triggerRefresh();
+            return false;
+          }
+        } catch {
+          // ignore; fall through to generic error toast
+        }
+
+        if (mergeInProgress) {
+          workspace.setActiveTab('repo');
+          setGitActionToast({
+            msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
+            isError: true,
+          });
+          return false;
+        }
+
+        setGitActionToast({ msg: errorMessage, isError: true });
+        return false;
+      };
+
       if (await maybeHandlePushWithoutOrigin({ command, options })) {
         return false;
       }
@@ -125,195 +232,12 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           triggerRefresh();
           return true;
         }
-        if (command === 'push' && isNoLocalCommitPushError(r.error)) {
-          if (options?.skipAutoInitialCommitOnPushFailure) {
-            workspace.setActiveTab('repo');
-            setGitActionToast({
-              msg: t('generated.components.layout.workflows.usegitcommandworkflow.push_not_possible_there_is_no_local_commit_yet_please_co_7a8286f0'),
-              isError: true,
-            });
-            return false;
-          }
-
-          if (!options?.confirmedAutoInitialCommit) {
-            const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
-              commandLabel: `git ${args.join(' ')}`,
-              confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
-              onConfirm: async () => {
-                await runGitCommand(args, successMsg, actionLabel, {
-                  ...options,
-                  confirmedAutoInitialCommit: true,
-                });
-              },
-            });
-            if (confirmationOpened) {
-              return false;
-            }
-          }
-
-          const prepared = await ensureInitialCommitForPush();
-          if (!prepared) {
-            return false;
-          }
-
-          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream') ? args : ['push', '-u', 'origin', 'HEAD'];
-
-          return runGitCommand(
-            argsWithUpstream,
-            t('generated.components.layout.workflows.usegitcommandworkflow.initial_commit_created_and_pushed_295fbe68'),
-            t('generated.components.layout.workflows.usegitcommandworkflow.pushing_initial_commit_6b4afbb5'),
-            {
-              ...options,
-              confirmedAutoInitialCommit: true,
-              skipAutoInitialCommitOnPushFailure: true,
-              skipAutoSetUpstreamOnPushFailure: true,
-            },
-          );
-        }
-        const missingUpstream = isMissingUpstreamPushError(r.error);
-        if (await tryAutoSetUpstreamPush(r.error)) {
-          return true;
-        }
-        if (missingUpstream) {
-          return false;
-        }
-        if (await maybeRecoverRemoteSetup({ command, options, failureMessage: r.error })) {
-          return false;
-        }
-        if (maybeHandleSyncMismatchFailure({ command, failureMessage: r.error, args, successMsg, actionLabel, options })) {
-          return false;
-        }
-        const mergeInProgress = isMergeInProgressError(r.error);
-        triggerRefresh();
-        try {
-          const statusAfter = await gitClient.getStatusPorcelain();
-          const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
-          const conflictPath = resolveConflictPathAfterGitFailure(porcelain, r.error);
-          if (conflictPath) {
-            workspace.setActiveTab('repo');
-            setConflictResolverPath(conflictPath);
-            setGitActionToast({
-              msg: tr(
-                mergeInProgress
-                  ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
-                  : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
-                mergeInProgress
-                  ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
-                  : 'Merge conflict: opening the conflict resolver.',
-              ),
-              isError: false,
-            });
-            triggerRefresh();
-            return false;
-          }
-        } catch {
-          // ignore; fall through to generic error toast
-        }
-        if (mergeInProgress) {
-          workspace.setActiveTab('repo');
-          setGitActionToast({
-            msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
-            isError: true,
-          });
-          return false;
-        }
-        setGitActionToast({ msg: r.error || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'), isError: true });
-        return false;
+        return recoverFromGitCommandFailure(r.error, t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'));
       } catch (e: any) {
-        if (command === 'push' && isNoLocalCommitPushError(e?.message)) {
-          if (options?.skipAutoInitialCommitOnPushFailure) {
-            workspace.setActiveTab('repo');
-            setGitActionToast({
-              msg: t('generated.components.layout.workflows.usegitcommandworkflow.push_not_possible_there_is_no_local_commit_yet_please_co_7a8286f0'),
-              isError: true,
-            });
-            return false;
-          }
-
-          if (!options?.confirmedAutoInitialCommit) {
-            const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
-              commandLabel: `git ${args.join(' ')}`,
-              confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
-              onConfirm: async () => {
-                await runGitCommand(args, successMsg, actionLabel, {
-                  ...options,
-                  confirmedAutoInitialCommit: true,
-                });
-              },
-            });
-            if (confirmationOpened) {
-              return false;
-            }
-          }
-
-          const prepared = await ensureInitialCommitForPush();
-          if (!prepared) {
-            return false;
-          }
-
-          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream') ? args : ['push', '-u', 'origin', 'HEAD'];
-
-          return runGitCommand(
-            argsWithUpstream,
-            t('generated.components.layout.workflows.usegitcommandworkflow.initial_commit_created_and_pushed_295fbe68'),
-            t('generated.components.layout.workflows.usegitcommandworkflow.pushing_initial_commit_6b4afbb5'),
-            {
-              ...options,
-              confirmedAutoInitialCommit: true,
-              skipAutoInitialCommitOnPushFailure: true,
-              skipAutoSetUpstreamOnPushFailure: true,
-            },
-          );
-        }
-        const missingUpstream = isMissingUpstreamPushError(e?.message);
-        if (await tryAutoSetUpstreamPush(e?.message)) {
-          return true;
-        }
-        if (missingUpstream) {
-          return false;
-        }
-        if (await maybeRecoverRemoteSetup({ command, options, failureMessage: e?.message })) {
-          return false;
-        }
-        if (maybeHandleSyncMismatchFailure({ command, failureMessage: e?.message, args, successMsg, actionLabel, options })) {
-          return false;
-        }
-        const mergeInProgress = isMergeInProgressError(e?.message);
-        triggerRefresh();
-        try {
-          const statusAfter = await gitClient.getStatusPorcelain();
-          const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
-          const conflictPath = resolveConflictPathAfterGitFailure(porcelain, e?.message);
-          if (conflictPath) {
-            workspace.setActiveTab('repo');
-            setConflictResolverPath(conflictPath);
-            setGitActionToast({
-              msg: tr(
-                mergeInProgress
-                  ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
-                  : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
-                mergeInProgress
-                  ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
-                  : 'Merge conflict: opening the conflict resolver.',
-              ),
-              isError: false,
-            });
-            triggerRefresh();
-            return false;
-          }
-        } catch {
-          // ignore
-        }
-        if (mergeInProgress) {
-          workspace.setActiveTab('repo');
-          setGitActionToast({
-            msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
-            isError: true,
-          });
-          return false;
-        }
-        setGitActionToast({ msg: e.message, isError: true });
-        return false;
+        return recoverFromGitCommandFailure(
+          e?.message,
+          e?.message || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'),
+        );
       } finally {
         setIsGitActionRunning(false);
         setActiveGitCommand(null);
@@ -323,15 +247,19 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
     [
       ensureInitialCommitForPush,
       forceGithubRepoCreationPrompt,
+      maybeHandlePushWithoutOrigin,
+      maybeHandleSyncMismatchFailure,
+      maybeRecoverRemoteSetup,
       requestInitialCommitConfirmationIfNeeded,
-      setConfirmDialog,
+      runGitCommandGuards,
+      setConnectError,
       setConflictResolverPath,
+      setForceGithubRepoCreationPrompt,
       setGitActionToast,
-      settings.confirmDangerousOps,
-      settings.secretScanBeforePushEnabled,
+      t,
       triggerRefresh,
-      workspace,
       tr,
+      workspace,
     ],
   );
 

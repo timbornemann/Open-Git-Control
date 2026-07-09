@@ -12,14 +12,25 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/utils/**/*.ts', 'electron/settings.ts'],
+      include: [
+        'src/utils/**/*.ts',
+        'src/hooks/**/*.{ts,tsx}',
+        'src/contexts/**/*.{ts,tsx}',
+        'src/components/layout/hooks/**/*.{ts,tsx}',
+        'src/components/layout/state/**/*.ts',
+        'src/components/layout/workflows/**/*.{ts,tsx}',
+        'src/services/**/*.ts',
+        'electron/*.ts',
+        'electron/main-process/**/*.ts',
+      ],
+      exclude: ['**/*.d.ts', '**/__tests__/**', '**/*.test.{ts,tsx}', 'electron/main.ts', 'electron/preload.ts'],
       thresholds: {
-        // Keep CI thresholds aligned with currently-included utility modules.
-        // These can be raised incrementally as uncovered branches are tested.
-        lines: 94,
-        functions: 88,
-        branches: 85,
-        statements: 92,
+        // Broad architectural baseline: this now includes hooks, workflows,
+        // services and IPC routers instead of reporting only utility coverage.
+        lines: 25,
+        functions: 20,
+        branches: 20,
+        statements: 25,
       },
     },
   },

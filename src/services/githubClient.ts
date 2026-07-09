@@ -15,7 +15,7 @@ import type {
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
 } from '@/global';
-import { getElectronApi, requireElectronApi } from './electronApi';
+import { getElectronApi, requireElectronAiApi, requireElectronAppApi, requireElectronGithubApi } from './electronApi';
 
 export const githubClient = {
   isAvailable(): boolean {
@@ -23,59 +23,59 @@ export const githubClient = {
   },
 
   async openExternalUrl(url: string): Promise<{ success: boolean; error?: string }> {
-    return requireElectronApi().openExternalUrl(url);
+    return requireElectronAppApi().openExternalUrl(url);
   },
 
   async checkAuthStatus(): Promise<{ authenticated: boolean; username: string | null }> {
-    return requireElectronApi().githubCheckAuthStatus();
+    return requireElectronGithubApi().githubCheckAuthStatus();
   },
 
   async auth(token: string, host?: string): Promise<boolean> {
-    return requireElectronApi().githubAuth(token, host);
+    return requireElectronGithubApi().githubAuth(token, host);
   },
 
   async deviceStart(): Promise<IpcResult<DeviceFlowStartDto>> {
-    return requireElectronApi().githubDeviceStart();
+    return requireElectronGithubApi().githubDeviceStart();
   },
 
   async devicePoll(deviceCode: string): Promise<IpcResult<DeviceFlowPollDto>> {
-    return requireElectronApi().githubDevicePoll(deviceCode);
+    return requireElectronGithubApi().githubDevicePoll(deviceCode);
   },
 
   async webLogin(): Promise<IpcResult<{ username: string | null }>> {
-    return requireElectronApi().githubWebLogin();
+    return requireElectronGithubApi().githubWebLogin();
   },
 
   async getRepositories(params?: { page?: number; perPage?: number; search?: string }): Promise<IpcResult<GitHubRepositoryPageDto>> {
-    return requireElectronApi().githubGetRepos(params);
+    return requireElectronGithubApi().githubGetRepos(params);
   },
 
   async getSavedAuthStatus(): ReturnType<ElectronAPI['githubGetSavedAuthStatus']> {
-    return requireElectronApi().githubGetSavedAuthStatus();
+    return requireElectronGithubApi().githubGetSavedAuthStatus();
   },
 
   async loginWithSavedToken(): ReturnType<ElectronAPI['githubLoginWithSavedToken']> {
-    return requireElectronApi().githubLoginWithSavedToken();
+    return requireElectronGithubApi().githubLoginWithSavedToken();
   },
 
   async logout(): ReturnType<ElectronAPI['githubLogout']> {
-    return requireElectronApi().githubLogout();
+    return requireElectronGithubApi().githubLogout();
   },
 
   async createRepository(name: string, description: string, isPrivate: boolean): Promise<IpcResult<GitHubRepositoryDto>> {
-    return requireElectronApi().githubCreateRepo(name, description, isPrivate);
+    return requireElectronGithubApi().githubCreateRepo(name, description, isPrivate);
   },
 
   async forkRepository(params: GitHubForkParamsDto): Promise<IpcResult<GitHubRepositoryDto>> {
-    return requireElectronApi().githubForkRepo(params);
+    return requireElectronGithubApi().githubForkRepo(params);
   },
 
   async getPullRequests(owner: string, repo: string, state: string): Promise<IpcResult<PullRequestDto[]>> {
-    return requireElectronApi().githubGetPRs(owner, repo, state);
+    return requireElectronGithubApi().githubGetPRs(owner, repo, state);
   },
 
   async createPullRequest(...args: Parameters<ElectronAPI['githubCreatePR']>): ReturnType<ElectronAPI['githubCreatePR']> {
-    return requireElectronApi().githubCreatePR(...args);
+    return requireElectronGithubApi().githubCreatePR(...args);
   },
 
   async getWorkflowRuns(params: {
@@ -85,11 +85,11 @@ export const githubClient = {
     headSha?: string;
     perPage?: number;
   }): Promise<IpcResult<GithubWorkflowRunDto[]>> {
-    return requireElectronApi().githubGetWorkflowRuns(params);
+    return requireElectronGithubApi().githubGetWorkflowRuns(params);
   },
 
   async getStatusChecks(params: { owner: string; repo: string; ref: string }): Promise<IpcResult<GithubStatusChecksDto>> {
-    return requireElectronApi().githubGetStatusChecks(params);
+    return requireElectronGithubApi().githubGetStatusChecks(params);
   },
 
   async mergePullRequest(params: {
@@ -98,15 +98,15 @@ export const githubClient = {
     pullNumber: number;
     mergeMethod: PullRequestMergeMethodDto;
   }): Promise<IpcResult<{ sha: string; merged: boolean; message: string }>> {
-    return requireElectronApi().githubMergePR(params);
+    return requireElectronGithubApi().githubMergePR(params);
   },
 
   async getReleaseContext(params: { owner: string; repo: string; targetCommitish?: string }): Promise<IpcResult<GitHubReleaseContextDto>> {
-    return requireElectronApi().githubGetReleaseContext(params);
+    return requireElectronGithubApi().githubGetReleaseContext(params);
   },
 
   async createRelease(params: GitHubCreateReleaseParamsDto): Promise<IpcResult<GitHubReleaseDto>> {
-    return requireElectronApi().githubCreateRelease(params);
+    return requireElectronGithubApi().githubCreateRelease(params);
   },
 
   async generateReleaseNotes(params: {
@@ -119,6 +119,6 @@ export const githubClient = {
     versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];
   }): Promise<IpcResult<{ markdown: string }>> {
-    return requireElectronApi().aiGenerateReleaseNotes(params);
+    return requireElectronAiApi().aiGenerateReleaseNotes(params);
   },
 };

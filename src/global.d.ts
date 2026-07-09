@@ -476,7 +476,130 @@ export type FileTimelineCommitDto = {
   changes: FileTimelineChangeDto[];
 };
 
+type ElectronApiNamespaceKey = 'git' | 'github' | 'planner' | 'settings' | 'app' | 'ai' | 'repos';
+type ElectronFlatAPI = Omit<ElectronAPI, ElectronApiNamespaceKey>;
+
+export type ElectronGitAPI = Pick<
+  ElectronFlatAPI,
+  | 'setRepoPath'
+  | 'clearRepoPath'
+  | 'runGitCommand'
+  | 'createCommit'
+  | 'getCommitLogPage'
+  | 'requestCommitStats'
+  | 'onCommitStats'
+  | 'getWorkingTreeSnapshot'
+  | 'getWorkingTreeStats'
+  | 'stagePaths'
+  | 'getDiffPreview'
+  | 'getFileBlameRange'
+  | 'onRepoUnavailable'
+  | 'startInteractiveRebase'
+  | 'applyPatch'
+  | 'getStashes'
+  | 'gitStashBranch'
+  | 'getRepoOriginUrl'
+  | 'addIgnoreRule'
+  | 'gitFetch'
+  | 'gitPull'
+  | 'gitPush'
+  | 'scanPushSecrets'
+  | 'cancelSecretScan'
+  | 'gitClone'
+  | 'gitInit'
+  | 'getFileHistory'
+  | 'getFileBlame'
+  | 'getFileTimelineData'
+  | 'readRepoFile'
+  | 'getMarkdownPreviewFile'
+  | 'getRepoFileDataUrl'
+  | 'writeRepoFile'
+  | 'openSubmodule'
+  | 'onCloneProgress'
+  | 'onJobEvent'
+>;
+
+export type ElectronGithubAPI = Pick<
+  ElectronFlatAPI,
+  | 'githubAuth'
+  | 'githubDeviceStart'
+  | 'githubDevicePoll'
+  | 'githubWebLogin'
+  | 'githubGetRepos'
+  | 'githubGetSavedAuthStatus'
+  | 'githubLoginWithSavedToken'
+  | 'githubCheckAuthStatus'
+  | 'githubLogout'
+  | 'githubCreateRepo'
+  | 'githubForkRepo'
+  | 'githubGetPRs'
+  | 'githubCreatePR'
+  | 'githubCreateRelease'
+  | 'githubGetReleaseContext'
+  | 'githubGetWorkflowRuns'
+  | 'githubGetStatusChecks'
+  | 'githubMergePR'
+>;
+
+export type ElectronPlannerAPI = Pick<
+  ElectronFlatAPI,
+  | 'plannerGetData'
+  | 'plannerEnsureRepositoryProject'
+  | 'plannerCreateProject'
+  | 'plannerUpdateProject'
+  | 'plannerDeleteProject'
+  | 'plannerDeleteRepositoryProjectByPath'
+  | 'plannerCreateItem'
+  | 'plannerUpdateItem'
+  | 'plannerDeleteItem'
+  | 'plannerMaterializeProject'
+>;
+
+export type ElectronSettingsAPI = Pick<ElectronFlatAPI, 'getSettings' | 'setSettings' | 'setGeminiApiKey' | 'clearGeminiApiKey'>;
+
+export type ElectronAppAPI = Pick<
+  ElectronFlatAPI,
+  | 'openDirectory'
+  | 'selectDirectory'
+  | 'selectProjectParentDirectory'
+  | 'openExternalUrl'
+  | 'getPlanningApiInfo'
+  | 'generatePlanningApiToken'
+  | 'clearPlanningApiToken'
+  | 'getAppVersion'
+  | 'getUpdaterStatus'
+  | 'checkForAppUpdates'
+  | 'runOneClickAppUpdate'
+  | 'downloadAppUpdate'
+  | 'installAppUpdate'
+  | 'onUpdaterEvent'
+  | 'getDiagnosticsReport'
+>;
+
+export type ElectronAiAPI = Pick<
+  ElectronFlatAPI,
+  | 'aiTestConnection'
+  | 'aiListModels'
+  | 'ollamaTestConnection'
+  | 'ollamaListModels'
+  | 'runAiAutoCommit'
+  | 'cancelAiAutoCommit'
+  | 'getAiAutoCommitState'
+  | 'aiGenerateCommitMessage'
+  | 'aiGenerateReleaseNotes'
+  | 'onJobEvent'
+>;
+
+export type ElectronReposAPI = Pick<ElectronFlatAPI, 'getStoredRepos' | 'setStoredRepos' | 'setRepoPath' | 'clearRepoPath'>;
+
 export interface ElectronAPI {
+  git: ElectronGitAPI;
+  github: ElectronGithubAPI;
+  planner: ElectronPlannerAPI;
+  settings: ElectronSettingsAPI;
+  app: ElectronAppAPI;
+  ai: ElectronAiAPI;
+  repos: ElectronReposAPI;
   openDirectory: () => Promise<{ path: string; isRepo: boolean } | null>;
   selectDirectory: () => Promise<string | null>;
   selectProjectParentDirectory: () => Promise<string | null>;

@@ -1,5 +1,5 @@
 import type { ElectronAPI } from '@/global';
-import { getElectronApi, requireElectronApi } from './electronApi';
+import { getElectronApi, requireElectronPlannerApi } from './electronApi';
 
 export const plannerClient = {
   isAvailable(): boolean {
@@ -7,44 +7,44 @@ export const plannerClient = {
   },
 
   async getData(...args: Parameters<ElectronAPI['plannerGetData']>): ReturnType<ElectronAPI['plannerGetData']> {
-    return requireElectronApi().plannerGetData(...args);
+    return requireElectronPlannerApi().plannerGetData(...args);
   },
 
   async ensureRepositoryProject(...args: Parameters<ElectronAPI['plannerEnsureRepositoryProject']>): ReturnType<ElectronAPI['plannerEnsureRepositoryProject']> {
-    return requireElectronApi().plannerEnsureRepositoryProject(...args);
+    return requireElectronPlannerApi().plannerEnsureRepositoryProject(...args);
   },
 
   async createProject(...args: Parameters<ElectronAPI['plannerCreateProject']>): ReturnType<ElectronAPI['plannerCreateProject']> {
-    return requireElectronApi().plannerCreateProject(...args);
+    return requireElectronPlannerApi().plannerCreateProject(...args);
   },
 
   async updateProject(...args: Parameters<ElectronAPI['plannerUpdateProject']>): ReturnType<ElectronAPI['plannerUpdateProject']> {
-    return requireElectronApi().plannerUpdateProject(...args);
+    return requireElectronPlannerApi().plannerUpdateProject(...args);
   },
 
   async deleteProject(...args: Parameters<ElectronAPI['plannerDeleteProject']>): ReturnType<ElectronAPI['plannerDeleteProject']> {
-    return requireElectronApi().plannerDeleteProject(...args);
+    return requireElectronPlannerApi().plannerDeleteProject(...args);
   },
 
   async deleteRepositoryProjectByPath(
     ...args: Parameters<ElectronAPI['plannerDeleteRepositoryProjectByPath']>
   ): ReturnType<ElectronAPI['plannerDeleteRepositoryProjectByPath']> {
-    return requireElectronApi().plannerDeleteRepositoryProjectByPath(...args);
+    return requireElectronPlannerApi().plannerDeleteRepositoryProjectByPath(...args);
   },
 
   async createItem(...args: Parameters<ElectronAPI['plannerCreateItem']>): ReturnType<ElectronAPI['plannerCreateItem']> {
-    return requireElectronApi().plannerCreateItem(...args);
+    return requireElectronPlannerApi().plannerCreateItem(...args);
   },
 
   async updateItem(...args: Parameters<ElectronAPI['plannerUpdateItem']>): ReturnType<ElectronAPI['plannerUpdateItem']> {
-    return requireElectronApi().plannerUpdateItem(...args);
+    return requireElectronPlannerApi().plannerUpdateItem(...args);
   },
 
   async deleteItem(...args: Parameters<ElectronAPI['plannerDeleteItem']>): ReturnType<ElectronAPI['plannerDeleteItem']> {
-    return requireElectronApi().plannerDeleteItem(...args);
+    return requireElectronPlannerApi().plannerDeleteItem(...args);
   },
 
   async materializeProject(...args: Parameters<ElectronAPI['plannerMaterializeProject']>): ReturnType<ElectronAPI['plannerMaterializeProject']> {
-    return requireElectronApi().plannerMaterializeProject(...args);
+    return requireElectronPlannerApi().plannerMaterializeProject(...args);
   },
 };

@@ -1,5 +1,5 @@
 import type { ElectronAPI, GitCommandNameDto, GitCommandResultDto, IpcResult, SecretScanResultDto } from '@/global';
-import { getElectronApi, requireElectronApi } from './electronApi';
+import { getElectronApi, requireElectronGitApi } from './electronApi';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';
 
 export type GitCommandArgs = [GitCommandNameDto, ...string[]];
@@ -51,7 +51,7 @@ export const gitClient = {
   },
 
   async runGitCommand(commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> {
-    const result = await requireElectronApi().runGitCommand(commandName, ...args);
+    const result = await requireElectronGitApi().runGitCommand(commandName, ...args);
     notifyRepoUnavailableIfNeeded(result, commandName);
     return result;
   },
@@ -142,144 +142,144 @@ export const gitClient = {
   },
 
   async scanPushSecrets(params?: { includeTags?: boolean }): Promise<IpcResult<SecretScanResultDto>> {
-    return requireElectronApi().scanPushSecrets(params);
+    return requireElectronGitApi().scanPushSecrets(params);
   },
 
   async cancelSecretScan(): Promise<{ success: boolean; cancelled: boolean }> {
-    return requireElectronApi().cancelSecretScan();
+    return requireElectronGitApi().cancelSecretScan();
   },
 
   async createCommit(...args: Parameters<ElectronAPI['createCommit']>): ReturnType<ElectronAPI['createCommit']> {
-    const result = await requireElectronApi().createCommit(...args);
+    const result = await requireElectronGitApi().createCommit(...args);
     notifyRepoUnavailableIfNeeded(result, 'commit');
     return result;
   },
 
   async getCommitLogPage(...args: Parameters<ElectronAPI['getCommitLogPage']>): ReturnType<ElectronAPI['getCommitLogPage']> {
-    return requireElectronApi().getCommitLogPage(...args);
+    return requireElectronGitApi().getCommitLogPage(...args);
   },
 
   async requestCommitStats(...args: Parameters<ElectronAPI['requestCommitStats']>): ReturnType<ElectronAPI['requestCommitStats']> {
-    return requireElectronApi().requestCommitStats(...args);
+    return requireElectronGitApi().requestCommitStats(...args);
   },
 
   onCommitStats(...args: Parameters<ElectronAPI['onCommitStats']>): ReturnType<ElectronAPI['onCommitStats']> {
-    return requireElectronApi().onCommitStats(...args);
+    return requireElectronGitApi().onCommitStats(...args);
   },
 
   async getWorkingTreeSnapshot(...args: Parameters<ElectronAPI['getWorkingTreeSnapshot']>): ReturnType<ElectronAPI['getWorkingTreeSnapshot']> {
-    return requireElectronApi().getWorkingTreeSnapshot(...args);
+    return requireElectronGitApi().getWorkingTreeSnapshot(...args);
   },
 
   async getWorkingTreeStats(...args: Parameters<ElectronAPI['getWorkingTreeStats']>): ReturnType<ElectronAPI['getWorkingTreeStats']> {
-    return requireElectronApi().getWorkingTreeStats(...args);
+    return requireElectronGitApi().getWorkingTreeStats(...args);
   },
 
   async stagePaths(...args: Parameters<ElectronAPI['stagePaths']>): ReturnType<ElectronAPI['stagePaths']> {
-    const result = await requireElectronApi().stagePaths(...args);
+    const result = await requireElectronGitApi().stagePaths(...args);
     notifyRepoUnavailableIfNeeded(result, 'add');
     return result;
   },
 
   async getDiffPreview(...args: Parameters<ElectronAPI['getDiffPreview']>): ReturnType<ElectronAPI['getDiffPreview']> {
-    return requireElectronApi().getDiffPreview(...args);
+    return requireElectronGitApi().getDiffPreview(...args);
   },
 
   async getFileBlameRange(...args: Parameters<ElectronAPI['getFileBlameRange']>): ReturnType<ElectronAPI['getFileBlameRange']> {
-    return requireElectronApi().getFileBlameRange(...args);
+    return requireElectronGitApi().getFileBlameRange(...args);
   },
 
   async startInteractiveRebase(...args: Parameters<ElectronAPI['startInteractiveRebase']>): ReturnType<ElectronAPI['startInteractiveRebase']> {
-    return requireElectronApi().startInteractiveRebase(...args);
+    return requireElectronGitApi().startInteractiveRebase(...args);
   },
 
   async applyPatch(...args: Parameters<ElectronAPI['applyPatch']>): ReturnType<ElectronAPI['applyPatch']> {
-    const result = await requireElectronApi().applyPatch(...args);
+    const result = await requireElectronGitApi().applyPatch(...args);
     notifyRepoUnavailableIfNeeded(result, 'apply');
     return result;
   },
 
   async getStashes(...args: Parameters<ElectronAPI['getStashes']>): ReturnType<ElectronAPI['getStashes']> {
-    return requireElectronApi().getStashes(...args);
+    return requireElectronGitApi().getStashes(...args);
   },
 
   async gitStashBranch(...args: Parameters<ElectronAPI['gitStashBranch']>): ReturnType<ElectronAPI['gitStashBranch']> {
-    const result = await requireElectronApi().gitStashBranch(...args);
+    const result = await requireElectronGitApi().gitStashBranch(...args);
     notifyRepoUnavailableIfNeeded(result, 'stash branch');
     return result;
   },
 
   async getRepoOriginUrl(...args: Parameters<ElectronAPI['getRepoOriginUrl']>): ReturnType<ElectronAPI['getRepoOriginUrl']> {
-    return requireElectronApi().getRepoOriginUrl(...args);
+    return requireElectronGitApi().getRepoOriginUrl(...args);
   },
 
   async addIgnoreRule(...args: Parameters<ElectronAPI['addIgnoreRule']>): ReturnType<ElectronAPI['addIgnoreRule']> {
-    const result = await requireElectronApi().addIgnoreRule(...args);
+    const result = await requireElectronGitApi().addIgnoreRule(...args);
     notifyRepoUnavailableIfNeeded(result, 'ignore');
     return result;
   },
 
   async gitFetch(): ReturnType<ElectronAPI['gitFetch']> {
-    const result = await requireElectronApi().gitFetch();
+    const result = await requireElectronGitApi().gitFetch();
     notifyRepoUnavailableIfNeeded(result, 'fetch');
     return result;
   },
 
   async gitPull(): ReturnType<ElectronAPI['gitPull']> {
-    const result = await requireElectronApi().gitPull();
+    const result = await requireElectronGitApi().gitPull();
     notifyRepoUnavailableIfNeeded(result, 'pull');
     return result;
   },
 
   async gitPush(): ReturnType<ElectronAPI['gitPush']> {
-    const result = await requireElectronApi().gitPush();
+    const result = await requireElectronGitApi().gitPush();
     notifyRepoUnavailableIfNeeded(result, 'push');
     return result;
   },
 
   async gitClone(...args: Parameters<ElectronAPI['gitClone']>): ReturnType<ElectronAPI['gitClone']> {
-    return requireElectronApi().gitClone(...args);
+    return requireElectronGitApi().gitClone(...args);
   },
 
   async gitInit(...args: Parameters<ElectronAPI['gitInit']>): ReturnType<ElectronAPI['gitInit']> {
-    return requireElectronApi().gitInit(...args);
+    return requireElectronGitApi().gitInit(...args);
   },
 
   async getFileHistory(...args: Parameters<ElectronAPI['getFileHistory']>): ReturnType<ElectronAPI['getFileHistory']> {
-    return requireElectronApi().getFileHistory(...args);
+    return requireElectronGitApi().getFileHistory(...args);
   },
 
   async getFileBlame(...args: Parameters<ElectronAPI['getFileBlame']>): ReturnType<ElectronAPI['getFileBlame']> {
-    return requireElectronApi().getFileBlame(...args);
+    return requireElectronGitApi().getFileBlame(...args);
   },
 
   async getFileTimelineData(...args: Parameters<ElectronAPI['getFileTimelineData']>): ReturnType<ElectronAPI['getFileTimelineData']> {
-    return requireElectronApi().getFileTimelineData(...args);
+    return requireElectronGitApi().getFileTimelineData(...args);
   },
 
   async readRepoFile(...args: Parameters<ElectronAPI['readRepoFile']>): ReturnType<ElectronAPI['readRepoFile']> {
-    return requireElectronApi().readRepoFile(...args);
+    return requireElectronGitApi().readRepoFile(...args);
   },
 
   async getMarkdownPreviewFile(...args: Parameters<ElectronAPI['getMarkdownPreviewFile']>): ReturnType<ElectronAPI['getMarkdownPreviewFile']> {
-    return requireElectronApi().getMarkdownPreviewFile(...args);
+    return requireElectronGitApi().getMarkdownPreviewFile(...args);
   },
 
   async getRepoFileDataUrl(...args: Parameters<ElectronAPI['getRepoFileDataUrl']>): ReturnType<ElectronAPI['getRepoFileDataUrl']> {
-    return requireElectronApi().getRepoFileDataUrl(...args);
+    return requireElectronGitApi().getRepoFileDataUrl(...args);
   },
 
   async writeRepoFile(...args: Parameters<ElectronAPI['writeRepoFile']>): ReturnType<ElectronAPI['writeRepoFile']> {
-    const result = await requireElectronApi().writeRepoFile(...args);
+    const result = await requireElectronGitApi().writeRepoFile(...args);
     notifyRepoUnavailableIfNeeded(result, 'write');
     return result;
   },
 
   async openSubmodule(...args: Parameters<ElectronAPI['openSubmodule']>): ReturnType<ElectronAPI['openSubmodule']> {
-    return requireElectronApi().openSubmodule(...args);
+    return requireElectronGitApi().openSubmodule(...args);
   },
 
   onCloneProgress(...args: Parameters<ElectronAPI['onCloneProgress']>): ReturnType<ElectronAPI['onCloneProgress']> {
-    return requireElectronApi().onCloneProgress(...args);
+    return requireElectronGitApi().onCloneProgress(...args);
   },
 };

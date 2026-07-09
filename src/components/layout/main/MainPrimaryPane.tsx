@@ -3,7 +3,7 @@ import { DiffViewer } from '@/components/diff-viewer';
 import { FileTimelineView } from '@/components/FileTimelineView';
 import { CommitGraph } from '@/components/commit-graph';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
-import { ReleaseCreator } from '@/components/ReleaseCreator';
+import { ReleaseCreator } from '@/components/release-creator/ReleaseCreator';
 import { StagingArea } from '@/components/staging-area';
 import { ProjectPlannerView } from '@/components/project-planner';
 import { SettingsMainContent } from '@/components/layout/SettingsMainContent';

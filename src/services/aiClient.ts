@@ -1,5 +1,5 @@
 import type { ElectronAPI } from '@/global';
-import { getElectronApi, requireElectronApi } from './electronApi';
+import { getElectronApi, requireElectronAiApi } from './electronApi';
 
 export const aiClient = {
   isAvailable(): boolean {
@@ -7,30 +7,30 @@ export const aiClient = {
   },
 
   async testConnection(...args: Parameters<ElectronAPI['aiTestConnection']>): ReturnType<ElectronAPI['aiTestConnection']> {
-    return requireElectronApi().aiTestConnection(...args);
+    return requireElectronAiApi().aiTestConnection(...args);
   },
 
   async listModels(...args: Parameters<ElectronAPI['aiListModels']>): ReturnType<ElectronAPI['aiListModels']> {
-    return requireElectronApi().aiListModels(...args);
+    return requireElectronAiApi().aiListModels(...args);
   },
 
   async runAutoCommit(...args: Parameters<ElectronAPI['runAiAutoCommit']>): ReturnType<ElectronAPI['runAiAutoCommit']> {
-    return requireElectronApi().runAiAutoCommit(...args);
+    return requireElectronAiApi().runAiAutoCommit(...args);
   },
 
   async cancelAutoCommit(...args: Parameters<ElectronAPI['cancelAiAutoCommit']>): ReturnType<ElectronAPI['cancelAiAutoCommit']> {
-    return requireElectronApi().cancelAiAutoCommit(...args);
+    return requireElectronAiApi().cancelAiAutoCommit(...args);
   },
 
   async getAutoCommitState(...args: Parameters<ElectronAPI['getAiAutoCommitState']>): ReturnType<ElectronAPI['getAiAutoCommitState']> {
-    return requireElectronApi().getAiAutoCommitState(...args);
+    return requireElectronAiApi().getAiAutoCommitState(...args);
   },
 
   async generateCommitMessage(...args: Parameters<ElectronAPI['aiGenerateCommitMessage']>): ReturnType<ElectronAPI['aiGenerateCommitMessage']> {
-    return requireElectronApi().aiGenerateCommitMessage(...args);
+    return requireElectronAiApi().aiGenerateCommitMessage(...args);
   },
 
   onJobEvent(...args: Parameters<ElectronAPI['onJobEvent']>): ReturnType<ElectronAPI['onJobEvent']> {
-    return requireElectronApi().onJobEvent(...args);
+    return requireElectronAiApi().onJobEvent(...args);
   },
 };
