@@ -1,10 +1,13 @@
 import React from 'react';
 import { SidebarActivityBar } from './sidebar/SidebarActivityBar';
-import { useUIContext } from '@/contexts/AppStateContext';
+import { useUIStore } from '@/contexts/AppStateContext';
 import { SidebarContentRouter, SidebarHeaderContainer } from './sidebar/AppSidebarPanels';
 
-export const AppSidebar: React.FC = () => {
-  const { activeTab, setActiveTab, isSidebarCollapsed, onToggleSidebar } = useUIContext();
+const AppSidebarComponent: React.FC = () => {
+  const activeTab = useUIStore((state) => state.activeTab);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+  const onToggleSidebar = useUIStore((state) => state.onToggleSidebar);
 
   return (
     <>
@@ -19,3 +22,5 @@ export const AppSidebar: React.FC = () => {
     </>
   );
 };
+
+export const AppSidebar = React.memo(AppSidebarComponent);

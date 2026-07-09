@@ -93,7 +93,7 @@ export function registerGitHandlers({
         };
       }
 
-      const raw = await gitService.getLog(limit + 1, scope === 'all', offset);
+      const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset);
       // eslint-disable-next-line no-control-regex -- Git log records are NUL/unit-separator delimited.
       const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)].map((match) => match[1]);
       const hasMore = hashes.length > limit;
@@ -165,7 +165,7 @@ export function registerGitHandlers({
       });
 
       try {
-        const data = await gitService.commitWithMessage({
+        const data = await gitService.commits.commitWithMessageAtPath(gitService.requireActiveRepoPath(), {
           title: String(params.title || ''),
           description: String(params.description || ''),
           amend: params.amend === true,
@@ -203,7 +203,7 @@ export function registerGitHandlers({
     try {
       commitStatsService.interruptBackgroundWork();
       const normalizedPaths = Array.isArray(paths) ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000) : [];
-      const data = await gitService.stagePaths(normalizedPaths);
+      const data = await gitService.commits.stagePathsAtPath(gitService.requireActiveRepoPath(), normalizedPaths);
       emitJobEvent(event.sender, {
         id: jobId,
         operation: 'git:add',
@@ -228,7 +228,7 @@ export function registerGitHandlers({
     try {
       commitStatsService.interruptBackgroundWork();
       const normalizedArgs = normalizeDiffPreviewArgs(args);
-      const data = await gitService.getDiffPreview(normalizedArgs, {
+      const data = await gitService.runner.getDiffPreview(gitService.requireActiveRepoPath(), normalizedArgs, {
         maxBytes: Number(limits.maxBytes) || undefined,
         maxLines: Number(limits.maxLines) || undefined,
       });
@@ -243,7 +243,12 @@ export function registerGitHandlers({
       commitStatsService.interruptBackgroundWork();
       const normalizedPath = String(filePath || '').trim();
       if (!normalizedPath) throw new Error('File path is required.');
-      const raw = await gitService.getFileBlameRange(normalizedPath, String(commitHash || '').trim() || undefined, Number(startLine), Number(lineCount));
+      const raw = await gitService.history.getFileBlameRange(
+        normalizedPath,
+        String(commitHash || '').trim() || undefined,
+        Number(startLine),
+        Number(lineCount),
+      );
       return { success: true, data: parseFileBlame(raw) };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -432,7 +437,7 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      const raw = await gitService.getFileHistory(normalizedPath, limit, commitHash);
+      const raw = await gitService.history.getFileHistory(normalizedPath, limit, commitHash);
       return { success: true, data: parseFileHistory(raw) };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -446,7 +451,7 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      const raw = await gitService.getFileBlame(normalizedPath, commitHash);
+      const raw = await gitService.history.getFileBlame(normalizedPath, commitHash);
       return { success: true, data: parseFileBlame(raw) };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -460,7 +465,7 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      const data = await gitService.readRepoFile(normalizedPath);
+      const data = await gitService.files.readRepoFile(normalizedPath);
       return { success: true, data };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -475,7 +480,11 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      const text = await gitService.readRepositoryFileTextAtSource(source, filePath, typeof params.commitHash === 'string' ? params.commitHash : undefined);
+      const text = await gitService.files.readRepositoryFileTextAtSource(
+        source,
+        filePath,
+        typeof params.commitHash === 'string' ? params.commitHash : undefined,
+      );
       return { success: true, data: { text } };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -490,7 +499,11 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      const data = await gitService.readRepositoryImageDataUrlAtSource(source, filePath, typeof params.commitHash === 'string' ? params.commitHash : undefined);
+      const data = await gitService.files.readRepositoryImageDataUrlAtSource(
+        source,
+        filePath,
+        typeof params.commitHash === 'string' ? params.commitHash : undefined,
+      );
       return { success: true, data };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -504,7 +517,7 @@ export function registerGitHandlers({
         return { success: false, error: 'File path is required' };
       }
 
-      await gitService.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
+      await gitService.files.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -594,7 +607,7 @@ export function registerGitHandlers({
       timestamp: Date.now(),
     });
 
-    const result = await gitService.cloneRepo(
+    const result = await gitService.clone.cloneRepo(
       cloneUrl,
       targetDir,
       (line: string) => {
@@ -633,7 +646,7 @@ export function registerGitHandlers({
 
   ipcMain.handle(IpcChannel.GitGetFileTimelineData, async (_event: any, limit?: number) => {
     try {
-      const commits = await gitService.getFileTimelineData(limit);
+      const commits = await gitService.history.getFileTimelineData(limit);
       return { success: true, data: commits };
     } catch (error: any) {
       return { success: false, error: error.message };

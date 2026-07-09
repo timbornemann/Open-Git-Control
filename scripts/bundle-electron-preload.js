@@ -20,7 +20,10 @@ const bundledPreload = `"use strict";
 const { contextBridge, ipcRenderer } = require('electron');
 
 ${factorySource}
-contextBridge.exposeInMainWorld('electronAPI', createElectronApi(ipcRenderer));
+const api = createElectronApi(ipcRenderer);
+
+contextBridge.exposeInMainWorld('electronAPI', api);
+contextBridge.exposeInMainWorld('api', api);
 `;
 
 fs.writeFileSync(outputPath, bundledPreload, 'utf8');

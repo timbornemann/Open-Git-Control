@@ -1,4 +1,6 @@
-import { createContext, useContext, type Context, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand/vanilla';
 import type {
   AppStateSlicesValue,
   GithubContextValue,
@@ -21,33 +23,45 @@ export type {
 } from './app-state/types';
 export { createAppStateSlices } from './app-state/createAppStateSlices';
 
-const SettingsContext = createContext<SettingsContextValue | null>(null);
-const RepositoryContext = createContext<RepositoryContextValue | null>(null);
-const GithubContext = createContext<GithubContextValue | null>(null);
-const WorkflowContext = createContext<WorkflowContextValue | null>(null);
-const UIContext = createContext<UIContextValue | null>(null);
+type AppStateStore = StoreApi<AppStateSlicesValue>;
 
-const useRequiredContext = <T,>(context: Context<T | null>, hookName: string): T => {
-  const ctx = useContext(context);
-  if (!ctx) throw new Error(`${hookName} must be used within AppStateSlicesProvider`);
-  return ctx;
+const AppStateStoreContext = createContext<AppStateStore | null>(null);
+
+const createAppStateStore = (initialValue: AppStateSlicesValue): AppStateStore => createStore<AppStateSlicesValue>()(() => initialValue);
+
+const useAppStateSelector = <T,>(selector: (state: AppStateSlicesValue) => T, hookName: string): T => {
+  const store = useContext(AppStateStoreContext);
+  if (!store) throw new Error(`${hookName} must be used within AppStateSlicesProvider`);
+  return useStore(store, selector);
 };
 
-export const useSettingsContext = () => useRequiredContext(SettingsContext, 'useSettingsContext');
-export const useRepositoryContext = () => useRequiredContext(RepositoryContext, 'useRepositoryContext');
-export const useGithubContext = () => useRequiredContext(GithubContext, 'useGithubContext');
-export const useWorkflowContext = () => useRequiredContext(WorkflowContext, 'useWorkflowContext');
-export const useUIContext = () => useRequiredContext(UIContext, 'useUIContext');
-export const useOptionalUIContext = () => useContext(UIContext);
+export const useSettingsStore = <T,>(selector: (state: SettingsContextValue) => T): T =>
+  useAppStateSelector((state) => selector(state.settings), 'useSettingsStore');
+export const useGitStore = <T,>(selector: (state: RepositoryContextValue) => T): T => useAppStateSelector((state) => selector(state.repository), 'useGitStore');
+export const useGitHubStore = <T,>(selector: (state: GithubContextValue) => T): T => useAppStateSelector((state) => selector(state.github), 'useGitHubStore');
+export const useWorkflowStore = <T,>(selector: (state: WorkflowContextValue) => T): T =>
+  useAppStateSelector((state) => selector(state.workflow), 'useWorkflowStore');
+export const useUIStore = <T,>(selector: (state: UIContextValue) => T): T => useAppStateSelector((state) => selector(state.ui), 'useUIStore');
 
-export const AppStateSlicesProvider = ({ value, children }: { value: AppStateSlicesValue; children: ReactNode }) => (
-  <SettingsContext.Provider value={value.settings}>
-    <RepositoryContext.Provider value={value.repository}>
-      <GithubContext.Provider value={value.github}>
-        <WorkflowContext.Provider value={value.workflow}>
-          <UIContext.Provider value={value.ui}>{children}</UIContext.Provider>
-        </WorkflowContext.Provider>
-      </GithubContext.Provider>
-    </RepositoryContext.Provider>
-  </SettingsContext.Provider>
-);
+export const useSettingsContext = () => useSettingsStore((state) => state);
+export const useRepositoryContext = () => useGitStore((state) => state);
+export const useGithubContext = () => useGitHubStore((state) => state);
+export const useWorkflowContext = () => useWorkflowStore((state) => state);
+export const useUIContext = () => useUIStore((state) => state);
+export const useOptionalUIContext = () => {
+  const store = useContext(AppStateStoreContext);
+  return store?.getState().ui ?? null;
+};
+
+export const AppStateSlicesProvider = ({ value, children }: { value: AppStateSlicesValue; children: ReactNode }) => {
+  const storeRef = useRef<AppStateStore | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = createAppStateStore(value);
+  }
+
+  useLayoutEffect(() => {
+    storeRef.current?.setState(value, true);
+  }, [value]);
+
+  return <AppStateStoreContext.Provider value={storeRef.current}>{children}</AppStateStoreContext.Provider>;
+};

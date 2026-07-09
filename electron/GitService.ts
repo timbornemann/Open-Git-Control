@@ -88,6 +88,30 @@ export class GitService {
     return this.repoPath;
   }
 
+  requireActiveRepoPath(): string {
+    return this.ensureRepoPath();
+  }
+
+  get runner(): GitRunner {
+    return this.gitRunner;
+  }
+
+  get commits(): CommitService {
+    return this.commitService;
+  }
+
+  get history(): HistoryService {
+    return this.historyService;
+  }
+
+  get files(): RepositoryFiles {
+    return this.repositoryFiles;
+  }
+
+  get clone(): CloneService {
+    return this.cloneService;
+  }
+
   /**
    * Normalisiert auf den echten Repository-Root (falls `newPath` innerhalb eines Repos liegt).
    * Das verhindert pathspec-Fehler bei Dateipfaden, wenn Nutzer Unterordner als Repo oeffnen.

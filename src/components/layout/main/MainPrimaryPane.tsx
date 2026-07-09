@@ -15,6 +15,7 @@ import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { GithubAuthGuide } from './GithubAuthGuide';
 import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
+import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -58,28 +59,23 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const workflow = useWorkflowContext();
   const { t } = useI18n();
 
-  const showGithubGuide = ui.activeTab === 'github' && !github.isAuthenticated && Boolean(github.selectedGithubAuthHelpMethod);
-  const isSettingsView = ui.activeTab === 'settings';
-  const isPlannerView = ui.activeTab === 'planner';
-  const isReleaseView = ui.activeTab === 'repo' && github.showReleaseCreator;
-  const isTimelineView = ui.activeTab === 'repo' && showTimeline;
-  const primaryPaneTitle = isSettingsView
-    ? t('generated.components.layout.main.mainprimarypane.settings_c6256784')
-    : isReleaseView
-      ? t('generated.components.layout.main.mainprimarypane.release_creator_e28377be')
-      : isTimelineView
-        ? t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25')
-        : showGithubGuide
-          ? t('generated.components.layout.main.mainprimarypane.github_login_guide_c2a55182')
-          : showRecoveryCenter
-            ? t('generated.components.layout.main.mainprimarypane.recovery_center_0adebec8')
-            : activeConflictPath
-              ? t('generated.components.layout.main.mainprimarypane.conflict_resolver_1f790ac5')
-              : activeDiffRequest
-                ? t('generated.components.layout.main.mainprimarypane.diff_viewer_979e21a6')
-                : '';
-  const shouldShowPrimaryPaneHeader =
-    isSettingsView || isReleaseView || isTimelineView || showGithubGuide || showRecoveryCenter || Boolean(activeConflictPath) || Boolean(activeDiffRequest);
+  const route = getMainPrimaryRoute({
+    activeConflictPath,
+    activeDiffRequest,
+    activeTab: ui.activeTab,
+    isAuthenticated: github.isAuthenticated,
+    selectedGithubAuthHelpMethod: github.selectedGithubAuthHelpMethod,
+    showRecoveryCenter,
+    showReleaseCreator: github.showReleaseCreator,
+    showTimeline,
+  });
+  const showGithubGuide = route === 'githubGuide';
+  const isSettingsView = route === 'settings';
+  const isPlannerView = route === 'planner';
+  const isReleaseView = route === 'release';
+  const isTimelineView = route === 'timeline';
+  const primaryPaneTitle = getMainPrimaryTitle(route, t);
+  const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
 
   return (
     <div

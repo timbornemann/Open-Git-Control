@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGithubContext, useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useGitHubStore, useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
@@ -10,13 +10,21 @@ import { MainTopbar } from './main/MainTopbar';
 import { useInspectorPaneVisibility } from './main/useInspectorPaneVisibility';
 import { useMainViewTimeline } from './main/useMainViewTimeline';
 
-export const MainView: React.FC = () => {
-  const ui = useUIContext();
-  const repository = useRepositoryContext();
-  const github = useGithubContext();
-  const workflow = useWorkflowContext();
+const MainViewComponent: React.FC = () => {
+  const activeTab = useUIStore((state) => state.activeTab);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const activeRepo = useGitStore((state) => state.activeRepo);
+  const refreshTrigger = useGitStore((state) => state.refreshTrigger);
+  const setSelectedCommit = useGitStore((state) => state.setSelectedCommit);
+  const onOpenRepoWorkspace = useGitStore((state) => state.onOpenRepoWorkspace);
+  const commitNavigationRequest = useGitStore((state) => state.commitNavigationRequest);
+  const onNavigateToCommit = useGitStore((state) => state.onNavigateToCommit);
+  const showReleaseCreator = useGitHubStore((state) => state.showReleaseCreator);
+  const onCloseReleaseCreator = useGitHubStore((state) => state.onCloseReleaseCreator);
+  const autoOpenConflictResolverPath = useWorkflowStore((state) => state.autoOpenConflictResolverPath);
+  const onAutoOpenConflictResolverConsumed = useWorkflowStore((state) => state.onAutoOpenConflictResolverConsumed);
   const { t } = useI18n();
-  const workingTree = useWorkingTreeSnapshot(repository.activeRepo, repository.refreshTrigger);
+  const workingTree = useWorkingTreeSnapshot(activeRepo, refreshTrigger);
 
   const { primaryPaneBasis, isContentResizing, contentAreaRef, handleContentResizeStart } = useMainViewPaneResizer();
 
@@ -40,32 +48,32 @@ export const MainView: React.FC = () => {
     closeInspector,
     handleStageCommitOpen,
   } = useMainViewInspector({
-    autoOpenConflictResolverPath: workflow.autoOpenConflictResolverPath,
-    onAutoOpenConflictResolverConsumed: workflow.onAutoOpenConflictResolverConsumed,
-    setSelectedCommit: repository.setSelectedCommit,
-    activeRepo: repository.activeRepo,
-    onOpenRepoWorkspace: repository.onOpenRepoWorkspace,
-    onCloseReleaseCreator: github.onCloseReleaseCreator,
-    commitNavigationRequest: repository.commitNavigationRequest,
-    onNavigateToCommit: repository.onNavigateToCommit,
+    autoOpenConflictResolverPath,
+    onAutoOpenConflictResolverConsumed,
+    setSelectedCommit,
+    activeRepo,
+    onOpenRepoWorkspace,
+    onCloseReleaseCreator,
+    commitNavigationRequest,
+    onNavigateToCommit,
   });
 
   const { isInspectorPaneVisible, toggleInspectorPane, hideInspectorPane } = useInspectorPaneVisibility();
 
   const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
-    activeRepo: repository.activeRepo,
-    setActiveTab: ui.setActiveTab,
-    onCloseReleaseCreator: github.onCloseReleaseCreator,
+    activeRepo,
+    setActiveTab,
+    onCloseReleaseCreator,
     t,
   });
 
   React.useEffect(() => {
-    if (github.showReleaseCreator) setShowTimeline(false);
-  }, [github.showReleaseCreator, setShowTimeline]);
+    if (showReleaseCreator) setShowTimeline(false);
+  }, [showReleaseCreator, setShowTimeline]);
 
-  const isSettingsView = ui.activeTab === 'settings';
-  const isPlannerView = ui.activeTab === 'planner';
-  const isReleaseView = ui.activeTab === 'repo' && github.showReleaseCreator;
+  const isSettingsView = activeTab === 'settings';
+  const isPlannerView = activeTab === 'planner';
+  const isReleaseView = activeTab === 'repo' && showReleaseCreator;
   const canShowInspectorPane = !isSettingsView && !isPlannerView && !isReleaseView;
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
@@ -121,3 +129,5 @@ export const MainView: React.FC = () => {
     </div>
   );
 };
+
+export const MainView = React.memo(MainViewComponent);

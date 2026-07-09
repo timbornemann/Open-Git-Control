@@ -1,5 +1,5 @@
 import React from 'react';
-import { useUIContext } from '@/contexts/AppStateContext';
+import { useUIStore } from '@/contexts/AppStateContext';
 import { ProjectPlannerSidebarContent } from '@/components/project-planner/ProjectPlannerSidebarContent';
 import { GithubSidebarContainer } from './GithubSidebarContainer';
 import { LocalReposSidebarContainer } from './LocalReposSidebarContainer';
@@ -7,7 +7,7 @@ import { RepoSidebarContainer } from './RepoSidebarContainer';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
 
 export const SidebarContentRouter: React.FC = React.memo(() => {
-  const { activeTab } = useUIContext();
+  const activeTab = useUIStore((state) => state.activeTab);
 
   return (
     <div className="pane-content" style={{ padding: '8px' }}>
