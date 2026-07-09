@@ -120,11 +120,11 @@ export const useRepositoryBranches = ({
     }
 
     setIsCreatingBranch(false);
-    const created = await runGitCommand(['checkout', '-b', name], tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
+    const created = await runGitCommand(gitClient.buildCreateBranchArgs(name), tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
     if (!created || !hasRemoteOrigin) return;
 
     await runGitCommand(
-      ['push', '-u', 'origin', name],
+      gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: name, setUpstream: true }),
       tr(`Branch "${name}" erstellt, auf origin veroeffentlicht und Upstream gesetzt.`, `Created branch "${name}", pushed to origin, and set upstream.`),
       tr(`Neuer Branch "${name}" wird auf origin veroeffentlicht...`, `Publishing new branch "${name}" to origin...`),
     );
@@ -138,7 +138,10 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onDelete: async () => {
-          const ok = await runGitCommand(['branch', '-d', branchName], tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`));
+          const ok = await runGitCommand(
+            gitClient.buildDeleteBranchArgs(branchName),
+            tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`),
+          );
           if (ok) return;
           setConfirmDialog(
             buildForceDeleteBranchDialog({
@@ -146,7 +149,10 @@ export const useRepositoryBranches = ({
               t,
               tr,
               onForceDelete: async () => {
-                await runGitCommand(['branch', '-D', branchName], tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`));
+                await runGitCommand(
+                  gitClient.buildDeleteBranchArgs(branchName, { force: true }),
+                  tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`),
+                );
               },
             }),
           );
@@ -158,7 +164,8 @@ export const useRepositoryBranches = ({
   const handleMergeBranch = async (branchName: string, mode: GitMergeMode = 'default') => {
     const mergeTarget = normalizeBranchRefForMerge(branchName);
     const flags = mergeModeArgs(mode);
-    const commandPreview = ['merge', ...flags, mergeTarget].join(' ');
+    const mergeArgs = gitClient.buildMergeBranchArgs(mergeTarget, flags);
+    const commandPreview = mergeArgs.join(' ');
     setConfirmDialog(
       buildMergeBranchDialog({
         branchName,
@@ -169,7 +176,7 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onMerge: async () => {
-          await runGitCommand(['merge', ...flags, mergeTarget], tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`));
+          await runGitCommand(mergeArgs, tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`));
         },
       }),
     );
@@ -183,7 +190,7 @@ export const useRepositoryBranches = ({
         tr,
         onRename: async (newName) => {
           await runGitCommand(
-            ['branch', '-m', oldName, newName],
+            gitClient.buildRenameBranchArgs(oldName, newName),
             tr(`Branch umbenannt: "${oldName}" -> "${newName}".`, `Renamed branch: "${oldName}" -> "${newName}".`),
           );
         },

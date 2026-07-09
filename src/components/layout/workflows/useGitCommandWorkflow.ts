@@ -7,6 +7,7 @@ import { isMissingUpstreamPushError, isNoLocalCommitPushError } from '@/utils/gi
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
+import { gitWorkflowCommands } from './gitWorkflowCommands';
 import { useGitCommandGuardWorkflow } from './useGitCommandGuardWorkflow';
 import { useGitSyncRecoveryWorkflow, type GitCommandRunner } from './useGitSyncRecoveryWorkflow';
 import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
@@ -141,7 +142,9 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
             return false;
           }
 
-          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream') ? args : ['push', '-u', 'origin', 'HEAD'];
+          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream')
+            ? args
+            : gitWorkflowCommands.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
 
           return runGitCommand(
             argsWithUpstream,

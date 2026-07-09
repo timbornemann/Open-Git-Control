@@ -1,5 +1,6 @@
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import type { CatalogTranslateFn } from '@/i18n';
+import { gitClient, type GitCommandArgs } from '@/services/gitClient';
 import type { BranchInfo } from '@/types/git';
 import type { GraphNode } from '@/utils/graphLayout';
 import { mergeTargetFromDecoratedRef, parseRemoteBranchRef } from '@/utils/gitParsing';
@@ -40,7 +41,7 @@ export const buildCommitRefMenuActions = ({
   const hash = node.commit.hash;
   const shortHash = node.commit.abbrevHash;
   const localBranchNames = new Set(branches.filter((branch) => branch.scope === 'local').map((branch) => branch.name));
-  const checkoutCandidates: { label: string; args: string[]; successMessage: string }[] = [];
+  const checkoutCandidates: { label: string; args: GitCommandArgs; successMessage: string }[] = [];
   const seenCheckoutTargets = new Set<string>();
 
   for (const ref of sortRefs(node.commit.refs)) {
@@ -59,7 +60,7 @@ export const buildCommitRefMenuActions = ({
           seenCheckoutTargets.add(localKey);
           checkoutCandidates.push({
             label: parsedRemote.localBranchName,
-            args: ['checkout', parsedRemote.localBranchName],
+            args: gitClient.buildCheckoutBranchArgs(parsedRemote.localBranchName),
             successMessage: `Branch "${parsedRemote.localBranchName}" ausgecheckt.`,
           });
         }
@@ -71,7 +72,7 @@ export const buildCommitRefMenuActions = ({
       seenCheckoutTargets.add(remoteKey);
       checkoutCandidates.push({
         label: parsedRemote.remoteRef,
-        args: ['checkout', '--track', parsedRemote.remoteRef],
+        args: gitClient.buildCheckoutRemoteBranchArgs(parsedRemote.remoteRef),
         successMessage: `Tracking-Branch "${parsedRemote.localBranchName}" aus "${parsedRemote.remoteRef}" ausgecheckt.`,
       });
       continue;
@@ -82,7 +83,7 @@ export const buildCommitRefMenuActions = ({
     seenCheckoutTargets.add(localKey);
     checkoutCandidates.push({
       label: normalizedTarget,
-      args: ['checkout', normalizedTarget],
+      args: gitClient.buildCheckoutBranchArgs(normalizedTarget),
       successMessage: `Branch "${normalizedTarget}" ausgecheckt.`,
     });
   }
@@ -124,7 +125,7 @@ export const buildCommitRefMenuActions = ({
           onSubmit: async (values) => {
             const name = (values.name || '').trim();
             if (!name) return;
-            await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" aus ${shortHash} ausgecheckt.`);
+            await runGitAction(gitClient.buildCreateBranchArgs(name, hash), `Branch "${name}" aus ${shortHash} ausgecheckt.`);
           },
         });
       },
@@ -145,7 +146,7 @@ export const buildCommitRefMenuActions = ({
           consequences: 'Neue Commits sind spaeter schwerer auffindbar, bis du einen Branch erstellst.',
           confirmLabel: 'Trotzdem auschecken',
           onConfirm: async () => {
-            await runGitAction(['checkout', hash], `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
+            await runGitAction(gitClient.buildCheckoutRefArgs(hash), `Checkout zu ${shortHash} (detached HEAD) erfolgreich.`);
           },
         });
       },
@@ -172,7 +173,7 @@ export const buildCommitRefMenuActions = ({
           onSubmit: async (values) => {
             const name = (values.name || '').trim();
             if (!name) return;
-            await runGitAction(['checkout', '-b', name, hash], `Branch "${name}" erstellt.`);
+            await runGitAction(gitClient.buildCreateBranchArgs(name, hash), `Branch "${name}" erstellt.`);
           },
         });
       },
@@ -206,9 +207,9 @@ export const buildCommitRefMenuActions = ({
             if (!name) return;
             const msg = (values.message || '').trim();
             if (msg) {
-              await runGitAction(['tag', '-a', name, '-m', msg, hash], `Tag "${name}" erstellt.`);
+              await runGitAction(gitClient.buildCreateTagArgs(name, { message: msg, target: hash }), `Tag "${name}" erstellt.`);
             } else {
-              await runGitAction(['tag', name, hash], `Tag "${name}" erstellt.`);
+              await runGitAction(gitClient.buildCreateTagArgs(name, { target: hash }), `Tag "${name}" erstellt.`);
             }
           },
         });

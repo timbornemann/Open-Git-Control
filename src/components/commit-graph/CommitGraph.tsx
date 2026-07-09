@@ -3,6 +3,7 @@ import { mergeableDecoratedRefs, normalizeBranchRefForMerge, type GitStatusDetai
 import type { GraphNode, GraphEdge } from '@/utils/graphLayout';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
+import { gitClient } from '@/services/gitClient';
 import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
 import { formatDate, formatRelativeTime, formatTime } from '@/utils/dateTime';
@@ -668,7 +669,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
               consequences: t('generated.components.commit_graph.commitgraph.if_conflicts_occur_resolve_them_in_the_working_tree_and_54357bae'),
               confirmLabel: t('generated.components.commit_graph.commitgraph.start_merge_516b5e37'),
               onConfirm: async () => {
-                await runGitAction(['merge', hash], tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`));
+                await runGitAction(gitClient.buildMergeBranchArgs(hash), tr(`Merge von ${shortHash} abgeschlossen.`, `Merge of ${shortHash} completed.`));
               },
             });
           }}

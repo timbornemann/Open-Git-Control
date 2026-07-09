@@ -4,6 +4,7 @@ import { isNonFastForwardPushError, isPullBlockedByLocalChangesError } from '@/u
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { AppTabId } from '@/app/state/contracts';
+import { gitWorkflowCommands } from './gitWorkflowCommands';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -52,7 +53,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       const quickFixStashMessage = 'Open Git Control quick sync fix';
 
       const stashed = await runGitCommand(
-        ['stash', 'push', '-u', '-m', quickFixStashMessage],
+        gitWorkflowCommands.stashPushAll(quickFixStashMessage),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_saved_changes_to_stash_5cd00a52'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_creating_stash_3adb0717'),
         quickFixOptions,
@@ -62,7 +63,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       }
 
       const pulled = await runGitCommand(
-        ['pull', '--rebase'],
+        gitWorkflowCommands.pullRebase(),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_pull_rebase_completed_acf1dc5f'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_running_pull_rebase_394092f9'),
         quickFixOptions,
@@ -76,7 +77,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       }
 
       const popped = await runGitCommand(
-        ['stash', 'pop'],
+        gitWorkflowCommands.stashPop(),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_stash_reapplied_5491de8e'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_reapplying_stash_3a51c601'),
         quickFixOptions,
@@ -119,7 +120,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       const stashMessage = `Open Git Control autostash before pull: git ${args.join(' ')}`;
 
       const stashed = await runGitCommand(
-        ['stash', 'push', '-u', '-m', stashMessage],
+        gitWorkflowCommands.stashPushAll(stashMessage),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_saved_local_changes_to_stash_eb2082e8'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_creating_stash_126e4d4f'),
         autostashOptions,
@@ -138,7 +139,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       }
 
       const popped = await runGitCommand(
-        ['stash', 'pop'],
+        gitWorkflowCommands.stashPop(),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_stash_reapplied_34ac5813'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_reapplying_stash_ebfb337f'),
         autostashOptions,

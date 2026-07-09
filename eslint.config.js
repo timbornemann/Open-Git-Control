@@ -2,6 +2,21 @@ const tsParser = require('@typescript-eslint/parser');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const reactHooksPlugin = require('eslint-plugin-react-hooks');
 
+const complexityExceptionFiles = [
+  'electron/ai/AiAutoCommitRunner.ts',
+  'electron/main-process/gitCommandPolicy.ts',
+  'electron/main-process/planningApiServer.ts',
+  'src/components/commit-graph/useCommitGraphData.ts',
+  'src/components/layout/ApiMcpSettingsPanel.tsx',
+  'src/components/layout/workflows/useBareRepoRecoveryWorkflow.ts',
+  'src/components/layout/workflows/useGitCommandGuardWorkflow.ts',
+  'src/components/layout/workflows/useReleaseWorkflow.ts',
+  'src/components/layout/workflows/useRemoteRecoveryWorkflow.ts',
+  'src/components/release-creator/ReleaseCreator.tsx',
+  'src/components/staging-area/ConflictResolverPanel.tsx',
+  'src/components/staging-area/StagingCommitPanel.tsx',
+];
+
 module.exports = [
   {
     ignores: ['coverage/**', 'dist/**', 'dist-electron/**', 'node_modules/**', 'release/**'],
@@ -68,6 +83,7 @@ module.exports = [
       'require-yield': 'error',
       'use-isnan': 'error',
       'valid-typeof': 'error',
+      complexity: ['error', 35],
       '@typescript-eslint/consistent-type-imports': ['warn', { prefer: 'type-imports' }],
       '@typescript-eslint/no-unused-vars': [
         'warn',
@@ -76,6 +92,28 @@ module.exports = [
           caughtErrorsIgnorePattern: '^_',
           ignoreRestSiblings: true,
           varsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
+    files: complexityExceptionFiles,
+    rules: {
+      complexity: 'off',
+    },
+  },
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'src/contexts/**/*.{ts,tsx}', 'src/app/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'electron',
+              message: 'UI code must use preload-backed clients/services instead of importing Electron directly.',
+            },
+          ],
         },
       ],
     },

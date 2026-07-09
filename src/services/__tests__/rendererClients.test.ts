@@ -203,6 +203,7 @@ describe('renderer service clients', () => {
 
   it('builds common git command argument lists without touching Electron', () => {
     expect(gitClient.buildPushCurrentBranchArgs()).toEqual(['push', '-u', 'origin', 'HEAD']);
+    expect(gitClient.buildPushArgs(['--force-with-lease'])).toEqual(['push', '--force-with-lease']);
     expect(gitClient.buildPushCurrentBranchArgs({ remote: 'upstream', ref: 'feature', setUpstream: false, extraArgs: ['--force-with-lease'] })).toEqual([
       'push',
       '--force-with-lease',
@@ -210,10 +211,41 @@ describe('renderer service clients', () => {
       'feature',
     ]);
     expect(gitClient.buildCheckoutBranchArgs('main')).toEqual(['checkout', 'main']);
+    expect(gitClient.buildCheckoutRefArgs('abc123')).toEqual(['checkout', 'abc123']);
     expect(gitClient.buildCheckoutRemoteBranchArgs('origin/main')).toEqual(['checkout', '--track', 'origin/main']);
     expect(gitClient.buildCheckoutRemoteBranchArgs('origin/main', 'main')).toEqual(['checkout', '-b', 'main', '--track', 'origin/main']);
+    expect(gitClient.buildCreateBranchArgs('feature')).toEqual(['checkout', '-b', 'feature']);
+    expect(gitClient.buildCreateBranchArgs('feature', 'abc123')).toEqual(['checkout', '-b', 'feature', 'abc123']);
+    expect(gitClient.buildDeleteBranchArgs('feature')).toEqual(['branch', '-d', 'feature']);
+    expect(gitClient.buildDeleteBranchArgs('feature', { force: true })).toEqual(['branch', '-D', 'feature']);
+    expect(gitClient.buildRenameBranchArgs('old', 'new')).toEqual(['branch', '-m', 'old', 'new']);
+    expect(gitClient.buildMergeBranchArgs('feature', ['--no-ff'])).toEqual(['merge', '--no-ff', 'feature']);
+    expect(gitClient.buildCherryPickCommitArgs('abc123')).toEqual(['cherry-pick', 'abc123']);
+    expect(gitClient.buildRevertCommitArgs('abc123', { noEdit: true })).toEqual(['revert', '--no-edit', 'abc123']);
+    expect(gitClient.buildRevertCommitArgs('abc123', { mainline: 1, noEdit: true })).toEqual(['revert', '-m', '1', '--no-edit', 'abc123']);
+    expect(gitClient.buildResetToCommitArgs('--hard', 'abc123')).toEqual(['reset', '--hard', 'abc123']);
     expect(gitClient.getPullRequestBranchName(42, 'feature/new thing')).toBe('pr-42-feature-new-thing');
     expect(gitClient.buildFetchPullRequestBranchArgs(42, 'pr-42-feature', 'upstream')).toEqual(['fetch', 'upstream', 'pull/42/head:pr-42-feature']);
+    expect(gitClient.buildSetUpstreamBranchArgs('main')).toEqual(['branch', '--set-upstream-to', 'origin/main', 'main']);
+    expect(gitClient.buildPullArgs(['--ff-only'])).toEqual(['pull', '--ff-only']);
+    expect(gitClient.buildPullRebaseArgs()).toEqual(['pull', '--rebase']);
+    expect(gitClient.buildStashPushArgs('saving work')).toEqual(['stash', 'push', '-u', '-m', 'saving work']);
+    expect(gitClient.buildStashPushArgs('tracked only', { includeUntracked: false })).toEqual(['stash', 'push', '-m', 'tracked only']);
+    expect(gitClient.buildStashPopArgs()).toEqual(['stash', 'pop']);
+    expect(gitClient.buildMergeContinueArgs()).toEqual(['mergeContinue']);
+    expect(gitClient.buildMergeAbortArgs()).toEqual(['mergeAbort']);
+    expect(gitClient.buildRebaseContinueArgs()).toEqual(['rebaseContinue']);
+    expect(gitClient.buildRebaseAbortArgs()).toEqual(['rebaseAbort']);
+    expect(gitClient.buildCreateTagArgs('v1', { message: 'release', target: 'abc123' })).toEqual(['tag', '-a', 'v1', '-m', 'release', 'abc123']);
+    expect(gitClient.buildCreateTagArgs('v1', { target: 'abc123' })).toEqual(['tag', 'v1', 'abc123']);
+    expect(gitClient.buildDeleteTagArgs('v1')).toEqual(['tag', '-d', 'v1']);
+    expect(gitClient.buildPushTagsArgs()).toEqual(['push', '--tags']);
+    expect(gitClient.buildAddRemoteArgs('upstream', 'url')).toEqual(['remote', 'add', 'upstream', 'url']);
+    expect(gitClient.buildRemoveRemoteArgs('upstream')).toEqual(['remote', 'remove', 'upstream']);
+    expect(gitClient.buildRenameRemoteArgs('origin', 'upstream')).toEqual(['remote', 'rename', 'origin', 'upstream']);
+    expect(gitClient.buildSetRemoteUrlArgs('origin', 'url')).toEqual(['remote', 'set-url', 'origin', 'url']);
+    expect(gitClient.buildSubmoduleUpdateInitRecursiveArgs()).toEqual(['submoduleUpdateInitRecursive']);
+    expect(gitClient.buildSubmoduleSyncRecursiveArgs()).toEqual(['submoduleSyncRecursive']);
   });
 
   it('delegates git commands and notifies repo-unavailable listeners once per debounce window', async () => {
@@ -242,6 +274,7 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.removeRemote('upstream'), api.git.runGitCommand, ['remote', 'remove', 'upstream']);
     await expectDelegation(() => gitClient.setRemoteUrl('upstream', 'url'), api.git.runGitCommand, ['remote', 'set-url', 'upstream', 'url']);
     await expectDelegation(() => gitClient.pushCurrentBranch({ remote: 'origin', ref: 'main' }), api.git.runGitCommand, ['push', '-u', 'origin', 'main']);
+    await expectDelegation(() => gitClient.setUpstreamBranch('main'), api.git.runGitCommand, ['branch', '--set-upstream-to', 'origin/main', 'main']);
     await expectDelegation(() => gitClient.checkoutBranch('main'), api.git.runGitCommand, ['checkout', 'main']);
     await expectDelegation(() => gitClient.checkoutRemoteBranch('origin/main', 'main'), api.git.runGitCommand, [
       'checkout',
@@ -251,6 +284,9 @@ describe('renderer service clients', () => {
       'origin/main',
     ]);
     await expectDelegation(() => gitClient.fetchPullRequestBranch(4, 'pr-4-main'), api.git.runGitCommand, ['fetch', 'origin', 'pull/4/head:pr-4-main']);
+    await expectDelegation(() => gitClient.pullRebase(), api.git.runGitCommand, ['pull', '--rebase']);
+    await expectDelegation(() => gitClient.stashPush('saving work'), api.git.runGitCommand, ['stash', 'push', '-u', '-m', 'saving work']);
+    await expectDelegation(() => gitClient.stashPop(), api.git.runGitCommand, ['stash', 'pop']);
     await expectDelegation(() => gitClient.stageAll(), api.git.runGitCommand, ['add', '-A']);
     await expectDelegation(() => gitClient.commitMessage('Title', ' Body '), api.git.runGitCommand, ['commit', '-m', 'Title', '-m', 'Body']);
     await expectDelegation(() => gitClient.commitMessage('Title'), api.git.runGitCommand, ['commit', '-m', 'Title']);

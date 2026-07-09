@@ -11,6 +11,7 @@ import type {
   WorkflowContextValue,
 } from '@/contexts/AppStateContext';
 import type { TranslationVariables } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -52,7 +53,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   isCreatingBranch: state.isCreatingBranch,
   onSetCreatingBranch: state.setIsCreatingBranch,
   onCreateBranch: state.handleCreateBranch,
-  onCheckoutBranch: (name) => state.runGitCommand(['checkout', name], tr(`Ausgecheckt: ${name}`, `Checked out: ${name}`)),
+  onCheckoutBranch: (name) => state.runGitCommand(gitClient.buildCheckoutBranchArgs(name), tr(`Ausgecheckt: ${name}`, `Checked out: ${name}`)),
   onSetBranchContextMenu: state.setBranchContextMenu,
   tags: state.tags,
   onCreateTag: state.handleCreateTag,
@@ -177,25 +178,31 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
   activeGitActionLabel: state.activeGitActionLabel,
   runGitCommand: state.runGitCommand,
   onFetch: () => state.refreshRemoteState(true),
-  onPull: () => state.runGitCommand(['pull'], t('generated.app.pull_completed_successfully_a760cd36'), t('generated.app.running_pull_282e1a76')),
+  onPull: () =>
+    state.runGitCommand(gitClient.buildPullArgs(), t('generated.app.pull_completed_successfully_a760cd36'), t('generated.app.running_pull_282e1a76')),
   onPullRebase: () =>
     state.runGitCommand(
-      ['pull', '--rebase'],
+      gitClient.buildPullRebaseArgs(),
       t('generated.app.pull_with_rebase_completed_successfully_732a6b7f'),
       t('generated.app.running_pull_rebase_f9ca4da2'),
     ),
   onPullFfOnly: () =>
     state.runGitCommand(
-      ['pull', '--ff-only'],
+      gitClient.buildPullArgs(['--ff-only']),
       t('generated.app.pull_with_ff_only_completed_successfully_01a725eb'),
       t('generated.app.running_pull_ff_only_efd80da9'),
     ),
   onPullNoFf: () =>
-    state.runGitCommand(['pull', '--no-ff'], t('generated.app.pull_with_no_ff_completed_0271e730'), t('generated.app.running_pull_no_ff_222dffa5')),
-  onPush: () => state.runGitCommand(['push'], t('generated.app.push_completed_successfully_edf8c1c9'), t('generated.app.running_push_0ab33329')),
+    state.runGitCommand(
+      gitClient.buildPullArgs(['--no-ff']),
+      t('generated.app.pull_with_no_ff_completed_0271e730'),
+      t('generated.app.running_pull_no_ff_222dffa5'),
+    ),
+  onPush: () =>
+    state.runGitCommand(gitClient.buildPushArgs(), t('generated.app.push_completed_successfully_edf8c1c9'), t('generated.app.running_push_0ab33329')),
   onPushForceWithLease: () =>
     state.runGitCommand(
-      ['push', '--force-with-lease'],
+      gitClient.buildPushArgs(['--force-with-lease']),
       t('generated.app.push_with_force_with_lease_completed_successfully_a27c0ef4'),
       t('generated.app.running_push_force_with_lease_590e0aba'),
     ),
@@ -204,7 +211,7 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
     const branch = state.currentBranch;
     if (!branch) return;
     void state.runGitCommand(
-      ['push', '-u', 'origin', branch],
+      gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: branch, setUpstream: true }),
       tr(`Branch "${branch}" gepusht & Upstream gesetzt.`, `Pushed "${branch}" & set upstream.`),
       'Push -u...',
     );
@@ -215,16 +222,16 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
   onAutoOpenConflictResolverConsumed: state.clearAutoOpenConflictResolverPath,
   onOpenConflictResolverForPath: state.openConflictResolverForPath,
   onConflictMergeContinue: () => {
-    void state.runGitCommand(['mergeContinue'], t('generated.app.merge_continued_63b9ee36'), t('generated.app.continuing_merge_9ed78a88'));
+    void state.runGitCommand(gitClient.buildMergeContinueArgs(), t('generated.app.merge_continued_63b9ee36'), t('generated.app.continuing_merge_9ed78a88'));
   },
   onConflictMergeAbort: () => {
-    void state.runGitCommand(['mergeAbort'], t('generated.app.merge_aborted_b602bf32'), t('generated.app.aborting_merge_4f4ac264'));
+    void state.runGitCommand(gitClient.buildMergeAbortArgs(), t('generated.app.merge_aborted_b602bf32'), t('generated.app.aborting_merge_4f4ac264'));
   },
   onConflictRebaseContinue: () => {
-    void state.runGitCommand(['rebaseContinue'], t('generated.app.rebase_continued_181b298d'), t('generated.app.continuing_rebase_21242ce6'));
+    void state.runGitCommand(gitClient.buildRebaseContinueArgs(), t('generated.app.rebase_continued_181b298d'), t('generated.app.continuing_rebase_21242ce6'));
   },
   onConflictRebaseAbort: () => {
-    void state.runGitCommand(['rebaseAbort'], t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
+    void state.runGitCommand(gitClient.buildRebaseAbortArgs(), t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
   },
 });
 

@@ -49,11 +49,17 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
   }, [activeRepo, refreshTrigger]);
 
   const handleSubmoduleInitUpdate = async () => {
-    await runGitCommand(['submoduleUpdateInitRecursive'], t('generated.components.layout.hooks.userepositorydomain.submodules_initialized_updated_76af1313'));
+    await runGitCommand(
+      gitClient.buildSubmoduleUpdateInitRecursiveArgs(),
+      t('generated.components.layout.hooks.userepositorydomain.submodules_initialized_updated_76af1313'),
+    );
   };
 
   const handleSubmoduleSync = async () => {
-    await runGitCommand(['submoduleSyncRecursive'], t('generated.components.layout.hooks.userepositorydomain.submodule_urls_synchronized_7dfc04ea'));
+    await runGitCommand(
+      gitClient.buildSubmoduleSyncRecursiveArgs(),
+      t('generated.components.layout.hooks.userepositorydomain.submodule_urls_synchronized_7dfc04ea'),
+    );
   };
 
   const handleOpenSubmodule = async (submodulePath: string) => {

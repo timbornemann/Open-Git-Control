@@ -1,4 +1,4 @@
-import type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto } from '../../src/global';
+import type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto } from '../../src/types/githubDtos';
 
 export const DEVICE_CODE_PATH = '/login/device/code';
 export const ACCESS_TOKEN_PATH = '/login/oauth/access_token';

@@ -39,12 +39,12 @@ export const buildCommitHistoryMenuActions = ({
     {
       label: `Cherry-Pick ${shortHash}`,
       icon: 'CP',
-      action: () => runGitAction(['cherry-pick', hash], `Cherry-Pick von ${shortHash} erfolgreich.`),
+      action: () => runGitAction(gitClient.buildCherryPickCommitArgs(hash), `Cherry-Pick von ${shortHash} erfolgreich.`),
     },
     {
       label: `Revert ${shortHash}`,
       icon: 'RV',
-      action: () => runGitAction(['revert', '--no-edit', hash], `Revert von ${shortHash} erfolgreich.`),
+      action: () => runGitAction(gitClient.buildRevertCommitArgs(hash, { noEdit: true }), `Revert von ${shortHash} erfolgreich.`),
     },
     {
       label: '',
@@ -68,7 +68,7 @@ export const buildCommitHistoryMenuActions = ({
           consequences: 'Die Commit-Historie wird lokal verschoben.',
           confirmLabel: 'Soft Reset',
           onConfirm: async () => {
-            await runGitAction(['reset', '--soft', hash], `Soft-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(gitClient.buildResetToCommitArgs('--soft', hash), `Soft-Reset auf ${shortHash} erfolgreich.`);
           },
         });
       },
@@ -89,7 +89,7 @@ export const buildCommitHistoryMenuActions = ({
           consequences: 'Index wird zurueckgesetzt. Commit-Historie aendert sich lokal.',
           confirmLabel: 'Mixed Reset',
           onConfirm: async () => {
-            await runGitAction(['reset', '--mixed', hash], `Mixed-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(gitClient.buildResetToCommitArgs('--mixed', hash), `Mixed-Reset auf ${shortHash} erfolgreich.`);
           },
         });
       },
@@ -111,7 +111,7 @@ export const buildCommitHistoryMenuActions = ({
           consequences: 'Lokale nicht-gesicherte Aenderungen gehen verloren.',
           confirmLabel: 'Hard Reset',
           onConfirm: async () => {
-            await runGitAction(['reset', '--hard', hash], `Hard-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(gitClient.buildResetToCommitArgs('--hard', hash), `Hard-Reset auf ${shortHash} erfolgreich.`);
           },
         });
       },
@@ -225,7 +225,7 @@ export const buildCommitHistoryMenuActions = ({
           consequences: 'Es entsteht ein neuer Revert-Commit und moegliche Konflikte muessen geloest werden.',
           confirmLabel: 'Merge-Revert',
           onConfirm: async () => {
-            await runGitAction(['revert', '-m', '1', '--no-edit', hash], `Merge-Revert von ${shortHash} erfolgreich.`);
+            await runGitAction(gitClient.buildRevertCommitArgs(hash, { mainline: 1, noEdit: true }), `Merge-Revert von ${shortHash} erfolgreich.`);
           },
         });
       },

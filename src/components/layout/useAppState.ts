@@ -6,9 +6,9 @@ import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '@/hooks/usePullRequests';
 import { githubClient } from '@/services/githubClient';
-import { parseRemoteBranchRef } from '@/utils/gitParsing';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
 import { usePrAndReleaseState } from './state/usePrAndReleaseState';
+import { useBranchTrackingWorkflow } from './workflows/useBranchTrackingWorkflow';
 import { useConflictResolverWorkflow } from './workflows/useConflictResolverWorkflow';
 import { useGitCommandWorkflow } from './workflows/useGitCommandWorkflow';
 import { usePullRequestWorkflow } from './workflows/usePullRequestWorkflow';
@@ -277,51 +277,13 @@ export const useAppState = () => {
     triggerRefresh,
     language: settings.language,
   });
-  const handleSetUpstreamForCurrentBranch = useCallback(async () => {
-    if (!workspace.activeRepo || !repository.currentBranch) return;
-
-    const setTracking = await runGitCommand(
-      ['branch', '--set-upstream-to', `origin/${repository.currentBranch}`, repository.currentBranch],
-      tr(
-        `Tracking gesetzt: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
-        `Tracking set: ${repository.currentBranch} -> origin/${repository.currentBranch}`,
-      ),
-    );
-
-    if (!setTracking) {
-      await runGitCommand(
-        ['push', '-u', 'origin', repository.currentBranch],
-        tr(`Branch ${repository.currentBranch} mit Upstream gepusht.`, `Pushed branch ${repository.currentBranch} with upstream.`),
-      );
-    }
-  }, [repository.currentBranch, runGitCommand, workspace.activeRepo, tr]);
-
-  const handleCheckoutRemoteBranch = useCallback(
-    async (remoteBranchName: string) => {
-      const normalized = (remoteBranchName || '').trim();
-      if (!normalized) return;
-
-      const parsed = parseRemoteBranchRef(normalized);
-      if (!parsed) {
-        setGitActionToast({
-          msg: t('generated.components.layout.useappstate.invalid_remote_branch_3042f288'),
-          isError: true,
-        });
-        return;
-      }
-
-      const { remoteRef, localBranchName } = parsed;
-      const createdTrackingBranch = await runGitCommand(
-        ['checkout', '--track', remoteRef],
-        tr(`Branch ${localBranchName} aus ${remoteRef} ausgecheckt.`, `Checked out branch ${localBranchName} from ${remoteRef}.`),
-      );
-
-      if (createdTrackingBranch) return;
-
-      await runGitCommand(['checkout', localBranchName], tr(`Branch ${localBranchName} ausgecheckt.`, `Checked out branch ${localBranchName}.`));
-    },
-    [runGitCommand, setGitActionToast, t, tr],
-  );
+  const { handleCheckoutRemoteBranch, handleSetUpstreamForCurrentBranch } = useBranchTrackingWorkflow({
+    activeRepo: workspace.activeRepo,
+    currentBranch: repository.currentBranch,
+    runGitCommand,
+    setGitActionToast,
+    language: settings.language,
+  });
 
   return {
     activeTab: workspace.activeTab,

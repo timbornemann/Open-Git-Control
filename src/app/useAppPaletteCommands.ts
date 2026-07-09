@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { PaletteCommand } from '@/components/CommandPalette';
 import type { useAppState } from '@/components/layout/useAppState';
 import type { TranslationVariables } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -54,25 +55,25 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'pull',
         label: t('generated.app.pull_8c55fb85'),
         keywords: ['pull', 'download'],
-        action: () => state.runGitCommand(['pull'], t('generated.app.pull_completed_successfully_a760cd36')),
+        action: () => state.runGitCommand(gitClient.buildPullArgs(), t('generated.app.pull_completed_successfully_a760cd36')),
       },
       {
         id: 'pull-rebase',
         label: t('generated.app.pull_rebase_5d462c6a'),
         keywords: ['pull', 'rebase'],
-        action: () => state.runGitCommand(['pull', '--rebase'], t('generated.app.pull_with_rebase_completed_a6e6129f')),
+        action: () => state.runGitCommand(gitClient.buildPullRebaseArgs(), t('generated.app.pull_with_rebase_completed_a6e6129f')),
       },
       {
         id: 'push',
         label: t('generated.app.push_61ad6264'),
         keywords: ['push', 'upload'],
-        action: () => state.runGitCommand(['push'], t('generated.app.push_completed_successfully_edf8c1c9')),
+        action: () => state.runGitCommand(gitClient.buildPushArgs(), t('generated.app.push_completed_successfully_edf8c1c9')),
       },
       {
         id: 'push-force',
         label: t('generated.app.push_force_with_lease_f7c67bfe'),
         keywords: ['push', 'force'],
-        action: () => state.runGitCommand(['push', '--force-with-lease'], t('generated.app.force_push_completed_1f9d562e')),
+        action: () => state.runGitCommand(gitClient.buildPushArgs(['--force-with-lease']), t('generated.app.force_push_completed_1f9d562e')),
       },
       {
         id: 'branch-create',
@@ -87,37 +88,37 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'stash-push',
         label: t('generated.components.staging_area.usefileoperations.create_stash_ebe60340'),
         keywords: ['stash', 'save', 'speichern'],
-        action: () => state.runGitCommand(['stash', 'push', '-m', 'Quick stash'], t('generated.app.stash_created_56116f06')),
+        action: () => state.runGitCommand(gitClient.buildStashPushArgs('Quick stash', { includeUntracked: false }), t('generated.app.stash_created_56116f06')),
       },
       {
         id: 'stash-pop',
         label: t('generated.app.apply_last_stash_pop_120593db'),
         keywords: ['stash', 'pop', 'apply', 'anwenden'],
-        action: () => state.runGitCommand(['stash', 'pop'], t('generated.app.stash_applied_4b30902e')),
+        action: () => state.runGitCommand(gitClient.buildStashPopArgs(), t('generated.app.stash_applied_4b30902e')),
       },
       {
         id: 'merge-abort',
         label: t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66'),
         keywords: ['merge', 'abort', 'abbrechen'],
-        action: () => state.runGitCommand(['mergeAbort'], t('generated.app.merge_aborted_b602bf32')),
+        action: () => state.runGitCommand(gitClient.buildMergeAbortArgs(), t('generated.app.merge_aborted_b602bf32')),
       },
       {
         id: 'merge-continue',
         label: t('generated.app.continue_merge_56cfed8e'),
         keywords: ['merge', 'continue', 'fortsetzen'],
-        action: () => state.runGitCommand(['mergeContinue'], t('generated.app.merge_continued_63b9ee36')),
+        action: () => state.runGitCommand(gitClient.buildMergeContinueArgs(), t('generated.app.merge_continued_63b9ee36')),
       },
       {
         id: 'rebase-abort',
         label: t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71'),
         keywords: ['rebase', 'abort', 'abbrechen'],
-        action: () => state.runGitCommand(['rebaseAbort'], t('generated.app.rebase_aborted_74ce61c8')),
+        action: () => state.runGitCommand(gitClient.buildRebaseAbortArgs(), t('generated.app.rebase_aborted_74ce61c8')),
       },
       {
         id: 'rebase-continue',
         label: t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9'),
         keywords: ['rebase', 'continue', 'fortsetzen'],
-        action: () => state.runGitCommand(['rebaseContinue'], t('generated.app.rebase_continued_181b298d')),
+        action: () => state.runGitCommand(gitClient.buildRebaseContinueArgs(), t('generated.app.rebase_continued_181b298d')),
       },
       {
         id: 'open-folder',

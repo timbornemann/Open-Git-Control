@@ -10,7 +10,7 @@ import type {
   PlanningApiTokenLifetimeDto,
   StoredRepoData,
   UpdaterStatusDto,
-} from '../../src/global';
+} from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 
 type RepoUnavailablePayload = {

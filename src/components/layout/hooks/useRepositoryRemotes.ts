@@ -78,7 +78,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onAdd: async (name, url) => {
-          await runGitCommand(['remote', 'add', name, url], tr(`Remote "${name}" hinzugefügt.`, `Added remote "${name}".`));
+          await runGitCommand(gitClient.buildAddRemoteArgs(name, url), tr(`Remote "${name}" hinzugefügt.`, `Added remote "${name}".`));
         },
       }),
     );
@@ -92,7 +92,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onRemove: async () => {
-          await runGitCommand(['remote', 'remove', remoteName], tr(`Remote "${remoteName}" entfernt.`, `Removed remote "${remoteName}".`));
+          await runGitCommand(gitClient.buildRemoveRemoteArgs(remoteName), tr(`Remote "${remoteName}" entfernt.`, `Removed remote "${remoteName}".`));
         },
       }),
     );
@@ -106,7 +106,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         tr,
         onRename: async (newName) => {
           await runGitCommand(
-            ['remote', 'rename', remoteName, newName],
+            gitClient.buildRenameRemoteArgs(remoteName, newName),
             tr(`Remote umbenannt: "${remoteName}" -> "${newName}".`, `Renamed remote: "${remoteName}" -> "${newName}".`),
           );
         },
@@ -122,7 +122,10 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onSetUrl: async (url) => {
-          await runGitCommand(['remote', 'set-url', remoteName, url], tr(`URL für "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`));
+          await runGitCommand(
+            gitClient.buildSetRemoteUrlArgs(remoteName, url),
+            tr(`URL für "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`),
+          );
         },
       }),
     );

@@ -63,9 +63,9 @@ export const useRepositoryTags = ({
         tr,
         onCreate: async (name, message) => {
           if (message) {
-            await runGitCommand(['tag', '-a', name, '-m', message], tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
+            await runGitCommand(gitClient.buildCreateTagArgs(name, { message }), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
           } else {
-            await runGitCommand(['tag', name], tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
+            await runGitCommand(gitClient.buildCreateTagArgs(name), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
           }
         },
       }),
@@ -79,7 +79,7 @@ export const useRepositoryTags = ({
         t,
         tr,
         onDelete: async () => {
-          await runGitCommand(['tag', '-d', tagName], tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`));
+          await runGitCommand(gitClient.buildDeleteTagArgs(tagName), tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`));
         },
       }),
     );
@@ -117,7 +117,7 @@ export const useRepositoryTags = ({
   );
 
   const handlePushTags = async () => {
-    await runGitCommand(['push', '--tags'], t('generated.components.layout.hooks.userepositorydomain.pushed_tags_d74ebef5'));
+    await runGitCommand(gitClient.buildPushTagsArgs(), t('generated.components.layout.hooks.userepositorydomain.pushed_tags_d74ebef5'));
   };
 
   return {
