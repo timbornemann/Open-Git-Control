@@ -1,4 +1,4 @@
-import type { AppSettingsDto } from '../../../global';
+import type { AppSettingsDto } from '../../../types/appDtos';
 
 export interface ElectronSettingsAPI {
   getSettings: () => Promise<AppSettingsDto>;

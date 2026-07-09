@@ -1,4 +1,4 @@
-import type { IpcResult } from '../../../global';
+import type { IpcResult } from '../../../types/ipc';
 import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from '../../../types/projectPlanner';
 
 export interface ElectronPlannerAPI {

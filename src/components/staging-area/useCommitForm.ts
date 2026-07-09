@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';

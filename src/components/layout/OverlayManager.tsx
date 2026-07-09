@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GitJobEventDto } from '@/global';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import type { GitMergeMode } from '@/types/git';
 import { ActionToastViewport, type ActionToastItem } from '@/components/ActionToastViewport';

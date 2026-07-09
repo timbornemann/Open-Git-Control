@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { GitCommandNameDto } from '@/global';
+import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { ToastMessage } from '@/types/git';
 import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';

@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 import type { AppTabId, InputDialogState } from '@/app/state/contracts';
 import { githubClient } from '@/services/githubClient';
 import { deriveRepoNameFromCloneSource, isCloneSourceLikelyRemote, normalizeGitHost, parseGithubRepoReference } from './repoWorkflowUtils';

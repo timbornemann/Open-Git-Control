@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { parseGitReflog } from '@/utils/gitParsing';
-import type { AppSettingsDto, GitCommandNameDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
+import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { GitReflogEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';

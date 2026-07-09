@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileEntry } from '@/utils/gitParsing';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
-import type { GitCommandNameDto, WorkingTreeStatsDto } from '@/global';
+import type { GitCommandNameDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import type { DiffRequest } from '@/types/diff';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';

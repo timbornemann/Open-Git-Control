@@ -101,6 +101,10 @@ const checkImportBoundaries = (file, absolutePath, source) => {
   for (const specifier of collectImports(source)) {
     const resolved = resolveProjectImport(specifier, absolutePath);
 
+    if (resolved === 'src/global' || resolved === 'src/global.d') {
+      addError(file, `DTO/API types must be imported from explicit src/types/* or src/shared/ipc/contracts/* modules instead of ${specifier}.`);
+    }
+
     if (file.startsWith('src/shared/') && resolved && startsWithAny(resolved, sharedForbiddenPrefixes)) {
       addError(file, `shared code must not import upward into app/UI layers (${specifier}). Move the contract into src/shared or src/types.`);
     }

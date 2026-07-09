@@ -1,6 +1,6 @@
 import React from 'react';
 import { DownloadCloud } from 'lucide-react';
-import type { GitJobEventDto } from '@/global';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { GitTransferProgressPanel } from './GitTransferProgressPanel';
 

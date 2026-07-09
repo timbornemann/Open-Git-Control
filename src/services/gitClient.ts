@@ -1,4 +1,5 @@
-import type { GitCommandNameDto, GitCommandResultDto, IpcResult, SecretScanResultDto } from '@/global';
+import type { GitCommandNameDto, GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
+import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';

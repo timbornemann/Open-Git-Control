@@ -11,7 +11,7 @@ import type {
   SidebarCoreState,
   WorkflowStateContract,
 } from '@/app/state/contracts';
-import type { GitHubReleaseContextDto } from '@/global';
+import type { GitHubReleaseContextDto } from '@/types/githubDtos';
 import type { GitMergeMode } from '@/types/git';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';

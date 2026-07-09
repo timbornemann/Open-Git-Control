@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { DEFAULT_SETTINGS } from './defaultSettings';

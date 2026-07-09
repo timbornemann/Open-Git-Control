@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AppSettingsDto, UpdaterStatusDto } from '@/global';
+import type { AppSettingsDto, UpdaterStatusDto } from '@/types/appDtos';
 import type { TranslationVariables } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import { appClient } from '@/services/appClient';

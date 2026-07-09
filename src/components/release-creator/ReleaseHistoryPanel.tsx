@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock3, GitBranch, RefreshCw } from 'lucide-react';
-import type { GitHubReleaseContextDto } from '@/global';
+import type { GitHubReleaseContextDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 
 type ReleaseCommit = GitHubReleaseContextDto['commitsSinceLastRelease'][number];

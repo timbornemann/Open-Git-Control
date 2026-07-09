@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { FileTimelineCommitDto } from '@/global';
+import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { AppTabId } from '@/app/state/contracts';
 import { gitClient } from '@/services/gitClient';

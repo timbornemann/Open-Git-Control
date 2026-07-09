@@ -9,11 +9,11 @@ import type {
   GitHubRepositoryDto,
   GithubStatusChecksDto,
   GithubWorkflowRunDto,
-  IpcResult,
   PullRequestDto,
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
-} from '@/global';
+} from '@/types/githubDtos';
+import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAiApi, requireElectronAppApi, requireElectronGithubApi } from './electronApi';
 

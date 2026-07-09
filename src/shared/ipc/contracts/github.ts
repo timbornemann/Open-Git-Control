@@ -9,11 +9,11 @@ import type {
   GitHubRepositoryPageDto,
   GithubStatusChecksDto,
   GithubWorkflowRunDto,
-  IpcResult,
   PullRequestDto,
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
-} from '../../../global';
+} from '../../../types/githubDtos';
+import type { IpcResult } from '../../../types/ipc';
 
 export type CreatePullRequestParamsDto = {
   owner: string;

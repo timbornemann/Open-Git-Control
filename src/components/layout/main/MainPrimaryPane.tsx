@@ -4,7 +4,7 @@ import { StagingArea } from '@/components/staging-area';
 import { useGithubContext, useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
-import type { FileTimelineCommitDto } from '@/global';
+import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { GithubAuthGuide } from './GithubAuthGuide';

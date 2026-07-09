@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/global';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import { DEFAULT_RELEASE_NOTES_OPTIONS } from '@/types/releaseNotes';
 

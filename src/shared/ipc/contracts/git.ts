@@ -7,16 +7,16 @@ import type {
   FileTimelineCommitDto,
   GitCommandNameDto,
   GitCommandResultDto,
-  GitJobEventDto,
   GitStashEntryDto,
-  IpcResult,
   MarkdownPreviewFileDto,
   RepoFileDataUrlDto,
   RepositoryFileSourceDto,
   SecretScanResultDto,
   WorkingTreeSnapshotDto,
   WorkingTreeStatsDto,
-} from '../../../global';
+} from '../../../types/gitDtos';
+import type { GitJobEventDto } from '../../../types/aiDtos';
+import type { IpcResult } from '../../../types/ipc';
 
 export type RepoUnavailablePayloadDto = {
   command: string;

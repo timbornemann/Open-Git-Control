@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GitJobEventDto } from '@/global';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import { aiClient } from '@/services/aiClient';
 import { compactTransferProgressJobs } from './jobEvents';
 

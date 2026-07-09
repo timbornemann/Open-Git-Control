@@ -1,11 +1,5 @@
-import type {
-  DiagnosticsReportDto,
-  IpcResult,
-  PlanningApiInfoDto,
-  PlanningApiTokenLifetimeDto,
-  UpdaterOneClickResultDto,
-  UpdaterStatusDto,
-} from '../../../global';
+import type { DiagnosticsReportDto, PlanningApiInfoDto, PlanningApiTokenLifetimeDto, UpdaterOneClickResultDto, UpdaterStatusDto } from '../../../types/appDtos';
+import type { IpcResult } from '../../../types/ipc';
 
 export type DirectoryOpenResultDto = {
   path: string;

@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/global';
+import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/types/githubDtos';
 import { createLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';

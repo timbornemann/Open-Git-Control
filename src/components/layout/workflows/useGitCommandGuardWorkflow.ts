@@ -1,5 +1,5 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { GUARDED_COMMANDS, isForcePushCommand, type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';

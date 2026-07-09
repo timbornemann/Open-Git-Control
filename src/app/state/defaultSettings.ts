@@ -1,4 +1,4 @@
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 
 export const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',

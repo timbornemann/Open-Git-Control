@@ -1,4 +1,5 @@
-import type { AiAutoCommitResultDto, AiConnectionResultDto, AiGeneratedCommitMessageDto, GitJobEventDto, IpcResult } from '../../../global';
+import type { AiAutoCommitResultDto, AiConnectionResultDto, AiGeneratedCommitMessageDto, GitJobEventDto } from '../../../types/aiDtos';
+import type { IpcResult } from '../../../types/ipc';
 import type { ElectronReleaseNotesAPI } from './github';
 
 export interface ElectronAiAPI extends ElectronReleaseNotesAPI {

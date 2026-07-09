@@ -1,4 +1,4 @@
-import type { GitJobEventDto } from '@/global';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import { parseGitTransferProgressLine } from '@/utils/gitTransferProgress';
 
 const isTransferProgressOperation = (operation: string): boolean => operation === 'git:clone' || operation === 'git:fetch' || operation === 'git:pull';

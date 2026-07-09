@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
-import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '@/global';
+import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
 

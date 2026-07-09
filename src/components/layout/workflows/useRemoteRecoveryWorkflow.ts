@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';

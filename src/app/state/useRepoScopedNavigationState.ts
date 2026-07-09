@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppTabId, CommitNavigationRequest } from './contracts';
-import type { GitHubReleaseContextDto } from '@/global';
+import type { GitHubReleaseContextDto } from '@/types/githubDtos';
 
 type UseRepoScopedNavigationStateParams = {
   setShowReleaseCreator: Dispatch<SetStateAction<boolean>>;

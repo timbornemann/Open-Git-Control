@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { RepoSortByDto } from '@/global';
+import type { RepoSortByDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';

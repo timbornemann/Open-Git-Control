@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/global';
+import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import { gitClient } from '@/services/gitClient';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';

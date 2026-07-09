@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Clock3, Copy, ExternalLink, GitBranch, GitPullRequest, Plus, RefreshCw, XCircle } from 'lucide-react';
-import type { PullRequestCiDto, PullRequestDto } from '@/global';
+import type { PullRequestCiDto, PullRequestDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import { EmptyState } from '@/components/EmptyState';
 import { Button, IconButton, Panel, SegmentedControl, StatusBadge, TextField, Toolbar, cx } from '@/components/ui';

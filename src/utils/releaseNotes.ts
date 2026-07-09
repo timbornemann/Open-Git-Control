@@ -1,4 +1,4 @@
-import type { ReleaseCommitDto } from '@/global';
+import type { ReleaseCommitDto } from '@/types/githubDtos';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 
 type CommitBucket = 'added' | 'changed' | 'fixed' | 'maintenance';

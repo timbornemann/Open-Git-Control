@@ -6,8 +6,6 @@ const complexityExceptionFiles = [
   'src/components/commit-graph/useCommitGraphData.ts',
   'src/components/layout/ApiMcpSettingsPanel.tsx',
   'src/components/layout/workflows/useBareRepoRecoveryWorkflow.ts',
-  'src/components/release-creator/ReleaseCreator.tsx',
-  'src/components/staging-area/ConflictResolverPanel.tsx',
   'src/components/staging-area/StagingCommitPanel.tsx',
 ];
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
-import type { GitStashEntryDto } from '@/global';
+import type { GitStashEntryDto } from '@/types/gitDtos';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { EmptyState } from '@/components/EmptyState';

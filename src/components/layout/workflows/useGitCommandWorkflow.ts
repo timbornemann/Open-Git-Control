@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AppSettingsDto, GitCommandNameDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
+import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';

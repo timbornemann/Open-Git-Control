@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { GitCommandNameDto } from '@/global';
+import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
 import { parseGitLog } from '@/utils/gitParsing';

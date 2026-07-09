@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
-import type { RepoSortByDto } from '@/global';
+import type { RepoSortByDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 
 type Props = {

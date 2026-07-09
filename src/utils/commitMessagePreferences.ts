@@ -1,4 +1,4 @@
-import type { AiCommitMessageLanguageDto, AiCommitMessageStyleDto } from '@/global';
+import type { AiCommitMessageLanguageDto, AiCommitMessageStyleDto } from '@/types/aiDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 
 type Translate = CatalogTranslateFn;

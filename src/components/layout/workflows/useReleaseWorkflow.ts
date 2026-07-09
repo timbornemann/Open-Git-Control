@@ -1,5 +1,5 @@
 import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/global';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { githubClient } from '@/services/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';

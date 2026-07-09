@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import type { AppSettingsDto, GitCommandNameDto, SecretScanFindingDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
+import type { GitCommandNameDto, SecretScanFindingDto } from '@/types/gitDtos';
 import { gitClient } from '@/services/gitClient';
 
 type RunGitCommandOptions = {

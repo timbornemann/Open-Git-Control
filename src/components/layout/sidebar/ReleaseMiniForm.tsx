@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseDto } from '@/global';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import { Button, Panel, TextField, Toolbar } from '@/components/ui';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';

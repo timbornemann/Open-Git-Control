@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
-import type { AppSettingsDto, GitJobEventDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import type { SettingsTabId } from '@/app/state/contracts';
 import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';

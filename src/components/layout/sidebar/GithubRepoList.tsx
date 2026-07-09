@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, DownloadCloud, FolderOpen, GitFork, RefreshCw, Search } from 'lucide-react';
-import type { GitHubRepositoryDto } from '@/global';
+import type { GitHubRepositoryDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import { toRepoIdentity, useGithubRepoOriginMap } from './useGithubRepoOriginMap';
 

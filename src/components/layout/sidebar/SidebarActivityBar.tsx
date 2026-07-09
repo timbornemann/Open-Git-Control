@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import { Download, Settings, FolderOpen, FolderGit2, Github, ListTodo, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import type { UpdaterStatusDto } from '@/global';
+import type { UpdaterStatusDto } from '@/types/appDtos';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';

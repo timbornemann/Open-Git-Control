@@ -1,4 +1,4 @@
-import type { StoredRepoData } from '../../../global';
+import type { StoredRepoData } from '../../../types/appDtos';
 
 export interface ElectronReposAPI {
   getStoredRepos: () => Promise<StoredRepoData>;

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Plus, RefreshCw, Search, XCircle } from 'lucide-react';
 import type { AppSidebarProps } from './AppSidebar.types';
-import type { GithubWorkflowRunDto } from '@/global';
+import type { GithubWorkflowRunDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import { githubClient } from '@/services/githubClient';
 import { formatDateTime } from '@/utils/dateTime';

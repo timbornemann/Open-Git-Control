@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '@/global';
+import type { DeviceFlowPollDto, DeviceFlowStartDto, GitHubRepositoryDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';

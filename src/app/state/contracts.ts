@@ -1,14 +1,13 @@
+import type { AppSettingsDto, RepoSortByDto } from '@/types/appDtos';
+import type { GitJobEventDto } from '@/types/aiDtos';
 import type {
-  AppSettingsDto,
   DeviceFlowStartDto,
   GitHubCreateReleaseParamsDto,
   GitHubReleaseDto,
   GitHubRepositoryDto,
-  GitJobEventDto,
   PullRequestCiDto,
   PullRequestDto,
-  RepoSortByDto,
-} from '@/global';
+} from '@/types/githubDtos';
 import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '@/types/git';
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';

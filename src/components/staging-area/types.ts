@@ -1,4 +1,5 @@
-import type { AppSettingsDto, WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/global';
+import type { AppSettingsDto } from '@/types/appDtos';
+import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import type { FileEntry, GitStatusDetailed } from '@/utils/gitParsing';
 import type { DiffRequest } from '@/types/diff';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
