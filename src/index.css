@@ -1,5 +1,12 @@
 @layer base, shell, feature;
 
 @import './styles/base.css' layer(base);
-@import './styles/settings-and-sidebar.css' layer(shell);
-@import './styles/staging-and-conflicts.css' layer(feature);
+@import './styles/theme-palettes.css' layer(base);
+@import './styles/ui-kit.css' layer(shell);
+@import './styles/settings.css' layer(shell);
+@import './styles/sidebar-repo.css' layer(shell);
+@import './styles/overlays.css' layer(shell);
+@import './styles/staging.css' layer(feature);
+@import './styles/stash-panel.css' layer(feature);
+@import './styles/github-panels.css' layer(feature);
+@import './styles/conflict-resolver.css' layer(feature);

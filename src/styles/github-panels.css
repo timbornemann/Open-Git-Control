@@ -1,0 +1,366 @@
+.github-panel-divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--border-color);
+}
+
+.github-panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 6px;
+}
+
+.github-panel-section-title,
+.release-mini-form__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pr-panel__filter {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.pr-panel__create-form,
+.release-mini-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pr-panel__branch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pr-panel__branch-row .ui-field {
+  flex: 1;
+}
+
+.pr-panel__branch-arrow {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.github-panel-loading {
+  padding: 6px 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.repo-state-text--danger {
+  color: var(--status-danger);
+}
+
+.pr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pr-card__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pr-card__icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pr-card__icon--open {
+  color: var(--status-success);
+}
+
+.pr-card__icon--closed {
+  color: var(--status-danger);
+}
+
+.pr-card__icon--merged {
+  color: var(--status-merged);
+}
+
+.pr-card__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pr-card__title {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-card__draft {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.pr-card__meta,
+.pr-card__workflow-meta,
+.pr-card__empty-detail,
+.pr-merge-panel__method-description,
+.release-mini-form__message-detail {
+  color: var(--text-secondary);
+}
+
+.pr-card__meta {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-card__ci-button {
+  margin-top: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pr-card__ci-button .ui-status-badge {
+  transition:
+    filter 120ms ease,
+    transform 120ms ease;
+}
+
+.pr-card__ci-button:hover .ui-status-badge {
+  filter: brightness(1.08);
+}
+
+.pr-card__ci-icon {
+  flex-shrink: 0;
+}
+
+.pr-card__details,
+.pr-merge-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pr-card__workflow-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 0.72rem;
+}
+
+.pr-card__workflow-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-card__workflow-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pr-card__empty-detail {
+  font-size: 0.72rem;
+}
+
+.pr-merge-panel__title {
+  margin-bottom: 2px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pr-merge-panel__method {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.pr-merge-panel__cancel {
+  width: 100%;
+  opacity: 0.72;
+}
+
+.pr-merge-panel__method-name {
+  margin-right: 4px;
+  font-weight: 700;
+}
+
+.pr-merge-panel__method-description {
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.pr-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.release-mini-form__checks {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.release-mini-form__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.release-mini-form__message {
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.release-mini-form__message--warning {
+  color: var(--status-warning);
+}
+
+.release-mini-form__message--danger {
+  color: var(--status-danger);
+}
+
+.release-mini-form__message--success {
+  color: var(--status-success);
+}
+
+.release-mini-form__message-detail {
+  margin-top: 4px;
+}
+
+.release-mini-form__link {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.github-auth-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.github-auth-guide__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.github-auth-guide__title {
+  min-width: 0;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.github-auth-guide__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.github-auth-guide__kicker {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.github-auth-guide__actions {
+  gap: 8px;
+}
+
+.github-auth-guide__steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.github-auth-guide__note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
+.github-copy-row {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--bg-dark);
+}
+
+.github-copy-row__label {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.github-copy-row__value {
+  overflow: hidden;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-workflow-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--bg-panel);
+}
+
+.repo-workflow-card__copy {
+  min-width: 0;
+}
+
+.repo-workflow-card__title {
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-workflow-card__meta {
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+}
+
+.repo-workflow-card__time {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
