@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { execFileSync } from 'child_process';
 import { GitService } from '../GitService';
+import { CloneService } from '../git/CloneService';
 
 describe('GitService.getLog pagination', () => {
   it('adds --skip for incremental loading and supports head scope', async () => {
@@ -580,14 +581,14 @@ describe('GitService expected non-fatal git errors', () => {
 
 describe('GitService clone target naming', () => {
   it('derives a stable repo name from a Windows local bare path', () => {
-    const service = new GitService();
-    const repoName = (service as any).deriveCloneRepoName('D:\\Projects\\Software\\zz. Test-remote.git');
+    const service = new CloneService({ cloneWithProgress: vi.fn() });
+    const repoName = service.deriveCloneRepoName('D:\\Projects\\Software\\zz. Test-remote.git');
     expect(repoName).toBe('zz. Test-remote');
   });
 
   it('sanitizes explicit clone target names', () => {
-    const service = new GitService();
-    const sanitized = (service as any).sanitizeCloneTargetName('demo/repo:name.');
+    const service = new CloneService({ cloneWithProgress: vi.fn() });
+    const sanitized = service.sanitizeCloneTargetName('demo/repo:name.');
     expect(sanitized).toBe('demo-repo-name');
   });
 });

@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { GitScheduler } from './GitScheduler';
+import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
@@ -19,6 +20,7 @@ export class GitService {
   private readonly commitService: CommitService;
   private readonly historyService: HistoryService;
   private readonly repositoryFiles: RepositoryFiles;
+  private readonly cloneService: CloneService;
 
   constructor(execFileAsyncRunner: ExecFileAsyncRunner = defaultExecFileAsyncRunner, scheduler: GitScheduler = new GitScheduler()) {
     this.gitRunner = new GitRunner(execFileAsyncRunner, scheduler);
@@ -31,6 +33,7 @@ export class GitService {
       () => this.ensureRepoPath(),
       (revisionSpec, maxBytes) => this.readGitFileBuffer(revisionSpec, maxBytes),
     );
+    this.cloneService = new CloneService(this.gitRunner);
   }
 
   private createPrivateTempDir(prefix: string): string {
@@ -520,52 +523,6 @@ export class GitService {
     return this.gitRunner.streamOutput(repoPath, args, onLine, signal);
   }
 
-  private sanitizeCloneTargetName(value: string): string {
-    const normalized = String(value || '')
-      .trim()
-      .replace(/[\\/]+/g, '-')
-      .replace(/[:*?"<>|]/g, '-')
-      .replace(/\s+/g, ' ')
-      .replace(/\.+$/, '');
-    return normalized || 'repo';
-  }
-
-  private deriveCloneRepoName(cloneSource: string): string {
-    const normalizedSource = String(cloneSource || '')
-      .trim()
-      .replace(/[\\]+/g, '/')
-      .replace(/\/+$/, '');
-    const withoutGitSuffix = normalizedSource.replace(/\.git$/i, '');
-    const lastSegment = withoutGitSuffix.split('/').pop() || 'repo';
-    return this.sanitizeCloneTargetName(lastSegment);
-  }
-
-  private resolveCloneTargetPath(cloneSource: string, targetDir: string, targetName?: string): string {
-    const rawTargetDir = String(targetDir || '').trim();
-    if (!rawTargetDir) {
-      throw new Error('Clone target directory is required.');
-    }
-
-    const resolvedTargetDir = path.resolve(rawTargetDir);
-    let targetDirStats: fs.Stats;
-    try {
-      targetDirStats = fs.statSync(resolvedTargetDir);
-    } catch {
-      throw new Error(`Clone target directory does not exist: ${resolvedTargetDir}`);
-    }
-    if (!targetDirStats.isDirectory()) {
-      throw new Error(`Clone target is not a directory: ${resolvedTargetDir}`);
-    }
-
-    const repoName = targetName ? this.sanitizeCloneTargetName(targetName) : this.deriveCloneRepoName(cloneSource);
-    const repoPath = path.resolve(resolvedTargetDir, repoName);
-    const relative = path.relative(resolvedTargetDir, repoPath);
-    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-      throw new Error('Clone target name resolves outside of the selected directory.');
-    }
-    return repoPath;
-  }
-
   async getFileTimelineData(limit: number = 2000): Promise<FileTimelineCommit[]> {
     return this.historyService.getFileTimelineData(limit);
   }
@@ -573,42 +530,8 @@ export class GitService {
   /**
    * Klont ein Repository mit Fortschrittsanzeige
    */
-  cloneRepo(
-    cloneUrl: string,
-    targetDir: string,
-    onProgress: (line: string) => void,
-    targetName?: string,
-  ): Promise<{ success: boolean; repoPath: string; error?: string }> {
-    return new Promise((resolve) => {
-      let repoPath = '';
-      try {
-        repoPath = this.resolveCloneTargetPath(cloneUrl, targetDir, targetName);
-      } catch (error: any) {
-        resolve({
-          success: false,
-          repoPath: targetDir ? path.resolve(String(targetDir)) : '',
-          error: error?.message || 'Invalid clone target.',
-        });
-        return;
-      }
-
-      if (fs.existsSync(repoPath)) {
-        resolve({
-          success: false,
-          repoPath,
-          error: `Destination path already exists: ${repoPath}`,
-        });
-        return;
-      }
-
-      void this.gitRunner.cloneWithProgress(cloneUrl, repoPath, onProgress).then((result) => {
-        resolve({
-          success: result.success,
-          repoPath,
-          error: result.error,
-        });
-      });
-    });
+  cloneRepo(cloneUrl: string, targetDir: string, onProgress: (line: string) => void, targetName?: string): Promise<CloneRepositoryResult> {
+    return this.cloneService.cloneRepo(cloneUrl, targetDir, onProgress, targetName);
   }
 }
 

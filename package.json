@@ -17,7 +17,7 @@
     "dev": "concurrently -k \"vite\" \"npm run electron:dev\"",
     "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/start-electron.js",
     "build": "tsc && vite build && npm run build:electron",
-    "build:electron": "tsc --project tsconfig.node.json",
+    "build:electron": "tsc --project tsconfig.node.json && node scripts/bundle-electron-preload.js",
     "lint": "eslint src electron",
     "format:check": "prettier --check .",
     "dist": "npm run build && electron-builder --publish never",

@@ -1,148 +1,20 @@
-import type { GithubCheckRunDto, GithubStatusContextDto, GithubWorkflowRunDto, GitHubRepositoryDto, PullRequestDto } from '../src/global';
-const DEVICE_CODE_PATH = '/login/device/code';
-const ACCESS_TOKEN_PATH = '/login/oauth/access_token';
+import { GitHubAuthService } from './github/GitHubAuthService';
+import { GitHubPullRequestService } from './github/GitHubPullRequestService';
+import { GitHubReleaseService } from './github/GitHubReleaseService';
+import { GitHubRepositoryService } from './github/GitHubRepositoryService';
+import { GitHubWorkflowService } from './github/GitHubWorkflowService';
+import {
+  DEFAULT_HOST,
+  type CreateReleaseParams,
+  type DeviceFlowPollResult,
+  type DeviceFlowStartResult,
+  type GitHubReleaseDto,
+  type MergeMethod,
+  type WebFlowExchangeParams,
+  type WebFlowExchangeResult,
+} from './github/types';
 
-type DeviceFlowStartResult = {
-  deviceCode: string;
-  userCode: string;
-  verificationUri: string;
-  expiresIn: number;
-  interval: number;
-};
-
-type DeviceFlowPollResult =
-  | { status: 'success'; accessToken: string; tokenType: string; scope: string }
-  | { status: 'pending'; interval?: number }
-  | { status: 'error'; error: string; errorDescription?: string };
-
-type WebFlowExchangeParams = {
-  code: string;
-  redirectUri: string;
-  codeVerifier: string;
-  configuredClientId?: string | null;
-  configuredHost?: string | null;
-};
-
-type WebFlowExchangeResult = {
-  accessToken: string;
-  tokenType: string;
-  scope: string;
-};
-
-type MergeMethod = 'merge' | 'squash' | 'rebase';
-
-export type CreateReleaseParams = {
-  owner: string;
-  repo: string;
-  tagName: string;
-  targetCommitish?: string;
-  releaseName: string;
-  body?: string;
-  draft?: boolean;
-  prerelease?: boolean;
-};
-
-export type GitHubReleaseDto = {
-  id: number;
-  tagName: string;
-  name: string;
-  htmlUrl: string;
-  draft: boolean;
-  prerelease: boolean;
-  publishedAt: string | null;
-};
-
-type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'requested' | 'waiting' | 'pending';
-type WorkflowRunConclusion = 'success' | 'failure' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required' | 'neutral' | 'stale' | null;
-
-type CheckRunStatus = 'queued' | 'in_progress' | 'completed' | 'waiting' | 'requested' | 'pending';
-type CheckRunConclusion = WorkflowRunConclusion;
-
-type GithubRepositoryApi = {
-  id: number;
-  name: string;
-  full_name: string;
-  private: boolean;
-  clone_url: string;
-  html_url: string;
-  description?: string | null;
-  updated_at?: string;
-};
-
-type PullRequestApi = {
-  number: number;
-  title: string;
-  state: string;
-  user?: { login?: string | null } | null;
-  created_at: string;
-  updated_at: string;
-  head?: { ref?: string | null; sha?: string | null } | null;
-  base?: { ref?: string | null } | null;
-  merged_at?: string | null;
-  html_url: string;
-  draft?: boolean;
-};
-
-type WorkflowRunApi = {
-  id: number;
-  name?: string | null;
-  display_title?: string | null;
-  status?: string | null;
-  conclusion?: string | null;
-  event?: string | null;
-  html_url: string;
-  head_branch?: string | null;
-  head_sha?: string | null;
-  created_at: string;
-  run_started_at?: string | null;
-  updated_at: string;
-};
-
-type CheckRunApi = {
-  id: number;
-  name?: string | null;
-  status?: string | null;
-  conclusion?: string | null;
-  details_url?: string | null;
-  html_url?: string | null;
-  app?: { name?: string | null } | null;
-  started_at?: string | null;
-  completed_at?: string | null;
-};
-
-type StatusContextApi = {
-  id: number;
-  context?: string | null;
-  state?: string | null;
-  description?: string | null;
-  target_url?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type RepositoryTagApi = {
-  name?: string | null;
-};
-
-type RepositoryReleaseApi = {
-  tag_name?: string | null;
-};
-
-type GithubApiErrorLike = {
-  status?: unknown;
-  message?: unknown;
-  response?: {
-    data?: {
-      message?: unknown;
-    };
-  };
-};
-
-const DEFAULT_HOST = 'github.com';
-
-function oauthEndpointForHost(host: string, path: string): string {
-  return 'https://' + host + path;
-}
+export type { CreateReleaseParams, DeviceFlowPollResult, DeviceFlowStartResult, GitHubReleaseDto, WebFlowExchangeParams, WebFlowExchangeResult };
 
 export class GitHubService {
   private octokit: any | null = null;
@@ -150,55 +22,25 @@ export class GitHubService {
   private username: string | null = null;
   private host: string = DEFAULT_HOST;
 
-  private normalizeClientId(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null;
+  private readonly authService = new GitHubAuthService();
+  private readonly repositories = new GitHubRepositoryService(() => this.requireOctokit());
+  private readonly pullRequests = new GitHubPullRequestService(() => this.requireOctokit());
+  private readonly workflows = new GitHubWorkflowService(() => this.requireOctokit());
+  private readonly releases = new GitHubReleaseService(() => this.requireOctokit());
+
+  private requireOctokit(): any {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
     }
-    const normalized = value.trim();
-    return normalized || null;
+    return this.octokit;
   }
 
   normalizeHost(value: unknown): string {
-    if (typeof value !== 'string') {
-      return DEFAULT_HOST;
-    }
-    const trimmed = value.trim().toLowerCase();
-    if (!trimmed) {
-      return DEFAULT_HOST;
-    }
-
-    const withoutProtocol = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-    if (!withoutProtocol || /[^a-z0-9.\-:]/.test(withoutProtocol)) {
-      return DEFAULT_HOST;
-    }
-
-    return withoutProtocol;
-  }
-
-  private getApiBaseUrl(configuredHost?: string | null): string {
-    const host = this.normalizeHost(configuredHost || this.host);
-    if (host === DEFAULT_HOST) {
-      return 'https://api.github.com';
-    }
-    return `https://${host}/api/v3`;
-  }
-
-  private getOauthHost(configuredHost?: string | null): string {
-    return this.normalizeHost(configuredHost || this.host);
-  }
-
-  private getOauthClientId(configuredClientId?: string | null): string | null {
-    const settingsClientId = this.normalizeClientId(configuredClientId);
-    if (settingsClientId) {
-      return settingsClientId;
-    }
-
-    const envClientId = this.normalizeClientId(process.env.GITHUB_OAUTH_CLIENT_ID);
-    return envClientId;
+    return this.authService.normalizeHost(value);
   }
 
   isDeviceFlowConfigured(configuredClientId?: string | null, _configuredHost?: string | null): boolean {
-    return Boolean(this.getOauthClientId(configuredClientId));
+    return this.authService.isDeviceFlowConfigured(configuredClientId);
   }
 
   getHost(): string {
@@ -206,218 +48,34 @@ export class GitHubService {
   }
 
   async authenticate(token: string, configuredHost?: string | null): Promise<boolean> {
-    try {
-      const host = this.normalizeHost(configuredHost);
-
-      // Using new Function to prevent TypeScript from compiling dynamic import into require()
-      const _importDynamic = new Function('modulePath', 'return import(modulePath)');
-      const { Octokit } = await _importDynamic('octokit');
-      this.octokit = new Octokit({ auth: token, baseUrl: this.getApiBaseUrl(host) });
-
-      // Validate the token by calling the rate limit endpoint (works with any valid token)
-      await this.octokit.rest.rateLimit.get();
-
-      this.token = token;
-      this.host = host;
-
-      // Try fetching the username for display
-      try {
-        const { data } = await this.octokit.rest.users.getAuthenticated();
-        this.username = data?.login || null;
-        console.log('GitHub Authenticated as:', this.username, 'on host:', host);
-      } catch {
-        this.username = null;
-        console.log('GitHub Authenticated (Token valid, but user scope not available). Host:', host);
-      }
-
-      return true;
-    } catch (e) {
-      console.error('GitHub Auth Error:', (e as Error).message);
+    const session = await this.authService.authenticate(token, configuredHost);
+    if (!session) {
       this.octokit = null;
       this.token = null;
       this.username = null;
       return false;
     }
+
+    this.octokit = session.octokit;
+    this.token = session.token;
+    this.username = session.username;
+    this.host = session.host;
+    return true;
   }
 
-  async startDeviceFlow(configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowStartResult> {
-    const host = this.getOauthHost(configuredHost);
-
-    const clientId = this.getOauthClientId(configuredClientId);
-    if (!clientId) {
-      throw new Error('Device Flow nicht konfiguriert. Bitte GitHub OAuth Client ID in den Einstellungen setzen oder GITHUB_OAUTH_CLIENT_ID bereitstellen.');
-    }
-
-    const params = new URLSearchParams();
-    params.set('client_id', clientId);
-    params.set('scope', 'repo read:user');
-
-    const response = await fetch(oauthEndpointForHost(host, DEVICE_CODE_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Device Flow konnte nicht gestartet werden (${response.status}).`);
-    }
-
-    const payload = (await response.json()) as {
-      device_code?: string;
-      user_code?: string;
-      verification_uri?: string;
-      expires_in?: number;
-      interval?: number;
-      error?: string;
-      error_description?: string;
-    };
-
-    if (payload.error) {
-      throw new Error(payload.error_description || payload.error);
-    }
-
-    if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
-      throw new Error('Unvollstaendige Device-Flow Antwort erhalten.');
-    }
-
-    return {
-      deviceCode: payload.device_code,
-      userCode: payload.user_code,
-      verificationUri: payload.verification_uri,
-      expiresIn: Number(payload.expires_in || 900),
-      interval: Number(payload.interval || 5),
-    };
+  startDeviceFlow(configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowStartResult> {
+    return this.authService.startDeviceFlow(configuredClientId, configuredHost || this.host);
   }
 
-  async pollDeviceFlow(deviceCode: string, configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowPollResult> {
-    const host = this.getOauthHost(configuredHost);
-
-    const clientId = this.getOauthClientId(configuredClientId);
-    if (!clientId) {
-      return {
-        status: 'error',
-        error: 'oauth_not_configured',
-        errorDescription: 'GitHub OAuth Client ID fehlt (Settings oder GITHUB_OAUTH_CLIENT_ID).',
-      };
-    }
-
-    const params = new URLSearchParams();
-    params.set('client_id', clientId);
-    params.set('device_code', deviceCode);
-    params.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code');
-
-    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      return {
-        status: 'error',
-        error: 'request_failed',
-        errorDescription: `Token-Abfrage fehlgeschlagen (${response.status}).`,
-      };
-    }
-
-    const payload = (await response.json()) as {
-      access_token?: string;
-      token_type?: string;
-      scope?: string;
-      error?: string;
-      error_description?: string;
-      interval?: number;
-    };
-
-    if (payload.error) {
-      if (payload.error === 'authorization_pending') {
-        return { status: 'pending' };
-      }
-      if (payload.error === 'slow_down') {
-        return { status: 'pending', interval: Number(payload.interval || 10) };
-      }
-      return {
-        status: 'error',
-        error: payload.error,
-        errorDescription: payload.error_description,
-      };
-    }
-
-    if (!payload.access_token) {
-      return {
-        status: 'error',
-        error: 'missing_access_token',
-        errorDescription: 'Kein Access Token in der Antwort enthalten.',
-      };
-    }
-
-    return {
-      status: 'success',
-      accessToken: payload.access_token,
-      tokenType: payload.token_type || 'bearer',
-      scope: payload.scope || '',
-    };
+  pollDeviceFlow(deviceCode: string, configuredClientId?: string | null, configuredHost?: string | null): Promise<DeviceFlowPollResult> {
+    return this.authService.pollDeviceFlow(deviceCode, configuredClientId, configuredHost || this.host);
   }
 
-  async exchangeWebFlowCode(params: WebFlowExchangeParams): Promise<WebFlowExchangeResult> {
-    const host = this.getOauthHost(params.configuredHost);
-
-    const clientId = this.getOauthClientId(params.configuredClientId);
-    if (!clientId) {
-      throw new Error('OAuth Browser Login ist nicht konfiguriert (GitHub OAuth Client ID fehlt).');
-    }
-
-    const body = new URLSearchParams();
-    body.set('client_id', clientId);
-    body.set('code', params.code);
-    body.set('redirect_uri', params.redirectUri);
-    body.set('code_verifier', params.codeVerifier);
-
-    const envClientSecret = this.normalizeClientId(process.env.GITHUB_OAUTH_CLIENT_SECRET);
-    if (envClientSecret) {
-      body.set('client_secret', envClientSecret);
-    }
-
-    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: body.toString(),
+  exchangeWebFlowCode(params: WebFlowExchangeParams): Promise<WebFlowExchangeResult> {
+    return this.authService.exchangeWebFlowCode({
+      ...params,
+      configuredHost: params.configuredHost || this.host,
     });
-
-    if (!response.ok) {
-      throw new Error(`OAuth Token-Austausch fehlgeschlagen (${response.status}).`);
-    }
-
-    const payload = (await response.json()) as {
-      access_token?: string;
-      token_type?: string;
-      scope?: string;
-      error?: string;
-      error_description?: string;
-    };
-
-    if (payload.error) {
-      throw new Error(payload.error_description || payload.error);
-    }
-
-    if (!payload.access_token) {
-      throw new Error('Kein Access Token in der OAuth-Antwort enthalten.');
-    }
-
-    return {
-      accessToken: payload.access_token,
-      tokenType: payload.token_type || 'bearer',
-      scope: payload.scope || '',
-    };
   }
 
   isAuthenticated(): boolean {
@@ -434,103 +92,15 @@ export class GitHubService {
     return this.username;
   }
 
-  async getMyRepositories(page: number = 1, perPage: number = 50, search: string = '') {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
-    const safePerPage = Number.isFinite(perPage) ? Math.max(10, Math.min(Math.floor(perPage), 100)) : 50;
-    const normalizedSearch = (search || '').trim().toLowerCase();
-
-    const mapRepository = (repo: GithubRepositoryApi): GitHubRepositoryDto => ({
-      id: repo.id,
-      name: repo.name,
-      fullName: repo.full_name,
-      private: repo.private,
-      cloneUrl: repo.clone_url,
-      htmlUrl: repo.html_url,
-      description: repo.description,
-      updatedAt: repo.updated_at,
-    });
-
-    const matchesSearch = (repo: GitHubRepositoryDto) => {
-      if (!normalizedSearch) return true;
-      const haystack = `${repo.name} ${repo.fullName} ${repo.description || ''}`.toLowerCase();
-      return haystack.includes(normalizedSearch);
-    };
-
-    if (!normalizedSearch) {
-      const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
-        sort: 'updated',
-        per_page: safePerPage,
-        page: safePage,
-      });
-
-      return {
-        repos: (data as GithubRepositoryApi[]).map(mapRepository),
-        nextPage: data.length === safePerPage ? safePage + 1 : null,
-        hasMore: data.length === safePerPage,
-        totalCount: null,
-      };
-    }
-
-    const requiredMatches = safePage * safePerPage;
-    const matchedRepos: GitHubRepositoryDto[] = [];
-    let sourcePage = 1;
-    let sourceHasMore = false;
-
-    while (matchedRepos.length <= requiredMatches) {
-      const { data } = await this.octokit.rest.repos.listForAuthenticatedUser({
-        sort: 'updated',
-        per_page: 100,
-        page: sourcePage,
-      });
-
-      const mapped = (data as GithubRepositoryApi[]).map(mapRepository);
-      matchedRepos.push(...mapped.filter(matchesSearch));
-
-      if (data.length < 100) {
-        sourceHasMore = false;
-        break;
-      }
-
-      sourceHasMore = true;
-      sourcePage += 1;
-    }
-
-    const startIndex = (safePage - 1) * safePerPage;
-    const repos = matchedRepos.slice(startIndex, startIndex + safePerPage);
-    const hasMore = matchedRepos.length > startIndex + safePerPage || sourceHasMore;
-    return {
-      repos,
-      nextPage: hasMore ? safePage + 1 : null,
-      hasMore,
-      totalCount: null,
-    };
+  getMyRepositories(page: number = 1, perPage: number = 50, search: string = '') {
+    return this.repositories.getMyRepositories(page, perPage, search);
   }
 
-  async createRepository(name: string, description: string, isPrivate: boolean) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const { data } = await this.octokit.rest.repos.createForAuthenticatedUser({
-      name,
-      description,
-      private: isPrivate,
-      auto_init: false,
-    });
-
-    return {
-      id: data.id,
-      name: data.name,
-      fullName: data.full_name,
-      private: data.private,
-      cloneUrl: data.clone_url,
-      htmlUrl: data.html_url,
-      description: data.description,
-      updatedAt: data.updated_at,
-    };
+  createRepository(name: string, description: string, isPrivate: boolean) {
+    return this.repositories.createRepository(name, description, isPrivate);
   }
 
-  async forkRepository(
+  forkRepository(
     owner: string,
     repo: string,
     options: {
@@ -538,297 +108,39 @@ export class GitHubService {
       defaultBranchOnly?: boolean;
     } = {},
   ) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const normalizedOwner = String(owner || '').trim();
-    const normalizedRepo = String(repo || '').trim();
-    const normalizedName = String(options.name || '').trim();
-
-    if (!normalizedOwner || !normalizedRepo) {
-      throw new Error('Owner and repository are required.');
-    }
-
-    const { data } = await this.octokit.rest.repos.createFork({
-      owner: normalizedOwner,
-      repo: normalizedRepo,
-      ...(normalizedName ? { name: normalizedName } : {}),
-      ...(typeof options.defaultBranchOnly === 'boolean' ? { default_branch_only: options.defaultBranchOnly } : {}),
-    });
-
-    return {
-      id: data.id,
-      name: data.name,
-      fullName: data.full_name,
-      private: data.private,
-      cloneUrl: data.clone_url,
-      htmlUrl: data.html_url,
-      description: data.description,
-      updatedAt: data.updated_at,
-    };
+    return this.repositories.forkRepository(owner, repo, options);
   }
 
-  async getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const normalizedState = state === 'closed' || state === 'all' ? state : 'open';
-    const allPullRequests: PullRequestApi[] = [];
-    let page = 1;
-
-    while (true) {
-      const { data } = await this.octokit.rest.pulls.list({
-        owner,
-        repo,
-        state: normalizedState,
-        per_page: 100,
-        page,
-        sort: 'updated',
-        direction: 'desc',
-      });
-
-      allPullRequests.push(...(data as PullRequestApi[]));
-      if (data.length < 100) {
-        break;
-      }
-      page += 1;
-    }
-
-    return allPullRequests.map((pr): PullRequestDto => ({
-      number: pr.number,
-      title: pr.title,
-      state: pr.state,
-      user: pr.user?.login || '',
-      createdAt: pr.created_at,
-      updatedAt: pr.updated_at,
-      head: pr.head?.ref || '',
-      headSha: pr.head?.sha || '',
-      base: pr.base?.ref || '',
-      merged: pr.merged_at !== null,
-      htmlUrl: pr.html_url,
-      draft: pr.draft || false,
-    }));
+  getPullRequests(owner: string, repo: string, state: 'open' | 'closed' | 'all' = 'open') {
+    return this.pullRequests.getPullRequests(owner, repo, state);
   }
 
-  async getWorkflowRuns(owner: string, repo: string, params: { branch?: string; headSha?: string; perPage?: number } = {}) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const safePerPage = Number.isFinite(params.perPage) ? Math.max(1, Math.min(Math.floor(params.perPage as number), 100)) : 20;
-
-    const { data } = await this.octokit.rest.actions.listWorkflowRunsForRepo({
-      owner,
-      repo,
-      ...(params.headSha ? { head_sha: params.headSha } : {}),
-      ...(!params.headSha && params.branch ? { branch: params.branch } : {}),
-      per_page: safePerPage,
-    });
-
-    const workflowRuns = (data.workflow_runs || []) as WorkflowRunApi[];
-    const runs = workflowRuns.filter((run) => {
-      if (!params.headSha) return true;
-      return run.head_sha === params.headSha;
-    });
-
-    return runs.map((run): GithubWorkflowRunDto => ({
-      id: run.id,
-      name: run.name || run.display_title || 'Workflow',
-      status: (run.status || 'pending') as WorkflowRunState,
-      conclusion: (run.conclusion ?? null) as WorkflowRunConclusion,
-      event: run.event || 'unknown',
-      htmlUrl: run.html_url,
-      workflowName: run.display_title || run.name || 'Workflow',
-      branch: run.head_branch || '',
-      headSha: run.head_sha || '',
-      createdAt: run.created_at,
-      startedAt: run.run_started_at || run.created_at,
-      updatedAt: run.updated_at,
-    }));
+  createPullRequest(owner: string, repo: string, title: string, body: string, head: string, base: string) {
+    return this.pullRequests.createPullRequest(owner, repo, title, body, head, base);
   }
 
-  async getStatusChecks(owner: string, repo: string, ref: string) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const normalizedRef = (ref || '').trim();
-    if (!normalizedRef) {
-      throw new Error('Ref is required');
-    }
-
-    const [checksResponse, statusesResponse] = await Promise.all([
-      this.octokit.rest.checks.listForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
-      this.octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
-    ]);
-
-    const checkRuns = ((checksResponse.data.check_runs || []) as CheckRunApi[]).map((run): GithubCheckRunDto => ({
-      id: run.id,
-      name: run.name || run.app?.name || 'Check',
-      status: (run.status || 'pending') as CheckRunStatus,
-      conclusion: (run.conclusion ?? null) as CheckRunConclusion,
-      detailsUrl: run.details_url || run.html_url || null,
-      appName: run.app?.name || null,
-      startedAt: run.started_at || null,
-      completedAt: run.completed_at || null,
-    }));
-
-    const statusContexts = ((statusesResponse.data.statuses || []) as StatusContextApi[]).map((status): GithubStatusContextDto => ({
-      id: status.id,
-      context: status.context || 'status',
-      state: status.state || 'pending',
-      description: status.description || null,
-      targetUrl: status.target_url || null,
-      createdAt: status.created_at || null,
-      updatedAt: status.updated_at || null,
-    }));
-
-    return {
-      state: statusesResponse.data.state || 'pending',
-      sha: statusesResponse.data.sha || normalizedRef,
-      checkRuns,
-      statusContexts,
-    };
+  mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string) {
+    return this.pullRequests.mergePullRequest(owner, repo, pullNumber, mergeMethod, commitTitle, commitMessage);
   }
 
-  async createPullRequest(owner: string, repo: string, title: string, body: string, head: string, base: string) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const { data } = await this.octokit.rest.pulls.create({
-      owner,
-      repo,
-      title,
-      body,
-      head,
-      base,
-    });
-
-    return {
-      number: data.number,
-      title: data.title,
-      htmlUrl: data.html_url,
-      state: data.state,
-    };
+  getWorkflowRuns(owner: string, repo: string, params: { branch?: string; headSha?: string; perPage?: number } = {}) {
+    return this.workflows.getWorkflowRuns(owner, repo, params);
   }
 
-  async listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {
-    if (!this.octokit) throw new Error('Not authenticated');
-    const safePerPage = Number.isFinite(perPage) ? Math.max(1, Math.min(Math.floor(perPage), 300)) : 200;
-
-    const tags: string[] = [];
-    let page = 1;
-
-    while (tags.length < safePerPage) {
-      const remaining = safePerPage - tags.length;
-      const { data } = await this.octokit.rest.repos.listTags({
-        owner,
-        repo,
-        per_page: Math.min(100, remaining),
-        page,
-      });
-
-      const pageTags = ((data || []) as RepositoryTagApi[]).map((tag) => String(tag?.name || '').trim()).filter(Boolean);
-
-      tags.push(...pageTags);
-      if (!data || data.length < 100) break;
-      page += 1;
-    }
-
-    return [...new Set(tags)];
+  getStatusChecks(owner: string, repo: string, ref: string) {
+    return this.workflows.getStatusChecks(owner, repo, ref);
   }
 
-  async getLatestReleaseTag(owner: string, repo: string): Promise<string | null> {
-    if (!this.octokit) throw new Error('Not authenticated');
-    const { data } = await this.octokit.rest.repos.listReleases({
-      owner,
-      repo,
-      per_page: 30,
-      page: 1,
-    });
-
-    const first = ((data || []) as RepositoryReleaseApi[]).find((release) => Boolean(String(release?.tag_name || '').trim()));
-    if (!first) return null;
-    const tag = String(first.tag_name || '').trim();
-    return tag || null;
+  listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {
+    return this.releases.listRepositoryTags(owner, repo, perPage);
   }
 
-  async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string) {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const method: MergeMethod = mergeMethod === 'rebase' || mergeMethod === 'squash' ? mergeMethod : 'merge';
-    const { data } = await this.octokit.rest.pulls.merge({
-      owner,
-      repo,
-      pull_number: pullNumber,
-      merge_method: method,
-      ...(commitTitle ? { commit_title: commitTitle } : {}),
-      ...(commitMessage ? { commit_message: commitMessage } : {}),
-    });
-
-    return {
-      sha: data.sha,
-      merged: Boolean(data.merged),
-      message: data.message || 'Merged',
-    };
+  getLatestReleaseTag(owner: string, repo: string): Promise<string | null> {
+    return this.releases.getLatestReleaseTag(owner, repo);
   }
 
-  async createRelease(params: CreateReleaseParams): Promise<GitHubReleaseDto> {
-    if (!this.octokit) throw new Error('Not authenticated');
-
-    const owner = (params.owner || '').trim();
-    const repo = (params.repo || '').trim();
-    const tagName = (params.tagName || '').trim();
-    const releaseName = (params.releaseName || '').trim();
-    const targetCommitish = (params.targetCommitish || '').trim();
-
-    if (!owner || !repo) {
-      throw new Error('Owner und Repository sind erforderlich.');
-    }
-
-    if (!tagName) {
-      throw new Error('Tag-Name ist erforderlich.');
-    }
-
-    if (!releaseName) {
-      throw new Error('Release-Name ist erforderlich.');
-    }
-
-    try {
-      const { data } = await this.octokit.rest.repos.createRelease({
-        owner,
-        repo,
-        tag_name: tagName,
-        name: releaseName,
-        body: params.body || '',
-        draft: Boolean(params.draft),
-        prerelease: Boolean(params.prerelease),
-        ...(targetCommitish ? { target_commitish: targetCommitish } : {}),
-      });
-
-      return {
-        id: data.id,
-        tagName: data.tag_name,
-        name: data.name || releaseName,
-        htmlUrl: data.html_url,
-        draft: Boolean(data.draft),
-        prerelease: Boolean(data.prerelease),
-        publishedAt: data.published_at || null,
-      };
-    } catch (error: unknown) {
-      const apiError = error as GithubApiErrorLike;
-      const status = Number(apiError?.status);
-      const apiMessage = typeof apiError?.response?.data?.message === 'string' ? apiError.response.data.message : '';
-      const fallbackMessage = typeof apiError?.message === 'string' ? apiError.message : '';
-      const normalizedMessage = `${fallbackMessage} ${apiMessage}`.toLowerCase();
-
-      if (status === 422 && normalizedMessage.includes('already_exists')) {
-        throw new Error('Tag existiert bereits. Bitte anderen Tag wählen oder bestehenden Tag verwenden.');
-      }
-
-      if (status === 422 && normalizedMessage.includes('target_commitish')) {
-        throw new Error('Ungültiger targetCommitish. Bitte Branch-Name oder Commit-SHA prüfen.');
-      }
-
-      if (status === 403 || status === 404) {
-        throw new Error('Keine Berechtigung für dieses Repository. Bitte Token-Rechte prüfen.');
-      }
-
-      throw new Error(apiMessage || fallbackMessage || 'Release konnte nicht erstellt werden.');
-    }
+  createRelease(params: CreateReleaseParams): Promise<GitHubReleaseDto> {
+    return this.releases.createRelease(params);
   }
 }
 
