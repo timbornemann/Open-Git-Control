@@ -16,7 +16,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite\" \"npm run electron:dev\"",
     "electron:dev": "npm run build:electron && wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/start-electron.js",
-    "build": "tsc && vite build && npm run build:electron",
+    "build": "tsc -b && vite build && node scripts/bundle-electron-preload.js",
     "build:electron": "tsc --project tsconfig.node.json && node scripts/bundle-electron-preload.js",
     "lint": "eslint src electron",
     "format:check": "prettier --check .",
@@ -58,6 +58,7 @@
     "electron": "^42.4.1",
     "electron-builder": "^26.15.3",
     "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.4",
     "typescript": "^5.2.2",

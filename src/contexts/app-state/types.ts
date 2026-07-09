@@ -213,8 +213,6 @@ export type UIContextValue = BaseUIContextValue & {
   executeInputDialog: (values: Record<string, string>) => Promise<void>;
 };
 
-export type AppContextValue = SettingsContextValue & RepositoryContextValue & GithubContextValue & WorkflowContextValue & BaseUIContextValue;
-
 export type AppStateSlicesValue = {
   settings: SettingsContextValue;
   repository: RepositoryContextValue;

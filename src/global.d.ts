@@ -1,4 +1,5 @@
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from './types/git';
+import type { GitCommandName } from './shared/ipc/gitCommands';
 import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from './types/projectPlanner';
 
 export interface StoredRepoEntryDto {
@@ -30,41 +31,7 @@ export type IpcErrorResult = {
 
 export type IpcResult<T> = IpcSuccessResult<T> | IpcErrorResult;
 
-export type GitCommandNameDto =
-  | 'status'
-  | 'statusPorcelain'
-  | 'log'
-  | 'branches'
-  | 'commitDetails'
-  | 'conflictTakeOurs'
-  | 'conflictTakeTheirs'
-  | 'conflictMarkResolved'
-  | 'mergeContinue'
-  | 'mergeAbort'
-  | 'rebaseContinue'
-  | 'rebaseAbort'
-  | 'branch'
-  | 'remote'
-  | 'tag'
-  | 'fetch'
-  | 'pull'
-  | 'push'
-  | 'checkout'
-  | 'commit'
-  | 'reset'
-  | 'clean'
-  | 'stash'
-  | 'diff'
-  | 'show'
-  | 'add'
-  | 'cherry-pick'
-  | 'revert'
-  | 'merge'
-  | 'submoduleStatus'
-  | 'submoduleUpdateInitRecursive'
-  | 'submoduleSyncRecursive'
-  | 'reflog'
-  | 'forensicHistory';
+export type GitCommandNameDto = GitCommandName;
 
 export type GitCommandResultDto = IpcResult<string>;
 

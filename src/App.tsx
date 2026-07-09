@@ -8,15 +8,15 @@ import { I18nProvider, translateFromCatalog, type TranslationVariables } from '.
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { useRepoSwitcherKeyboard } from './hooks/useRepoSwitcherKeyboard';
 import { useResizableSidebar } from './hooks/useResizableSidebar';
-import { AppStateSlicesProvider, createAppStateSlices } from './contexts/AppStateContext';
+import { AppStateSlicesProvider } from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
-import { createAppContextValue } from './app/createAppContextValue';
+import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
 import './index.css';
 
 const App: React.FC = () => {
   const state = useAppState();
-  const tr = (deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText);
+  const tr = useCallback((deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText), [state.settings.language]);
   const t = useCallback(
     (key: string, variables?: TranslationVariables) => translateFromCatalog(state.settings.language, key, variables),
     [state.settings.language],
@@ -71,7 +71,7 @@ const App: React.FC = () => {
     state.triggerRefresh();
   }, [state]);
 
-  const ctxValue = createAppContextValue({
+  const appStateSlices = createAppStateSlicesValue({
     state,
     selectedGithubAuthHelpMethod,
     setSelectedGithubAuthHelpMethod,
@@ -80,26 +80,26 @@ const App: React.FC = () => {
     resetLayout,
     t,
     tr,
-  });
-  const appStateSlices = createAppStateSlices(ctxValue, {
-    sidebarWidth,
-    isSidebarCollapsed,
-    isSidebarResizing,
-    onToggleSidebar: handleToggleSidebar,
-    onSidebarResizeStart: handleSidebarResizeStart,
-    isCommandPaletteOpen: isPaletteOpen,
-    setCommandPaletteOpen: setIsPaletteOpen,
-    branchContextMenu: state.branchContextMenu,
-    setBranchContextMenu: state.setBranchContextMenu,
-    confirmDialog: state.confirmDialog,
-    setConfirmDialog: state.setConfirmDialog,
-    inputDialog: state.inputDialog,
-    setInputDialog: state.setInputDialog,
-    closeConfirmDialog: state.closeConfirmDialog,
-    executeConfirmDialog: state.executeConfirmDialog,
-    executeConfirmDialogSecondary: state.executeConfirmDialogSecondary,
-    closeInputDialog: state.closeInputDialog,
-    executeInputDialog: state.executeInputDialog,
+    uiState: {
+      sidebarWidth,
+      isSidebarCollapsed,
+      isSidebarResizing,
+      onToggleSidebar: handleToggleSidebar,
+      onSidebarResizeStart: handleSidebarResizeStart,
+      isCommandPaletteOpen: isPaletteOpen,
+      setCommandPaletteOpen: setIsPaletteOpen,
+      branchContextMenu: state.branchContextMenu,
+      setBranchContextMenu: state.setBranchContextMenu,
+      confirmDialog: state.confirmDialog,
+      setConfirmDialog: state.setConfirmDialog,
+      inputDialog: state.inputDialog,
+      setInputDialog: state.setInputDialog,
+      closeConfirmDialog: state.closeConfirmDialog,
+      executeConfirmDialog: state.executeConfirmDialog,
+      executeConfirmDialogSecondary: state.executeConfirmDialogSecondary,
+      closeInputDialog: state.closeInputDialog,
+      executeInputDialog: state.executeInputDialog,
+    },
   });
 
   return (

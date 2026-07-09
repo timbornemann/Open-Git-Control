@@ -19,18 +19,19 @@ type RepoUnavailablePayload = {
 };
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
+type ElectronApiNamespaceKey = 'git' | 'github' | 'planner' | 'settings' | 'app' | 'ai' | 'repos';
+type FlatElectronAPI = Omit<ElectronAPI, ElectronApiNamespaceKey>;
 
 export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI => {
   const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
     return ipcRenderer.invoke(IpcChannel.GitCommand, commandName, ...args);
   };
 
-  const invokeGitMutation = async (ipcChannel: IpcChannel, commandName: string, payload: unknown) => {
-    void commandName;
+  const invokeGitMutation = async (ipcChannel: IpcChannel, payload: unknown) => {
     return ipcRenderer.invoke(ipcChannel, payload);
   };
 
-  const electronAPI = {
+  const flatApi = {
     openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpenDirectory),
     selectDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectDirectory),
     selectProjectParentDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectProjectParentDirectory),
@@ -39,7 +40,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
     runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
     createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
-      invokeGitMutation(IpcChannel.GitCreateCommit, 'commit', params),
+      invokeGitMutation(IpcChannel.GitCreateCommit, params),
     getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => ipcRenderer.invoke(IpcChannel.GitCommitLogPage, params),
     requestCommitStats: (hashes: string[], priority?: 'selected' | 'visible' | 'background') =>
       ipcRenderer.invoke(IpcChannel.GitRequestCommitStats, hashes, priority),
@@ -61,7 +62,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke(IpcChannel.GitInteractiveRebase, baseHash, todoLines),
     applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke(IpcChannel.GitApplyPatch, patch, options || {}),
     getStashes: () => ipcRenderer.invoke(IpcChannel.GitStashes),
-    gitStashBranch: (stashName: string, branchName: string) => invokeGitMutation(IpcChannel.GitStashBranch, 'stash branch', { stashName, branchName }),
+    gitStashBranch: (stashName: string, branchName: string) => invokeGitMutation(IpcChannel.GitStashBranch, { stashName, branchName }),
     getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitRepoOriginUrl, repoPath),
     addIgnoreRule: (pattern: string) => ipcRenderer.invoke(IpcChannel.GitAddIgnoreRule, pattern),
     gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
@@ -180,124 +181,121 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       commitMessage?: string;
     }) => ipcRenderer.invoke(IpcChannel.GithubMergePr, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
-  } as unknown as ElectronAPI;
+  } satisfies FlatElectronAPI;
 
-  electronAPI.git = {
-    setRepoPath: electronAPI.setRepoPath,
-    clearRepoPath: electronAPI.clearRepoPath,
-    runGitCommand: electronAPI.runGitCommand,
-    createCommit: electronAPI.createCommit,
-    getCommitLogPage: electronAPI.getCommitLogPage,
-    requestCommitStats: electronAPI.requestCommitStats,
-    onCommitStats: electronAPI.onCommitStats,
-    getWorkingTreeSnapshot: electronAPI.getWorkingTreeSnapshot,
-    getWorkingTreeStats: electronAPI.getWorkingTreeStats,
-    stagePaths: electronAPI.stagePaths,
-    getDiffPreview: electronAPI.getDiffPreview,
-    getFileBlameRange: electronAPI.getFileBlameRange,
-    onRepoUnavailable: electronAPI.onRepoUnavailable,
-    startInteractiveRebase: electronAPI.startInteractiveRebase,
-    applyPatch: electronAPI.applyPatch,
-    getStashes: electronAPI.getStashes,
-    gitStashBranch: electronAPI.gitStashBranch,
-    getRepoOriginUrl: electronAPI.getRepoOriginUrl,
-    addIgnoreRule: electronAPI.addIgnoreRule,
-    gitFetch: electronAPI.gitFetch,
-    gitPull: electronAPI.gitPull,
-    gitPush: electronAPI.gitPush,
-    scanPushSecrets: electronAPI.scanPushSecrets,
-    cancelSecretScan: electronAPI.cancelSecretScan,
-    gitClone: electronAPI.gitClone,
-    gitInit: electronAPI.gitInit,
-    getFileHistory: electronAPI.getFileHistory,
-    getFileBlame: electronAPI.getFileBlame,
-    getFileTimelineData: electronAPI.getFileTimelineData,
-    readRepoFile: electronAPI.readRepoFile,
-    getMarkdownPreviewFile: electronAPI.getMarkdownPreviewFile,
-    getRepoFileDataUrl: electronAPI.getRepoFileDataUrl,
-    writeRepoFile: electronAPI.writeRepoFile,
-    openSubmodule: electronAPI.openSubmodule,
-    onCloneProgress: electronAPI.onCloneProgress,
-    onJobEvent: electronAPI.onJobEvent,
-  };
-
-  electronAPI.github = {
-    githubAuth: electronAPI.githubAuth,
-    githubDeviceStart: electronAPI.githubDeviceStart,
-    githubDevicePoll: electronAPI.githubDevicePoll,
-    githubWebLogin: electronAPI.githubWebLogin,
-    githubGetRepos: electronAPI.githubGetRepos,
-    githubGetSavedAuthStatus: electronAPI.githubGetSavedAuthStatus,
-    githubLoginWithSavedToken: electronAPI.githubLoginWithSavedToken,
-    githubCheckAuthStatus: electronAPI.githubCheckAuthStatus,
-    githubLogout: electronAPI.githubLogout,
-    githubCreateRepo: electronAPI.githubCreateRepo,
-    githubForkRepo: electronAPI.githubForkRepo,
-    githubGetPRs: electronAPI.githubGetPRs,
-    githubCreatePR: electronAPI.githubCreatePR,
-    githubCreateRelease: electronAPI.githubCreateRelease,
-    githubGetReleaseContext: electronAPI.githubGetReleaseContext,
-    githubGetWorkflowRuns: electronAPI.githubGetWorkflowRuns,
-    githubGetStatusChecks: electronAPI.githubGetStatusChecks,
-    githubMergePR: electronAPI.githubMergePR,
-  };
-
-  electronAPI.planner = {
-    plannerGetData: electronAPI.plannerGetData,
-    plannerEnsureRepositoryProject: electronAPI.plannerEnsureRepositoryProject,
-    plannerCreateProject: electronAPI.plannerCreateProject,
-    plannerUpdateProject: electronAPI.plannerUpdateProject,
-    plannerDeleteProject: electronAPI.plannerDeleteProject,
-    plannerDeleteRepositoryProjectByPath: electronAPI.plannerDeleteRepositoryProjectByPath,
-    plannerCreateItem: electronAPI.plannerCreateItem,
-    plannerUpdateItem: electronAPI.plannerUpdateItem,
-    plannerDeleteItem: electronAPI.plannerDeleteItem,
-    plannerMaterializeProject: electronAPI.plannerMaterializeProject,
-  };
-
-  electronAPI.settings = {
-    getSettings: electronAPI.getSettings,
-    setSettings: electronAPI.setSettings,
-    setGeminiApiKey: electronAPI.setGeminiApiKey,
-    clearGeminiApiKey: electronAPI.clearGeminiApiKey,
-  };
-
-  electronAPI.app = {
-    openDirectory: electronAPI.openDirectory,
-    selectDirectory: electronAPI.selectDirectory,
-    selectProjectParentDirectory: electronAPI.selectProjectParentDirectory,
-    openExternalUrl: electronAPI.openExternalUrl,
-    getPlanningApiInfo: electronAPI.getPlanningApiInfo,
-    generatePlanningApiToken: electronAPI.generatePlanningApiToken,
-    clearPlanningApiToken: electronAPI.clearPlanningApiToken,
-    getAppVersion: electronAPI.getAppVersion,
-    getUpdaterStatus: electronAPI.getUpdaterStatus,
-    checkForAppUpdates: electronAPI.checkForAppUpdates,
-    runOneClickAppUpdate: electronAPI.runOneClickAppUpdate,
-    downloadAppUpdate: electronAPI.downloadAppUpdate,
-    installAppUpdate: electronAPI.installAppUpdate,
-    onUpdaterEvent: electronAPI.onUpdaterEvent,
-    getDiagnosticsReport: electronAPI.getDiagnosticsReport,
-  };
-
-  electronAPI.ai = {
-    aiTestConnection: electronAPI.aiTestConnection,
-    aiListModels: electronAPI.aiListModels,
-    ollamaTestConnection: electronAPI.ollamaTestConnection,
-    ollamaListModels: electronAPI.ollamaListModels,
-    runAiAutoCommit: electronAPI.runAiAutoCommit,
-    cancelAiAutoCommit: electronAPI.cancelAiAutoCommit,
-    getAiAutoCommitState: electronAPI.getAiAutoCommitState,
-    aiGenerateCommitMessage: electronAPI.aiGenerateCommitMessage,
-    aiGenerateReleaseNotes: electronAPI.aiGenerateReleaseNotes,
-    onJobEvent: electronAPI.onJobEvent,
-  };
-
-  electronAPI.repos = {
-    getStoredRepos: electronAPI.getStoredRepos,
-    setStoredRepos: electronAPI.setStoredRepos,
-    setRepoPath: electronAPI.setRepoPath,
-    clearRepoPath: electronAPI.clearRepoPath,
+  const electronAPI: ElectronAPI = {
+    ...flatApi,
+    git: {
+      setRepoPath: flatApi.setRepoPath,
+      clearRepoPath: flatApi.clearRepoPath,
+      runGitCommand: flatApi.runGitCommand,
+      createCommit: flatApi.createCommit,
+      getCommitLogPage: flatApi.getCommitLogPage,
+      requestCommitStats: flatApi.requestCommitStats,
+      onCommitStats: flatApi.onCommitStats,
+      getWorkingTreeSnapshot: flatApi.getWorkingTreeSnapshot,
+      getWorkingTreeStats: flatApi.getWorkingTreeStats,
+      stagePaths: flatApi.stagePaths,
+      getDiffPreview: flatApi.getDiffPreview,
+      getFileBlameRange: flatApi.getFileBlameRange,
+      onRepoUnavailable: flatApi.onRepoUnavailable,
+      startInteractiveRebase: flatApi.startInteractiveRebase,
+      applyPatch: flatApi.applyPatch,
+      getStashes: flatApi.getStashes,
+      gitStashBranch: flatApi.gitStashBranch,
+      getRepoOriginUrl: flatApi.getRepoOriginUrl,
+      addIgnoreRule: flatApi.addIgnoreRule,
+      gitFetch: flatApi.gitFetch,
+      gitPull: flatApi.gitPull,
+      gitPush: flatApi.gitPush,
+      scanPushSecrets: flatApi.scanPushSecrets,
+      cancelSecretScan: flatApi.cancelSecretScan,
+      gitClone: flatApi.gitClone,
+      gitInit: flatApi.gitInit,
+      getFileHistory: flatApi.getFileHistory,
+      getFileBlame: flatApi.getFileBlame,
+      getFileTimelineData: flatApi.getFileTimelineData,
+      readRepoFile: flatApi.readRepoFile,
+      getMarkdownPreviewFile: flatApi.getMarkdownPreviewFile,
+      getRepoFileDataUrl: flatApi.getRepoFileDataUrl,
+      writeRepoFile: flatApi.writeRepoFile,
+      openSubmodule: flatApi.openSubmodule,
+      onCloneProgress: flatApi.onCloneProgress,
+      onJobEvent: flatApi.onJobEvent,
+    },
+    github: {
+      githubAuth: flatApi.githubAuth,
+      githubDeviceStart: flatApi.githubDeviceStart,
+      githubDevicePoll: flatApi.githubDevicePoll,
+      githubWebLogin: flatApi.githubWebLogin,
+      githubGetRepos: flatApi.githubGetRepos,
+      githubGetSavedAuthStatus: flatApi.githubGetSavedAuthStatus,
+      githubLoginWithSavedToken: flatApi.githubLoginWithSavedToken,
+      githubCheckAuthStatus: flatApi.githubCheckAuthStatus,
+      githubLogout: flatApi.githubLogout,
+      githubCreateRepo: flatApi.githubCreateRepo,
+      githubForkRepo: flatApi.githubForkRepo,
+      githubGetPRs: flatApi.githubGetPRs,
+      githubCreatePR: flatApi.githubCreatePR,
+      githubCreateRelease: flatApi.githubCreateRelease,
+      githubGetReleaseContext: flatApi.githubGetReleaseContext,
+      githubGetWorkflowRuns: flatApi.githubGetWorkflowRuns,
+      githubGetStatusChecks: flatApi.githubGetStatusChecks,
+      githubMergePR: flatApi.githubMergePR,
+    },
+    planner: {
+      plannerGetData: flatApi.plannerGetData,
+      plannerEnsureRepositoryProject: flatApi.plannerEnsureRepositoryProject,
+      plannerCreateProject: flatApi.plannerCreateProject,
+      plannerUpdateProject: flatApi.plannerUpdateProject,
+      plannerDeleteProject: flatApi.plannerDeleteProject,
+      plannerDeleteRepositoryProjectByPath: flatApi.plannerDeleteRepositoryProjectByPath,
+      plannerCreateItem: flatApi.plannerCreateItem,
+      plannerUpdateItem: flatApi.plannerUpdateItem,
+      plannerDeleteItem: flatApi.plannerDeleteItem,
+      plannerMaterializeProject: flatApi.plannerMaterializeProject,
+    },
+    settings: {
+      getSettings: flatApi.getSettings,
+      setSettings: flatApi.setSettings,
+      setGeminiApiKey: flatApi.setGeminiApiKey,
+      clearGeminiApiKey: flatApi.clearGeminiApiKey,
+    },
+    app: {
+      openDirectory: flatApi.openDirectory,
+      selectDirectory: flatApi.selectDirectory,
+      selectProjectParentDirectory: flatApi.selectProjectParentDirectory,
+      openExternalUrl: flatApi.openExternalUrl,
+      getPlanningApiInfo: flatApi.getPlanningApiInfo,
+      generatePlanningApiToken: flatApi.generatePlanningApiToken,
+      clearPlanningApiToken: flatApi.clearPlanningApiToken,
+      getAppVersion: flatApi.getAppVersion,
+      getUpdaterStatus: flatApi.getUpdaterStatus,
+      checkForAppUpdates: flatApi.checkForAppUpdates,
+      runOneClickAppUpdate: flatApi.runOneClickAppUpdate,
+      downloadAppUpdate: flatApi.downloadAppUpdate,
+      installAppUpdate: flatApi.installAppUpdate,
+      onUpdaterEvent: flatApi.onUpdaterEvent,
+      getDiagnosticsReport: flatApi.getDiagnosticsReport,
+    },
+    ai: {
+      aiTestConnection: flatApi.aiTestConnection,
+      aiListModels: flatApi.aiListModels,
+      ollamaTestConnection: flatApi.ollamaTestConnection,
+      ollamaListModels: flatApi.ollamaListModels,
+      runAiAutoCommit: flatApi.runAiAutoCommit,
+      cancelAiAutoCommit: flatApi.cancelAiAutoCommit,
+      getAiAutoCommitState: flatApi.getAiAutoCommitState,
+      aiGenerateCommitMessage: flatApi.aiGenerateCommitMessage,
+      aiGenerateReleaseNotes: flatApi.aiGenerateReleaseNotes,
+      onJobEvent: flatApi.onJobEvent,
+    },
+    repos: {
+      getStoredRepos: flatApi.getStoredRepos,
+      setStoredRepos: flatApi.setStoredRepos,
+      setRepoPath: flatApi.setRepoPath,
+      clearRepoPath: flatApi.clearRepoPath,
+    },
   };
 
   return electronAPI;

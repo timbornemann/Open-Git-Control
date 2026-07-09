@@ -1,75 +1,6 @@
-export type GitCommandName =
-  | 'status'
-  | 'statusPorcelain'
-  | 'log'
-  | 'branches'
-  | 'commitDetails'
-  | 'conflictTakeOurs'
-  | 'conflictTakeTheirs'
-  | 'conflictMarkResolved'
-  | 'mergeContinue'
-  | 'mergeAbort'
-  | 'rebaseContinue'
-  | 'rebaseAbort'
-  | 'branch'
-  | 'remote'
-  | 'tag'
-  | 'fetch'
-  | 'pull'
-  | 'push'
-  | 'checkout'
-  | 'commit'
-  | 'reset'
-  | 'clean'
-  | 'stash'
-  | 'diff'
-  | 'show'
-  | 'add'
-  | 'cherry-pick'
-  | 'revert'
-  | 'merge'
-  | 'submoduleStatus'
-  | 'submoduleUpdateInitRecursive'
-  | 'submoduleSyncRecursive'
-  | 'reflog'
-  | 'forensicHistory';
+import { isGitCommandName, MAX_ARGS_BY_GIT_COMMAND, type GitCommandName } from '../../src/shared/ipc/gitCommands';
 
-const ALLOWED_GIT_COMMANDS: Set<GitCommandName> = new Set([
-  'status',
-  'statusPorcelain',
-  'log',
-  'branches',
-  'commitDetails',
-  'conflictTakeOurs',
-  'conflictTakeTheirs',
-  'conflictMarkResolved',
-  'mergeContinue',
-  'mergeAbort',
-  'rebaseContinue',
-  'rebaseAbort',
-  'branch',
-  'remote',
-  'tag',
-  'fetch',
-  'pull',
-  'push',
-  'checkout',
-  'commit',
-  'reset',
-  'clean',
-  'stash',
-  'diff',
-  'show',
-  'add',
-  'cherry-pick',
-  'revert',
-  'merge',
-  'submoduleStatus',
-  'submoduleUpdateInitRecursive',
-  'submoduleSyncRecursive',
-  'reflog',
-  'forensicHistory',
-]);
+export type { GitCommandName };
 
 export function createJobId(operation: string): string {
   return operation + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -100,50 +31,13 @@ export function normalizeArgs(args: unknown[]): string[] {
 }
 
 export function assertAllowedGitCommand(commandName: unknown): asserts commandName is GitCommandName {
-  if (typeof commandName !== 'string' || !ALLOWED_GIT_COMMANDS.has(commandName as GitCommandName)) {
+  if (!isGitCommandName(commandName)) {
     throw new Error('Git command not allowed.');
   }
 }
 
 export function validateCommandArgs(commandName: GitCommandName, args: string[]): void {
-  const maxArgsByCommand: Partial<Record<GitCommandName, number>> = {
-    status: 2,
-    statusPorcelain: 0,
-    log: 3,
-    branches: 0,
-    commitDetails: 1,
-    conflictTakeOurs: 1,
-    conflictTakeTheirs: 1,
-    conflictMarkResolved: 1,
-    mergeContinue: 0,
-    mergeAbort: 0,
-    rebaseContinue: 0,
-    rebaseAbort: 0,
-    fetch: 8,
-    pull: 6,
-    push: 8,
-    branch: 4,
-    remote: 4,
-    tag: 6,
-    checkout: 5,
-    commit: 6,
-    reset: 4,
-    clean: 4,
-    stash: 6,
-    diff: 6,
-    show: 6,
-    add: 4,
-    'cherry-pick': 3,
-    revert: 5,
-    merge: 4,
-    submoduleStatus: 0,
-    submoduleUpdateInitRecursive: 0,
-    submoduleSyncRecursive: 0,
-    reflog: 1,
-    forensicHistory: 6,
-  };
-
-  const max = maxArgsByCommand[commandName];
+  const max = MAX_ARGS_BY_GIT_COMMAND[commandName];
   if (typeof max === 'number' && args.length > max) {
     throw new Error('Too many args for git ' + commandName + '.');
   }

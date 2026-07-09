@@ -11,8 +11,8 @@ import type {
 } from './app-state/types';
 
 export type {
-  AppContextValue,
   AppStateSlicesValue,
+  AppStateUIState,
   BaseUIContextValue,
   CommitNavigationRequest,
   GithubContextValue,
@@ -21,7 +21,6 @@ export type {
   UIContextValue,
   WorkflowContextValue,
 } from './app-state/types';
-export { createAppStateSlices } from './app-state/createAppStateSlices';
 
 type AppStateStore = StoreApi<AppStateSlicesValue>;
 

@@ -1,16 +1,15 @@
-import { ipcMain, shell } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
-import type { CommitStatsPriority, CommitStatsService } from '../../CommitStatsService';
-import type { GitService, RepositoryFileSource } from '../../GitService';
+import { ipcMain } from 'electron';
+import type { CommitStatsService } from '../../CommitStatsService';
+import type { GitService } from '../../GitService';
 import type { SecretScanService } from '../../SecretScanService';
 import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
 import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
-import { parseFileBlame, parseFileHistory, parseStashList } from '../parsing';
 import { handleGitCommand } from './gitCommandRouter';
+import { registerGitFileHandlers } from './git/registerGitFileHandlers';
+import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { emitJobEvent } from './jobEvents';
 
 type RegisterGitHandlersDeps = {
@@ -21,16 +20,6 @@ type RegisterGitHandlersDeps = {
   readSettingsWithMigration: () => AppSettings;
 };
 
-const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
-
-const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => {
-  const source = String(value || '').trim();
-  if (!REPOSITORY_FILE_SOURCES.has(source as RepositoryFileSource)) {
-    throw new Error('Invalid repository file source.');
-  }
-  return source as RepositoryFileSource;
-};
-
 export function registerGitHandlers({
   gitService,
   secretScanService,
@@ -38,17 +27,10 @@ export function registerGitHandlers({
   workingTreeService,
   readSettingsWithMigration,
 }: RegisterGitHandlersDeps): void {
-  const commitStatsSubscribers = new Set<any>();
   let activeSecretScanController: AbortController | null = null;
-  commitStatsService.onUpdate((update) => {
-    for (const webContents of commitStatsSubscribers) {
-      if (webContents.isDestroyed?.()) {
-        commitStatsSubscribers.delete(webContents);
-        continue;
-      }
-      webContents.send(IpcChannel.GitCommitStats, update);
-    }
-  });
+
+  registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
+  registerGitFileHandlers({ gitService });
 
   ipcMain.handle(IpcChannel.GitSetRepo, async (_event: any, repoPath: string) => {
     commitStatsService.interruptBackgroundWork();
@@ -67,82 +49,6 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) =>
     handleGitCommand(event, gitService, commandName, ...rawArgs),
   );
-
-  ipcMain.handle(IpcChannel.GitCommitLogPage, async (_event: any, params: { limit?: unknown; offset?: unknown; scope?: unknown } = {}) => {
-    try {
-      const limit = Math.max(1, Math.min(500, Math.floor(Number(params.limit) || 100)));
-      const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
-      const scope = params.scope === 'head' ? 'head' : 'all';
-      const repoPath = gitService.getRepoPath();
-      if (!repoPath) throw new Error('No repository path set.');
-
-      try {
-        await gitService.runCommand(['rev-parse', '--verify', 'HEAD']);
-      } catch (error: any) {
-        if (/\[REPO_UNAVAILABLE\]|not a git repository|no repository path set/i.test(String(error?.message || ''))) {
-          throw error;
-        }
-        return {
-          success: true,
-          data: {
-            raw: '',
-            hasMore: false,
-            stats: {},
-            repoPath,
-          },
-        };
-      }
-
-      const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset);
-      // eslint-disable-next-line no-control-regex -- Git log records are NUL/unit-separator delimited.
-      const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)].map((match) => match[1]);
-      const hasMore = hashes.length > limit;
-      const visibleHashes = hashes.slice(0, limit);
-      const stats = await commitStatsService.getCachedStats(visibleHashes);
-      return {
-        success: true,
-        data: {
-          raw,
-          hasMore,
-          stats,
-          repoPath,
-        },
-      };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitRequestCommitStats, async (event: any, hashes: unknown, requestedPriority: unknown) => {
-    try {
-      commitStatsSubscribers.add(event.sender);
-      const normalizedHashes = Array.isArray(hashes) ? hashes.map((hash) => String(hash || '')).slice(0, 500) : [];
-      const priority: CommitStatsPriority =
-        requestedPriority === 'selected' || requestedPriority === 'visible' || requestedPriority === 'background' ? requestedPriority : 'background';
-      const data = await commitStatsService.requestStats(normalizedHashes, priority);
-      return { success: true, data };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitWorkingTreeSnapshot, async () => {
-    try {
-      return { success: true, data: await workingTreeService.getSnapshot() };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitWorkingTreeStats, async (_event: any, snapshotId: unknown) => {
-    try {
-      const normalizedId = String(snapshotId || '').trim();
-      if (!normalizedId) throw new Error('Snapshot ID is required.');
-      return { success: true, data: await workingTreeService.getStats(normalizedId) };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
 
   ipcMain.handle(
     IpcChannel.GitCreateCommit,
@@ -233,23 +139,6 @@ export function registerGitHandlers({
         maxLines: Number(limits.maxLines) || undefined,
       });
       return { success: true, data };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitFileBlameRange, async (_event: any, filePath: unknown, commitHash: unknown, startLine: unknown, lineCount: unknown) => {
-    try {
-      commitStatsService.interruptBackgroundWork();
-      const normalizedPath = String(filePath || '').trim();
-      if (!normalizedPath) throw new Error('File path is required.');
-      const raw = await gitService.history.getFileBlameRange(
-        normalizedPath,
-        String(commitHash || '').trim() || undefined,
-        Number(startLine),
-        Number(lineCount),
-      );
-      return { success: true, data: parseFileBlame(raw) };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -377,15 +266,6 @@ export function registerGitHandlers({
     }
   });
 
-  ipcMain.handle(IpcChannel.GitStashes, async () => {
-    try {
-      const raw = await gitService.getStashes(200);
-      return { success: true, data: parseStashList(raw) };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
   ipcMain.handle(IpcChannel.GitStashBranch, async (event: any, params: { stashName?: unknown; branchName?: unknown } = {}) => {
     const jobId = createJobId('git-stash-branch');
     emitJobEvent(event.sender, {
@@ -425,172 +305,6 @@ export function registerGitHandlers({
 
       const url = await gitService.getRepoOriginUrl(normalizedPath);
       return { success: true, data: url };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitFileHistory, async (_event: any, filePath: string, commitHash?: string, limit: number = 100) => {
-    try {
-      const normalizedPath = (filePath || '').trim();
-      if (!normalizedPath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      const raw = await gitService.history.getFileHistory(normalizedPath, limit, commitHash);
-      return { success: true, data: parseFileHistory(raw) };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitFileBlame, async (_event: any, filePath: string, commitHash?: string) => {
-    try {
-      const normalizedPath = (filePath || '').trim();
-      if (!normalizedPath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      const raw = await gitService.history.getFileBlame(normalizedPath, commitHash);
-      return { success: true, data: parseFileBlame(raw) };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitReadRepoFile, async (_event: any, filePath: unknown) => {
-    try {
-      const normalizedPath = String(filePath || '').trim();
-      if (!normalizedPath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      const data = await gitService.files.readRepoFile(normalizedPath);
-      return { success: true, data };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitMarkdownPreviewFile, async (_event: any, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
-    try {
-      const source = normalizeRepositoryFileSource(params.source);
-      const filePath = String(params.path || '').trim();
-      if (!filePath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      const text = await gitService.files.readRepositoryFileTextAtSource(
-        source,
-        filePath,
-        typeof params.commitHash === 'string' ? params.commitHash : undefined,
-      );
-      return { success: true, data: { text } };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitRepoFileDataUrl, async (_event: any, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
-    try {
-      const source = normalizeRepositoryFileSource(params.source);
-      const filePath = String(params.path || '').trim();
-      if (!filePath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      const data = await gitService.files.readRepositoryImageDataUrlAtSource(
-        source,
-        filePath,
-        typeof params.commitHash === 'string' ? params.commitHash : undefined,
-      );
-      return { success: true, data };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitWriteRepoFile, async (_event: any, filePath: unknown, content: unknown) => {
-    try {
-      const normalizedPath = String(filePath || '').trim();
-      if (!normalizedPath) {
-        return { success: false, error: 'File path is required' };
-      }
-
-      await gitService.files.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitOpenSubmodule, async (_event: any, submodulePath: unknown) => {
-    try {
-      const relativePath = String(submodulePath || '').trim();
-      if (!relativePath) {
-        return { success: false, error: 'Submodule path is required.' };
-      }
-
-      const repoPath = gitService.getRepoPath();
-      if (!repoPath) {
-        return { success: false, error: 'No repository path set.' };
-      }
-
-      const resolvedPath = path.resolve(repoPath, relativePath);
-      const relativeFromRepo = path.relative(repoPath, resolvedPath);
-      if (relativeFromRepo.startsWith('..') || path.isAbsolute(relativeFromRepo)) {
-        return { success: false, error: 'Submodule path is outside the current repository.' };
-      }
-
-      const openError = await shell.openPath(resolvedPath);
-      if (openError) {
-        return { success: false, error: openError };
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitAddIgnoreRule, async (_event: any, pattern: string) => {
-    try {
-      const normalizedPattern = String(pattern || '')
-        .trim()
-        .replace(/\\/g, '/');
-      if (!normalizedPattern) {
-        return { success: false, error: 'Pattern is required' };
-      }
-      if (normalizedPattern.length > 400) {
-        return { success: false, error: 'Pattern is too long' };
-      }
-      if (/\r|\n/.test(normalizedPattern)) {
-        return { success: false, error: 'Pattern must be a single line' };
-      }
-
-      const selectedRepo = gitService.getRepoPath();
-      if (!selectedRepo) {
-        return { success: false, error: 'No repository selected' };
-      }
-
-      const repoRoot = await gitService.runCommand(['rev-parse', '--show-toplevel']);
-      const gitignorePath = path.join(repoRoot, '.gitignore');
-      const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
-      const existingRules = new Set(
-        existing
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean),
-      );
-
-      if (existingRules.has(normalizedPattern)) {
-        return { success: true, added: false, pattern: normalizedPattern };
-      }
-
-      const needsLeadingNewline = existing.length > 0 && !existing.endsWith('\n') && !existing.endsWith('\r\n');
-      const nextContent = `${needsLeadingNewline ? '\n' : ''}${normalizedPattern}\n`;
-      fs.appendFileSync(gitignorePath, nextContent, 'utf-8');
-      return { success: true, added: true, pattern: normalizedPattern };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -639,15 +353,6 @@ export function registerGitHandlers({
       gitService.setRepoPath(repoPath);
       const out = await gitService.runCommand(['init']);
       return { success: true, data: out };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle(IpcChannel.GitGetFileTimelineData, async (_event: any, limit?: number) => {
-    try {
-      const commits = await gitService.history.getFileTimelineData(limit);
-      return { success: true, data: commits };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

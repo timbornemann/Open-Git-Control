@@ -1,13 +1,21 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { SettingsTabId } from '@/components/layout/sidebar/AppSidebar.types';
 import type { useAppState } from '@/components/layout/useAppState';
-import type { AppContextValue } from '@/contexts/AppStateContext';
+import type {
+  AppStateSlicesValue,
+  AppStateUIState,
+  GithubContextValue,
+  RepositoryContextValue,
+  SettingsContextValue,
+  UIContextValue,
+  WorkflowContextValue,
+} from '@/contexts/AppStateContext';
 import type { TranslationVariables } from '@/i18n';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
 
-type Params = {
+type CreateAppStateSlicesValueParams = {
   state: AppState;
   selectedGithubAuthHelpMethod: 'pat' | 'device' | 'web' | null;
   setSelectedGithubAuthHelpMethod: Dispatch<SetStateAction<'pat' | 'device' | 'web' | null>>;
@@ -16,21 +24,17 @@ type Params = {
   resetLayout: () => void;
   t: Translate;
   tr: (deText: string, enText: string) => string;
+  uiState: AppStateUIState;
 };
 
-export const createAppContextValue = ({
-  state,
-  selectedGithubAuthHelpMethod,
-  setSelectedGithubAuthHelpMethod,
+const createSettingsSlice = (state: AppState, settingsTab: SettingsTabId, setSettingsTab: Dispatch<SetStateAction<SettingsTabId>>): SettingsContextValue => ({
+  settings: state.settings,
+  onUpdateSettings: state.handleUpdateSettings,
   settingsTab,
-  setSettingsTab,
-  resetLayout,
-  t,
-  tr,
-}: Params): AppContextValue => ({
-  activeTab: state.activeTab,
-  setActiveTab: state.setActiveTab,
+  onSelectSettingsTab: setSettingsTab,
+});
 
+const createRepositorySlice = (state: AppState, tr: (deText: string, enText: string) => string): RepositoryContextValue => ({
   activeRepo: state.activeRepo,
   openRepos: state.openRepos,
   repoMeta: state.repoMeta,
@@ -41,30 +45,20 @@ export const createAppContextValue = ({
   onCloneByUrl: state.handleCloneByUrl,
   onSwitchRepo: state.handleSwitchRepo,
   onCloseRepo: state.handleCloseRepo,
-  isRepoPanelCollapsed: state.isRepoPanelCollapsed,
-  onToggleRepoPanelCollapsed: state.toggleRepoPanelCollapsed,
-
   remoteSync: state.remoteSync,
-  isGitActionRunning: state.isGitActionRunning,
   onRefreshRemoteQuick: () => state.refreshRemoteState(true),
-
   branches: state.branches,
+  currentBranch: state.currentBranch,
   isCreatingBranch: state.isCreatingBranch,
   onSetCreatingBranch: state.setIsCreatingBranch,
   onCreateBranch: state.handleCreateBranch,
   onCheckoutBranch: (name) => state.runGitCommand(['checkout', name], tr(`Ausgecheckt: ${name}`, `Checked out: ${name}`)),
   onSetBranchContextMenu: state.setBranchContextMenu,
-  isBranchPanelCollapsed: state.isBranchPanelCollapsed,
-  onToggleBranchPanelCollapsed: state.toggleBranchPanelCollapsed,
-
   tags: state.tags,
   onCreateTag: state.handleCreateTag,
   onPushTags: state.handlePushTags,
   onDeleteTag: state.handleDeleteTag,
   onSelectTag: state.handleSelectTag,
-  isTagPanelCollapsed: state.isTagPanelCollapsed,
-  onToggleTagPanelCollapsed: state.toggleTagPanelCollapsed,
-
   remotes: state.remotes,
   remoteStatus: state.remoteStatus,
   onAddRemote: state.handleAddRemote,
@@ -73,16 +67,10 @@ export const createAppContextValue = ({
   onSetRemoteUrl: state.handleSetRemoteUrl,
   onRefreshRemote: () => state.refreshRemoteState(true),
   onSetUpstreamForCurrentBranch: state.handleSetUpstreamForCurrentBranch,
-  isRemotePanelCollapsed: state.isRemotePanelCollapsed,
-  onToggleRemotePanelCollapsed: state.toggleRemotePanelCollapsed,
-
   submodules: state.submodules,
   onSubmoduleInitUpdate: state.handleSubmoduleInitUpdate,
   onSubmoduleSync: state.handleSubmoduleSync,
   onOpenSubmodule: state.handleOpenSubmodule,
-  isSubmodulePanelCollapsed: state.isSubmodulePanelCollapsed,
-  onToggleSubmodulePanelCollapsed: state.toggleSubmodulePanelCollapsed,
-
   hasRemoteOrigin: state.hasRemoteOrigin,
   forceGithubRepoCreationPrompt: state.forceGithubRepoCreationPrompt,
   isConnectingGithubRepo: state.isConnectingGithubRepo,
@@ -94,7 +82,24 @@ export const createAppContextValue = ({
   newRepoPrivate: state.newRepoPrivate,
   setNewRepoPrivate: state.setNewRepoPrivate,
   onCreateGithubRepoForCurrent: state.handleCreateGithubRepoForCurrent,
+  selectedCommit: state.selectedCommit,
+  setSelectedCommit: state.setSelectedCommit,
+  commitNavigationRequest: state.commitNavigationRequest,
+  onNavigateToCommit: state.onNavigateToCommit,
+  refreshTrigger: state.refreshTrigger,
+  triggerRefresh: state.triggerRefresh,
+  commitRefreshTrigger: state.commitRefreshTrigger,
+  triggerCommitRefresh: state.triggerCommitRefresh,
+  showSecondaryHistory: state.settings.showSecondaryHistory,
+  onMergeBranch: state.handleMergeBranch,
+  onOpenRepoWorkspace: () => state.setActiveTab('repo'),
+});
 
+const createGithubSlice = (
+  state: AppState,
+  selectedGithubAuthHelpMethod: 'pat' | 'device' | 'web' | null,
+  setSelectedGithubAuthHelpMethod: Dispatch<SetStateAction<'pat' | 'device' | 'web' | null>>,
+): GithubContextValue => ({
   isAuthenticated: state.isAuthenticated,
   tokenInput: state.tokenInput,
   setTokenInput: state.setTokenInput,
@@ -113,7 +118,6 @@ export const createAppContextValue = ({
   onStartWebFlowLogin: state.handleStartWebFlowLogin,
   selectedGithubAuthHelpMethod,
   onSelectGithubAuthHelpMethod: setSelectedGithubAuthHelpMethod,
-
   githubUser: state.githubUser,
   githubRepos: state.githubRepos,
   githubReposHasMore: state.githubReposHasMore,
@@ -125,7 +129,6 @@ export const createAppContextValue = ({
   onClone: state.handleClone,
   onForkByUrl: state.handleForkByUrl,
   isCloning: state.isCloning,
-
   prOwnerRepo: state.prOwnerRepo,
   prFilter: state.prFilter,
   setPrFilter: state.setPrFilter,
@@ -136,10 +139,8 @@ export const createAppContextValue = ({
   onCopyPRUrl: state.handleCopyPRUrl,
   onCheckoutPR: state.handleCheckoutPR,
   onMergePR: state.handleMergePR,
-
   showCreatePR: state.showCreatePR,
   setShowCreatePR: state.setShowCreatePR,
-  currentBranch: state.currentBranch,
   setNewPRHead: state.setNewPRHead,
   newPRTitle: state.newPRTitle,
   setNewPRTitle: state.setNewPRTitle,
@@ -150,37 +151,31 @@ export const createAppContextValue = ({
   newPRBase: state.newPRBase,
   setNewPRBase: state.setNewPRBase,
   onCreatePR: state.handleCreatePR,
-
   releaseForm: state.releaseForm,
   setReleaseForm: state.setReleaseForm,
   releaseSubmitting: state.releaseSubmitting,
   releaseError: state.releaseError,
   releaseSuccess: state.releaseSuccess,
   onCreateRelease: state.handleCreateRelease,
+  showReleaseCreator: state.showReleaseCreator,
+  onOpenReleaseCreator: state.openReleaseCreator,
+  onCloseReleaseCreator: state.closeReleaseCreator,
+  releaseContextLoading: state.releaseContextLoading,
+  releaseContextError: state.releaseContextError,
+  releaseContext: state.releaseContext,
+  onRefreshReleaseContext: state.refreshReleaseContext,
+  onGenerateReleaseNotes: state.generateReleaseNotesWithAI,
+  releaseNotesGenerating: state.releaseNotesGenerating,
+  releaseNotesLanguage: state.releaseNotesLanguage,
+  setReleaseNotesLanguage: state.setReleaseNotesLanguage,
+  releaseNotesOptions: state.releaseNotesOptions,
+  setReleaseNotesOptions: (updater) => state.setReleaseNotesOptions(updater),
+});
 
-  settings: state.settings,
-  onUpdateSettings: state.handleUpdateSettings,
-  jobs: state.jobs,
-  onClearJobs: state.clearJobs,
-  settingsTab,
-  onSelectSettingsTab: setSettingsTab,
-
-  onClearGithubAuthHelpMethod: () => setSelectedGithubAuthHelpMethod(null),
-  onResetLayout: resetLayout,
-
+const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string, enText: string) => string): WorkflowContextValue => ({
+  isGitActionRunning: state.isGitActionRunning,
   activeGitActionLabel: state.activeGitActionLabel,
   runGitCommand: state.runGitCommand,
-
-  selectedCommit: state.selectedCommit,
-  setSelectedCommit: state.setSelectedCommit,
-  commitNavigationRequest: state.commitNavigationRequest,
-  onNavigateToCommit: state.onNavigateToCommit,
-  refreshTrigger: state.refreshTrigger,
-  triggerRefresh: state.triggerRefresh,
-  commitRefreshTrigger: state.commitRefreshTrigger,
-  triggerCommitRefresh: state.triggerCommitRefresh,
-  showSecondaryHistory: state.settings.showSecondaryHistory,
-
   onFetch: () => state.refreshRemoteState(true),
   onPull: () => state.runGitCommand(['pull'], t('generated.app.pull_completed_successfully_a760cd36'), t('generated.app.running_pull_282e1a76')),
   onPullRebase: () =>
@@ -204,6 +199,7 @@ export const createAppContextValue = ({
       t('generated.app.push_with_force_with_lease_completed_successfully_a27c0ef4'),
       t('generated.app.running_push_force_with_lease_590e0aba'),
     ),
+  onPushTags: state.handlePushTags,
   onPushSetUpstream: () => {
     const branch = state.currentBranch;
     if (!branch) return;
@@ -213,23 +209,8 @@ export const createAppContextValue = ({
       'Push -u...',
     );
   },
-  onMergeBranch: state.handleMergeBranch,
-  onOpenRepoWorkspace: () => state.setActiveTab('repo'),
-
-  showReleaseCreator: state.showReleaseCreator,
-  onOpenReleaseCreator: state.openReleaseCreator,
-  onCloseReleaseCreator: state.closeReleaseCreator,
-  releaseContextLoading: state.releaseContextLoading,
-  releaseContextError: state.releaseContextError,
-  releaseContext: state.releaseContext,
-  onRefreshReleaseContext: state.refreshReleaseContext,
-  onGenerateReleaseNotes: state.generateReleaseNotesWithAI,
-  releaseNotesGenerating: state.releaseNotesGenerating,
-  releaseNotesLanguage: state.releaseNotesLanguage,
-  setReleaseNotesLanguage: state.setReleaseNotesLanguage,
-  releaseNotesOptions: state.releaseNotesOptions,
-  setReleaseNotesOptions: (updater) => state.setReleaseNotesOptions(updater),
-
+  jobs: state.jobs,
+  onClearJobs: state.clearJobs,
   autoOpenConflictResolverPath: state.autoOpenConflictResolverPath,
   onAutoOpenConflictResolverConsumed: state.clearAutoOpenConflictResolverPath,
   onOpenConflictResolverForPath: state.openConflictResolverForPath,
@@ -245,4 +226,50 @@ export const createAppContextValue = ({
   onConflictRebaseAbort: () => {
     void state.runGitCommand(['rebaseAbort'], t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
   },
+});
+
+const createUiSlice = ({
+  state,
+  setSelectedGithubAuthHelpMethod,
+  resetLayout,
+  uiState,
+}: Pick<CreateAppStateSlicesValueParams, 'state' | 'setSelectedGithubAuthHelpMethod' | 'resetLayout' | 'uiState'>): UIContextValue => ({
+  activeTab: state.activeTab,
+  setActiveTab: state.setActiveTab,
+  onClearGithubAuthHelpMethod: () => setSelectedGithubAuthHelpMethod(null),
+  onResetLayout: resetLayout,
+  isRepoPanelCollapsed: state.isRepoPanelCollapsed,
+  onToggleRepoPanelCollapsed: state.toggleRepoPanelCollapsed,
+  isBranchPanelCollapsed: state.isBranchPanelCollapsed,
+  onToggleBranchPanelCollapsed: state.toggleBranchPanelCollapsed,
+  isTagPanelCollapsed: state.isTagPanelCollapsed,
+  onToggleTagPanelCollapsed: state.toggleTagPanelCollapsed,
+  isRemotePanelCollapsed: state.isRemotePanelCollapsed,
+  onToggleRemotePanelCollapsed: state.toggleRemotePanelCollapsed,
+  isSubmodulePanelCollapsed: state.isSubmodulePanelCollapsed,
+  onToggleSubmodulePanelCollapsed: state.toggleSubmodulePanelCollapsed,
+  ...uiState,
+});
+
+export const createAppStateSlicesValue = ({
+  state,
+  selectedGithubAuthHelpMethod,
+  setSelectedGithubAuthHelpMethod,
+  settingsTab,
+  setSettingsTab,
+  resetLayout,
+  t,
+  tr,
+  uiState,
+}: CreateAppStateSlicesValueParams): AppStateSlicesValue => ({
+  settings: createSettingsSlice(state, settingsTab, setSettingsTab),
+  repository: createRepositorySlice(state, tr),
+  github: createGithubSlice(state, selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod),
+  workflow: createWorkflowSlice(state, t, tr),
+  ui: createUiSlice({
+    state,
+    setSelectedGithubAuthHelpMethod,
+    resetLayout,
+    uiState,
+  }),
 });

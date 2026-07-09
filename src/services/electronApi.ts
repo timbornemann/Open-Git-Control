@@ -23,36 +23,29 @@ export const requireElectronApi = (): ElectronAPI => {
 };
 
 export const requireElectronGitApi = (): ElectronGitAPI => {
-  const api = requireElectronApi();
-  return api.git ?? (api as unknown as ElectronGitAPI);
+  return requireElectronApi().git;
 };
 
 export const requireElectronGithubApi = (): ElectronGithubAPI => {
-  const api = requireElectronApi();
-  return api.github ?? (api as unknown as ElectronGithubAPI);
+  return requireElectronApi().github;
 };
 
 export const requireElectronPlannerApi = (): ElectronPlannerAPI => {
-  const api = requireElectronApi();
-  return api.planner ?? (api as unknown as ElectronPlannerAPI);
+  return requireElectronApi().planner;
 };
 
 export const requireElectronSettingsApi = (): ElectronSettingsAPI => {
-  const api = requireElectronApi();
-  return api.settings ?? (api as unknown as ElectronSettingsAPI);
+  return requireElectronApi().settings;
 };
 
 export const requireElectronAppApi = (): ElectronAppAPI => {
-  const api = requireElectronApi();
-  return api.app ?? (api as unknown as ElectronAppAPI);
+  return requireElectronApi().app;
 };
 
 export const requireElectronAiApi = (): ElectronAiAPI => {
-  const api = requireElectronApi();
-  return api.ai ?? (api as unknown as ElectronAiAPI);
+  return requireElectronApi().ai;
 };
 
 export const requireElectronReposApi = (): ElectronReposAPI => {
-  const api = requireElectronApi();
-  return api.repos ?? (api as unknown as ElectronReposAPI);
+  return requireElectronApi().repos;
 };
