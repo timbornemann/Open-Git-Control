@@ -1,6 +1,5 @@
-import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from './PrivateTempFiles';
 
 export type CommitMessageInput = {
   title: string;
@@ -17,35 +16,6 @@ const MAX_COMMIT_MESSAGE_FILE_LENGTH = 100_000;
 export class CommitService {
   constructor(private readonly executeGit: ExecuteGitCommand) {}
 
-  private createPrivateTempDir(prefix: string): string {
-    const safePrefix = String(prefix || 'ogc-temp-').replace(/[^a-z0-9_-]/gi, '-') || 'ogc-temp-';
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), safePrefix.endsWith('-') ? safePrefix : `${safePrefix}-`));
-    try {
-      fs.chmodSync(tempDir, 0o700);
-    } catch {
-      // Some platforms ignore chmod for temp directories.
-    }
-    return tempDir;
-  }
-
-  private writePrivateTempFile(filePath: string, content: string): void {
-    fs.writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
-    try {
-      fs.chmodSync(filePath, 0o600);
-    } catch {
-      // Some platforms ignore chmod for temp files.
-    }
-  }
-
-  private cleanupPrivateTempDir(tempDir: string | null): void {
-    if (!tempDir) return;
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      // Best-effort cleanup: the directory is private and will be retried by the OS temp cleaner.
-    }
-  }
-
   private normalizePathspecEntries(paths: string[]): string[] {
     const normalized = [...new Set(paths.map((filePath) => String(filePath || '').trim()).filter(Boolean))];
     if (normalized.some((filePath) => /[\0\r\n]/.test(filePath))) {
@@ -60,9 +30,9 @@ export class CommitService {
       throw new Error('At least one path is required.');
     }
 
-    const tempDir = this.createPrivateTempDir(tempPrefix);
+    const tempDir = createPrivateTempDir(tempPrefix);
     const pathspecFile = path.join(tempDir, 'paths.nul');
-    this.writePrivateTempFile(pathspecFile, `${entries.join('\0')}\0`);
+    writePrivateTempFile(pathspecFile, `${entries.join('\0')}\0`);
     return { tempDir, pathspecFile };
   }
 
@@ -83,9 +53,9 @@ export class CommitService {
       throw new Error('Commit message is too long.');
     }
 
-    const tempDir = this.createPrivateTempDir('ogc-commit-message-');
+    const tempDir = createPrivateTempDir('ogc-commit-message-');
     const messageFile = path.join(tempDir, 'message.txt');
-    this.writePrivateTempFile(messageFile, message);
+    writePrivateTempFile(messageFile, message);
     let pathspecTempDir: string | null = null;
 
     const args = ['commit'];
@@ -102,8 +72,8 @@ export class CommitService {
     try {
       return await this.executeGit(normalizedPath, args);
     } finally {
-      this.cleanupPrivateTempDir(tempDir);
-      this.cleanupPrivateTempDir(pathspecTempDir);
+      cleanupPrivateTempDir(tempDir);
+      cleanupPrivateTempDir(pathspecTempDir);
     }
   }
 
@@ -128,7 +98,7 @@ export class CommitService {
     try {
       return await this.executeGit(normalizedPath, [commandName, `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
     } finally {
-      this.cleanupPrivateTempDir(pathspec.tempDir);
+      cleanupPrivateTempDir(pathspec.tempDir);
     }
   }
 }

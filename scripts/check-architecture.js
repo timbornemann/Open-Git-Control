@@ -21,7 +21,6 @@ const maxLineExceptions = new Map([
   ['electron/git/GitRunner.ts', 'Core Git process runner; requires dedicated refactor because it owns process policy.'],
   ['src/styles/commit-graph.css', 'Legacy commit graph stylesheet; split with commit graph module cleanup.'],
   ['electron/ai/AiAutoCommitRunner.ts', 'AI auto-commit orchestration hotspot; split as part of AI workflow refactor.'],
-  ['electron/GitService.ts', 'Legacy Git facade; split by command family after GitRunner policy extraction.'],
   ['src/utils/gitParsing.ts', 'Legacy parser collection; split into branch, status and conflict parsers.'],
   ['src/styles/diff-viewer.css', 'Legacy diff viewer stylesheet; split with diff viewer module cleanup.'],
   ['electron/__tests__/GitService.test.ts', 'Large service test suite; split by Git service capability groups.'],

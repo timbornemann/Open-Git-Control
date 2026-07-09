@@ -1,12 +1,15 @@
 import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
 import { GitScheduler } from './GitScheduler';
+import { shouldSuppressBareWorkTreeCommand } from './git/BareRepositoryPolicy';
 import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
+import { MergeConflictService } from './git/MergeConflictService';
+import { RebaseService } from './git/RebaseService';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
+import { StashService } from './git/StashService';
+import { SubmoduleService } from './git/SubmoduleService';
 
 export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
@@ -21,6 +24,10 @@ export class GitService {
   private readonly historyService: HistoryService;
   private readonly repositoryFiles: RepositoryFiles;
   private readonly cloneService: CloneService;
+  private readonly mergeConflictService: MergeConflictService;
+  private readonly rebaseService: RebaseService;
+  private readonly stashService: StashService;
+  private readonly submoduleService: SubmoduleService;
 
   constructor(execFileAsyncRunner: ExecFileAsyncRunner = defaultExecFileAsyncRunner, scheduler: GitScheduler = new GitScheduler()) {
     this.gitRunner = new GitRunner(execFileAsyncRunner, scheduler);
@@ -34,35 +41,14 @@ export class GitService {
       (revisionSpec, maxBytes) => this.readGitFileBuffer(revisionSpec, maxBytes),
     );
     this.cloneService = new CloneService(this.gitRunner);
-  }
-
-  private createPrivateTempDir(prefix: string): string {
-    const safePrefix = String(prefix || 'ogc-temp-').replace(/[^a-z0-9_-]/gi, '-') || 'ogc-temp-';
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), safePrefix.endsWith('-') ? safePrefix : `${safePrefix}-`));
-    try {
-      fs.chmodSync(tempDir, 0o700);
-    } catch {
-      // Some platforms ignore chmod for temp directories.
-    }
-    return tempDir;
-  }
-
-  private writePrivateTempFile(filePath: string, content: string): void {
-    fs.writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
-    try {
-      fs.chmodSync(filePath, 0o600);
-    } catch {
-      // Some platforms ignore chmod for temp files.
-    }
-  }
-
-  private cleanupPrivateTempDir(tempDir: string | null): void {
-    if (!tempDir) return;
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch {
-      // Best-effort cleanup: the directory is private and will be retried by the OS temp cleaner.
-    }
+    this.mergeConflictService = new MergeConflictService(
+      () => this.ensureRepoPath(),
+      (args) => this.runCommand(args),
+      this.gitRunner,
+    );
+    this.rebaseService = new RebaseService(() => this.ensureRepoPath(), this.gitRunner);
+    this.stashService = new StashService((args) => this.runCommand(args));
+    this.submoduleService = new SubmoduleService((args) => this.runCommand(args));
   }
 
   setRepoPath(newPath: string) {
@@ -132,36 +118,6 @@ export class GitService {
     return this.repoIsBare;
   }
 
-  private shouldSuppressBareWorkTreeCommand(args: string[]): boolean {
-    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
-    const primary = String(commandArgs?.[0] || '')
-      .trim()
-      .toLowerCase();
-    if (!primary) return false;
-
-    if (primary === 'status') {
-      return true;
-    }
-
-    if (primary === 'diff') {
-      return commandArgs.some(
-        (arg) =>
-          String(arg || '')
-            .trim()
-            .toLowerCase() === '--numstat',
-      );
-    }
-
-    if (primary === 'submodule') {
-      const secondary = String(commandArgs?.[1] || '')
-        .trim()
-        .toLowerCase();
-      return secondary === 'status';
-    }
-
-    return false;
-  }
-
   private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
     const repoPath = this.ensureRepoPath();
     return this.gitRunner.runBuffer(repoPath, ['show', revisionSpec], {
@@ -177,7 +133,7 @@ export class GitService {
    */
   async runCommand(args: string[]): Promise<string> {
     const repoPath = this.ensureRepoPath();
-    if (this.isCurrentRepositoryBare(repoPath) && this.shouldSuppressBareWorkTreeCommand(args)) {
+    if (this.isCurrentRepositoryBare(repoPath) && shouldSuppressBareWorkTreeCommand(args)) {
       return '';
     }
     return this.gitRunner.run(repoPath, args);
@@ -256,14 +212,14 @@ export class GitService {
    * Nimmt bei einer Konfliktdatei die lokale (ours) oder entfernte (theirs) Variante.
    */
   async checkoutConflictVersion(filePath: string, side: 'ours' | 'theirs'): Promise<string> {
-    return this.runCommand(['checkout', '--' + side, '--', filePath]);
+    return this.mergeConflictService.checkoutConflictVersion(filePath, side);
   }
 
   /**
    * Markiert eine Datei nach Konfliktaufloesung als geloest (staged).
    */
   async addFile(filePath: string): Promise<string> {
-    return this.runCommand(['add', '--', filePath]);
+    return this.mergeConflictService.markFileResolved(filePath);
   }
 
   /**
@@ -292,85 +248,35 @@ export class GitService {
    * Setzt einen laufenden Merge nach Konfliktaufloesung fort.
    */
   async continueMerge(): Promise<string> {
-    const repoPath = this.ensureRepoPath();
-    return this.gitRunner.run(repoPath, ['merge', '--continue'], {
-      envOverrides: {
-        GIT_EDITOR: 'true',
-        GIT_MERGE_AUTOEDIT: 'no',
-      },
-    });
+    return this.mergeConflictService.continueMerge();
   }
 
   /**
    * Bricht einen laufenden Merge ab.
    */
   async abortMerge(): Promise<string> {
-    return this.runCommand(['merge', '--abort']);
+    return this.mergeConflictService.abortMerge();
   }
 
   /**
    * Setzt einen laufenden Rebase nach Konfliktaufloesung fort.
    */
   async continueRebase(): Promise<string> {
-    const repoPath = this.ensureRepoPath();
-    return this.gitRunner.run(repoPath, ['rebase', '--continue'], {
-      envOverrides: {
-        GIT_EDITOR: 'true',
-      },
-    });
+    return this.rebaseService.continueRebase();
   }
 
   /**
    * Bricht einen laufenden Rebase ab.
    */
   async abortRebase(): Promise<string> {
-    return this.runCommand(['rebase', '--abort']);
+    return this.rebaseService.abortRebase();
   }
 
   /**
    * Startet einen interaktiven Rebase mit einer vorgegebenen Todo-Liste.
    */
   async startInteractiveRebase(baseHash: string, todoLines: string[]): Promise<string> {
-    const repoPath = this.ensureRepoPath();
-    const normalizedBase = (baseHash || '').trim();
-    if (!normalizedBase) {
-      throw new Error('Base commit hash is required for interactive rebase.');
-    }
-
-    const normalizedLines = Array.isArray(todoLines) ? todoLines.map((line) => String(line || '').trim()).filter(Boolean) : [];
-
-    if (normalizedLines.length === 0) {
-      throw new Error('At least one rebase todo line is required.');
-    }
-
-    const todoText = normalizedLines.join('\n') + '\n';
-    const tempDir = this.createPrivateTempDir('ogc-rebase-editor-');
-    const helperPath = path.join(tempDir, 'editor.js');
-    const helperScript = [
-      "const fs = require('fs');",
-      'const target = process.argv[2];',
-      'if (!target) process.exit(1);',
-      "const raw = process.env.OGC_REBASE_TODO_B64 || '';",
-      "const content = Buffer.from(raw, 'base64').toString('utf8');",
-      "fs.writeFileSync(target, content, 'utf8');",
-    ].join('\n');
-
-    this.writePrivateTempFile(helperPath, helperScript);
-
-    const quotedNode = `\"${process.execPath.replace(/\"/g, '\\\"')}\"`;
-    const quotedHelper = `\"${helperPath.replace(/\"/g, '\\\"')}\"`;
-
-    try {
-      return await this.gitRunner.run(repoPath, ['rebase', '-i', normalizedBase], {
-        envOverrides: {
-          GIT_SEQUENCE_EDITOR: `${quotedNode} ${quotedHelper}`,
-          OGC_REBASE_TODO_B64: Buffer.from(todoText, 'utf8').toString('base64'),
-        },
-        requestedKind: 'write',
-      });
-    } finally {
-      this.cleanupPrivateTempDir(tempDir);
-    }
+    return this.rebaseService.startInteractiveRebase(baseHash, todoLines);
   }
 
   async commitWithMessage(input: CommitMessageInput): Promise<string> {
@@ -424,41 +330,23 @@ export class GitService {
   }
 
   async getStashes(limit: number = 200): Promise<string> {
-    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
-    return this.runCommand(['stash', 'list', `--max-count=${safeLimit}`]);
+    return this.stashService.getStashes(limit);
   }
 
   async createBranchFromStash(stashName: string, branchName: string): Promise<string> {
-    const normalizedStashName = String(stashName || '').trim();
-    const normalizedBranchName = String(branchName || '').trim();
-    if (!normalizedStashName) {
-      throw new Error('Stash name is required.');
-    }
-    if (!normalizedBranchName) {
-      throw new Error('Branch name is required.');
-    }
-
-    await this.runCommand(['check-ref-format', '--branch', normalizedBranchName]);
-    return this.runCommand(['stash', 'branch', normalizedBranchName, normalizedStashName]);
+    return this.stashService.createBranchFromStash(stashName, branchName);
   }
 
   async getSubmoduleStatus(): Promise<string> {
-    try {
-      return await this.runCommand(['submodule', 'status', '--recursive']);
-    } catch (error: any) {
-      if (/no submodule mapping found in \.gitmodules for path/i.test(String(error?.message || ''))) {
-        return '';
-      }
-      throw error;
-    }
+    return this.submoduleService.getSubmoduleStatus();
   }
 
   async updateSubmodulesInitRecursive(): Promise<string> {
-    return this.runCommand(['submodule', 'update', '--init', '--recursive']);
+    return this.submoduleService.updateInitRecursive();
   }
 
   async syncSubmodulesRecursive(): Promise<string> {
-    return this.runCommand(['submodule', 'sync', '--recursive']);
+    return this.submoduleService.syncRecursive();
   }
 
   /**
