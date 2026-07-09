@@ -36,66 +36,77 @@ export function assertAllowedGitCommand(commandName: unknown): asserts commandNa
   }
 }
 
-export function validateCommandArgs(commandName: GitCommandName, args: string[]): void {
-  const max = MAX_ARGS_BY_GIT_COMMAND[commandName];
-  if (typeof max === 'number' && args.length > max) {
-    throw new Error('Too many args for git ' + commandName + '.');
-  }
-
-  if (commandName === 'log' && args.length >= 1) {
+const validateLogArgs = (args: string[]): void => {
+  if (args.length >= 1) {
     const parsedLimit = Number(args[0]);
     if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 5000) {
       throw new Error('Invalid log limit.');
     }
   }
 
-  if (commandName === 'log' && args.length >= 2) {
+  if (args.length >= 2) {
     const scope = args[1];
     if (scope !== 'all' && scope !== 'head') {
       throw new Error('Invalid log scope.');
     }
   }
 
-  if (commandName === 'log' && args.length >= 3) {
+  if (args.length >= 3) {
     const parsedOffset = Number(args[2]);
     if (!Number.isFinite(parsedOffset) || parsedOffset < 0 || parsedOffset > 50000) {
       throw new Error('Invalid log offset.');
     }
   }
+};
 
-  if (commandName === 'reflog' && args.length >= 1) {
-    const parsedLimit = Number(args[0]);
-    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
-      throw new Error('Invalid reflog limit.');
-    }
+const validateReflogArgs = (args: string[]): void => {
+  if (args.length < 1) return;
+
+  const parsedLimit = Number(args[0]);
+  if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 1000) {
+    throw new Error('Invalid reflog limit.');
+  }
+};
+
+const validateForensicHistoryArgs = (args: string[]): void => {
+  const searchType = args[0];
+  const targetPath = args[1];
+  if (!searchType || !['string', 'regex', 'line'].includes(searchType)) {
+    throw new Error('Invalid forensic search type.');
+  }
+  if (!targetPath) {
+    throw new Error('Forensic path is required.');
   }
 
-  if (commandName === 'forensicHistory') {
-    const searchType = args[0];
-    const targetPath = args[1];
-    if (!searchType || !['string', 'regex', 'line'].includes(searchType)) {
-      throw new Error('Invalid forensic search type.');
-    }
-    if (!targetPath) {
-      throw new Error('Forensic path is required.');
-    }
-
-    const parsedLimit = Number(args[5] || '200');
-    if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 500) {
-      throw new Error('Invalid forensic limit.');
-    }
-
-    if (searchType === 'line') {
-      const parsedStart = Number(args[3]);
-      const parsedEnd = Number(args[4]);
-      if (!Number.isFinite(parsedStart) || parsedStart < 1) {
-        throw new Error('Invalid forensic start line.');
-      }
-      if (!Number.isFinite(parsedEnd) || parsedEnd < parsedStart) {
-        throw new Error('Invalid forensic end line.');
-      }
-    } else if (!args[2]) {
-      throw new Error('Forensic search term is required.');
-    }
+  const parsedLimit = Number(args[5] || '200');
+  if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || parsedLimit > 500) {
+    throw new Error('Invalid forensic limit.');
   }
+
+  if (searchType === 'line') {
+    const parsedStart = Number(args[3]);
+    const parsedEnd = Number(args[4]);
+    if (!Number.isFinite(parsedStart) || parsedStart < 1) {
+      throw new Error('Invalid forensic start line.');
+    }
+    if (!Number.isFinite(parsedEnd) || parsedEnd < parsedStart) {
+      throw new Error('Invalid forensic end line.');
+    }
+    return;
+  }
+
+  if (!args[2]) {
+    throw new Error('Forensic search term is required.');
+  }
+};
+
+export function validateCommandArgs(commandName: GitCommandName, args: string[]): void {
+  const max = MAX_ARGS_BY_GIT_COMMAND[commandName];
+  if (typeof max === 'number' && args.length > max) {
+    throw new Error('Too many args for git ' + commandName + '.');
+  }
+
+  if (commandName === 'log') validateLogArgs(args);
+  if (commandName === 'reflog') validateReflogArgs(args);
+  if (commandName === 'forensicHistory') validateForensicHistoryArgs(args);
 }

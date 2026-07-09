@@ -3,15 +3,9 @@ const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const reactHooksPlugin = require('eslint-plugin-react-hooks');
 
 const complexityExceptionFiles = [
-  'electron/ai/AiAutoCommitRunner.ts',
-  'electron/main-process/gitCommandPolicy.ts',
-  'electron/main-process/planningApiServer.ts',
   'src/components/commit-graph/useCommitGraphData.ts',
   'src/components/layout/ApiMcpSettingsPanel.tsx',
   'src/components/layout/workflows/useBareRepoRecoveryWorkflow.ts',
-  'src/components/layout/workflows/useGitCommandGuardWorkflow.ts',
-  'src/components/layout/workflows/useReleaseWorkflow.ts',
-  'src/components/layout/workflows/useRemoteRecoveryWorkflow.ts',
   'src/components/release-creator/ReleaseCreator.tsx',
   'src/components/staging-area/ConflictResolverPanel.tsx',
   'src/components/staging-area/StagingCommitPanel.tsx',

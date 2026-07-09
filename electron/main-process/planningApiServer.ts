@@ -19,16 +19,16 @@ import { MCP_TOOLS, callMcpTool, handleMcpRpc } from './mcpServer';
 
 export type { PlanningApiServerHandle };
 
-const routeApi = async (ctx: RequestContext): Promise<unknown> => {
-  const [root, resource, idOrAction, nested] = ctx.segments;
-  if (root !== 'api') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+type RouteResult = { handled: false } | { handled: true; value: unknown };
 
-  if (!resource) {
-    return apiIndex(ctx.baseUrl);
-  }
+const unhandledRoute = (): RouteResult => ({ handled: false });
 
-  if (resource === 'health' && ctx.method === 'GET') {
-    return {
+const handleHealthRoute = (ctx: RequestContext, resource: string): RouteResult => {
+  if (resource !== 'health' || ctx.method !== 'GET') return unhandledRoute();
+
+  return {
+    handled: true,
+    value: {
       name: SERVER_NAME,
       status: 'ok',
       baseUrl: `${ctx.baseUrl}/api/`,
@@ -40,8 +40,69 @@ const routeApi = async (ctx: RequestContext): Promise<unknown> => {
       },
       statuses: PLANNER_STATUSES,
       priorities: PLANNER_PRIORITIES,
-    };
+    },
+  };
+};
+
+const handleTabsRoute = (ctx: RequestContext, resource: string | undefined, idOrAction: string | undefined, nested: string | undefined): RouteResult => {
+  if (resource !== 'tabs') return unhandledRoute();
+  if (!idOrAction && ctx.method === 'GET') return { handled: true, value: getTabs() };
+  if (idOrAction && nested === 'todos' && ctx.method === 'GET') {
+    return { handled: true, value: { todos: getTodos(queryOptionsFromUrl(ctx.url, { status: parseStatus(idOrAction, 'tab') })) } };
   }
+  if (idOrAction && nested === 'todos' && ctx.method === 'POST') {
+    const project = resolveProjectLocator(ctx.body);
+    const item = createPlannerItem(project.id, itemInputFromBody(ctx.body, parseStatus(idOrAction, 'tab')));
+    return { handled: true, value: getTodoById(item.id) };
+  }
+  return unhandledRoute();
+};
+
+const handleRepositoriesRoute = (ctx: RequestContext, resource: string | undefined, idOrAction: string | undefined): RouteResult => {
+  if (resource !== 'repositories') return unhandledRoute();
+  if (!idOrAction && ctx.method === 'GET') return { handled: true, value: { repositories: getRepositories() } };
+  if (idOrAction === 'ensure' && ctx.method === 'POST') {
+    return { handled: true, value: ensureRepositoryProject(cleanString(ctx.body.repoPath)) };
+  }
+  if (idOrAction === 'todos' && ctx.method === 'GET') {
+    return { handled: true, value: { todos: getTodos(queryOptionsFromUrl(ctx.url, { kind: 'repository' })) } };
+  }
+  return unhandledRoute();
+};
+
+const handleAgentRoute = (ctx: RequestContext, resource: string | undefined, idOrAction: string | undefined): RouteResult => {
+  if (resource === 'agent' && idOrAction === 'next' && ctx.method === 'GET') {
+    return { handled: true, value: { todos: getTodos(queryOptionsFromUrl(ctx.url, { includeDone: false, limit: 20 })) } };
+  }
+  return unhandledRoute();
+};
+
+const handleMcpToolsRoute = async (
+  ctx: RequestContext,
+  resource: string | undefined,
+  idOrAction: string | undefined,
+  nested: string | undefined,
+): Promise<RouteResult> => {
+  if (resource !== 'mcp' || idOrAction !== 'tools') return unhandledRoute();
+  if (!nested && ctx.method === 'GET') return { handled: true, value: { tools: MCP_TOOLS } };
+  if (nested === 'call' && ctx.method === 'POST') {
+    const name = cleanString(ctx.body.name);
+    const args = (ctx.body.arguments && typeof ctx.body.arguments === 'object' ? ctx.body.arguments : {}) as JsonObject;
+    return { handled: true, value: await callMcpTool(name, args) };
+  }
+  return unhandledRoute();
+};
+
+const routeApi = async (ctx: RequestContext): Promise<unknown> => {
+  const [root, resource, idOrAction, nested] = ctx.segments;
+  if (root !== 'api') throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
+
+  if (!resource) {
+    return apiIndex(ctx.baseUrl);
+  }
+
+  const healthRoute = handleHealthRoute(ctx, resource);
+  if (healthRoute.handled) return healthRoute.value;
 
   if (resource === 'openapi.json' && ctx.method === 'GET') {
     return openApiSpec(ctx.baseUrl);
@@ -53,40 +114,17 @@ const routeApi = async (ctx: RequestContext): Promise<unknown> => {
   const todosRoute = await handleTodosRoute(ctx);
   if (todosRoute.handled) return todosRoute.value;
 
-  if (resource === 'tabs') {
-    if (!idOrAction && ctx.method === 'GET') return getTabs();
-    if (idOrAction && nested === 'todos' && ctx.method === 'GET') {
-      return { todos: getTodos(queryOptionsFromUrl(ctx.url, { status: parseStatus(idOrAction, 'tab') })) };
-    }
-    if (idOrAction && nested === 'todos' && ctx.method === 'POST') {
-      const project = resolveProjectLocator(ctx.body);
-      const item = createPlannerItem(project.id, itemInputFromBody(ctx.body, parseStatus(idOrAction, 'tab')));
-      return getTodoById(item.id);
-    }
-  }
+  const tabsRoute = handleTabsRoute(ctx, resource, idOrAction, nested);
+  if (tabsRoute.handled) return tabsRoute.value;
 
-  if (resource === 'repositories') {
-    if (!idOrAction && ctx.method === 'GET') return { repositories: getRepositories() };
-    if (idOrAction === 'ensure' && ctx.method === 'POST') {
-      return ensureRepositoryProject(cleanString(ctx.body.repoPath));
-    }
-    if (idOrAction === 'todos' && ctx.method === 'GET') {
-      return { todos: getTodos(queryOptionsFromUrl(ctx.url, { kind: 'repository' })) };
-    }
-  }
+  const repositoriesRoute = handleRepositoriesRoute(ctx, resource, idOrAction);
+  if (repositoriesRoute.handled) return repositoriesRoute.value;
 
-  if (resource === 'agent' && idOrAction === 'next' && ctx.method === 'GET') {
-    return { todos: getTodos(queryOptionsFromUrl(ctx.url, { includeDone: false, limit: 20 })) };
-  }
+  const agentRoute = handleAgentRoute(ctx, resource, idOrAction);
+  if (agentRoute.handled) return agentRoute.value;
 
-  if (resource === 'mcp' && idOrAction === 'tools') {
-    if (!nested && ctx.method === 'GET') return { tools: MCP_TOOLS };
-    if (nested === 'call' && ctx.method === 'POST') {
-      const name = cleanString(ctx.body.name);
-      const args = (ctx.body.arguments && typeof ctx.body.arguments === 'object' ? ctx.body.arguments : {}) as JsonObject;
-      return callMcpTool(name, args);
-    }
-  }
+  const mcpToolsRoute = await handleMcpToolsRoute(ctx, resource, idOrAction, nested);
+  if (mcpToolsRoute.handled) return mcpToolsRoute.value;
 
   throw new ApiError(404, 'NOT_FOUND', 'Route not found.');
 };
