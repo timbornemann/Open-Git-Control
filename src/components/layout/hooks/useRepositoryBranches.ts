@@ -138,7 +138,7 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onDelete: async () => {
-          const ok = await runGitCommand(['branch', '-d', branchName], tr(`Branch "${branchName}" gelÃ¶scht.`, `Deleted branch "${branchName}".`));
+          const ok = await runGitCommand(['branch', '-d', branchName], tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`));
           if (ok) return;
           setConfirmDialog(
             buildForceDeleteBranchDialog({
@@ -146,7 +146,7 @@ export const useRepositoryBranches = ({
               t,
               tr,
               onForceDelete: async () => {
-                await runGitCommand(['branch', '-D', branchName], tr(`Branch "${branchName}" force-gelÃ¶scht.`, `Force-deleted branch "${branchName}".`));
+                await runGitCommand(['branch', '-D', branchName], tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`));
               },
             }),
           );

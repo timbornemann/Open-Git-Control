@@ -166,4 +166,69 @@ describe('registerGithubHandlers fork flow', () => {
     expect(gitService.runCommand).toHaveBeenCalledWith(['log', 'master', '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad', '--date=short', '--max-count=150']);
     expect(gitService.runCommand.mock.calls.some((call: any[]) => Array.isArray(call[0]) && call[0][1] === 'v1.2.5..master')).toBe(false);
   });
+
+  it('validates and normalizes create release input before calling GitHub', async () => {
+    const createRelease = vi.fn().mockResolvedValue({
+      id: 42,
+      tagName: 'v1.3.0',
+      name: 'Release 1.3.0',
+      htmlUrl: 'https://github.com/acme/project/releases/tag/v1.3.0',
+    });
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue('tim'),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const handler = handlers.get('github:createRelease');
+    expect(handler).toBeTruthy();
+
+    const invalidResult = await handler!({}, { owner: 'acme', repo: 'project', tagName: '   ', releaseName: 'Release 1.3.0' });
+    expect(invalidResult).toEqual({ success: false, error: 'Tag-Name ist erforderlich.' });
+    expect(createRelease).not.toHaveBeenCalled();
+
+    const result = await handler!(
+      {},
+      {
+        owner: 'acme',
+        repo: 'project',
+        tagName: ' v1.3.0 ',
+        targetCommitish: 'main',
+        releaseName: ' Release 1.3.0 ',
+        body: 'Notes',
+        draft: true,
+        prerelease: false,
+      },
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: {
+        id: 42,
+        tagName: 'v1.3.0',
+        name: 'Release 1.3.0',
+        htmlUrl: 'https://github.com/acme/project/releases/tag/v1.3.0',
+      },
+    });
+    expect(createRelease).toHaveBeenCalledWith({
+      owner: 'acme',
+      repo: 'project',
+      tagName: 'v1.3.0',
+      targetCommitish: 'main',
+      releaseName: 'Release 1.3.0',
+      body: 'Notes',
+      draft: true,
+      prerelease: false,
+    });
+  });
 });

@@ -27,10 +27,10 @@ export default defineConfig({
       thresholds: {
         // Broad architectural baseline: this now includes hooks, workflows,
         // services and IPC routers instead of reporting only utility coverage.
-        lines: 25,
-        functions: 20,
-        branches: 20,
-        statements: 25,
+        lines: 35,
+        functions: 30,
+        branches: 35,
+        statements: 35,
       },
     },
   },

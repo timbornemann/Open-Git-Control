@@ -219,7 +219,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
       }
       setIsGitActionRunning(true);
       setActiveGitCommand(command);
-      setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgefÃ¼hrt...`, `Running git ${command}...`));
+      setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
       try {
         const r = await gitClient.runGitCommand(command, ...args.slice(1));

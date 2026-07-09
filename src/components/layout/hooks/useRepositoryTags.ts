@@ -79,7 +79,7 @@ export const useRepositoryTags = ({
         t,
         tr,
         onDelete: async () => {
-          await runGitCommand(['tag', '-d', tagName], tr(`Tag "${tagName}" gelÃ¶scht.`, `Deleted tag "${tagName}".`));
+          await runGitCommand(['tag', '-d', tagName], tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`));
         },
       }),
     );

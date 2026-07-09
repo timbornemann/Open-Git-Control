@@ -491,16 +491,7 @@ const MERGE_IN_PROGRESS_PATTERNS: RegExp[] = [
   /cannot do .* during a merge/i,
 ];
 
-const REPO_UNAVAILABLE_PATTERNS: RegExp[] = [
-  /\[REPO_UNAVAILABLE\]/i,
-  /not a git repository/i,
-  /no repository path set/i,
-  /cannot change to/i,
-  /unable to get current working directory/i,
-  /no such file or directory/i,
-  /the system cannot find the path specified/i,
-  /\buv_cwd\b/i,
-];
+export { isRepoUnavailableError } from '@/shared/git/errors';
 
 /** First repo-relative path that is still in a conflict state, or null. */
 export function parseFirstConflictPathFromPorcelain(statusOutput: string): string | null {
@@ -531,12 +522,6 @@ export function parseFirstConflictPathFromGitError(errorText: string | null | un
 export function isMergeInProgressError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
   return MERGE_IN_PROGRESS_PATTERNS.some((pattern) => pattern.test(errorText));
-}
-
-/** Whether git reports that the current repository path is no longer valid/available. */
-export function isRepoUnavailableError(errorText: string | null | undefined): boolean {
-  if (!errorText) return false;
-  return REPO_UNAVAILABLE_PATTERNS.some((pattern) => pattern.test(errorText));
 }
 
 /** Prefer porcelain; if missing, parse from error message (merge/cherry-pick/rebase failures). */

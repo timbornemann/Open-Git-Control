@@ -4,6 +4,8 @@ import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
 import { fileNameFromPath, useCommitDetailsData } from '@/components/commit-details/useCommitDetailsData';
 import { VirtualList } from '@/components/VirtualList';
+import { BlamePanel } from '@/components/file-details/BlamePanel';
+import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 
 interface CommitDetailsProps {
   hash: string;
@@ -212,158 +214,30 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
           </div>
 
           {activeTab === 'history' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                {t('generated.components.commitdetails.history_of_this_file_click_an_entry_to_open_the_full_com_c1c0d4bb')}
-              </span>
-              {historyLoading && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_history_3ca2a3ab')}</span>
-              )}
-              {historyError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{historyError}</span>}
-              {!historyLoading && !historyError && historyEntries.length === 0 && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_history_found_a820bc27')}</span>
-              )}
-              {!historyLoading &&
-                !historyError &&
-                historyEntries.map((entry) => {
-                  const normalizedEntryHash = (entry.hash.match(/[0-9a-f]{7,40}/i) || [''])[0];
-                  const isCurrentCommit = normalizedEntryHash === normalizedHash;
-                  return (
-                    <button
-                      key={`${entry.hash}-${entry.subject}`}
-                      onClick={() => normalizedEntryHash && onSelectCommit?.(normalizedEntryHash)}
-                      style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        border: isCurrentCommit ? '1px solid var(--accent-primary-border)' : '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        backgroundColor: isCurrentCommit ? 'var(--accent-primary-soft)' : 'var(--bg-panel)',
-                        padding: '8px 9px',
-                        cursor: onSelectCommit ? 'pointer' : 'default',
-                        color: 'var(--text-primary)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                      }}
-                      disabled={!normalizedEntryHash}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                          {entry.abbrevHash ||
-                            (normalizedEntryHash ? normalizedEntryHash.slice(0, 8) : t('generated.components.commitdetails.invalid_4296db6c'))}
-                        </span>
-                        {isCurrentCommit && (
-                          <span
-                            style={{
-                              fontSize: '0.68rem',
-                              padding: '1px 6px',
-                              borderRadius: 999,
-                              backgroundColor: 'var(--accent-primary-soft)',
-                              color: 'var(--text-accent)',
-                            }}
-                          >
-                            {t('generated.components.commitdetails.current_53fe57f0')}
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '0.84rem', color: entry.subject ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                        {entry.subject || t('generated.components.commitdetails.no_message_e74e94fd')}
-                      </span>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                        {entry.author || '-'} | {formatDate(entry.date)} | {formatRelativeDate(entry.date)}
-                      </span>
-                    </button>
-                  );
-                })}
-            </div>
+            <FileHistoryPanel
+              entries={historyEntries}
+              loading={historyLoading}
+              error={historyError}
+              formatDate={formatDate}
+              formatRelativeDate={formatRelativeDate}
+              intro={t('generated.components.commitdetails.history_of_this_file_click_an_entry_to_open_the_full_com_c1c0d4bb')}
+              currentHash={normalizedHash}
+              onSelectCommit={onSelectCommit}
+            />
           )}
 
           {activeTab === 'blame' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                {t('generated.components.commitdetails.blame_shows_for_each_line_which_commit_last_touched_it_280be5ae')}
-              </span>
-              {blameLoading && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>
-              )}
-              {blameError && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{blameError}</span>}
-              {!blameLoading && !blameError && blameLines.length === 0 && (
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-                  {t('generated.components.commitdetails.no_blame_data_found_e996f81f')}
-                </span>
-              )}
-              {!blameLoading && !blameError && (
-                <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '56px 80px 120px 60px 1fr',
-                      gap: '8px',
-                      padding: '6px 8px',
-                      borderBottom: '1px solid var(--border-color)',
-                      backgroundColor: 'var(--accent-primary-softer)',
-                      fontSize: '0.72rem',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.03em',
-                    }}
-                  >
-                    <span>{t('generated.components.commitdetails.line_84da5e3a')}</span>
-                    <span>{t('generated.components.commit_graph.commitgraph.commit_b9ec78bd')}</span>
-                    <span>{t('generated.components.commitdetails.author_7f609ec0')}</span>
-                    <span>{t('generated.components.commitdetails.date_c70081f3')}</span>
-                    <span>{t('generated.components.commitdetails.content_72b16731')}</span>
-                  </div>
-                  <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                    {blameLines.map((line, index) => (
-                      <div
-                        key={`${line.lineNumber}-${line.commitHash}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: '56px 80px 120px 60px 1fr',
-                          gap: '8px',
-                          alignItems: 'start',
-                          padding: '5px 8px',
-                          borderBottom: '1px solid var(--line-subtle)',
-                          fontFamily: 'monospace',
-                          fontSize: '0.76rem',
-                          color: 'var(--text-primary)',
-                          backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--accent-primary-softer)',
-                        }}
-                        title={`${line.author} - ${line.summary}`}
-                      >
-                        <span style={{ color: 'var(--text-secondary)' }}>{line.lineNumber}</span>
-                        <button
-                          onClick={() => onSelectCommit?.(line.commitHash)}
-                          style={{
-                            padding: 0,
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--accent-primary)',
-                            textAlign: 'left',
-                            cursor: onSelectCommit ? 'pointer' : 'default',
-                            fontFamily: 'monospace',
-                            fontSize: '0.76rem',
-                          }}
-                        >
-                          {line.abbrevHash}
-                        </button>
-                        <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {line.author || '-'}
-                        </span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{formatBlameDate(line.authorTime)}</span>
-                        <span style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{line.content}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {blameHasMore && (
-                    <button className="staging-tool-btn" onClick={() => void loadMoreBlame()} disabled={blameLoading} style={{ margin: 8 }}>
-                      {t('generated.components.commitdetails.load_500_more_lines_16c0eb75')}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <BlamePanel
+              lines={blameLines}
+              loading={blameLoading}
+              error={blameError}
+              hasMore={blameHasMore}
+              intro={t('generated.components.commitdetails.blame_shows_for_each_line_which_commit_last_touched_it_280be5ae')}
+              variant="detailed"
+              formatBlameDate={formatBlameDate}
+              onLoadMore={loadMoreBlame}
+              onSelectCommit={onSelectCommit}
+            />
           )}
 
           {activeTab === 'patch' && (

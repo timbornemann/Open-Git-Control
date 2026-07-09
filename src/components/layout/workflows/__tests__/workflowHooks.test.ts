@@ -7,6 +7,9 @@ import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { useGitCommandGuardWorkflow } from '@/components/layout/workflows/useGitCommandGuardWorkflow';
 import { type GitCommandRunner, useGitSyncRecoveryWorkflow } from '@/components/layout/workflows/useGitSyncRecoveryWorkflow';
 import { useInitialCommitRecoveryWorkflow } from '@/components/layout/workflows/useInitialCommitRecoveryWorkflow';
+import { useRepoUnavailableWorkflow } from '@/components/layout/workflows/useRepoUnavailableWorkflow';
+import { gitClient } from '@/services/gitClient';
+import { plannerClient } from '@/services/plannerClient';
 
 type HookRender<T> = {
   readonly current: T;
@@ -51,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -215,5 +219,63 @@ describe('workflow hooks', () => {
     );
 
     hook.unmount();
+  });
+
+  it('raeumt ein nicht mehr verfuegbares Repository samt Planungsdaten auf', async () => {
+    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    const unsubscribe = vi.fn();
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
+      repoUnavailableListener = callback;
+      return unsubscribe;
+    });
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'deleteRepositoryProjectByPath').mockResolvedValue({
+      success: true,
+      data: { deletedItemCount: 2, deletedProjectCount: 1 },
+    });
+
+    const handleCloseRepo = vi.fn().mockResolvedValue(undefined);
+    const setPlannerRefreshSignal = vi.fn();
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const hook = renderHook(() =>
+      useRepoUnavailableWorkflow({
+        activeRepo: 'C:\\repos\\demo',
+        handleCloseRepo,
+        setPlannerRefreshSignal,
+        setConfirmDialog,
+        setGitActionToast,
+        language: 'de',
+      }),
+    );
+
+    act(() => {
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] not a git repository' });
+      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] repeated' });
+    });
+
+    expect(setConfirmDialog).toHaveBeenCalledTimes(1);
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog).toEqual(
+      expect.objectContaining({
+        variant: 'confirm',
+        confirmLabel: expect.any(String),
+        onConfirm: expect.any(Function),
+      }),
+    );
+
+    await act(async () => {
+      await dialog.onConfirm?.();
+    });
+
+    expect(plannerClient.deleteRepositoryProjectByPath).toHaveBeenCalledWith('C:\\repos\\demo');
+    expect(handleCloseRepo).toHaveBeenCalledWith('C:\\repos\\demo');
+    expect(setPlannerRefreshSignal).toHaveBeenCalledWith(expect.any(Function));
+    expect(setPlannerRefreshSignal.mock.calls[0][0](3)).toBe(4);
+    expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
+
+    hook.unmount();
+    expect(unsubscribe).toHaveBeenCalled();
   });
 });

@@ -78,7 +78,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onAdd: async (name, url) => {
-          await runGitCommand(['remote', 'add', name, url], tr(`Remote "${name}" hinzugefÃ¼gt.`, `Added remote "${name}".`));
+          await runGitCommand(['remote', 'add', name, url], tr(`Remote "${name}" hinzugefügt.`, `Added remote "${name}".`));
         },
       }),
     );
@@ -122,7 +122,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onSetUrl: async (url) => {
-          await runGitCommand(['remote', 'set-url', remoteName, url], tr(`URL fÃ¼r "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`));
+          await runGitCommand(['remote', 'set-url', remoteName, url], tr(`URL für "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`));
         },
       }),
     );

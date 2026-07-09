@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
+import '@/styles/project-planner.css';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
   idea: <Lightbulb size={14} />,

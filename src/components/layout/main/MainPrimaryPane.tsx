@@ -1,12 +1,6 @@
 import React from 'react';
-import { DiffViewer } from '@/components/diff-viewer';
-import { FileTimelineView } from '@/components/FileTimelineView';
-import { CommitGraph } from '@/components/commit-graph';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
-import { ReleaseCreator } from '@/components/release-creator/ReleaseCreator';
 import { StagingArea } from '@/components/staging-area';
-import { ProjectPlannerView } from '@/components/project-planner';
-import { SettingsMainContent } from '@/components/layout/SettingsMainContent';
 import { useGithubContext, useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
@@ -16,6 +10,13 @@ import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPan
 import { GithubAuthGuide } from './GithubAuthGuide';
 import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
+
+const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((module) => ({ default: module.CommitGraph })));
+const DiffViewer = React.lazy(() => import('@/components/diff-viewer').then((module) => ({ default: module.DiffViewer })));
+const FileTimelineView = React.lazy(() => import('@/components/FileTimelineView').then((module) => ({ default: module.FileTimelineView })));
+const ProjectPlannerView = React.lazy(() => import('@/components/project-planner').then((module) => ({ default: module.ProjectPlannerView })));
+const ReleaseCreator = React.lazy(() => import('@/components/release-creator/ReleaseCreator').then((module) => ({ default: module.ReleaseCreator })));
+const SettingsMainContent = React.lazy(() => import('@/components/layout/SettingsMainContent').then((module) => ({ default: module.SettingsMainContent })));
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -76,6 +77,21 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isTimelineView = route === 'timeline';
   const primaryPaneTitle = getMainPrimaryTitle(route, t);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
+  const lazyPaneFallback = (
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-secondary)',
+        fontSize: '0.85rem',
+        padding: '16px',
+      }}
+    >
+      {t('generated.components.layout.sidebar.settingssidebarcontent.loading_7f8a8587')}
+    </div>
+  );
 
   return (
     <div
@@ -163,38 +179,46 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
 
       <div className="pane-content" style={{ padding: 0 }}>
         {isPlannerView ? (
-          <ProjectPlannerView />
+          <React.Suspense fallback={lazyPaneFallback}>
+            <ProjectPlannerView />
+          </React.Suspense>
         ) : isSettingsView ? (
-          <SettingsMainContent
-            settings={settingsState.settings}
-            onUpdateSettings={settingsState.onUpdateSettings}
-            jobs={workflow.jobs}
-            onClearJobs={workflow.onClearJobs}
-            activeTab={settingsState.settingsTab}
-            onResetLayout={ui.onResetLayout}
-          />
+          <React.Suspense fallback={lazyPaneFallback}>
+            <SettingsMainContent
+              settings={settingsState.settings}
+              onUpdateSettings={settingsState.onUpdateSettings}
+              jobs={workflow.jobs}
+              onClearJobs={workflow.onClearJobs}
+              activeTab={settingsState.settingsTab}
+              onResetLayout={ui.onResetLayout}
+            />
+          </React.Suspense>
         ) : isReleaseView ? (
-          <ReleaseCreator
-            ownerRepo={github.prOwnerRepo}
-            releaseForm={github.releaseForm}
-            setReleaseForm={github.setReleaseForm}
-            releaseSubmitting={github.releaseSubmitting}
-            releaseError={github.releaseError}
-            releaseSuccess={github.releaseSuccess}
-            onCreateRelease={github.onCreateRelease}
-            contextLoading={github.releaseContextLoading}
-            contextError={github.releaseContextError}
-            context={github.releaseContext}
-            onRefreshContext={github.onRefreshReleaseContext}
-            onGenerateNotes={github.onGenerateReleaseNotes}
-            notesGenerating={github.releaseNotesGenerating}
-            notesLanguage={github.releaseNotesLanguage}
-            setNotesLanguage={github.setReleaseNotesLanguage}
-            notesOptions={github.releaseNotesOptions}
-            setNotesOptions={github.setReleaseNotesOptions}
-          />
+          <React.Suspense fallback={lazyPaneFallback}>
+            <ReleaseCreator
+              ownerRepo={github.prOwnerRepo}
+              releaseForm={github.releaseForm}
+              setReleaseForm={github.setReleaseForm}
+              releaseSubmitting={github.releaseSubmitting}
+              releaseError={github.releaseError}
+              releaseSuccess={github.releaseSuccess}
+              onCreateRelease={github.onCreateRelease}
+              contextLoading={github.releaseContextLoading}
+              contextError={github.releaseContextError}
+              context={github.releaseContext}
+              onRefreshContext={github.onRefreshReleaseContext}
+              onGenerateNotes={github.onGenerateReleaseNotes}
+              notesGenerating={github.releaseNotesGenerating}
+              notesLanguage={github.releaseNotesLanguage}
+              setNotesLanguage={github.setReleaseNotesLanguage}
+              notesOptions={github.releaseNotesOptions}
+              setNotesOptions={github.setReleaseNotesOptions}
+            />
+          </React.Suspense>
         ) : isTimelineView ? (
-          <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
+          <React.Suspense fallback={lazyPaneFallback}>
+            <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
+          </React.Suspense>
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}
@@ -211,7 +235,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             onRefreshWorkingTree={workingTree.refresh}
           />
         ) : activeDiffRequest || (!showGithubGuide && !showRecoveryCenter) ? (
-          <>
+          <React.Suspense fallback={lazyPaneFallback}>
             <div
               aria-hidden={activeDiffRequest ? true : undefined}
               style={{
@@ -253,7 +277,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 }}
               />
             )}
-          </>
+          </React.Suspense>
         ) : showGithubGuide ? (
           <GithubAuthGuide method={github.selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>} onClose={ui.onClearGithubAuthHelpMethod} />
         ) : showRecoveryCenter ? (

@@ -12,7 +12,6 @@ import { AppStateSlicesProvider } from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
-import './index.css';
 
 const App: React.FC = () => {
   const state = useAppState();

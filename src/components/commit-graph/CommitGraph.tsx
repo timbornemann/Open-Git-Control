@@ -21,6 +21,7 @@ import { CommitContextMenu, type ContextMenuPlacement, type ContextMenuState, ty
 import { useCommitGraphViewport } from './useCommitGraphViewport';
 import { buildCommitMenuActions } from './commitGraphMenuActions';
 import { useCommitGraphGitActions } from './useCommitGraphGitActions';
+import '@/styles/commit-graph.css';
 
 export { buildGraphHighlightData, findCommitIndexByNavigationTarget } from './commitGraphRefs';
 

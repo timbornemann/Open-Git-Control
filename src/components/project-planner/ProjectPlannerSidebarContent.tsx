@@ -2,6 +2,7 @@ import React from 'react';
 import { FolderGit2, Lightbulb, Plus, Trash2 } from 'lucide-react';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
 import { useI18n } from '@/i18n';
+import '@/styles/project-planner.css';
 
 export const ProjectPlannerSidebarContent: React.FC = () => {
   const { data, selectedProjectId, selectProject, loading, busy, requestCreateProject, requestDeleteProject } = useProjectPlanner();

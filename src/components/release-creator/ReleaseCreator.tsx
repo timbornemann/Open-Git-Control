@@ -8,6 +8,7 @@ import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 import { detectReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import { AiOptionToggle } from './AiOptionToggle';
 import { ReleaseHistoryPanel } from './ReleaseHistoryPanel';
+import '@/styles/release-creator.css';
 
 type Props = {
   ownerRepo: { owner: string; repo: string } | null;

@@ -800,7 +800,7 @@
             "initial_commit_created_and_pushed_295fbe68": "Initial-Commit erstellt und gepusht.",
             "pushing_initial_commit_6b4afbb5": "Initial-Commit wird gepusht...",
             "a_merge_is_already_active_merge_head_please_continue_or_65bed253": "Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen ausfuehren.",
-            "error_while_running_git_69219c3a": "Fehler beim AusfÃ¼hren von git."
+            "error_while_running_git_69219c3a": "Fehler beim Ausführen von git."
           },
           "usegitsyncrecoveryworkflow": {
             "quick_fix_saved_changes_to_stash_5cd00a52": "Quick-Fix: Aenderungen wurden im Stash gesichert.",

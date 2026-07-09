@@ -10,6 +10,7 @@ import { useDiffBlame } from './useDiffBlame';
 import { useDiffPreviewData } from './useDiffPreviewData';
 import { useHunkPatchActions } from './useHunkPatchActions';
 import { useMarkdownPreview } from './useMarkdownPreview';
+import '@/styles/diff-viewer.css';
 
 interface DiffViewerProps {
   repoPath: string | null;

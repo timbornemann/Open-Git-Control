@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, FastForward } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { FileTimelineCanvas } from './FileTimelineCanvas';
 import type { FileTimelineCommit, FileTimelineNode } from './file-timeline/types';
+import '@/styles/diff-viewer.css';
 
 type FileTimelineViewProps = {
   onClose: () => void;

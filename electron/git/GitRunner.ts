@@ -4,22 +4,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { GitJobKind } from '../GitScheduler';
 import { GitScheduler } from '../GitScheduler';
+import { createRepoUnavailableErrorMessage, isRepoUnavailableError } from '../../src/shared/git/errors';
 
 const execFileAsync = util.promisify(execFile);
 const STALE_INDEX_LOCK_MAX_AGE_MS = 45_000;
 const INDEX_LOCK_RETRY_MAX_ATTEMPTS = 6;
 const INDEX_LOCK_RETRY_BASE_DELAY_MS = 75;
 const INDEX_LOCK_RETRY_MAX_DELAY_MS = 600;
-
-const REPO_UNAVAILABLE_PATTERNS: RegExp[] = [
-  /not a git repository/i,
-  /no repository path set/i,
-  /cannot change to/i,
-  /unable to get current working directory/i,
-  /no such file or directory/i,
-  /the system cannot find the path specified/i,
-  /\buv_cwd\b/i,
-];
 
 const SERIALIZED_GIT_COMMANDS = new Set<string>([
   'add',
@@ -124,7 +115,7 @@ export class GitRunner {
           }
 
           if (errorCode === 'ENOENT' && !this.isRepoPathAccessible(repoPath)) {
-            throw new Error('[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not accessible).');
+            throw new Error(createRepoUnavailableErrorMessage());
           }
 
           if (errorCode === 'ENOENT' && /spawn\s+git\s+enoent/i.test(readErrorText(error, 'message'))) {
@@ -552,11 +543,9 @@ export class GitRunner {
     const gitOut = readErrorText(error, 'stderr').trim() || readErrorText(error, 'stdout').trim();
     const fallbackMessage = readErrorText(error, 'message') || 'Unknown git error';
     const detailedMessage = gitOut ? `${fallbackMessage}\nGit Output: ${gitOut}` : fallbackMessage;
-    const isRepoUnavailable = this.isRepoUnavailableError(detailedMessage);
+    const isRepoUnavailable = isRepoUnavailableError(detailedMessage);
     const isExpectedNonFatal = this.isExpectedNonFatalGitError(args, detailedMessage);
-    const finalMessage = isRepoUnavailable
-      ? `[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not a Git repo).\nGit Output: ${gitOut || fallbackMessage}`
-      : detailedMessage;
+    const finalMessage = isRepoUnavailable ? createRepoUnavailableErrorMessage(gitOut || fallbackMessage) : detailedMessage;
 
     if (!isRepoUnavailable && !isExpectedNonFatal) {
       console.error(`Git Error executing "git ${args.join(' ')}":\n${finalMessage}`);
@@ -571,7 +560,7 @@ export class GitRunner {
         throw new Error('Repository path is not a directory.');
       }
     } catch {
-      throw new Error('[REPO_UNAVAILABLE] Repository is no longer available (moved, deleted, or not accessible).');
+      throw new Error(createRepoUnavailableErrorMessage());
     }
   }
 
@@ -609,12 +598,6 @@ export class GitRunner {
       return /no such remote ['"]?origin['"]?/i.test(errorText);
     }
     return false;
-  }
-
-  private isRepoUnavailableError(errorText: string): boolean {
-    const text = String(errorText || '');
-    if (!text.trim()) return false;
-    return REPO_UNAVAILABLE_PATTERNS.some((pattern) => pattern.test(text));
   }
 
   private isIndexLockError(error: unknown): boolean {

@@ -2,6 +2,7 @@ import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import type { CommitStatsPriority, CommitStatsService } from '../../../CommitStatsService';
 import type { GitService } from '../../../GitService';
 import type { WorkingTreeService } from '../../../WorkingTreeService';
+import { isRepoUnavailableError } from '../../../../src/shared/git/errors';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../../parsing';
 
@@ -35,7 +36,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         await gitService.runCommand(['rev-parse', '--verify', 'HEAD']);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        if (/\[REPO_UNAVAILABLE\]|not a git repository|no repository path set/i.test(message)) {
+        if (isRepoUnavailableError(message)) {
           throw error;
         }
         return {
