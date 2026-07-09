@@ -23,10 +23,93 @@ export type {
 } from './app-state/types';
 
 type AppStateStore = StoreApi<AppStateSlicesValue>;
+type AppStateSliceKey = keyof AppStateSlicesValue;
+type AnyFunction = (...args: never[]) => unknown;
+type FunctionRef = { current: AnyFunction };
+type SliceFunctionCache = {
+  refs: Map<string, FunctionRef>;
+  wrappers: Map<string, AnyFunction>;
+};
+type AppStateFunctionCache = Record<AppStateSliceKey, SliceFunctionCache>;
 
 const AppStateStoreContext = createContext<AppStateStore | null>(null);
 
-const createAppStateStore = (initialValue: AppStateSlicesValue): AppStateStore => createStore<AppStateSlicesValue>()(() => initialValue);
+const appStateSliceKeys: AppStateSliceKey[] = ['settings', 'repository', 'github', 'workflow', 'ui'];
+
+const createAppStateFunctionCache = (): AppStateFunctionCache => ({
+  settings: { refs: new Map(), wrappers: new Map() },
+  repository: { refs: new Map(), wrappers: new Map() },
+  github: { refs: new Map(), wrappers: new Map() },
+  workflow: { refs: new Map(), wrappers: new Map() },
+  ui: { refs: new Map(), wrappers: new Map() },
+});
+
+const isFunction = (value: unknown): value is AnyFunction => typeof value === 'function';
+
+const getStableFunction = (cache: SliceFunctionCache, key: string, value: AnyFunction): AnyFunction => {
+  let ref = cache.refs.get(key);
+  if (!ref) {
+    ref = { current: value };
+    cache.refs.set(key, ref);
+  }
+  ref.current = value;
+
+  let wrapper = cache.wrappers.get(key);
+  if (!wrapper) {
+    wrapper = ((...args: never[]) => ref.current(...args)) as AnyFunction;
+    cache.wrappers.set(key, wrapper);
+  }
+  return wrapper;
+};
+
+const materializeSlice = <T extends Record<string, unknown>>(slice: T, cache: SliceFunctionCache): T => {
+  const materialized = {} as T;
+  for (const [key, value] of Object.entries(slice)) {
+    materialized[key as keyof T] = (isFunction(value) ? getStableFunction(cache, key, value) : value) as T[keyof T];
+  }
+  return materialized;
+};
+
+const materializeAppStateSlices = (value: AppStateSlicesValue, cache: AppStateFunctionCache): AppStateSlicesValue => ({
+  settings: materializeSlice(value.settings as unknown as Record<string, unknown>, cache.settings) as SettingsContextValue,
+  repository: materializeSlice(value.repository as unknown as Record<string, unknown>, cache.repository) as RepositoryContextValue,
+  github: materializeSlice(value.github as unknown as Record<string, unknown>, cache.github) as GithubContextValue,
+  workflow: materializeSlice(value.workflow as unknown as Record<string, unknown>, cache.workflow) as WorkflowContextValue,
+  ui: materializeSlice(value.ui as unknown as Record<string, unknown>, cache.ui) as UIContextValue,
+});
+
+const areRenderableSliceFieldsEqual = (current: Record<string, unknown>, next: Record<string, unknown>): boolean => {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return false;
+
+  for (const key of nextKeys) {
+    const currentValue = current[key];
+    const nextValue = next[key];
+    if (isFunction(currentValue) && isFunction(nextValue)) continue;
+    if (!Object.is(currentValue, nextValue)) return false;
+  }
+  return true;
+};
+
+const reconcileAppStateSlices = (current: AppStateSlicesValue, nextValue: AppStateSlicesValue, cache: AppStateFunctionCache): AppStateSlicesValue => {
+  const next = materializeAppStateSlices(nextValue, cache);
+  let changed = false;
+  const reconciled = {} as AppStateSlicesValue;
+
+  for (const key of appStateSliceKeys) {
+    const currentSlice = current[key] as unknown as Record<string, unknown>;
+    const nextSlice = next[key] as unknown as Record<string, unknown>;
+    const sliceChanged = !areRenderableSliceFieldsEqual(currentSlice, nextSlice);
+    reconciled[key] = (sliceChanged ? next[key] : current[key]) as never;
+    changed = changed || sliceChanged;
+  }
+
+  return changed ? reconciled : current;
+};
+
+const createAppStateStore = (initialValue: AppStateSlicesValue, cache: AppStateFunctionCache): AppStateStore =>
+  createStore<AppStateSlicesValue>()(() => materializeAppStateSlices(initialValue, cache));
 
 const useAppStateSelector = <T,>(selector: (state: AppStateSlicesValue) => T, hookName: string): T => {
   const store = useContext(AppStateStoreContext);
@@ -54,12 +137,18 @@ export const useOptionalUIContext = () => {
 
 export const AppStateSlicesProvider = ({ value, children }: { value: AppStateSlicesValue; children: ReactNode }) => {
   const storeRef = useRef<AppStateStore | null>(null);
+  const functionCacheRef = useRef<AppStateFunctionCache | null>(null);
+  if (!functionCacheRef.current) {
+    functionCacheRef.current = createAppStateFunctionCache();
+  }
   if (!storeRef.current) {
-    storeRef.current = createAppStateStore(value);
+    storeRef.current = createAppStateStore(value, functionCacheRef.current);
   }
 
   useLayoutEffect(() => {
-    storeRef.current?.setState(value, true);
+    const cache = functionCacheRef.current;
+    if (!cache) return;
+    storeRef.current?.setState((current) => reconcileAppStateSlices(current, value, cache));
   }, [value]);
 
   return <AppStateStoreContext.Provider value={storeRef.current}>{children}</AppStateStoreContext.Provider>;
