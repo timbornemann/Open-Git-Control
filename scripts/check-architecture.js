@@ -11,7 +11,6 @@ const importExtensions = new Set(['.ts', '.tsx', '.js', '.jsx']);
 const maxLineExceptions = new Map([
   ['electron/__tests__/AiService.test.ts', 'Large integration-style test fixture; split with the AI service test cleanup.'],
   ['electron/git/GitRunner.ts', 'Core Git process runner; requires dedicated refactor because it owns process policy.'],
-  ['src/utils/gitParsing.ts', 'Legacy parser collection; split into branch, status and conflict parsers.'],
   ['electron/__tests__/GitService.test.ts', 'Large service test suite; split by Git service capability groups.'],
 ]);
 
