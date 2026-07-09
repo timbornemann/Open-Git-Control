@@ -4,7 +4,7 @@ import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { isMissingUpstreamPushError, isNoLocalCommitPushError } from '@/utils/gitPushRecovery';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import { useGitCommandGuardWorkflow } from './useGitCommandGuardWorkflow';

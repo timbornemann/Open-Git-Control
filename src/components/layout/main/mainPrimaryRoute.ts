@@ -1,4 +1,4 @@
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 

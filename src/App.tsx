@@ -3,7 +3,7 @@ import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
 import { OverlayManager } from './components/layout/OverlayManager';
 import { useAppState } from './components/layout/useAppState';
-import type { SettingsTabId } from './components/layout/sidebar/AppSidebar.types';
+import type { SettingsTabId } from './app/state/contracts';
 import { I18nProvider, translateFromCatalog, type TranslationVariables } from './i18n';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { useRepoSwitcherKeyboard } from './hooks/useRepoSwitcherKeyboard';

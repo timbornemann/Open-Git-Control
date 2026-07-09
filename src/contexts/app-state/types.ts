@@ -1,89 +1,31 @@
 import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from 'react';
-import type { AppSidebarProps } from '@/components/layout/sidebar/AppSidebar.types';
-import { type BranchContextMenuState } from '@/components/layout/sidebar/AppSidebar.types';
-import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
-import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
+import type {
+  BranchContextMenuState,
+  CommitNavigationRequest,
+  ConfirmDialogState,
+  GithubStateContract,
+  InputDialogState,
+  RepositoryStateContract,
+  RunGitCommandOptions,
+  SettingsStateContract,
+  SidebarCoreState,
+  WorkflowStateContract,
+} from '@/app/state/contracts';
 import type { GitHubReleaseContextDto } from '@/global';
 import type { GitMergeMode } from '@/types/git';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 
-export type CommitNavigationRequest = {
-  hash: string;
-  requestId: number;
-};
+export type { CommitNavigationRequest } from '@/app/state/contracts';
 
-export type BaseUIContextValue = Pick<
-  AppSidebarProps,
-  | 'activeTab'
-  | 'setActiveTab'
-  | 'isRepoPanelCollapsed'
-  | 'onToggleRepoPanelCollapsed'
-  | 'isBranchPanelCollapsed'
-  | 'onToggleBranchPanelCollapsed'
-  | 'isTagPanelCollapsed'
-  | 'onToggleTagPanelCollapsed'
-  | 'isRemotePanelCollapsed'
-  | 'onToggleRemotePanelCollapsed'
-  | 'isSubmodulePanelCollapsed'
-  | 'onToggleSubmodulePanelCollapsed'
-> & {
+export type BaseUIContextValue = SidebarCoreState & {
   onClearGithubAuthHelpMethod: () => void;
   onResetLayout: () => void;
 };
 
-export type SettingsContextValue = Pick<AppSidebarProps, 'settings' | 'onUpdateSettings' | 'settingsTab' | 'onSelectSettingsTab'>;
+export type SettingsContextValue = SettingsStateContract;
 
-export type RepositoryContextValue = Pick<
-  AppSidebarProps,
-  | 'activeRepo'
-  | 'openRepos'
-  | 'repoMeta'
-  | 'repoSortBy'
-  | 'onSetRepoSortBy'
-  | 'onToggleRepoPin'
-  | 'onOpenFolder'
-  | 'onCloneByUrl'
-  | 'onSwitchRepo'
-  | 'onCloseRepo'
-  | 'remoteSync'
-  | 'onRefreshRemoteQuick'
-  | 'branches'
-  | 'currentBranch'
-  | 'isCreatingBranch'
-  | 'onSetCreatingBranch'
-  | 'onCreateBranch'
-  | 'onCheckoutBranch'
-  | 'onSetBranchContextMenu'
-  | 'tags'
-  | 'onCreateTag'
-  | 'onPushTags'
-  | 'onDeleteTag'
-  | 'onSelectTag'
-  | 'remotes'
-  | 'remoteStatus'
-  | 'onAddRemote'
-  | 'onRemoveRemote'
-  | 'onRenameRemote'
-  | 'onSetRemoteUrl'
-  | 'onRefreshRemote'
-  | 'onSetUpstreamForCurrentBranch'
-  | 'submodules'
-  | 'onSubmoduleInitUpdate'
-  | 'onSubmoduleSync'
-  | 'onOpenSubmodule'
-  | 'hasRemoteOrigin'
-  | 'forceGithubRepoCreationPrompt'
-  | 'isConnectingGithubRepo'
-  | 'connectError'
-  | 'newRepoName'
-  | 'setNewRepoName'
-  | 'newRepoDescription'
-  | 'setNewRepoDescription'
-  | 'newRepoPrivate'
-  | 'setNewRepoPrivate'
-  | 'onCreateGithubRepoForCurrent'
-> & {
+export type RepositoryContextValue = RepositoryStateContract & {
   selectedCommit: string | null;
   setSelectedCommit: (hash: string | null) => void;
   commitNavigationRequest: CommitNavigationRequest | null;
@@ -97,66 +39,7 @@ export type RepositoryContextValue = Pick<
   onOpenRepoWorkspace: () => void;
 };
 
-export type GithubContextValue = Pick<
-  AppSidebarProps,
-  | 'isAuthenticated'
-  | 'tokenInput'
-  | 'setTokenInput'
-  | 'isAuthenticating'
-  | 'authError'
-  | 'setAuthError'
-  | 'onTokenLogin'
-  | 'oauthConfigured'
-  | 'deviceFlow'
-  | 'isDeviceFlowRunning'
-  | 'deviceFlowError'
-  | 'onStartDeviceFlowLogin'
-  | 'onCancelDeviceFlow'
-  | 'isWebFlowRunning'
-  | 'webFlowError'
-  | 'onStartWebFlowLogin'
-  | 'selectedGithubAuthHelpMethod'
-  | 'onSelectGithubAuthHelpMethod'
-  | 'githubUser'
-  | 'githubRepos'
-  | 'githubReposHasMore'
-  | 'isLoadingGithubRepos'
-  | 'isLoadingMoreGithubRepos'
-  | 'loadMoreGithubRepos'
-  | 'refreshGithubRepos'
-  | 'onLogout'
-  | 'onClone'
-  | 'onForkByUrl'
-  | 'isCloning'
-  | 'prOwnerRepo'
-  | 'prFilter'
-  | 'setPrFilter'
-  | 'prLoading'
-  | 'pullRequests'
-  | 'prCiByNumber'
-  | 'onOpenPR'
-  | 'onCopyPRUrl'
-  | 'onCheckoutPR'
-  | 'onMergePR'
-  | 'showCreatePR'
-  | 'setShowCreatePR'
-  | 'setNewPRHead'
-  | 'newPRTitle'
-  | 'setNewPRTitle'
-  | 'newPRBody'
-  | 'setNewPRBody'
-  | 'newPRHead'
-  | 'setNewPRHeadInput'
-  | 'newPRBase'
-  | 'setNewPRBase'
-  | 'onCreatePR'
-  | 'releaseForm'
-  | 'setReleaseForm'
-  | 'releaseSubmitting'
-  | 'releaseError'
-  | 'releaseSuccess'
-  | 'onCreateRelease'
-> & {
+export type GithubContextValue = GithubStateContract & {
   showReleaseCreator: boolean;
   onOpenReleaseCreator: () => void;
   onCloseReleaseCreator: () => void;
@@ -172,7 +55,7 @@ export type GithubContextValue = Pick<
   setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
 };
 
-export type WorkflowContextValue = Pick<AppSidebarProps, 'isGitActionRunning' | 'onPushTags' | 'jobs' | 'onClearJobs'> & {
+export type WorkflowContextValue = WorkflowStateContract & {
   activeGitActionLabel: string | null;
   runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   onFetch: () => void;

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 
 type Toast = { msg: string; isError: boolean };
 

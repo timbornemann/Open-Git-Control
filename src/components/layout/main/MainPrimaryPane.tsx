@@ -8,7 +8,7 @@ import type { FileTimelineCommitDto } from '@/global';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { GithubAuthGuide } from './GithubAuthGuide';
-import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
+import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
 
 const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((module) => ({ default: module.CommitGraph })));

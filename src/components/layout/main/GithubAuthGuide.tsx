@@ -1,7 +1,7 @@
 import React from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import type { GithubAuthHelpMethod } from '@/components/layout/sidebar/AppSidebar.types';
+import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { appClient } from '@/services/appClient';
 
 const linkStyle: React.CSSProperties = {

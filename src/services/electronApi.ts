@@ -7,7 +7,7 @@ import type {
   ElectronPlannerAPI,
   ElectronReposAPI,
   ElectronSettingsAPI,
-} from '@/global';
+} from '@/shared/ipc/contracts/electronApi';
 
 export const getElectronApi = (): ElectronAPI | null => {
   if (typeof window === 'undefined') return null;

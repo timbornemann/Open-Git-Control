@@ -10,7 +10,7 @@ import {
   isRemoteRepositoryMissingError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
 } from '@/utils/gitPushRecovery';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import { stripGitSuffix } from './repoWorkflowUtils';

@@ -1,20 +1,9 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { DialogContextItem } from './Confirm';
+import type { DialogContextItem, InputDialogField } from '@/app/state/contracts';
 import { DialogFrame } from './DialogFrame';
 import { useI18n } from '@/i18n';
 
-export interface InputDialogField {
-  id: string;
-  label: string;
-  placeholder?: string;
-  defaultValue?: string;
-  required?: boolean;
-  helperText?: string;
-  multiline?: boolean;
-  rows?: number;
-  type?: 'text' | 'url';
-  validate?: (value: string, values: Record<string, string>) => string | null;
-}
+export type { InputDialogField } from '@/app/state/contracts';
 
 interface InputProps {
   open: boolean;

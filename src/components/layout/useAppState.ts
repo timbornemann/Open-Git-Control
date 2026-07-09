@@ -1,40 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettingsDto, GitJobEventDto } from '@/global';
+import { useCallback, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
-import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18n';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
 import { useGithubDomain } from './hooks/useGithubDomain';
 import { usePullRequests } from '@/hooks/usePullRequests';
-import { aiClient } from '@/services/aiClient';
-import { appClient } from '@/services/appClient';
 import { githubClient } from '@/services/githubClient';
 import { parseRemoteBranchRef } from '@/utils/gitParsing';
-import { DEFAULT_SETTINGS } from './state/appStateShared';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
 import { usePrAndReleaseState } from './state/usePrAndReleaseState';
 import { useConflictResolverWorkflow } from './workflows/useConflictResolverWorkflow';
-import { compactTransferProgressJobs } from './workflows/jobWorkflowUtils';
 import { useGitCommandWorkflow } from './workflows/useGitCommandWorkflow';
 import { usePullRequestWorkflow } from './workflows/usePullRequestWorkflow';
 import { useRepoUnavailableWorkflow } from './workflows/useRepoUnavailableWorkflow';
+import { useRepositoryCreationWorkflow } from './workflows/useRepositoryCreationWorkflow';
 import { useReleaseWorkflow } from './workflows/useReleaseWorkflow';
-import { deriveRepoNameFromCloneSource, isCloneSourceLikelyRemote, normalizeGitHost, parseGithubRepoReference } from './workflows/repoWorkflowUtils';
+import { useGitJobEvents } from '@/app/state/useGitJobEvents';
+import { useRepoScopedNavigationState } from '@/app/state/useRepoScopedNavigationState';
+import { useSettingsState } from '@/app/state/useSettingsState';
 
 export const useAppState = () => {
-  const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
-  const [commitNavigationRequest, setCommitNavigationRequest] = useState<{ hash: string; requestId: number } | null>(null);
-  const commitNavigationSequenceRef = useRef(0);
-  const [autoOpenConflictResolverPath, setAutoOpenConflictResolverPath] = useState<string | null>(null);
-  const clearAutoOpenConflictResolverPath = useCallback(() => {
-    setAutoOpenConflictResolverPath(null);
-  }, []);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [commitRefreshTrigger, setCommitRefreshTrigger] = useState(0);
-
-  const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
-  const [jobs, setJobs] = useState<GitJobEventDto[]>([]);
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
 
   const {
@@ -94,30 +79,28 @@ export const useAppState = () => {
     executeInputDialog,
   } = useDialogControllers();
 
-  const tr = useCallback(
-    (deText: string, enText: string) => {
-      return trByLanguage(settings.language, deText, enText);
-    },
-    [settings.language],
-  );
-  const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language, key, variables), [settings.language]);
+  const { settings, handleUpdateSettings, t, tr } = useSettingsState({ setGitActionToast });
 
-  const triggerRefresh = useCallback(() => {
-    setRefreshTrigger((prev) => prev + 1);
-  }, []);
+  const {
+    selectedCommit,
+    setSelectedCommit,
+    commitNavigationRequest,
+    autoOpenConflictResolverPath,
+    setAutoOpenConflictResolverPath,
+    clearAutoOpenConflictResolverPath,
+    refreshTrigger,
+    triggerRefresh,
+    commitRefreshTrigger,
+    triggerCommitRefresh,
+    resetRepoScopedUi,
+    navigateToCommit: navigateToCommitRequest,
+  } = useRepoScopedNavigationState({
+    setShowReleaseCreator,
+    setReleaseContext,
+    setReleaseContextError,
+  });
 
-  const triggerCommitRefresh = useCallback(() => {
-    setCommitRefreshTrigger((prev) => prev + 1);
-  }, []);
-
-  const resetRepoScopedUi = useCallback(() => {
-    setSelectedCommit(null);
-    setCommitNavigationRequest(null);
-    setAutoOpenConflictResolverPath(null);
-    setShowReleaseCreator(false);
-    setReleaseContext(null);
-    setReleaseContextError(null);
-  }, [setReleaseContext, setReleaseContextError, setShowReleaseCreator]);
+  const { jobs, clearJobs } = useGitJobEvents();
 
   const workspace = useWorkspaceDomain({
     triggerRefresh,
@@ -171,49 +154,6 @@ export const useAppState = () => {
     activeRepo: workspace.activeRepo,
   });
 
-  const handleUpdateSettings = useCallback(
-    async (partial: Partial<AppSettingsDto>) => {
-      if (!appClient.isAvailable()) return;
-
-      try {
-        const next = await appClient.setSettings(partial);
-        setSettings(next);
-        setGitActionToast({ msg: t('generated.components.layout.useappstate.settings_saved_d81d1258'), isError: false });
-      } catch (e: any) {
-        setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
-      }
-    },
-    [setGitActionToast, t],
-  );
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (!appClient.isAvailable()) return;
-      try {
-        const loaded = await appClient.getSettings();
-        setSettings(loaded);
-      } catch {
-        setSettings(DEFAULT_SETTINGS);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
-  useEffect(() => {
-    document.body.setAttribute('data-theme', settings.theme);
-  }, [settings.theme]);
-
-  useEffect(() => {
-    if (!aiClient.isAvailable()) return;
-
-    const unsubscribe = aiClient.onJobEvent((event) => {
-      setJobs((prev) => compactTransferProgressJobs(prev, event));
-    });
-
-    return unsubscribe;
-  }, []);
-
   useRepoUnavailableWorkflow({
     activeRepo: workspace.activeRepo,
     handleCloseRepo: workspace.handleCloseRepo,
@@ -230,21 +170,10 @@ export const useAppState = () => {
     triggerRefresh,
     language: settings.language,
   });
-  const navigateToCommit = useCallback(
-    (hash: string) => {
-      const normalizedHash = String(hash || '').trim();
-      if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
 
-      workspace.setActiveTab('repo');
-      setShowReleaseCreator(false);
-      setSelectedCommit(normalizedHash);
-      commitNavigationSequenceRef.current += 1;
-      setCommitNavigationRequest({
-        hash: normalizedHash,
-        requestId: commitNavigationSequenceRef.current,
-      });
-    },
-    [setShowReleaseCreator, workspace],
+  const navigateToCommit = useCallback(
+    (hash: string) => navigateToCommitRequest(hash, workspace.setActiveTab),
+    [navigateToCommitRequest, workspace.setActiveTab],
   );
 
   const repository = useRepositoryDomain({
@@ -270,165 +199,15 @@ export const useAppState = () => {
     githubHost: settings.githubHost,
   });
 
-  const cloneFromRemoteSource = useCallback(
-    async (cloneSourceRaw: string, targetNameRaw?: string): Promise<boolean> => {
-      const cloneSource = String(cloneSourceRaw || '').trim();
-      if (!cloneSource) {
-        setGitActionToast({ msg: t('generated.components.layout.useappstate.clone_source_is_required_0f140f6c'), isError: true });
-        return false;
-      }
-      if (!isCloneSourceLikelyRemote(cloneSource)) {
-        setGitActionToast({
-          msg: t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_s_834268dc'),
-          isError: true,
-        });
-        return false;
-      }
-
-      const targetName = String(targetNameRaw || '').trim();
-      return github.cloneRepository(cloneSource, {
-        repoName: deriveRepoNameFromCloneSource(cloneSource),
-        targetName: targetName || undefined,
-      });
-    },
-    [github, setGitActionToast, t],
-  );
-
-  const handleCloneByUrl = useCallback(() => {
-    setInputDialog({
-      title: t('generated.components.sidebar.repolist.clone_repository_from_url_b2415d88'),
-      message: t('generated.components.layout.useappstate.enter_an_http_https_or_ssh_url_and_choose_a_target_direc_4e24ef1b'),
-      fields: [
-        {
-          id: 'cloneSource',
-          label: t('generated.components.layout.useappstate.clone_url_449646ea'),
-          placeholder: 'https://github.com/owner/repo.git',
-          required: true,
-          validate: (value) => {
-            const normalized = String(value || '').trim();
-            if (!normalized) return null;
-            if (isCloneSourceLikelyRemote(normalized)) return null;
-            return t('generated.components.layout.useappstate.please_provide_an_http_https_ssh_url_for_example_https_o_f3e16379');
-          },
-        },
-        {
-          id: 'targetName',
-          label: t('generated.components.layout.useappstate.folder_name_optional_bcb3f976'),
-          placeholder: t('generated.components.layout.useappstate.default_name_from_url_3a3ad316'),
-          required: false,
-        },
-      ],
-      contextItems: [],
-      irreversible: false,
-      consequences: t('generated.components.layout.useappstate.a_target_folder_will_be_created_and_the_repository_will_c295fbf1'),
-      confirmLabel: t('generated.components.layout.useappstate.clone_6a063226'),
-      onSubmit: async (values) => {
-        const cloned = await cloneFromRemoteSource(values.cloneSource || '', values.targetName || '');
-        if (!cloned) return;
-        setGitActionToast({
-          msg: t('generated.components.layout.useappstate.repository_cloned_successfully_7b3b2cd9'),
-          isError: false,
-        });
-      },
-    });
-  }, [cloneFromRemoteSource, setGitActionToast, setInputDialog, t]);
-
-  const handleForkByUrl = useCallback(() => {
-    if (!githubClient.isAvailable()) return;
-    if (!github.isAuthenticated) {
-      workspace.setActiveTab('github');
-      setGitActionToast({
-        msg: t('generated.components.layout.useappstate.please_sign_in_first_in_the_github_tab_d5addce9'),
-        isError: true,
-      });
-      return;
-    }
-
-    setInputDialog({
-      title: t('generated.components.layout.useappstate.fork_github_repository_1007beda'),
-      message: t('generated.components.layout.useappstate.enter_a_github_repository_url_the_fork_will_be_created_a_d4393eec'),
-      fields: [
-        {
-          id: 'sourceUrl',
-          label: t('generated.components.layout.useappstate.source_url_7796b5a2'),
-          placeholder: 'https://github.com/owner/repo',
-          required: true,
-          validate: (value) => {
-            const normalized = String(value || '').trim();
-            if (!normalized) return null;
-            return parseGithubRepoReference(normalized)
-              ? null
-              : t('generated.components.layout.useappstate.please_provide_a_valid_github_url_https_ssh_or_git_host_e46862d3');
-          },
-        },
-        {
-          id: 'forkName',
-          label: t('generated.components.layout.useappstate.fork_name_optional_0bb173f5'),
-          placeholder: t('generated.components.layout.useappstate.default_same_name_beadebe3'),
-          required: false,
-        },
-      ],
-      contextItems: [
-        {
-          label: t('generated.components.layout.useappstate.github_host_fe3a52b8'),
-          value: normalizeGitHost(settings.githubHost),
-        },
-      ],
-      irreversible: false,
-      consequences: t('generated.components.layout.useappstate.a_fork_will_be_created_in_your_github_account_and_cloned_b2f425e5'),
-      confirmLabel: t('generated.components.layout.useappstate.fork_clone_b5d1214a'),
-      onSubmit: async (values) => {
-        const sourceUrl = String(values.sourceUrl || '').trim();
-        const parsed = parseGithubRepoReference(sourceUrl);
-        if (!parsed) {
-          setGitActionToast({
-            msg: t('generated.components.layout.useappstate.invalid_github_url_926331e1'),
-            isError: true,
-          });
-          return;
-        }
-
-        const configuredHost = normalizeGitHost(settings.githubHost);
-        if (parsed.host !== configuredHost) {
-          setGitActionToast({
-            msg: tr(`Host passt nicht zum aktiven GitHub-Host (${configuredHost}).`, `Host does not match the active GitHub host (${configuredHost}).`),
-            isError: true,
-          });
-          return;
-        }
-
-        const requestedForkName = String(values.forkName || '').trim();
-        const forkResult = await githubClient.forkRepository({
-          owner: parsed.owner,
-          repo: parsed.repo,
-          name: requestedForkName || undefined,
-        });
-
-        if (!forkResult.success) {
-          setGitActionToast({
-            msg: forkResult.error || t('generated.components.layout.useappstate.could_not_create_fork_bbfec539'),
-            isError: true,
-          });
-          return;
-        }
-
-        setGitActionToast({
-          msg: tr(`Fork erstellt: ${forkResult.data.fullName}. Starte Clone...`, `Fork created: ${forkResult.data.fullName}. Starting clone...`),
-          isError: false,
-        });
-
-        const cloneSuccess = await github.cloneRepository(forkResult.data.cloneUrl, {
-          repoName: forkResult.data.name,
-        });
-        if (!cloneSuccess) {
-          setGitActionToast({
-            msg: t('generated.components.layout.useappstate.fork_created_but_clone_failed_please_retry_cloning_939a65a0'),
-            isError: true,
-          });
-        }
-      },
-    });
-  }, [github, setGitActionToast, setInputDialog, settings.githubHost, t, tr, workspace]);
+  const { handleCloneByUrl, handleForkByUrl } = useRepositoryCreationWorkflow({
+    github,
+    workspace,
+    settings,
+    setInputDialog,
+    setGitActionToast,
+    t,
+    tr,
+  });
 
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
@@ -543,8 +322,6 @@ export const useAppState = () => {
     },
     [runGitCommand, setGitActionToast, t, tr],
   );
-
-  const clearJobs = () => setJobs([]);
 
   return {
     activeTab: workspace.activeTab,

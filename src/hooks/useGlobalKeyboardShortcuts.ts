@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 
 type ShortcutHandlers = {
   setActiveTab: (tab: AppTabId) => void;

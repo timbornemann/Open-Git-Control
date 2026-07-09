@@ -1,7 +1,6 @@
 import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
-  ElectronAPI,
   GitHubCreateReleaseParamsDto,
   GitHubForkParamsDto,
   GitHubReleaseContextDto,
@@ -15,6 +14,7 @@ import type {
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
 } from '@/global';
+import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAiApi, requireElectronAppApi, requireElectronGithubApi } from './electronApi';
 
 export const githubClient = {

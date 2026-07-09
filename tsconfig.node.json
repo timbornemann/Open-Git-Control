@@ -14,6 +14,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["electron", "src/types/ipcContract.ts", "src/shared/**/*.ts"],
+  "include": ["electron", "src/types/**/*.ts", "src/shared/**/*.ts"],
   "exclude": ["electron/__tests__/**"]
 }

@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '@/global';
+import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAppApi, requireElectronReposApi, requireElectronSettingsApi } from './electronApi';
 
 export const appClient = {

@@ -1,11 +1,9 @@
 ﻿import React from 'react';
 import { DialogFrame } from './DialogFrame';
 import { useI18n } from '@/i18n';
+import type { DialogContextItem } from '@/app/state/contracts';
 
-export interface DialogContextItem {
-  label: string;
-  value: string;
-}
+export type { DialogContextItem } from '@/app/state/contracts';
 
 interface ConfirmProps {
   open: boolean;

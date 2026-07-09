@@ -3,7 +3,7 @@ import type { AppSettingsDto } from '@/global';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getElectronApi } from '@/services/electronApi';
 import { gitClient } from '@/services/gitClient';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 import { normalizeRepoPointer, splitRepoPath, stripGitSuffix } from './repoWorkflowUtils';
 
 type Toast = { msg: string; isError: boolean };

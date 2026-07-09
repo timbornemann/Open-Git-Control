@@ -7,7 +7,7 @@ import type { RepoOwnerRef } from '@/types/git';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
 import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes } from '@/utils/releaseNotes';
 import { type ReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 
 type Toast = { msg: string; isError: boolean };

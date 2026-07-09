@@ -1,9 +1,9 @@
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
+import type { ElectronAPI, ElectronFlatAPI } from '../../src/shared/ipc/contracts/electronApi';
 import type {
   AppSettingsDto,
   CommitStatsUpdateDto,
-  ElectronAPI,
   GitCommandNameDto,
   GitCommandResultDto,
   GitJobEventDto,
@@ -19,8 +19,6 @@ type RepoUnavailablePayload = {
 };
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
-type ElectronApiNamespaceKey = 'git' | 'github' | 'planner' | 'settings' | 'app' | 'ai' | 'repos';
-type FlatElectronAPI = Omit<ElectronAPI, ElectronApiNamespaceKey>;
 
 export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI => {
   const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
@@ -181,7 +179,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       commitMessage?: string;
     }) => ipcRenderer.invoke(IpcChannel.GithubMergePr, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
-  } satisfies FlatElectronAPI;
+  } satisfies ElectronFlatAPI;
 
   const electronAPI: ElectronAPI = {
     ...flatApi,

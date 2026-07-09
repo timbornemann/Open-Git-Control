@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { RotateCcw } from 'lucide-react';
 import type { AppSettingsDto, GitJobEventDto } from '@/global';
 import { useI18n } from '@/i18n';
-import type { SettingsTabId } from './sidebar/AppSidebar.types';
+import type { SettingsTabId } from '@/app/state/contracts';
 import { useSettingsAiUpdater } from './hooks/useSettingsAiUpdater';
 import { ReleaseNotesContent } from './ReleaseNotesContent';
 import { THEME_OPTIONS } from './settingsShared';

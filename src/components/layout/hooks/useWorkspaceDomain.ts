@@ -4,7 +4,7 @@ import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 
 type Params = {
   triggerRefresh: () => void;

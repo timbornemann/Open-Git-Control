@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { SettingsTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { SettingsTabId } from '@/app/state/contracts';
 import type { useAppState } from '@/components/layout/useAppState';
 import type {
   AppStateSlicesValue,

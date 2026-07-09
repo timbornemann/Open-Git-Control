@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from '@/types/projectPlanner';
-import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
+import type { ConfirmDialogState } from '@/app/state/contracts';
 import { useI18n } from '@/i18n';
 import { plannerClient } from '@/services/plannerClient';
 

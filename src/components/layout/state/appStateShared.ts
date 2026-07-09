@@ -1,40 +1,5 @@
-import type { AppSettingsDto } from '@/global';
-
-export const DEFAULT_SETTINGS: AppSettingsDto = {
-  theme: 'copper-night',
-  language: 'de',
-  autoFetchIntervalMs: 60_000,
-  defaultBranch: 'main',
-  confirmDangerousOps: true,
-  commitTemplate: '',
-  showSecondaryHistory: true,
-  commitSignoffByDefault: false,
-  autoUpdateEnabled: true,
-  secretScanBeforePushEnabled: true,
-  secretScanStrictness: 'medium',
-  secretScanAllowlist: '',
-  aiAutoCommitEnabled: false,
-  aiProvider: 'ollama',
-  aiCommitMessageStyle: 'conventional',
-  aiCommitMessageLanguage: 'auto',
-  ollamaBaseUrl: 'http://127.0.0.1:11434',
-  ollamaModel: '',
-  geminiModel: 'gemini-3-flash-preview',
-  hasGeminiApiKey: false,
-  githubOauthClientId: '',
-  githubHost: 'github.com',
-};
-
-export type RunGitCommandOptions = {
-  skipDirtyGuard?: boolean;
-  skipRemoteAheadDirtyGuard?: boolean;
-  skipSecretScan?: boolean;
-  skipAutoSetUpstreamOnPushFailure?: boolean;
-  skipGithubRecoveryOnPushFailure?: boolean;
-  skipAutoInitialCommitOnPushFailure?: boolean;
-  skipSyncMismatchRecovery?: boolean;
-  confirmedAutoInitialCommit?: boolean;
-};
+export { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
+export type { RunGitCommandOptions } from '@/app/state/contracts';
 
 export const GUARDED_COMMANDS = new Set(['checkout', 'merge', 'reset']);
 

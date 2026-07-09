@@ -3,7 +3,7 @@ import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { isNonFastForwardPushError, isPullBlockedByLocalChangesError } from '@/utils/gitPushRecovery';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
-import type { AppTabId } from '@/components/layout/sidebar/AppSidebar.types';
+import type { AppTabId } from '@/app/state/contracts';
 
 type Toast = { msg: string; isError: boolean };
 

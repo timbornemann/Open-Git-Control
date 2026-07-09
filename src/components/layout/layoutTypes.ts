@@ -1,38 +1,4 @@
-import type { DialogContextItem } from '@/components/Confirm';
-import type { InputDialogField } from '@/components/Input';
+import type { RemoteStatus } from '@/app/state/contracts';
 
-export type ConfirmDialogState = {
-  variant: 'confirm' | 'danger';
-  title: string;
-  message: string;
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onConfirm: () => Promise<void> | void;
-  onCancel?: () => Promise<void> | void;
-  secondaryActionLabel?: string;
-  secondaryActionVariant?: 'default' | 'danger';
-  onSecondaryAction?: () => Promise<void> | void;
-};
-
-export type InputDialogState = {
-  title: string;
-  message: string;
-  fields: InputDialogField[];
-  contextItems: DialogContextItem[];
-  irreversible: boolean;
-  consequences: string;
-  confirmLabel?: string;
-  onSubmit: (values: Record<string, string>) => Promise<void> | void;
-};
-
-export type BranchContextMenuState = { x: number; y: number; branch: string; isHead: boolean } | null;
-
-export type RemoteStatusInfo = {
-  title: string;
-  detail: string;
-  color: string;
-  backgroundColor: string;
-  borderColor: string;
-};
+export type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from '@/app/state/contracts';
+export type RemoteStatusInfo = RemoteStatus;
