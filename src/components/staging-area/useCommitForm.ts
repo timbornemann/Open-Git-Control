@@ -17,7 +17,7 @@ type Params = {
 };
 
 export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated, settings }: Params) => {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const [commitMsg, setCommitMsgState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitMsg);
   const [commitDescription, setCommitDescriptionState] = useState(() => getCommitFormDraft(repoPath, settings.commitTemplate).commitDescription);
   const [amendCommit, setAmendCommit] = useState(false);
@@ -114,18 +114,18 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       setIsCommitting(false);
     }
   }, [
-    repoPath,
     commitMsg,
-    commitDescription,
-    amendCommit,
-    signoffCommit,
     status,
-    settings.commitTemplate,
+    amendCommit,
     setToast,
-    refresh,
-    onRepoChanged,
+    t,
+    commitDescription,
+    signoffCommit,
+    repoPath,
+    settings.commitTemplate,
     onCommitsCreated,
-    tr,
+    onRepoChanged,
+    refresh,
   ]);
 
   return {

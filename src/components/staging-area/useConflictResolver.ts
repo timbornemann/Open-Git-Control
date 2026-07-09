@@ -237,7 +237,7 @@ export const useConflictResolver = ({
         isError: false,
       });
     },
-    [conflictEditor, selectedConflictBlockIndex, setToast, tr],
+    [conflictEditor, selectedConflictBlockIndex, setToast, t, tr],
   );
 
   const applyConflictChoiceToAll = useCallback(
@@ -263,7 +263,7 @@ export const useConflictResolver = ({
             : t('generated.components.staging_area.useconflictresolver.both_sides_a40e890e');
       setToast({ msg: tr(`${selectedLabel} fuer alle Konfliktbloecke uebernommen.`, `Applied ${selectedLabel} for all conflict blocks.`), isError: false });
     },
-    [conflictEditor, setToast, tr],
+    [conflictEditor, setToast, t, tr],
   );
 
   const markConflictResolved = useCallback(
@@ -290,7 +290,7 @@ export const useConflictResolver = ({
       return { ...prev, content: prev.originalContent };
     });
     setToast({ msg: t('generated.components.staging_area.useconflictresolver.discarded_local_editor_changes_297514e3'), isError: false });
-  }, [conflictEditor, setToast, tr]);
+  }, [conflictEditor, setToast, t]);
 
   const saveConflictEditor = useCallback(
     async (markResolvedAfterSave: boolean) => {
@@ -337,12 +337,12 @@ export const useConflictResolver = ({
         setToast({ msg: error?.message || t('generated.components.staging_area.useconflictresolver.could_not_save_conflict_file_e9930739'), isError: true });
       }
     },
-    [conflictEditor, onRepoChanged, refresh, setToast, tr],
+    [conflictEditor, onRepoChanged, refresh, setToast, t, tr],
   );
 
   const mergeContinue = useCallback(
     () => git(['mergeContinue'], t('generated.components.staging_area.useconflictresolver.merge_continued_fc503f43'), true),
-    [git, tr],
+    [git, t],
   );
   const mergeAbort = useCallback(() => {
     setConfirmDialog({
@@ -357,11 +357,11 @@ export const useConflictResolver = ({
         await git(['mergeAbort'], t('generated.components.staging_area.useconflictresolver.merge_aborted_1750e90f'), true);
       },
     });
-  }, [setConfirmDialog, git, tr]);
+  }, [setConfirmDialog, t, git]);
 
   const rebaseContinue = useCallback(
     () => git(['rebaseContinue'], t('generated.components.staging_area.useconflictresolver.rebase_continued_d91def08'), true),
-    [git, tr],
+    [git, t],
   );
   const rebaseAbort = useCallback(() => {
     setConfirmDialog({
@@ -376,7 +376,7 @@ export const useConflictResolver = ({
         await git(['rebaseAbort'], t('generated.components.staging_area.useconflictresolver.rebase_aborted_339ee787'), true);
       },
     });
-  }, [setConfirmDialog, git, tr]);
+  }, [setConfirmDialog, t, git]);
 
   const onConflictEditorContentChange = useCallback((filePath: string, nextContent: string) => {
     setConflictEditor((prev) => {

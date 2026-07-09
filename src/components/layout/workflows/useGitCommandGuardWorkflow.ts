@@ -245,7 +245,7 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
 
       return false;
     },
-    [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, tr],
+    [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, t, tr],
   );
 
   return { runGitCommandGuards };

@@ -94,7 +94,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
     return () => {
       active = false;
     };
-  }, [ownerRepoKey, props.currentBranch, props.refreshTrigger, tr]);
+  }, [ownerRepoKey, props.currentBranch, props.prOwnerRepo, props.refreshTrigger, t, tr]);
 
   const filteredWorkflowRuns = useMemo(() => {
     const normalized = workflowQuery.trim().toLowerCase();

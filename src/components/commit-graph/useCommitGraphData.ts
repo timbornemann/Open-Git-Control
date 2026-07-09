@@ -251,7 +251,7 @@ export const useCommitGraphData = ({
 
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
-  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout]);
+  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout, clearWorkingTreeStatus]);
 
   useEffect(() => {
     if (commitRefreshTrigger === lastCommitRefreshTriggerRef.current) return;
@@ -377,7 +377,7 @@ export const useCommitGraphData = ({
       }
     };
     void enqueue();
-  }, [loadedCommitHashes, repoPath, requestCommitStats]);
+  }, [layout, loadedCommitHashes, repoPath, requestCommitStats]);
 
   return {
     layout,

@@ -162,7 +162,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
       setReposLoaded(true);
     };
     loadStored();
-  }, []);
+  }, [onNoActiveRepo]);
 
   useEffect(() => {
     if (!reposLoaded || !appClient.isAvailable()) return;

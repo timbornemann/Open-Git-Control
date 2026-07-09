@@ -117,7 +117,7 @@ export const useAppState = () => {
     setShowReleaseCreator(false);
     setReleaseContext(null);
     setReleaseContextError(null);
-  }, []);
+  }, [setReleaseContext, setReleaseContextError, setShowReleaseCreator]);
 
   const workspace = useWorkspaceDomain({
     triggerRefresh,
@@ -183,7 +183,7 @@ export const useAppState = () => {
         setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
       }
     },
-    [setGitActionToast, tr],
+    [setGitActionToast, t],
   );
 
   useEffect(() => {
@@ -244,7 +244,7 @@ export const useAppState = () => {
         requestId: commitNavigationSequenceRef.current,
       });
     },
-    [setShowReleaseCreator, workspace.setActiveTab],
+    [setShowReleaseCreator, workspace],
   );
 
   const repository = useRepositoryDomain({
@@ -291,7 +291,7 @@ export const useAppState = () => {
         targetName: targetName || undefined,
       });
     },
-    [github, setGitActionToast, tr],
+    [github, setGitActionToast, t],
   );
 
   const handleCloneByUrl = useCallback(() => {
@@ -331,7 +331,7 @@ export const useAppState = () => {
         });
       },
     });
-  }, [cloneFromRemoteSource, setGitActionToast, setInputDialog, tr]);
+  }, [cloneFromRemoteSource, setGitActionToast, setInputDialog, t]);
 
   const handleForkByUrl = useCallback(() => {
     if (!githubClient.isAvailable()) return;
@@ -428,7 +428,7 @@ export const useAppState = () => {
         }
       },
     });
-  }, [github, setGitActionToast, setInputDialog, settings.githubHost, tr, workspace]);
+  }, [github, setGitActionToast, setInputDialog, settings.githubHost, t, tr, workspace]);
 
   const pullRequestDomain = usePullRequests({
     activeRepo: workspace.activeRepo,
@@ -541,7 +541,7 @@ export const useAppState = () => {
 
       await runGitCommand(['checkout', localBranchName], tr(`Branch ${localBranchName} ausgecheckt.`, `Checked out branch ${localBranchName}.`));
     },
-    [runGitCommand, setGitActionToast, tr],
+    [runGitCommand, setGitActionToast, t, tr],
   );
 
   const clearJobs = () => setJobs([]);

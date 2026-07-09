@@ -48,7 +48,7 @@ export const ReleaseCreator: React.FC<Props> = ({
   notesOptions,
   setNotesOptions,
 }) => {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const [versionBump, setVersionBump] = useState<ReleaseVersionBump>('patch');
 
   const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
@@ -86,7 +86,7 @@ export const ReleaseCreator: React.FC<Props> = ({
       return t('generated.components.releasecreator.release_name_is_too_short_min_3_chars_c39377d1');
     }
     return null;
-  }, [tr, validation.errors.releaseName, validation.errors.tagName]);
+  }, [t, validation.errors.releaseName, validation.errors.tagName]);
 
   const commits = context?.commitsSinceLastRelease || [];
   const commitsCount = commits.length;
@@ -128,7 +128,7 @@ export const ReleaseCreator: React.FC<Props> = ({
       return validationMessage;
     }
     return t('generated.components.releasecreator.the_release_will_be_created_on_github_with_the_current_i_3608f5d0');
-  }, [ownerRepo, tagAlreadyExists, tr, validation.valid, validationMessage]);
+  }, [ownerRepo, t, tagAlreadyExists, validation.valid, validationMessage]);
 
   return (
     <div className="release-creator release-creator--clean">

@@ -64,9 +64,10 @@ export const useMainViewInspector = ({
   }, [activeRepo]);
 
   useLayoutEffect(() => {
-    if (!commitNavigationRequest) return;
-    if (handledNavigationRequestIdRef.current === commitNavigationRequest.requestId) return;
-    handledNavigationRequestIdRef.current = commitNavigationRequest.requestId;
+    const request = commitNavigationRequest;
+    if (!request) return;
+    if (handledNavigationRequestIdRef.current === request.requestId) return;
+    handledNavigationRequestIdRef.current = request.requestId;
 
     onOpenRepoWorkspace();
     onCloseReleaseCreator();
@@ -80,8 +81,8 @@ export const useMainViewInspector = ({
     } else {
       setCommitHistoryStack([]);
     }
-    setSelectedCommit(commitNavigationRequest.hash);
-  }, [commitNavigationRequest?.requestId, commitNavigationRequest?.hash, onCloseReleaseCreator, onOpenRepoWorkspace, setSelectedCommit]);
+    setSelectedCommit(request.hash);
+  }, [commitNavigationRequest, onCloseReleaseCreator, onOpenRepoWorkspace, setSelectedCommit]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     setActiveDiffRequest(null);

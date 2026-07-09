@@ -54,7 +54,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   setConfirmDialog,
   children,
 }) => {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const [data, setData] = useState<ProjectPlannerData>(EMPTY_DATA);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +170,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (project) setSelectedProjectId(project.id);
       return project;
     },
-    [runMutation],
+    [onToast, runMutation],
   );
 
   const updateProject = useCallback(
@@ -243,7 +243,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         },
       });
     },
-    [data.items, data.projects, deleteProject, setConfirmDialog, tr],
+    [data.items, data.projects, deleteProject, setConfirmDialog, t],
   );
 
   const requestDeleteItem = useCallback(
@@ -268,7 +268,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         },
       });
     },
-    [data.items, data.projects, deleteItem, setConfirmDialog, tr],
+    [data.items, data.projects, deleteItem, setConfirmDialog, t],
   );
 
   const materializeProject = useCallback(

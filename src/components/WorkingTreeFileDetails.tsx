@@ -31,7 +31,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       source === 'staged'
         ? t('generated.components.workingtreefiledetails.staged_changes_2b2e99a1')
         : t('generated.components.workingtreefiledetails.unstaged_changes_898c9c1d'),
-    [source, tr],
+    [source, t],
   );
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     };
 
     fetchHistory();
-  }, [activeTab, path, tr]);
+  }, [activeTab, path, t, tr]);
 
   useEffect(() => {
     if (activeTab !== 'blame' || !path || !gitClient.isAvailable()) return;
@@ -94,7 +94,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     };
 
     fetchBlame();
-  }, [activeTab, path, tr]);
+  }, [activeTab, path, t, tr]);
 
   const loadMoreBlame = async () => {
     if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
@@ -120,7 +120,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       path,
       title: t('generated.components.workingtreefiledetails.working_tree_diff_c7f9bda9'),
     });
-  }, [activeTab, onOpenDiff, path, source, tr]);
+  }, [activeTab, onOpenDiff, path, source, t, tr]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';

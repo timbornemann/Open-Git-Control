@@ -59,7 +59,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isLoadingMoreRepos, setIsLoadingMoreRepos] = useState(false);
 
-  const { t, tr } = useLanguageTranslations(language);
+  const { t } = useLanguageTranslations(language);
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {
@@ -116,7 +116,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         }
       }
     },
-    [isAuthenticated, tr],
+    [isAuthenticated, t],
   );
 
   const refreshRepos = useCallback(
@@ -436,7 +436,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         setIsCloning(false);
       }
     },
-    [onRepoCloned, setActiveTab, tr],
+    [onRepoCloned, setActiveTab, t],
   );
 
   const handleClone = useCallback(

@@ -50,7 +50,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     } finally {
       setLoading(false);
     }
-  }, [repoPath, tr]);
+  }, [repoPath, t]);
 
   const loadStashFiles = useCallback(
     async (stashName: string) => {
@@ -91,7 +91,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         }));
       }
     },
-    [repoPath, tr],
+    [repoPath, t],
   );
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         },
       });
     },
-    [load, onRepoChanged, setInputDialog, tr],
+    [load, onRepoChanged, setInputDialog, t],
   );
 
   const toggleFiles = (stash: GitStashEntryDto) => {

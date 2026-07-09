@@ -89,5 +89,5 @@ export const useRepoUnavailableWorkflow = ({ activeRepo, handleCloseRepo, setPla
     });
 
     return unsubscribe;
-  }, [activeRepo, handleCloseRepo, language, setConfirmDialog, setGitActionToast, setPlannerRefreshSignal]);
+  }, [activeRepo, handleCloseRepo, language, setConfirmDialog, setGitActionToast, setPlannerRefreshSignal, t, tr]);
 };

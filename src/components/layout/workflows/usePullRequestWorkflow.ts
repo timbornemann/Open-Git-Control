@@ -71,7 +71,7 @@ export const usePullRequestWorkflow = ({
         setGitActionToast({ msg: t('generated.components.layout.workflows.usepullrequestworkflow.could_not_copy_pr_url_15ef5c92'), isError: true });
       }
     },
-    [setGitActionToast, tr],
+    [setGitActionToast, t],
   );
 
   const handleMergePR = useCallback(
@@ -128,7 +128,7 @@ export const usePullRequestWorkflow = ({
 
       await executeMerge();
     },
-    [confirmDangerousOps, ownerRepo, refreshRemoteState, setConfirmDialog, setGitActionToast, tr, triggerRefresh],
+    [confirmDangerousOps, ownerRepo, refreshRemoteState, setConfirmDialog, setGitActionToast, t, tr, triggerRefresh],
   );
 
   const handleCheckoutPR = useCallback(

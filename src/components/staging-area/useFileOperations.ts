@@ -194,7 +194,7 @@ export const useFileOperations = ({
         setMutationStartedAt(null);
       }
     },
-    [setToast, onRepoChanged, refresh, tr],
+    [setToast, onRepoChanged, refresh, t],
   );
 
   const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
@@ -229,13 +229,13 @@ export const useFileOperations = ({
         setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
       }
     },
-    [setToast, onRepoChanged, refresh, tr],
+    [setToast, tr, onRepoChanged, refresh, t],
   );
 
   const stageFile = useCallback((f: string) => git(['add', '--', f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)), [git, tr]);
   const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
-  const stageAll = useCallback(() => git(['add', '.'], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702')), [git, tr]);
-  const unstageAll = useCallback(() => git(['reset', 'HEAD'], t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313')), [git, tr]);
+  const stageAll = useCallback(() => git(['add', '.'], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702')), [git, t]);
+  const unstageAll = useCallback(() => git(['reset', 'HEAD'], t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313')), [git, t]);
 
   const stageAllUntracked = useCallback(async () => {
     if (!gitClient.isAvailable() || !status || status.untracked.length === 0) return;
@@ -280,7 +280,7 @@ export const useFileOperations = ({
         },
       });
     },
-    [setConfirmDialog, git, tr],
+    [setConfirmDialog, t, git, tr],
   );
 
   const discardAll = useCallback(() => {
@@ -305,7 +305,7 @@ export const useFileOperations = ({
         await git(['checkout', '--', '.'], t('generated.components.staging_area.usefileoperations.discarded_all_changes_f85f8117'), true);
       },
     });
-  }, [setConfirmDialog, git, tr]);
+  }, [setConfirmDialog, t, git]);
 
   const deleteUntracked = useCallback(
     (f: string) => {
@@ -328,7 +328,7 @@ export const useFileOperations = ({
         },
       });
     },
-    [setConfirmDialog, git, tr],
+    [setConfirmDialog, t, git, tr],
   );
 
   const stashFile = useCallback(
@@ -362,7 +362,7 @@ export const useFileOperations = ({
         },
       });
     },
-    [setInputDialog, repoPath, git, onStashChanged, tr],
+    [setInputDialog, t, repoPath, git, tr, onStashChanged],
   );
 
   const stashAll = useCallback(() => {
@@ -396,7 +396,7 @@ export const useFileOperations = ({
         if (ok) onStashChanged?.();
       },
     });
-  }, [setInputDialog, repoPath, status, git, onStashChanged, tr]);
+  }, [status?.staged.length, status?.unstaged.length, status?.untracked.length, setInputDialog, t, repoPath, git, onStashChanged]);
 
   const showDiff = useCallback(
     (filePath: string, staged: boolean) => {
@@ -409,7 +409,7 @@ export const useFileOperations = ({
       };
       onOpenDiff?.(request);
     },
-    [onOpenDiff, tr],
+    [onOpenDiff, t],
   );
 
   return {

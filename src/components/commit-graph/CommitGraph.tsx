@@ -81,7 +81,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       regex: t('generated.components.commit_graph.commitgraph.g_regex_45e4b70c'),
       line: t('generated.components.commit_graph.commitgraph.l_line_range_a736c2f1'),
     }),
-    [tr],
+    [t],
   );
 
   const handleRepoCleared = useCallback(() => {

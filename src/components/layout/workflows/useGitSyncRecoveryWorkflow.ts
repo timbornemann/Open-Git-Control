@@ -101,7 +101,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         isError: false,
       });
     },
-    [runGitCommandRef, setGitActionToast, tr],
+    [runGitCommandRef, setGitActionToast, t, tr],
   );
 
   const runAutostashPullFlow = useCallback(
@@ -156,7 +156,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         isError: false,
       });
     },
-    [runGitCommandRef, setGitActionToast, tr],
+    [runGitCommandRef, setGitActionToast, t],
   );
 
   const maybeHandleSyncMismatchFailure = useCallback(
@@ -199,7 +199,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
 
       return false;
     },
-    [runAutostashPullFlow, setActiveTab, setConfirmDialog, setGitActionToast, tr],
+    [runAutostashPullFlow, setActiveTab, setConfirmDialog, setGitActionToast, t],
   );
 
   return {

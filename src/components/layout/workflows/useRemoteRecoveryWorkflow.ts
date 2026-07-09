@@ -53,7 +53,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [newRepoPrivate, setNewRepoPrivate] = useState(true);
 
-  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
+  const { t } = useLanguageTranslations(settings.language as AppLanguage);
 
   useEffect(() => {
     setNewRepoName('');
@@ -91,7 +91,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       );
       workspace.setActiveTab('repo');
     },
-    [tr, workspace],
+    [t, workspace],
   );
 
   const maybeRecoverRemoteSetup = useCallback(
@@ -184,7 +184,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       });
       return true;
     },
-    [openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, tr, triggerRefresh, workspace],
+    [openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, t, triggerRefresh, workspace],
   );
 
   const maybeHandlePushWithoutOrigin = useCallback(
@@ -223,7 +223,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       });
       return true;
     },
-    [setGitActionToast, tr, triggerRefresh, workspace],
+    [setGitActionToast, t, triggerRefresh, workspace],
   );
 
   const createGithubRepoAndConnect = useCallback(
@@ -389,9 +389,9 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       newRepoPrivate,
       requestInitialCommitConfirmationIfNeeded,
       setGitActionToast,
-      tr,
+      t,
       triggerRefresh,
-      workspace,
+      workspace.activeRepo,
     ],
   );
 

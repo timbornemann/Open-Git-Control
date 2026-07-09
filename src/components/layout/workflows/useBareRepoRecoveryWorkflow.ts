@@ -23,7 +23,7 @@ type Params = {
 };
 
 export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefresh, setGitActionToast }: Params) => {
-  const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
+  const { t } = useLanguageTranslations(settings.language as AppLanguage);
   const recoverBareRepoForPush = useCallback(async (): Promise<boolean> => {
     const electronApi = getElectronApi();
     if (!electronApi || !gitClient.isAvailable() || !workspace.activeRepo) return false;
@@ -170,7 +170,7 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
     });
     triggerRefresh();
     return true;
-  }, [setGitActionToast, settings.defaultBranch, tr, triggerRefresh, workspace]);
+  }, [setGitActionToast, settings.defaultBranch, t, triggerRefresh, workspace]);
 
   return { recoverBareRepoForPush };
 };

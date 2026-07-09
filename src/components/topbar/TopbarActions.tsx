@@ -55,7 +55,7 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenTimeline,
   isTimelineLoading = false,
 }) => {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
@@ -81,7 +81,7 @@ export const TopbarActions: React.FC<Props> = ({
         action: onPullFfOnly,
       },
     ],
-    [onPullFfOnly, onPullNoFf, onPullRebase, tr],
+    [onPullFfOnly, onPullNoFf, onPullRebase, t],
   );
 
   const mergeCandidates = useMemo(() => {
@@ -123,7 +123,7 @@ export const TopbarActions: React.FC<Props> = ({
         hint: t('generated.components.topbar.topbaractions.abort_if_not_fast_forward_c6074964'),
       },
     ],
-    [tr],
+    [t],
   );
 
   const pushOptions = useMemo<SplitOption[]>(
@@ -144,7 +144,7 @@ export const TopbarActions: React.FC<Props> = ({
         action: onPushTags,
       },
     ],
-    [onPushForceWithLease, onPushSetUpstream, onPushTags, tr],
+    [onPushForceWithLease, onPushSetUpstream, onPushTags, t],
   );
 
   useEffect(() => {

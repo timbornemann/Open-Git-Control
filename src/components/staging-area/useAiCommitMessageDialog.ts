@@ -11,7 +11,7 @@ type UseAiCommitMessageDialogParams = {
 };
 
 export const useAiCommitMessageDialog = ({ aiCommit, commitForm, setInputDialog }: UseAiCommitMessageDialogParams) => {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
 
   return useCallback(() => {
     setInputDialog({
@@ -39,5 +39,5 @@ export const useAiCommitMessageDialog = ({ aiCommit, commitForm, setInputDialog 
         commitForm.setCommitDescription(message.description || '');
       },
     });
-  }, [aiCommit, commitForm, setInputDialog, tr]);
+  }, [aiCommit, commitForm, setInputDialog, t]);
 };

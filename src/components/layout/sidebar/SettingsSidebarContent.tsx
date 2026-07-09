@@ -90,7 +90,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({ 
         isError: true,
       });
     }
-  }, [tr]);
+  }, [t]);
 
   return (
     <div className="ssc-root">

@@ -53,7 +53,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
       default:
         return t('generated.components.layout.hooks.usesettingsaiupdater.ready_544f4b02');
     }
-  }, [updaterStatus, tr]);
+  }, [updaterStatus, t]);
 
   const updaterSupported = Boolean(updaterStatus?.isSupported);
   const installedVersion = appVersion || updaterStatus?.currentVersion || t('generated.components.layout.hooks.usesettingsaiupdater.unknown_3f835544');
@@ -66,7 +66,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     if (updaterStatus?.state === 'downloaded') return t('generated.components.layout.hooks.usesettingsaiupdater.install_update_f3aa2988');
     if (updaterStatus?.state === 'update-available') return t('generated.components.layout.hooks.usesettingsaiupdater.download_update_8917c04f');
     return t('generated.components.layout.hooks.usesettingsaiupdater.check_for_updates_a131e2c5');
-  }, [isInstallingUpdate, isRunningUpdate, updaterStatus?.state, tr]);
+  }, [isInstallingUpdate, t, isRunningUpdate, updaterStatus?.state]);
 
   const oneClickUpdateDisabled =
     !updaterSupported || isRunningUpdate || isInstallingUpdate || updaterStatus?.state === 'checking' || updaterStatus?.state === 'downloading';
@@ -218,7 +218,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
       active = false;
       unsubscribe();
     };
-  }, [tr]);
+  }, [t, tr]);
 
   return {
     isTestingAi,

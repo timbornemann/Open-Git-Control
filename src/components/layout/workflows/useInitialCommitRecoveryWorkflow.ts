@@ -100,7 +100,7 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
       });
       return false;
     },
-    [recoverBareRepoForPush, setActiveTab, setGitActionToast, tr],
+    [recoverBareRepoForPush, setActiveTab, setGitActionToast, t],
   );
 
   const requestInitialCommitConfirmationIfNeeded = useCallback(
@@ -152,7 +152,7 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
       });
       return true;
     },
-    [setActiveTab, setConfirmDialog, tr],
+    [setActiveTab, setConfirmDialog, t, tr],
   );
 
   return {

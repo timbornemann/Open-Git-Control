@@ -165,7 +165,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
         scheduleTerminalClear();
       }
     },
-    [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, tr],
+    [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, t],
   );
 
   const pullLatestAiState = useCallback(async () => {
@@ -311,16 +311,17 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       setIsAiCommitting(false);
     }
   }, [
-    clearTerminalClearTimer,
+    status,
     isAiCommitting,
     isAiJobRunning,
+    clearTerminalClearTimer,
+    t,
     maybeRefresh,
-    onRepoChanged,
+    setToast,
     onCommitsCreated,
+    onRepoChanged,
     refresh,
     scheduleTerminalClear,
-    setToast,
-    status,
     tr,
   ]);
 
@@ -355,7 +356,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
         isError: true,
       });
     }
-  }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, tr]);
+  }, [isAiCommitting, isAiJobRunning, pullLatestAiState, scheduleTerminalClear, setToast, t]);
 
   const generateCommitMessageFromNotes = useCallback(
     async (notes: string): Promise<GeneratedCommitMessage | null> => {
@@ -387,7 +388,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
         setIsAiMessageGenerating(false);
       }
     },
-    [setToast, tr],
+    [setToast, t],
   );
 
   return {

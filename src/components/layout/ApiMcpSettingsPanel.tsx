@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '@/global';
 import { useI18n } from '@/i18n';
@@ -84,7 +84,7 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   const [tokenActionMessage, setTokenActionMessage] = useState<string | null>(null);
   const [isTokenActionRunning, setIsTokenActionRunning] = useState(false);
 
-  const loadApiInfo = async () => {
+  const loadApiInfo = useCallback(async () => {
     if (!appClient.isAvailable()) {
       setLoadError(t('generated.components.layout.apimcpsettingspanel.api_status_is_not_available_in_this_app_process_e90733fe'));
       return;
@@ -96,11 +96,11 @@ export const ApiMcpSettingsPanel: React.FC = () => {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : String(error));
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     void loadApiInfo();
-  }, []);
+  }, [loadApiInfo]);
 
   const runTokenAction = async (action: 'generate' | 'clear') => {
     if (!appClient.isAvailable()) return;
