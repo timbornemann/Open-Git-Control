@@ -63,6 +63,24 @@ afterEach(() => {
 });
 
 describe('usePullRequestWorkflow merge guards', () => {
+  it('fetches a PR into FETCH_HEAD before force-resetting the disposable local review branch', async () => {
+    const rendered = renderWorkflow();
+
+    await act(async () => {
+      await rendered.hook.handleCheckoutPR(42, 'feature/new thing');
+    });
+
+    expect(rendered.params.runGitCommand).toHaveBeenNthCalledWith(1, ['fetch', 'origin', 'pull/42/head'], 'Loaded branch for PR #42.', 'Loading PR #42...', {
+      skipDirtyGuard: true,
+    });
+    expect(rendered.params.runGitCommand).toHaveBeenNthCalledWith(
+      2,
+      ['checkout', '-B', 'pr-42-feature-new-thing', 'FETCH_HEAD'],
+      'Checked out PR branch pr-42-feature-new-thing.',
+    );
+    rendered.unmount();
+  });
+
   it('reports a successful HTTP response with merged=false as a failed merge', async () => {
     vi.spyOn(githubClient, 'mergePullRequest').mockResolvedValue({
       success: true,

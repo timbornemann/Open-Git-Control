@@ -235,4 +235,26 @@ describe('platform IPC handlers', () => {
     await expect(handlers.get(IpcChannel.SettingsClearOpenAiApiKey)?.({})).resolves.toEqual(expect.objectContaining({ hasOpenAiApiKey: false }));
     expect(clearSavedOpenAiApiKeySecurelyMock).toHaveBeenCalled();
   });
+
+  it('clears a saved OpenAI key when its endpoint origin changes', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    readSettingsWithMigrationMock.mockReturnValue({
+      language: 'en',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: false,
+      hasOpenAiApiKey: true,
+      openAiBaseUrl: 'https://api.openai.com/v1',
+    });
+
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() } } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsSet)?.({}, { openAiBaseUrl: 'https://gateway.example.test/v1' })).resolves.toEqual(
+      expect.objectContaining({ openAiBaseUrl: 'https://gateway.example.test/v1', hasOpenAiApiKey: false }),
+    );
+
+    expect(clearSavedOpenAiApiKeySecurelyMock).toHaveBeenCalledTimes(1);
+    expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ hasOpenAiApiKey: false }));
+  });
 });

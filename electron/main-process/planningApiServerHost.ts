@@ -17,6 +17,15 @@ type PlanningApiHostDeps = {
   handleMcpRpc: McpRpcHandler;
 };
 
+type McpBodyReadResult =
+  | {
+      kind: 'payload';
+      payload: unknown;
+    }
+  | {
+      kind: 'parse-error';
+    };
+
 const cleanString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
 const createAuthToken = (configuredToken?: string): string => {
@@ -109,7 +118,7 @@ const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> 
     request.on('error', reject);
   });
 
-const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> =>
+const readMcpBody = async (request: http.IncomingMessage): Promise<McpBodyReadResult> =>
   new Promise((resolve, reject) => {
     let total = 0;
     const chunks: Buffer[] = [];
@@ -129,17 +138,22 @@ const readMcpBody = async (request: http.IncomingMessage): Promise<unknown> =>
         return;
       }
       try {
-        resolve(JSON.parse(text));
+        resolve({ kind: 'payload', payload: JSON.parse(text) });
       } catch {
         resolve({
-          jsonrpc: '2.0',
-          id: null,
-          error: { code: -32700, message: 'Parse error' },
+          kind: 'parse-error',
         });
       }
     });
     request.on('error', reject);
   });
+
+const jsonRpcParseError = () =>
+  ({
+    jsonrpc: '2.0',
+    id: null,
+    error: { code: -32700, message: 'Parse error' },
+  }) as const;
 
 export const createPlanningApiRequestHandler =
   (deps: PlanningApiHostDeps & { getAuthToken: () => string }) =>
@@ -171,12 +185,12 @@ export const createPlanningApiRequestHandler =
         if (method !== 'POST') {
           throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'MCP endpoint expects HTTP POST with JSON-RPC payloads.');
         }
-        const payload = await readMcpBody(request);
-        if (payload && typeof payload === 'object' && 'jsonrpc' in payload && 'error' in payload) {
-          sendJson(response, 200, payload);
+        const body = await readMcpBody(request);
+        if (body.kind === 'parse-error') {
+          sendJson(response, 200, jsonRpcParseError());
           return;
         }
-        const rpcResponse = await deps.handleMcpRpc(payload);
+        const rpcResponse = await deps.handleMcpRpc(body.payload);
         if (rpcResponse === null) {
           response.writeHead(204);
           response.end();

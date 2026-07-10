@@ -5,6 +5,7 @@ import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { BlamePanel } from './file-details/BlamePanel';
 import { FileHistoryPanel } from './file-details/FileHistoryPanel';
+import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from './file-details/blamePagination';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -78,10 +79,11 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await gitClient.getFileBlameRange(path, undefined, 1, 500);
+        const result = await gitClient.getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT);
         if (result.success) {
-          setBlameLines(result.data || []);
-          setBlameHasMore((result.data || []).length === 500);
+          const page = splitBlamePage(result.data || []);
+          setBlameLines(page.lines);
+          setBlameHasMore(page.hasMore);
         } else {
           setBlameLines([]);
           setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
@@ -102,13 +104,14 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
     setBlameLoading(true);
     try {
-      const result = await gitClient.getFileBlameRange(path, undefined, blameLines.length + 1, 500);
+      const result = await gitClient.getFileBlameRange(path, undefined, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT);
       if (!result.success) {
         setBlameError(result.error);
         return;
       }
-      setBlameLines((current) => [...current, ...result.data]);
-      setBlameHasMore(result.data.length === 500);
+      const page = splitBlamePage(result.data);
+      setBlameLines((current) => [...current, ...page.lines]);
+      setBlameHasMore(page.hasMore);
     } finally {
       setBlameLoading(false);
     }

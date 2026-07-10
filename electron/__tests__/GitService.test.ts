@@ -173,6 +173,15 @@ describe('GitService file blame', () => {
     expect(runCommandSpy).toHaveBeenNthCalledWith(1, ['ls-tree', '-r', '--name-only', 'HEAD', '--', ':(literal)src/existing.ts']);
     expect(runCommandSpy).toHaveBeenNthCalledWith(2, ['blame', '--line-porcelain', '-L1,500', '--', 'src/existing.ts']);
   });
+
+  it('permits one look-ahead line so the renderer can detect the end of an exact page', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValueOnce('src/existing.ts\n').mockResolvedValueOnce('blame output');
+
+    await expect(service.getFileBlameRange('src/existing.ts', undefined, 1, 501)).resolves.toBe('blame output');
+
+    expect(runCommandSpy).toHaveBeenNthCalledWith(2, ['blame', '--line-porcelain', '-L1,501', '--', 'src/existing.ts']);
+  });
 });
 
 describe('GitService repo path normalization', () => {

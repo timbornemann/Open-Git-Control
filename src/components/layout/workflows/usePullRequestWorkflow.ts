@@ -149,14 +149,14 @@ export const usePullRequestWorkflow = ({
     async (prNumber: number, headRef: string) => {
       const targetBranch = gitClient.getPullRequestBranchName(prNumber, headRef);
       const fetched = await runGitCommand(
-        gitClient.buildFetchPullRequestBranchArgs(prNumber, targetBranch),
+        gitClient.buildFetchPullRequestBranchArgs(prNumber),
         tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
         tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
         { skipDirtyGuard: true },
       );
       if (!fetched) return;
       await runGitCommand(
-        gitClient.buildCheckoutBranchArgs(targetBranch),
+        gitClient.buildCheckoutPullRequestBranchArgs(targetBranch),
         tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
       );
     },

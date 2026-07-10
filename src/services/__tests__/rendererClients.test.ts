@@ -235,7 +235,8 @@ describe('renderer service clients', () => {
     expect(gitClient.buildRevertCommitArgs('abc123', { mainline: 1, noEdit: true })).toEqual(['revert', '-m', '1', '--no-edit', 'abc123']);
     expect(gitClient.buildResetToCommitArgs('--hard', 'abc123')).toEqual(['reset', '--hard', 'abc123']);
     expect(gitClient.getPullRequestBranchName(42, 'feature/new thing')).toBe('pr-42-feature-new-thing');
-    expect(gitClient.buildFetchPullRequestBranchArgs(42, 'pr-42-feature', 'upstream')).toEqual(['fetch', 'upstream', 'pull/42/head:pr-42-feature']);
+    expect(gitClient.buildFetchPullRequestBranchArgs(42, 'upstream')).toEqual(['fetch', 'upstream', 'pull/42/head']);
+    expect(gitClient.buildCheckoutPullRequestBranchArgs('pr-42-feature')).toEqual(['checkout', '-B', 'pr-42-feature', 'FETCH_HEAD']);
     expect(gitClient.buildSetUpstreamBranchArgs('main')).toEqual(['branch', '--set-upstream-to', 'origin/main', 'main']);
     expect(gitClient.buildPullArgs(['--ff-only'])).toEqual(['pull', '--ff-only']);
     expect(gitClient.buildPullRebaseArgs()).toEqual(['pull', '--rebase']);
@@ -297,7 +298,7 @@ describe('renderer service clients', () => {
       '--track',
       'origin/main',
     ]);
-    await expectDelegation(() => gitClient.fetchPullRequestBranch(4, 'pr-4-main'), api.git.runGitCommand, ['fetch', 'origin', 'pull/4/head:pr-4-main']);
+    await expectDelegation(() => gitClient.fetchPullRequestBranch(4), api.git.runGitCommand, ['fetch', 'origin', 'pull/4/head']);
     await expectDelegation(() => gitClient.pullRebase(), api.git.runGitCommand, ['pull', '--rebase']);
     await expectDelegation(() => gitClient.stashPush('saving work'), api.git.runGitCommand, ['stash', 'push', '-u', '-m', 'saving work']);
     await expectDelegation(() => gitClient.stashPop(), api.git.runGitCommand, ['stash', 'pop']);

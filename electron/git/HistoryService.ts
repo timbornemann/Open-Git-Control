@@ -145,7 +145,9 @@ export class HistoryService {
 
   async getFileBlameRange(filePath: string, commitHash: string | undefined, startLine: number, lineCount: number): Promise<string> {
     const safeStart = Number.isFinite(startLine) ? Math.max(1, Math.floor(startLine)) : 1;
-    const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 500)) : 500;
+    // The renderer asks for one look-ahead line (501 total) to tell a full
+    // page from the end of a file with exactly 500/1000/... lines.
+    const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 501)) : 500;
     const endLine = safeStart + safeCount - 1;
     const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
     const normalizedHash = normalizeOptionalCommitHash(commitHash);

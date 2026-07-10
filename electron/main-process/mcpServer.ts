@@ -5,24 +5,21 @@ import {
   createPlannerItem,
   deletePlannerItem,
   ensureRepositoryProject,
-  readProjectPlannerData,
-  updatePlannerItem,
 } from './projectPlannerStore';
 import type { JsonObject } from './planningApiTypes';
 import { MCP_PROTOCOL_VERSION, SERVER_NAME, ApiError } from './planningApiTypes';
 import {
   cleanString,
-  enrichTodos,
   getRepositories,
   getTabs,
   getTodoById,
   getTodos,
   itemInputFromBody,
-  itemUpdateFromBody,
   listProjectsForTool,
   moveTodoFromBody,
   resolveProjectLocator,
   toolTodoOptions,
+  updateTodoFromBody,
 } from './planningApiDomain';
 
 export const callMcpTool = async (name: string, args: JsonObject): Promise<unknown> => {
@@ -52,12 +49,7 @@ export const callMcpTool = async (name: string, args: JsonObject): Promise<unkno
     case 'update_todo': {
       const itemId = cleanString(args.itemId);
       if (!itemId) throw new ApiError(400, 'TODO_REQUIRED', 'itemId is required.');
-      if (cleanString(args.projectId) || cleanString(args.repoPath) || cleanString(args.projectName)) {
-        moveTodoFromBody(itemId, args);
-      }
-      const updated = updatePlannerItem(itemId, itemUpdateFromBody(args));
-      const data = readProjectPlannerData();
-      return enrichTodos([updated], data.projects)[0];
+      return updateTodoFromBody(itemId, args);
     }
     case 'move_todo': {
       const itemId = cleanString(args.itemId);
@@ -183,6 +175,9 @@ export const MCP_TOOLS = [
 
 export const handleMcpRpc = async (payload: unknown, serverVersion: string): Promise<unknown> => {
   if (Array.isArray(payload)) {
+    if (payload.length === 0) {
+      return jsonRpcError(null, -32600, 'Invalid Request');
+    }
     const responses = (await Promise.all(payload.map((entry) => handleMcpMessage(entry, serverVersion)))).filter((entry) => entry !== null);
     return responses.length > 0 ? responses : null;
   }
@@ -229,21 +224,37 @@ function todoMutationSchema(required: string[]): JsonObject {
   };
 }
 
+const hasOwn = (value: JsonObject, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key);
+
+const isValidRequestId = (value: unknown): value is string | number | null => value === null || typeof value === 'string' || typeof value === 'number';
+
+const isJsonObject = (value: unknown): value is JsonObject => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isStructuredValue = (value: unknown): boolean => isJsonObject(value) || Array.isArray(value);
+
 const handleMcpMessage = async (message: unknown, serverVersion: string): Promise<unknown> => {
-  if (!message || typeof message !== 'object') {
+  if (!isJsonObject(message)) {
     return jsonRpcError(null, -32600, 'Invalid Request');
   }
-  const request = message as JsonObject;
-  const id = Object.prototype.hasOwnProperty.call(request, 'id') ? request.id : undefined;
-  const method = cleanString(request.method);
-  const params = request.params && typeof request.params === 'object' ? (request.params as JsonObject) : {};
 
-  if (!method) return jsonRpcError(id ?? null, -32600, 'Invalid Request');
+  const request = message;
+  const hasId = hasOwn(request, 'id');
+  const id = hasId ? request.id : null;
+  const method = typeof request.method === 'string' ? request.method : '';
+  const rawParams = request.params === undefined ? {} : request.params;
 
+  if (request.jsonrpc !== '2.0' || !method || (hasId && !isValidRequestId(id)) || !isStructuredValue(rawParams)) {
+    return jsonRpcError(null, -32600, 'Invalid Request');
+  }
+
+  // A JSON-RPC notification is a valid request without an id. It is still
+  // executed, but it must never receive a result or an error response.
+  const isNotification = !hasId;
   try {
+    let response: JsonObject;
     switch (method) {
       case 'initialize':
-        return jsonRpcResult(id, {
+        response = jsonRpcResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: {
             tools: {
@@ -257,30 +268,43 @@ const handleMcpMessage = async (message: unknown, serverVersion: string): Promis
           },
           instructions: 'Use get_next_todos for open work ordered by urgency. Use move_todo to change tabs/status.',
         });
+        break;
       case 'notifications/initialized':
-        return null;
+        response = jsonRpcResult(id, {});
+        break;
       case 'ping':
-        return jsonRpcResult(id, {});
+        response = jsonRpcResult(id, {});
+        break;
       case 'tools/list':
-        return jsonRpcResult(id, { tools: MCP_TOOLS });
+        response = jsonRpcResult(id, { tools: MCP_TOOLS });
+        break;
       case 'tools/call': {
+        if (!isJsonObject(rawParams)) {
+          response = jsonRpcError(id, -32602, 'Invalid params');
+          break;
+        }
+        const params = rawParams;
         const toolName = cleanString(params.name);
-        const args = params.arguments && typeof params.arguments === 'object' ? (params.arguments as JsonObject) : {};
+        const args = isJsonObject(params.arguments) ? params.arguments : {};
         const structuredContent = await callMcpTool(toolName, args);
-        return jsonRpcResult(id, {
+        response = jsonRpcResult(id, {
           content: [{ type: 'text', text: JSON.stringify(structuredContent, null, 2) }],
           structuredContent,
           isError: false,
         });
+        break;
       }
       default:
-        return jsonRpcError(id ?? null, -32601, `Method not found: ${method}`);
+        response = jsonRpcError(id, -32601, `Method not found: ${method}`);
+        break;
     }
+    return isNotification ? null : response;
   } catch (error) {
-    return jsonRpcResult(id, {
+    const response = jsonRpcResult(id, {
       content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
       isError: true,
     });
+    return isNotification ? null : response;
   }
 };
 

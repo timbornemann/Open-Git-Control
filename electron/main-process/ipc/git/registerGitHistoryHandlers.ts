@@ -2,6 +2,7 @@ import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import type { CommitStatsPriority, CommitStatsService } from '../../../CommitStatsService';
 import type { GitService } from '../../../GitService';
 import type { WorkingTreeService } from '../../../WorkingTreeService';
+import { EXPECTED_NON_FATAL_GIT_ERROR_NAME } from '../../../git/GitErrorFormatter';
 import { isRepoUnavailableError } from '../../../../src/shared/git/errors';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseFileBlame, parseFileHistory, parseStashList } from '../../parsing';
@@ -10,6 +11,14 @@ type RegisterGitHistoryHandlersDeps = {
   gitService: GitService;
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
+};
+
+const isUnbornHeadError = (error: unknown): boolean => {
+  if (error instanceof Error && error.name === EXPECTED_NON_FATAL_GIT_ERROR_NAME) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /needed a single revision|does not have any commits yet|unknown revision or path not in the working tree|ambiguous argument ['"]?HEAD['"]?: unknown revision/i.test(
+    message,
+  );
 };
 
 export function registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService }: RegisterGitHistoryHandlersDeps): void {
@@ -33,10 +42,13 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
       if (!repoPath) throw new Error('No repository path set.');
 
       try {
-        await gitService.runCommand(['rev-parse', '--verify', 'HEAD']);
+        await gitService.runCommand(['rev-parse', '--verify', '--quiet', 'HEAD']);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         if (isRepoUnavailableError(message)) {
+          throw error;
+        }
+        if (!isUnbornHeadError(error)) {
           throw error;
         }
         return {

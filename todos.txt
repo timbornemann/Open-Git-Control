@@ -1,130 +1,30 @@
-## Audit-Fazit
+Blame-Pagination scheitert bei exakt 500, 1000 usw. Zeilen. Die UI bietet „mehr laden“ an; Git beantwortet die nächste Range mit „file has only 500 lines“.
+Fundstellen: [HistoryService.ts (line 146)](D:/Projects/Software/Open-Git-Control/electron/git/HistoryService.ts:146), [WorkingTreeFileDetails.tsx (line 81)](D:/Projects/Software/Open-Git-Control/src/components/WorkingTreeFileDetails.tsx:81)
 
-Die Anwendung ist nicht fehlerfrei. Der Audit hat mehrere hohe Datenverlust-, Security- und Repository-Zuordnungsrisiken sowie zahlreiche Race Conditions und unvollständige Edge-Case-Implementierungen ergeben. Der normale Build und alle Unit-Tests bestehen, erkennen diese Fälle aber derzeit nicht.
+PR-Checkout lässt sich nicht zuverlässig aktualisieren. Fetch direkt in den lokalen PR-Branch scheitert, wenn dieser ausgecheckt ist oder der PR force-gepusht wurde.
+Fundstellen: [gitClient.ts (line 169)](D:/Projects/Software/Open-Git-Control/src/services/gitClient.ts:169), [usePullRequestWorkflow.ts (line 148)](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/usePullRequestWorkflow.ts:148)
 
-Es wurden keine Quellcodedateien verändert.
+Tag-Validierung ist unvollständig. Unter anderem werden .v1, v1..2, v1.lock, v1/@{x} und v1//x akzeptiert, obwohl git check-ref-format sie ablehnt. Die Versionsvorschau erzwingt außerdem einen v-Prefix, selbst wenn das Repository ausschließlich Tags wie 1.4.2 verwendet.
+Fundstellen: [githubReleaseValidation.ts (line 1)](D:/Projects/Software/Open-Git-Control/src/utils/githubReleaseValidation.ts:1), [releaseTagSuggestion.ts (line 1)](D:/Projects/Software/Open-Git-Control/src/utils/releaseTagSuggestion.ts:1)
 
-## Hohe Priorität
+Planner-Update kann trotz Fehler Teildaten speichern. Bei gleichzeitigem Verschieben und ungültiger Änderung wird zuerst das Projekt dauerhaft geändert und danach ein Fehler zurückgegeben. Ungültige Clientdaten werden zudem als HTTP 500 statt 4xx ausgegeben.
+Fundstellen: [planningTodosController.ts (line 33)](D:/Projects/Software/Open-Git-Control/electron/main-process/planningTodosController.ts:33), [planningApiServerHost.ts (line 199)](D:/Projects/Software/Open-Git-Control/electron/main-process/planningApiServerHost.ts:199)
 
-1. **Falsche Dateioperationen durch Pfadnormalisierung**
+One-Click-Updater läuft während eines bestehenden Downloads nach fünf Sekunden fälschlich in error, obwohl der Download weiterläuft.
+Fundstelle: [updaterManager.ts (line 178)](D:/Projects/Software/Open-Git-Control/electron/main-process/updaterManager.ts:178)
 
-   Führende/nachgestellte Leerzeichen werden aus legitimen Git-Dateinamen entfernt; auf POSIX wird zusätzlich `\` fälschlich als Pfadtrenner behandelt. Im Temp-Repo überschrieb `writeRepoFile(' target.txt', ...)` nachweislich stattdessen `target.txt`.
+Git-Fehler werden teilweise verschluckt oder können Credentials loggen. Korruption, Berechtigungs- oder Git-Executable-Fehler erscheinen teilweise als „keine Commits/kein Origin“. Bei unerwarteten Fehlern wird die vollständige Argumentliste inklusive möglicher Tokens in Remote-URLs protokolliert.
+Fundstellen: [registerGitHistoryHandlers.ts (line 35)](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/git/registerGitHistoryHandlers.ts:35), [GitService.ts (line 350)](D:/Projects/Software/Open-Git-Control/electron/GitService.ts:350), [GitErrorFormatter.ts (line 13)](D:/Projects/Software/Open-Git-Control/electron/git/GitErrorFormatter.ts:13)
 
-   Fundstellen: [RepositoryPathSafety.ts](D:/Projects/Software/Open-Git-Control/electron/git/RepositoryPathSafety.ts:12), [RepositoryFiles.ts](D:/Projects/Software/Open-Git-Control/electron/git/RepositoryFiles.ts:74), [CommitService.ts](D:/Projects/Software/Open-Git-Control/electron/git/CommitService.ts:20)
+Mehrere App-Instanzen können gemeinsame Whole-file-Stores überschreiben. Ein requestSingleInstanceLock fehlt. Der Planner verwendet zudem einen festen .tmp-Pfad.
+Fundstellen: [main.ts (line 100)](D:/Projects/Software/Open-Git-Control/electron/main.ts:100), [projectPlannerStore.ts (line 165)](D:/Projects/Software/Open-Git-Control/electron/main-process/projectPlannerStore.ts:165)
 
-2. **Konflikteditor zerstört Nicht-UTF-8-Dateien**
-
-   Dateien werden immer als UTF-8 gelesen und geschrieben. UTF-16LE, Latin-1, ungültiges UTF-8 oder binäre Konflikte werden dadurch bereits beim unveränderten Speichern irreversibel verändert. Der Fehler wurde bytegenau reproduziert.
-
-   Fundstelle: [RepositoryFiles.ts](D:/Projects/Software/Open-Git-Control/electron/git/RepositoryFiles.ts:34)
-
-3. **GitHub-Enterprise-Asset-Upload leakt Token und Datei an Public GitHub**
-
-   Trotz konfigurierter GHES-API sendet Octokit Release-Assets an `https://uploads.github.com`. Im Repro wurden Enterprise-Token und Dateistream an diese öffentliche URL übergeben.
-
-   Fundstellen: [GitHubAuthService.ts](D:/Projects/Software/Open-Git-Control/electron/github/GitHubAuthService.ts:68), [GitHubReleaseService.ts](D:/Projects/Software/Open-Git-Control/electron/github/GitHubReleaseService.ts:145)
-
-4. **Secret-Scan kann umgangen werden und übersieht aktuelle GitHub-Tokens**
-
-   - `approveSecretScanPush()` setzt lediglich einen globalen Zwei-Minuten-Zeitstempel. Die Freigabe ist nicht an Repository, Ref, Remote, Sender oder Scan-Ergebnis gebunden. Eine Freigabe für Repo A kann daher den Push in Repo B ungeprüft durchlassen.
-   - Fine-Grained-PATs mit `github_pat_...` werden in typischen unquoted `.env`-Zuweisungen nicht erkannt.
-
-   Fundstellen: [registerGitHandlers.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/registerGitHandlers.ts:37), [SecretScanService.ts](D:/Projects/Software/Open-Git-Control/electron/SecretScanService.ts:52)
-
-5. **Renderer und Main-Prozess können auf unterschiedliche Repositories zeigen**
-
-   Ein laufender Wechsel A → B kann durch das parallele Schließen eines beliebigen Repositories im Renderer invalidiert werden, obwohl der Main-Prozess bereits auf B gewechselt hat. Danach zeigt die UI A, während globale Git-Befehle in B laufen.
-
-   Ein verwandter Fehler besteht beim Hinzufügen einer Ignore-Regel: `.gitignore` kann in A geändert und das anschließende Unstage nach einem Wechsel in B ausgeführt werden.
-
-   Fundstellen: [useWorkspaceDomain.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/hooks/useWorkspaceDomain.ts:185), [useIgnoreRule.ts](D:/Projects/Software/Open-Git-Control/src/components/staging-area/useIgnoreRule.ts:17)
-
-6. **Installierte Anwendung kann durch `NODE_ENV` in unsicheren Dev-Modus versetzt werden**
-
-   Der Modus wird ausschließlich aus der vererbten Umgebungsvariable bestimmt. Ein installiertes Binary mit `NODE_ENV=development` lädt `http://localhost:5173` mit vollständiger Preload-IPC-API, DevTools und lockerer Dev-CSP. `app.isPackaged` wird nicht berücksichtigt.
-
-   Fundstellen: [main.ts](D:/Projects/Software/Open-Git-Control/electron/main.ts:24), [windowFactory.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/windowFactory.ts:39), [security.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/security.ts:55)
-
-7. **Fenster schließen oder neu laden während eines Clones kann den Main-Prozess treffen**
-
-   Der Clone-Progress-Callback verwendet ungeschütztes `webContents.send`. Wird das Fenster während eines Daten-Events zerstört, entsteht eine unbehandelte Exception außerhalb des Clone-Promises.
-
-   Fundstellen: [GitSpawnOperations.ts](D:/Projects/Software/Open-Git-Control/electron/git/GitSpawnOperations.ts:225), [registerGitHandlers.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/registerGitHandlers.ts:403)
-
-8. **Beliebige Remote-Namen werden faktisch nicht unterstützt**
-
-   Push-Recovery und automatischer Fetch sind fest auf `origin` verdrahtet. Repositories mit ausschließlich `upstream` oder `github` werden blockiert, obwohl der Branch korrekt trackt. Gleichzeitig wird `origin2` durch `startsWith('origin')` fälschlich als `origin` erkannt.
-
-   Fundstellen: [useRemoteRecoveryWorkflow.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/useRemoteRecoveryWorkflow.ts:191), [useRepositoryRemoteSync.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/hooks/useRepositoryRemoteSync.ts:103), [useRepositoryRemotes.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/hooks/useRepositoryRemotes.ts:17)
-
-9. **Der offizielle CI-/Release-Pfad ist aktuell blockiert**
-
-   `npm run test:ci` endet mit Exit-Code 1:
-
-   - Architekturprüfung: fünf Dateien überschreiten das eigene 500-Zeilen-Limit.
-   - Prettier: 20 Dateien nicht formatiert.
-   - Coverage: mehrere festgelegte Datei-Schwellen werden trotz 420 bestandener Tests verfehlt.
-
-   Damit können derzeit auch die GitHub-Release-Jobs nicht erfolgreich durchlaufen.
-   Dateien müssen aufgeteilt werde damit sie weniger funktionen auf einmal übernehmen.
-
-## Mittlere Priorität
-
-1. **KI-Auto-Commit ist beim Abbruch nicht transaktional.** Ein Cancel kann gestagte Dateien zurücklassen oder nach bereits erstelltem Commit trotzdem „abgebrochen“ melden. Ein zweiter Startversuch überschreibt außerdem den sichtbaren Status des weiterhin laufenden Jobs. Große untracked Dateien werden vollständig in den Main-Prozess geladen und können Speicher bzw. Event-Loop blockieren.  
-   Fundstellen: [AiAutoCommitRunSession.ts](D:/Projects/Software/Open-Git-Control/electron/ai/AiAutoCommitRunSession.ts:318), [registerAiHandlers.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/registerAiHandlers.ts:85), [diffContext.ts](D:/Projects/Software/Open-Git-Control/electron/ai/diffContext.ts:174)
-
-2. **Mehrere UI-Anfragen besitzen keine Request-ID oder Repository-Generation.** Dadurch können verspätete Antworten alten Zustand in eine neue Ansicht schreiben:
-
-   - Commit-Inspector vermischt Hash, Beschreibung, Dateien und Blame verschiedener Commits: [useCommitDetailsData.ts](D:/Projects/Software/Open-Git-Control/src/components/commit-details/useCommitDetailsData.ts:55)
-   - Forensische Suche bleibt bei A → B erhalten: [useForensicSearch.ts](D:/Projects/Software/Open-Git-Control/src/components/commit-graph/useForensicSearch.ts:18)
-   - Amend-/Commit-Formular kann Text aus dem alten Repo übernehmen: [useCommitForm.ts](D:/Projects/Software/Open-Git-Control/src/components/staging-area/useCommitForm.ts:64)
-   - Release-Kontext kann beim Tippen von `targetCommitish` auf einen älteren Stand zurückspringen: [useReleaseWorkflow.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/useReleaseWorkflow.ts:161)
-   - GitHub-Suche und „Load more“ können verschiedene Suchläufe vermischen: [useGithubRepositoryPages.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/hooks/github/useGithubRepositoryPages.ts:33)
-   - Timeline kann nach Repo-Wechsel wieder alte Daten öffnen: [useMainViewTimeline.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/main/useMainViewTimeline.ts:19)
-   - Verspätete Commit-Statistiken können Graph-Caches verschiedener Repositories vermischen: [useCommitGraphData.ts](D:/Projects/Software/Open-Git-Control/src/components/commit-graph/useCommitGraphData.ts:318)
-   - Modelllisten bleiben beim Wechsel des KI-Providers erhalten: [useSettingsAiUpdater.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/hooks/useSettingsAiUpdater.ts:21)
-
-3. **File-Timeline wird durch Git-Copy-Status beschädigt.** `C100 old new` konsumiert nur einen Pfad; im Repro entstand eine Phantomdatei namens `M`, während die eigentliche Kopie fehlte.  
-   Fundstelle: [HistoryService.ts](D:/Projects/Software/Open-Git-Control/electron/git/HistoryService.ts:214)
-
-4. **Git-Scheduler erkennt Pfad-Aliase desselben Repositories nicht.** `C:\repo` und `C:\repo\`, Symlinks oder Junctions erhalten getrennte Queues. Zwei Writes liefen im Repro gleichzeitig. Abgebrochene wartende Jobs werden außerdem erst nach Ende des blockierenden Jobs rejected.  
-   Fundstelle: [GitScheduler.ts](D:/Projects/Software/Open-Git-Control/electron/GitScheduler.ts:87)
-
-5. **Bare-Repositories sind nur teilweise unterstützt.** Der Bare-Status eines expliziten Pfades wird aus dem Cache des aktiven Repositories gelesen. Working-Tree-Stats starten anschließend trotzdem `git diff --numstat` und scheitern bei jedem Poll.  
-   Fundstellen: [GitService.ts](D:/Projects/Software/Open-Git-Control/electron/GitService.ts:121), [WorkingTreeService.ts](D:/Projects/Software/Open-Git-Control/electron/WorkingTreeService.ts:164)
-
-6. **Modify/Delete-Konflikte können nicht vollständig im Resolver gelöst werden.** Eine „gelöschte Seite übernehmen“-Operation fehlt. Zusätzlich blockiert bereits eine einzelne legitime Markdown-Zeile `=======` das Markieren als gelöst.  
-   Fundstelle: [MergeConflictService.ts](D:/Projects/Software/Open-Git-Control/electron/git/MergeConflictService.ts:14)
-
-7. **Blame-Pagination scheitert bei exakt 500, 1000 usw. Zeilen.** Die UI bietet „mehr laden“ an; Git beantwortet die nächste Range mit „file has only 500 lines“.  
-   Fundstellen: [HistoryService.ts](D:/Projects/Software/Open-Git-Control/electron/git/HistoryService.ts:146), [WorkingTreeFileDetails.tsx](D:/Projects/Software/Open-Git-Control/src/components/WorkingTreeFileDetails.tsx:81)
-
-8. **PR-Checkout lässt sich nicht zuverlässig aktualisieren.** Fetch direkt in den lokalen PR-Branch scheitert, wenn dieser ausgecheckt ist oder der PR force-gepusht wurde.  
-   Fundstellen: [gitClient.ts](D:/Projects/Software/Open-Git-Control/src/services/gitClient.ts:169), [usePullRequestWorkflow.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/usePullRequestWorkflow.ts:148)
-
-9. **Tag-Validierung ist unvollständig.** Unter anderem werden `.v1`, `v1..2`, `v1.lock`, `v1/@{x}` und `v1//x` akzeptiert, obwohl `git check-ref-format` sie ablehnt. Die Versionsvorschau erzwingt außerdem einen `v`-Prefix, selbst wenn das Repository ausschließlich Tags wie `1.4.2` verwendet.  
-   Fundstellen: [githubReleaseValidation.ts](D:/Projects/Software/Open-Git-Control/src/utils/githubReleaseValidation.ts:1), [releaseTagSuggestion.ts](D:/Projects/Software/Open-Git-Control/src/utils/releaseTagSuggestion.ts:1)
-
-10. **Planner-Update kann trotz Fehler Teildaten speichern.** Bei gleichzeitigem Verschieben und ungültiger Änderung wird zuerst das Projekt dauerhaft geändert und danach ein Fehler zurückgegeben. Ungültige Clientdaten werden zudem als HTTP 500 statt 4xx ausgegeben.  
-    Fundstellen: [planningTodosController.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/planningTodosController.ts:33), [planningApiServerHost.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/planningApiServerHost.ts:199)
-
-11. **One-Click-Updater läuft während eines bestehenden Downloads nach fünf Sekunden fälschlich in `error`, obwohl der Download weiterläuft.**  
-    Fundstelle: [updaterManager.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/updaterManager.ts:178)
-
-12. **Git-Fehler werden teilweise verschluckt oder können Credentials loggen.** Korruption, Berechtigungs- oder Git-Executable-Fehler erscheinen teilweise als „keine Commits/kein Origin“. Bei unerwarteten Fehlern wird die vollständige Argumentliste inklusive möglicher Tokens in Remote-URLs protokolliert.  
-    Fundstellen: [registerGitHistoryHandlers.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/git/registerGitHistoryHandlers.ts:35), [GitService.ts](D:/Projects/Software/Open-Git-Control/electron/GitService.ts:350), [GitErrorFormatter.ts](D:/Projects/Software/Open-Git-Control/electron/git/GitErrorFormatter.ts:13)
-
-13. **Mehrere App-Instanzen können gemeinsame Whole-file-Stores überschreiben.** Ein `requestSingleInstanceLock` fehlt. Der Planner verwendet zudem einen festen `.tmp`-Pfad.  
-    Fundstellen: [main.ts](D:/Projects/Software/Open-Git-Control/electron/main.ts:100), [projectPlannerStore.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/projectPlannerStore.ts:165)
-
-## Weitere kleinere oder bedingte Befunde
-
-- Ein kompromittierter Renderer könnte beliebige lesbare Dateien ohne vorherigen File-Dialog-Grant in ein GitHub-Release hochladen: [registerGithubReleaseHandlers.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/github/registerGithubReleaseHandlers.ts:103)
-- Ein gespeicherter OpenAI-Key kann nach Änderung der frei konfigurierbaren Base-URL an eine andere oder unverschlüsselte HTTP-Adresse gesendet werden: [settings.ts](D:/Projects/Software/Open-Git-Control/electron/settings.ts:177)
-- Auf Linux wird der mögliche `basic_text`-Fallback von Electron Safe Storage nicht explizit ausgeschlossen: [secureStore.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/secureStore.ts:76)
-- Abgebrochener GitHub-CLI-Login beendet den bis zu fünf Minuten laufenden `gh auth login`-Prozess nicht: [githubCliAuth.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/githubCliAuth.ts:31)
-- Numstat-Renames werden in großen KI-Batches falsch dem neuen Pfad zugeordnet: [diffContext.ts](D:/Projects/Software/Open-Git-Control/electron/ai/diffContext.ts:40)
-- `window.electronAPI.git.onRepoUnavailable` registriert einen Callback, der niemals ausgelöst wird: [createElectronApi.ts](D:/Projects/Software/Open-Git-Control/electron/preload/createElectronApi.ts:19)
-- MCP antwortet fälschlich auf JSON-RPC-Notifications und behandelt leere Batches nicht standardkonform: [mcpServer.ts](D:/Projects/Software/Open-Git-Control/electron/main-process/mcpServer.ts:184)
-- In der englischen Release-Ansicht erscheinen „Dateien hinzufuegen“ und ein deutscher Upload-Fallbackfehler: [ReleaseNotesWorkbench.tsx](D:/Projects/Software/Open-Git-Control/src/components/release-creator/ReleaseNotesWorkbench.tsx:174), [useReleaseWorkflow.ts](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/useReleaseWorkflow.ts:325)
-
+Weitere kleinere oder bedingte Befunde
+Ein kompromittierter Renderer könnte beliebige lesbare Dateien ohne vorherigen File-Dialog-Grant in ein GitHub-Release hochladen: [registerGithubReleaseHandlers.ts (line 103)](D:/Projects/Software/Open-Git-Control/electron/main-process/ipc/github/registerGithubReleaseHandlers.ts:103)
+Ein gespeicherter OpenAI-Key kann nach Änderung der frei konfigurierbaren Base-URL an eine andere oder unverschlüsselte HTTP-Adresse gesendet werden: [settings.ts (line 177)](D:/Projects/Software/Open-Git-Control/electron/settings.ts:177)
+Auf Linux wird der mögliche basic_text-Fallback von Electron Safe Storage nicht explizit ausgeschlossen: [secureStore.ts (line 76)](D:/Projects/Software/Open-Git-Control/electron/main-process/secureStore.ts:76)
+Abgebrochener GitHub-CLI-Login beendet den bis zu fünf Minuten laufenden gh auth login-Prozess nicht: [githubCliAuth.ts (line 31)](D:/Projects/Software/Open-Git-Control/electron/main-process/githubCliAuth.ts:31)
+Numstat-Renames werden in großen KI-Batches falsch dem neuen Pfad zugeordnet: [diffContext.ts (line 40)](D:/Projects/Software/Open-Git-Control/electron/ai/diffContext.ts:40)
+window.electronAPI.git.onRepoUnavailable registriert einen Callback, der niemals ausgelöst wird: [createElectronApi.ts (line 19)](D:/Projects/Software/Open-Git-Control/electron/preload/createElectronApi.ts:19)
+MCP antwortet fälschlich auf JSON-RPC-Notifications und behandelt leere Batches nicht standardkonform: [mcpServer.ts (line 184)](D:/Projects/Software/Open-Git-Control/electron/main-process/mcpServer.ts:184)
+In der englischen Release-Ansicht erscheinen „Dateien hinzufuegen“ und ein deutscher Upload-Fallbackfehler: [ReleaseNotesWorkbench.tsx (line 174)](D:/Projects/Software/Open-Git-Control/src/components/release-creator/ReleaseNotesWorkbench.tsx:174), [useReleaseWorkflow.ts (line 325)](D:/Projects/Software/Open-Git-Control/src/components/layout/workflows/useReleaseWorkflow.ts:325)

@@ -6,6 +6,7 @@ import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseReleaseCommits } from '../../parsing';
 import { assertGithubAuthenticated, toErrorMessage } from './githubHandlerUtils';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
+import { getAuthorizedSelectedFile } from '../../fileAccessGrant';
 
 type RegisterGithubReleaseHandlersDeps = {
   gitService: GitService;
@@ -88,7 +89,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
   ipcMain.handle(
     IpcChannel.GithubUploadReleaseAsset,
     async (
-      _event: IpcMainInvokeEvent,
+      event: IpcMainInvokeEvent,
       params: {
         owner: string;
         repo: string;
@@ -116,12 +117,17 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         return { success: false, error: 'Dateipfad ist erforderlich.' };
       }
 
+      const authorizedFilePath = getAuthorizedSelectedFile(event.sender.id, filePath);
+      if (!authorizedFilePath) {
+        return { success: false, error: 'Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.' };
+      }
+
       try {
         const asset = await githubService.uploadReleaseAsset({
           owner,
           repo,
           releaseId,
-          filePath,
+          filePath: authorizedFilePath,
           ...(name ? { name } : {}),
         });
         return { success: true, data: asset };

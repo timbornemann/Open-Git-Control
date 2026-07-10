@@ -74,7 +74,22 @@ function getPlanningApiTokenStorePath(): string {
 }
 
 export function isSecureStorageAvailable(): boolean {
-  return safeStorage.isEncryptionAvailable();
+  if (!safeStorage.isEncryptionAvailable()) {
+    return false;
+  }
+
+  // Electron reports `isEncryptionAvailable()` for Linux's `basic_text`
+  // fallback as well. That backend only obfuscates data and is not suitable
+  // for credentials or bearer tokens.
+  if (process.platform === 'linux') {
+    try {
+      return safeStorage.getSelectedStorageBackend() !== 'basic_text';
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function parseSavedGithubTokenPayload(raw: string): SavedGithubToken | null {
@@ -116,7 +131,7 @@ export function serializeGithubTokenPayload(token: string, host: string): string
 }
 
 export function saveGithubTokenSecurely(token: string, host = 'github.com'): boolean {
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!isSecureStorageAvailable()) {
     console.warn('OS-backed encryption is not available. GitHub token will not be persisted.');
     return false;
   }
@@ -129,7 +144,7 @@ export function saveGithubTokenSecurely(token: string, host = 'github.com'): boo
 export function readSavedGithubTokenWithHost(): SavedGithubToken | null {
   const tokenPath = getGithubTokenStorePath();
   if (!fs.existsSync(tokenPath)) return null;
-  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (!isSecureStorageAvailable()) return null;
 
   try {
     const encrypted = fs.readFileSync(tokenPath);
@@ -154,7 +169,7 @@ export function saveGeminiApiKeySecurely(apiKey: string): boolean {
     return true;
   }
 
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!isSecureStorageAvailable()) {
     console.warn('OS-backed encryption is not available. Gemini API key will not be persisted.');
     return false;
   }
@@ -167,7 +182,7 @@ export function saveGeminiApiKeySecurely(apiKey: string): boolean {
 export function readSavedGeminiApiKey(): string | null {
   const keyPath = getGeminiApiKeyStorePath();
   if (!fs.existsSync(keyPath)) return null;
-  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (!isSecureStorageAvailable()) return null;
 
   try {
     const encrypted = fs.readFileSync(keyPath);
@@ -188,7 +203,7 @@ export function saveOpenAiApiKeySecurely(apiKey: string): boolean {
     return true;
   }
 
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!isSecureStorageAvailable()) {
     console.warn('OS-backed encryption is not available. OpenAI API key will not be persisted.');
     return false;
   }
@@ -201,7 +216,7 @@ export function saveOpenAiApiKeySecurely(apiKey: string): boolean {
 export function readSavedOpenAiApiKey(): string | null {
   const keyPath = getOpenAiApiKeyStorePath();
   if (!fs.existsSync(keyPath)) return null;
-  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (!isSecureStorageAvailable()) return null;
 
   try {
     const encrypted = fs.readFileSync(keyPath);
@@ -276,7 +291,7 @@ export function serializePlanningApiTokenPayload(token: SavedPlanningApiToken): 
 }
 
 export function savePlanningApiTokenSecurely(token: SavedPlanningApiToken): boolean {
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!isSecureStorageAvailable()) {
     console.warn('OS-backed encryption is not available. Planning API token will not be persisted.');
     return false;
   }
@@ -289,7 +304,7 @@ export function savePlanningApiTokenSecurely(token: SavedPlanningApiToken): bool
 export function readSavedPlanningApiToken(): SavedPlanningApiToken | null {
   const tokenPath = getPlanningApiTokenStorePath();
   if (!fs.existsSync(tokenPath)) return null;
-  if (!safeStorage.isEncryptionAvailable()) return null;
+  if (!isSecureStorageAvailable()) return null;
 
   try {
     const encrypted = fs.readFileSync(tokenPath);

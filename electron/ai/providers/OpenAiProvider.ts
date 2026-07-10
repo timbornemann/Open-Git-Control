@@ -7,7 +7,20 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
 
 const getOpenAiBaseUrl = (settings: AppSettings): string => {
   const configured = settings.openAiBaseUrl?.trim().replace(/\/+$/, '');
-  return configured || DEFAULT_OPENAI_BASE_URL;
+  const baseUrl = configured || DEFAULT_OPENAI_BASE_URL;
+
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol.toLowerCase() !== 'https:' || parsed.username || parsed.password) {
+      throw new Error('OpenAI Base URL muss HTTPS verwenden.');
+    }
+    return parsed.toString().replace(/\/+$/, '');
+  } catch (error) {
+    if (error instanceof Error && error.message === 'OpenAI Base URL muss HTTPS verwenden.') {
+      throw error;
+    }
+    throw new Error('OpenAI Base URL ist ungueltig.');
+  }
 };
 
 const getOpenAiModel = (settings: AppSettings): string => {

@@ -1,15 +1,13 @@
-import { createPlannerItem, deletePlannerItem, readProjectPlannerData, updatePlannerItem } from './projectPlannerStore';
+import { createPlannerItem, deletePlannerItem } from './projectPlannerStore';
 import type { RequestContext } from './planningApiTypes';
 import {
-  cleanString,
-  enrichTodos,
   getTodoById,
   getTodos,
   itemInputFromBody,
-  itemUpdateFromBody,
   moveTodoFromBody,
   queryOptionsFromUrl,
   resolveProjectLocator,
+  updateTodoFromBody,
 } from './planningApiDomain';
 import type { RouteHandlerResult } from './planningApiControllerTypes';
 import { routeHandled, routeNotHandled } from './planningApiControllerTypes';
@@ -31,11 +29,7 @@ export const handleTodosRoute = async (ctx: RequestContext): Promise<RouteHandle
   }
   if (idOrAction && !nested && ctx.method === 'GET') return routeHandled(getTodoById(idOrAction));
   if (idOrAction && !nested && ctx.method === 'PATCH') {
-    const moveProject = cleanString(ctx.body.projectId) || cleanString(ctx.body.repoPath) || cleanString(ctx.body.projectName);
-    if (moveProject) moveTodoFromBody(idOrAction, ctx.body);
-    const updated = updatePlannerItem(idOrAction, itemUpdateFromBody(ctx.body));
-    const data = readProjectPlannerData();
-    return routeHandled(enrichTodos([updated], data.projects)[0]);
+    return routeHandled(updateTodoFromBody(idOrAction, ctx.body));
   }
   if (idOrAction && !nested && ctx.method === 'DELETE') {
     deletePlannerItem(idOrAction);

@@ -170,12 +170,20 @@ export const gitClient = {
     return `pr-${prNumber}-${sanitizeBranchSuffix(headRef)}`;
   },
 
-  buildFetchPullRequestBranchArgs(prNumber: number, targetBranch: string, remote = 'origin'): GitCommandArgs {
-    return command('fetch', remote, `pull/${prNumber}/head:${targetBranch}`);
+  buildFetchPullRequestBranchArgs(prNumber: number, remote = 'origin'): GitCommandArgs {
+    // Fetch only into FETCH_HEAD. Updating the local PR branch directly fails
+    // when it is currently checked out and also rejects a force-pushed PR.
+    return command('fetch', remote, `pull/${prNumber}/head`);
   },
 
-  async fetchPullRequestBranch(prNumber: number, targetBranch: string, remote = 'origin'): Promise<GitCommandResultDto> {
-    return this.runGitArgs(this.buildFetchPullRequestBranchArgs(prNumber, targetBranch, remote));
+  async fetchPullRequestBranch(prNumber: number, remote = 'origin'): Promise<GitCommandResultDto> {
+    return this.runGitArgs(this.buildFetchPullRequestBranchArgs(prNumber, remote));
+  },
+
+  buildCheckoutPullRequestBranchArgs(targetBranch: string): GitCommandArgs {
+    // -B intentionally moves this disposable local review branch to the
+    // freshly fetched PR head, including after a force-push.
+    return command('checkout', '-B', targetBranch, 'FETCH_HEAD');
   },
 
   buildPullArgs(extraArgs: string[] = []): GitCommandArgs {

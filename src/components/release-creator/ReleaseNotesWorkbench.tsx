@@ -171,10 +171,10 @@ export const ReleaseNotesWorkbench = ({
 
             <div className="release-assets-panel">
               <div className="release-publish-head" style={{ marginBottom: 8 }}>
-                <h4 style={{ margin: 0 }}>Assets</h4>
+                <h4 style={{ margin: 0 }}>{t('generated.components.releasecreator.assets_9d2f6ef0')}</h4>
               </div>
               <button type="button" className="staging-tool-btn" onClick={() => void onAddPendingAssets()} disabled={isEditorDisabled}>
-                Dateien hinzufuegen
+                {t('generated.components.releasecreator.add_assets_48c9f10a')}
               </button>
               {pendingAssets.length > 0 && (
                 <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
@@ -188,7 +188,7 @@ export const ReleaseNotesWorkbench = ({
                           className="icon-btn"
                           onClick={() => onRemovePendingAsset(filePath)}
                           disabled={isEditorDisabled}
-                          aria-label="Remove asset"
+                          aria-label={t('generated.components.releasecreator.remove_asset_5371d6b7')}
                         >
                           ×
                         </button>

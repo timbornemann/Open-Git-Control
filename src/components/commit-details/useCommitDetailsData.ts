@@ -6,6 +6,7 @@ import type { CommitFileDetail } from '@/utils/gitParsing';
 import { parseCommitDetails } from '@/utils/gitParsing';
 import { extractGitObjectId } from '@/utils/gitObjectId';
 import { gitClient } from '@/services/gitClient';
+import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '../file-details/blamePagination';
 
 export type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -199,11 +200,12 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, 500);
+        const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, BLAME_LOOKAHEAD_COUNT);
         if (!isCurrent()) return;
         if (result.success) {
-          setBlameLines(result.data || []);
-          setBlameHasMore((result.data || []).length === 500);
+          const page = splitBlamePage(result.data || []);
+          setBlameLines(page.lines);
+          setBlameHasMore(page.hasMore);
         } else {
           setBlameLines([]);
           setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
@@ -226,14 +228,15 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
     const generation = requestGenerationRef.current;
     setBlameLoading(true);
     try {
-      const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, blameLines.length + 1, 500);
+      const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT);
       if (requestGenerationRef.current !== generation) return;
       if (!result.success) {
         setBlameError(result.error);
         return;
       }
-      setBlameLines((current) => [...current, ...result.data]);
-      setBlameHasMore(result.data.length === 500);
+      const page = splitBlamePage(result.data);
+      setBlameLines((current) => [...current, ...page.lines]);
+      setBlameHasMore(page.hasMore);
     } finally {
       if (requestGenerationRef.current === generation) setBlameLoading(false);
     }

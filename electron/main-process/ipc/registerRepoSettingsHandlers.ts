@@ -22,6 +22,14 @@ type RegisterRepoSettingsHandlersDeps = {
   githubService: Pick<GitHubService, 'logout'>;
 };
 
+function getEndpointOrigin(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return '';
+  }
+}
+
 export function registerRepoSettingsHandlers({ updaterManager, githubService }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
@@ -49,12 +57,20 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     delete partialWithoutSecrets.openAiApiKey;
     delete partialWithoutSecrets.hasOpenAiApiKey;
 
-    const next = normalizeSettings({
+    let next = normalizeSettings({
       ...current,
       ...partialWithoutSecrets,
       hasGeminiApiKey: current.hasGeminiApiKey,
       hasOpenAiApiKey: current.hasOpenAiApiKey,
     });
+
+    // A saved key belongs to the endpoint the user explicitly configured it
+    // for. Do not carry it over to another host (or back to the default) where
+    // it could otherwise be sent without a fresh user action.
+    if (getEndpointOrigin(next.openAiBaseUrl) !== getEndpointOrigin(current.openAiBaseUrl)) {
+      clearSavedOpenAiApiKeySecurely();
+      next = normalizeSettings({ ...next, hasOpenAiApiKey: false });
+    }
 
     writeSettings(next);
     if (next.githubHost !== current.githubHost) {

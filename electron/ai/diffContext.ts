@@ -42,6 +42,17 @@ export function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS)
   return compact.length <= maxChars ? compact : `${compact.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
 }
 
+const extractNumstatTargetPath = (rawPath: string): string => {
+  // `git diff --numstat` abbreviates renames as `old => new` and can retain
+  // their shared prefix/suffix as `src/{old => new}.ts`. Expand brace forms
+  // before handling the plain variant so stats are indexed under the actual
+  // destination path from the status snapshot.
+  const expandedPath = rawPath.replace(/\{([^{}]*) => ([^{}]*)\}/g, (_match, _oldPart: string, newPart: string) => newPart);
+  const renameSeparator = expandedPath.lastIndexOf(' => ') >= 0 ? ' => ' : ' -> ';
+  const renameSeparatorIndex = expandedPath.lastIndexOf(renameSeparator);
+  return renameSeparatorIndex >= 0 ? expandedPath.slice(renameSeparatorIndex + renameSeparator.length) : expandedPath;
+};
+
 export function parseNumstatReport(numstatOutput: string): Map<string, Numstat> {
   const byPath = new Map<string, Numstat>();
   const lines = (numstatOutput || '').split(/\r?\n/);
@@ -52,8 +63,7 @@ export function parseNumstatReport(numstatOutput: string): Map<string, Numstat> 
     const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
     if (!match) continue;
     const rawPath = match[3].trim();
-    const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
-    const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
+    const targetPath = extractNumstatTargetPath(rawPath);
     const decodedPath = decodePorcelainPath(targetPath);
     if (!decodedPath) continue;
     byPath.set(decodedPath, parsed);

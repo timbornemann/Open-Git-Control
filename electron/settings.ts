@@ -202,7 +202,29 @@ function normalizeOllamaBaseUrl(value: unknown): string {
 }
 
 function normalizeOpenAiBaseUrl(value: unknown): string {
-  return normalizeHttpBaseUrl(value, DEFAULT_SETTINGS.openAiBaseUrl);
+  if (typeof value !== 'string') {
+    return DEFAULT_SETTINGS.openAiBaseUrl;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return DEFAULT_SETTINGS.openAiBaseUrl;
+  }
+
+  try {
+    const parsed = new URL(trimmed.slice(0, MAX_OLLAMA_BASE_URL_LENGTH));
+    // An OpenAI API key must never be sent over an unencrypted connection.
+    // Credentials in the URL are disallowed as well, so an endpoint cannot
+    // smuggle a second authentication mechanism into an API-key request.
+    if (parsed.protocol.toLowerCase() !== 'https:' || parsed.username || parsed.password) {
+      return DEFAULT_SETTINGS.openAiBaseUrl;
+    }
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  } catch {
+    return DEFAULT_SETTINGS.openAiBaseUrl;
+  }
 }
 
 function normalizeModel(value: unknown, fallback = ''): string {

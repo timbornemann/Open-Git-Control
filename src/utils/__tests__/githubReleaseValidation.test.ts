@@ -15,6 +15,19 @@ describe('validateGithubReleaseInput', () => {
     expect(validateGithubReleaseInput({ tagName: 'release^1.0.0', releaseName: 'Release 1.0.0' }).errors.tagName).toBe('release.validation.tagInvalid');
   });
 
+  it.each(['.v1', 'v1..2', 'v1.lock', 'v1/@{x}', 'v1//x', '/v1', 'v1/', 'v1.', 'v1/.preview', '@'])('rejects the Git-invalid ref name %s', (tagName) => {
+    const result = validateGithubReleaseInput({ tagName, releaseName: 'Release 1.0.0' });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.tagName).toBe('release.validation.tagInvalid');
+  });
+
+  it('accepts valid hierarchical tag names', () => {
+    const result = validateGithubReleaseInput({ tagName: 'releases/v1.0.0', releaseName: 'Release 1.0.0' });
+
+    expect(result.valid).toBe(true);
+  });
+
   it('enforces minimum release name length', () => {
     const result = validateGithubReleaseInput({ tagName: 'v1.0.0', releaseName: 'ab' });
 

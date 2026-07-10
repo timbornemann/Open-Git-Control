@@ -3,6 +3,7 @@ import { GitScheduler } from './GitScheduler';
 import { shouldSuppressBareWorkTreeCommand } from './git/BareRepositoryPolicy';
 import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
+import { isMissingOriginGitError } from './git/GitErrorFormatter';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
 import { CherryPickService } from './git/CherryPickService';
@@ -352,11 +353,10 @@ export class GitService {
 
     try {
       const output = await this.gitRunner.run(normalizedPath, ['remote', 'get-url', 'origin']);
-      const trimmed = String(output || '').trim();
-      return trimmed || null;
-    } catch {
-      // Missing origin is a normal state for local-only repos. Do not spam console errors.
-      return null;
+      return String(output || '').trim() || null;
+    } catch (error: unknown) {
+      if (isMissingOriginGitError(error)) return null;
+      throw error;
     }
   }
 

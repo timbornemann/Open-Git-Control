@@ -12,23 +12,40 @@ import type {
   UpdaterStatusDto,
 } from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
-import type { RepoUnavailablePayload } from '../../src/shared/git/errors';
+import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
-// Repo-unavailable events are raised in the renderer (gitClient + shared bus).
-// Preload and renderer are separate JS contexts, so this API keeps a local
-// listener list for contract compatibility without importing renderer modules
-// (sandboxed preload cannot require ../../src/*).
-const preloadRepoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
-
 export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI => {
-  const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
-    return ipcRenderer.invoke(IpcChannel.GitCommand, commandName, ...args);
+  const preloadRepoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
+  const notifyRepoUnavailableIfNeeded = (result: unknown, command: string): void => {
+    if (!result || typeof result !== 'object') return;
+
+    const candidate = result as { success?: unknown; error?: unknown };
+    if (candidate.success !== false || typeof candidate.error !== 'string' || !isRepoUnavailableError(candidate.error)) return;
+
+    const payload = { command, error: candidate.error };
+    for (const listener of preloadRepoUnavailableListeners) {
+      try {
+        listener(payload);
+      } catch {
+        // A consumer must not be able to break an unrelated IPC operation.
+      }
+    }
   };
 
-  const invokeGitMutation = async (ipcChannel: IpcChannel, payload: unknown) => {
-    return ipcRenderer.invoke(ipcChannel, payload);
+  const invokeGitOperation = async (command: string, ipcChannel: IpcChannel, ...args: unknown[]): ReturnType<PreloadIpcRenderer['invoke']> => {
+    const result = await ipcRenderer.invoke(ipcChannel, ...args);
+    notifyRepoUnavailableIfNeeded(result, command);
+    return result;
+  };
+
+  const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
+    return invokeGitOperation(commandName, IpcChannel.GitCommand, commandName, ...args);
+  };
+
+  const invokeGitMutation = (command: string, ipcChannel: IpcChannel, payload: unknown) => {
+    return invokeGitOperation(command, ipcChannel, payload);
   };
 
   const flatApi = {
@@ -41,53 +58,56 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
     runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
     runGitCommandForRepo: (repoPath: string, commandName: GitCommandNameDto, ...args: string[]) =>
-      ipcRenderer.invoke(IpcChannel.GitCommandForRepo, repoPath, commandName, ...args),
+      invokeGitOperation(commandName, IpcChannel.GitCommandForRepo, repoPath, commandName, ...args),
     createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
-      invokeGitMutation(IpcChannel.GitCreateCommit, params),
-    getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => ipcRenderer.invoke(IpcChannel.GitCommitLogPage, params),
+      invokeGitMutation('commit', IpcChannel.GitCreateCommit, params),
+    getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => invokeGitOperation('log', IpcChannel.GitCommitLogPage, params),
     requestCommitStats: (hashes: string[], priority?: 'selected' | 'visible' | 'background') =>
-      ipcRenderer.invoke(IpcChannel.GitRequestCommitStats, hashes, priority),
+      invokeGitOperation('show', IpcChannel.GitRequestCommitStats, hashes, priority),
     onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => {
       const handler = (_event: IpcRendererEvent, update: CommitStatsUpdateDto) => callback(update);
       ipcRenderer.on(IpcChannel.GitCommitStats, handler);
       return () => ipcRenderer.removeListener(IpcChannel.GitCommitStats, handler);
     },
-    getWorkingTreeSnapshot: () => ipcRenderer.invoke(IpcChannel.GitWorkingTreeSnapshot),
-    getWorkingTreeStats: (snapshotId: string) => ipcRenderer.invoke(IpcChannel.GitWorkingTreeStats, snapshotId),
-    stagePaths: (paths: string[], repoPath?: string) => ipcRenderer.invoke(IpcChannel.GitStagePaths, paths, repoPath),
-    getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) => ipcRenderer.invoke(IpcChannel.GitDiffPreview, args, limits || {}),
+    getWorkingTreeSnapshot: () => invokeGitOperation('status', IpcChannel.GitWorkingTreeSnapshot),
+    getWorkingTreeStats: (snapshotId: string) => invokeGitOperation('status', IpcChannel.GitWorkingTreeStats, snapshotId),
+    stagePaths: (paths: string[], repoPath?: string) => invokeGitOperation('add', IpcChannel.GitStagePaths, paths, repoPath),
+    getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) =>
+      invokeGitOperation('diff', IpcChannel.GitDiffPreview, args, limits || {}),
     getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
-      ipcRenderer.invoke(IpcChannel.GitFileBlameRange, filePath, commitHash, startLine, lineCount),
+      invokeGitOperation('blame', IpcChannel.GitFileBlameRange, filePath, commitHash, startLine, lineCount),
     onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
       preloadRepoUnavailableListeners.add(callback);
       return () => {
         preloadRepoUnavailableListeners.delete(callback);
       };
     },
-    startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke(IpcChannel.GitInteractiveRebase, baseHash, todoLines),
-    applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke(IpcChannel.GitApplyPatch, patch, options || {}),
-    getStashes: () => ipcRenderer.invoke(IpcChannel.GitStashes),
-    gitStashBranch: (stashName: string, branchName: string) => invokeGitMutation(IpcChannel.GitStashBranch, { stashName, branchName }),
-    getRepoOriginUrl: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitRepoOriginUrl, repoPath),
-    addIgnoreRule: (pattern: string, repoPath?: string) => ipcRenderer.invoke(IpcChannel.GitAddIgnoreRule, pattern, repoPath),
+    startInteractiveRebase: (baseHash: string, todoLines: string[]) => invokeGitOperation('rebase', IpcChannel.GitInteractiveRebase, baseHash, todoLines),
+    applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) =>
+      invokeGitOperation('apply', IpcChannel.GitApplyPatch, patch, options || {}),
+    getStashes: () => invokeGitOperation('stash list', IpcChannel.GitStashes),
+    gitStashBranch: (stashName: string, branchName: string) => invokeGitMutation('stash branch', IpcChannel.GitStashBranch, { stashName, branchName }),
+    getRepoOriginUrl: (repoPath: string) => invokeGitOperation('remote get-url', IpcChannel.GitRepoOriginUrl, repoPath),
+    addIgnoreRule: (pattern: string, repoPath?: string) => invokeGitOperation('ignore', IpcChannel.GitAddIgnoreRule, pattern, repoPath),
     gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
     gitPull: () => invokeGitCommand('pull'),
     gitPush: () => invokeGitCommand('push'),
-    scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => ipcRenderer.invoke(IpcChannel.GitScanPushSecrets, params || {}),
-    approveSecretScanPush: (pushArgs?: string[]) => ipcRenderer.invoke(IpcChannel.GitApproveSecretScanPush, pushArgs),
-    cancelSecretScan: () => ipcRenderer.invoke(IpcChannel.GitCancelSecretScan),
-    gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke(IpcChannel.GitClone, cloneUrl, targetDir, targetName),
-    gitInit: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitInit, repoPath),
-    getFileHistory: (filePath: string, commitHash?: string, limit?: number) => ipcRenderer.invoke(IpcChannel.GitFileHistory, filePath, commitHash, limit),
-    getFileBlame: (filePath: string, commitHash?: string) => ipcRenderer.invoke(IpcChannel.GitFileBlame, filePath, commitHash),
-    getFileTimelineData: (limit?: number) => ipcRenderer.invoke(IpcChannel.GitGetFileTimelineData, limit),
-    readRepoFile: (filePath: string) => ipcRenderer.invoke(IpcChannel.GitReadRepoFile, filePath),
+    scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => invokeGitOperation('push', IpcChannel.GitScanPushSecrets, params || {}),
+    approveSecretScanPush: (pushArgs?: string[]) => invokeGitOperation('push', IpcChannel.GitApproveSecretScanPush, pushArgs),
+    cancelSecretScan: () => invokeGitOperation('push', IpcChannel.GitCancelSecretScan),
+    gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => invokeGitOperation('clone', IpcChannel.GitClone, cloneUrl, targetDir, targetName),
+    gitInit: (repoPath: string) => invokeGitOperation('init', IpcChannel.GitInit, repoPath),
+    getFileHistory: (filePath: string, commitHash?: string, limit?: number) =>
+      invokeGitOperation('log', IpcChannel.GitFileHistory, filePath, commitHash, limit),
+    getFileBlame: (filePath: string, commitHash?: string) => invokeGitOperation('blame', IpcChannel.GitFileBlame, filePath, commitHash),
+    getFileTimelineData: (limit?: number) => invokeGitOperation('log', IpcChannel.GitGetFileTimelineData, limit),
+    readRepoFile: (filePath: string) => invokeGitOperation('show', IpcChannel.GitReadRepoFile, filePath),
     getMarkdownPreviewFile: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
-      ipcRenderer.invoke(IpcChannel.GitMarkdownPreviewFile, params),
+      invokeGitOperation('show', IpcChannel.GitMarkdownPreviewFile, params),
     getRepoFileDataUrl: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string }) =>
-      ipcRenderer.invoke(IpcChannel.GitRepoFileDataUrl, params),
-    writeRepoFile: (filePath: string, content: string) => ipcRenderer.invoke(IpcChannel.GitWriteRepoFile, filePath, content),
-    openSubmodule: (submodulePath: string) => ipcRenderer.invoke(IpcChannel.GitOpenSubmodule, submodulePath),
+      invokeGitOperation('show', IpcChannel.GitRepoFileDataUrl, params),
+    writeRepoFile: (filePath: string, content: string) => invokeGitOperation('write', IpcChannel.GitWriteRepoFile, filePath, content),
+    openSubmodule: (submodulePath: string) => invokeGitOperation('submodule', IpcChannel.GitOpenSubmodule, submodulePath),
     onCloneProgress: (callback: (line: string) => void) => {
       const handler = (_event: IpcRendererEvent, line: string) => callback(line);
       ipcRenderer.on(IpcChannel.CloneProgress, handler);

@@ -170,6 +170,24 @@ export class UpdaterManager {
     });
   }
 
+  private async waitForOneClickDownload(): Promise<{ success: boolean; action?: 'downloaded'; error?: string }> {
+    let stateAfterDownload: UpdaterStatusPayload;
+    try {
+      stateAfterDownload = await this.waitForUpdaterState(['downloaded', 'error'], UPDATER_DOWNLOAD_TIMEOUT_MS);
+    } catch (error: unknown) {
+      // This caller may only be observing a download that was started by an
+      // automatic update check. Do not overwrite its still-valid progress
+      // state just because the caller stopped waiting.
+      return { success: false, error: formatUpdaterError(error) };
+    }
+
+    if (stateAfterDownload.state === 'downloaded') {
+      return { success: true, action: 'downloaded' };
+    }
+
+    return { success: false, error: stateAfterDownload.error || 'Update konnte nicht heruntergeladen werden.' };
+  }
+
   async checkForAppUpdates(): Promise<{ success: boolean; error?: string }> {
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
@@ -265,6 +283,10 @@ export class UpdaterManager {
       return { success: true, action: 'downloaded' };
     }
 
+    if (this.updaterStatus.state === 'downloading') {
+      return this.waitForOneClickDownload();
+    }
+
     let stateAfterCheck: UpdaterStatusPayload;
 
     if (this.updaterStatus.state === 'update-available') {
@@ -276,7 +298,10 @@ export class UpdaterManager {
       }
 
       try {
-        stateAfterCheck = await this.waitForUpdaterState(['no-update', 'update-available', 'downloaded', 'error'], UPDATER_STATE_WAIT_TIMEOUT_MS);
+        stateAfterCheck = await this.waitForUpdaterState(
+          ['no-update', 'update-available', 'downloading', 'downloaded', 'error'],
+          UPDATER_STATE_WAIT_TIMEOUT_MS,
+        );
       } catch (error: unknown) {
         const message = formatUpdaterError(error);
         this.setUpdaterStatus({
@@ -296,6 +321,10 @@ export class UpdaterManager {
       return { success: true, action: 'downloaded' };
     }
 
+    if (stateAfterCheck.state === 'downloading') {
+      return this.waitForOneClickDownload();
+    }
+
     if (stateAfterCheck.state === 'error') {
       return { success: false, error: stateAfterCheck.error || 'Update-Pruefung fehlgeschlagen.' };
     }
@@ -305,23 +334,7 @@ export class UpdaterManager {
       return downloadResult;
     }
 
-    let stateAfterDownload: UpdaterStatusPayload;
-    try {
-      stateAfterDownload = await this.waitForUpdaterState(['downloaded', 'error'], UPDATER_DOWNLOAD_TIMEOUT_MS);
-    } catch (error: unknown) {
-      const message = formatUpdaterError(error);
-      this.setUpdaterStatus({
-        state: 'error',
-        error: message,
-      });
-      return { success: false, error: message };
-    }
-
-    if (stateAfterDownload.state === 'downloaded') {
-      return { success: true, action: 'downloaded' };
-    }
-
-    return { success: false, error: stateAfterDownload.error || 'Update konnte nicht heruntergeladen werden.' };
+    return this.waitForOneClickDownload();
   }
 
   setAutoUpdatesEnabled(enabled: boolean): void {

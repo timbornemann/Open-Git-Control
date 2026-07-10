@@ -2,6 +2,8 @@ import { app } from 'electron';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { writeTextFileAtomically } from './atomicFile';
+import { ApiError } from './planningApiTypes';
 
 export type PlannerProjectKind = 'repository' | 'planned';
 export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -165,17 +167,14 @@ export function readProjectPlannerData(): ProjectPlannerData {
 export function writeProjectPlannerData(data: ProjectPlannerData): ProjectPlannerData {
   const normalized = normalizeProjectPlannerData(data);
   const storePath = getStorePath();
-  const tempPath = `${storePath}.tmp`;
-  fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  fs.writeFileSync(tempPath, JSON.stringify(normalized, null, 2), 'utf8');
-  fs.renameSync(tempPath, storePath);
+  writeTextFileAtomically(storePath, JSON.stringify(normalized, null, 2));
   return normalized;
 }
 
-export function ensureRepositoryProject(repoPath: string): PlannerProject {
+/** Adds a repository project to the supplied in-memory document when needed. */
+export function ensureRepositoryProjectInData(data: ProjectPlannerData, repoPath: string): PlannerProject {
   const resolvedPath = normalizeRepoPath(repoPath);
-  if (!resolvedPath) throw new Error('Repository path is required.');
-  const data = readProjectPlannerData();
+  if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
   const repoKey = getRepositoryProjectKey(resolvedPath);
   const existing = data.projects.find((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey);
   if (existing) return existing;
@@ -190,13 +189,23 @@ export function ensureRepositoryProject(repoPath: string): PlannerProject {
     createdAt: now,
     updatedAt: now,
   };
-  writeProjectPlannerData({ ...data, projects: [...data.projects, project] });
+  data.projects = [...data.projects, project];
+  return project;
+}
+
+export function ensureRepositoryProject(repoPath: string): PlannerProject {
+  const data = readProjectPlannerData();
+  const projectCount = data.projects.length;
+  const project = ensureRepositoryProjectInData(data, repoPath);
+  if (data.projects.length !== projectCount) {
+    writeProjectPlannerData(data);
+  }
   return project;
 }
 
 export function createPlannedProject(input: { name: string; description?: string }): PlannerProject {
   const name = cleanText(input?.name, 160);
-  if (!name) throw new Error('Project name is required.');
+  if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
   const data = readProjectPlannerData();
   const now = Date.now();
   const project: PlannerProject = {
@@ -215,10 +224,10 @@ export function createPlannedProject(input: { name: string; description?: string
 export function updatePlannerProject(projectId: string, input: { name?: string; description?: string }): PlannerProject {
   const data = readProjectPlannerData();
   const index = data.projects.findIndex((project) => project.id === projectId);
-  if (index < 0) throw new Error('Project not found.');
+  if (index < 0) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   const current = data.projects[index];
   const name = input.name === undefined ? current.name : cleanText(input.name, 160);
-  if (!name) throw new Error('Project name is required.');
+  if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
 
   const updated: PlannerProject = {
     ...current,
@@ -244,7 +253,7 @@ export function deletePlannerProject(projectId: string): void {
 
 export function deleteRepositoryPlannerProjectByPath(repoPath: string): { deletedProjectCount: number; deletedItemCount: number } {
   const resolvedPath = normalizeRepoPath(repoPath);
-  if (!resolvedPath) throw new Error('Repository path is required.');
+  if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
 
   const data = readProjectPlannerData();
   const repoKey = getRepositoryProjectKey(resolvedPath);
@@ -269,10 +278,10 @@ export function deleteRepositoryPlannerProjectByPath(repoPath: string): { delete
 export function createPlannerItem(projectId: string, input: PlannerItemInput): PlannerItem {
   const data = readProjectPlannerData();
   if (!data.projects.some((project) => project.id === projectId)) {
-    throw new Error('Project not found.');
+    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   }
   const title = cleanText(input?.title, 240);
-  if (!title) throw new Error('Item title is required.');
+  if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
   const now = Date.now();
   const item: PlannerItem = {
     id: randomUUID(),
@@ -289,16 +298,31 @@ export function createPlannerItem(projectId: string, input: PlannerItemInput): P
   return item;
 }
 
-export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInput>): PlannerItem {
-  const data = readProjectPlannerData();
+export type PlannerItemUpdateOptions = {
+  projectId?: string;
+};
+
+/** Applies an item update to an in-memory document without persisting it. */
+export function updatePlannerItemInData(
+  data: ProjectPlannerData,
+  itemId: string,
+  input: Partial<PlannerItemInput>,
+  options: PlannerItemUpdateOptions = {},
+): PlannerItem {
   const index = data.items.findIndex((item) => item.id === itemId);
-  if (index < 0) throw new Error('Item not found.');
+  if (index < 0) throw new ApiError(404, 'TODO_NOT_FOUND', 'Item not found.');
   const current = data.items[index];
   const title = input.title === undefined ? current.title : cleanText(input.title, 240);
-  if (!title) throw new Error('Item title is required.');
+  if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
+
+  const projectId = options.projectId === undefined ? current.projectId : cleanText(options.projectId, 100);
+  if (!data.projects.some((project) => project.id === projectId)) {
+    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
+  }
 
   const updated: PlannerItem = {
     ...current,
+    projectId,
     title,
     description: input.description === undefined ? current.description : cleanText(input.description, 20_000),
     priority: input.priority !== undefined && PRIORITIES.has(input.priority) ? input.priority : current.priority,
@@ -308,34 +332,21 @@ export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInpu
   };
   const items = [...data.items];
   items[index] = updated;
-  writeProjectPlannerData({ ...data, items });
+  data.items = items;
+  return updated;
+}
+
+export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInput>, options: PlannerItemUpdateOptions = {}): PlannerItem {
+  const data = readProjectPlannerData();
+  const updated = updatePlannerItemInData(data, itemId, input, options);
+  writeProjectPlannerData(data);
   return updated;
 }
 
 export function movePlannerItem(itemId: string, input: { projectId?: string; status?: PlannerStatus }): PlannerItem {
   const data = readProjectPlannerData();
-  const index = data.items.findIndex((item) => item.id === itemId);
-  if (index < 0) throw new Error('Item not found.');
-
-  const current = data.items[index];
-  let projectId = current.projectId;
-  if (input.projectId !== undefined) {
-    const nextProjectId = cleanText(input.projectId, 100);
-    if (!data.projects.some((project) => project.id === nextProjectId)) {
-      throw new Error('Project not found.');
-    }
-    projectId = nextProjectId;
-  }
-
-  const updated: PlannerItem = {
-    ...current,
-    projectId,
-    status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status,
-    updatedAt: Date.now(),
-  };
-  const items = [...data.items];
-  items[index] = updated;
-  writeProjectPlannerData({ ...data, items });
+  const updated = updatePlannerItemInData(data, itemId, { status: input.status }, { projectId: input.projectId });
+  writeProjectPlannerData(data);
   return updated;
 }
 
@@ -347,14 +358,14 @@ export function deletePlannerItem(itemId: string): void {
 export function convertProjectToRepository(projectId: string, repoPath: string): PlannerProject {
   const data = readProjectPlannerData();
   const index = data.projects.findIndex((project) => project.id === projectId);
-  if (index < 0) throw new Error('Project not found.');
-  if (data.projects[index].kind !== 'planned') throw new Error('Project already has a repository.');
+  if (index < 0) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
+  if (data.projects[index].kind !== 'planned') throw new ApiError(409, 'PROJECT_ALREADY_REPOSITORY', 'Project already has a repository.');
 
   const resolvedPath = normalizeRepoPath(repoPath);
-  if (!resolvedPath) throw new Error('Repository path is required.');
+  if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
   const repoKey = getRepositoryProjectKey(resolvedPath);
   if (data.projects.some((project, projectIndex) => projectIndex !== index && project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey)) {
-    throw new Error('A planning project already exists for this repository.');
+    throw new ApiError(409, 'REPOSITORY_PROJECT_EXISTS', 'A planning project already exists for this repository.');
   }
 
   const updated: PlannerProject = {
@@ -371,16 +382,16 @@ export function convertProjectToRepository(projectId: string, repoPath: string):
 
 export function validateProjectFolderName(value: unknown): string {
   const folderName = cleanText(value, 100);
-  if (!folderName) throw new Error('Project folder name is required.');
+  if (!folderName) throw new ApiError(400, 'PROJECT_FOLDER_REQUIRED', 'Project folder name is required.');
   // eslint-disable-next-line no-control-regex -- Windows folder names must reject ASCII control characters.
   if (folderName === '.' || folderName === '..' || /[<>:"/\\|?*\u0000-\u001F]/.test(folderName)) {
-    throw new Error('Project folder name contains invalid characters.');
+    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name contains invalid characters.');
   }
   if (/[. ]$/.test(folderName)) {
-    throw new Error('Project folder name must not end with a dot or space.');
+    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name must not end with a dot or space.');
   }
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(folderName)) {
-    throw new Error('Project folder name is reserved by the operating system.');
+    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name is reserved by the operating system.');
   }
   return folderName;
 }

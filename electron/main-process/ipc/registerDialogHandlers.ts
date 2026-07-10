@@ -1,6 +1,7 @@
 import { dialog, ipcMain } from 'electron';
 import type { GitService } from '../../GitService';
 import { IpcChannel } from '../../../src/types/ipcContract';
+import { grantSelectedFiles } from '../fileAccessGrant';
 
 type RegisterDialogHandlersDeps = {
   gitService: GitService;
@@ -46,12 +47,13 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     return filePaths[0];
   });
 
-  ipcMain.handle(IpcChannel.DialogSelectFiles, async () => {
+  ipcMain.handle(IpcChannel.DialogSelectFiles, async (event) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
       title: 'Dateien auswaehlen',
     });
     if (canceled) return null;
+    grantSelectedFiles(event.sender.id, filePaths);
     return filePaths;
   });
 }

@@ -100,6 +100,51 @@ describe('GitService expected non-fatal git errors', () => {
     }
   });
 
+  it('propagates unexpected origin lookup failures instead of reporting no origin', async () => {
+    const error: any = new Error('Command failed');
+    error.stderr = 'fatal: config file is corrupt';
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-origin-error-test-'));
+
+    try {
+      await expect(service.getRepoOriginUrl(repoDir)).rejects.toThrow(/config file is corrupt/i);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('redacts credentials from Git error logs and returned errors', async () => {
+    const secret = 'github_pat_secret-value-123';
+    const url = `https://alice:${secret}@github.example/acme/project.git?access_token=query-secret`;
+    const error: any = new Error(`Command failed: git remote set-url origin ${url}`);
+    error.stderr = `fatal: authentication failed for '${url}' (Bearer bearer-secret-value)`;
+    const fakeExec = vi.fn(async () => {
+      throw error;
+    });
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const service = new GitService(fakeExec as any);
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-redacted-git-error-test-'));
+    (service as any).repoPath = repoDir;
+
+    try {
+      await expect(service.runCommand(['remote', 'set-url', 'origin', url])).rejects.toThrow(/\[REDACTED\]/);
+      const logged = String(consoleErrorSpy.mock.calls[0][0]);
+      expect(logged).toContain('[REDACTED]');
+      expect(logged).not.toContain(secret);
+      expect(logged).not.toContain('query-secret');
+      expect(logged).not.toContain('bearer-secret-value');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
   it('logs git format strings without treating %s as console placeholders', async () => {
     const error: any = new Error('Command failed');
     error.stderr = 'fatal: bad revision';

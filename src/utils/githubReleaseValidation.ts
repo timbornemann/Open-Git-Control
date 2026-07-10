@@ -1,4 +1,24 @@
-export const RELEASE_TAG_PATTERN = /^[^\s~^:?*[\]\\]+$/;
+// Git accepts tag names as ref names. This pattern covers the character-level
+// restrictions; the remaining ref-name rules are checked below.
+// eslint-disable-next-line no-control-regex -- Git ref names reject ASCII control bytes.
+export const RELEASE_TAG_PATTERN = /^[^\s\x00-\x1F\x7F~^:?*[\]\\]+$/;
+
+const hasInvalidRefComponent = (tagName: string): boolean => tagName.split('/').some((component) => component.startsWith('.') || component.endsWith('.lock'));
+
+export const isValidReleaseTagName = (tagName: string): boolean => {
+  if (!RELEASE_TAG_PATTERN.test(tagName)) return false;
+
+  return (
+    tagName !== '@' &&
+    !tagName.startsWith('/') &&
+    !tagName.endsWith('/') &&
+    !tagName.includes('//') &&
+    !tagName.includes('..') &&
+    !tagName.includes('@{') &&
+    !tagName.endsWith('.') &&
+    !hasInvalidRefComponent(tagName)
+  );
+};
 
 export type ReleaseValidationResult = {
   valid: boolean;
@@ -25,7 +45,7 @@ export const validateGithubReleaseInput = (
 
   if (!tagName) {
     errors.tagName = 'release.validation.tagRequired';
-  } else if (!RELEASE_TAG_PATTERN.test(tagName)) {
+  } else if (!isValidReleaseTagName(tagName)) {
     errors.tagName = 'release.validation.tagInvalid';
   }
 

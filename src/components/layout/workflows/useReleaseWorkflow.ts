@@ -301,7 +301,7 @@ export const useReleaseWorkflow = ({
           });
           if (!isCurrentGeneration(generation, repoPath)) return;
           if (!uploadResult.success) {
-            setReleaseError(uploadResult.error || 'Release-Asset konnte nicht hochgeladen werden.');
+            setReleaseError(uploadResult.error || t('generated.components.releasecreator.release_asset_could_not_be_uploaded_e97d42d5'));
             setReleaseSuccess(result.data);
             return;
           }

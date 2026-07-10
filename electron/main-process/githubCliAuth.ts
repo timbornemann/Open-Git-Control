@@ -28,11 +28,19 @@ function formatExecError(error: unknown): string {
   return stderr || stdout || error.message;
 }
 
-async function runGhCommand(args: string[], timeoutMs: number): Promise<{ stdout: string; stderr: string }> {
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new Error('GitHub CLI login was cancelled.');
+  }
+}
+
+async function runGhCommand(args: string[], timeoutMs: number, signal?: AbortSignal): Promise<{ stdout: string; stderr: string }> {
+  throwIfAborted(signal);
   const result = await execFileAsync('gh', args, {
     windowsHide: true,
     timeout: timeoutMs,
     maxBuffer: 10 * 1024 * 1024,
+    signal,
   });
 
   return {
@@ -49,38 +57,45 @@ function normalizeGithubHost(value: string | null | undefined): string {
   return trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '') || DEFAULT_GITHUB_HOST;
 }
 
-async function readGithubCliToken(host: string): Promise<string | null> {
+async function readGithubCliToken(host: string, signal?: AbortSignal): Promise<string | null> {
   try {
-    const { stdout } = await runGhCommand(['auth', 'token', '--hostname', host], GITHUB_CLI_TOKEN_TIMEOUT_MS);
+    const { stdout } = await runGhCommand(['auth', 'token', '--hostname', host], GITHUB_CLI_TOKEN_TIMEOUT_MS, signal);
     const token = stdout.trim();
     return token || null;
   } catch {
+    throwIfAborted(signal);
     return null;
   }
 }
 
-export async function runGithubCliOneClickLogin(githubHost?: string | null): Promise<{ accessToken: string }> {
+export async function runGithubCliOneClickLogin(githubHost?: string | null, signal?: AbortSignal): Promise<{ accessToken: string }> {
   const host = normalizeGithubHost(githubHost);
 
   try {
-    await runGhCommand(['--version'], GITHUB_CLI_TOKEN_TIMEOUT_MS);
+    await runGhCommand(['--version'], GITHUB_CLI_TOKEN_TIMEOUT_MS, signal);
   } catch {
+    throwIfAborted(signal);
     throw new Error(`GitHub CLI (gh) wurde nicht gefunden. Bitte installieren: ${GITHUB_CLI_INSTALL_URL}`);
   }
 
-  const existingToken = await readGithubCliToken(host);
+  const existingToken = await readGithubCliToken(host, signal);
   if (existingToken) {
     return { accessToken: existingToken };
   }
 
   try {
-    await runGhCommand(['auth', 'login', '--hostname', host, '--web', '--git-protocol', 'https', '--scopes', 'repo,read:user'], GITHUB_CLI_LOGIN_TIMEOUT_MS);
+    await runGhCommand(
+      ['auth', 'login', '--hostname', host, '--web', '--git-protocol', 'https', '--scopes', 'repo,read:user'],
+      GITHUB_CLI_LOGIN_TIMEOUT_MS,
+      signal,
+    );
   } catch (error: unknown) {
+    throwIfAborted(signal);
     const detail = formatExecError(error);
     throw new Error(`GitHub 1-Klick Login fehlgeschlagen (${host}). ${detail}`);
   }
 
-  const token = await readGithubCliToken(host);
+  const token = await readGithubCliToken(host, signal);
   if (!token) {
     throw new Error(`GitHub Login wurde abgeschlossen (${host}), aber kein Token wurde von gh geliefert.`);
   }

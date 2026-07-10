@@ -3,9 +3,11 @@ import {
   PLANNER_PRIORITIES,
   PLANNER_STATUSES,
   ensureRepositoryProject,
+  ensureRepositoryProjectInData,
   getRepositoryProjectKey,
-  movePlannerItem,
   readProjectPlannerData,
+  updatePlannerItemInData,
+  writeProjectPlannerData,
 } from './projectPlannerStore';
 import type { StoredRepoEntry } from './repoStore';
 import { readStoreData } from './repoStore';
@@ -151,20 +153,38 @@ export const summarizeProject = (project: PlannerProject, allItems: PlannerItem[
   counts: countItems(allItems.filter((item) => item.projectId === project.id)),
 });
 
-export const findProjectById = (projectId: string): PlannerProject => {
-  const project = readProjectPlannerData().projects.find((candidate) => candidate.id === projectId);
+const findProjectByIdInData = (data: ReturnType<typeof readProjectPlannerData>, projectId: string): PlannerProject => {
+  const project = data.projects.find((candidate) => candidate.id === projectId);
   if (!project) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   return project;
 };
 
-const findProjectByName = (projectName: string): PlannerProject => {
+export const findProjectById = (projectId: string): PlannerProject => findProjectByIdInData(readProjectPlannerData(), projectId);
+
+const findProjectByNameInData = (data: ReturnType<typeof readProjectPlannerData>, projectName: string): PlannerProject => {
   const name = projectName.trim().toLowerCase();
-  const matches = readProjectPlannerData().projects.filter((project) => project.name.toLowerCase() === name);
+  const matches = data.projects.filter((project) => project.name.toLowerCase() === name);
   if (matches.length === 0) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   if (matches.length > 1) {
     throw new ApiError(409, 'PROJECT_NAME_AMBIGUOUS', 'Multiple projects use this name. Use projectId instead.');
   }
   return matches[0];
+};
+
+const hasProjectLocator = (input: JsonObject): boolean =>
+  Boolean(cleanString(input.projectId) || cleanString(input.repoPath) || cleanString(input.projectName));
+
+const resolveProjectLocatorInData = (input: JsonObject, data: ReturnType<typeof readProjectPlannerData>): PlannerProject => {
+  const projectId = cleanString(input.projectId);
+  if (projectId) return findProjectByIdInData(data, projectId);
+
+  const repoPath = cleanString(input.repoPath);
+  if (repoPath) return ensureRepositoryProjectInData(data, repoPath);
+
+  const projectName = cleanString(input.projectName);
+  if (projectName) return findProjectByNameInData(data, projectName);
+
+  throw new ApiError(400, 'PROJECT_REQUIRED', 'Provide projectId, repoPath, or projectName.');
 };
 
 export const resolveProjectLocator = (input: JsonObject): PlannerProject => {
@@ -175,7 +195,7 @@ export const resolveProjectLocator = (input: JsonObject): PlannerProject => {
   if (repoPath) return ensureRepositoryProject(repoPath);
 
   const projectName = cleanString(input.projectName);
-  if (projectName) return findProjectByName(projectName);
+  if (projectName) return findProjectByNameInData(readProjectPlannerData(), projectName);
 
   throw new ApiError(400, 'PROJECT_REQUIRED', 'Provide projectId, repoPath, or projectName.');
 };
@@ -283,26 +303,51 @@ export const itemInputFromBody = (body: JsonObject, defaultStatus?: PlannerStatu
 
 export const itemUpdateFromBody = (body: JsonObject): Partial<PlannerItemInput> => {
   const input: Partial<PlannerItemInput> = {};
-  if ('title' in body) input.title = cleanString(body.title);
+  if ('title' in body) {
+    const title = cleanString(body.title);
+    if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'title is required.');
+    input.title = title;
+  }
   if ('description' in body) input.description = cleanString(body.description);
-  if ('priority' in body) input.priority = parsePriority(body.priority);
-  if ('status' in body || 'tab' in body) input.status = parseStatus(body.status ?? body.tab);
+  if ('priority' in body) {
+    const priority = parsePriority(body.priority);
+    if (!priority) throw new ApiError(400, 'INVALID_PRIORITY', `priority must be one of ${PLANNER_PRIORITIES.join(', ')}.`);
+    input.priority = priority;
+  }
+  if ('status' in body || 'tab' in body) {
+    const status = parseStatus(body.status ?? body.tab);
+    if (!status) throw new ApiError(400, 'INVALID_STATUS', `status must be one of ${PLANNER_STATUSES.join(', ')}.`);
+    input.status = status;
+  }
   if ('tags' in body) input.tags = normalizeTagsInput(body.tags);
   return input;
 };
 
+/** Validates and persists a PATCH todo mutation as one all-or-nothing write. */
+export const updateTodoFromBody = (itemId: string, body: JsonObject): EnrichedTodo => {
+  // Validate request fields before resolving a repository locator, which may
+  // add a repository project to this in-memory transaction.
+  const input = itemUpdateFromBody(body);
+  const data = readProjectPlannerData();
+  const project = hasProjectLocator(body) ? resolveProjectLocatorInData(body, data) : null;
+  const updated = updatePlannerItemInData(data, itemId, input, { projectId: project?.id });
+  writeProjectPlannerData(data);
+  return enrichTodos([updated], data.projects)[0];
+};
+
 export const moveTodoFromBody = (itemId: string, body: JsonObject): EnrichedTodo => {
   const status = parseStatus(body.status ?? body.tab);
-  const hasProjectLocator = Boolean(cleanString(body.projectId) || cleanString(body.repoPath) || cleanString(body.projectName));
-  const project = hasProjectLocator ? resolveProjectLocator(body) : null;
+  const projectLocatorProvided = hasProjectLocator(body);
+  if ('status' in body || 'tab' in body) {
+    if (!status) throw new ApiError(400, 'INVALID_STATUS', `status must be one of ${PLANNER_STATUSES.join(', ')}.`);
+  }
+  const data = readProjectPlannerData();
+  const project = projectLocatorProvided ? resolveProjectLocatorInData(body, data) : null;
   if (!status && !project) {
     throw new ApiError(400, 'MOVE_TARGET_REQUIRED', 'Provide status/tab, projectId, repoPath, or projectName.');
   }
-  const moved = movePlannerItem(itemId, {
-    projectId: project?.id,
-    status,
-  });
-  const data = readProjectPlannerData();
+  const moved = updatePlannerItemInData(data, itemId, { status }, { projectId: project?.id });
+  writeProjectPlannerData(data);
   return enrichTodos([moved], data.projects)[0];
 };
 

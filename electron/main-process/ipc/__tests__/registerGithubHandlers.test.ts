@@ -9,6 +9,12 @@ const { clearSavedGithubTokenSecurelyMock, readSavedGithubTokenWithHostMock, sav
   readSavedGithubTokenWithHostMock: vi.fn(),
   saveGithubTokenSecurelyMock: vi.fn(),
 }));
+const { runGithubCliOneClickLoginMock } = vi.hoisted(() => ({
+  runGithubCliOneClickLoginMock: vi.fn(),
+}));
+const { getAuthorizedSelectedFileMock } = vi.hoisted(() => ({
+  getAuthorizedSelectedFileMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -22,6 +28,14 @@ vi.mock('../../secureStore', () => ({
   saveGithubTokenSecurely: saveGithubTokenSecurelyMock,
 }));
 
+vi.mock('../../githubCliAuth', () => ({
+  runGithubCliOneClickLogin: runGithubCliOneClickLoginMock,
+}));
+
+vi.mock('../../fileAccessGrant', () => ({
+  getAuthorizedSelectedFile: getAuthorizedSelectedFileMock,
+}));
+
 describe('registerGithubHandlers fork flow', () => {
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
 
@@ -31,6 +45,8 @@ describe('registerGithubHandlers fork flow', () => {
     clearSavedGithubTokenSecurelyMock.mockReset();
     readSavedGithubTokenWithHostMock.mockReset();
     saveGithubTokenSecurelyMock.mockReset();
+    runGithubCliOneClickLoginMock.mockReset();
+    getAuthorizedSelectedFileMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -355,6 +371,44 @@ describe('registerGithubHandlers fork flow', () => {
     });
   });
 
+  it('only uploads release assets previously selected through the native dialog', async () => {
+    const uploadReleaseAsset = vi.fn().mockResolvedValue({ id: 4, name: 'release.zip' });
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      uploadReleaseAsset,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue('tim'),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const handler = handlers.get('github:uploadReleaseAsset');
+    expect(handler).toBeTruthy();
+    const event = { sender: { id: 7 } };
+
+    getAuthorizedSelectedFileMock.mockReturnValueOnce(null);
+    await expect(handler!(event, { owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/private/secret.txt' })).resolves.toEqual({
+      success: false,
+      error: 'Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.',
+    });
+    expect(uploadReleaseAsset).not.toHaveBeenCalled();
+
+    getAuthorizedSelectedFileMock.mockReturnValueOnce('C:/selected/release.zip');
+    await expect(handler!(event, { owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/selected/release.zip' })).resolves.toEqual({
+      success: true,
+      data: { id: 4, name: 'release.zip' },
+    });
+    expect(getAuthorizedSelectedFileMock).toHaveBeenLastCalledWith(7, 'C:/selected/release.zip');
+    expect(uploadReleaseAsset).toHaveBeenCalledWith({ owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/selected/release.zip' });
+  });
+
   it('does not persist a device-flow result after logout invalidated the polling request', async () => {
     let resolveAuthentication: ((value: boolean) => void) | undefined;
     const authenticate = vi.fn(
@@ -426,6 +480,41 @@ describe('registerGithubHandlers fork flow', () => {
     expect(githubService.cancelPendingAuthentication).toHaveBeenCalledTimes(1);
     expect(githubService.authenticate).not.toHaveBeenCalled();
     expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+  });
+
+  it('aborts the GitHub CLI child process when web login is cancelled', async () => {
+    let receivedSignal: AbortSignal | undefined;
+    runGithubCliOneClickLoginMock.mockImplementation(
+      (_host: string, signal?: AbortSignal) =>
+        new Promise((resolve, reject) => {
+          receivedSignal = signal;
+          signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        }),
+    );
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      getAuthenticationGeneration: vi.fn().mockReturnValue(0),
+      cancelPendingAuthentication: vi.fn(),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const loginPromise = handlers.get('github:webLogin')!({});
+    await vi.waitFor(() => expect(receivedSignal).toBeDefined());
+    await handlers.get('github:cancelAuth')!({});
+
+    expect(receivedSignal?.aborted).toBe(true);
+    await expect(loginPromise).resolves.toEqual({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+    expect(githubService.cancelPendingAuthentication).toHaveBeenCalledTimes(1);
   });
 
   it('invalidates device polling when settings logout changes the service generation', async () => {

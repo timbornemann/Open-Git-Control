@@ -175,6 +175,56 @@ describe('planningApiServer', () => {
     ]);
   });
 
+  it('rejects invalid todo patches without persisting a simultaneous move', async () => {
+    const sourceProject = await requestJson('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Source project' }),
+    });
+    const targetProject = await requestJson('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Target project' }),
+    });
+    const todo = await requestJson('/api/todos', {
+      method: 'POST',
+      body: JSON.stringify({ projectId: sourceProject.data.id, title: 'Keep my assignment' }),
+    });
+
+    const invalidPatch = await fetch(`${server!.url}/api/todos/${todo.data.id}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        [server!.authHeaderName]: server!.authToken,
+      },
+      body: JSON.stringify({ projectId: targetProject.data.id, title: '   ' }),
+    });
+    expect(invalidPatch.status).toBe(400);
+    await expect(invalidPatch.json()).resolves.toMatchObject({
+      success: false,
+      error: { code: 'TITLE_REQUIRED' },
+    });
+
+    const unchanged = await requestJson(`/api/todos/${todo.data.id}`);
+    expect(unchanged.data).toMatchObject({
+      id: todo.data.id,
+      title: 'Keep my assignment',
+      projectId: sourceProject.data.id,
+    });
+
+    const unknownTodo = await fetch(`${server!.url}/api/todos/missing-todo`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        [server!.authHeaderName]: server!.authToken,
+      },
+      body: JSON.stringify({ title: 'Does not exist' }),
+    });
+    expect(unknownTodo.status).toBe(404);
+    await expect(unknownTodo.json()).resolves.toMatchObject({
+      success: false,
+      error: { code: 'TODO_NOT_FOUND' },
+    });
+  });
+
   it('exposes planner operations through MCP tools/call JSON-RPC', async () => {
     const createProject = await requestJson('/api/projects', {
       method: 'POST',
@@ -256,5 +306,59 @@ describe('planningApiServer', () => {
       isError: true,
     });
     expect(mcpStatus.result.content[0].text).toContain('Unknown tool: get_git_status');
+  });
+  it('follows JSON-RPC rules for notifications, batches, and parse errors', async () => {
+    const headers = {
+      'content-type': 'application/json',
+      [server!.authHeaderName]: server!.authToken,
+    };
+    const notification = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', params: [] }),
+    });
+    expect(notification.status).toBe(204);
+    await expect(notification.text()).resolves.toBe('');
+
+    const mixedBatch = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify([
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        { jsonrpc: '2.0', id: 'ping-request', method: 'ping' },
+      ]),
+    });
+    expect(mixedBatch.status).toBe(200);
+    await expect(mixedBatch.json()).resolves.toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 'ping-request',
+        result: {},
+      },
+    ]);
+
+    const emptyBatch = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers,
+      body: '[]',
+    });
+    expect(emptyBatch.status).toBe(200);
+    await expect(emptyBatch.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32600, message: 'Invalid Request' },
+    });
+
+    const parseError = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers,
+      body: '{',
+    });
+    expect(parseError.status).toBe(200);
+    await expect(parseError.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32700, message: 'Parse error' },
+    });
   });
 });

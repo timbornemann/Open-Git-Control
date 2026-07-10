@@ -16,7 +16,7 @@ function parseSemverTag(tag: string): ParsedTag | null {
   if (!match) return null;
 
   return {
-    prefix: match[1] || 'v',
+    prefix: match[1] || '',
     major: Number(match[2]),
     minor: Number(match[3]),
     patch: Number(match[4]),
@@ -51,7 +51,7 @@ export function suggestNextReleaseTag(tags: string[], bump: ReleaseVersionBump =
   });
 
   const top = parsed[0];
-  const prefix = top.prefix || 'v';
+  const prefix = top.prefix;
 
   if (bump === 'major') {
     return `${prefix}${top.major + 1}.0.0`;

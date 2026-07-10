@@ -23,6 +23,7 @@ const persistGithubToken = (token: string, host: string): { tokenPersisted: bool
 
 export function registerGithubAuthHandlers({ githubService, readSettingsWithMigration }: RegisterGithubAuthHandlersDeps): void {
   let authGeneration = 0;
+  let activeGithubCliLogin: AbortController | null = null;
   const beginAuthAttempt = (): number => {
     authGeneration += 1;
     return authGeneration;
@@ -31,6 +32,10 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   const serviceGeneration = (): number => githubService.getAuthenticationGeneration();
   const staleAuthError = () => ({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
   const lastAuthenticationError = (): string | undefined => githubService.getLastAuthenticationFailure?.()?.message;
+  const abortGithubCliLogin = (): void => {
+    activeGithubCliLogin?.abort();
+    activeGithubCliLogin = null;
+  };
 
   ipcMain.handle(IpcChannel.GithubAuth, async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
     const generation = beginAuthAttempt();
@@ -50,6 +55,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
 
   ipcMain.handle(IpcChannel.GithubCancelAuth, async () => {
     authGeneration += 1;
+    abortGithubCliLogin();
     githubService.cancelPendingAuthentication();
     return { success: true } as const;
   });
@@ -191,10 +197,13 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   ipcMain.handle(IpcChannel.GithubWebLogin, async () => {
     const generation = beginAuthAttempt();
     const startingServiceGeneration = serviceGeneration();
+    abortGithubCliLogin();
+    const abortController = new AbortController();
+    activeGithubCliLogin = abortController;
     try {
       const settings = readSettingsWithMigration();
       const normalizedHost = githubService.normalizeHost(settings.githubHost);
-      const tokenResult = await runGithubCliOneClickLogin(normalizedHost);
+      const tokenResult = await runGithubCliOneClickLogin(normalizedHost, abortController.signal);
       if (!isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) return staleAuthError();
 
       const authenticated = await githubService.authenticate(tokenResult.accessToken, normalizedHost, () => isCurrentAuthAttempt(generation));
@@ -213,13 +222,21 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
         error: persist.persistWarning,
       };
     } catch (error: unknown) {
+      if (abortController.signal.aborted || !isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) {
+        return staleAuthError();
+      }
       const message = error instanceof Error ? error.message : 'GitHub 1-Klick Login fehlgeschlagen.';
       return { success: false, error: message };
+    } finally {
+      if (activeGithubCliLogin === abortController) {
+        activeGithubCliLogin = null;
+      }
     }
   });
 
   ipcMain.handle(IpcChannel.GithubLogout, async () => {
     authGeneration += 1;
+    abortGithubCliLogin();
     githubService.logout();
     clearSavedGithubTokenSecurely();
     return { success: true };

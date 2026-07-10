@@ -128,6 +128,13 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ ollamaBaseUrl: 123 as never }).ollamaBaseUrl).toBe(DEFAULT_SETTINGS.ollamaBaseUrl);
   });
 
+  it('only accepts secure OpenAI base URLs', () => {
+    expect(normalizeSettings({ openAiBaseUrl: ' https://api.example.test/v1/ ' }).openAiBaseUrl).toBe('https://api.example.test/v1');
+    expect(normalizeSettings({ openAiBaseUrl: 'http://api.example.test/v1' }).openAiBaseUrl).toBe(DEFAULT_SETTINGS.openAiBaseUrl);
+    expect(normalizeSettings({ openAiBaseUrl: 'https://user:password@api.example.test/v1' }).openAiBaseUrl).toBe(DEFAULT_SETTINGS.openAiBaseUrl);
+    expect(normalizeSettings({ openAiBaseUrl: 'https://api.example.test/v1?proxy=1#fragment' }).openAiBaseUrl).toBe('https://api.example.test/v1');
+  });
+
   it('normalizes model values and gemini key presence flag', () => {
     const veryLong = 'm'.repeat(500);
 

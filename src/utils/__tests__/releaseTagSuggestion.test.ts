@@ -23,9 +23,11 @@ describe('suggestNextReleaseTag', () => {
     expect(suggestNextReleaseTag([], 'major')).toBe('v1.0.0');
   });
 
-  it('normalizes tags without v-prefix to v-prefix in suggestion', () => {
-    expect(suggestNextReleaseTag(['1.4.2'])).toBe('v1.4.3');
-    expect(suggestNextReleaseTag(['  1.4.2  ', 'invalid'])).toBe('v1.4.3');
+  it('preserves unprefixed version formats in suggestions', () => {
+    expect(suggestNextReleaseTag(['1.4.2'])).toBe('1.4.3');
+    expect(suggestNextReleaseTag(['1.4.2'], 'minor')).toBe('1.5.0');
+    expect(suggestNextReleaseTag(['1.4.2'], 'major')).toBe('2.0.0');
+    expect(suggestNextReleaseTag(['  1.4.2  ', 'invalid'])).toBe('1.4.3');
   });
 
   it('keeps explicit uppercase/lowercase prefix from the winning tag', () => {

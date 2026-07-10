@@ -5,6 +5,9 @@ const { handleMock, showOpenDialogMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   showOpenDialogMock: vi.fn(),
 }));
+const { grantSelectedFilesMock } = vi.hoisted(() => ({
+  grantSelectedFilesMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -15,6 +18,10 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('../../fileAccessGrant', () => ({
+  grantSelectedFiles: grantSelectedFilesMock,
+}));
+
 describe('registerDialogHandlers', () => {
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
 
@@ -22,6 +29,7 @@ describe('registerDialogHandlers', () => {
     handlers.clear();
     handleMock.mockReset();
     showOpenDialogMock.mockReset();
+    grantSelectedFilesMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -107,8 +115,9 @@ describe('registerDialogHandlers', () => {
     const selectFilesHandler = handlers.get('dialog:selectFiles');
     expect(selectFilesHandler).toBeTruthy();
 
-    const files = await selectFilesHandler!();
+    const files = await selectFilesHandler!({ sender: { id: 42 } });
     expect(files).toEqual(['D:/a.txt', 'D:/b.txt']);
+    expect(grantSelectedFilesMock).toHaveBeenCalledWith(42, ['D:/a.txt', 'D:/b.txt']);
     expect(showOpenDialogMock).toHaveBeenLastCalledWith({
       properties: ['openFile', 'multiSelections'],
       title: 'Dateien auswaehlen',
