@@ -2,7 +2,7 @@ import type { AppSettingsDto } from '@/types/appDtos';
 
 export const DEFAULT_SETTINGS: AppSettingsDto = {
   theme: 'copper-night',
-  language: 'de',
+  language: 'en',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
   confirmDangerousOps: true,

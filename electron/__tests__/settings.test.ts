@@ -55,7 +55,7 @@ describe('normalizeSettings', () => {
 
     expect(normalizeSettings({ theme: 'invalid' as never, language: 'fr' as never })).toMatchObject({
       theme: 'copper-night',
-      language: 'de',
+      language: 'en',
     });
   });
 

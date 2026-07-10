@@ -16,7 +16,7 @@ type I18nContextValue = {
   t: CatalogTranslateFn;
 };
 
-const DEFAULT_LANGUAGE: AppLanguage = 'de';
+const DEFAULT_LANGUAGE: AppLanguage = 'en';
 const catalogs: Record<AppLanguage, TranslationCatalog> = {
   de: deCatalog,
   en: enCatalog,

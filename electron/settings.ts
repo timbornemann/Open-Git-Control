@@ -42,7 +42,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'copper-night',
-  language: 'de',
+  language: 'en',
   autoFetchIntervalMs: 60_000,
   defaultBranch: 'main',
   confirmDangerousOps: true,
@@ -98,7 +98,8 @@ function normalizeTheme(value: unknown): AppSettings['theme'] {
 }
 
 function normalizeLanguage(value: unknown): AppSettings['language'] {
-  return value === 'en' ? 'en' : 'de';
+  if (value === 'de' || value === 'en') return value;
+  return DEFAULT_SETTINGS.language;
 }
 
 function normalizeAutoFetchInterval(value: unknown): number {
