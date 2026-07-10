@@ -238,6 +238,7 @@ export const useAppState = () => {
 
   const { closeReleaseCreator, generateReleaseNotesWithAI, handleCreateRelease, openReleaseCreator, refreshReleaseContext, setReleaseForm } =
     useReleaseWorkflow({
+      activeRepo: workspace.activeRepo,
       isGithubAuthenticated: github.isAuthenticated,
       ownerRepo: pullRequestDomain.prOwnerRepo,
       currentBranch: repository.currentBranch,

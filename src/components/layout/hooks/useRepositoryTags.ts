@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
@@ -36,6 +36,11 @@ export const useRepositoryTags = ({
 }: Params) => {
   const [tags, setTags] = useState<string[]>([]);
   const { t, tr } = useLanguageTranslations(language);
+  const activeRepoRef = useRef<string | null>(activeRepo);
+
+  useEffect(() => {
+    activeRepoRef.current = activeRepo;
+  }, [activeRepo]);
 
   useEffect(() => {
     if (!activeRepo || !gitClient.isAvailable()) {
@@ -43,16 +48,22 @@ export const useRepositoryTags = ({
       return;
     }
 
+    let cancelled = false;
     const fetchTags = async () => {
       try {
         const byVersion = await gitClient.runGitCommand('tag', '-l', '--sort=-v:refname');
+        if (cancelled) return;
         setTags(byVersion.success ? parseTags(byVersion.data) : []);
       } catch {
+        if (cancelled) return;
         setTags([]);
       }
     };
 
     fetchTags();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRepo, refreshTrigger]);
 
   const handleCreateTag = async () => {
@@ -90,8 +101,10 @@ export const useRepositoryTags = ({
       if (!activeRepo || !gitClient.isAvailable()) return;
 
       try {
+        const repoAtStart = activeRepo;
         const tagRef = `refs/tags/${tagName}^{commit}`;
         const result = await gitClient.runGitCommand('show', '--quiet', '--format=%H', tagRef);
+        if (repoAtStart !== activeRepoRef.current) return;
         const hash =
           String(result.data || '')
             .trim()

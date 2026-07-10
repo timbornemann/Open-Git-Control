@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
@@ -37,6 +37,14 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const [activeGitCommand, setActiveGitCommand] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
   const runGitCommandRef = useRef<GitCommandRunner | null>(null);
+  const activeRepoRef = useRef<string | null>(workspace.activeRepo);
+
+  useEffect(() => {
+    activeRepoRef.current = workspace.activeRepo;
+    setIsGitActionRunning(false);
+    setActiveGitCommand(null);
+    setActiveGitActionLabel(null);
+  }, [workspace.activeRepo]);
 
   const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
@@ -84,6 +92,8 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const runGitCommand = useCallback(
     async (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions): Promise<boolean> => {
       if (!gitClient.isAvailable() || !workspace.activeRepo || args.length === 0) return false;
+      const repoAtStart = workspace.activeRepo;
+      const isStillActiveRepo = () => activeRepoRef.current === repoAtStart;
 
       const command = args[0] as GitCommandNameDto;
       const tryAutoSetUpstreamPush = async (failureMessage: unknown): Promise<boolean> => {
@@ -103,6 +113,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           t('generated.components.layout.workflows.usegitcommandworkflow.running_push_with_upstream_c4d07a1f'),
           { ...options, skipAutoSetUpstreamOnPushFailure: true },
         );
+        if (!isStillActiveRepo()) return false;
         return fallbackSuccess;
       };
 
@@ -138,7 +149,9 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
             }
           }
 
+          if (!isStillActiveRepo()) return false;
           const prepared = await ensureInitialCommitForPush();
+          if (!isStillActiveRepo()) return false;
           if (!prepared) {
             return false;
           }
@@ -164,20 +177,24 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         if (await tryAutoSetUpstreamPush(errorMessage)) {
           return true;
         }
+        if (!isStillActiveRepo()) return false;
         if (missingUpstream) {
           return false;
         }
         if (await maybeRecoverRemoteSetup({ command, options, failureMessage: errorMessage })) {
           return false;
         }
+        if (!isStillActiveRepo()) return false;
         if (maybeHandleSyncMismatchFailure({ command, failureMessage: errorMessage, args, successMsg, actionLabel, options })) {
           return false;
         }
 
         const mergeInProgress = isMergeInProgressError(errorMessage);
+        if (!isStillActiveRepo()) return false;
         triggerRefresh();
         try {
           const statusAfter = await gitClient.getStatusPorcelain();
+          if (!isStillActiveRepo()) return false;
           const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
           const conflictPath = resolveConflictPathAfterGitFailure(porcelain, errorMessage);
           if (conflictPath) {
@@ -217,16 +234,19 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
       if (await maybeHandlePushWithoutOrigin({ command, options })) {
         return false;
       }
+      if (!isStillActiveRepo()) return false;
 
-      if (await runGitCommandGuards({ args, command, successMsg, actionLabel, options })) {
+      if (await runGitCommandGuards({ args, command, repoPath: repoAtStart, successMsg, actionLabel, options })) {
         return false;
       }
+      if (!isStillActiveRepo()) return false;
       setIsGitActionRunning(true);
       setActiveGitCommand(command);
       setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
       try {
         const r = await gitClient.runGitCommand(command, ...args.slice(1));
+        if (!isStillActiveRepo()) return false;
         if (r.success) {
           if (forceGithubRepoCreationPrompt && (command === 'push' || command === 'pull' || command === 'fetch')) {
             setForceGithubRepoCreationPrompt(false);
@@ -238,14 +258,17 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         }
         return recoverFromGitCommandFailure(r.error, t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'));
       } catch (e: any) {
+        if (!isStillActiveRepo()) return false;
         return recoverFromGitCommandFailure(
           e?.message,
           e?.message || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'),
         );
       } finally {
-        setIsGitActionRunning(false);
-        setActiveGitCommand(null);
-        setActiveGitActionLabel(null);
+        if (isStillActiveRepo()) {
+          setIsGitActionRunning(false);
+          setActiveGitCommand(null);
+          setActiveGitActionLabel(null);
+        }
       }
     },
     [

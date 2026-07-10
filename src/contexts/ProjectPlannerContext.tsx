@@ -62,6 +62,11 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [createProjectRequestId, setCreateProjectRequestId] = useState(0);
   const ensuredRepoRef = useRef<string | null>(null);
+  const activeRepoGenerationRef = useRef(0);
+
+  useEffect(() => {
+    activeRepoGenerationRef.current += 1;
+  }, [activeRepo]);
 
   const refresh = useCallback(async () => {
     if (!plannerClient.isAvailable()) {
@@ -106,15 +111,18 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     if (!activeRepo || !plannerClient.isAvailable()) return;
     const key = repoKey(activeRepo);
     if (ensuredRepoRef.current === key) return;
-    ensuredRepoRef.current = key;
+    const generation = activeRepoGenerationRef.current;
 
     const ensure = async () => {
       const result = await plannerClient.ensureRepositoryProject(activeRepo);
+      if (generation !== activeRepoGenerationRef.current) return;
       if (!result.success) {
         setError(result.error);
         return;
       }
+      ensuredRepoRef.current = key;
       await refresh();
+      if (generation !== activeRepoGenerationRef.current) return;
       setSelectedProjectId(result.data.id);
     };
     void ensure();

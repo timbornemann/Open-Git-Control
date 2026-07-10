@@ -11,6 +11,7 @@ type SetConfirmDialog = (dialog: ConfirmDialogState | null | ((prev: ConfirmDial
 export type GitCommandGuardRequest = {
   args: string[];
   command: string;
+  repoPath?: string | null;
   successMsg: string;
   actionLabel?: string;
   options?: RunGitCommandOptions;
@@ -151,7 +152,7 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
   const { runWithOptions, setConfirmDialog, setGitActionToast, t, tr } = runtime;
 
   try {
-    const scanResult = await scanPushSecretsWithTimeout(includeTags);
+    const scanResult = await scanPushSecretsWithTimeout(includeTags, request.repoPath || undefined);
     if (!scanResult.success) {
       setGitActionToast({
         msg: scanResult.error || t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_before_push_failed_a33eb357'),
@@ -198,7 +199,7 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
   }
 };
 
-const scanPushSecretsWithTimeout = async (includeTags: boolean): Promise<Awaited<ReturnType<typeof gitClient.scanPushSecrets>>> => {
+const scanPushSecretsWithTimeout = async (includeTags: boolean, repoPath?: string): Promise<Awaited<ReturnType<typeof gitClient.scanPushSecrets>>> => {
   const scanTimeoutMs = 15000;
   let scanTimeoutId: number | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -206,7 +207,7 @@ const scanPushSecretsWithTimeout = async (includeTags: boolean): Promise<Awaited
   });
 
   try {
-    return await Promise.race([gitClient.scanPushSecrets({ includeTags }), timeoutPromise]);
+    return await Promise.race([gitClient.scanPushSecrets({ includeTags, repoPath }), timeoutPromise]);
   } finally {
     if (scanTimeoutId !== null) window.clearTimeout(scanTimeoutId);
   }

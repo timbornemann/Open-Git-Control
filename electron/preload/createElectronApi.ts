@@ -66,7 +66,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
     gitPull: () => invokeGitCommand('pull'),
     gitPush: () => invokeGitCommand('push'),
-    scanPushSecrets: (params?: { includeTags?: boolean }) => ipcRenderer.invoke(IpcChannel.GitScanPushSecrets, params || {}),
+    scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => ipcRenderer.invoke(IpcChannel.GitScanPushSecrets, params || {}),
     cancelSecretScan: () => ipcRenderer.invoke(IpcChannel.GitCancelSecretScan),
     gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke(IpcChannel.GitClone, cloneUrl, targetDir, targetName),
     gitInit: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitInit, repoPath),
@@ -125,7 +125,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     aiListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
     ollamaTestConnection: () => ipcRenderer.invoke(IpcChannel.AiTestConnection),
     ollamaListModels: () => ipcRenderer.invoke(IpcChannel.AiListModels),
-    runAiAutoCommit: () => ipcRenderer.invoke(IpcChannel.GitAiAutoCommit),
+    runAiAutoCommit: (params: { repoPath: string }) => ipcRenderer.invoke(IpcChannel.GitAiAutoCommit, params),
     cancelAiAutoCommit: () => ipcRenderer.invoke(IpcChannel.GitCancelAiAutoCommit),
     getAiAutoCommitState: () => ipcRenderer.invoke(IpcChannel.GitGetAiAutoCommitState),
     aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke(IpcChannel.AiGenerateCommitMessage, params),
@@ -155,7 +155,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       draft?: boolean;
       prerelease?: boolean;
     }) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
-    githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string }) =>
+    githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubGetReleaseContext, params),
     aiGenerateReleaseNotes: (params: {
       tagName: string;

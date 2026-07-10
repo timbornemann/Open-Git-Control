@@ -86,7 +86,7 @@ export interface ElectronGithubAPI {
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: CreatePullRequestParamsDto) => Promise<IpcResult<CreatePullRequestResultDto>>;
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
-  githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string }) => Promise<IpcResult<GitHubReleaseContextDto>>;
+  githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }) => Promise<IpcResult<GitHubReleaseContextDto>>;
   githubGetWorkflowRuns: (params: WorkflowRunsRequestDto) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
   githubGetStatusChecks: (params: StatusChecksRequestDto) => Promise<IpcResult<GithubStatusChecksDto>>;
   githubMergePR: (params: MergePullRequestParamsDto) => Promise<IpcResult<MergePullRequestResultDto>>;

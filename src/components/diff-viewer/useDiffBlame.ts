@@ -19,6 +19,8 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
   }, [request]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchBlame = async () => {
       if (!showBlame || !repoPath || !gitClient.isAvailable()) return;
 
@@ -27,19 +29,26 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
         const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
 
         const result = await gitClient.getFileBlame(request.path, commitHashForBlame);
+        if (cancelled) return;
         if (result.success) {
           setBlameData(result.data);
         } else {
           console.error('Failed to fetch blame data:', result.error);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching blame data:', err);
       } finally {
-        setIsBlameLoading(false);
+        if (!cancelled) {
+          setIsBlameLoading(false);
+        }
       }
     };
 
     void fetchBlame();
+    return () => {
+      cancelled = true;
+    };
   }, [showBlame, repoPath, request]);
 
   const blameMap = useMemo(() => {

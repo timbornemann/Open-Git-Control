@@ -46,7 +46,15 @@ export const useRepositoryRemoteSync = ({
 }: Params) => {
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({ ...EMPTY_REMOTE_SYNC_STATE });
   const isRemoteFetchRunningRef = useRef(false);
+  const remoteFetchRunIdRef = useRef(0);
+  const activeRepoRef = useRef<string | null>(activeRepo);
   const { t, tr } = useLanguageTranslations(language);
+
+  useEffect(() => {
+    activeRepoRef.current = activeRepo;
+    remoteFetchRunIdRef.current += 1;
+    isRemoteFetchRunningRef.current = false;
+  }, [activeRepo]);
 
   const formatLastFetchedAt = useCallback(
     (timestamp: number | null) => {
@@ -70,6 +78,7 @@ export const useRepositoryRemoteSync = ({
   }, [activeRepo, setRemoteSync]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchRemoteTracking = async () => {
       if (!activeRepo || !gitClient.isAvailable()) {
         setRemoteSync((prev) => ({ ...prev, ahead: 0, behind: 0, hasUpstream: false }));
@@ -78,6 +87,7 @@ export const useRepositoryRemoteSync = ({
 
       try {
         const { success, data } = await gitClient.getBranchStatusPorcelainV2();
+        if (cancelled) return;
         if (!success || !data) return;
 
         const parsed = parseBranchSyncFromPorcelainV2(String(data));
@@ -93,12 +103,18 @@ export const useRepositoryRemoteSync = ({
     };
 
     fetchRemoteTracking();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRepo, refreshTrigger, setRemoteSync]);
 
   const refreshRemoteState = useCallback(
     async (showToast = false) => {
       if (!gitClient.isAvailable() || !activeRepo) return false;
       if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
+      const repoAtStart = activeRepo;
+      const fetchRunId = remoteFetchRunIdRef.current + 1;
+      remoteFetchRunIdRef.current = fetchRunId;
 
       const fetchLabel = t('generated.components.layout.hooks.userepositorydomain.running_fetch_2dde9664');
       isRemoteFetchRunningRef.current = true;
@@ -107,6 +123,7 @@ export const useRepositoryRemoteSync = ({
 
       try {
         const result = await gitClient.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
+        if (activeRepoRef.current !== repoAtStart) return false;
         if (result.success) {
           setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
           triggerRefresh();
@@ -119,6 +136,7 @@ export const useRepositoryRemoteSync = ({
         const errorMessage = String(result.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
         if (isRemoteRepositoryMissingError(errorMessage)) {
           const removeOriginResult = await gitClient.removeRemote('origin');
+          if (activeRepoRef.current !== repoAtStart) return false;
           const removeOriginError = String(removeOriginResult.error || '').trim();
           const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
 
@@ -144,6 +162,7 @@ export const useRepositoryRemoteSync = ({
         }
         return false;
       } catch (error: any) {
+        if (activeRepoRef.current !== repoAtStart) return false;
         const errorMessage = error?.message || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423');
         setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
         if (showToast) {
@@ -151,8 +170,12 @@ export const useRepositoryRemoteSync = ({
         }
         return false;
       } finally {
-        isRemoteFetchRunningRef.current = false;
-        setActiveGitActionLabel((current) => (current === fetchLabel ? null : current));
+        if (remoteFetchRunIdRef.current === fetchRunId) {
+          isRemoteFetchRunningRef.current = false;
+          if (activeRepoRef.current === repoAtStart) {
+            setActiveGitActionLabel((current) => (current === fetchLabel ? null : current));
+          }
+        }
       }
     },
     [activeRepo, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setHasRemoteOrigin, setRemotes, setRemoteSync, t, triggerRefresh],

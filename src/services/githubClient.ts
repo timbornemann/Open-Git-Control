@@ -101,7 +101,7 @@ export const githubClient = {
     return requireElectronGithubApi().githubMergePR(params);
   },
 
-  async getReleaseContext(params: { owner: string; repo: string; targetCommitish?: string }): Promise<IpcResult<GitHubReleaseContextDto>> {
+  async getReleaseContext(params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }): Promise<IpcResult<GitHubReleaseContextDto>> {
     return requireElectronGithubApi().githubGetReleaseContext(params);
   },
 

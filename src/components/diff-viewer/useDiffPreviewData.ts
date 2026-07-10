@@ -28,6 +28,8 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
   const [sourceTruncated, setSourceTruncated] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchDiff = async () => {
       if (!repoPath || !gitClient.isAvailable()) return;
 
@@ -41,6 +43,7 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
           maxBytes: MAX_RENDER_CHARS,
           maxLines: MAX_RENDER_LINES,
         });
+        if (cancelled) return;
 
         if (!result.success) {
           setError(result.error || t('diffViewer.errors.diffLoadFailed'));
@@ -50,14 +53,20 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
         setDiffText(result.data.text);
         setSourceTruncated(result.data.truncated);
       } catch (fetchError: unknown) {
+        if (cancelled) return;
         console.error(fetchError);
         setError(t('diffViewer.errors.diffLoadFailed'));
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     void fetchDiff();
+    return () => {
+      cancelled = true;
+    };
   }, [repoPath, request, t]);
 
   const looksBinaryByExt = useMemo(() => looksBinaryByExtension(request.path), [request.path]);

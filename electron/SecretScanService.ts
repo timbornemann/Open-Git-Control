@@ -189,6 +189,7 @@ export class SecretScanService {
   constructor(private readonly gitService: GitService) {}
 
   async scanPushDiffs(options: {
+    repoPath: string;
     strictness: SecretScanStrictness;
     allowlistText: string;
     signal?: AbortSignal;
@@ -238,7 +239,8 @@ export class SecretScanService {
     const streamDiff = async (args: string[], source: SecretScanSource) => {
       let currentFile = '';
       let currentNewLineNumber = 0;
-      await this.gitService.streamCommandLines(
+      await this.gitService.streamCommandLinesAtPath(
+        options.repoPath,
         args,
         (line) => {
           const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
@@ -293,14 +295,14 @@ export class SecretScanService {
 
     await streamDiff(['diff', '--cached', '--no-color', '--unified=0'], 'staged');
     try {
-      const upstreamRef = await this.gitService.runCommand(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+      const upstreamRef = await this.gitService.runCommandAtPath(options.repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
       if (upstreamRef) {
         await streamDiff(['diff', '--no-color', '--unified=0', `${upstreamRef}..HEAD`], 'to-push');
       }
     } catch (error) {
       if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
       try {
-        const unpushedCommitsRaw = await this.gitService.runCommand(['rev-list', '--reverse', '--topo-order', 'HEAD', '--not', '--remotes']);
+        const unpushedCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', 'HEAD', '--not', '--remotes']);
         const unpushedCommits = parseCommitList(unpushedCommitsRaw);
         await scanCommits(unpushedCommits, 'to-push');
         notes.push(
@@ -316,7 +318,7 @@ export class SecretScanService {
 
     if (options.includeTags) {
       try {
-        const tagOnlyCommitsRaw = await this.gitService.runCommand(['rev-list', '--reverse', '--topo-order', '--tags', '--not', '--remotes']);
+        const tagOnlyCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', '--tags', '--not', '--remotes']);
         const tagOnlyCommits = parseCommitList(tagOnlyCommitsRaw);
         await scanCommits(tagOnlyCommits, 'tag');
 

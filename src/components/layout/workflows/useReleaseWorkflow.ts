@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { githubClient } from '@/services/githubClient';
@@ -15,6 +15,7 @@ type Toast = { msg: string; isError: boolean };
 type ReleaseValidation = ReturnType<typeof validateGithubReleaseInput>;
 
 type Params = {
+  activeRepo: string | null;
   isGithubAuthenticated: boolean;
   ownerRepo: RepoOwnerRef | null;
   currentBranch: string;
@@ -66,6 +67,7 @@ const getCreateReleaseErrorMessage = (errorText: string, t: (key: string) => str
 };
 
 export const useReleaseWorkflow = ({
+  activeRepo,
   isGithubAuthenticated,
   ownerRepo,
   currentBranch,
@@ -90,6 +92,17 @@ export const useReleaseWorkflow = ({
   language,
 }: Params) => {
   const { t, tr } = useLanguageTranslations(language);
+  const generationRef = useRef(0);
+  const activeRepoRef = useRef<string | null>(activeRepo);
+
+  useEffect(() => {
+    activeRepoRef.current = activeRepo;
+    generationRef.current += 1;
+  }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo]);
+
+  const isCurrentGeneration = useCallback((generation: number, repoPath: string | null) => {
+    return generation === generationRef.current && activeRepoRef.current === repoPath;
+  }, []);
 
   const setReleaseForm = useCallback(
     (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => {
@@ -151,6 +164,8 @@ export const useReleaseWorkflow = ({
 
       setReleaseContextLoading(true);
       setReleaseContextError(null);
+      const generation = generationRef.current;
+      const repoPath = activeRepoRef.current;
 
       try {
         const targetCommitish = (targetCommitishOverride ?? releaseForm.targetCommitish ?? '').trim() || currentBranch;
@@ -158,7 +173,9 @@ export const useReleaseWorkflow = ({
           owner: ownerRepo.owner,
           repo: ownerRepo.repo,
           targetCommitish,
+          repoPath: repoPath || undefined,
         });
+        if (!isCurrentGeneration(generation, repoPath)) return;
 
         if (!result.success) {
           setReleaseContext(null);
@@ -187,13 +204,17 @@ export const useReleaseWorkflow = ({
           };
         });
       } catch (error: any) {
+        if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseContext(null);
         setReleaseContextError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
       } finally {
-        setReleaseContextLoading(false);
+        if (isCurrentGeneration(generation, repoPath)) {
+          setReleaseContextLoading(false);
+        }
       }
     },
     [
+      isCurrentGeneration,
       currentBranch,
       isGithubAuthenticated,
       ownerRepo,
@@ -266,6 +287,8 @@ export const useReleaseWorkflow = ({
       setReleaseSubmitting(true);
       setReleaseError(null);
       setReleaseSuccess(null);
+      const generation = generationRef.current;
+      const repoPath = activeRepoRef.current;
 
       try {
         const result = await githubClient.createRelease({
@@ -278,6 +301,7 @@ export const useReleaseWorkflow = ({
           draft: Boolean(releaseForm.draft),
           prerelease: Boolean(releaseForm.prerelease),
         });
+        if (!isCurrentGeneration(generation, repoPath)) return;
 
         if (!result.success) {
           setReleaseError(getCreateReleaseErrorMessage(result.error || '', t));
@@ -293,12 +317,16 @@ export const useReleaseWorkflow = ({
         resetReleaseDraft({ clearContext: true, clearSuccess: false });
         await refreshReleaseContext(currentBranch || undefined);
       } catch (error: any) {
+        if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0'));
       } finally {
-        setReleaseSubmitting(false);
+        if (isCurrentGeneration(generation, repoPath)) {
+          setReleaseSubmitting(false);
+        }
       }
     },
     [
+      isCurrentGeneration,
       currentBranch,
       isGithubAuthenticated,
       ownerRepo,
@@ -347,6 +375,8 @@ export const useReleaseWorkflow = ({
 
       setReleaseNotesGenerating(true);
       setReleaseError(null);
+      const generation = generationRef.current;
+      const repoPath = activeRepoRef.current;
 
       try {
         const result = await githubClient.generateReleaseNotes({
@@ -359,6 +389,7 @@ export const useReleaseWorkflow = ({
           versionBump,
           hints: promptHints,
         });
+        if (!isCurrentGeneration(generation, repoPath)) return;
 
         if (!result.success) {
           setReleaseError(result.error || t('generated.components.layout.workflows.usereleaseworkflow.could_not_generate_ai_release_notes_0402ba88'));
@@ -380,12 +411,16 @@ export const useReleaseWorkflow = ({
         }));
         setGitActionToast({ msg: t('generated.components.layout.workflows.usereleaseworkflow.ai_release_notes_generated_c784fbf3'), isError: false });
       } catch (error: any) {
+        if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_generate_ai_release_notes_0402ba88'));
       } finally {
-        setReleaseNotesGenerating(false);
+        if (isCurrentGeneration(generation, repoPath)) {
+          setReleaseNotesGenerating(false);
+        }
       }
     },
     [
+      isCurrentGeneration,
       isGithubAuthenticated,
       ownerRepo,
       releaseContext?.commitsSinceLastRelease,

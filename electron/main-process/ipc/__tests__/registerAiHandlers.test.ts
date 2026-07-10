@@ -28,7 +28,7 @@ describe('registerAiHandlers', () => {
       testConnection: vi.fn(),
       listModels: vi.fn(),
       generateCommitMessageFromUserNotes: vi.fn(),
-      runAutoCommit: vi.fn(async (_settings: any, _getKey: any, onProgress: any) => {
+      runAutoCommit: vi.fn(async (_repoPath: string, _settings: any, _getKey: any, onProgress: any) => {
         onProgress({
           phase: 'grouping',
           message: 'KI gruppiert Dateien...',
@@ -61,7 +61,7 @@ describe('registerAiHandlers', () => {
     expect(autoCommitHandler).toBeTruthy();
     expect(getStateHandler).toBeTruthy();
 
-    const runPromise = autoCommitHandler!({ sender: { send: vi.fn() } });
+    const runPromise = autoCommitHandler!({ sender: { send: vi.fn() } }, { repoPath: '/tmp/repo' });
     await Promise.resolve();
 
     const runningState = await getStateHandler!();

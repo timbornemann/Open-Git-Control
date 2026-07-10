@@ -11,11 +11,12 @@ export class AiAutoCommitRunner {
   ) {}
 
   async run(
+    repoPath: string,
     settings: AppSettings,
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
   ): Promise<AiAutoCommitResult> {
-    return new AiAutoCommitRunSession(this.gitService, this.providerClient, settings, getGeminiApiKey, onProgress, shouldCancel).run();
+    return new AiAutoCommitRunSession(this.gitService, this.providerClient, repoPath, settings, getGeminiApiKey, onProgress, shouldCancel).run();
   }
 }

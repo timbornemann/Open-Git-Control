@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ToastMessage } from '@/types/git';
+import type { AiAutoCommitResultDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import type { GitStatusWithConflicts } from './types';
@@ -9,6 +10,7 @@ const LIVE_REFRESH_MIN_INTERVAL_MS = 1_200;
 const AI_TERMINAL_CLEAR_DELAY_MS = 4_000;
 
 type Params = {
+  repoPath: string | null;
   status: GitStatusWithConflicts | null;
   setToast: (msg: ToastMessage | null) => void;
   refresh: () => Promise<void>;
@@ -35,7 +37,7 @@ const asNumber = (value: unknown): number | null => (typeof value === 'number' &
 
 const asString = (value: unknown): string | null => (typeof value === 'string' && value.trim().length > 0 ? value : null);
 
-export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommitsCreated }: Params) => {
+export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged, onCommitsCreated }: Params) => {
   const { t, tr } = useI18n();
   const [isAiCommitting, setIsAiCommitting] = useState(false);
   const [isAiJobRunning, setIsAiJobRunning] = useState(false);
@@ -57,6 +59,8 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   const lastRefreshAtRef = useRef(0);
   const aiTotalFilesRef = useRef<number | null>(null);
   const terminalClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repoPathRef = useRef<string | null>(repoPath);
+  const runGenerationRef = useRef(0);
 
   const clearTerminalClearTimer = useCallback(() => {
     if (!terminalClearTimerRef.current) return;
@@ -95,13 +99,18 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     (eventRaw: AiJobEvent | null | undefined) => {
       if (!eventRaw || eventRaw.operation !== 'git:aiAutoCommit') return;
 
+      const details = eventRaw.details && typeof eventRaw.details === 'object' ? eventRaw.details : {};
+      const eventRepoPath = asString(details.repoPath);
+      if (eventRepoPath && repoPathRef.current && eventRepoPath !== repoPathRef.current) {
+        return;
+      }
+
       const eventTimestamp = asNumber(eventRaw.timestamp) ?? Date.now();
       if (eventTimestamp < lastEventTimestampRef.current) {
         return;
       }
       lastEventTimestampRef.current = eventTimestamp;
 
-      const details = eventRaw.details && typeof eventRaw.details === 'object' ? eventRaw.details : {};
       const phase = asString(details.phase);
       const mode = asString(details.mode);
       const lastCommit = asString(details.lastCommit);
@@ -168,6 +177,19 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, t],
   );
 
+  useEffect(() => {
+    repoPathRef.current = repoPath;
+    runGenerationRef.current += 1;
+    cancelRequestedRef.current = false;
+    aiStartLockRef.current = false;
+    lastEventTimestampRef.current = 0;
+    setIsAiCommitting(false);
+    setIsAiJobRunning(false);
+    setIsAiMessageGenerating(false);
+    clearTerminalClearTimer();
+    resetAiProgressUi();
+  }, [clearTerminalClearTimer, repoPath, resetAiProgressUi]);
+
   const pullLatestAiState = useCallback(async () => {
     if (!aiClient.isAvailable()) return;
     try {
@@ -209,9 +231,60 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     [clearTerminalClearTimer],
   );
 
+  const handleAiRunFailure = useCallback(
+    async (message: string) => {
+      const cancelled = /abgebrochen|cancel/i.test(message);
+      setToast({ msg: message, isError: !cancelled });
+      lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
+      setAiPhase(cancelled ? 'cancelled' : 'failed');
+      setAiProgressMessage(message);
+      setIsAiJobRunning(false);
+      await refresh();
+      scheduleTerminalClear();
+    },
+    [refresh, scheduleTerminalClear, setToast],
+  );
+
+  const handleAiRunSuccess = useCallback(
+    async (data: AiAutoCommitResultDto) => {
+      const commits = data.commits || [];
+      const warnings = data.warnings || [];
+      const diagnostics = data.diagnostics || [];
+
+      if (commits.length === 0) {
+        setToast({
+          msg: data.summary || t('generated.components.staging_area.useaicommit.ai_did_not_create_commits_fa18e8e4'),
+          isError: false,
+        });
+      } else {
+        const list = commits.map((commit) => `${commit.hash} ${commit.subject}`).join(' | ');
+        const extra = warnings.length > 0 ? tr(` | Hinweise: ${warnings.length}`, ` | Warnings: ${warnings.length}`) : '';
+        setToast({ msg: tr(`KI Commit(s): ${list}${extra}`, `AI commit(s): ${list}${extra}`), isError: false });
+      }
+
+      if (diagnostics.length > 0) {
+        console.info('AI Auto-Commit diagnostics:', diagnostics);
+      }
+
+      if (onCommitsCreated) onCommitsCreated();
+      else if (onRepoChanged) onRepoChanged();
+      await refresh();
+
+      if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
+        lastKnownStatusRef.current = 'done';
+        setAiPhase('done');
+        setAiProgressMessage(data.summary || t('generated.components.staging_area.useaicommit.ai_auto_commit_completed_671832fb'));
+      }
+      setIsAiJobRunning(false);
+      scheduleTerminalClear();
+    },
+    [onCommitsCreated, onRepoChanged, refresh, scheduleTerminalClear, setToast, t, tr],
+  );
+
   const handleAiAutoCommit = useCallback(async () => {
-    if (!aiClient.isAvailable() || !status) return;
+    if (!aiClient.isAvailable() || !status || !repoPath) return;
     if (aiStartLockRef.current || isAiCommitting || isAiJobRunning) return;
+    const generation = runGenerationRef.current;
 
     if (status.conflicts.length > 0) {
       setToast({ msg: t('generated.components.staging_area.useaicommit.please_resolve_all_conflicts_first_9e29c688'), isError: true });
@@ -246,83 +319,42 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
     maybeRefresh();
 
     try {
-      const result = await aiClient.runAutoCommit();
+      const result = await aiClient.runAutoCommit({ repoPath });
+      if (generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
       if (cancelRequestedRef.current) return;
 
       if (!result.success) {
         const errorMessage = result.error || t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
-        const cancelled = /abgebrochen|cancel/i.test(errorMessage);
-        setToast({ msg: errorMessage, isError: !cancelled });
-        lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
-        setAiPhase(cancelled ? 'cancelled' : 'failed');
-        setAiProgressMessage(errorMessage);
-        setIsAiJobRunning(false);
-        await refresh();
-        scheduleTerminalClear();
+        await handleAiRunFailure(errorMessage);
         return;
       }
 
-      const commits = result.data.commits || [];
-      const warnings = result.data.warnings || [];
-      const diagnostics = result.data.diagnostics || [];
-
-      if (commits.length === 0) {
-        setToast({
-          msg: result.data.summary || t('generated.components.staging_area.useaicommit.ai_did_not_create_commits_fa18e8e4'),
-          isError: false,
-        });
-      } else {
-        const list = commits.map((commit: { hash: string; subject: string }) => `${commit.hash} ${commit.subject}`).join(' | ');
-        const extra = warnings.length > 0 ? tr(` | Hinweise: ${warnings.length}`, ` | Warnings: ${warnings.length}`) : '';
-        setToast({ msg: tr(`KI Commit(s): ${list}${extra}`, `AI commit(s): ${list}${extra}`), isError: false });
-      }
-
-      if (diagnostics.length > 0) {
-        console.info('AI Auto-Commit diagnostics:', diagnostics);
-      }
-
-      if (onCommitsCreated) onCommitsCreated();
-      else if (onRepoChanged) onRepoChanged();
-      await refresh();
-
-      if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
-        lastKnownStatusRef.current = 'done';
-        setAiPhase('done');
-        setAiProgressMessage(result.data.summary || t('generated.components.staging_area.useaicommit.ai_auto_commit_completed_671832fb'));
-      }
-      setIsAiJobRunning(false);
-      scheduleTerminalClear();
+      await handleAiRunSuccess(result.data);
     } catch (error: unknown) {
+      if (generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
       if (cancelRequestedRef.current) return;
 
       const message = error instanceof Error ? error.message : t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
 
-      const cancelled = /abgebrochen|cancel/i.test(message);
-      setToast({ msg: message, isError: !cancelled });
-      lastKnownStatusRef.current = cancelled ? 'cancelled' : 'failed';
-      setAiPhase(cancelled ? 'cancelled' : 'failed');
-      setAiProgressMessage(message);
-      setIsAiJobRunning(false);
-      await refresh();
-      scheduleTerminalClear();
+      await handleAiRunFailure(message);
     } finally {
-      aiStartLockRef.current = false;
-      cancelRequestedRef.current = false;
-      setIsAiCommitting(false);
+      if (generation === runGenerationRef.current && repoPathRef.current === repoPath) {
+        aiStartLockRef.current = false;
+        cancelRequestedRef.current = false;
+        setIsAiCommitting(false);
+      }
     }
   }, [
+    repoPath,
     status,
     isAiCommitting,
     isAiJobRunning,
     clearTerminalClearTimer,
+    handleAiRunFailure,
+    handleAiRunSuccess,
     t,
     maybeRefresh,
     setToast,
-    onCommitsCreated,
-    onRepoChanged,
-    refresh,
-    scheduleTerminalClear,
-    tr,
   ]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
@@ -361,6 +393,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
   const generateCommitMessageFromNotes = useCallback(
     async (notes: string): Promise<GeneratedCommitMessage | null> => {
       if (!aiClient.isAvailable()) return null;
+      const generation = runGenerationRef.current;
 
       const normalizedNotes = notes.trim();
       if (!normalizedNotes) {
@@ -371,6 +404,7 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
       setIsAiMessageGenerating(true);
       try {
         const result = await aiClient.generateCommitMessage({ notes: normalizedNotes });
+        if (generation !== runGenerationRef.current) return null;
         if (!result.success) {
           setToast({ msg: result.error || t('generated.components.staging_area.useaicommit.could_not_create_ai_commit_message_ee54707d'), isError: true });
           return null;
@@ -379,13 +413,16 @@ export const useAiCommit = ({ status, setToast, refresh, onRepoChanged, onCommit
         setToast({ msg: t('generated.components.staging_area.useaicommit.ai_commit_message_inserted_bead6485'), isError: false });
         return result.data;
       } catch (error: unknown) {
+        if (generation !== runGenerationRef.current) return null;
         setToast({
           msg: error instanceof Error ? error.message : t('generated.components.staging_area.useaicommit.could_not_create_ai_commit_message_ee54707d'),
           isError: true,
         });
         return null;
       } finally {
-        setIsAiMessageGenerating(false);
+        if (generation === runGenerationRef.current) {
+          setIsAiMessageGenerating(false);
+        }
       }
     },
     [setToast, t],

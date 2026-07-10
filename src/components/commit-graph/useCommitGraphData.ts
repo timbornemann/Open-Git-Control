@@ -127,7 +127,7 @@ export const useCommitGraphData = ({
           offset,
           scope,
         });
-        if (requestGeneration !== requestGenerationRef.current && !isAppend) return;
+        if (requestGeneration !== requestGenerationRef.current) return;
         if (result.success) {
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
@@ -203,8 +203,11 @@ export const useCommitGraphData = ({
 
   useEffect(() => {
     if (!repoPath) {
+      requestGenerationRef.current += 1;
       setLayout(null);
       setCommitCount(0);
+      setLoading(false);
+      setLoadingMore(false);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
       clearWorkingTreeStatus();
@@ -226,11 +229,14 @@ export const useCommitGraphData = ({
     lastRepoPathRef.current = repoPath;
     lastSecondaryHistoryRef.current = showSecondaryHistory;
     if (repoChanged || historyModeChanged) {
+      requestGenerationRef.current += 1;
       // Drop previous-repo state immediately to avoid transient sync refreshes
       // restoring stale scroll positions while the new repo is loading.
       setLayout(null);
       layoutRef.current = null;
       setCommitCount(0);
+      setLoading(false);
+      setLoadingMore(false);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
       clearWorkingTreeStatus();

@@ -282,7 +282,7 @@ export const gitClient = {
     return this.runGitCommand('commit', '--allow-empty', '-m', message);
   },
 
-  async scanPushSecrets(params?: { includeTags?: boolean }): Promise<IpcResult<SecretScanResultDto>> {
+  async scanPushSecrets(params?: { includeTags?: boolean; repoPath?: string }): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
   },
 

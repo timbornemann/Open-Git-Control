@@ -52,8 +52,7 @@ export class GitService {
   }
 
   setRepoPath(newPath: string) {
-    const normalizedPath = path.resolve(String(newPath || '').trim() || '.');
-    const resolvedRepoPath = this.resolveRepoRoot(normalizedPath);
+    const resolvedRepoPath = this.resolveRepositoryPath(newPath);
     this.repoPath = resolvedRepoPath;
     this.repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
   }
@@ -65,6 +64,11 @@ export class GitService {
 
   getRepoPath(): string | null {
     return this.repoPath;
+  }
+
+  resolveRepositoryPath(repoPath: string): string {
+    const normalizedPath = path.resolve(String(repoPath || '').trim() || '.');
+    return this.resolveRepoRoot(normalizedPath);
   }
 
   private ensureRepoPath(): string {
@@ -430,9 +434,25 @@ export class GitService {
     await this.gitRunner.streamLines(repoPath, args, onLine, signal);
   }
 
+  async streamCommandLinesAtPath(repoPath: string, args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<void> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+    await this.gitRunner.streamLines(normalizedPath, args, onLine, signal);
+  }
+
   async streamCommandOutput(args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<string> {
     const repoPath = this.ensureRepoPath();
     return this.gitRunner.streamOutput(repoPath, args, onLine, signal);
+  }
+
+  async streamCommandOutputAtPath(repoPath: string, args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+    return this.gitRunner.streamOutput(normalizedPath, args, onLine, signal);
   }
 
   async getFileTimelineData(limit: number = 2000): Promise<FileTimelineCommit[]> {

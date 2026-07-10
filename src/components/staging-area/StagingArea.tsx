@@ -70,6 +70,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   });
 
   const aiCommit = useAiCommit({
+    repoPath,
     status: fileOps.status,
     setToast,
     refresh: fileOps.refresh,

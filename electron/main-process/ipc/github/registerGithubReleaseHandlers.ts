@@ -16,12 +16,12 @@ function buildGithubRepositoryUrl(host: string, owner: string, repo: string): st
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 }
 
-async function localCommitishExists(gitService: GitService, commitish: string): Promise<boolean> {
+async function localCommitishExists(gitService: GitService, repoPath: string, commitish: string): Promise<boolean> {
   const trimmed = String(commitish || '').trim();
   if (!trimmed) return false;
 
   try {
-    await gitService.runCommand(['rev-parse', '--verify', '--quiet', `${trimmed}^{commit}`]);
+    await gitService.runCommandAtPath(repoPath, ['rev-parse', '--verify', '--quiet', `${trimmed}^{commit}`]);
     return true;
   } catch {
     return false;
@@ -84,6 +84,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         owner: string;
         repo: string;
         targetCommitish?: string;
+        repoPath?: string;
       },
     ) => {
       const authError = assertGithubAuthenticated(githubService);
@@ -92,10 +93,16 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       const owner = String(params?.owner || '').trim();
       const repo = String(params?.repo || '').trim();
       const targetCommitish = String(params?.targetCommitish || '').trim() || 'HEAD';
+      const requestedRepoPath = String(params?.repoPath || gitService.getRepoPath() || '').trim();
 
       if (!owner || !repo) {
         return { success: false, error: 'Owner und Repository sind erforderlich.' };
       }
+
+      if (!requestedRepoPath) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+      const repoPath = gitService.resolveRepositoryPath(requestedRepoPath);
 
       try {
         const [existingTags, lastReleaseTag] = await Promise.all([
@@ -108,17 +115,17 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         let commitsRaw = '';
 
         try {
-          const canUseLastReleaseTag = lastReleaseTag ? await localCommitishExists(gitService, lastReleaseTag) : false;
+          const canUseLastReleaseTag = lastReleaseTag ? await localCommitishExists(gitService, repoPath, lastReleaseTag) : false;
 
           if (lastReleaseTag && canUseLastReleaseTag) {
-            commitsRaw = await gitService.runCommand(['log', `${lastReleaseTag}..${targetCommitish}`, commitFormat, '--date=short', '--max-count=400']);
+            commitsRaw = await gitService.runCommandAtPath(repoPath, ['log', `${lastReleaseTag}..${targetCommitish}`, commitFormat, '--date=short', '--max-count=400']);
           } else {
             fallbackUsed = Boolean(lastReleaseTag);
-            commitsRaw = await gitService.runCommand(['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
+            commitsRaw = await gitService.runCommandAtPath(repoPath, ['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
           }
         } catch {
           fallbackUsed = true;
-          commitsRaw = await gitService.runCommand(['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
+          commitsRaw = await gitService.runCommandAtPath(repoPath, ['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);
         }
 
         const settings = readSettingsWithMigration();

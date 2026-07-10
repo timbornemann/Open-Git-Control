@@ -64,9 +64,11 @@ export const useRepositoryBranches = ({
       return;
     }
 
+    let cancelled = false;
     const fetchBranches = async () => {
       try {
         const { success, data } = await gitClient.runGitCommand('branch', '-a');
+        if (cancelled) return;
         if (!success || !data) return;
 
         const parsedBranches = data
@@ -92,6 +94,9 @@ export const useRepositoryBranches = ({
     };
 
     fetchBranches();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRepo, refreshTrigger]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import type { GitStashEntryDto } from '@/types/gitDtos';
 import { useI18n } from '@/i18n';
@@ -29,38 +29,65 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   const [stashes, setStashes] = useState<GitStashEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [pendingOp, setPendingOp] = useState<{ name: string; op: StashOp } | null>(null);
+  const [runningStashOp, setRunningStashOp] = useState<{ name: string; op: StashOp } | null>(null);
   const [pendingFileOp, setPendingFileOp] = useState<{ stashName: string; path: string } | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
   const [stashFiles, setStashFiles] = useState<Record<string, StashFileState>>({});
   const [error, setError] = useState<string | null>(null);
+  const generationRef = useRef(0);
+
+  const isCurrentGeneration = useCallback((generation: number, capturedRepoPath: string | null) => {
+    return generation === generationRef.current && capturedRepoPath === repoPath;
+  }, [repoPath]);
+
+  useEffect(() => {
+    generationRef.current += 1;
+    setStashes([]);
+    setExpandedFiles(new Set());
+    setStashFiles({});
+    setError(null);
+    setPendingOp(null);
+    setRunningStashOp(null);
+    setPendingFileOp(null);
+    setLoading(false);
+  }, [repoPath]);
 
   const load = useCallback(async () => {
     if (!repoPath || !gitClient.isAvailable()) return;
+    const generation = generationRef.current;
+    const capturedRepoPath = repoPath;
     setLoading(true);
     setError(null);
     try {
       const result = await gitClient.getStashes();
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       if (result.success) {
         setStashes((result as any).data ?? []);
       } else {
         setError((result as any).error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_list_29c36606'));
       }
     } catch (e: any) {
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (isCurrentGeneration(generation, capturedRepoPath)) {
+        setLoading(false);
+      }
     }
-  }, [repoPath, t]);
+  }, [isCurrentGeneration, repoPath, t]);
 
   const loadStashFiles = useCallback(
     async (stashName: string) => {
       if (!repoPath || !gitClient.isAvailable()) return;
+      const generation = generationRef.current;
+      const capturedRepoPath = repoPath;
       setStashFiles((current) => ({
         ...current,
         [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
       }));
       try {
         const result = await gitClient.runGitCommand('stash', 'show', '-u', '--name-only', stashName);
+        if (!isCurrentGeneration(generation, capturedRepoPath)) return;
         if (!result.success) {
           setStashFiles((current) => ({
             ...current,
@@ -80,18 +107,20 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
               .filter(Boolean),
           ),
         ).sort((a, b) => a.localeCompare(b));
+        if (!isCurrentGeneration(generation, capturedRepoPath)) return;
         setStashFiles((current) => ({
           ...current,
           [stashName]: { loading: false, files, error: null },
         }));
       } catch (e: any) {
+        if (!isCurrentGeneration(generation, capturedRepoPath)) return;
         setStashFiles((current) => ({
           ...current,
           [stashName]: { loading: false, files: [], error: e.message },
         }));
       }
     },
-    [repoPath, t],
+    [isCurrentGeneration, repoPath, t],
   );
 
   useEffect(() => {
@@ -99,7 +128,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   }, [collapsed, load, refreshTrigger]);
 
   const runStashOp = async (stashName: string, op: StashOp) => {
-    if (!gitClient.isAvailable()) return;
+    if (!repoPath || !gitClient.isAvailable() || runningStashOp) return;
+    const generation = generationRef.current;
+    const capturedRepoPath = repoPath;
+    setRunningStashOp({ name: stashName, op });
     try {
       let args: string[];
       if (op === 'apply') {
@@ -110,20 +142,26 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         args = ['stash', 'drop', stashName];
       }
       const result = await gitClient.runGitCommand('stash', ...args.slice(1));
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       if (result.success) {
         if (op === 'pop' || op === 'drop') {
           setExpandedFiles(new Set());
           setStashFiles({});
         }
         await load();
+        if (!isCurrentGeneration(generation, capturedRepoPath)) return;
         if (op !== 'drop') onRepoChanged?.();
       } else {
         setError(result.error || t('generated.components.staging_area.stashpanel.stash_operation_failed_7a8358ef'));
       }
     } catch (e: any) {
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       setError(e.message);
     } finally {
-      setPendingOp(null);
+      if (isCurrentGeneration(generation, capturedRepoPath)) {
+        setRunningStashOp(null);
+        setPendingOp(null);
+      }
     }
   };
 
@@ -170,14 +208,19 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         consequences: t('generated.components.staging_area.stashpanel.if_applying_succeeds_git_automatically_removes_the_stash_0f54e6bb'),
         confirmLabel: t('generated.components.staging_area.stashpanel.create_branch_f1e70a0b'),
         onSubmit: async (values) => {
+          if (!repoPath) return;
+          const generation = generationRef.current;
+          const capturedRepoPath = repoPath;
           const branchName = String(values.branchName || '').trim();
           setError(null);
           const result = await gitClient.gitStashBranch(stash.name, branchName);
+          if (!isCurrentGeneration(generation, capturedRepoPath)) return;
 
           if (result.success) {
             setExpandedFiles(new Set());
             setStashFiles({});
             await load();
+            if (!isCurrentGeneration(generation, capturedRepoPath)) return;
             onRepoChanged?.();
             return;
           }
@@ -185,7 +228,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         },
       });
     },
-    [load, onRepoChanged, setInputDialog, t],
+    [isCurrentGeneration, load, onRepoChanged, repoPath, setInputDialog, t],
   );
 
   const toggleFiles = (stash: GitStashEntryDto) => {
@@ -202,12 +245,16 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   };
 
   const restoreStashFile = async (stashName: string, filePath: string) => {
-    if (!gitClient.isAvailable()) return;
+    if (!repoPath || !gitClient.isAvailable() || pendingFileOp) return;
+    const generation = generationRef.current;
+    const capturedRepoPath = repoPath;
     setPendingFileOp({ stashName, path: filePath });
     setError(null);
     try {
       const trackedResult = await gitClient.runGitCommand('checkout', stashName, '--', filePath);
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       const finalResult = trackedResult.success ? trackedResult : await gitClient.runGitCommand('checkout', `${stashName}^3`, '--', filePath);
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
 
       if (finalResult.success) {
         onRepoChanged?.();
@@ -215,9 +262,12 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         setError(trackedResult.error || finalResult.error || t('generated.components.staging_area.stashpanel.could_not_apply_file_from_the_stash_cd8005a7'));
       }
     } catch (e: any) {
+      if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       setError(e.message);
     } finally {
-      setPendingFileOp(null);
+      if (isCurrentGeneration(generation, capturedRepoPath)) {
+        setPendingFileOp(null);
+      }
     }
   };
 
@@ -264,13 +314,14 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                         <button
                           className="staging-btn-sm staging-btn-danger"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => {
                             void runStashOp(stash.name, 'drop');
                           }}
                         >
                           {t('generated.components.staging_area.stagingfilesections.delete_e5186a63')}
                         </button>
-                        <button className="staging-btn-sm" onClick={() => setPendingOp(null)}>
+                        <button className="staging-btn-sm" disabled={Boolean(runningStashOp)} onClick={() => setPendingOp(null)}>
                           {t('generated.components.confirm.cancel_035b7526')}
                         </button>
                       </div>
@@ -287,6 +338,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                       <div className="stash-entry-actions">
                         <button
                           className="staging-btn-sm"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => toggleFiles(stash)}
                           title={
                             isExpanded
@@ -300,13 +352,17 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                         </button>
                         <button
                           className="staging-btn-sm"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => handleOp(stash, 'apply')}
                           title={t('generated.components.staging_area.stashpanel.apply_stash_keep_stash_43a20097')}
                         >
-                          {t('generated.components.staging_area.stashpanel.apply_e7699992')}
+                          {runningStashOp?.name === stash.name && runningStashOp.op === 'apply'
+                            ? t('generated.components.staging_area.stashpanel.applying_74286d47')
+                            : t('generated.components.staging_area.stashpanel.apply_e7699992')}
                         </button>
                         <button
                           className="staging-btn-sm"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => handleOp(stash, 'pop')}
                           title={t('generated.components.staging_area.stashpanel.apply_and_delete_stash_2df674b9')}
                         >
@@ -314,6 +370,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                         </button>
                         <button
                           className="staging-btn-sm"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => branchFromStash(stash)}
                           title={t('generated.components.staging_area.stashpanel.create_a_branch_from_this_stash_caa1dff5')}
                         >
@@ -321,6 +378,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                         </button>
                         <button
                           className="staging-btn-sm staging-btn-danger"
+                          disabled={Boolean(runningStashOp)}
                           onClick={() => handleOp(stash, 'drop')}
                           title={t('generated.components.staging_area.stashpanel.delete_stash_6804245b')}
                         >

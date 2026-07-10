@@ -12,7 +12,12 @@ function createGitServiceMock(outputs: Record<string, string | Error>) {
   };
   return {
     runCommand: resolve,
+    runCommandAtPath: async (_repoPath: string, args: string[]) => resolve(args),
     streamCommandLines: async (args: string[], onLine: (line: string) => void) => {
+      const output = await resolve(args);
+      output.split(/\r?\n/).forEach(onLine);
+    },
+    streamCommandLinesAtPath: async (_repoPath: string, args: string[], onLine: (line: string) => void) => {
       const output = await resolve(args);
       output.split(/\r?\n/).forEach(onLine);
     },
@@ -38,7 +43,7 @@ describe('SecretScanService', () => {
       }),
     );
 
-    const result = await service.scanPushDiffs({ strictness: 'low', allowlistText: '' });
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
     expect(result.findings.length).toBe(2);
     expect(result.findings.map((f) => f.source).sort()).toEqual(['staged', 'to-push']);
   });
@@ -59,6 +64,7 @@ describe('SecretScanService', () => {
     );
 
     const result = await service.scanPushDiffs({
+      repoPath: '/tmp/repo',
       strictness: 'low',
       allowlistText: 'regex:ghp_[a-z0-9]+',
     });
@@ -79,7 +85,7 @@ describe('SecretScanService', () => {
       }),
     );
 
-    const result = await service.scanPushDiffs({ strictness: 'low', allowlistText: '' });
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
 
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].source).toBe('to-push');
@@ -101,6 +107,7 @@ describe('SecretScanService', () => {
     );
 
     const result = await service.scanPushDiffs({
+      repoPath: '/tmp/repo',
       strictness: 'low',
       allowlistText: '',
       includeTags: true,

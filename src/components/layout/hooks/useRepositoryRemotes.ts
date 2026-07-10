@@ -48,9 +48,11 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
       return;
     }
 
+    let cancelled = false;
     const checkRemote = async () => {
       try {
         const result = await gitClient.runGitCommand('remote', '-v');
+        if (cancelled) return;
         if (!result.success) return;
 
         const rawRemoteOutput = String(result.data || '');
@@ -69,6 +71,9 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     };
 
     checkRemote();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRepo, refreshTrigger]);
 
   const handleAddRemote = async () => {

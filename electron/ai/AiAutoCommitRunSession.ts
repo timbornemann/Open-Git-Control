@@ -38,6 +38,7 @@ export class AiAutoCommitRunSession {
   constructor(
     private readonly gitService: GitService,
     private readonly providerClient: AiProviderClient,
+    private readonly repoPath: string,
     private readonly settings: AppSettings,
     private readonly getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
@@ -48,28 +49,26 @@ export class AiAutoCommitRunSession {
   }
 
   async run(): Promise<AiAutoCommitResult> {
-    const repoPath = this.validateInputs();
+    this.validateInputs();
     this.state.emitProgress({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: this.state.buildProgressDetails(0) });
 
     const snapshotFiles = await this.prepareSnapshotFiles();
-    const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, repoPath, () => this.ensureNotCancelled());
+    const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, this.repoPath, () => this.ensureNotCancelled());
     const groups = await this.planGroups(snapshotFiles, snapshotHydrator);
     await this.processGroups(groups, snapshotFiles, snapshotHydrator);
-    return buildAiAutoCommitRunResult(this.gitService, snapshotFiles, groups, this.state);
+    return buildAiAutoCommitRunResult(this.gitService, this.repoPath, snapshotFiles, groups, this.state);
   }
 
-  private validateInputs(): string {
-    const repoPath = this.gitService.getRepoPath();
-    if (!repoPath) throw new Error('No repository selected.');
+  private validateInputs(): void {
+    if (!this.repoPath.trim()) throw new Error('No repository selected.');
     if (!this.settings.aiAutoCommitEnabled) throw new Error('AI Auto-Commit ist in den Einstellungen deaktiviert.');
     if (!getSelectedAiModel(this.settings)) throw new Error('Kein KI-Modell konfiguriert.');
     if (this.settings.aiProvider === 'gemini' && !this.getGeminiApiKey().trim()) throw new Error('Gemini API key fehlt.');
-    return repoPath;
   }
 
   private async prepareSnapshotFiles(): Promise<SnapshotFile[]> {
     this.ensureNotCancelled();
-    const initialStatus = await this.gitService.getStatusPorcelain();
+    const initialStatus = await this.getStatusPorcelain();
     this.ensureNotCancelled();
 
     const statusEntries = parseStatusPorcelain(initialStatus);
@@ -311,11 +310,12 @@ export class AiAutoCommitRunSession {
   private async commitBatch(batchFiles: SnapshotFile[], queue: SnapshotFile[], groupIndex: number, totalFiles: number): Promise<void> {
     await this.stageBatchFiles(batchFiles);
     const message = await this.buildMessageForBatch(batchFiles, groupIndex, queue.length, totalFiles);
+    this.ensureNotCancelled();
     await this.commitBatchWithMessage(batchFiles, message);
     this.ensureNotCancelled();
 
-    const hash = (await this.gitService.runCommand(['rev-parse', '--short', 'HEAD'])).trim();
-    const subject = (await this.gitService.runCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
+    const hash = (await this.runGitCommand(['rev-parse', '--short', 'HEAD'])).trim();
+    const subject = (await this.runGitCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
     this.state.commits.push({ hash, subject });
     this.removeCommittedFiles(queue, batchFiles);
     this.state.processedFiles += batchFiles.length;
@@ -334,6 +334,11 @@ export class AiAutoCommitRunSession {
 
   private async stageBatchFiles(batchFiles: SnapshotFile[]): Promise<void> {
     const gitCapabilities: unknown = this.gitService;
+    if (typeof this.gitService.stagePathsAtPath === 'function') {
+      await this.gitService.stagePathsAtPath(this.repoPath, batchFiles.map((file) => file.path));
+      this.ensureNotCancelled();
+      return;
+    }
     if (hasStagePaths(gitCapabilities)) {
       await gitCapabilities.stagePaths(batchFiles.map((file) => file.path));
       this.ensureNotCancelled();
@@ -341,7 +346,7 @@ export class AiAutoCommitRunSession {
     }
 
     for (const file of batchFiles) {
-      await this.gitService.runCommand(['add', '--', file.path]);
+      await this.runGitCommand(['add', '--', file.path]);
       this.ensureNotCancelled();
     }
   }
@@ -390,17 +395,43 @@ export class AiAutoCommitRunSession {
     const batchPaths = batchFiles.map((file) => file.path);
     const input = { title: message.title, description: message.description };
 
-    if (hasCommitWithMessageForPaths(gitCapabilities)) {
+    if (hasCommitWithMessageAtPath(gitCapabilities)) {
+      await gitCapabilities.commitWithMessageAtPath(this.repoPath, input, batchPaths);
+    } else if (hasCommitWithMessageForPaths(gitCapabilities)) {
       await gitCapabilities.commitWithMessageForPaths(input, batchPaths);
-    } else if (hasCommitWithMessageAtPath(gitCapabilities)) {
-      const repoPathForCommit = gitCapabilities.getRepoPath();
-      if (!repoPathForCommit) throw new Error('Repository path is required.');
-      await gitCapabilities.commitWithMessageAtPath(repoPathForCommit, input, batchPaths);
     } else if (hasCommitWithMessage(gitCapabilities) && batchPaths.length === 0) {
       await gitCapabilities.commitWithMessage(input);
     } else {
-      await this.gitService.runCommand(this.buildCommitArgs(message, batchPaths));
+      await this.runGitCommand(this.buildCommitArgs(message, batchPaths));
     }
+  }
+
+  private async getStatusPorcelain(): Promise<string> {
+    const gitCapabilities = this.gitService as GitService & {
+      getStatusPorcelainAtPath?: (repoPath: string) => Promise<string>;
+      getStatusPorcelain?: () => Promise<string>;
+    };
+    if (typeof gitCapabilities.getStatusPorcelainAtPath === 'function') {
+      return gitCapabilities.getStatusPorcelainAtPath(this.repoPath);
+    }
+    if (typeof gitCapabilities.getStatusPorcelain === 'function') {
+      return gitCapabilities.getStatusPorcelain();
+    }
+    throw new Error('Git status porcelain is not available.');
+  }
+
+  private async runGitCommand(args: string[]): Promise<string> {
+    const gitCapabilities = this.gitService as GitService & {
+      runCommandAtPath?: (repoPath: string, args: string[]) => Promise<string>;
+      runCommand?: (args: string[]) => Promise<string>;
+    };
+    if (typeof gitCapabilities.runCommandAtPath === 'function') {
+      return gitCapabilities.runCommandAtPath(this.repoPath, args);
+    }
+    if (typeof gitCapabilities.runCommand === 'function') {
+      return gitCapabilities.runCommand(args);
+    }
+    throw new Error('Git command execution is not available.');
   }
 
   private buildCommitArgs(message: CommitMessage, batchPaths: string[]): string[] {

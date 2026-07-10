@@ -235,6 +235,53 @@ describe('AiService context extraction and prompts', () => {
     expect(runCommand.mock.calls.some((call) => Array.isArray(call[0]) && call[0][0] === 'commit')).toBe(false);
   });
 
+  it('keeps AI auto-commit git operations pinned to the requested repository path', async () => {
+    const repoPathLog: string[] = [];
+    const runCommandAtPath = vi.fn(async (repoPath: string, args: string[]) => {
+      repoPathLog.push(repoPath);
+      const key = args.join(' ');
+      if (key === 'diff --numstat HEAD -- src/app.ts') return '5\t2\tsrc/app.ts';
+      if (key === 'diff --no-color --unified=3 HEAD -- src/app.ts') {
+        return ['diff --git a/src/app.ts b/src/app.ts', '@@ -1 +1 @@', '-old', '+new'].join('\n');
+      }
+      if (key === 'rev-parse --short HEAD') return 'abc1234';
+      if (key === 'show -s --format=%s HEAD') return 'chore(src): adjust app behavior';
+      throw new Error(`Unexpected command: ${key}`);
+    });
+    const stagePathsAtPath = vi.fn(async (repoPath: string) => {
+      repoPathLog.push(repoPath);
+      return '';
+    });
+    const commitWithMessageAtPath = vi.fn(async (repoPath: string) => {
+      repoPathLog.push(repoPath);
+      return '';
+    });
+
+    const service = new AiService({
+      getRepoPath: () => '/tmp/repo-b',
+      resolveRepositoryPath: (repoPath: string) => repoPath,
+      getStatusPorcelainAtPath: vi.fn(async (repoPath: string) => {
+        repoPathLog.push(repoPath);
+        return repoPathLog.length === 1 ? ' M src/app.ts\n' : '';
+      }),
+      runCommandAtPath,
+      stagePathsAtPath,
+      commitWithMessageAtPath,
+    } as any);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"selectedPaths":["src/app.ts"]}' } }))
+      .mockResolvedValueOnce(okJsonResponse({ message: { content: '{"title":"chore(src): adjust app behavior","description":""}' } }));
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    await service.runAutoCommit('/tmp/repo-a', { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
+
+    expect(new Set(repoPathLog)).toEqual(new Set(['/tmp/repo-a']));
+    expect(stagePathsAtPath).toHaveBeenCalledWith('/tmp/repo-a', ['src/app.ts']);
+    expect(commitWithMessageAtPath).toHaveBeenCalledWith('/tmp/repo-a', { title: expect.any(String), description: '' }, ['src/app.ts']);
+  });
+
   it('uses batch-level fallback message without first-file bias', () => {
     const message = buildFallbackCommitMessage([
       { path: 'docs/readme.md', changeType: 'modified', additions: 1, deletions: 0 },

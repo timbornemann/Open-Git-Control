@@ -70,12 +70,45 @@ export class AiService {
   }
 
   async runAutoCommit(
+    repoPath: string,
     settings: AppSettings,
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
+  ): Promise<AiAutoCommitResult>;
+  async runAutoCommit(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    onProgress?: (update: AiProgressUpdate) => void,
+    shouldCancel?: () => boolean,
+  ): Promise<AiAutoCommitResult>;
+  async runAutoCommit(
+    repoPathOrSettings: string | AppSettings,
+    settingsOrGetGeminiApiKey: AppSettings | (() => string),
+    getGeminiApiKeyOrOnProgress?: (() => string) | ((update: AiProgressUpdate) => void),
+    onProgressOrShouldCancel?: ((update: AiProgressUpdate) => void) | (() => boolean),
+    shouldCancel?: () => boolean,
   ): Promise<AiAutoCommitResult> {
-    return this.autoCommitRunner.run(settings, getGeminiApiKey, onProgress, shouldCancel);
+    if (typeof repoPathOrSettings === 'string') {
+      const repoPath = this.gitService.resolveRepositoryPath(repoPathOrSettings);
+      return this.autoCommitRunner.run(
+        repoPath,
+        settingsOrGetGeminiApiKey as AppSettings,
+        getGeminiApiKeyOrOnProgress as () => string,
+        onProgressOrShouldCancel as ((update: AiProgressUpdate) => void) | undefined,
+        shouldCancel,
+      );
+    }
+
+    const repoPath = this.gitService.getRepoPath();
+    if (!repoPath) throw new Error('No repository selected.');
+    return this.autoCommitRunner.run(
+      repoPath,
+      repoPathOrSettings,
+      settingsOrGetGeminiApiKey as () => string,
+      getGeminiApiKeyOrOnProgress as ((update: AiProgressUpdate) => void) | undefined,
+      onProgressOrShouldCancel as (() => boolean) | undefined,
+    );
   }
 }
 

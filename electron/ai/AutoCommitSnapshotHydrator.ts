@@ -25,7 +25,7 @@ export class AutoCommitSnapshotHydrator {
 
     let numstatRaw = '';
     try {
-      numstatRaw = await this.gitService.runCommand(['diff', '--numstat', 'HEAD', '--', file.path]);
+      numstatRaw = await this.runGitCommand(['diff', '--numstat', 'HEAD', '--', file.path]);
     } catch {
       numstatRaw = '';
     }
@@ -34,7 +34,7 @@ export class AutoCommitSnapshotHydrator {
 
     let previewRaw = '';
     try {
-      previewRaw = await this.gitService.runCommand(['diff', '--no-color', '--unified=3', 'HEAD', '--', file.path]);
+      previewRaw = await this.runGitCommand(['diff', '--no-color', '--unified=3', 'HEAD', '--', file.path]);
     } catch {
       previewRaw = '';
     }
@@ -68,7 +68,7 @@ export class AutoCommitSnapshotHydrator {
     this.ensureNotCancelled();
     let numstatReport = '';
     try {
-      numstatReport = await this.gitService.runCommand(['diff', '--numstat', 'HEAD', '--']);
+      numstatReport = await this.runGitCommand(['diff', '--numstat', 'HEAD', '--']);
     } catch {
       numstatReport = '';
     }
@@ -95,5 +95,19 @@ export class AutoCommitSnapshotHydrator {
       file.preview = toContextPreview(keyChanges);
     }
     this.ensureNotCancelled();
+  }
+
+  private async runGitCommand(args: string[]): Promise<string> {
+    const gitCapabilities = this.gitService as GitService & {
+      runCommandAtPath?: (repoPath: string, args: string[]) => Promise<string>;
+      runCommand?: (args: string[]) => Promise<string>;
+    };
+    if (typeof gitCapabilities.runCommandAtPath === 'function') {
+      return gitCapabilities.runCommandAtPath(this.repoPath, args);
+    }
+    if (typeof gitCapabilities.runCommand === 'function') {
+      return gitCapabilities.runCommand(args);
+    }
+    throw new Error('Git command execution is not available.');
   }
 }

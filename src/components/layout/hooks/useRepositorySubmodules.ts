@@ -19,6 +19,7 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
   const { t } = useLanguageTranslations(language);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchSubmodules = async () => {
       if (!activeRepo || !gitClient.isAvailable()) {
         setSubmodules([]);
@@ -27,6 +28,7 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
 
       try {
         const response = await gitClient.runGitCommand('submoduleStatus');
+        if (cancelled) return;
         if (!response.success) {
           setSubmodules([]);
           return;
@@ -41,11 +43,15 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
         }));
         setSubmodules(parsed);
       } catch {
+        if (cancelled) return;
         setSubmodules([]);
       }
     };
 
     fetchSubmodules();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRepo, refreshTrigger]);
 
   const handleSubmoduleInitUpdate = async () => {

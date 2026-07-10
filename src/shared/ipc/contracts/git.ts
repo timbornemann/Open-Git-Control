@@ -121,7 +121,7 @@ export interface ElectronGitAPI {
   gitFetch: () => Promise<GitCommandResultDto>;
   gitPull: () => Promise<GitCommandResultDto>;
   gitPush: () => Promise<GitCommandResultDto>;
-  scanPushSecrets: (params?: { includeTags?: boolean }) => Promise<IpcResult<SecretScanResultDto>>;
+  scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => Promise<IpcResult<SecretScanResultDto>>;
   cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
   gitInit: (repoPath: string) => Promise<GitInitResultDto>;

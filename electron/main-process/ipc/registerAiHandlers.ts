@@ -2,6 +2,8 @@ import { ipcMain } from 'electron';
 import type { AiService, ReleaseCommitInput } from '../../AiService';
 import type { AppSettings } from '../../settings';
 import { createJobId } from '../gitCommandPolicy';
+import { RepoJobCancelledError, repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
+import type { RepoJobRegistry } from '../repoJobRegistry';
 import type { JobEventPayload } from './jobEvents';
 import { emitJobEvent } from './jobEvents';
 import { IpcChannel } from '../../../src/types/ipcContract';
@@ -10,10 +12,16 @@ type RegisterAiHandlersDeps = {
   aiService: AiService;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
+  repoJobRegistry?: RepoJobRegistry;
 };
 
-export function registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore }: RegisterAiHandlersDeps): void {
-  let currentAiAutoCommitJob: { id: string; cancelRequested: boolean } | null = null;
+export function registerAiHandlers({
+  aiService,
+  readSettingsWithMigration,
+  getGeminiApiKeyFromSecureStore,
+  repoJobRegistry = defaultRepoJobRegistry,
+}: RegisterAiHandlersDeps): void {
+  let currentAiAutoCommitJob: { id: string; repoPath: string; generation: number; cancelRequested: boolean } | null = null;
   let latestAiAutoCommitEvent: JobEventPayload | null = null;
 
   const emitAiAutoCommitEvent = (webContents: Electron.WebContents, payload: JobEventPayload): void => {
@@ -60,8 +68,13 @@ export function registerAiHandlers({ aiService, readSettingsWithMigration, getGe
     }
   });
 
-  ipcMain.handle(IpcChannel.GitAiAutoCommit, async (event: any) => {
+  ipcMain.handle(IpcChannel.GitAiAutoCommit, async (event: any, params: { repoPath?: unknown } = {}) => {
     const webContents = event.sender;
+    const repoPath = String(params?.repoPath || '').trim();
+    if (!repoPath) {
+      return { success: false, error: 'No repository selected.' };
+    }
+
     if (currentAiAutoCommitJob) {
       const message = 'KI Auto-Commit laeuft bereits. Bitte den laufenden Job erst abschliessen oder abbrechen.';
       emitAiAutoCommitEvent(webContents, {
@@ -69,42 +82,48 @@ export function registerAiHandlers({ aiService, readSettingsWithMigration, getGe
         operation: IpcChannel.GitAiAutoCommit,
         status: 'failed',
         message,
-        details: { phase: 'failed', mode: 'normal' },
+        details: { phase: 'failed', mode: 'normal', repoPath: currentAiAutoCommitJob.repoPath, generation: currentAiAutoCommitJob.generation },
         timestamp: Date.now(),
       });
       return { success: false, error: message };
     }
 
     const jobId = createJobId('git-aiAutoCommit');
-    currentAiAutoCommitJob = { id: jobId, cancelRequested: false };
+    const repoJob = repoJobRegistry.begin(repoPath);
+    currentAiAutoCommitJob = { id: jobId, repoPath: repoJob.repoPath, generation: repoJob.generation, cancelRequested: false };
 
     emitAiAutoCommitEvent(webContents, {
       id: jobId,
       operation: IpcChannel.GitAiAutoCommit,
       status: 'start',
       message: 'KI Auto-Commit gestartet.',
-      details: { phase: 'snapshot', mode: 'normal' },
+      details: { phase: 'snapshot', mode: 'normal', repoPath: repoJob.repoPath, generation: repoJob.generation },
       timestamp: Date.now(),
     });
 
     try {
       const settings = readSettingsWithMigration();
       const result = await aiService.runAutoCommit(
+        repoJob.repoPath,
         settings,
         getGeminiApiKeyFromSecureStore,
         (update) => {
+          repoJob.ensureActive();
           emitAiAutoCommitEvent(webContents, {
             id: jobId,
             operation: IpcChannel.GitAiAutoCommit,
             status: 'progress',
             message: update.message,
             ...(typeof update.progress === 'number' ? { progress: update.progress } : {}),
-            details: update.details ? { ...update.details, phase: update.phase } : { phase: update.phase },
+            details: update.details
+              ? { ...update.details, phase: update.phase, repoPath: repoJob.repoPath, generation: repoJob.generation }
+              : { phase: update.phase, repoPath: repoJob.repoPath, generation: repoJob.generation },
             timestamp: Date.now(),
           });
         },
-        () => currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested,
+        () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
       );
+      repoJob.ensureActive();
 
       emitAiAutoCommitEvent(webContents, {
         id: jobId,
@@ -114,6 +133,8 @@ export function registerAiHandlers({ aiService, readSettingsWithMigration, getGe
         details: {
           phase: 'done',
           mode: result.modeTransitions[result.modeTransitions.length - 1] || 'normal',
+          repoPath: repoJob.repoPath,
+          generation: repoJob.generation,
           processedFiles: result.processedFiles,
           remainingFiles: result.remainingFiles,
           totalCommits: result.commitPlanStats.totalCommits,
@@ -124,19 +145,20 @@ export function registerAiHandlers({ aiService, readSettingsWithMigration, getGe
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
-      const wasCancelled = /abgebrochen/i.test(message);
+      const wasCancelled = error instanceof RepoJobCancelledError || repoJob.signal.aborted || /abgebrochen|cancelled/i.test(message);
 
       emitAiAutoCommitEvent(webContents, {
         id: jobId,
         operation: IpcChannel.GitAiAutoCommit,
         status: wasCancelled ? 'cancelled' : 'failed',
-        message,
-        details: { phase: wasCancelled ? 'cancelled' : 'failed', mode: 'normal' },
+        message: wasCancelled ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : message,
+        details: { phase: wasCancelled ? 'cancelled' : 'failed', mode: 'normal', repoPath: repoJob.repoPath, generation: repoJob.generation },
         timestamp: Date.now(),
       });
 
-      return { success: false, error: message };
+      return { success: false, error: wasCancelled ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : message };
     } finally {
+      repoJob.complete();
       if (currentAiAutoCommitJob?.id === jobId) {
         currentAiAutoCommitJob = null;
       }
@@ -161,7 +183,14 @@ export function registerAiHandlers({ aiService, readSettingsWithMigration, getGe
       operation: IpcChannel.GitAiAutoCommit,
       status: 'progress',
       message: 'Abbruch angefordert...',
-      details: { ...previousDetails, phase, mode, cancelRequested: true },
+      details: {
+        ...previousDetails,
+        phase,
+        mode,
+        repoPath: currentAiAutoCommitJob.repoPath,
+        generation: currentAiAutoCommitJob.generation,
+        cancelRequested: true,
+      },
       timestamp: Date.now(),
     });
     return { success: true, canceled: true };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
@@ -65,15 +65,19 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDescription, setNewRepoDescription] = useState('');
   const [newRepoPrivate, setNewRepoPrivate] = useState(true);
+  const activeRepoRef = useRef<string | null>(workspace.activeRepo);
 
   const { t } = useLanguageTranslations(settings.language as AppLanguage);
 
   useEffect(() => {
+    activeRepoRef.current = workspace.activeRepo;
     setNewRepoName('');
     setNewRepoDescription('');
     setConnectError(null);
     setForceGithubRepoCreationPrompt(false);
   }, [workspace.activeRepo]);
+
+  const isStillActiveRepo = useCallback((repoPath: string | null) => Boolean(repoPath && activeRepoRef.current === repoPath), []);
 
   const { recoverBareRepoForPush } = useBareRepoRecoveryWorkflow({
     workspace,
@@ -108,6 +112,8 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
 
   const maybeRecoverRemoteSetup = useCallback(
     async ({ command, options, failureMessage }: RemoteSetupRecoveryParams): Promise<boolean> => {
+      const repoAtStart = activeRepoRef.current;
+      if (!repoAtStart) return false;
       const supportsRecovery = command === 'push' || command === 'pull' || command === 'fetch';
       if (!supportsRecovery || options?.skipGithubRecoveryOnPushFailure || !shouldOfferGithubRepoRecoveryOnPushFailure(failureMessage)) {
         return false;
@@ -115,7 +121,9 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       const missingRemote = isMissingRemotePushError(failureMessage);
 
       if (isRemoteRepositoryMissingError(failureMessage)) {
+        if (!isStillActiveRepo(repoAtStart)) return false;
         const removeOriginResult = await gitClient.removeRemote('origin');
+        if (!isStillActiveRepo(repoAtStart)) return false;
         const removeOriginError = String(removeOriginResult.error || '').trim();
         const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
         if (!removeOriginResult.success && !originAlreadyMissing) {
@@ -128,7 +136,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
           return false;
         }
 
-        const suggestedName = suggestRepositoryName(workspace.activeRepo);
+        const suggestedName = suggestRepositoryName(repoAtStart);
         setNewRepoName((prev) => {
           const trimmed = String(prev || '').trim();
           return trimmed || suggestedName;
@@ -164,8 +172,10 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       let isGithubAuthenticated = false;
       try {
         const authStatus = await githubClient.checkAuthStatus();
+        if (!isStillActiveRepo(repoAtStart)) return false;
         isGithubAuthenticated = Boolean(authStatus.authenticated);
       } catch {
+        if (!isStillActiveRepo(repoAtStart)) return false;
         isGithubAuthenticated = false;
       }
 
@@ -194,16 +204,19 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       });
       return true;
     },
-    [openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, t, triggerRefresh, workspace],
+    [isStillActiveRepo, openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, t, triggerRefresh, workspace],
   );
 
   const maybeHandlePushWithoutOrigin = useCallback(
     async ({ command, options }: PushWithoutOriginParams): Promise<boolean> => {
+      const repoAtStart = activeRepoRef.current;
+      if (!repoAtStart) return false;
       if (command !== 'push' || options?.skipGithubRecoveryOnPushFailure) {
         return false;
       }
 
       const remotesResult = await gitClient.listRemotes();
+      if (!isStillActiveRepo(repoAtStart)) return false;
       if (!remotesResult.success) {
         return false;
       }
@@ -217,7 +230,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         return false;
       }
 
-      const suggestedName = suggestRepositoryName(workspace.activeRepo);
+      const suggestedName = suggestRepositoryName(repoAtStart);
       setNewRepoName((prev) => {
         const trimmed = String(prev || '').trim();
         return trimmed || suggestedName;
@@ -232,16 +245,22 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       });
       return true;
     },
-    [setGitActionToast, t, triggerRefresh, workspace],
+    [isStillActiveRepo, setGitActionToast, t, triggerRefresh, workspace],
   );
 
   const ensureOriginRemote = useCallback(
     async (remoteUrl: string, replaceOriginIfExists: boolean): Promise<void> => {
+      const repoAtStart = activeRepoRef.current;
+      if (!repoAtStart) {
+        throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_setting_git_remote_2d2ed41d'));
+      }
       const remotesResult = await gitClient.listRemotes();
+      if (!isStillActiveRepo(repoAtStart)) return;
       const remoteNames = remotesResult.success ? parseRemoteNames(remotesResult.data) : [];
 
       if (!remoteNames.includes('origin')) {
         const addRemoteResult = await gitClient.addRemote('origin', remoteUrl);
+        if (!isStillActiveRepo(repoAtStart)) return;
         if (!addRemoteResult.success) {
           throw new Error(
             addRemoteResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_setting_git_remote_2d2ed41d'),
@@ -251,6 +270,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       }
 
       const originUrlResult = await gitClient.getRemoteUrl('origin');
+      if (!isStillActiveRepo(repoAtStart)) return;
       const currentOriginUrl = originUrlResult.success ? String(originUrlResult.data || '').trim() : '';
       if (currentOriginUrl === remoteUrl) return;
 
@@ -259,16 +279,20 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       }
 
       const setUrlResult = await gitClient.setRemoteUrl('origin', remoteUrl);
+      if (!isStillActiveRepo(repoAtStart)) return;
       if (!setUrlResult.success) {
         throw new Error(setUrlResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_updating_remote_origin_74dca838'));
       }
     },
-    [t],
+    [isStillActiveRepo, t],
   );
 
   const pushConnectedRepository = useCallback(
     async (confirmedAutoInitialCommit: boolean): Promise<PushConnectedRepositoryResult> => {
+      const repoAtStart = activeRepoRef.current;
+      if (!repoAtStart) return { completed: false, showGenericSuccess: false };
       const pushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+      if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (pushResult.success) {
         return { completed: true, showGenericSuccess: true };
       }
@@ -284,12 +308,16 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
           confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
           onConfirm: async () => {
             if (!gitClient.isAvailable()) return;
+            const confirmRepo = activeRepoRef.current;
+            if (!confirmRepo) return;
             setIsConnectingGithubRepo(true);
             try {
               const prepared = await ensureInitialCommitForPush();
+              if (!isStillActiveRepo(confirmRepo)) return;
               if (!prepared) return;
 
               const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+              if (!isStillActiveRepo(confirmRepo)) return;
               if (!retryPushResult.success) {
                 throw new Error(
                   retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'),
@@ -317,11 +345,13 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       }
 
       const prepared = await ensureInitialCommitForPush();
+      if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (!prepared) {
         throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_auto_prepare_push_15a11b83'));
       }
 
       const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+      if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (!retryPushResult.success) {
         throw new Error(retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'));
       }
@@ -335,7 +365,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       triggerRefresh();
       return { completed: true, showGenericSuccess: false };
     },
-    [ensureInitialCommitForPush, requestInitialCommitConfirmationIfNeeded, setGitActionToast, t, triggerRefresh],
+    [ensureInitialCommitForPush, isStillActiveRepo, requestInitialCommitConfirmationIfNeeded, setGitActionToast, t, triggerRefresh],
   );
 
   const createGithubRepoAndConnect = useCallback(
@@ -362,9 +392,11 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
 
       setIsConnectingGithubRepo(true);
       setConnectError(null);
+      const repoAtStart = workspace.activeRepo;
 
       try {
         const result = await githubClient.createRepository(name, description, newRepoPrivate);
+        if (!isStillActiveRepo(repoAtStart)) return false;
         if (!result.success) {
           throw new Error(
             result.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_creating_the_github_repository_8f0393dd'),
@@ -373,10 +405,12 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
 
         const remoteUrl = result.data.cloneUrl;
         await ensureOriginRemote(remoteUrl, replaceOriginIfExists);
+        if (!isStillActiveRepo(repoAtStart)) return false;
 
         let showGenericSuccess = true;
         if (pushAfterConnect) {
           const pushOutcome = await pushConnectedRepository(confirmedAutoInitialCommit);
+          if (!isStillActiveRepo(repoAtStart)) return false;
           if (!pushOutcome.completed) return false;
           showGenericSuccess = pushOutcome.showGenericSuccess;
         }
@@ -403,7 +437,18 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         setIsConnectingGithubRepo(false);
       }
     },
-    [ensureOriginRemote, newRepoDescription, newRepoName, newRepoPrivate, pushConnectedRepository, setGitActionToast, t, triggerRefresh, workspace.activeRepo],
+    [
+      ensureOriginRemote,
+      isStillActiveRepo,
+      newRepoDescription,
+      newRepoName,
+      newRepoPrivate,
+      pushConnectedRepository,
+      setGitActionToast,
+      t,
+      triggerRefresh,
+      workspace.activeRepo,
+    ],
   );
 
   return {

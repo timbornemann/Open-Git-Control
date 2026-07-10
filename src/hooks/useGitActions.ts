@@ -38,6 +38,7 @@ export const useGitActions = ({ activeRepo, settings, onSecretScanBlocked, onSuc
       if (shouldScanPush) {
         const scanResult = await gitClient.scanPushSecrets({
           includeTags: args.some((arg) => arg === '--tags'),
+          repoPath: activeRepo,
         });
         if (!scanResult.success) {
           onError?.(scanResult.error || 'Secret-Scan vor Push fehlgeschlagen.');

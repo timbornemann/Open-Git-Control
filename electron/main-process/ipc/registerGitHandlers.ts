@@ -7,6 +7,8 @@ import type { AppSettings } from '../../settings';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
 import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
+import { repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
+import type { RepoJobRegistry } from '../repoJobRegistry';
 import { handleGitCommand } from './gitCommandRouter';
 import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
@@ -18,6 +20,7 @@ type RegisterGitHandlersDeps = {
   commitStatsService: CommitStatsService;
   workingTreeService: WorkingTreeService;
   readSettingsWithMigration: () => AppSettings;
+  repoJobRegistry?: RepoJobRegistry;
 };
 
 export function registerGitHandlers({
@@ -26,6 +29,7 @@ export function registerGitHandlers({
   commitStatsService,
   workingTreeService,
   readSettingsWithMigration,
+  repoJobRegistry = defaultRepoJobRegistry,
 }: RegisterGitHandlersDeps): void {
   let activeSecretScanController: AbortController | null = null;
 
@@ -35,12 +39,17 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitSetRepo, async (_event: any, repoPath: string) => {
     commitStatsService.interruptBackgroundWork();
     gitService.setRepoPath(repoPath);
-    commitStatsService.setActiveRepo(gitService.getRepoPath() || repoPath);
+    const activeRepoPath = gitService.getRepoPath() || repoPath;
+    repoJobRegistry.cancelForRepoChange(activeRepoPath);
+    activeSecretScanController?.abort();
+    commitStatsService.setActiveRepo(activeRepoPath);
     return true;
   });
 
   ipcMain.handle(IpcChannel.GitClearRepo, async () => {
     commitStatsService.interruptBackgroundWork();
+    repoJobRegistry.cancelForRepoChange(null);
+    activeSecretScanController?.abort();
     gitService.clearRepoPath();
     commitStatsService.setActiveRepo('');
     return true;
@@ -146,7 +155,14 @@ export function registerGitHandlers({
 
   ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown } = {}) => {
     activeSecretScanController?.abort();
+    const requestedRepoPath = String((params as { repoPath?: unknown })?.repoPath || gitService.getRepoPath() || '').trim();
+    if (!requestedRepoPath) {
+      return { success: false, error: 'Repository path is required.' };
+    }
+    const repoPath = gitService.resolveRepositoryPath(requestedRepoPath);
+    const repoJob = repoJobRegistry.begin(repoPath);
     const controller = new AbortController();
+    repoJob.signal.addEventListener('abort', () => controller.abort(), { once: true });
     activeSecretScanController = controller;
     const jobId = createJobId('security-secret-scan');
     const operation = 'security:secret-scan';
@@ -161,6 +177,7 @@ export function registerGitHandlers({
     try {
       const settings = readSettingsWithMigration();
       const result = await secretScanService.scanPushDiffs({
+        repoPath: repoJob.repoPath,
         strictness: settings.secretScanStrictness,
         allowlistText: settings.secretScanAllowlist,
         includeTags: params?.includeTags === true,
@@ -176,6 +193,7 @@ export function registerGitHandlers({
           });
         },
       });
+      repoJob.ensureActive();
 
       const findingCount = result.findings.length;
       const filesWithFindings = new Set(result.findings.map((item) => item.filePath)).size;
@@ -209,6 +227,7 @@ export function registerGitHandlers({
       });
       return { success: false, error: cancelled ? 'Secret scan cancelled.' : error?.message || 'Secret scan failed.' };
     } finally {
+      repoJob.complete();
       if (activeSecretScanController === controller) activeSecretScanController = null;
     }
   });
@@ -350,8 +369,15 @@ export function registerGitHandlers({
 
   ipcMain.handle(IpcChannel.GitInit, async (_event: any, repoPath: string) => {
     try {
-      gitService.setRepoPath(repoPath);
-      const out = await gitService.runCommand(['init']);
+      const normalizedPath = String(repoPath || '').trim();
+      if (!normalizedPath) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+      const out = await gitService.runCommandAtPath(normalizedPath, ['init']);
+      gitService.setRepoPath(normalizedPath);
+      const activeRepoPath = gitService.getRepoPath() || normalizedPath;
+      repoJobRegistry.cancelForRepoChange(activeRepoPath);
+      commitStatsService.setActiveRepo(activeRepoPath);
       return { success: true, data: out };
     } catch (error: any) {
       return { success: false, error: error.message };

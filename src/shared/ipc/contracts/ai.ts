@@ -7,7 +7,7 @@ export interface ElectronAiAPI extends ElectronReleaseNotesAPI {
   aiListModels: () => Promise<IpcResult<string[]>>;
   ollamaTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;
   ollamaListModels: () => Promise<IpcResult<string[]>>;
-  runAiAutoCommit: () => Promise<IpcResult<AiAutoCommitResultDto>>;
+  runAiAutoCommit: (params: { repoPath: string }) => Promise<IpcResult<AiAutoCommitResultDto>>;
   cancelAiAutoCommit: () => Promise<{ success: boolean; canceled: boolean }>;
   getAiAutoCommitState: () => Promise<IpcResult<GitJobEventDto | null>>;
   aiGenerateCommitMessage: (params: { notes: string }) => Promise<IpcResult<AiGeneratedCommitMessageDto>>;

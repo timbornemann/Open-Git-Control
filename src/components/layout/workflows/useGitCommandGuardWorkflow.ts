@@ -26,6 +26,7 @@ type Params = {
 type GuardParams = {
   args: string[];
   command: string;
+  repoPath?: string | null;
   successMsg: string;
   actionLabel?: string;
   options?: RunGitCommandOptions;
@@ -44,14 +45,14 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
   );
 
   const runGitCommandGuards = useCallback(
-    async ({ args, command, successMsg, actionLabel, options }: GuardParams): Promise<boolean> => {
+    async ({ args, command, repoPath, successMsg, actionLabel, options }: GuardParams): Promise<boolean> => {
       const isForcePushLike = isForcePushCommand(args);
       const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
       const shouldGuardForcePush = settings.confirmDangerousOps && !options?.skipDirtyGuard && isForcePushLike;
       const shouldGuardRemoteAheadWithDirtyState = !options?.skipRemoteAheadDirtyGuard && (command === 'pull' || (command === 'push' && !isForcePushLike));
       const shouldScanPushSecrets = command === 'push' && settings.secretScanBeforePushEnabled && !options?.skipSecretScan;
       const shouldScanTagRefs = command === 'push' && args.some((arg) => arg === '--tags');
-      const request: GitCommandGuardRequest = { args, command, successMsg, actionLabel, options };
+      const request: GitCommandGuardRequest = { args, command, repoPath, successMsg, actionLabel, options };
       const runtime: GitCommandGuardRuntime = {
         runRemoteAheadQuickFix,
         runWithOptions,
