@@ -97,6 +97,27 @@ describe('GitService commitWithMessage', () => {
   });
 });
 
+describe('GitService stagePaths', () => {
+  it('stages multiple untracked files through one literal pathspec file', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-stage-untracked-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
+      fs.mkdirSync(path.join(repoDir, 'nested'), { recursive: true });
+      fs.writeFileSync(path.join(repoDir, 'first file.txt'), 'one\n', 'utf8');
+      fs.writeFileSync(path.join(repoDir, 'nested', '[second].txt'), 'two\n', 'utf8');
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+      await expect(service.stagePaths(['first file.txt', 'nested/[second].txt'])).resolves.toBe('');
+
+      const staged = (await service.runCommand(['diff', '--cached', '--name-only'])).split(/\r?\n/).filter(Boolean).sort();
+      expect(staged).toEqual(['first file.txt', 'nested/[second].txt']);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
+  });
+});
+
 describe('GitService status and stash helpers', () => {
   it('requests porcelain status with path quoting disabled', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-status-quotepath-'));

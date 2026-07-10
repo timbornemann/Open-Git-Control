@@ -28,8 +28,7 @@ export class CommitService {
     ];
   }
 
-  private createPathspecFile(tempPrefix: string, paths: string[]): { tempDir: string; pathspecFile: string } {
-    const entries = this.normalizePathspecEntries(paths);
+  private createPathspecFile(tempPrefix: string, entries: string[]): { tempDir: string; pathspecFile: string } {
     if (entries.length === 0) {
       throw new Error('At least one path is required.');
     }
@@ -68,7 +67,7 @@ export class CommitService {
     if (input.allowEmpty) args.push('--allow-empty');
     args.push('-F', messageFile);
     if (paths) {
-      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', paths);
+      const pathspec = this.createPathspecFile('ogc-commit-pathspec-', this.normalizePathspecEntries(paths));
       pathspecTempDir = pathspec.tempDir;
       args.push(`--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul');
     }
