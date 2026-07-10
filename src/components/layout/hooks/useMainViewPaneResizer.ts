@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { APPLICATION_LAYOUT_RESET_EVENT, CONTENT_PANE_RATIO_STORAGE_KEY, INSPECTOR_PANE_WIDTH_STORAGE_KEY } from '@/utils/layoutPreferences';
 
 export const PRIMARY_PANE_DEFAULT_RATIO = 0.7;
 export const PRIMARY_PANE_MIN_WIDTH = 320;
 export const INSPECTOR_PANE_MIN_WIDTH = 280;
 const CONTENT_RESIZER_WIDTH = 8;
 const MAIN_CONTENT_MIN_WIDTH = PRIMARY_PANE_MIN_WIDTH + INSPECTOR_PANE_MIN_WIDTH + CONTENT_RESIZER_WIDTH;
-const CONTENT_PANE_RATIO_STORAGE_KEY = 'open-git-control.content-pane-ratio';
-const INSPECTOR_PANE_WIDTH_STORAGE_KEY = 'open-git-control.inspector-pane-width';
 
 const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number => {
   const effectiveWidth = Math.max(containerWidth, MAIN_CONTENT_MIN_WIDTH);
@@ -20,12 +19,12 @@ const clampPrimaryPaneRatio = (ratio: number, containerWidth: number): number =>
 export const useMainViewPaneResizer = () => {
   const [primaryPaneRatio, setPrimaryPaneRatio] = useState(() => {
     const storedRatioRaw = window.localStorage.getItem(CONTENT_PANE_RATIO_STORAGE_KEY);
-    const storedRatio = Number(storedRatioRaw);
-    return Number.isFinite(storedRatio) ? storedRatio : PRIMARY_PANE_DEFAULT_RATIO;
+    const storedRatio = storedRatioRaw === null ? Number.NaN : Number(storedRatioRaw);
+    return Number.isFinite(storedRatio) && storedRatio > 0 && storedRatio < 1 ? storedRatio : PRIMARY_PANE_DEFAULT_RATIO;
   });
   const [preferredInspectorWidth, setPreferredInspectorWidth] = useState<number | null>(() => {
     const storedWidthRaw = window.localStorage.getItem(INSPECTOR_PANE_WIDTH_STORAGE_KEY);
-    const storedWidth = Number(storedWidthRaw);
+    const storedWidth = storedWidthRaw === null ? Number.NaN : Number(storedWidthRaw);
     return Number.isFinite(storedWidth) && storedWidth > 0 ? Math.round(storedWidth) : null;
   });
   const [isContentResizing, setIsContentResizing] = useState(false);
@@ -40,6 +39,20 @@ export const useMainViewPaneResizer = () => {
     setIsContentResizing(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handleLayoutReset = () => {
+      contentResizeActiveRef.current = false;
+      setIsContentResizing(false);
+      setPrimaryPaneRatio(PRIMARY_PANE_DEFAULT_RATIO);
+      setPreferredInspectorWidth(null);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
+    return () => window.removeEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
   }, []);
 
   useEffect(() => {

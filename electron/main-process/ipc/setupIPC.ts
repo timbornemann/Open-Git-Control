@@ -57,10 +57,16 @@ export function setupIPC({
     readSettingsWithMigration,
     repoJobRegistry,
   });
-  registerRepoSettingsHandlers({ updaterManager });
+  registerRepoSettingsHandlers({ updaterManager, githubService });
   registerProjectPlannerHandlers({ gitService });
   registerUpdaterHandlers({ updaterManager });
-  registerAiHandlers({ aiService, readSettingsWithMigration, getGeminiApiKeyFromSecureStore, repoJobRegistry });
+  registerAiHandlers({
+    aiService,
+    readSettingsWithMigration,
+    getGeminiApiKeyFromSecureStore,
+    getActiveRepoPath: () => gitService.getRepoPath(),
+    repoJobRegistry,
+  });
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
   registerExternalLinkHandlers();

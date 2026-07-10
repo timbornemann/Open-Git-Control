@@ -1,14 +1,44 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { AppTabId, CommitNavigationRequest } from './contracts';
-import type { GitHubReleaseContextDto } from '@/types/githubDtos';
+import type { AppTabId, CommitNavigationRequest, ConfirmDialogState, InputDialogState } from './contracts';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 
 type UseRepoScopedNavigationStateParams = {
+  setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
+  setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
+  setShowCreatePR: Dispatch<SetStateAction<boolean>>;
+  setNewPRTitle: Dispatch<SetStateAction<string>>;
+  setNewPRBody: Dispatch<SetStateAction<string>>;
+  setNewPRHead: Dispatch<SetStateAction<string>>;
+  setNewPRBase: Dispatch<SetStateAction<string>>;
   setShowReleaseCreator: Dispatch<SetStateAction<boolean>>;
+  setReleaseFormState: Dispatch<SetStateAction<GitHubCreateReleaseParamsDto>>;
+  setReleaseSubmitting: Dispatch<SetStateAction<boolean>>;
+  setReleaseError: Dispatch<SetStateAction<string | null>>;
+  setReleaseSuccess: Dispatch<SetStateAction<GitHubReleaseDto | null>>;
+  setReleaseContextLoading: Dispatch<SetStateAction<boolean>>;
   setReleaseContext: Dispatch<SetStateAction<GitHubReleaseContextDto | null>>;
   setReleaseContextError: Dispatch<SetStateAction<string | null>>;
+  setReleaseNotesGenerating: Dispatch<SetStateAction<boolean>>;
 };
 
-export const useRepoScopedNavigationState = ({ setShowReleaseCreator, setReleaseContext, setReleaseContextError }: UseRepoScopedNavigationStateParams) => {
+export const useRepoScopedNavigationState = ({
+  setConfirmDialog,
+  setInputDialog,
+  setShowCreatePR,
+  setNewPRTitle,
+  setNewPRBody,
+  setNewPRHead,
+  setNewPRBase,
+  setShowReleaseCreator,
+  setReleaseFormState,
+  setReleaseSubmitting,
+  setReleaseError,
+  setReleaseSuccess,
+  setReleaseContextLoading,
+  setReleaseContext,
+  setReleaseContextError,
+  setReleaseNotesGenerating,
+}: UseRepoScopedNavigationStateParams) => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [commitNavigationRequest, setCommitNavigationRequest] = useState<CommitNavigationRequest | null>(null);
   const commitNavigationSequenceRef = useRef(0);
@@ -32,10 +62,52 @@ export const useRepoScopedNavigationState = ({ setShowReleaseCreator, setRelease
     setSelectedCommit(null);
     setCommitNavigationRequest(null);
     setAutoOpenConflictResolverPath(null);
+    // Dialog callbacks capture repository-scoped operations. Closing them on a
+    // repository switch prevents a confirmation created for repo A from
+    // mutating repo B later.
+    setConfirmDialog(null);
+    setInputDialog(null);
+    setShowCreatePR(false);
+    setNewPRTitle('');
+    setNewPRBody('');
+    setNewPRHead('');
+    setNewPRBase('main');
     setShowReleaseCreator(false);
+    setReleaseFormState({
+      owner: '',
+      repo: '',
+      tagName: '',
+      targetCommitish: '',
+      releaseName: '',
+      body: '',
+      draft: false,
+      prerelease: false,
+    });
+    setReleaseSubmitting(false);
+    setReleaseError(null);
+    setReleaseSuccess(null);
+    setReleaseContextLoading(false);
     setReleaseContext(null);
     setReleaseContextError(null);
-  }, [setReleaseContext, setReleaseContextError, setShowReleaseCreator]);
+    setReleaseNotesGenerating(false);
+  }, [
+    setConfirmDialog,
+    setInputDialog,
+    setNewPRBase,
+    setNewPRBody,
+    setNewPRHead,
+    setNewPRTitle,
+    setReleaseContext,
+    setReleaseContextError,
+    setReleaseContextLoading,
+    setReleaseError,
+    setReleaseFormState,
+    setReleaseNotesGenerating,
+    setReleaseSubmitting,
+    setReleaseSuccess,
+    setShowCreatePR,
+    setShowReleaseCreator,
+  ]);
 
   const navigateToCommit = useCallback(
     (hash: string, setActiveTab: (tab: AppTabId) => void) => {

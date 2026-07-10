@@ -37,6 +37,9 @@ export function normalizeInteractiveRebaseTodo(todoLines: unknown): string[] {
     const action = match[1].toLowerCase();
     const hash = match[2].toLowerCase();
     const subject = (match[3] || '').trim();
+    if (action === 'reword' && !subject) {
+      throw new Error(`Reword instruction on line ${index + 1} requires a replacement subject.`);
+    }
     return subject ? `${action} ${hash} ${subject}` : `${action} ${hash}`;
   });
 }
@@ -68,20 +71,33 @@ export class RebaseService {
 
     const normalizedLines = normalizeInteractiveRebaseTodo(todoLines);
 
-    const todoText = normalizedLines.join('\n') + '\n';
     const tempDir = createPrivateTempDir('ogc-rebase-editor-');
     const helperPath = path.join(tempDir, 'editor.js');
     const todoPath = path.join(tempDir, 'todo.txt');
     const helperScript = [
       "const fs = require('fs');",
+      "const path = require('path');",
       'const target = process.argv[2];',
       "const source = process.env.OGC_REBASE_TODO_FILE || '';",
       'if (!target || !source) process.exit(1);',
-      'fs.copyFileSync(source, target);',
+      "const todoLines = JSON.parse(fs.readFileSync(source, 'utf8'));",
+      'const rebaseStateDir = path.dirname(target);',
+      'const output = [];',
+      'let rewordIndex = 0;',
+      'for (const line of todoLines) {',
+      '  const match = line.match(/^reword\\s+([0-9a-f]{7,64})\\s+(.+)$/i);',
+      '  if (!match) { output.push(line); continue; }',
+      '  const fileName = `ogc-reword-${rewordIndex}.txt`;',
+      "  fs.writeFileSync(path.join(rebaseStateDir, fileName), match[2].trim() + '\\n', { encoding: 'utf8', mode: 0o600 });",
+      '  output.push(`pick ${match[1]} ${match[2].trim()}`);',
+      '  output.push(`exec git commit --amend -F "$(git rev-parse --git-path rebase-merge)/${fileName}"`);',
+      '  rewordIndex += 1;',
+      '}',
+      "fs.writeFileSync(target, output.join('\\n') + '\\n', 'utf8');",
     ].join('\n');
 
     writePrivateTempFile(helperPath, helperScript);
-    writePrivateTempFile(todoPath, todoText);
+    writePrivateTempFile(todoPath, JSON.stringify(normalizedLines));
 
     const quotedNode = `"${process.execPath.replace(/"/g, '\\"')}"`;
     const quotedHelper = `"${helperPath.replace(/"/g, '\\"')}"`;
@@ -89,7 +105,10 @@ export class RebaseService {
     try {
       return await this.runGit.run(repoPath, ['rebase', '-i', normalizedBase], {
         envOverrides: {
+          ELECTRON_RUN_AS_NODE: '1',
+          GIT_EDITOR: 'true',
           GIT_SEQUENCE_EDITOR: `${quotedNode} ${quotedHelper}`,
+          LC_ALL: 'C',
           OGC_REBASE_TODO_FILE: todoPath,
         },
         requestedKind: 'write',

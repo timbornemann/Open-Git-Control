@@ -39,6 +39,7 @@ describe('planningApiServer', () => {
       preferredPort: 0,
       maxPortSearch: 0,
       authToken: 'test-planning-api-token',
+      serverVersion: '9.8.7',
     });
   });
 
@@ -184,6 +185,15 @@ describe('planningApiServer', () => {
       priority: 'high',
       status: 'planned',
       tags: ['agent'],
+    });
+
+    const initialize = await requestJson('/mcp', {
+      method: 'POST',
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize' }),
+    });
+    expect(initialize.result.serverInfo).toMatchObject({
+      name: 'open-git-control-planner',
+      version: '9.8.7',
     });
 
     const toolsList = await requestJson('/mcp', {

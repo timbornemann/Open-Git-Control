@@ -289,4 +289,44 @@ describe('registerGitHandlers', () => {
     expect(showMessageBoxMock).toHaveBeenCalledWith(expect.objectContaining({ buttons: ['Cancel', 'Push anyway'] }));
     expect(gitService.runCommand).not.toHaveBeenCalled();
   });
+
+  it('rejects secret scans for a renderer-selected non-active repository', async () => {
+    const scanPushDiffs = vi.fn();
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/active-repo'),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const result = await handlers.get('git:scanPushSecrets')!({ sender: { send: vi.fn() } }, { repoPath: 'C:/private-other-repo' });
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(scanPushDiffs).not.toHaveBeenCalled();
+  });
+
+  it('does not replace the active repository when git init fails', async () => {
+    const setRepoPath = vi.fn();
+    const gitService = {
+      runCommandAtPath: vi.fn().mockRejectedValue(new Error('init failed')),
+      setRepoPath,
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const result = await handlers.get('git:init')!({}, 'C:/new-repo');
+
+    expect(result).toEqual({ success: false, error: 'init failed' });
+    expect(setRepoPath).not.toHaveBeenCalled();
+  });
 });

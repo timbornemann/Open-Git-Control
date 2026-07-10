@@ -4,6 +4,7 @@ import * as path from 'path';
 import type { AppSettings } from '../settings';
 import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
 import { normalizeGeminiApiKey, readSavedGeminiApiKey, saveGeminiApiKeySecurely } from './secureStore';
+import { writeTextFileAtomically } from './atomicFile';
 
 export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };
 
@@ -30,7 +31,7 @@ export function readSettings(): AppSettings {
 
 export function writeSettings(settings: AppSettings): void {
   const normalized = normalizeSettings(settings);
-  fs.writeFileSync(getSettingsPath(), JSON.stringify(normalized, null, 2));
+  writeTextFileAtomically(getSettingsPath(), JSON.stringify(normalized, null, 2));
 }
 
 export function readSettingsWithMigration(): AppSettings {

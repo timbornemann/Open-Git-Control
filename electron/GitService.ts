@@ -53,8 +53,9 @@ export class GitService {
 
   setRepoPath(newPath: string) {
     const resolvedRepoPath = this.resolveRepositoryPath(newPath);
+    const repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
     this.repoPath = resolvedRepoPath;
-    this.repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
+    this.repoIsBare = repoIsBare;
   }
 
   clearRepoPath() {

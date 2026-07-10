@@ -34,6 +34,10 @@ export const githubClient = {
     return requireElectronGithubApi().githubAuth(token, host);
   },
 
+  async cancelAuth(): ReturnType<ElectronAPI['githubCancelAuth']> {
+    return requireElectronGithubApi().githubCancelAuth();
+  },
+
   async deviceStart(): Promise<IpcResult<DeviceFlowStartDto>> {
     return requireElectronGithubApi().githubDeviceStart();
   },

@@ -134,6 +134,7 @@ describe('platform IPC handlers', () => {
     const updaterManager = {
       setAutoUpdatesEnabled: vi.fn(),
     };
+    const githubService = { logout: vi.fn() };
     const currentSettings = {
       language: 'de',
       githubHost: 'github.com',
@@ -144,7 +145,7 @@ describe('platform IPC handlers', () => {
     readStoreDataMock.mockReturnValue({ repos: [{ path: 'C:/repo' }] });
     appGetVersionMock.mockReturnValue('9.8.7');
 
-    registerRepoSettingsHandlers({ updaterManager } as any);
+    registerRepoSettingsHandlers({ updaterManager, githubService } as any);
 
     await expect(handlers.get(IpcChannel.ReposGetStored)?.({})).resolves.toEqual({ repos: [{ path: 'C:/repo' }] });
     await expect(handlers.get(IpcChannel.ReposSetStored)?.({}, { repos: [] })).resolves.toBe(true);
@@ -166,6 +167,7 @@ describe('platform IPC handlers', () => {
     expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ language: 'en', hasGeminiApiKey: true }));
     expect(writeSettingsMock.mock.calls[0][0]).not.toHaveProperty('geminiApiKey');
     expect(clearSavedGithubTokenSecurelyMock).toHaveBeenCalled();
+    expect(githubService.logout).toHaveBeenCalledOnce();
     expect(updaterManager.setAutoUpdatesEnabled).toHaveBeenCalledWith(true);
 
     await expect(handlers.get(IpcChannel.AppGetVersion)?.({})).resolves.toBe('9.8.7');
@@ -182,7 +184,7 @@ describe('platform IPC handlers', () => {
     });
     saveGeminiApiKeySecurelyMock.mockReturnValue(true);
 
-    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() } } as any);
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() } } as any);
 
     await expect(handlers.get(IpcChannel.SettingsSetGeminiApiKey)?.({}, '  key  ')).resolves.toEqual(expect.objectContaining({ hasGeminiApiKey: true }));
     expect(saveGeminiApiKeySecurelyMock).toHaveBeenCalledWith('key');

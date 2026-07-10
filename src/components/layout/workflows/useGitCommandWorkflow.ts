@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
@@ -41,7 +41,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const runGitCommandRef = useRef<GitCommandRunner | null>(null);
   const activeRepoRef = useRef<string | null>(workspace.activeRepo);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = workspace.activeRepo;
     activeGitWorkflowRunRef.current = null;
     isGitActionRunningRef.current = false;

@@ -63,28 +63,42 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const [createProjectRequestId, setCreateProjectRequestId] = useState(0);
   const ensuredRepoRef = useRef<string | null>(null);
   const activeRepoGenerationRef = useRef(0);
+  const ensureRequestGenerationRef = useRef(0);
+  const refreshRequestGenerationRef = useRef(0);
 
   useEffect(() => {
     activeRepoGenerationRef.current += 1;
+    ensureRequestGenerationRef.current += 1;
+    refreshRequestGenerationRef.current += 1;
+    setSelectedProjectId(null);
   }, [activeRepo]);
 
-  const refresh = useCallback(async () => {
+  const refreshData = useCallback(async (): Promise<boolean> => {
+    const requestGeneration = refreshRequestGenerationRef.current + 1;
+    refreshRequestGenerationRef.current = requestGeneration;
     if (!plannerClient.isAvailable()) {
       throw new Error('Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.');
     }
     try {
       const result = await plannerClient.getData();
+      if (requestGeneration !== refreshRequestGenerationRef.current) return false;
       if (!result.success) {
         throw new Error(result.error);
       }
       setData(result.data);
       setError(null);
+      return true;
     } catch (refreshError) {
+      if (requestGeneration !== refreshRequestGenerationRef.current) return false;
       const message = refreshError instanceof Error ? refreshError.message : String(refreshError);
       setError(message);
       throw refreshError;
     }
   }, []);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    await refreshData();
+  }, [refreshData]);
 
   useEffect(() => {
     const load = async () => {
@@ -111,22 +125,36 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     if (!activeRepo || !plannerClient.isAvailable()) return;
     const key = repoKey(activeRepo);
     if (ensuredRepoRef.current === key) return;
-    const generation = activeRepoGenerationRef.current;
+    const repoGeneration = activeRepoGenerationRef.current;
+    const ensureGeneration = ensureRequestGenerationRef.current + 1;
+    ensureRequestGenerationRef.current = ensureGeneration;
+    const isCurrentEnsure = () => repoGeneration === activeRepoGenerationRef.current && ensureGeneration === ensureRequestGenerationRef.current;
 
     const ensure = async () => {
-      const result = await plannerClient.ensureRepositoryProject(activeRepo);
-      if (generation !== activeRepoGenerationRef.current) return;
-      if (!result.success) {
-        setError(result.error);
-        return;
+      try {
+        const result = await plannerClient.ensureRepositoryProject(activeRepo);
+        if (!isCurrentEnsure()) return;
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        ensuredRepoRef.current = key;
+        const refreshed = await refreshData();
+        if (!isCurrentEnsure() || !refreshed) return;
+        setSelectedProjectId(result.data.id);
+      } catch (ensureError) {
+        if (!isCurrentEnsure()) return;
+        setError(ensureError instanceof Error ? ensureError.message : String(ensureError));
       }
-      ensuredRepoRef.current = key;
-      await refresh();
-      if (generation !== activeRepoGenerationRef.current) return;
-      setSelectedProjectId(result.data.id);
     };
     void ensure();
-  }, [activeRepo, refresh]);
+
+    return () => {
+      if (ensureRequestGenerationRef.current === ensureGeneration) {
+        ensureRequestGenerationRef.current += 1;
+      }
+    };
+  }, [activeRepo, refreshData, refreshSignal]);
 
   useEffect(() => {
     if (loading || selectedProjectId) return;

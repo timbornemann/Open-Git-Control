@@ -19,9 +19,20 @@ if (!semverPattern.test(normalizedVersion)) {
 }
 
 const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+const packageLockPath = path.resolve(process.cwd(), 'package-lock.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 packageJson.version = normalizedVersion;
 
 fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
+
+if (fs.existsSync(packageLockPath)) {
+  const packageLock = JSON.parse(fs.readFileSync(packageLockPath, 'utf8'));
+  packageLock.version = normalizedVersion;
+  if (packageLock.packages?.['']) {
+    packageLock.packages[''].version = normalizedVersion;
+  }
+  fs.writeFileSync(packageLockPath, `${JSON.stringify(packageLock, null, 2)}\n`, 'utf8');
+}
+
 console.log(`Prepared release version: ${normalizedVersion}`);

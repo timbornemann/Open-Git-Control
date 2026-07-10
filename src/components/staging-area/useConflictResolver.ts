@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
@@ -47,7 +47,7 @@ export const useConflictResolver = ({
   const nextConflictActionIdRef = useRef(0);
   const { conflictBlockCountsByPath, isConflictBlockCountPending } = useConflictBlockCounts({ repoPath, status });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     repoGenerationRef.current += 1;
     editorRequestRef.current += 1;
     editorSessionRef.current += 1;
@@ -194,6 +194,13 @@ export const useConflictResolver = ({
   const markConflictResolvedAndSync = useCallback(
     async (filePath: string) => {
       if (activeConflictActionRef.current !== null) return;
+      if (conflictEditor?.filePath === filePath && hasRawConflictMarkers) {
+        setToast({
+          msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'),
+          isError: true,
+        });
+        return;
+      }
       const actionId = ++nextConflictActionIdRef.current;
       const repoGeneration = repoGenerationRef.current;
       const editorSession = editorSessionRef.current;
@@ -216,7 +223,7 @@ export const useConflictResolver = ({
         if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
       }
     },
-    [conflictEditor, markConflictResolved],
+    [conflictEditor, hasRawConflictMarkers, markConflictResolved, setToast, t],
   );
 
   const resetConflictEditorDraft = useCallback(() => {

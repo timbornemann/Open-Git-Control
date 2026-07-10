@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
+import { APPLICATION_LAYOUT_RESET_EVENT, INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY } from '@/utils/layoutPreferences';
 
 export const useInspectorPaneVisibility = () => {
   const inspectorManuallyCollapsedRef = useRef(window.localStorage.getItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY) === 'true');
@@ -21,6 +20,16 @@ export const useInspectorPaneVisibility = () => {
     inspectorManuallyCollapsedRef.current = true;
     window.localStorage.setItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY, 'true');
     setIsInspectorPaneVisible(false);
+  }, []);
+
+  useEffect(() => {
+    const handleLayoutReset = () => {
+      inspectorManuallyCollapsedRef.current = false;
+      setIsInspectorPaneVisible(window.innerWidth > 900);
+    };
+
+    window.addEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
+    return () => window.removeEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
   }, []);
 
   useEffect(() => {

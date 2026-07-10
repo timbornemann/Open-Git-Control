@@ -5,6 +5,7 @@ import type { AppSettings } from '../../../settings';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { parseReleaseCommits } from '../../parsing';
 import { assertGithubAuthenticated, toErrorMessage } from './githubHandlerUtils';
+import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 
 type RegisterGithubReleaseHandlersDeps = {
   gitService: GitService;
@@ -14,6 +15,14 @@ type RegisterGithubReleaseHandlersDeps = {
 
 function buildGithubRepositoryUrl(host: string, owner: string, repo: string): string {
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+}
+
+function normalizeReleaseRevision(value: unknown, label: string): string {
+  const revision = String(value || '').trim();
+  if (!revision || revision.length > 255 || revision.startsWith('-') || /[\0\r\n]/.test(revision)) {
+    throw new Error(`Invalid ${label}.`);
+  }
+  return revision;
 }
 
 async function localCommitishExists(gitService: GitService, repoPath: string, commitish: string): Promise<boolean> {
@@ -92,17 +101,23 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
 
       const owner = String(params?.owner || '').trim();
       const repo = String(params?.repo || '').trim();
-      const targetCommitish = String(params?.targetCommitish || '').trim() || 'HEAD';
-      const requestedRepoPath = String(params?.repoPath || gitService.getRepoPath() || '').trim();
+      let targetCommitish: string;
+      try {
+        targetCommitish = normalizeReleaseRevision(params?.targetCommitish || 'HEAD', 'release target');
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Invalid release target.' };
+      }
 
       if (!owner || !repo) {
         return { success: false, error: 'Owner und Repository sind erforderlich.' };
       }
 
-      if (!requestedRepoPath) {
-        return { success: false, error: 'Repository path is required.' };
+      let repoPath: string;
+      try {
+        repoPath = requireActiveRepositoryPath(params?.repoPath, gitService.getRepoPath());
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
       }
-      const repoPath = gitService.resolveRepositoryPath(requestedRepoPath);
 
       try {
         const [existingTags, lastReleaseTag] = await Promise.all([
@@ -115,10 +130,17 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         let commitsRaw = '';
 
         try {
-          const canUseLastReleaseTag = lastReleaseTag ? await localCommitishExists(gitService, repoPath, lastReleaseTag) : false;
+          const normalizedLastReleaseTag = lastReleaseTag ? normalizeReleaseRevision(lastReleaseTag, 'last release tag') : null;
+          const canUseLastReleaseTag = normalizedLastReleaseTag ? await localCommitishExists(gitService, repoPath, normalizedLastReleaseTag) : false;
 
-          if (lastReleaseTag && canUseLastReleaseTag) {
-            commitsRaw = await gitService.runCommandAtPath(repoPath, ['log', `${lastReleaseTag}..${targetCommitish}`, commitFormat, '--date=short', '--max-count=400']);
+          if (normalizedLastReleaseTag && canUseLastReleaseTag) {
+            commitsRaw = await gitService.runCommandAtPath(repoPath, [
+              'log',
+              `${normalizedLastReleaseTag}..${targetCommitish}`,
+              commitFormat,
+              '--date=short',
+              '--max-count=400',
+            ]);
           } else {
             fallbackUsed = Boolean(lastReleaseTag);
             commitsRaw = await gitService.runCommandAtPath(repoPath, ['log', targetCommitish, commitFormat, '--date=short', '--max-count=150']);

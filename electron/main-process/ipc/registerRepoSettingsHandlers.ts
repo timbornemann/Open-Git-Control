@@ -7,12 +7,14 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { clearSavedGeminiApiKeySecurely, clearSavedGithubTokenSecurely, normalizeGeminiApiKey, saveGeminiApiKeySecurely } from '../secureStore';
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
 import type { UpdaterManager } from '../updaterManager';
+import type { GitHubService } from '../../GitHubService';
 
 type RegisterRepoSettingsHandlersDeps = {
   updaterManager: UpdaterManager;
+  githubService: Pick<GitHubService, 'logout'>;
 };
 
-export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSettingsHandlersDeps): void {
+export function registerRepoSettingsHandlers({ updaterManager, githubService }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
   });
@@ -43,6 +45,7 @@ export function registerRepoSettingsHandlers({ updaterManager }: RegisterRepoSet
 
     writeSettings(next);
     if (next.githubHost !== current.githubHost) {
+      githubService.logout();
       clearSavedGithubTokenSecurely();
     }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {

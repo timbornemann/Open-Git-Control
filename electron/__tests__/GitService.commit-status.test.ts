@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process';
 import { GitService } from '../GitService';
 
 describe('GitService stale index.lock recovery', () => {
-  it('removes stale lock files and retries git command once', async () => {
+  it('does not delete an index lock whose ownership cannot be verified', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-index-lock-'));
     try {
       execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
@@ -23,10 +23,8 @@ describe('GitService stale index.lock recovery', () => {
       const service = new GitService();
       service.setRepoPath(repoDir);
 
-      await service.addFile('CHANGE.txt');
-      const stagedFiles = await service.runCommand(['diff', '--cached', '--name-only']);
-      expect(stagedFiles.split(/\r?\n/).filter(Boolean)).toContain('CHANGE.txt');
-      expect(fs.existsSync(lockPath)).toBe(false);
+      await expect(service.addFile('CHANGE.txt')).rejects.toThrow(/index\.lock/i);
+      expect(fs.existsSync(lockPath)).toBe(true);
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { isFullGitObjectId } from '@/utils/gitObjectId';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildCreateTagDialog, buildDeleteTagDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
@@ -38,8 +39,9 @@ export const useRepositoryTags = ({
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef<string | null>(activeRepo);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
+    setTags([]);
   }, [activeRepo]);
 
   useEffect(() => {
@@ -110,7 +112,7 @@ export const useRepositoryTags = ({
             .trim()
             .split(/\s+/)[0] || '';
 
-        if (!result.success || !/^[0-9a-f]{40}$/i.test(hash)) {
+        if (!result.success || !isFullGitObjectId(hash)) {
           setGitActionToast({
             msg: result.error || tr(`Commit fuer Tag "${tagName}" konnte nicht gefunden werden.`, `Could not find the commit for tag "${tagName}".`),
             isError: true,

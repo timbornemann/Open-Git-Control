@@ -58,8 +58,6 @@ export const useRepositoryDomain = ({
     autoFetchIntervalMs,
     language,
     hasRemoteOrigin: remotes.hasRemoteOrigin,
-    setHasRemoteOrigin: remotes.setHasRemoteOrigin,
-    setRemotes: remotes.setRemotes,
     setGitActionToast,
     setActiveGitActionLabel,
     isGitActionRunningRef,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
@@ -34,7 +34,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownPreviewState>(EMPTY_MARKDOWN_PREVIEW);
   const requestGenerationRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setMarkdownPreview(EMPTY_MARKDOWN_PREVIEW);
   }, [repoPath, request]);
 

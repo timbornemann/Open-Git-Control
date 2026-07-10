@@ -14,6 +14,7 @@ import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { emitJobEvent } from './jobEvents';
 import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
+import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 
 type RegisterGitHandlersDeps = {
   gitService: GitService;
@@ -150,13 +151,14 @@ export function registerGitHandlers({
     }
   });
 
-  const scanPushSecrets = async (event: any, params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown } = {}) => {
+  const scanPushSecrets = async (event: any, params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown; excludeRemote?: unknown } = {}) => {
     activeSecretScanController?.abort();
-    const requestedRepoPath = String(params.repoPath || gitService.getRepoPath() || '').trim();
-    if (!requestedRepoPath) {
-      return { success: false, error: 'Repository path is required.' };
+    let repoPath: string;
+    try {
+      repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
     }
-    const repoPath = gitService.resolveRepositoryPath(requestedRepoPath);
     const repoJob = repoJobRegistry.begin(repoPath);
     const controller = new AbortController();
     repoJob.signal.addEventListener('abort', () => controller.abort(), { once: true });
@@ -179,6 +181,7 @@ export function registerGitHandlers({
         allowlistText: settings.secretScanAllowlist,
         includeTags: params?.includeTags === true,
         revisions: Array.isArray(params.revisions) ? params.revisions.map((revision) => String(revision || '')).slice(0, 8) : undefined,
+        excludeRemote: typeof params.excludeRemote === 'string' ? params.excludeRemote : undefined,
         signal: controller.signal,
         onProgress: (checkedLines) => {
           emitJobEvent(event.sender, {
@@ -235,12 +238,14 @@ export function registerGitHandlers({
     if (!settings?.secretScanBeforePushEnabled) return null;
 
     const positionalArgs = rawArgs.filter((arg): arg is string => typeof arg === 'string' && !arg.startsWith('-'));
+    const destinationRemote = positionalArgs[0] || '';
     const refspec = positionalArgs.length >= 2 ? positionalArgs[1] : '';
-    const sourceRevision = refspec && !refspec.startsWith(':') ? refspec.split(':', 1)[0] || 'HEAD' : '';
+    const sourceRevision = refspec && !refspec.startsWith(':') ? (refspec.split(':', 1)[0] || 'HEAD').replace(/^\+/, '') : destinationRemote ? 'HEAD' : '';
     const scanResult = await scanPushSecrets(event, {
       includeTags: rawArgs.some((arg) => arg === '--tags'),
       repoPath: gitService.getRepoPath(),
-      revisions: sourceRevision && sourceRevision !== 'HEAD' ? [sourceRevision] : undefined,
+      revisions: sourceRevision ? [sourceRevision] : undefined,
+      excludeRemote: destinationRemote || undefined,
     });
     if (!scanResult.success || !scanResult.data) return scanResult;
     if (scanResult.data.findings.length === 0) return null;
@@ -273,8 +278,8 @@ export function registerGitHandlers({
     return handleGitCommand(event, gitService, commandName, ...rawArgs);
   });
 
-  ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown } = {}) =>
-    scanPushSecrets(event, params),
+  ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown } = {}) =>
+    scanPushSecrets(event, { includeTags: params.includeTags, repoPath: params.repoPath }),
   );
 
   ipcMain.handle(IpcChannel.GitCancelSecretScan, async () => {
@@ -286,7 +291,7 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitInteractiveRebase, async (_event: any, baseHash: unknown, todoLines: unknown) => {
     try {
       const normalizedBase = String(baseHash || '').trim();
-      if (!/^[0-9a-f]{7,40}$/i.test(normalizedBase)) {
+      if (!/^[0-9a-f]{7,64}$/i.test(normalizedBase)) {
         return { success: false, error: 'Invalid base commit hash.' };
       }
 

@@ -7,11 +7,13 @@ import type { RepoJobRegistry } from '../repoJobRegistry';
 import type { JobEventPayload } from './jobEvents';
 import { emitJobEvent } from './jobEvents';
 import { IpcChannel } from '../../../src/types/ipcContract';
+import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 
 type RegisterAiHandlersDeps = {
   aiService: AiService;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
+  getActiveRepoPath: () => string | null;
   repoJobRegistry?: RepoJobRegistry;
 };
 
@@ -19,6 +21,7 @@ export function registerAiHandlers({
   aiService,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
+  getActiveRepoPath,
   repoJobRegistry = defaultRepoJobRegistry,
 }: RegisterAiHandlersDeps): void {
   let currentAiAutoCommitJob: { id: string; repoPath: string; generation: number; cancelRequested: boolean } | null = null;
@@ -70,9 +73,11 @@ export function registerAiHandlers({
 
   ipcMain.handle(IpcChannel.GitAiAutoCommit, async (event: any, params: { repoPath?: unknown } = {}) => {
     const webContents = event.sender;
-    const repoPath = String(params?.repoPath || '').trim();
-    if (!repoPath) {
-      return { success: false, error: 'No repository selected.' };
+    let repoPath: string;
+    try {
+      repoPath = requireActiveRepositoryPath(params?.repoPath, getActiveRepoPath());
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'No repository selected.' };
     }
 
     if (currentAiAutoCommitJob) {

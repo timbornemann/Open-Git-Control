@@ -788,14 +788,16 @@ npm run dist:linux
 npm run dist:mac
 ```
 
-GitHub Publishing laeuft ueber [.github/workflows/release.yml](.github/workflows/release.yml). Das Pushen eines geschuetzten Tags wie `vX.Y.Z` startet Plattform-Builds fuer Windows, Linux und macOS. Der Workflow leitet die Paketversion aus dem Tag ab, erzeugt rechtliche Hinweise, verlangt Windows-/macOS-Signierungsmaterial, prueft signierte Installer, validiert Updater-Metadaten, erzeugt `SHA256SUMS.txt` und erstellt das GitHub Release erst, wenn alle Plattform-Artefakte validiert sind. Dadurch sieht der Auto-Updater kein veroeffentlichtes Release ohne fertige Assets.
+GitHub Publishing laeuft ueber [.github/workflows/release.yml](.github/workflows/release.yml). Das Pushen eines geschuetzten Tags wie `vX.Y.Z` startet Qualitaetspruefungen und Plattform-Builds fuer Windows, Linux und macOS. Der Workflow leitet Paket- und Lockfile-Version aus dem Tag ab, erzeugt rechtliche Hinweise, verlangt Windows-/macOS-Signierungsmaterial, prueft den signierten Installer und die paketierte Anwendung, validiert Updater-Metadaten und erzeugt `SHA256SUMS.txt`. Danach laedt er alle Assets in ein Draft-Release, prueft dieses remote und veroeffentlicht es erst anschliessend. Der Auto-Updater kann das Release daher nicht sehen, bevor alle erforderlichen Assets vorhanden sind.
+
+Lokale `dist:*`-Builds verwenden die in `package.json` eingecheckte Version. Offizielle Release-Builds fuehren `prepare-release-version.js` aus, damit `package.json`, `package-lock.json`, paketierte App-Version und MCP-Server-Metadaten auf dieselbe Release-Tag-Version aufgeloest werden.
 
 Erforderliche Repository-Secrets fuer signierte Releases:
 
 - Windows: `WINDOWS_CSC_LINK`, `WINDOWS_CSC_KEY_PASSWORD`
 - macOS: `MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
 
-`CSC_LINK`-Secrets werden nur beim Release an electron-builder uebergeben und duerfen nie committet werden. Lokale `dist:*`-Builds bleiben unsigniert; `release:win` und `release:mac` schlagen ohne ihre Signierungsumgebung absichtlich fehl.
+Die Windows-Repository-Secrets werden auf electron-builders Variablen `WIN_CSC_LINK` und `WIN_CSC_KEY_PASSWORD` abgebildet. macOS verwendet `CSC_LINK`, `CSC_KEY_PASSWORD` und die Apple-Notarisierungsvariablen. Signierungs-Secrets werden nur in Release-Jobs uebergeben und duerfen nie committet werden. Lokale `dist:*`-Builds bleiben unsigniert; `release:win` erwartet `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`, waehrend `release:mac` die dokumentierte macOS-Signierungsumgebung erwartet.
 
 Erwartete Release Assets:
 

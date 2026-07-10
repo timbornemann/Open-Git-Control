@@ -21,12 +21,16 @@ type ActiveRepoJob = {
   controller: AbortController;
 };
 
-const normalizeRepoPathKey = (repoPath: string): string => path.resolve(String(repoPath || '').trim()).toLowerCase();
+const normalizeRepoPathKey = (repoPath: string): string => {
+  const resolved = path.resolve(String(repoPath || '').trim());
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+};
 
 export class RepoJobRegistry {
   private generation = 0;
   private nextJobId = 1;
   private activeJobs = new Map<number, ActiveRepoJob>();
+  private currentRepoPathKey: string | null | undefined;
 
   getGeneration(): number {
     return this.generation;
@@ -50,7 +54,7 @@ export class RepoJobRegistry {
     });
 
     const ensureActive = () => {
-      if (controller.signal.aborted || jobGeneration !== this.generation) {
+      if (controller.signal.aborted) {
         throw new RepoJobCancelledError();
       }
     };
@@ -68,6 +72,11 @@ export class RepoJobRegistry {
 
   cancelForRepoChange(nextRepoPath?: string | null): void {
     const nextKey = nextRepoPath ? normalizeRepoPathKey(nextRepoPath) : null;
+    if (this.currentRepoPathKey === nextKey) {
+      return;
+    }
+
+    this.currentRepoPathKey = nextKey;
     this.generation += 1;
 
     for (const job of this.activeJobs.values()) {

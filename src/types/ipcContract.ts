@@ -44,6 +44,7 @@ export const enum IpcChannel {
   GitWorkingTreeStats = 'git:workingTreeStats',
   GitWriteRepoFile = 'git:writeRepoFile',
   GithubAuth = 'github:auth',
+  GithubCancelAuth = 'github:cancelAuth',
   GithubCheckAuthStatus = 'github:checkAuthStatus',
   GithubCreatePr = 'github:createPR',
   GithubCreateRelease = 'github:createRelease',

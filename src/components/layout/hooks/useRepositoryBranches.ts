@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
@@ -52,9 +52,11 @@ export const useRepositoryBranches = ({
     [t],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setBranches([]);
     setCurrentBranch('');
+    setIsCreatingBranch(false);
+    setBranchContextMenu(null);
   }, [activeRepo]);
 
   useEffect(() => {

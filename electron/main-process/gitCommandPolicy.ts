@@ -49,6 +49,13 @@ const assertCommitHash = (value: string, label = 'commit hash'): void => {
   }
 };
 
+const assertSafeRemoteUrl = (value: string): void => {
+  assertSafeValue(value, 'remote URL');
+  if (/^[a-z][a-z0-9+.-]*::/i.test(value)) {
+    throw new Error('Git remote-helper URLs are not allowed.');
+  }
+};
+
 const assertAllOptions = (args: string[], allowed: ReadonlySet<string>, commandName: GitCommandName): void => {
   for (const arg of args) {
     if (!allowed.has(arg)) {
@@ -153,7 +160,10 @@ const validateRemoteArgs = (args: string[]): void => {
   if (!(action in expectedCounts) || values.length !== expectedCounts[action]) {
     throw new Error('Unsupported argument combination for git remote.');
   }
-  values.forEach((value, index) => assertSafeValue(value, index === 0 ? 'remote name' : 'remote URL'));
+  values.forEach((value) => assertSafeValue(value, 'remote name'));
+  if (action === 'add' || action === 'set-url') {
+    assertSafeRemoteUrl(values[1]);
+  }
 };
 
 const validateTagArgs = (args: string[]): void => {
@@ -182,7 +192,8 @@ const validateFetchArgs = (args: string[]): void => {
   if (values.length > 2 || (options.includes('--all') && values.length > 0)) {
     throw new Error('Unsupported argument combination for git fetch.');
   }
-  values.forEach((value, index) => assertSafeValue(value, index === 0 ? 'remote name' : 'refspec'));
+  if (values[0]) assertSafeRemoteUrl(values[0]);
+  if (values[1]) assertSafeValue(values[1], 'refspec');
 };
 
 const validatePullArgs = (args: string[]): void => {
@@ -208,7 +219,8 @@ const validatePushArgs = (args: string[]): void => {
   if (values.length > 2 || (options.includes('--tags') && values.length > 0)) {
     throw new Error('Unsupported argument combination for git push.');
   }
-  values.forEach((value, index) => assertSafeValue(value, index === 0 ? 'remote name' : 'push ref'));
+  if (values[0]) assertSafeRemoteUrl(values[0]);
+  if (values[1]) assertSafeValue(values[1], 'push ref');
 };
 
 const validateCheckoutArgs = (args: string[]): void => {

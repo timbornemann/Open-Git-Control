@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
-import {
-  compactGitError,
-  isMissingRemotePushError,
-  isNoLocalCommitPushError,
-  isRemoteRepositoryMissingError,
-  shouldOfferGithubRepoRecoveryOnPushFailure,
-} from '@/utils/gitPushRecovery';
+import { compactGitError, isMissingRemotePushError, isNoLocalCommitPushError, shouldOfferGithubRepoRecoveryOnPushFailure } from '@/utils/gitPushRecovery';
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
@@ -78,7 +72,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
     invalidate: invalidateGithubConnection,
   } = useGithubConnectionGuard(isStillActiveRepo, setIsConnectingGithubRepo);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = workspace.activeRepo;
     invalidateGithubConnection();
     setNewRepoName('');
@@ -118,6 +112,34 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
     [t, workspace],
   );
 
+  const requestGithubRepoCreationRecovery = useCallback(
+    (failureMessage: unknown): boolean => {
+      const repoAtRequest = activeRepoRef.current;
+      if (!repoAtRequest) return false;
+      const shortError = compactGitError(failureMessage);
+
+      setConfirmDialog({
+        variant: 'confirm',
+        title: t('generated.components.layout.workflows.useremoterecoveryworkflow.remote_access_failed_9a3129df'),
+        message: t(
+          'generated.components.layout.workflows.useremoterecoveryworkflow.git_could_not_use_origin_authentication_permissions_or_remote_availability_may_be_the_cause_37fd2e1b',
+        ),
+        contextItems: shortError ? [{ label: t('generated.components.layout.workflows.useremoterecoveryworkflow.git_error_91da27d4'), value: shortError }] : [],
+        irreversible: false,
+        consequences: t(
+          'generated.components.layout.workflows.useremoterecoveryworkflow.the_existing_origin_will_remain_unchanged_no_remote_is_removed_automatically_29e57d81',
+        ),
+        confirmLabel: t('generated.components.layout.workflows.useremoterecoveryworkflow.open_recovery_options_3d3a5d62'),
+        onConfirm: async () => {
+          if (!isStillActiveRepo(repoAtRequest)) return;
+          openGithubRepoCreationRecovery(failureMessage);
+        },
+      });
+      return true;
+    },
+    [isStillActiveRepo, openGithubRepoCreationRecovery, setConfirmDialog, t],
+  );
+
   const maybeRecoverRemoteSetup = useCallback(
     async ({ command, options, failureMessage }: RemoteSetupRecoveryParams): Promise<boolean> => {
       const repoAtStart = activeRepoRef.current;
@@ -128,52 +150,8 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       }
       const missingRemote = isMissingRemotePushError(failureMessage);
 
-      if (isRemoteRepositoryMissingError(failureMessage)) {
-        if (!isStillActiveRepo(repoAtStart)) return false;
-        const removeOriginResult = await gitClient.removeRemote('origin');
-        if (!isStillActiveRepo(repoAtStart)) return false;
-        const removeOriginError = String(removeOriginResult.error || '').trim();
-        const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
-        if (!removeOriginResult.success && !originAlreadyMissing) {
-          setGitActionToast({
-            msg:
-              removeOriginResult.error ||
-              t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_automatically_remove_the_invalid_origin_remote_117d0832'),
-            isError: true,
-          });
-          return false;
-        }
-
-        const suggestedName = suggestRepositoryName(repoAtStart);
-        setNewRepoName((prev) => {
-          const trimmed = String(prev || '').trim();
-          return trimmed || suggestedName;
-        });
-        setForceGithubRepoCreationPrompt(true);
-        setConnectError(null);
-        workspace.setActiveTab('repo');
-        triggerRefresh();
-        setGitActionToast({
-          msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_repository_no_longer_exists_origin_was_removed_pl_d880ec95'),
-          isError: false,
-        });
-        return true;
-      }
-
       if (missingRemote) {
-        const suggestedName = suggestRepositoryName(workspace.activeRepo);
-        setNewRepoName((prev) => {
-          const trimmed = String(prev || '').trim();
-          return trimmed || suggestedName;
-        });
-        setForceGithubRepoCreationPrompt(true);
-        setConnectError(null);
-        workspace.setActiveTab('repo');
-        setGitActionToast({
-          msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.no_valid_origin_remote_is_configured_please_set_name_pri_c0095a48'),
-          isError: false,
-        });
-        return true;
+        return requestGithubRepoCreationRecovery(failureMessage);
       }
 
       const shortError = compactGitError(failureMessage);
@@ -205,14 +183,9 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         return true;
       }
 
-      openGithubRepoCreationRecovery(failureMessage);
-      setGitActionToast({
-        msg: t('generated.components.layout.workflows.useremoterecoveryworkflow.github_remote_is_no_longer_valid_please_set_name_private_6fe27238'),
-        isError: true,
-      });
-      return true;
+      return requestGithubRepoCreationRecovery(failureMessage);
     },
-    [isStillActiveRepo, openGithubRepoCreationRecovery, setConfirmDialog, setGitActionToast, t, triggerRefresh, workspace],
+    [isStillActiveRepo, requestGithubRepoCreationRecovery, setConfirmDialog, t, workspace],
   );
 
   const maybeHandlePushWithoutOrigin = useCallback(

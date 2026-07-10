@@ -169,6 +169,7 @@ export const useCommitGraphData = ({
           console.error('Failed to fetch commits:', result.error);
         }
       } catch (e: unknown) {
+        if (requestGeneration !== requestGenerationRef.current) return;
         if (isRepoUnavailableError(errorMessage(e))) {
           setLayout(null);
           setCommitCount(0);
@@ -178,18 +179,20 @@ export const useCommitGraphData = ({
         }
         console.error(e);
       } finally {
-        if (isAppend) {
-          appendInFlightRef.current = false;
-          setLoadingMore(false);
-          if (pendingRefreshAfterAppendRef.current) {
-            const pendingMode = pendingRefreshAfterAppendRef.current;
-            pendingRefreshAfterAppendRef.current = null;
-            queueMicrotask(() => {
-              void refreshCommits(pendingMode);
-            });
+        if (requestGeneration === requestGenerationRef.current) {
+          if (isAppend) {
+            appendInFlightRef.current = false;
+            setLoadingMore(false);
+            if (pendingRefreshAfterAppendRef.current) {
+              const pendingMode = pendingRefreshAfterAppendRef.current;
+              pendingRefreshAfterAppendRef.current = null;
+              queueMicrotask(() => {
+                void refreshCommits(pendingMode);
+              });
+            }
+          } else if (shouldShowLoadingState) {
+            setLoading(false);
           }
-        } else if (shouldShowLoadingState) {
-          setLoading(false);
         }
       }
     },

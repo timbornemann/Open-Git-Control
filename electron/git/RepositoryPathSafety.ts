@@ -5,8 +5,9 @@ const CONTROL_CHARACTERS = /[\0\r\n]/;
 
 /**
  * Validates a path supplied by the renderer before it is used as a Git
- * pathspec or as a working-tree path. Git pathspec magic is deliberately
- * rejected here; callers that need a pathspec should use toLiteralPathspec.
+ * pathspec or as a working-tree path. Callers that use the value as a Git
+ * pathspec must wrap it with toLiteralPathspec; a real filename may itself
+ * legitimately start with pathspec-looking text such as `:(glob)`.
  */
 export function normalizeRepositoryRelativePath(value: unknown, label = 'File path'): string {
   const rawPath = String(value || '').trim();
@@ -20,7 +21,6 @@ export function normalizeRepositoryRelativePath(value: unknown, label = 'File pa
     path.isAbsolute(rawPath) ||
     path.win32.isAbsolute(rawPath) ||
     normalizedPath.startsWith('/') ||
-    normalizedPath.startsWith(':(') ||
     segments.includes('..') ||
     CONTROL_CHARACTERS.test(rawPath)
   ) {

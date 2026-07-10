@@ -788,14 +788,16 @@ npm run dist:linux
 npm run dist:mac
 ```
 
-GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Pushing a protected tag such as `vX.Y.Z` triggers platform builds for Windows, Linux, and macOS. The workflow derives the package version from the tag, generates legal notices, requires Windows/macOS signing material, verifies signed installers, validates updater metadata, generates `SHA256SUMS.txt`, and creates the GitHub Release only after every platform artifact passed validation. This prevents the auto-updater from seeing a published release before its assets exist.
+GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Pushing a protected tag such as `vX.Y.Z` triggers quality gates and platform builds for Windows, Linux, and macOS. The workflow derives the package and lockfile version from the tag, generates legal notices, requires Windows/macOS signing material, verifies the signed installer and packaged application, validates updater metadata, and generates `SHA256SUMS.txt`. It then uploads all assets to a draft release, verifies the draft remotely, and only then publishes it. The auto-updater therefore cannot see the release before all required assets exist.
+
+Local `dist:*` builds use the version committed in `package.json`. Official release builds run `prepare-release-version.js` so `package.json`, `package-lock.json`, the packaged app version, and MCP server metadata all resolve to the release tag version.
 
 Repository secrets required for signed releases:
 
 - Windows: `WINDOWS_CSC_LINK`, `WINDOWS_CSC_KEY_PASSWORD`
 - macOS: `MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
 
-`CSC_LINK` secrets are passed only to electron-builder at release time and must never be committed. Local `dist:*` builds remain unsigned; `release:win` and `release:mac` intentionally fail without their signing environment.
+The Windows repository secrets are mapped to electron-builder's `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` variables. macOS uses `CSC_LINK`, `CSC_KEY_PASSWORD`, and the Apple notarization variables. Signing secrets are passed only during release jobs and must never be committed. Local `dist:*` builds remain unsigned; `release:win` expects `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`, while `release:mac` expects the documented macOS signing environment.
 
 Expected release assets:
 

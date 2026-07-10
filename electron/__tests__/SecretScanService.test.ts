@@ -26,6 +26,7 @@ function createGitServiceMock(outputs: Record<string, string | Error>) {
 
 describe('SecretScanService', () => {
   it('detects staged and outgoing secrets', async () => {
+    const outgoingCommit = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const stagedDiff = [
       'diff --git a/src/app.ts b/src/app.ts',
       '+++ b/src/app.ts',
@@ -39,13 +40,53 @@ describe('SecretScanService', () => {
       createGitServiceMock({
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
-        'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': outgoingDiff,
+        'rev-list --reverse --topo-order origin/main..HEAD': outgoingCommit,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${outgoingCommit}`]: outgoingDiff,
       }),
     );
 
     const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
     expect(result.findings.length).toBe(2);
     expect(result.findings.map((f) => f.source).sort()).toEqual(['staged', 'to-push']);
+  });
+
+  it('scans every outgoing commit so a secret removed by a later commit is still found', async () => {
+    const secretCommit = '1111111111111111111111111111111111111111';
+    const removalCommit = '2222222222222222222222222222222222222222';
+    const secretDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const removalDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -1 +0,0 @@', '-AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+        'rev-list --reverse --topo-order origin/main..HEAD': `${secretCommit}\n${removalCommit}`,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${secretCommit}`]: secretDiff,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${removalCommit}`]: removalDiff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ source: 'to-push', filePath: '.env' });
+    expect(result.notes.join('\n')).toContain('Scanned 2 commit(s) ahead of origin/main.');
+  });
+
+  it('accepts SHA-256 commit ids while enumerating outgoing commits', async () => {
+    const sha256Commit = 'a'.repeat(64);
+    const diff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+        'rev-list --reverse --topo-order origin/main..HEAD': sha256Commit,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${sha256Commit}`]: diff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
   });
 
   it('respects project allowlist', async () => {
@@ -184,7 +225,7 @@ describe('SecretScanService', () => {
     const service = new SecretScanService(
       createGitServiceMock({
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
-        'rev-list --reverse --topo-order release-candidate --not --remotes': commitHash,
+        'rev-list --reverse --topo-order release-candidate --not --remotes=backup': commitHash,
         [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: branchDiff,
       }),
     );
@@ -194,6 +235,7 @@ describe('SecretScanService', () => {
       strictness: 'low',
       allowlistText: '',
       revisions: ['release-candidate'],
+      excludeRemote: 'backup',
     });
 
     expect(result.findings).toHaveLength(1);

@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { writeTextFileAtomically } from './atomicFile';
 
 export interface StoredRepoEntry {
   path: string;
@@ -86,5 +87,5 @@ export function readStoreData(): StoredData {
 }
 
 export function writeStoreData(data: StoredData): void {
-  fs.writeFileSync(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
+  writeTextFileAtomically(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
 }

@@ -164,6 +164,7 @@ describe('renderer service clients', () => {
     await expectDelegation(() => githubClient.openExternalUrl('https://github.com'), api.app.openExternalUrl, ['https://github.com']);
     await expectDelegation(() => githubClient.checkAuthStatus(), api.github.githubCheckAuthStatus, []);
     await expectDelegation(() => githubClient.auth('token', 'github.test'), api.github.githubAuth, ['token', 'github.test']);
+    await expectDelegation(() => githubClient.cancelAuth(), api.github.githubCancelAuth, []);
     await expectDelegation(() => githubClient.deviceStart(), api.github.githubDeviceStart, []);
     await expectDelegation(() => githubClient.devicePoll('device-code'), api.github.githubDevicePoll, ['device-code']);
     await expectDelegation(() => githubClient.webLogin(), api.github.githubWebLogin, []);

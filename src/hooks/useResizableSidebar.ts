@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  APPLICATION_LAYOUT_RESET_EVENT,
+  resetStoredLayoutPreferences,
+  SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+} from '@/utils/layoutPreferences';
 
 const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 560;
@@ -6,8 +12,6 @@ const SIDEBAR_DEFAULT_WIDTH = 260;
 const APP_RESIZER_WIDTH = 8;
 const MIN_MAIN_VIEW_WIDTH = 608;
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
-const SIDEBAR_WIDTH_STORAGE_KEY = 'open-git-control.sidebar-width';
-const SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.sidebar-manually-collapsed';
 
 const getSidebarMaxWidthForViewport = (viewportWidth: number): number => {
   if (viewportWidth <= COMPACT_LAYOUT_MAX_WIDTH) {
@@ -21,8 +25,9 @@ const clampSidebarWidthForViewport = (width: number, viewportWidth: number): num
   Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidthForViewport(viewportWidth), width));
 
 const readInitialSidebarWidth = (): number => {
-  const storedWidthValue = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  const width = Number.isFinite(storedWidthValue) ? Math.round(storedWidthValue) : SIDEBAR_DEFAULT_WIDTH;
+  const storedWidthRaw = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+  const storedWidthValue = storedWidthRaw === null ? Number.NaN : Number(storedWidthRaw);
+  const width = Number.isFinite(storedWidthValue) && storedWidthValue > 0 ? Math.round(storedWidthValue) : SIDEBAR_DEFAULT_WIDTH;
   return clampSidebarWidthForViewport(width, window.innerWidth);
 };
 
@@ -47,10 +52,18 @@ export const useResizableSidebar = () => {
   );
 
   const resetLayout = useCallback(() => {
-    setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
-    sidebarManuallyCollapsedRef.current = false;
-    window.localStorage.setItem(SIDEBAR_MANUAL_COLLAPSED_STORAGE_KEY, 'false');
-    setIsSidebarCollapsed(false);
+    resetStoredLayoutPreferences();
+  }, []);
+
+  useEffect(() => {
+    const handleLayoutReset = () => {
+      sidebarManuallyCollapsedRef.current = false;
+      setSidebarWidth(clampSidebarWidth(SIDEBAR_DEFAULT_WIDTH));
+      setIsSidebarCollapsed(window.innerWidth <= COMPACT_LAYOUT_MAX_WIDTH);
+    };
+
+    window.addEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
+    return () => window.removeEventListener(APPLICATION_LAYOUT_RESET_EVENT, handleLayoutReset);
   }, [clampSidebarWidth]);
 
   const handleToggleSidebar = useCallback(() => {

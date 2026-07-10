@@ -234,6 +234,15 @@ function normalizeSecretScanRevision(value: unknown, label: string): string {
   return revision;
 }
 
+function normalizeSecretScanRemote(value: unknown): string | undefined {
+  const remote = String(value || '').trim();
+  if (!remote) return undefined;
+  if (remote.length > 512 || remote.startsWith('-') || /[\0\r\n]/.test(remote)) {
+    throw new Error('Invalid push destination remote for secret scan.');
+  }
+  return remote;
+}
+
 export class SecretScanService {
   constructor(private readonly gitService: GitService) {}
 
@@ -245,6 +254,7 @@ export class SecretScanService {
     onProgress?: (checkedLines: number) => void;
     includeTags?: boolean;
     revisions?: string[];
+    excludeRemote?: string;
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -344,16 +354,26 @@ export class SecretScanService {
       raw
         .split(/\r?\n/)
         .map((line) => line.trim())
-        .filter((line) => /^[0-9a-f]{40}$/i.test(line));
+        .filter((line) => /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(line));
 
     const normalizeRequestedRevisions = (revisions: string[] | undefined): string[] =>
       [...new Set((revisions || []).map((revision) => String(revision || '').trim()).filter(Boolean))].map((revision) =>
         normalizeSecretScanRevision(revision, 'push source revision'),
       );
 
+    const excludedRemote = normalizeSecretScanRemote(options.excludeRemote);
+    const remoteExclusionArg = excludedRemote ? `--remotes=${excludedRemote}` : '--remotes';
+
     const scanRequestedRevisions = async (revisions: string[]) => {
       for (const revision of revisions) {
-        const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', revision, '--not', '--remotes']);
+        const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
+          'rev-list',
+          '--reverse',
+          '--topo-order',
+          revision,
+          '--not',
+          remoteExclusionArg,
+        ]);
         const commits = parseCommitList(commitsRaw);
         await scanCommits(commits, 'to-push');
         notes.push(
@@ -378,7 +398,10 @@ export class SecretScanService {
         const upstreamRefRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
         const upstreamRef = normalizeSecretScanRevision(upstreamRefRaw, 'upstream revision');
         if (upstreamRef) {
-          await streamDiff(['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', `${upstreamRef}..HEAD`], 'to-push');
+          const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', `${upstreamRef}..HEAD`]);
+          const commits = parseCommitList(commitsRaw);
+          await scanCommits(commits, 'to-push');
+          notes.push(commits.length > 0 ? `Scanned ${commits.length} commit(s) ahead of ${upstreamRef}.` : `No commits found ahead of ${upstreamRef}.`);
         }
       } catch (error) {
         if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
@@ -399,7 +422,7 @@ export class SecretScanService {
           '--topo-order',
           '--tags',
           '--not',
-          '--remotes',
+          remoteExclusionArg,
         ]);
         const tagOnlyCommits = parseCommitList(tagOnlyCommitsRaw);
         await scanCommits(tagOnlyCommits, 'tag');

@@ -383,6 +383,52 @@ describe('AiService context extraction and prompts', () => {
     expect(abortCount).toBeGreaterThan(0);
   });
 
+  it('does not commit when cancellation happens during commit-message generation', async () => {
+    let cancelRequested = false;
+    const commitWithMessageAtPath = vi.fn();
+    const stagePathsAtPath = vi.fn().mockResolvedValue('');
+    const service = new AiService({
+      getRepoPath: () => '/tmp/repo',
+      resolveRepositoryPath: (repoPath: string) => repoPath,
+      getStatusPorcelainAtPath: vi.fn().mockResolvedValue(' M src/app.ts\n'),
+      runCommandAtPath: vi.fn(async (_repoPath: string, args: string[]) => {
+        const key = args.join(' ');
+        if (key === 'diff --numstat HEAD -- :(literal)src/app.ts') return '1\t0\tsrc/app.ts';
+        if (key === 'diff --no-color --unified=3 HEAD -- :(literal)src/app.ts') return ['@@ -1 +1 @@', '-old', '+new'].join('\n');
+        throw new Error(`Unexpected command: ${key}`);
+      }),
+      stagePathsAtPath,
+      commitWithMessageAtPath,
+    } as any);
+
+    const fetchMock = vi.fn(
+      async (_url: string, init: any) =>
+        new Promise((_resolve, reject) => {
+          const signal = init.signal as AbortSignal;
+          signal.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            error.name = 'AbortError';
+            reject(error);
+          });
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock as any);
+
+    const run = service.runAutoCommit(
+      '/tmp/repo',
+      { ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' },
+      () => '',
+      undefined,
+      () => cancelRequested,
+    );
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    cancelRequested = true;
+
+    await expect(run).rejects.toThrow('abgebrochen');
+    expect(stagePathsAtPath).toHaveBeenCalledWith('/tmp/repo', ['src/app.ts']);
+    expect(commitWithMessageAtPath).not.toHaveBeenCalled();
+  });
+
   it('stops retry loops after repeated commit failures instead of hanging', async () => {
     const runCommand = vi.fn(async (args: string[]) => {
       const key = args.join(' ');

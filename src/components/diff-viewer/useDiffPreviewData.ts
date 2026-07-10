@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { parseDiff } from '@/utils/diffParser';
 import { gitClient } from '@/services/gitClient';
@@ -28,7 +28,7 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
   const [sourceTruncated, setSourceTruncated] = useState(false);
   const requestGenerationRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const requestGeneration = requestGenerationRef.current + 1;
     requestGenerationRef.current = requestGeneration;
     const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;

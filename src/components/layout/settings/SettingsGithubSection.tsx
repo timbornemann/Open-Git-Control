@@ -1,10 +1,53 @@
+import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { fieldClass, hintClass, inputClass, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 export const SettingsGithubSection = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const [githubHostDraft, setGithubHostDraft] = useState(settings.githubHost);
+  const githubHostHintId = variant === 'sidebar' ? 'github-host-hint-sidebar' : 'github-host-hint-settings';
+
+  useEffect(() => {
+    setGithubHostDraft(settings.githubHost);
+  }, [settings.githubHost]);
+
+  const saveGithubHost = useCallback(async () => {
+    const nextHost = githubHostDraft.trim() || 'github.com';
+    if (nextHost === settings.githubHost) {
+      setGithubHostDraft(settings.githubHost);
+      return;
+    }
+
+    await onUpdateSettings({ githubHost: nextHost });
+  }, [githubHostDraft, onUpdateSettings, settings.githubHost]);
+
   const content = (
     <>
+      <label className={fieldClass(variant)}>
+        {tr('GitHub-Host (GitHub Enterprise)', 'GitHub host (GitHub Enterprise)')}
+        <input
+          className={inputClass(variant)}
+          type="text"
+          inputMode="url"
+          value={githubHostDraft}
+          onChange={(event) => setGithubHostDraft(event.target.value)}
+          onBlur={() => void saveGithubHost()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+          }}
+          placeholder="github.com"
+          aria-describedby={githubHostHintId}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+      </label>
+      <p id={githubHostHintId} className={hintClass(variant)}>
+        {tr(
+          'Nur den Hostnamen eingeben, z. B. github.example.com. Eine Aenderung meldet die aktuelle GitHub-Sitzung ab.',
+          'Enter the host name only, for example github.example.com. Changing it signs out the current GitHub session.',
+        )}
+      </p>
       <label className={fieldClass(variant)}>
         {t('generated.components.layout.settingsmaincontent.github_oauth_client_id_device_flow_f6e1ae7f')}
         <input

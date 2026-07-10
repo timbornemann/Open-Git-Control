@@ -17,7 +17,7 @@ const files = fs
   .readdirSync(releaseDir, { withFileTypes: true })
   .filter((entry) => entry.isFile() && !excluded.has(entry.name))
   .map((entry) => entry.name)
-  .filter((fileName) => !/^latest.*\.yml$/i.test(fileName) && !fileName.endsWith('.blockmap'))
+  .filter((fileName) => /\.(?:exe|appimage|deb|dmg|zip)$/i.test(fileName))
   .sort((left, right) => left.localeCompare(right));
 
 if (files.length === 0) {

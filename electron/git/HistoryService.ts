@@ -201,7 +201,7 @@ export class HistoryService {
       if (tokens.length === 0) continue;
 
       const [hash = '', author = '', date = '', subject = ''] = tokens[0].split(fieldSeparator);
-      if (!/^[0-9a-f]{7,40}$/i.test(hash)) continue;
+      if (!/^[0-9a-f]{7,64}$/i.test(hash)) continue;
 
       const currentCommit: FileTimelineCommit = {
         hash,

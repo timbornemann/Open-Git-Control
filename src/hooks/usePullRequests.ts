@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/types/githubDtos';
 import { createLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
@@ -52,6 +52,18 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const [prFilter, setPrFilter] = useState<'open' | 'closed' | 'all'>('open');
   const [prCiByNumber, setPrCiByNumber] = useState<Record<number, PullRequestCiDto>>({});
   const ownerRepoKeyRef = useRef('');
+  const activeRepoRef = useRef<string | null>(activeRepo);
+  const prOwnerRepoRef = useRef<RepoOwnerRef | null>(null);
+
+  useLayoutEffect(() => {
+    activeRepoRef.current = activeRepo;
+    prOwnerRepoRef.current = null;
+    ownerRepoKeyRef.current = '';
+    setPrOwnerRepo(null);
+    setPullRequests([]);
+    setPrCiByNumber({});
+    setPrLoading(false);
+  }, [activeRepo, githubHost, isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -68,6 +80,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
         setPrCiByNumber({});
       }
 
+      prOwnerRepoRef.current = ownerRepo;
       setPrOwnerRepo((previous) => {
         if (previous?.owner === ownerRepo?.owner && previous?.repo === ownerRepo?.repo) {
           return previous;
@@ -161,9 +174,12 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const createPR = useCallback(
     async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
       if (!title.trim()) return false;
+      const repoAtStart = activeRepo;
+      const ownerRepoAtStart = prOwnerRepo;
+      const ownerRepoKeyAtStart = ownerRepoAtStart ? `${ownerRepoAtStart.owner}/${ownerRepoAtStart.repo}` : '';
 
       const result = await submitPullRequest(
-        prOwnerRepo,
+        ownerRepoAtStart,
         {
           title,
           body,
@@ -173,6 +189,9 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
         },
         language,
       );
+      const currentOwnerRepo = prOwnerRepoRef.current;
+      const currentOwnerRepoKey = currentOwnerRepo ? `${currentOwnerRepo.owner}/${currentOwnerRepo.repo}` : '';
+      if (activeRepoRef.current !== repoAtStart || currentOwnerRepoKey !== ownerRepoKeyAtStart) return false;
 
       if (result.success) {
         onCreated?.(result.number);
@@ -182,7 +201,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       onError?.(result.error);
       return false;
     },
-    [language, onCreated, onError, prOwnerRepo],
+    [activeRepo, language, onCreated, onError, prOwnerRepo],
   );
 
   return {

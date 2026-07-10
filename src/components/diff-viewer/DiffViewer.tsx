@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
+import { useUIContext } from '@/contexts/AppStateContext';
 import type { DiffRequest } from '@/types/diff';
 import { isMarkdownFilePath } from '@/utils/markdownPreview';
-import type { DiffViewMode } from '@/utils/diffParser';
+import type { DiffViewMode, ParsedHunk } from '@/utils/diffParser';
 import { DiffContentPane } from './DiffContentPane';
 import { DiffToolbar } from './DiffToolbar';
 import { MarkdownPreviewPane } from './MarkdownPreviewPane';
@@ -21,10 +22,14 @@ interface DiffViewerProps {
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged, onNavigateToCommit }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const { setConfirmDialog } = useUIContext();
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const requestScope = `${repoPath || ''}\0${request.source}\0${request.commitHash || ''}\0${request.path}`;
+  const requestScopeRef = useRef<string | null>(requestScope);
+  requestScopeRef.current = requestScope;
 
   const isMarkdownFile = useMemo(() => isMarkdownFilePath(request.path), [request.path]);
   const isMarkdownPreviewMode = viewMode === 'preview' && isMarkdownFile;
@@ -43,6 +48,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
     setActiveHunkIndex(0);
     hunkRefs.current = [];
   }, [request]);
+
+  useEffect(
+    () => () => {
+      requestScopeRef.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isMarkdownFile && viewMode === 'preview') {
@@ -63,6 +75,37 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const setHunkRef = useCallback((index: number, element: HTMLDivElement | null) => {
     hunkRefs.current[index] = element;
   }, []);
+
+  const requestHunkOperation = useCallback(
+    (hunk: ParsedHunk, fileHeader: string[], operation: 'stage' | 'unstage' | 'discard') => {
+      if (operation !== 'discard') {
+        void applyHunk(hunk, fileHeader, operation);
+        return;
+      }
+
+      const scopeAtRequest = requestScope;
+      setConfirmDialog({
+        variant: 'danger',
+        title: tr('Aenderungen in diesem Hunk verwerfen?', 'Discard changes in this hunk?'),
+        message: tr(
+          'Die ausgewaehlten, nicht gestagten Zeilen werden dauerhaft aus dem Working Tree entfernt.',
+          'The selected unstaged lines will be permanently removed from the working tree.',
+        ),
+        contextItems: [
+          { label: t('generated.components.commitdetails.file_9d811416'), value: request.path },
+          { label: 'Hunk', value: hunk.header },
+        ],
+        irreversible: true,
+        consequences: t('generated.components.staging_area.usefileoperations.discarded_lines_cannot_be_restored_from_git_d40dd8f1'),
+        confirmLabel: t('generated.components.staging_area.conflictresolverpanel.discard_changes_b80ac3bd'),
+        onConfirm: async () => {
+          if (requestScopeRef.current !== scopeAtRequest) return;
+          await applyHunk(hunk, fileHeader, 'discard');
+        },
+      });
+    },
+    [applyHunk, request.path, requestScope, setConfirmDialog, t, tr],
+  );
 
   return (
     <div className="diff-viewer-root">
@@ -102,7 +145,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
           scrollToHunk={scrollToHunk}
           hunkOpError={hunkOpError}
           isHunkOperationRunning={isHunkOperationRunning}
-          applyHunk={applyHunk}
+          applyHunk={requestHunkOperation}
           onRepoChanged={onRepoChanged}
           showBlame={blame.showBlame}
           isBlameLoading={blame.isBlameLoading}

@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: release-publish
   cancel-in-progress: false
 
 jobs:
@@ -49,6 +49,36 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Ensure release is new or an unpublished retry
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            if [[ "$IS_DRAFT" != "true" ]]; then
+              echo "A published GitHub Release already exists for $RELEASE_TAG. Refusing to mutate it."
+              exit 1
+            fi
+            echo "Reusing existing draft release for $RELEASE_TAG."
+          else
+            echo "No existing release found for $RELEASE_TAG."
+          fi
+
+          LATEST_TAG="$(gh release view --json tagName --jq '.tagName' 2>/dev/null || true)"
+          if [[ "$LATEST_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            LATEST_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+            IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$RELEASE_VERSION"
+            IFS='.' read -r OLD_MAJOR OLD_MINOR OLD_PATCH <<< "$LATEST_VERSION"
+            if (( 10#$NEW_MAJOR < 10#$OLD_MAJOR )) ||
+               (( 10#$NEW_MAJOR == 10#$OLD_MAJOR && 10#$NEW_MINOR < 10#$OLD_MINOR )) ||
+               (( 10#$NEW_MAJOR == 10#$OLD_MAJOR && 10#$NEW_MINOR == 10#$OLD_MINOR && 10#$NEW_PATCH <= 10#$OLD_PATCH )); then
+              echo "Release version $RELEASE_VERSION must be newer than latest published version $LATEST_VERSION."
+              exit 1
+            fi
+          fi
+
   build:
     name: Build + verify (${{ matrix.label }})
     needs: prepare
@@ -61,17 +91,14 @@ jobs:
             label: Windows
             platform: windows
             script: dist:win
-            requires_signing: true
           - os: ubuntu-latest
             label: Linux
             platform: linux
             script: dist:linux
-            requires_signing: false
           - os: macos-latest
             label: macOS
             platform: macos
             script: dist:mac
-            requires_signing: true
 
     steps:
       - name: Checkout release tag
@@ -88,18 +115,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare distribution legal notices
-        run: npm run legal:prepare
-
       - name: Prepare package version
         run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
+      - name: Run release quality gate
+        run: npm run test:ci
 
       - name: Validate required Windows signing secrets
         if: matrix.platform == 'windows'
         run: node scripts/validate-release-signing.js windows
         env:
-          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
 
       - name: Validate required macOS signing and notarization secrets
         if: matrix.platform == 'macos'
@@ -114,8 +141,10 @@ jobs:
       - name: Build release assets
         run: npm run ${{ matrix.script }}
         env:
-          CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_LINK || matrix.platform == 'macos' && secrets.MACOS_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || matrix.platform == 'macos' && secrets.MACOS_CSC_KEY_PASSWORD || '' }}
+          WIN_CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || '' }}
+          CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MACOS_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MACOS_CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
@@ -127,10 +156,15 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $installer = Get-ChildItem release -Filter '*.exe' | Select-Object -First 1
-          if ($null -eq $installer) { throw 'Windows installer was not created.' }
-          $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
-          if ($signature.Status -ne 'Valid') { throw "Windows installer signature is not valid: $($signature.Status)" }
+          $targets = @(
+            "release/Open-Git-Control-${{ needs.prepare.outputs.version }}-win-x64.exe",
+            "release/win-unpacked/Open-Git-Control.exe"
+          )
+          foreach ($target in $targets) {
+            if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "Signed Windows executable was not created: $target" }
+            $signature = Get-AuthenticodeSignature -LiteralPath $target
+            if ($signature.Status -ne 'Valid') { throw "Windows signature is not valid for ${target}: $($signature.Status)" }
+          }
 
       - name: Verify signed and notarized macOS app
         if: matrix.platform == 'macos'
@@ -191,12 +225,13 @@ jobs:
       - name: Generate SHA-256 checksums
         run: node scripts/generate-release-checksums.js release
 
-      - name: Create and publish GitHub Release
+      - name: Create draft GitHub Release and upload verified assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: Open-Git-Control ${{ needs.prepare.outputs.tag }}
           generate_release_notes: true
+          draft: true
           files: |
             release/latest.yml
             release/latest-linux.yml
@@ -211,6 +246,44 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify draft assets before publishing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')"
+          test "$IS_DRAFT" = "true"
+
+          EXPECTED_ASSETS=(
+            "latest.yml"
+            "latest-linux.yml"
+            "latest-mac.yml"
+            "Open-Git-Control-${RELEASE_VERSION}-win-x64.exe"
+            "Open-Git-Control-${RELEASE_VERSION}-win-x64.exe.blockmap"
+            "Open-Git-Control-${RELEASE_VERSION}-linux-x86_64.AppImage"
+            "Open-Git-Control-${RELEASE_VERSION}-linux-amd64.deb"
+            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.dmg"
+            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.zip"
+            "Open-Git-Control-${RELEASE_VERSION}-mac-x64.zip.blockmap"
+            "SHA256SUMS.txt"
+          )
+          UPLOADED_ASSETS="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
+          for asset in "${EXPECTED_ASSETS[@]}"; do
+            if ! grep -Fqx "$asset" <<<"$UPLOADED_ASSETS"; then
+              echo "Draft release is missing required asset: $asset"
+              exit 1
+            fi
+          done
+
+      - name: Publish verified draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest
 
   sync-readme-release-links:
     name: Sync README release links
@@ -229,6 +302,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Sync package manifests to release version
+        run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
       - name: Update README download links
         run: npm run docs:release-links
         env:
@@ -237,13 +313,13 @@ jobs:
       - name: Commit README updates
         shell: bash
         run: |
-          if git diff --quiet -- README.md README.de.md; then
-            echo "README release links are already current."
+          if git diff --quiet -- package.json package-lock.json README.md README.de.md; then
+            echo "Release version and README links are already current."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md README.de.md
-          git commit -m "docs: update latest release download links"
+          git add package.json package-lock.json README.md README.de.md
+          git commit -m "chore(release): sync ${{ needs.prepare.outputs.tag }} version and download links"
           git push

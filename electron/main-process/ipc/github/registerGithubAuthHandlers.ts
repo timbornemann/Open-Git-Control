@@ -12,14 +12,30 @@ type RegisterGithubAuthHandlersDeps = {
 };
 
 export function registerGithubAuthHandlers({ githubService, readSettingsWithMigration }: RegisterGithubAuthHandlersDeps): void {
+  let authGeneration = 0;
+  const beginAuthAttempt = (): number => {
+    authGeneration += 1;
+    return authGeneration;
+  };
+  const isCurrentAuthAttempt = (generation: number): boolean => generation === authGeneration;
+  const serviceGeneration = (): number => githubService.getAuthenticationGeneration();
+  const staleAuthError = () => ({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+
   ipcMain.handle(IpcChannel.GithubAuth, async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
+    const generation = beginAuthAttempt();
     const settings = readSettingsWithMigration();
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
-    const success = await githubService.authenticate(token, normalizedHost);
-    if (success) {
+    const success = await githubService.authenticate(token, normalizedHost, () => isCurrentAuthAttempt(generation));
+    if (success && isCurrentAuthAttempt(generation)) {
       saveGithubTokenSecurely(token, normalizedHost);
     }
-    return success;
+    return success && isCurrentAuthAttempt(generation);
+  });
+
+  ipcMain.handle(IpcChannel.GithubCancelAuth, async () => {
+    authGeneration += 1;
+    githubService.cancelPendingAuthentication();
+    return { success: true } as const;
   });
 
   ipcMain.handle(IpcChannel.GithubGetSavedAuthStatus, async () => {
@@ -35,6 +51,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   });
 
   ipcMain.handle(IpcChannel.GithubLoginWithSavedToken, async () => {
+    const generation = beginAuthAttempt();
     const savedToken = readSavedGithubTokenWithHost();
     if (!savedToken?.token) {
       githubService.logout();
@@ -63,7 +80,10 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       };
     }
 
-    const success = await githubService.authenticate(savedToken.token, normalizedHost);
+    const success = await githubService.authenticate(savedToken.token, normalizedHost, () => isCurrentAuthAttempt(generation));
+    if (!isCurrentAuthAttempt(generation)) {
+      return { success: false, authenticated: false, username: null, error: 'GitHub-Anmeldung wurde abgebrochen.' };
+    }
     if (!success) {
       clearSavedGithubTokenSecurely();
       return { success: false, authenticated: false, username: null };
@@ -78,9 +98,12 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   });
 
   ipcMain.handle(IpcChannel.GithubDeviceStart, async () => {
+    const generation = beginAuthAttempt();
+    const startingServiceGeneration = serviceGeneration();
     try {
       const settings = readSettingsWithMigration();
       const flow = await githubService.startDeviceFlow(settings.githubOauthClientId, settings.githubHost);
+      if (!isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) return staleAuthError();
       return { success: true, data: flow };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Device Flow konnte nicht gestartet werden.';
@@ -89,6 +112,8 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   });
 
   ipcMain.handle(IpcChannel.GithubDevicePoll, async (_event: IpcMainInvokeEvent, deviceCode: string) => {
+    const generation = beginAuthAttempt();
+    const startingServiceGeneration = serviceGeneration();
     try {
       const normalizedDeviceCode = (deviceCode || '').trim();
       if (!normalizedDeviceCode) {
@@ -98,6 +123,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       const settings = readSettingsWithMigration();
       const normalizedHost = githubService.normalizeHost(settings.githubHost);
       const result = await githubService.pollDeviceFlow(normalizedDeviceCode, settings.githubOauthClientId, normalizedHost);
+      if (!isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) return staleAuthError();
       if (result.status === 'pending') {
         return { success: true, data: { status: 'pending', interval: result.interval || null } };
       }
@@ -113,7 +139,8 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
         };
       }
 
-      const authenticated = await githubService.authenticate(result.accessToken, normalizedHost);
+      const authenticated = await githubService.authenticate(result.accessToken, normalizedHost, () => isCurrentAuthAttempt(generation));
+      if (!isCurrentAuthAttempt(generation)) return staleAuthError();
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
       }
@@ -133,12 +160,16 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   });
 
   ipcMain.handle(IpcChannel.GithubWebLogin, async () => {
+    const generation = beginAuthAttempt();
+    const startingServiceGeneration = serviceGeneration();
     try {
       const settings = readSettingsWithMigration();
       const normalizedHost = githubService.normalizeHost(settings.githubHost);
       const tokenResult = await runGithubCliOneClickLogin(normalizedHost);
+      if (!isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) return staleAuthError();
 
-      const authenticated = await githubService.authenticate(tokenResult.accessToken, normalizedHost);
+      const authenticated = await githubService.authenticate(tokenResult.accessToken, normalizedHost, () => isCurrentAuthAttempt(generation));
+      if (!isCurrentAuthAttempt(generation)) return staleAuthError();
       if (!authenticated) {
         return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
       }
@@ -157,6 +188,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   });
 
   ipcMain.handle(IpcChannel.GithubLogout, async () => {
+    authGeneration += 1;
     githubService.logout();
     clearSavedGithubTokenSecurely();
     return { success: true };

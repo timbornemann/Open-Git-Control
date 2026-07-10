@@ -6,6 +6,7 @@ import { basename } from './utils';
 type ConflictEditorToolbarProps = {
   conflictEditor: ConflictEditorState;
   conflictBlocksCount: number;
+  hasUnresolvedConflictMarkers: boolean;
   reloadActiveConflictEditor: () => Promise<void> | void;
   applyConflictChoiceToAll: (choice: ConflictResolutionChoice) => void;
   markConflictResolvedAndSync: (filePath: string) => Promise<void> | void;
@@ -14,6 +15,7 @@ type ConflictEditorToolbarProps = {
 export const ConflictEditorToolbar = ({
   conflictEditor,
   conflictBlocksCount,
+  hasUnresolvedConflictMarkers,
   reloadActiveConflictEditor,
   applyConflictChoiceToAll,
   markConflictResolvedAndSync,
@@ -50,6 +52,7 @@ export const ConflictEditorToolbar = ({
         <div className="conflict-toolbar-divider" />
         <Button
           variant="success"
+          disabled={conflictEditor.isSaving || hasUnresolvedConflictMarkers}
           onClick={() => {
             void markConflictResolvedAndSync(conflictEditor.filePath);
           }}

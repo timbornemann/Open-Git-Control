@@ -122,6 +122,7 @@ app.whenReady().then(() => {
   if (process.env.OPEN_GIT_CONTROL_API_DISABLED !== 'true') {
     void startPlanningApiServer({
       authTokenProvider: () => getPlanningApiAuthState().token,
+      serverVersion: app.getVersion(),
     })
       .then((server) => {
         planningApiServer = server;

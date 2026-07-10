@@ -25,7 +25,6 @@ const LARGE_HYBRID_PLAN_TIMEOUT_MS = 12_000;
 const LARGE_HYBRID_SELECT_TIMEOUT_MS = 10_000;
 const LARGE_HYBRID_MESSAGE_TIMEOUT_MS = 14_000;
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
-
 export class AiAutoCommitRunSession {
   private readonly state: AiAutoCommitRunState;
   private readonly groupRecovery: AiAutoCommitGroupRecovery;
@@ -35,7 +34,6 @@ export class AiAutoCommitRunSession {
     maxFilesFallback: MAX_COMMIT_FILES_FALLBACK,
     maxNetLinesPerCommit: MAX_NET_LINES_PER_COMMIT,
   });
-
   constructor(
     private readonly gitService: GitService,
     private readonly providerClient: AiProviderClient,
@@ -48,30 +46,25 @@ export class AiAutoCommitRunSession {
     this.state = new AiAutoCommitRunState(onProgress);
     this.groupRecovery = new AiAutoCommitGroupRecovery(this.state);
   }
-
   async run(): Promise<AiAutoCommitResult> {
     this.validateInputs();
     this.state.emitProgress({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: this.state.buildProgressDetails(0) });
-
     const snapshotFiles = await this.prepareSnapshotFiles();
     const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, this.repoPath, () => this.ensureNotCancelled());
     const groups = await this.planGroups(snapshotFiles, snapshotHydrator);
     await this.processGroups(groups, snapshotFiles, snapshotHydrator);
     return buildAiAutoCommitRunResult(this.gitService, this.repoPath, snapshotFiles, groups, this.state);
   }
-
   private validateInputs(): void {
     if (!this.repoPath.trim()) throw new Error('No repository selected.');
     if (!this.settings.aiAutoCommitEnabled) throw new Error('AI Auto-Commit ist in den Einstellungen deaktiviert.');
     if (!getSelectedAiModel(this.settings)) throw new Error('Kein KI-Modell konfiguriert.');
     if (this.settings.aiProvider === 'gemini' && !this.getGeminiApiKey().trim()) throw new Error('Gemini API key fehlt.');
   }
-
   private async prepareSnapshotFiles(): Promise<SnapshotFile[]> {
     this.ensureNotCancelled();
     const initialStatus = await this.getStatusPorcelain();
     this.ensureNotCancelled();
-
     const statusEntries = parseStatusPorcelain(initialStatus);
     if (statusEntries.some((entry) => CONFLICT_CODES.has(entry.code))) {
       throw new Error('Repository hat Konflikte. Bitte zuerst aufloesen.');
@@ -165,6 +158,7 @@ export class AiAutoCommitRunSession {
       this.ensureNotCancelled();
       return plannedGroups;
     } catch (error: unknown) {
+      this.ensureNotCancelled();
       this.state.diagnostics.push(error instanceof Error ? error.message : 'KI-Gruppenplanung fehlgeschlagen.');
       return [];
     }
@@ -284,6 +278,7 @@ export class AiAutoCommitRunSession {
       this.ensureNotCancelled();
       return selectedPaths;
     } catch (error: unknown) {
+      this.ensureNotCancelled();
       this.state.diagnostics.push(error instanceof Error ? error.message : 'KI-Auswahl fehlgeschlagen.');
       return [];
     }
@@ -303,6 +298,7 @@ export class AiAutoCommitRunSession {
       this.state.transitionMode('normal');
       return true;
     } catch (error: unknown) {
+      this.ensureNotCancelled();
       this.state.diagnostics.push(error instanceof Error ? error.message : 'Commit fehlgeschlagen.');
       return this.groupRecovery.handleCommitFailure(groupState, groupIndex, queue.length, snapshotFiles);
     }
@@ -389,6 +385,7 @@ export class AiAutoCommitRunSession {
       this.ensureNotCancelled();
       return message;
     } catch (error: unknown) {
+      this.ensureNotCancelled();
       this.state.diagnostics.push(error instanceof Error ? error.message : 'Commit-Message KI fehlgeschlagen.');
       return buildFallbackCommitMessage(batchFiles);
     }

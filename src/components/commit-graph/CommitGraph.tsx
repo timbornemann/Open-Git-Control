@@ -256,8 +256,22 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         refreshCommits,
         refreshWorkingTreeStatus,
         t,
+        tr,
       }),
-    [branches, currentBranch, layout, reachableFromHead, refreshCommits, refreshWorkingTreeStatus, runGitAction, setConfirmDialog, setInputDialog, setToast, t],
+    [
+      branches,
+      currentBranch,
+      layout,
+      reachableFromHead,
+      refreshCommits,
+      refreshWorkingTreeStatus,
+      runGitAction,
+      setConfirmDialog,
+      setInputDialog,
+      setToast,
+      t,
+      tr,
+    ],
   );
 
   if (!repoPath) {

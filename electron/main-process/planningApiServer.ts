@@ -130,9 +130,10 @@ const routeApi = async (ctx: RequestContext): Promise<unknown> => {
 };
 
 export async function startPlanningApiServer(options: PlanningApiServerOptions = {}): Promise<PlanningApiServerHandle> {
+  const serverVersion = options.serverVersion?.trim() || '0.0.0';
   return startPlanningApiHost(options, {
     routeApi,
-    handleMcpRpc,
+    handleMcpRpc: (payload) => handleMcpRpc(payload, serverVersion),
   });
 }
 

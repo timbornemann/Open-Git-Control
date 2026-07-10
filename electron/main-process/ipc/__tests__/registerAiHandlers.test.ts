@@ -54,6 +54,7 @@ describe('registerAiHandlers', () => {
       aiService,
       readSettingsWithMigration: vi.fn(() => ({ aiAutoCommitEnabled: true })) as any,
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
+      getActiveRepoPath: () => '/tmp/repo',
     });
 
     const autoCommitHandler = handlers.get('git:aiAutoCommit');
@@ -84,5 +85,20 @@ describe('registerAiHandlers', () => {
 
     const finishedState = await getStateHandler!();
     expect(finishedState).toEqual({ success: true, data: null });
+  });
+
+  it('rejects an auto-commit request for a renderer-selected non-active repository', async () => {
+    const aiService = { runAutoCommit: vi.fn() } as any;
+    registerAiHandlers({
+      aiService,
+      readSettingsWithMigration: vi.fn(() => ({})) as any,
+      getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
+      getActiveRepoPath: () => '/tmp/active-repo',
+    });
+
+    const result = await handlers.get('git:aiAutoCommit')!({ sender: { send: vi.fn() } }, { repoPath: '/tmp/private-other-repo' });
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(aiService.runAutoCommit).not.toHaveBeenCalled();
   });
 });

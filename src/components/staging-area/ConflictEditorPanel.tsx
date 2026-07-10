@@ -65,6 +65,7 @@ export const ConflictEditorPanel = ({
         <ConflictEditorToolbar
           conflictEditor={conflictEditor}
           conflictBlocksCount={conflictBlocks.length}
+          hasUnresolvedConflictMarkers={conflictBlocks.length > 0 || isStructuredConflictViewLocked}
           reloadActiveConflictEditor={reloadActiveConflictEditor}
           applyConflictChoiceToAll={applyConflictChoiceToAll}
           markConflictResolvedAndSync={markConflictResolvedAndSync}

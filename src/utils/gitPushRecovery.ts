@@ -51,16 +51,6 @@ export function isPushAuthOrPermissionError(value: unknown): boolean {
   );
 }
 
-export function isRemoteRepositoryMissingError(value: unknown): boolean {
-  const message = normalizeErrorText(value);
-  return (
-    message.includes('repository not found') ||
-    message.includes('repository wurde nicht gefunden') ||
-    message.includes('requested url returned error: 404') ||
-    (message.includes('repository') && message.includes('not found'))
-  );
-}
-
 export function shouldOfferGithubRepoRecoveryOnPushFailure(value: unknown): boolean {
   return isMissingRemotePushError(value) || isPushAuthOrPermissionError(value);
 }

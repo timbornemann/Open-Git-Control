@@ -1,5 +1,6 @@
+import * as fs from 'fs';
 import type { GitRunner } from './GitRunner';
-import { toLiteralPathspec } from './RepositoryPathSafety';
+import { resolveExistingRepositoryPath, toLiteralPathspec } from './RepositoryPathSafety';
 
 export type ActiveRepoCommand = (args: string[]) => Promise<string>;
 
@@ -14,7 +15,15 @@ export class MergeConflictService {
     return this.runCommand(['checkout', '--' + side, '--', toLiteralPathspec(filePath)]);
   }
 
-  markFileResolved(filePath: string): Promise<string> {
+  async markFileResolved(filePath: string): Promise<string> {
+    const resolvedPath = resolveExistingRepositoryPath(this.getRepoPath(), filePath, 'Conflict file path');
+    const contents = await fs.promises.readFile(resolvedPath, 'utf8');
+    const hasStartMarker = /^<{7,}(?: .*)?\r?$/m.test(contents);
+    const hasSeparatorMarker = /^={7,}\r?$/m.test(contents);
+    const hasEndMarker = /^>{7,}(?: .*)?\r?$/m.test(contents);
+    if (hasStartMarker || hasSeparatorMarker || hasEndMarker) {
+      throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
+    }
     return this.runCommand(['add', '--', toLiteralPathspec(filePath)]);
   }
 

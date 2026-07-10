@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { githubClient } from '@/services/githubClient';
@@ -95,7 +95,7 @@ export const useReleaseWorkflow = ({
   const generationRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     generationRef.current += 1;
   }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo]);

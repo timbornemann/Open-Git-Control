@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
@@ -46,6 +46,10 @@ export const usePullRequestWorkflow = ({
   language,
 }: Params) => {
   const { t, tr } = useLanguageTranslations(language);
+  const mergeInFlightRef = useRef(new Set<string>());
+  const ownerRepoScope = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : '';
+  const ownerRepoScopeRef = useRef(ownerRepoScope);
+  ownerRepoScopeRef.current = ownerRepoScope;
 
   const handleCreatePR = useCallback(async () => {
     await createPullRequest({
@@ -77,8 +81,12 @@ export const usePullRequestWorkflow = ({
   const handleMergePR = useCallback(
     async (prNumber: number, mergeMethod: 'merge' | 'squash' | 'rebase' = 'merge') => {
       if (!githubClient.isAvailable() || !ownerRepo) return;
+      const mergeKey = `${ownerRepo.owner}/${ownerRepo.repo}#${prNumber}`;
+      const scopeAtStart = ownerRepoScope;
 
       const executeMerge = async () => {
+        if (mergeInFlightRef.current.has(mergeKey)) return;
+        mergeInFlightRef.current.add(mergeKey);
         try {
           const result = await githubClient.mergePullRequest({
             owner: ownerRepo.owner,
@@ -86,10 +94,13 @@ export const usePullRequestWorkflow = ({
             pullNumber: prNumber,
             mergeMethod,
           });
+          if (ownerRepoScopeRef.current !== scopeAtStart) return;
 
-          if (!result.success) {
+          if (!result.success || result.data.merged !== true) {
             setGitActionToast({
-              msg: result.error || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'),
+              msg:
+                (!result.success ? result.error : result.data.message) ||
+                t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'),
               isError: true,
             });
             return;
@@ -99,10 +110,13 @@ export const usePullRequestWorkflow = ({
           refreshRemoteState(true);
           triggerRefresh();
         } catch (error: any) {
+          if (ownerRepoScopeRef.current !== scopeAtStart) return;
           setGitActionToast({
             msg: error?.message || t('generated.components.layout.workflows.usepullrequestworkflow.could_not_merge_pr_964a5a04'),
             isError: true,
           });
+        } finally {
+          mergeInFlightRef.current.delete(mergeKey);
         }
       };
 
@@ -128,7 +142,7 @@ export const usePullRequestWorkflow = ({
 
       await executeMerge();
     },
-    [confirmDangerousOps, ownerRepo, refreshRemoteState, setConfirmDialog, setGitActionToast, t, tr, triggerRefresh],
+    [confirmDangerousOps, ownerRepo, ownerRepoScope, refreshRemoteState, setConfirmDialog, setGitActionToast, t, tr, triggerRefresh],
   );
 
   const handleCheckoutPR = useCallback(

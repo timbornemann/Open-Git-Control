@@ -4,6 +4,7 @@ import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
 import type { CommitFileDetail } from '@/utils/gitParsing';
 import { parseCommitDetails } from '@/utils/gitParsing';
+import { extractGitObjectId } from '@/utils/gitObjectId';
 import { gitClient } from '@/services/gitClient';
 
 export type DetailsTab = 'history' | 'blame' | 'patch';
@@ -29,8 +30,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   const { t, tr, locale } = useI18n();
 
   const normalizedHash = useMemo(() => {
-    const match = String(hash || '').match(/[0-9a-f]{7,40}/i);
-    return match ? match[0] : '';
+    return extractGitObjectId(hash) || '';
   }, [hash]);
 
   const [loadingFiles, setLoadingFiles] = useState(false);

@@ -4,7 +4,7 @@ const platform = String(process.argv[2] || '')
   .trim()
   .toLowerCase();
 const requiredByPlatform = {
-  windows: ['CSC_LINK', 'CSC_KEY_PASSWORD'],
+  windows: ['WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD'],
   macos: ['CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID'],
 };
 

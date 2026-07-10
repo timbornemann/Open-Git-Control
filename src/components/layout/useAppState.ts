@@ -95,9 +95,22 @@ export const useAppState = () => {
     resetRepoScopedUi,
     navigateToCommit: navigateToCommitRequest,
   } = useRepoScopedNavigationState({
+    setConfirmDialog,
+    setInputDialog,
+    setShowCreatePR,
+    setNewPRTitle,
+    setNewPRBody,
+    setNewPRHead,
+    setNewPRBase,
     setShowReleaseCreator,
+    setReleaseFormState,
+    setReleaseSubmitting,
+    setReleaseError,
+    setReleaseSuccess,
+    setReleaseContextLoading,
     setReleaseContext,
     setReleaseContextError,
+    setReleaseNotesGenerating,
   });
 
   const { jobs, clearJobs } = useGitJobEvents();

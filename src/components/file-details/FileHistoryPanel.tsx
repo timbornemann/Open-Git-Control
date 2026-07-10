@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/i18n';
 import type { GitFileHistoryEntryDto } from '@/types/git';
+import { extractGitObjectId } from '@/utils/gitObjectId';
 
 type FileHistoryPanelProps = {
   entries: GitFileHistoryEntryDto[];
@@ -13,7 +14,7 @@ type FileHistoryPanelProps = {
   onSelectCommit?: (hash: string) => void;
 };
 
-const normalizeCommitHash = (value: string): string => (value.match(/[0-9a-f]{7,40}/i) || [''])[0];
+const normalizeCommitHash = (value: string): string => extractGitObjectId(value) || '';
 
 export const FileHistoryPanel: React.FC<FileHistoryPanelProps> = ({
   entries,

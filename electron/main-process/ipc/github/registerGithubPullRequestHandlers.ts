@@ -116,6 +116,10 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
           params.commitMessage,
         );
 
+        if (!result.merged) {
+          return { success: false, error: result.message || 'GitHub did not merge the pull request.' };
+        }
+
         return { success: true, data: result };
       } catch (error: unknown) {
         return { success: false, error: toErrorMessage(error, 'Pull request could not be merged.') };

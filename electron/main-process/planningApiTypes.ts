@@ -73,6 +73,7 @@ export type PlanningApiServerOptions = {
   maxPortSearch?: number;
   authToken?: string;
   authTokenProvider?: () => string;
+  serverVersion?: string;
 };
 
 export type PlanningApiServerHandle = {

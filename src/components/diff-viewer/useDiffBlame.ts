@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import type { GitFileBlameLineDto } from '@/types/git';
 import { gitClient } from '@/services/gitClient';
@@ -14,7 +14,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
   const [isBlameLoading, setIsBlameLoading] = useState(false);
   const requestGenerationRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setShowBlame(false);
     setBlameData([]);
     setIsBlameLoading(false);

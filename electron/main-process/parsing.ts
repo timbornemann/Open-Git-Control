@@ -51,7 +51,7 @@ export function parseFileHistory(logOutput: string): FileHistoryEntry[] {
 
       const [hashRaw = '', abbrevRaw = '', authorRaw = '', dateRaw = '', ...subjectRest] = parts;
       const hash = hashRaw.trim();
-      if (!/^[0-9a-f]{7,40}$/i.test(hash)) {
+      if (!/^[0-9a-f]{7,64}$/i.test(hash)) {
         return null;
       }
 
@@ -73,7 +73,7 @@ export function parseFileBlame(blameOutput: string): FileBlameLine[] {
 
   for (let i = 0; i < lines.length; i += 1) {
     const header = lines[i]?.trim() || '';
-    const headerMatch = header.match(/^([0-9a-f]{40})\s+\d+\s+(\d+)\s+\d+$/i);
+    const headerMatch = header.match(/^((?:[0-9a-f]{40}|[0-9a-f]{64}))\s+\d+\s+(\d+)\s+\d+$/i);
 
     if (!headerMatch) {
       continue;
@@ -154,7 +154,7 @@ export function parseStashList(stashOutput: string): StashEntry[] {
       const index = Number(match[1]);
       const branch = (match[2] || '').trim();
       const subject = (match[3] || '').trim();
-      const hashMatch = subject.match(/^([0-9a-f]{7,40})\s+/i);
+      const hashMatch = subject.match(/^([0-9a-f]{7,64})\s+/i);
       const hash = hashMatch ? hashMatch[1] : '';
 
       return {

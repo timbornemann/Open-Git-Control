@@ -344,18 +344,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
         setIsAiCommitting(false);
       }
     }
-  }, [
-    repoPath,
-    status,
-    isAiCommitting,
-    isAiJobRunning,
-    clearTerminalClearTimer,
-    handleAiRunFailure,
-    handleAiRunSuccess,
-    t,
-    maybeRefresh,
-    setToast,
-  ]);
+  }, [repoPath, status, isAiCommitting, isAiJobRunning, clearTerminalClearTimer, handleAiRunFailure, handleAiRunSuccess, t, maybeRefresh, setToast]);
 
   const handleCancelAiAutoCommit = useCallback(async () => {
     if (!aiClient.isAvailable()) return;

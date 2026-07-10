@@ -16,6 +16,9 @@ export class CloneService {
     if (!source || source.length > 2_000 || /[\0\r\n]/.test(source)) {
       throw new Error('Clone source is invalid.');
     }
+    if (/^[a-z][a-z0-9+.-]*::/i.test(source)) {
+      throw new Error('Git remote-helper clone sources are not allowed.');
+    }
     return source;
   }
 

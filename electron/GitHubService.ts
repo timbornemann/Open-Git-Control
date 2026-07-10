@@ -22,6 +22,7 @@ export class GitHubService {
   private token: string | null = null;
   private username: string | null = null;
   private host: string = DEFAULT_HOST;
+  private authenticationGeneration = 0;
 
   private readonly authService = new GitHubAuthService();
   private readonly repositories = new GitHubRepositoryService(() => this.requireOctokit());
@@ -48,12 +49,25 @@ export class GitHubService {
     return this.host;
   }
 
-  async authenticate(token: string, configuredHost?: string | null): Promise<boolean> {
+  getAuthenticationGeneration(): number {
+    return this.authenticationGeneration;
+  }
+
+  cancelPendingAuthentication(): void {
+    this.authenticationGeneration += 1;
+  }
+
+  async authenticate(token: string, configuredHost?: string | null, shouldApplySession: () => boolean = () => true): Promise<boolean> {
+    const generation = ++this.authenticationGeneration;
     const session = await this.authService.authenticate(token, configuredHost);
+    if (generation !== this.authenticationGeneration || !shouldApplySession()) {
+      return false;
+    }
     if (!session) {
       this.octokit = null;
       this.token = null;
       this.username = null;
+      this.host = DEFAULT_HOST;
       return false;
     }
 
@@ -84,9 +98,11 @@ export class GitHubService {
   }
 
   logout(): void {
+    this.authenticationGeneration += 1;
     this.octokit = null;
     this.token = null;
     this.username = null;
+    this.host = DEFAULT_HOST;
   }
 
   getUsername(): string | null {

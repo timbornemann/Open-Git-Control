@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
@@ -42,8 +42,10 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef(activeRepo);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
+    setHasRemoteOrigin(null);
+    setRemotes([]);
   }, [activeRepo]);
 
   const runRemoteMutation = useCallback(

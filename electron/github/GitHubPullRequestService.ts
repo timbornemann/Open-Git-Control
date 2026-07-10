@@ -74,10 +74,11 @@ export class GitHubPullRequestService {
       ...(commitMessage ? { commit_message: commitMessage } : {}),
     });
 
+    const merged = Boolean(data.merged);
     return {
       sha: data.sha,
-      merged: Boolean(data.merged),
-      message: data.message || 'Merged',
+      merged,
+      message: data.message || (merged ? 'Merged' : 'GitHub did not merge the pull request.'),
     };
   }
 }

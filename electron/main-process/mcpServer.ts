@@ -181,12 +181,12 @@ export const MCP_TOOLS = [
   },
 ];
 
-export const handleMcpRpc = async (payload: unknown): Promise<unknown> => {
+export const handleMcpRpc = async (payload: unknown, serverVersion: string): Promise<unknown> => {
   if (Array.isArray(payload)) {
-    const responses = (await Promise.all(payload.map((entry) => handleMcpMessage(entry)))).filter((entry) => entry !== null);
+    const responses = (await Promise.all(payload.map((entry) => handleMcpMessage(entry, serverVersion)))).filter((entry) => entry !== null);
     return responses.length > 0 ? responses : null;
   }
-  return handleMcpMessage(payload);
+  return handleMcpMessage(payload, serverVersion);
 };
 
 function todoFilterSchema(): JsonObject {
@@ -229,7 +229,7 @@ function todoMutationSchema(required: string[]): JsonObject {
   };
 }
 
-const handleMcpMessage = async (message: unknown): Promise<unknown> => {
+const handleMcpMessage = async (message: unknown, serverVersion: string): Promise<unknown> => {
   if (!message || typeof message !== 'object') {
     return jsonRpcError(null, -32600, 'Invalid Request');
   }
@@ -253,7 +253,7 @@ const handleMcpMessage = async (message: unknown): Promise<unknown> => {
           serverInfo: {
             name: SERVER_NAME,
             title: 'Open-Git-Control Planner',
-            version: '1.1.1',
+            version: serverVersion,
           },
           instructions: 'Use get_next_todos for open work ordered by urgency. Use move_todo to change tabs/status.',
         });

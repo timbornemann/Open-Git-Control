@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
+import { extractGitObjectId } from '@/utils/gitObjectId';
 
 type WorkingTreeSelection = {
   path: string;
@@ -18,9 +19,7 @@ type Params = {
 };
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
-  if (!value) return null;
-  const match = String(value).match(/[0-9a-f]{7,40}/i);
-  return match ? match[0] : null;
+  return extractGitObjectId(value);
 };
 
 export const useMainViewInspector = ({

@@ -8,7 +8,9 @@ import { useGitCommandGuardWorkflow } from '@/components/layout/workflows/useGit
 import { type GitCommandRunner, useGitSyncRecoveryWorkflow } from '@/components/layout/workflows/useGitSyncRecoveryWorkflow';
 import { useInitialCommitRecoveryWorkflow } from '@/components/layout/workflows/useInitialCommitRecoveryWorkflow';
 import { useRepoUnavailableWorkflow } from '@/components/layout/workflows/useRepoUnavailableWorkflow';
+import { useRemoteRecoveryWorkflow } from '@/components/layout/workflows/useRemoteRecoveryWorkflow';
 import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
 import { plannerClient } from '@/services/plannerClient';
 
 type HookRender<T> = {
@@ -59,6 +61,58 @@ afterEach(() => {
 });
 
 describe('workflow hooks', () => {
+  it('keeps origin unchanged and requires confirmation before opening 404 recovery', async () => {
+    vi.spyOn(githubClient, 'checkAuthStatus').mockResolvedValue({ authenticated: true, username: 'octocat' });
+    const removeRemote = vi.spyOn(gitClient, 'removeRemote').mockResolvedValue({ success: true, data: '' });
+    const setActiveTab = vi.fn();
+    const setConfirmDialog = vi.fn();
+    const workspace = {
+      activeRepo: 'C:\\repos\\demo',
+      addOpenRepo: vi.fn().mockResolvedValue(undefined),
+      setActiveRepo: vi.fn(),
+      setActiveTab,
+    };
+    const hook = renderHook(() =>
+      useRemoteRecoveryWorkflow({
+        workspace,
+        settings: { defaultBranch: 'main', language: 'en' },
+        triggerRefresh: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast: vi.fn(),
+      }),
+    );
+
+    let handled = false;
+    await act(async () => {
+      handled = await hook.current.maybeRecoverRemoteSetup({
+        command: 'fetch',
+        failureMessage: "fatal: unable to access 'https://github.com/acme/demo.git/': The requested URL returned error: 404",
+      });
+    });
+
+    expect(handled).toBe(true);
+    expect(removeRemote).not.toHaveBeenCalled();
+    expect(hook.current.forceGithubRepoCreationPrompt).toBe(false);
+    expect(setActiveTab).not.toHaveBeenCalled();
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog).toEqual(
+      expect.objectContaining({
+        variant: 'confirm',
+        irreversible: false,
+        onConfirm: expect.any(Function),
+      }),
+    );
+
+    await act(async () => {
+      await dialog.onConfirm?.();
+    });
+
+    expect(removeRemote).not.toHaveBeenCalled();
+    expect(hook.current.forceGithubRepoCreationPrompt).toBe(true);
+    expect(setActiveTab).toHaveBeenCalledWith('repo');
+    hook.unmount();
+  });
+
   it('fuehrt den Remote-ahead-Quick-Fix als stash, pull --rebase und stash pop aus', async () => {
     const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
     const setGitActionToast = vi.fn();

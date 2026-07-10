@@ -4,11 +4,22 @@ import { registerGithubHandlers } from '../registerGithubHandlers';
 const { handleMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
 }));
+const { clearSavedGithubTokenSecurelyMock, readSavedGithubTokenWithHostMock, saveGithubTokenSecurelyMock } = vi.hoisted(() => ({
+  clearSavedGithubTokenSecurelyMock: vi.fn(),
+  readSavedGithubTokenWithHostMock: vi.fn(),
+  saveGithubTokenSecurelyMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
     handle: handleMock,
   },
+}));
+
+vi.mock('../../secureStore', () => ({
+  clearSavedGithubTokenSecurely: clearSavedGithubTokenSecurelyMock,
+  readSavedGithubTokenWithHost: readSavedGithubTokenWithHostMock,
+  saveGithubTokenSecurely: saveGithubTokenSecurelyMock,
 }));
 
 describe('registerGithubHandlers fork flow', () => {
@@ -17,6 +28,9 @@ describe('registerGithubHandlers fork flow', () => {
   beforeEach(() => {
     handlers.clear();
     handleMock.mockReset();
+    clearSavedGithubTokenSecurelyMock.mockReset();
+    readSavedGithubTokenWithHostMock.mockReset();
+    saveGithubTokenSecurelyMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -101,6 +115,7 @@ describe('registerGithubHandlers fork flow', () => {
       runCommand: vi.fn().mockResolvedValue('abc123\x1fabc123\x1ffeat: release links\x1fTim\x1f2026-06-30'),
       runCommandAtPath: vi.fn().mockResolvedValue('abc123\x1fabc123\x1ffeat: release links\x1fTim\x1f2026-06-30'),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      getRepoPath: vi.fn(() => '/tmp/repo'),
     } as any;
     const githubService = {
       isAuthenticated: vi.fn().mockReturnValue(true),
@@ -145,6 +160,7 @@ describe('registerGithubHandlers fork flow', () => {
         return 'def456\x1fdef456\x1ffix: fallback release context\x1fTim\x1f2026-06-30';
       }),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      getRepoPath: vi.fn(() => '/tmp/repo'),
     } as any;
     const githubService = {
       isAuthenticated: vi.fn().mockReturnValue(true),
@@ -245,5 +261,159 @@ describe('registerGithubHandlers fork flow', () => {
       draft: true,
       prerelease: false,
     });
+  });
+
+  it('does not persist a device-flow result after logout invalidated the polling request', async () => {
+    let resolveAuthentication: ((value: boolean) => void) | undefined;
+    const authenticate = vi.fn(
+      async () =>
+        new Promise<boolean>((resolve) => {
+          resolveAuthentication = resolve;
+        }),
+    );
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      pollDeviceFlow: vi.fn().mockResolvedValue({ status: 'success', accessToken: 'stale-token' }),
+      getAuthenticationGeneration: vi.fn().mockReturnValue(0),
+      authenticate,
+      getUsername: vi.fn().mockReturnValue('stale-user'),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: 'client-id' }),
+    });
+
+    const pollPromise = handlers.get('github:devicePoll')!({}, 'device-code');
+    await vi.waitFor(() => expect(authenticate).toHaveBeenCalled());
+    await handlers.get('github:logout')!({});
+    resolveAuthentication?.(true);
+
+    await expect(pollPromise).resolves.toEqual({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+    expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+    expect(githubService.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not persist a device-flow result after explicit login cancellation', async () => {
+    let resolvePoll: ((value: any) => void) | undefined;
+    let serviceGeneration = 0;
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      getAuthenticationGeneration: vi.fn(() => serviceGeneration),
+      cancelPendingAuthentication: vi.fn(() => {
+        serviceGeneration += 1;
+      }),
+      pollDeviceFlow: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolvePoll = resolve;
+          }),
+      ),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(),
+    } as any;
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: 'client-id' }),
+    });
+
+    const pollPromise = handlers.get('github:devicePoll')!({}, 'device-code');
+    await vi.waitFor(() => expect(resolvePoll).toBeTypeOf('function'));
+    await handlers.get('github:cancelAuth')!({});
+    resolvePoll?.({ status: 'success', accessToken: 'stale-token' });
+
+    await expect(pollPromise).resolves.toEqual({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+    expect(githubService.cancelPendingAuthentication).toHaveBeenCalledTimes(1);
+    expect(githubService.authenticate).not.toHaveBeenCalled();
+    expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+  });
+
+  it('invalidates device polling when settings logout changes the service generation', async () => {
+    let resolvePoll: ((value: any) => void) | undefined;
+    let serviceGeneration = 0;
+    const authenticate = vi.fn();
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      getAuthenticationGeneration: vi.fn(() => serviceGeneration),
+      pollDeviceFlow: vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolvePoll = resolve;
+          }),
+      ),
+      authenticate,
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(() => {
+        serviceGeneration += 1;
+      }),
+    } as any;
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: 'client-id' }),
+    });
+
+    const pollPromise = handlers.get('github:devicePoll')!({}, 'device-code');
+    await vi.waitFor(() => expect(resolvePoll).toBeTypeOf('function'));
+    githubService.logout();
+    resolvePoll?.({ status: 'success', accessToken: 'stale-token' });
+
+    await expect(pollPromise).resolves.toEqual({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+  });
+
+  it('returns an outer failure when GitHub declines a pull request merge', async () => {
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      mergePullRequest: vi.fn().mockResolvedValue({ sha: '', merged: false, message: 'Branch protection blocked this merge' }),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue('tim'),
+      logout: vi.fn(),
+    } as any;
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:mergePR')!({}, { owner: 'acme', repo: 'project', pullNumber: 7, mergeMethod: 'squash' });
+
+    expect(result).toEqual({ success: false, error: 'Branch protection blocked this merge' });
+  });
+
+  it('rejects release context reads for a renderer-selected non-active repository', async () => {
+    const listRepositoryTags = vi.fn();
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      listRepositoryTags,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn(),
+      getUsername: vi.fn().mockReturnValue('tim'),
+      logout: vi.fn(),
+    } as any;
+    registerGithubHandlers({
+      gitService: { getRepoPath: vi.fn(() => '/tmp/active-repo') } as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:getReleaseContext')!({}, { owner: 'acme', repo: 'project', repoPath: '/tmp/private-other-repo' });
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(listRepositoryTags).not.toHaveBeenCalled();
   });
 });

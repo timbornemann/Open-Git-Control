@@ -130,6 +130,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     getAiAutoCommitState: () => ipcRenderer.invoke(IpcChannel.GitGetAiAutoCommitState),
     aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke(IpcChannel.AiGenerateCommitMessage, params),
     githubAuth: (token: string, host?: string) => ipcRenderer.invoke(IpcChannel.GithubAuth, token, host),
+    githubCancelAuth: () => ipcRenderer.invoke(IpcChannel.GithubCancelAuth),
     githubDeviceStart: () => ipcRenderer.invoke(IpcChannel.GithubDeviceStart),
     githubDevicePoll: (deviceCode: string) => ipcRenderer.invoke(IpcChannel.GithubDevicePoll, deviceCode),
     githubWebLogin: () => ipcRenderer.invoke(IpcChannel.GithubWebLogin),
@@ -223,6 +224,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     github: {
       githubAuth: flatApi.githubAuth,
+      githubCancelAuth: flatApi.githubCancelAuth,
       githubDeviceStart: flatApi.githubDeviceStart,
       githubDevicePoll: flatApi.githubDevicePoll,
       githubWebLogin: flatApi.githubWebLogin,

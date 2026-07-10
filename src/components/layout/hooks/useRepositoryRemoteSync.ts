@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { RemoteSyncState } from '@/types/git';
 import { getLocale, useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
-import { isRemoteRepositoryMissingError } from '@/utils/gitPushRecovery';
 import { formatTime } from '@/utils/dateTime';
 import { gitClient } from '@/services/gitClient';
 import type { RemoteStatusInfo } from '@/components/layout/layoutTypes';
-import type { GitActionToast, RepositoryRemote } from './repositoryDomainTypes';
+import type { GitActionToast } from './repositoryDomainTypes';
 
 export const EMPTY_REMOTE_SYNC_STATE: RemoteSyncState = {
   isFetching: false,
@@ -24,8 +23,6 @@ type Params = {
   autoFetchIntervalMs: number;
   language: AppLanguage;
   hasRemoteOrigin: boolean | null;
-  setHasRemoteOrigin: Dispatch<SetStateAction<boolean | null>>;
-  setRemotes: Dispatch<SetStateAction<RepositoryRemote[]>>;
   setGitActionToast: (toast: GitActionToast) => void;
   setActiveGitActionLabel: Dispatch<SetStateAction<string | null>>;
   isGitActionRunningRef: MutableRefObject<boolean>;
@@ -38,8 +35,6 @@ export const useRepositoryRemoteSync = ({
   autoFetchIntervalMs,
   language,
   hasRemoteOrigin,
-  setHasRemoteOrigin,
-  setRemotes,
   setGitActionToast,
   setActiveGitActionLabel,
   isGitActionRunningRef,
@@ -50,10 +45,11 @@ export const useRepositoryRemoteSync = ({
   const activeRepoRef = useRef<string | null>(activeRepo);
   const { t, tr } = useLanguageTranslations(language);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     remoteFetchRunIdRef.current += 1;
     isRemoteFetchRunningRef.current = false;
+    setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
   }, [activeRepo]);
 
   const formatLastFetchedAt = useCallback(
@@ -72,10 +68,6 @@ export const useRepositoryRemoteSync = ({
     },
     [language, t],
   );
-
-  useEffect(() => {
-    setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
-  }, [activeRepo, setRemoteSync]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +102,7 @@ export const useRepositoryRemoteSync = ({
 
   const refreshRemoteState = useCallback(
     async (showToast = false) => {
-      if (!gitClient.isAvailable() || !activeRepo) return false;
+      if (!gitClient.isAvailable() || !activeRepo || hasRemoteOrigin !== true) return false;
       if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
       const repoAtStart = activeRepo;
       const fetchRunId = remoteFetchRunIdRef.current + 1;
@@ -122,7 +114,7 @@ export const useRepositoryRemoteSync = ({
       setRemoteSync((prev) => ({ ...prev, isFetching: true }));
 
       try {
-        const result = await gitClient.runGitCommand('fetch', '--all', '--prune', '--tags', '--quiet');
+        const result = await gitClient.runGitCommand('fetch', 'origin', '--prune', '--tags', '--quiet');
         if (activeRepoRef.current !== repoAtStart) return false;
         if (result.success) {
           setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
@@ -134,28 +126,6 @@ export const useRepositoryRemoteSync = ({
         }
 
         const errorMessage = String(result.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-        if (isRemoteRepositoryMissingError(errorMessage)) {
-          const removeOriginResult = await gitClient.removeRemote('origin');
-          if (activeRepoRef.current !== repoAtStart) return false;
-          const removeOriginError = String(removeOriginResult.error || '').trim();
-          const originAlreadyMissing = /no such remote\s+'?origin'?/i.test(removeOriginError);
-
-          if (removeOriginResult.success || originAlreadyMissing) {
-            setHasRemoteOrigin(false);
-            setRemotes((prev) => prev.filter((remote) => remote.name !== 'origin'));
-            setRemoteSync({
-              ...EMPTY_REMOTE_SYNC_STATE,
-              isFetching: false,
-            });
-            triggerRefresh();
-            setGitActionToast({
-              msg: t('generated.components.layout.hooks.userepositorydomain.github_repository_no_longer_exists_origin_was_removed_re_119b0bb7'),
-              isError: false,
-            });
-            return true;
-          }
-        }
-
         setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
         if (showToast) {
           setGitActionToast({ msg: errorMessage, isError: true });
@@ -178,7 +148,7 @@ export const useRepositoryRemoteSync = ({
         }
       }
     },
-    [activeRepo, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setHasRemoteOrigin, setRemotes, setRemoteSync, t, triggerRefresh],
+    [activeRepo, hasRemoteOrigin, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setRemoteSync, t, triggerRefresh],
   );
 
   useEffect(() => {

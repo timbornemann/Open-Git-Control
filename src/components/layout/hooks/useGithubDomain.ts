@@ -309,6 +309,9 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const handleCancelDeviceFlow = () => {
     const activeRun = activeAuthRunRef.current;
     if (activeRun?.kind !== 'device') return;
+    if (githubClient.isAvailable()) {
+      void githubClient.cancelAuth().catch((error) => console.error('GitHub authentication cancellation failed:', error));
+    }
     invalidateAuthRuns();
     setIsDeviceFlowRunning(false);
     setDeviceFlow(null);

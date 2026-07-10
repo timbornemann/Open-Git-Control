@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type { GitSubmoduleInfo } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { parseGitSubmoduleStatus } from '@/utils/gitParsing';
@@ -17,6 +17,10 @@ type Params = {
 export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, setGitActionToast, runGitCommand }: Params) => {
   const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
   const { t } = useLanguageTranslations(language);
+
+  useLayoutEffect(() => {
+    setSubmodules([]);
+  }, [activeRepo]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,4 +1,5 @@
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
+import type { TranslateFn } from '@/i18n';
 import type { ToastMessage } from '@/types/git';
 import type { GraphLayout, GraphNode } from '@/utils/graphLayout';
 import { gitClient } from '@/services/gitClient';
@@ -14,6 +15,7 @@ type BuildCommitHistoryMenuActionsParams = {
   setToast: (toast: ToastMessage | null) => void;
   refreshCommits: () => Promise<void> | void;
   refreshWorkingTreeStatus: () => Promise<void> | void;
+  tr: TranslateFn;
 };
 
 export const buildCommitHistoryMenuActions = ({
@@ -26,6 +28,7 @@ export const buildCommitHistoryMenuActions = ({
   setToast,
   refreshCommits,
   refreshWorkingTreeStatus,
+  tr,
 }: BuildCommitHistoryMenuActionsParams): MenuAction[] => {
   const hash = node.commit.hash;
   const shortHash = node.commit.abbrevHash;
@@ -37,14 +40,19 @@ export const buildCommitHistoryMenuActions = ({
       action: () => {},
     },
     {
-      label: `Cherry-Pick ${shortHash}`,
+      label: tr(`Cherry-Pick ${shortHash}`, `Cherry-pick ${shortHash}`),
       icon: 'CP',
-      action: () => runGitAction(gitClient.buildCherryPickCommitArgs(hash), `Cherry-Pick von ${shortHash} erfolgreich.`),
+      action: () =>
+        runGitAction(gitClient.buildCherryPickCommitArgs(hash), tr(`Cherry-Pick von ${shortHash} erfolgreich.`, `Successfully cherry-picked ${shortHash}.`)),
     },
     {
-      label: `Revert ${shortHash}`,
+      label: tr(`Revert ${shortHash}`, `Revert ${shortHash}`),
       icon: 'RV',
-      action: () => runGitAction(gitClient.buildRevertCommitArgs(hash, { noEdit: true }), `Revert von ${shortHash} erfolgreich.`),
+      action: () =>
+        runGitAction(
+          gitClient.buildRevertCommitArgs(hash, { noEdit: true }),
+          tr(`Revert von ${shortHash} erfolgreich.`, `Successfully reverted ${shortHash}.`),
+        ),
     },
     {
       label: '',
@@ -53,96 +61,117 @@ export const buildCommitHistoryMenuActions = ({
       action: () => {},
     },
     {
-      label: `Reset --soft auf ${shortHash}`,
+      label: tr(`Reset --soft auf ${shortHash}`, `Reset --soft to ${shortHash}`),
       icon: 'RS',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',
-          title: 'Soft Reset ausfuehren?',
-          message: 'HEAD wird auf den Commit gesetzt, Aenderungen bleiben staged.',
+          title: tr('Soft Reset ausfuehren?', 'Perform soft reset?'),
+          message: tr('HEAD wird auf den Commit gesetzt, Aenderungen bleiben staged.', 'HEAD will move to this commit while changes remain staged.'),
           contextItems: [
-            { label: 'Commit', value: shortHash },
-            { label: 'Reset-Modus', value: '--soft' },
+            { label: tr('Commit', 'Commit'), value: shortHash },
+            { label: tr('Reset-Modus', 'Reset mode'), value: '--soft' },
           ],
           irreversible: false,
-          consequences: 'Die Commit-Historie wird lokal verschoben.',
-          confirmLabel: 'Soft Reset',
+          consequences: tr('Die Commit-Historie wird lokal verschoben.', 'The local commit history will be moved.'),
+          confirmLabel: tr('Soft Reset', 'Soft reset'),
           onConfirm: async () => {
-            await runGitAction(gitClient.buildResetToCommitArgs('--soft', hash), `Soft-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(
+              gitClient.buildResetToCommitArgs('--soft', hash),
+              tr(`Soft-Reset auf ${shortHash} erfolgreich.`, `Successfully soft-reset to ${shortHash}.`),
+            );
           },
         });
       },
     },
     {
-      label: `Reset --mixed auf ${shortHash}`,
+      label: tr(`Reset --mixed auf ${shortHash}`, `Reset --mixed to ${shortHash}`),
       icon: 'RM',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',
-          title: 'Mixed Reset ausfuehren?',
-          message: 'HEAD wird verschoben, Aenderungen bleiben unstaged im Working Tree.',
+          title: tr('Mixed Reset ausfuehren?', 'Perform mixed reset?'),
+          message: tr(
+            'HEAD wird verschoben, Aenderungen bleiben unstaged im Working Tree.',
+            'HEAD will move while changes remain unstaged in the working tree.',
+          ),
           contextItems: [
-            { label: 'Commit', value: shortHash },
-            { label: 'Reset-Modus', value: '--mixed' },
+            { label: tr('Commit', 'Commit'), value: shortHash },
+            { label: tr('Reset-Modus', 'Reset mode'), value: '--mixed' },
           ],
           irreversible: false,
-          consequences: 'Index wird zurueckgesetzt. Commit-Historie aendert sich lokal.',
-          confirmLabel: 'Mixed Reset',
+          consequences: tr('Index wird zurueckgesetzt. Commit-Historie aendert sich lokal.', 'The index will be reset and local commit history will change.'),
+          confirmLabel: tr('Mixed Reset', 'Mixed reset'),
           onConfirm: async () => {
-            await runGitAction(gitClient.buildResetToCommitArgs('--mixed', hash), `Mixed-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(
+              gitClient.buildResetToCommitArgs('--mixed', hash),
+              tr(`Mixed-Reset auf ${shortHash} erfolgreich.`, `Successfully mixed-reset to ${shortHash}.`),
+            );
           },
         });
       },
     },
     {
-      label: `Reset --hard auf ${shortHash}`,
+      label: tr(`Reset --hard auf ${shortHash}`, `Reset --hard to ${shortHash}`),
       icon: 'RH',
       danger: true,
       action: () => {
         setConfirmDialog({
           variant: 'danger',
-          title: 'Hard Reset ausfuehren?',
-          message: 'HEAD, Index und Working Tree werden auf den Commit zurueckgesetzt.',
+          title: tr('Hard Reset ausfuehren?', 'Perform hard reset?'),
+          message: tr(
+            'HEAD, Index und Working Tree werden auf den Commit zurueckgesetzt.',
+            'HEAD, the index, and the working tree will be reset to this commit.',
+          ),
           contextItems: [
-            { label: 'Commit', value: shortHash },
-            { label: 'Reset-Modus', value: '--hard' },
+            { label: tr('Commit', 'Commit'), value: shortHash },
+            { label: tr('Reset-Modus', 'Reset mode'), value: '--hard' },
           ],
           irreversible: true,
-          consequences: 'Lokale nicht-gesicherte Aenderungen gehen verloren.',
-          confirmLabel: 'Hard Reset',
+          consequences: tr('Lokale nicht-gesicherte Aenderungen gehen verloren.', 'Uncommitted local changes will be lost.'),
+          confirmLabel: tr('Hard Reset', 'Hard reset'),
           onConfirm: async () => {
-            await runGitAction(gitClient.buildResetToCommitArgs('--hard', hash), `Hard-Reset auf ${shortHash} erfolgreich.`);
+            await runGitAction(
+              gitClient.buildResetToCommitArgs('--hard', hash),
+              tr(`Hard-Reset auf ${shortHash} erfolgreich.`, `Successfully hard-reset to ${shortHash}.`),
+            );
           },
         });
       },
     },
     {
-      label: `Interaktiver Rebase bis ${shortHash}`,
+      label: tr(`Interaktiver Rebase bis ${shortHash}`, `Interactive rebase through ${shortHash}`),
       icon: 'IR',
       action: () => {
         if (!layout) return;
 
         const selectedNode = layout.nodes.find((candidate) => candidate.commit.hash === hash);
         if (!selectedNode) {
-          setToast({ msg: 'Ausgewaehlter Commit wurde nicht gefunden.', isError: true });
+          setToast({ msg: tr('Ausgewaehlter Commit wurde nicht gefunden.', 'The selected commit could not be found.'), isError: true });
           return;
         }
 
         if (selectedNode.commit.parentHashes.length === 0) {
-          setToast({ msg: 'Root-Commit kann nicht interaktiv gerebased werden.', isError: true });
+          setToast({ msg: tr('Root-Commit kann nicht interaktiv gerebased werden.', 'The root commit cannot be interactively rebased.'), isError: true });
           return;
         }
 
         const headPath = layout.nodes.filter((candidate) => reachableFromHead.has(candidate.commit.hash));
         const selectedIndex = headPath.findIndex((candidate) => candidate.commit.hash === hash);
         if (selectedIndex < 0) {
-          setToast({ msg: 'Commit liegt nicht auf dem aktuellen HEAD-Pfad.', isError: true });
+          setToast({ msg: tr('Commit liegt nicht auf dem aktuellen HEAD-Pfad.', 'The commit is not on the current HEAD path.'), isError: true });
           return;
         }
 
         const rangeNewestFirst = headPath.slice(0, selectedIndex + 1);
         if (rangeNewestFirst.some((candidate) => candidate.isMerge)) {
-          setToast({ msg: 'Interaktiver Rebase mit Merge-Commits wird hier nicht unterstuetzt.', isError: true });
+          setToast({
+            msg: tr(
+              'Interaktiver Rebase mit Merge-Commits wird hier nicht unterstuetzt.',
+              'Interactive rebases containing merge commits are not supported here.',
+            ),
+            isError: true,
+          });
           return;
         }
 
@@ -152,25 +181,31 @@ export const buildCommitHistoryMenuActions = ({
         const baseHash = selectedNode.commit.parentHashes[0];
 
         setInputDialog({
-          title: 'Interaktiven Rebase starten',
-          message: 'Bearbeite die Rebase-Todo-Liste (pick/reword/edit/squash/fixup/drop).',
+          title: tr('Interaktiven Rebase starten', 'Start interactive rebase'),
+          message: tr(
+            'Bearbeite die Rebase-Todo-Liste (pick/reword/edit/squash/fixup/drop).',
+            'Edit the rebase todo list (pick/reword/edit/squash/fixup/drop).',
+          ),
           fields: [
             {
               id: 'todo',
-              label: 'Rebase Todo',
+              label: tr('Rebase-Todo', 'Rebase todo'),
               defaultValue: defaultTodo,
               required: true,
               multiline: true,
-              helperText: 'Eine Zeile pro Commit, z.B. "pick <hash> <message>"',
+              helperText: tr('Eine Zeile pro Commit, z. B. "pick <hash> <message>"', 'One line per commit, e.g. "pick <hash> <message>"'),
             },
           ],
           contextItems: [
-            { label: 'Basis', value: baseHash.slice(0, 8) },
-            { label: 'Commit-Anzahl', value: String(rangeOldestFirst.length) },
+            { label: tr('Basis', 'Base'), value: baseHash.slice(0, 8) },
+            { label: tr('Commit-Anzahl', 'Commit count'), value: String(rangeOldestFirst.length) },
           ],
           irreversible: false,
-          consequences: 'Commits werden lokal umgeschrieben. Bei Konflikten Rebase continue/abort im Working Directory nutzen.',
-          confirmLabel: 'Rebase starten',
+          consequences: tr(
+            'Commits werden lokal umgeschrieben. Bei Konflikten Rebase continue/abort im Working Directory nutzen.',
+            'Commits will be rewritten locally. If conflicts occur, use rebase continue/abort in the working directory.',
+          ),
+          confirmLabel: tr('Rebase starten', 'Start rebase'),
           onSubmit: async (values) => {
             const lines = (values.todo || '')
               .split(/\r?\n/)
@@ -181,11 +216,11 @@ export const buildCommitHistoryMenuActions = ({
 
             const result = await gitClient.startInteractiveRebase(baseHash, lines);
             if (!result.success) {
-              setToast({ msg: result.error || 'Interaktiver Rebase fehlgeschlagen.', isError: true });
+              setToast({ msg: result.error || tr('Interaktiver Rebase fehlgeschlagen.', 'Interactive rebase failed.'), isError: true });
               return;
             }
 
-            setToast({ msg: 'Interaktiver Rebase gestartet.', isError: false });
+            setToast({ msg: tr('Interaktiver Rebase gestartet.', 'Interactive rebase started.'), isError: false });
             refreshCommits();
             refreshWorkingTreeStatus();
           },
@@ -199,33 +234,39 @@ export const buildCommitHistoryMenuActions = ({
       action: () => {},
     },
     {
-      label: 'Commit-Hash kopieren',
+      label: tr('Commit-Hash kopieren', 'Copy commit hash'),
       icon: 'ID',
       action: () => {
         navigator.clipboard.writeText(hash);
-        setToast({ msg: 'Hash kopiert!', isError: false });
+        setToast({ msg: tr('Hash kopiert!', 'Hash copied!'), isError: false });
       },
     },
   ];
 
   if (node.isMerge) {
     actions.splice(3, 0, {
-      label: `Revert Merge ${shortHash}`,
+      label: tr(`Merge ${shortHash} reverten`, `Revert merge ${shortHash}`),
       icon: 'MR',
       action: () => {
         setConfirmDialog({
           variant: 'confirm',
-          title: 'Merge-Revert ausfuehren?',
-          message: 'Der Merge-Commit wird mit Parent 1 als Hauptlinie reverted.',
+          title: tr('Merge-Revert ausfuehren?', 'Revert merge commit?'),
+          message: tr('Der Merge-Commit wird mit Parent 1 als Hauptlinie reverted.', 'The merge commit will be reverted using parent 1 as the mainline.'),
           contextItems: [
-            { label: 'Merge-Commit', value: shortHash },
-            { label: 'Parent', value: '1' },
+            { label: tr('Merge-Commit', 'Merge commit'), value: shortHash },
+            { label: tr('Parent', 'Parent'), value: '1' },
           ],
           irreversible: false,
-          consequences: 'Es entsteht ein neuer Revert-Commit und moegliche Konflikte muessen geloest werden.',
-          confirmLabel: 'Merge-Revert',
+          consequences: tr(
+            'Es entsteht ein neuer Revert-Commit und moegliche Konflikte muessen geloest werden.',
+            'A new revert commit will be created and any resulting conflicts must be resolved.',
+          ),
+          confirmLabel: tr('Merge-Revert', 'Revert merge'),
           onConfirm: async () => {
-            await runGitAction(gitClient.buildRevertCommitArgs(hash, { mainline: 1, noEdit: true }), `Merge-Revert von ${shortHash} erfolgreich.`);
+            await runGitAction(
+              gitClient.buildRevertCommitArgs(hash, { mainline: 1, noEdit: true }),
+              tr(`Merge-Revert von ${shortHash} erfolgreich.`, `Successfully reverted merge ${shortHash}.`),
+            );
           },
         });
       },

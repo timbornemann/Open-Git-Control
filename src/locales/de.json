@@ -866,6 +866,10 @@
             "ai_release_notes_generated_c784fbf3": "Release Notes mit KI erstellt."
           },
           "useremoterecoveryworkflow": {
+            "remote_access_failed_9a3129df": "Remote-Zugriff fehlgeschlagen",
+            "git_could_not_use_origin_authentication_permissions_or_remote_availability_may_be_the_cause_37fd2e1b": "Git konnte origin nicht verwenden. Ursache koennen Authentifizierung, Berechtigungen oder die Erreichbarkeit des Remotes sein. Wiederherstellungsoptionen oeffnen?",
+            "the_existing_origin_will_remain_unchanged_no_remote_is_removed_automatically_29e57d81": "Das bestehende origin bleibt unveraendert. Kein Remote wird automatisch entfernt.",
+            "open_recovery_options_3d3a5d62": "Wiederherstellungsoptionen oeffnen",
             "the_current_remote_is_no_longer_usable_please_create_a_n_3133bbff": "Der aktuelle Remote ist nicht mehr nutzbar. Bitte neues GitHub-Repository anlegen oder origin aktualisieren.",
             "could_not_automatically_remove_the_invalid_origin_remote_117d0832": "Das nicht mehr gueltige origin-Remote konnte nicht automatisch entfernt werden.",
             "github_repository_no_longer_exists_origin_was_removed_pl_d880ec95": "GitHub-Repository nicht mehr vorhanden: origin wurde entfernt. Bitte jetzt Name/Private setzen und neues GitHub-Repository erstellen.",
