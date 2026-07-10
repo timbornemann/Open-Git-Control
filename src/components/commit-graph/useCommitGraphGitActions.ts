@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { ToastMessage } from '@/types/git';
-import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
+import { isCherryPickInProgressError, isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { gitClient } from '@/services/gitClient';
 
 type UseCommitGraphGitActionsParams = {
@@ -62,6 +62,7 @@ export const useCommitGraphGitActions = ({
         }
 
         const mergeInProgress = isMergeInProgressError(result.error);
+        const cherryPickInProgress = isCherryPickInProgressError(result.error);
         refreshCommits();
         void refreshWorkingTreeStatus();
         if (await openConflictResolverFromFailure(result.error)) return;
@@ -73,10 +74,18 @@ export const useCommitGraphGitActions = ({
           });
           return;
         }
+        if (cherryPickInProgress) {
+          setToast({
+            msg: t('commitGraph.gitActions.cherryPickAlreadyActive'),
+            isError: true,
+          });
+          return;
+        }
         setToast({ msg: result.error || 'Unbekannter Fehler', isError: true });
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error || '');
         const mergeInProgress = isMergeInProgressError(message);
+        const cherryPickInProgress = isCherryPickInProgressError(message);
         refreshCommits();
         void refreshWorkingTreeStatus();
         if (await openConflictResolverFromFailure(message)) return;
@@ -84,6 +93,13 @@ export const useCommitGraphGitActions = ({
         if (mergeInProgress) {
           setToast({
             msg: t('commitGraph.gitActions.mergeAlreadyActive'),
+            isError: true,
+          });
+          return;
+        }
+        if (cherryPickInProgress) {
+          setToast({
+            msg: t('commitGraph.gitActions.cherryPickAlreadyActive'),
             isError: true,
           });
           return;

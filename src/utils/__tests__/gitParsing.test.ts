@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   countChangedEntriesFromPorcelainV2,
+  isCherryPickInProgressError,
   isMergeInProgressError,
   isRepoUnavailableError,
   mergeableDecoratedRefs,
@@ -359,6 +360,17 @@ describe('isMergeInProgressError', () => {
 
   it('returns false for unrelated errors', () => {
     expect(isMergeInProgressError('fatal: bad revision')).toBe(false);
+  });
+});
+
+describe('isCherryPickInProgressError', () => {
+  it('detects CHERRY_PICK_HEAD related errors', () => {
+    expect(isCherryPickInProgressError('fatal: You have not concluded your cherry-pick (CHERRY_PICK_HEAD exists).')).toBe(true);
+    expect(isCherryPickInProgressError('error: a cherry-pick is in progress')).toBe(true);
+  });
+
+  it('returns false for unrelated errors', () => {
+    expect(isCherryPickInProgressError('fatal: You have not concluded your merge (MERGE_HEAD exists).')).toBe(false);
   });
 });
 

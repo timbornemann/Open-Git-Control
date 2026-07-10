@@ -71,6 +71,8 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   mergeAbort: async ({ gitService }) => gitService.abortMerge(),
   rebaseContinue: async ({ gitService }) => gitService.continueRebase(),
   rebaseAbort: async ({ gitService }) => gitService.abortRebase(),
+  cherryPickContinue: async ({ gitService }) => gitService.continueCherryPick(),
+  cherryPickAbort: async ({ gitService }) => gitService.abortCherryPick(),
   fetch: executeStreamingCommand,
   pull: executeStreamingCommand,
   submoduleStatus: async ({ gitService }) => gitService.getSubmoduleStatus(),

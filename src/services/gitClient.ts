@@ -1,10 +1,11 @@
-import type { GitCommandNameDto, GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
+import type { GitCommandName } from '@/shared/ipc/gitCommands';
+import type { GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
 import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';
 
-export type GitCommandArgs = [GitCommandNameDto, ...string[]];
+export type GitCommandArgs = [GitCommandName, ...string[]];
 
 export type PushCurrentBranchOptions = {
   remote?: string;
@@ -25,7 +26,7 @@ export type RevertCommitOptions = {
 
 const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
-const command = <TCommand extends GitCommandNameDto>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
+const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
 const repoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
 let lastRepoUnavailableNotifyAt = 0;
@@ -62,7 +63,7 @@ export const gitClient = {
     };
   },
 
-  async runGitCommand(commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> {
+  async runGitCommand(commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
     const result = await requireElectronGitApi().runGitCommand(commandName, ...args);
     notifyRepoUnavailableIfNeeded(result, commandName);
     return result;
@@ -232,6 +233,14 @@ export const gitClient = {
     return command('rebaseAbort');
   },
 
+  buildCherryPickContinueArgs(): GitCommandArgs {
+    return command('cherryPickContinue');
+  },
+
+  buildCherryPickAbortArgs(): GitCommandArgs {
+    return command('cherryPickAbort');
+  },
+
   buildCreateTagArgs(name: string, options: CreateTagOptions = {}): GitCommandArgs {
     const target = options.target ? [options.target] : [];
     return options.message ? command('tag', '-a', name, '-m', options.message, ...target) : command('tag', name, ...target);
@@ -284,6 +293,10 @@ export const gitClient = {
 
   async scanPushSecrets(params?: { includeTags?: boolean; repoPath?: string }): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
+  },
+
+  async approveSecretScanPush(): Promise<{ success: boolean }> {
+    return requireElectronGitApi().approveSecretScanPush();
   },
 
   async cancelSecretScan(): Promise<{ success: boolean; cancelled: boolean }> {

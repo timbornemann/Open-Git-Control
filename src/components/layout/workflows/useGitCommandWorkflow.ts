@@ -3,7 +3,7 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
+import { isMergeInProgressError, isCherryPickInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { isMissingUpstreamPushError, isNoLocalCommitPushError } from '@/utils/gitPushRecovery';
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -210,6 +210,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         }
 
         const mergeInProgress = isMergeInProgressError(errorMessage);
+        const cherryPickInProgress = isCherryPickInProgressError(errorMessage);
         if (!isStillActiveRepo()) return false;
         triggerRefresh();
         try {
@@ -224,10 +225,14 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
               msg: tr(
                 mergeInProgress
                   ? 'Ein laufender Merge ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
-                  : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
+                  : cherryPickInProgress
+                    ? 'Ein laufender Cherry-Pick ist noch nicht abgeschlossen. Konflikt-Resolver wird geoeffnet.'
+                    : 'Merge-Konflikt: Konflikt-Resolver wird geoeffnet.',
                 mergeInProgress
                   ? 'A merge is already in progress and not finished yet. Opening the conflict resolver.'
-                  : 'Merge conflict: opening the conflict resolver.',
+                  : cherryPickInProgress
+                    ? 'A cherry-pick is already in progress and not finished yet. Opening the conflict resolver.'
+                    : 'Merge conflict: opening the conflict resolver.',
               ),
               isError: false,
             });
@@ -242,6 +247,18 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           workspace.setActiveTab('repo');
           setGitActionToast({
             msg: t('generated.components.layout.workflows.usegitcommandworkflow.a_merge_is_already_active_merge_head_please_continue_or_65bed253'),
+            isError: true,
+          });
+          return false;
+        }
+
+        if (cherryPickInProgress) {
+          workspace.setActiveTab('repo');
+          setGitActionToast({
+            msg: tr(
+              'Ein Cherry-Pick ist noch aktiv (CHERRY_PICK_HEAD). Bitte fortsetzen oder abbrechen.',
+              'A cherry-pick is still active (CHERRY_PICK_HEAD). Please continue or abort.',
+            ),
             isError: true,
           });
           return false;

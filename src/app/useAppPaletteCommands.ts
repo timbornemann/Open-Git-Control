@@ -121,6 +121,18 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         action: () => state.runGitCommand(gitClient.buildRebaseContinueArgs(), t('generated.app.rebase_continued_181b298d')),
       },
       {
+        id: 'cherry-pick-abort',
+        label: t('generated.components.layout.main.mainprimarypane.abort_cherry_pick_5b6c7d8e'),
+        keywords: ['cherry-pick', 'cherrypick', 'abort', 'abbrechen'],
+        action: () => state.runGitCommand(gitClient.buildCherryPickAbortArgs(), t('generated.app.cherry_pick_aborted_c9d0e1f2')),
+      },
+      {
+        id: 'cherry-pick-continue',
+        label: t('generated.components.layout.main.mainprimarypane.continue_cherry_pick_1d2e3f4a'),
+        keywords: ['cherry-pick', 'cherrypick', 'continue', 'fortsetzen'],
+        action: () => state.runGitCommand(gitClient.buildCherryPickContinueArgs(), t('generated.app.cherry_pick_continued_a1b2c3d4')),
+      },
+      {
         id: 'open-folder',
         label: t('generated.app.open_repository_09ccbb87'),
         keywords: ['open', 'folder', 'oeffnen'],

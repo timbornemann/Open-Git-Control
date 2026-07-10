@@ -71,15 +71,27 @@ export type MergePullRequestResultDto = {
   message: string;
 };
 
+export type GithubAuthResultDto = {
+  success: boolean;
+  tokenPersisted?: boolean;
+  error?: string;
+};
+
 export interface ElectronGithubAPI {
-  githubAuth: (token: string, host?: string) => Promise<boolean>;
+  githubAuth: (token: string, host?: string) => Promise<GithubAuthResultDto>;
   githubCancelAuth: () => Promise<{ success: true }>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
-  githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto>>;
-  githubWebLogin: () => Promise<IpcResult<{ username: string | null }>>;
+  githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto & { tokenPersisted?: boolean }>>;
+  githubWebLogin: () => Promise<IpcResult<{ username: string | null; tokenPersisted?: boolean }>>;
   githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => Promise<IpcResult<GitHubRepositoryPageDto>>;
   githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null; oauthConfigured: boolean }>;
-  githubLoginWithSavedToken: () => Promise<{ success: boolean; authenticated: boolean; username: string | null }>;
+  githubLoginWithSavedToken: () => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    username: string | null;
+    tokenPersisted?: boolean;
+    error?: string;
+  }>;
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
   githubLogout: () => Promise<{ success: true } | { success: false; error: string }>;
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;

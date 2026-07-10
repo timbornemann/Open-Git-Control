@@ -8,6 +8,14 @@ const MERGE_IN_PROGRESS_PATTERNS: RegExp[] = [
   /cannot do .* during a merge/i,
 ];
 
+const CHERRY_PICK_IN_PROGRESS_PATTERNS: RegExp[] = [
+  /\bCHERRY_PICK_HEAD\b.*\bexists\b/i,
+  /you have not concluded your cherry-pick/i,
+  /you are currently cherry-picking/i,
+  /cannot do .* during a cherry-pick/i,
+  /a cherry-pick is in progress/i,
+];
+
 export function parseFirstConflictPathFromPorcelain(statusOutput: string): string | null {
   if (!statusOutput.trim()) return null;
   for (const rawLine of statusOutput.split('\n')) {
@@ -31,6 +39,11 @@ export function parseFirstConflictPathFromGitError(errorText: string | null | un
 export function isMergeInProgressError(errorText: string | null | undefined): boolean {
   if (!errorText) return false;
   return MERGE_IN_PROGRESS_PATTERNS.some((pattern) => pattern.test(errorText));
+}
+
+export function isCherryPickInProgressError(errorText: string | null | undefined): boolean {
+  if (!errorText) return false;
+  return CHERRY_PICK_IN_PROGRESS_PATTERNS.some((pattern) => pattern.test(errorText));
 }
 
 export function resolveConflictPathAfterGitFailure(porcelainData: string | null | undefined, errorText: string | null | undefined): string | null {

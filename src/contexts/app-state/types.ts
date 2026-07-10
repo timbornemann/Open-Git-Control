@@ -73,6 +73,8 @@ export type WorkflowContextValue = WorkflowStateContract & {
   onConflictMergeAbort: () => void;
   onConflictRebaseContinue: () => void;
   onConflictRebaseAbort: () => void;
+  onConflictCherryPickContinue: () => void;
+  onConflictCherryPickAbort: () => void;
 };
 
 export type UIContextValue = BaseUIContextValue & {

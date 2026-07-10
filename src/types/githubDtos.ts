@@ -143,4 +143,4 @@ export interface DeviceFlowStartDto {
 export type DeviceFlowPollDto =
   | { status: 'pending'; interval: number | null }
   | { status: 'error'; error: string; errorDescription: string | null }
-  | { status: 'success'; username: string | null };
+  | { status: 'success'; username: string | null; tokenPersisted?: boolean };

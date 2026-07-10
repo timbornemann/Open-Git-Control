@@ -375,6 +375,9 @@
             "rebase_26c8effa": "Rebase",
             "continue_rebase_828a1cd9": "Rebase fortsetzen",
             "abort_rebase_c924fd71": "Rebase abbrechen",
+            "cherry_pick_7f8a9b0c": "Cherry-Pick",
+            "continue_cherry_pick_1d2e3f4a": "Cherry-Pick fortsetzen",
+            "abort_cherry_pick_5b6c7d8e": "Cherry-Pick abbrechen",
             "back_to_graph_07687079": "Zurueck zum Graph"
           },
           "maintopbar": {
@@ -1442,6 +1445,10 @@
       "aborting_merge_4f4ac264": "Merge wird abgebrochen...",
       "continuing_rebase_21242ce6": "Rebase wird fortgesetzt...",
       "aborting_rebase_bd30693b": "Rebase wird abgebrochen...",
+      "cherry_pick_continued_a1b2c3d4": "Cherry-Pick fortgesetzt.",
+      "cherry_pick_aborted_c9d0e1f2": "Cherry-Pick abgebrochen.",
+      "continuing_cherry_pick_e5f6a7b8": "Cherry-Pick wird fortgesetzt...",
+      "aborting_cherry_pick_a3b4c5d6": "Cherry-Pick wird abgebrochen...",
       "created_project_folder_and_initialized_git_repository_1d314004": "Projektordner erstellt und Git-Repository initialisiert.",
       "resize_sidebar_width_d9368c0f": "Sidebar-Breite anpassen",
       "switch_repository_84935354": "Repository wechseln",
@@ -1495,7 +1502,8 @@
       "invalidBranchName": "Ungueltiger Branch-Name. Vermeide Sonderzeichen wie ~ ^ : ? * [ \\ sowie .. und @{."
     },
     "gitActions": {
-      "mergeAlreadyActive": "Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen."
+      "mergeAlreadyActive": "Ein Merge ist bereits aktiv (MERGE_HEAD). Bitte zuerst Merge fortsetzen oder Merge abbrechen.",
+      "cherryPickAlreadyActive": "Ein Cherry-Pick ist bereits aktiv (CHERRY_PICK_HEAD). Bitte zuerst Cherry-Pick fortsetzen oder abbrechen."
     }
   }
 }

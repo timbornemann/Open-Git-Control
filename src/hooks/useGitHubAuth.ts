@@ -90,7 +90,7 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     try {
       const success = await githubClient.auth(token);
       if (!isCurrentOperation()) return;
-      if (!success) {
+      if (!success.success) {
         setAuthError('Token ungültig. Bitte prüfe die Berechtigungen.');
         return;
       }
@@ -98,6 +98,9 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
       setIsAuthenticated(true);
       onAuthChanged?.(true);
       setTokenInput('');
+      if (success.tokenPersisted === false) {
+        setAuthError(success.error || 'OS encryption is not available; the token was not persisted.');
+      }
       const status = await githubClient.checkAuthStatus();
       if (!isCurrentOperation()) return;
       setGithubUser(status.username);

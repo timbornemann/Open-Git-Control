@@ -365,6 +365,8 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
     case 'mergeAbort':
     case 'rebaseContinue':
     case 'rebaseAbort':
+    case 'cherryPickContinue':
+    case 'cherryPickAbort':
     case 'submoduleStatus':
     case 'submoduleUpdateInitRecursive':
     case 'submoduleSyncRecursive':

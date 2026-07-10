@@ -224,6 +224,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     isTestingAi,
     isLoadingModels,
     aiStatus,
+    setAiStatus,
     modelOptions,
     geminiApiKeyInput,
     setGeminiApiKeyInput,

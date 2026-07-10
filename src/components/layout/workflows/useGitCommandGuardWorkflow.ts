@@ -7,6 +7,7 @@ import {
   openDirtyWorktreeGuard,
   openForcePushGuard,
   openRemoteAheadDirtyStateGuard,
+  runSecretScanGuard,
   type GitCommandGuardRequest,
   type GitCommandGuardRuntime,
 } from './gitCommandGuardHandlers';
@@ -49,6 +50,7 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
       const shouldGuard = settings.confirmDangerousOps && !options?.skipDirtyGuard && GUARDED_COMMANDS.has(command);
       const shouldGuardForcePush = settings.confirmDangerousOps && !options?.skipDirtyGuard && isForcePushLike;
       const shouldGuardRemoteAheadWithDirtyState = !options?.skipRemoteAheadDirtyGuard && (command === 'pull' || (command === 'push' && !isForcePushLike));
+      const shouldSecretScan = settings.secretScanBeforePushEnabled && !options?.skipSecretScan && command === 'push';
       const request: GitCommandGuardRequest = { args, command, repoPath, successMsg, actionLabel, options };
       const runtime: GitCommandGuardRuntime = {
         runRemoteAheadQuickFix,
@@ -62,9 +64,10 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
       if (shouldGuardForcePush && openForcePushGuard(request, runtime)) return true;
       if (shouldGuardRemoteAheadWithDirtyState && (await openRemoteAheadDirtyStateGuard(request, runtime))) return true;
       if (shouldGuard && (await openDirtyWorktreeGuard(request, runtime))) return true;
+      if (shouldSecretScan && (await runSecretScanGuard(request, runtime, args.some((arg) => arg === '--tags')))) return true;
       return false;
     },
-    [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, t, tr],
+    [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, t, tr],
   );
 
   return { runGitCommandGuards };

@@ -30,7 +30,7 @@ export const githubClient = {
     return requireElectronGithubApi().githubCheckAuthStatus();
   },
 
-  async auth(token: string, host?: string): Promise<boolean> {
+  async auth(token: string, host?: string): Promise<{ success: boolean; tokenPersisted?: boolean; error?: string }> {
     return requireElectronGithubApi().githubAuth(token, host);
   },
 
@@ -46,7 +46,7 @@ export const githubClient = {
     return requireElectronGithubApi().githubDevicePoll(deviceCode);
   },
 
-  async webLogin(): Promise<IpcResult<{ username: string | null }>> {
+  async webLogin(): Promise<IpcResult<{ username: string | null; tokenPersisted?: boolean }>> {
     return requireElectronGithubApi().githubWebLogin();
   },
 
@@ -58,7 +58,13 @@ export const githubClient = {
     return requireElectronGithubApi().githubGetSavedAuthStatus();
   },
 
-  async loginWithSavedToken(): ReturnType<ElectronAPI['githubLoginWithSavedToken']> {
+  async loginWithSavedToken(): Promise<{
+    success: boolean;
+    authenticated: boolean;
+    username: string | null;
+    tokenPersisted?: boolean;
+    error?: string;
+  }> {
     return requireElectronGithubApi().githubLoginWithSavedToken();
   },
 

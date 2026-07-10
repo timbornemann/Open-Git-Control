@@ -34,6 +34,8 @@ export function registerGitHandlers({
   repoJobRegistry = defaultRepoJobRegistry,
 }: RegisterGitHandlersDeps): void {
   let activeSecretScanController: AbortController | null = null;
+  /** One-shot bypass after the in-app secret-scan dialog confirmed "push anyway". */
+  let secretScanPushBypassExpiresAt = 0;
 
   registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
   registerGitFileHandlers({ gitService });
@@ -237,6 +239,12 @@ export function registerGitHandlers({
     const settings = readSettingsWithMigration();
     if (!settings?.secretScanBeforePushEnabled) return null;
 
+    // In-app UI already confirmed after its own scan; consume one-shot bypass.
+    if (Date.now() < secretScanPushBypassExpiresAt) {
+      secretScanPushBypassExpiresAt = 0;
+      return null;
+    }
+
     const positionalArgs = rawArgs.filter((arg): arg is string => typeof arg === 'string' && !arg.startsWith('-'));
     const destinationRemote = positionalArgs[0] || '';
     const refspec = positionalArgs.length >= 2 ? positionalArgs[1] : '';
@@ -281,6 +289,11 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown } = {}) =>
     scanPushSecrets(event, { includeTags: params.includeTags, repoPath: params.repoPath }),
   );
+
+  ipcMain.handle(IpcChannel.GitApproveSecretScanPush, async () => {
+    secretScanPushBypassExpiresAt = Date.now() + 120_000;
+    return { success: true };
+  });
 
   ipcMain.handle(IpcChannel.GitCancelSecretScan, async () => {
     const cancelled = Boolean(activeSecretScanController);

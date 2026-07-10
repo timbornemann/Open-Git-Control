@@ -107,6 +107,17 @@ export function isPullBlockedByLocalChangesError(value: unknown): boolean {
   );
 }
 
+export function isNotFullyMergedBranchDeleteError(value: unknown): boolean {
+  const message = normalizeErrorText(value);
+  return (
+    message.includes('is not fully merged') ||
+    message.includes('nicht vollständig zusammengeführt') ||
+    message.includes('nicht vollstaendig zusammengefuehrt') ||
+    message.includes('nicht vollständig gemerged') ||
+    message.includes('nicht vollstaendig gemerged')
+  );
+}
+
 export function compactGitError(value: unknown, maxLen = 240): string {
   const compact = String(value || '')
     .replace(/\s+/g, ' ')

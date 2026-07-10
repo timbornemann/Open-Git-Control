@@ -3,6 +3,7 @@ import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
 import { validateBranchName } from '@/utils/gitRefValidation';
+import { compactGitError, isNotFullyMergedBranchDeleteError } from '@/utils/gitPushRecovery';
 import { gitClient } from '@/services/gitClient';
 import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildMergeBranchDialog, buildRenameBranchDialog } from './repositoryDomainDialogs';
@@ -15,6 +16,7 @@ type Params = {
   language: AppLanguage;
   setGitActionToast: (toast: GitActionToast) => void;
   runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  triggerRefresh: () => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
 };
@@ -33,6 +35,7 @@ export const useRepositoryBranches = ({
   language,
   setGitActionToast,
   runGitCommand,
+  triggerRefresh,
   setConfirmDialog,
   setInputDialog,
 }: Params) => {
@@ -145,24 +148,40 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onDelete: async () => {
-          const ok = await runGitCommand(
-            gitClient.buildDeleteBranchArgs(branchName),
-            tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`),
-          );
-          if (ok) return;
-          setConfirmDialog(
-            buildForceDeleteBranchDialog({
-              branchName,
-              t,
-              tr,
-              onForceDelete: async () => {
-                await runGitCommand(
-                  gitClient.buildDeleteBranchArgs(branchName, { force: true }),
-                  tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`),
-                );
-              },
-            }),
-          );
+          if (!gitClient.isAvailable()) return;
+          const deleteArgs = gitClient.buildDeleteBranchArgs(branchName);
+          const [command, ...rest] = deleteArgs;
+          const result = await gitClient.runGitCommand(command, ...rest);
+          if (result.success) {
+            setGitActionToast({
+              msg: tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`),
+              isError: false,
+            });
+            triggerRefresh();
+            return;
+          }
+
+          if (isNotFullyMergedBranchDeleteError(result.error)) {
+            setConfirmDialog(
+              buildForceDeleteBranchDialog({
+                branchName,
+                t,
+                tr,
+                onForceDelete: async () => {
+                  await runGitCommand(
+                    gitClient.buildDeleteBranchArgs(branchName, { force: true }),
+                    tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`),
+                  );
+                },
+              }),
+            );
+            return;
+          }
+
+          setGitActionToast({
+            msg: compactGitError(result.error) || tr(`Branch "${branchName}" konnte nicht gelöscht werden.`, `Could not delete branch "${branchName}".`),
+            isError: true,
+          });
         },
       }),
     );

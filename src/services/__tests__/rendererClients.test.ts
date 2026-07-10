@@ -237,6 +237,8 @@ describe('renderer service clients', () => {
     expect(gitClient.buildMergeAbortArgs()).toEqual(['mergeAbort']);
     expect(gitClient.buildRebaseContinueArgs()).toEqual(['rebaseContinue']);
     expect(gitClient.buildRebaseAbortArgs()).toEqual(['rebaseAbort']);
+    expect(gitClient.buildCherryPickContinueArgs()).toEqual(['cherryPickContinue']);
+    expect(gitClient.buildCherryPickAbortArgs()).toEqual(['cherryPickAbort']);
     expect(gitClient.buildCreateTagArgs('v1', { message: 'release', target: 'abc123' })).toEqual(['tag', '-a', 'v1', '-m', 'release', 'abc123']);
     expect(gitClient.buildCreateTagArgs('v1', { target: 'abc123' })).toEqual(['tag', 'v1', 'abc123']);
     expect(gitClient.buildDeleteTagArgs('v1')).toEqual(['tag', '-d', 'v1']);

@@ -5,6 +5,7 @@ import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
 import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
+import { CherryPickService } from './git/CherryPickService';
 import { MergeConflictService } from './git/MergeConflictService';
 import { RebaseService } from './git/RebaseService';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
@@ -26,6 +27,7 @@ export class GitService {
   private readonly cloneService: CloneService;
   private readonly mergeConflictService: MergeConflictService;
   private readonly rebaseService: RebaseService;
+  private readonly cherryPickService: CherryPickService;
   private readonly stashService: StashService;
   private readonly submoduleService: SubmoduleService;
 
@@ -47,6 +49,7 @@ export class GitService {
       this.gitRunner,
     );
     this.rebaseService = new RebaseService(() => this.ensureRepoPath(), this.gitRunner);
+    this.cherryPickService = new CherryPickService(() => this.ensureRepoPath(), this.gitRunner);
     this.stashService = new StashService((args) => this.runCommand(args));
     this.submoduleService = new SubmoduleService((args) => this.runCommand(args));
   }
@@ -275,6 +278,20 @@ export class GitService {
    */
   async abortRebase(): Promise<string> {
     return this.rebaseService.abortRebase();
+  }
+
+  /**
+   * Setzt einen laufenden Cherry-Pick nach Konfliktaufloesung fort.
+   */
+  async continueCherryPick(): Promise<string> {
+    return this.cherryPickService.continueCherryPick();
+  }
+
+  /**
+   * Bricht einen laufenden Cherry-Pick ab.
+   */
+  async abortCherryPick(): Promise<string> {
+    return this.cherryPickService.abortCherryPick();
   }
 
   /**

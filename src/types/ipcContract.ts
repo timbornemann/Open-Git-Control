@@ -15,6 +15,7 @@ export const enum IpcChannel {
   GitApplyPatch = 'git:applyPatch',
   GitCancelAiAutoCommit = 'git:cancelAiAutoCommit',
   GitCancelSecretScan = 'git:cancelSecretScan',
+  GitApproveSecretScanPush = 'git:approveSecretScanPush',
   GitClearRepo = 'git:clearRepo',
   GitClone = 'git:clone',
   GitCommand = 'git:command',

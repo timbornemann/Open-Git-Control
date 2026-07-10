@@ -5,7 +5,6 @@ import type {
   CommitStatsUpdateDto,
   DiffPreviewDto,
   FileTimelineCommitDto,
-  GitCommandNameDto,
   GitCommandResultDto,
   GitStashEntryDto,
   MarkdownPreviewFileDto,
@@ -15,6 +14,7 @@ import type {
   WorkingTreeSnapshotDto,
   WorkingTreeStatsDto,
 } from '../../../types/gitDtos';
+import type { GitCommandName } from '../gitCommands';
 import type { GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
 
@@ -101,7 +101,7 @@ export type OpenSubmoduleResultDto = {
 export interface ElectronGitAPI {
   setRepoPath: (repoPath: string) => Promise<boolean>;
   clearRepoPath: () => Promise<boolean>;
-  runGitCommand: (command: GitCommandNameDto, ...args: string[]) => Promise<GitCommandResultDto>;
+  runGitCommand: (command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;
   createCommit: (params: CreateCommitParamsDto) => Promise<IpcResult<string>>;
   getCommitLogPage: (params: CommitLogPageRequestDto) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto) => Promise<IpcResult<CommitStatsRequestResultDto>>;
@@ -122,6 +122,7 @@ export interface ElectronGitAPI {
   gitPull: () => Promise<GitCommandResultDto>;
   gitPush: () => Promise<GitCommandResultDto>;
   scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => Promise<IpcResult<SecretScanResultDto>>;
+  approveSecretScanPush: () => Promise<{ success: boolean }>;
   cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
   gitInit: (repoPath: string) => Promise<GitInitResultDto>;

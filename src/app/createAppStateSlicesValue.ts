@@ -233,6 +233,20 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
   onConflictRebaseAbort: () => {
     void state.runGitCommand(gitClient.buildRebaseAbortArgs(), t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
   },
+  onConflictCherryPickContinue: () => {
+    void state.runGitCommand(
+      gitClient.buildCherryPickContinueArgs(),
+      t('generated.app.cherry_pick_continued_a1b2c3d4'),
+      t('generated.app.continuing_cherry_pick_e5f6a7b8'),
+    );
+  },
+  onConflictCherryPickAbort: () => {
+    void state.runGitCommand(
+      gitClient.buildCherryPickAbortArgs(),
+      t('generated.app.cherry_pick_aborted_c9d0e1f2'),
+      t('generated.app.aborting_cherry_pick_a3b4c5d6'),
+    );
+  },
 });
 
 const createUiSlice = ({

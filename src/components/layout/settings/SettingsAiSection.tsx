@@ -60,9 +60,23 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
-                await appClient.setGeminiApiKey(ai.geminiApiKeyInput);
-                ai.setGeminiApiKeyInput('');
-                await onUpdateSettings({});
+                const keyToSave = ai.geminiApiKeyInput;
+                try {
+                  const next = await appClient.setGeminiApiKey(keyToSave);
+                  ai.setGeminiApiKeyInput('');
+                  await onUpdateSettings({});
+                  if (keyToSave.trim() && !next.hasGeminiApiKey) {
+                    ai.setAiStatus(
+                      t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+                    );
+                  }
+                } catch (error: unknown) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad');
+                  ai.setAiStatus(message);
+                }
               }}
             >
               {t('generated.components.layout.settingsmaincontent.save_api_key_5cb25ffc')}

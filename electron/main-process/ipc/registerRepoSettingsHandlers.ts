@@ -58,9 +58,12 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     const normalized = normalizeGeminiApiKey(apiKey);
     const current = readSettingsWithMigration();
     const saved = saveGeminiApiKeySecurely(normalized);
+    if (normalized && !saved) {
+      throw new Error('OS-backed encryption is not available. The Gemini API key was not saved.');
+    }
     const next = normalizeSettings({
       ...current,
-      hasGeminiApiKey: normalized ? saved : false,
+      hasGeminiApiKey: Boolean(normalized),
     });
     writeSettings(next);
     return next;

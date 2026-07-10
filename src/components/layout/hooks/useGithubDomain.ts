@@ -98,6 +98,12 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           setIsAuthenticated(true);
           setGithubUser(loginResult.username);
           resetRepositoryPages();
+          if (loginResult.tokenPersisted === false) {
+            setAuthError(
+              loginResult.error ||
+                t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+            );
+          }
         } else {
           setIsAuthenticated(false);
           setGithubUser(null);
@@ -113,7 +119,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     };
 
     void loginWithSavedToken();
-  }, [githubHost, resetRepositoryPages]);
+  }, [githubHost, resetRepositoryPages, t]);
 
   useEffect(() => {
     stoppedRef.current = false;
@@ -167,15 +173,21 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     setAuthError(null);
 
     try {
-      const success = await githubClient.auth(token, githubHost);
+      const authResult = await githubClient.auth(token, githubHost);
       if (!isCurrentAuthRun(run)) return;
-      if (success) {
+      if (authResult.success) {
         setIsAuthenticated(true);
         setTokenInput('');
         const status = await githubClient.checkAuthStatus();
         if (!isCurrentAuthRun(run)) return;
         setGithubUser(status.username);
         resetRepositoryPages();
+        if (authResult.tokenPersisted === false) {
+          setAuthError(
+            authResult.error ||
+              t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+          );
+        }
       } else {
         setAuthError(t('generated.components.layout.hooks.usegithubdomain.invalid_token_please_check_permissions_73c7b36b'));
       }
@@ -223,6 +235,12 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           setIsAuthenticated(true);
           setGithubUser(data.username || null);
           resetRepositoryPages();
+          if (data.tokenPersisted === false || pollResult.error) {
+            setAuthError(
+              pollResult.error ||
+                t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+            );
+          }
           finishAuthRun(run);
         } catch (error: any) {
           if (!isCurrentAuthRun(run)) return;
@@ -297,6 +315,12 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       setGithubUser(loginResult.data.username || null);
       setTokenInput('');
       resetRepositoryPages();
+      if (loginResult.data.tokenPersisted === false || loginResult.error) {
+        setAuthError(
+          loginResult.error ||
+            t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+        );
+      }
     } catch (error: any) {
       if (!isCurrentAuthRun(run)) return;
       setWebFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));

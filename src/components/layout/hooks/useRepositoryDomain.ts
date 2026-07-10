@@ -35,6 +35,7 @@ export const useRepositoryDomain = ({
     language,
     setGitActionToast,
     runGitCommand,
+    triggerRefresh,
     setConfirmDialog,
     setInputDialog,
   });

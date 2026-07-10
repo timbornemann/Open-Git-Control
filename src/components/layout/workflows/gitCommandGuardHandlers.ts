@@ -181,6 +181,7 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
       consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.please_review_these_findings_pushing_can_irreversibly_pu_fb7def03'),
       confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
       onConfirm: async () => {
+        await gitClient.approveSecretScanPush();
         await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
       },
     });
@@ -226,6 +227,7 @@ const openSecretScanTimeoutDialog = (request: GitCommandGuardRequest, runtime: G
     consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.without_a_secret_scan_sensitive_data_could_be_pushed_eda26acb'),
     confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
     onConfirm: async () => {
+      await gitClient.approveSecretScanPush();
       await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
     },
   });

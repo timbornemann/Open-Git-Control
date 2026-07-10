@@ -375,6 +375,9 @@
             "rebase_26c8effa": "Rebase",
             "continue_rebase_828a1cd9": "Continue rebase",
             "abort_rebase_c924fd71": "Abort rebase",
+            "cherry_pick_7f8a9b0c": "Cherry-pick",
+            "continue_cherry_pick_1d2e3f4a": "Continue cherry-pick",
+            "abort_cherry_pick_5b6c7d8e": "Abort cherry-pick",
             "back_to_graph_07687079": "Back to graph"
           },
           "maintopbar": {
@@ -1442,6 +1445,10 @@
       "aborting_merge_4f4ac264": "Aborting merge...",
       "continuing_rebase_21242ce6": "Continuing rebase...",
       "aborting_rebase_bd30693b": "Aborting rebase...",
+      "cherry_pick_continued_a1b2c3d4": "Cherry-pick continued.",
+      "cherry_pick_aborted_c9d0e1f2": "Cherry-pick aborted.",
+      "continuing_cherry_pick_e5f6a7b8": "Continuing cherry-pick...",
+      "aborting_cherry_pick_a3b4c5d6": "Aborting cherry-pick...",
       "created_project_folder_and_initialized_git_repository_1d314004": "Created project folder and initialized Git repository.",
       "resize_sidebar_width_d9368c0f": "Resize sidebar width",
       "switch_repository_84935354": "Switch repository",
@@ -1495,7 +1502,8 @@
       "invalidBranchName": "Invalid branch name. Avoid special characters like ~ ^ : ? * [ \\ and patterns like .. or @{."
     },
     "gitActions": {
-      "mergeAlreadyActive": "A merge is already active (MERGE_HEAD). Please continue or abort the current merge first."
+      "mergeAlreadyActive": "A merge is already active (MERGE_HEAD). Please continue or abort the current merge first.",
+      "cherryPickAlreadyActive": "A cherry-pick is already active (CHERRY_PICK_HEAD). Please continue or abort the current cherry-pick first."
     }
   }
 }

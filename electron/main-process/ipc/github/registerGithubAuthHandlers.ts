@@ -11,6 +11,16 @@ type RegisterGithubAuthHandlersDeps = {
   readSettingsWithMigration: () => AppSettings;
 };
 
+const TOKEN_PERSIST_UNAVAILABLE =
+  'OS-backed encryption is not available. The GitHub token was authenticated for this session but was not persisted and will be lost after restart.';
+
+const persistGithubToken = (token: string, host: string): { tokenPersisted: boolean; persistWarning?: string } => {
+  if (saveGithubTokenSecurely(token, host)) {
+    return { tokenPersisted: true };
+  }
+  return { tokenPersisted: false, persistWarning: TOKEN_PERSIST_UNAVAILABLE };
+};
+
 export function registerGithubAuthHandlers({ githubService, readSettingsWithMigration }: RegisterGithubAuthHandlersDeps): void {
   let authGeneration = 0;
   const beginAuthAttempt = (): number => {
@@ -26,10 +36,15 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
     const settings = readSettingsWithMigration();
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
     const success = await githubService.authenticate(token, normalizedHost, () => isCurrentAuthAttempt(generation));
-    if (success && isCurrentAuthAttempt(generation)) {
-      saveGithubTokenSecurely(token, normalizedHost);
+    if (!(success && isCurrentAuthAttempt(generation))) {
+      return { success: false };
     }
-    return success && isCurrentAuthAttempt(generation);
+    const persist = persistGithubToken(token, normalizedHost);
+    return {
+      success: true,
+      tokenPersisted: persist.tokenPersisted,
+      error: persist.persistWarning,
+    };
   });
 
   ipcMain.handle(IpcChannel.GithubCancelAuth, async () => {
@@ -88,12 +103,14 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       clearSavedGithubTokenSecurely();
       return { success: false, authenticated: false, username: null };
     }
-    saveGithubTokenSecurely(savedToken.token, normalizedHost);
+    const persist = persistGithubToken(savedToken.token, normalizedHost);
 
     return {
       success: true,
       authenticated: true,
       username: githubService.getUsername(),
+      tokenPersisted: persist.tokenPersisted,
+      error: persist.persistWarning,
     };
   });
 
@@ -145,13 +162,15 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
         return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
       }
 
-      saveGithubTokenSecurely(result.accessToken, normalizedHost);
+      const persist = persistGithubToken(result.accessToken, normalizedHost);
       return {
         success: true,
         data: {
           status: 'success',
           username: githubService.getUsername(),
+          tokenPersisted: persist.tokenPersisted,
         },
+        error: persist.persistWarning,
       };
     } catch (error: unknown) {
       const message = toErrorMessage(error, 'Device Flow Polling fehlgeschlagen.');
@@ -174,12 +193,14 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
         return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
       }
 
-      saveGithubTokenSecurely(tokenResult.accessToken, normalizedHost);
+      const persist = persistGithubToken(tokenResult.accessToken, normalizedHost);
       return {
         success: true,
         data: {
           username: githubService.getUsername(),
+          tokenPersisted: persist.tokenPersisted,
         },
+        error: persist.persistWarning,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'GitHub 1-Klick Login fehlgeschlagen.';

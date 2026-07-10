@@ -7,6 +7,7 @@ import {
   isNoLocalCommitPushError,
   isPullBlockedByLocalChangesError,
   isPushAuthOrPermissionError,
+  isNotFullyMergedBranchDeleteError,
   isWorkTreeRequiredError,
   shouldOfferGithubRepoRecoveryOnPushFailure,
 } from '@/utils/gitPushRecovery';
@@ -64,6 +65,12 @@ describe('gitPushRecovery', () => {
     expect(isWorkTreeRequiredError('fatal: this operation must be run in a work tree')).toBe(true);
     expect(isWorkTreeRequiredError('fatal: git-submodule cannot be used without a working tree.')).toBe(true);
     expect(isWorkTreeRequiredError('fatal: Authentication failed')).toBe(false);
+  });
+
+  it('detects not-fully-merged branch delete errors', () => {
+    expect(isNotFullyMergedBranchDeleteError("error: The branch 'feature' is not fully merged.")).toBe(true);
+    expect(isNotFullyMergedBranchDeleteError("error: Der Branch 'feature' ist nicht vollständig zusammengeführt.")).toBe(true);
+    expect(isNotFullyMergedBranchDeleteError("error: Cannot delete branch 'main' checked out at")).toBe(false);
   });
 
   it('compacts and truncates verbose errors', () => {

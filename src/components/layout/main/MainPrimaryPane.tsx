@@ -146,6 +146,27 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                     {t('generated.components.confirm.cancel_035b7526')}
                   </button>
                 </div>
+                <div className="conflict-action-group">
+                  <span className="conflict-action-group-label">
+                    {t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}
+                  </span>
+                  <button
+                    className="staging-btn-sm conflict-action-btn"
+                    onClick={workflow.onConflictCherryPickContinue}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.continue_cherry_pick_1d2e3f4a')}
+                  >
+                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+                  </button>
+                  <button
+                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+                    onClick={workflow.onConflictCherryPickAbort}
+                    disabled={workflow.isGitActionRunning}
+                    title={t('generated.components.layout.main.mainprimarypane.abort_cherry_pick_5b6c7d8e')}
+                  >
+                    {t('generated.components.confirm.cancel_035b7526')}
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}
