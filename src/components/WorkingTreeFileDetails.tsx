@@ -52,7 +52,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await gitClient.getFileHistory(path, 'HEAD', 80);
+        const result = await gitClient.getFileHistory(path, undefined, 80);
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -78,7 +78,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await gitClient.getFileBlameRange(path, 'HEAD', 1, 500);
+        const result = await gitClient.getFileBlameRange(path, undefined, 1, 500);
         if (result.success) {
           setBlameLines(result.data || []);
           setBlameHasMore((result.data || []).length === 500);
@@ -102,7 +102,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
     setBlameLoading(true);
     try {
-      const result = await gitClient.getFileBlameRange(path, 'HEAD', blameLines.length + 1, 500);
+      const result = await gitClient.getFileBlameRange(path, undefined, blameLines.length + 1, 500);
       if (!result.success) {
         setBlameError(result.error);
         return;

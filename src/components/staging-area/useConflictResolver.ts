@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
@@ -40,14 +40,42 @@ export const useConflictResolver = ({
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
 
   const conflictManualScrollRef = useRef<HTMLDivElement>(null);
+  const repoGenerationRef = useRef(0);
+  const editorRequestRef = useRef(0);
+  const editorSessionRef = useRef(0);
+  const activeConflictActionRef = useRef<number | null>(null);
+  const nextConflictActionIdRef = useRef(0);
   const { conflictBlockCountsByPath, isConflictBlockCountPending } = useConflictBlockCounts({ repoPath, status });
+
+  useEffect(() => {
+    repoGenerationRef.current += 1;
+    editorRequestRef.current += 1;
+    editorSessionRef.current += 1;
+    activeConflictActionRef.current = null;
+    setConflictEditor(null);
+    setIsConflictEditorLoading(false);
+    setSelectedConflictBlockIndex(0);
+  }, [repoPath]);
+
+  useEffect(() => {
+    if ((status?.conflicts || []).length === 0) {
+      editorRequestRef.current += 1;
+      editorSessionRef.current += 1;
+    }
+  }, [status?.conflicts]);
 
   const openConflictEditor = useCallback(
     async (filePath: string, initialBlockIndex = 0) => {
       if (!gitClient.isAvailable()) return;
+      const repoGeneration = repoGenerationRef.current;
+      const requestId = ++editorRequestRef.current;
+      const editorSession = ++editorSessionRef.current;
+      const isCurrentRequest = () =>
+        repoGeneration === repoGenerationRef.current && requestId === editorRequestRef.current && editorSession === editorSessionRef.current;
       setIsConflictEditorLoading(true);
       try {
         const result = await gitClient.readRepoFile(filePath);
+        if (!isCurrentRequest()) return;
         if (!result.success || typeof result.data !== 'string') {
           setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
           return;
@@ -59,9 +87,10 @@ export const useConflictResolver = ({
         setConflictEditor({ filePath, originalContent: normalized, content: normalized, isSaving: false });
         setSelectedConflictBlockIndex(boundedIndex);
       } catch (error: any) {
+        if (!isCurrentRequest()) return;
         setToast({ msg: error?.message || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
       } finally {
-        setIsConflictEditorLoading(false);
+        if (isCurrentRequest()) setIsConflictEditorLoading(false);
       }
     },
     [setToast, tr],
@@ -164,11 +193,27 @@ export const useConflictResolver = ({
 
   const markConflictResolvedAndSync = useCallback(
     async (filePath: string) => {
-      const didResolve = await markConflictResolved(filePath);
-      if (!didResolve) return;
-      if (conflictEditor?.filePath === filePath) {
-        setConflictEditor(null);
-        setSelectedConflictBlockIndex(0);
+      if (activeConflictActionRef.current !== null) return;
+      const actionId = ++nextConflictActionIdRef.current;
+      const repoGeneration = repoGenerationRef.current;
+      const editorSession = editorSessionRef.current;
+      activeConflictActionRef.current = actionId;
+      try {
+        const didResolve = await markConflictResolved(filePath);
+        if (
+          !didResolve ||
+          repoGeneration !== repoGenerationRef.current ||
+          editorSession !== editorSessionRef.current ||
+          activeConflictActionRef.current !== actionId
+        ) {
+          return;
+        }
+        if (conflictEditor?.filePath === filePath) {
+          setConflictEditor(null);
+          setSelectedConflictBlockIndex(0);
+        }
+      } finally {
+        if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
       }
     },
     [conflictEditor, markConflictResolved],
@@ -185,7 +230,7 @@ export const useConflictResolver = ({
 
   const saveConflictEditor = useCallback(
     async (markResolvedAfterSave: boolean) => {
-      if (!gitClient.isAvailable() || !conflictEditor) return;
+      if (!gitClient.isAvailable() || !conflictEditor || activeConflictActionRef.current !== null) return;
       const pendingBlocks = parseConflictBlocks(conflictEditor.content);
       if (markResolvedAfterSave && pendingBlocks.length > 0) {
         setToast({
@@ -196,15 +241,23 @@ export const useConflictResolver = ({
       }
       const targetPath = conflictEditor.filePath;
       const targetContent = conflictEditor.content;
+      const repoGeneration = repoGenerationRef.current;
+      const editorSession = editorSessionRef.current;
+      const actionId = ++nextConflictActionIdRef.current;
+      activeConflictActionRef.current = actionId;
+      const isCurrentAction = () =>
+        repoGeneration === repoGenerationRef.current && editorSession === editorSessionRef.current && activeConflictActionRef.current === actionId;
       setConflictEditor((prev) => {
         if (!prev || prev.filePath !== targetPath) return prev;
         return { ...prev, isSaving: true };
       });
       try {
         const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
+        if (!isCurrentAction()) return;
         if (!writeResult.success) throw new Error(writeResult.error || t('generated.components.staging_area.useconflictresolver.could_not_save_file_6d41241a'));
         if (markResolvedAfterSave) {
           const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
+          if (!isCurrentAction()) return;
           if (!stageResult.success)
             throw new Error(stageResult.error || t('generated.components.staging_area.useconflictresolver.could_not_mark_file_as_resolved_f7ee9c12'));
         }
@@ -221,11 +274,14 @@ export const useConflictResolver = ({
         if (onRepoChanged) onRepoChanged();
         await refresh();
       } catch (error: any) {
+        if (!isCurrentAction()) return;
         setConflictEditor((prev) => {
           if (!prev || prev.filePath !== targetPath) return prev;
           return { ...prev, isSaving: false };
         });
         setToast({ msg: error?.message || t('generated.components.staging_area.useconflictresolver.could_not_save_conflict_file_e9930739'), isError: true });
+      } finally {
+        if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
       }
     },
     [conflictEditor, onRepoChanged, refresh, setToast, t, tr],

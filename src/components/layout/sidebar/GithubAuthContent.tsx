@@ -59,6 +59,9 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   onSelectGithubAuthHelpMethod,
 }) => {
   const { t } = useI18n();
+  const canTokenLogin = Boolean(tokenInput.trim()) && !isAuthenticating && !isDeviceFlowRunning && !isWebFlowRunning;
+  const canStartDeviceFlow = oauthConfigured && !isDeviceFlowRunning && !isAuthenticating && !isWebFlowRunning;
+  const canStartWebFlow = !isWebFlowRunning && !isDeviceFlowRunning && !isAuthenticating;
 
   return (
     <div
@@ -135,15 +138,15 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
           </p>
         )}
         <button
-          disabled={!tokenInput.trim() || isAuthenticating}
+          disabled={!canTokenLogin}
           onClick={onTokenLogin}
           style={{
             padding: '8px',
-            backgroundColor: tokenInput.trim() && !isAuthenticating ? 'var(--accent-primary)' : 'var(--bg-dark)',
-            color: tokenInput.trim() && !isAuthenticating ? 'var(--on-accent)' : 'var(--text-secondary)',
+            backgroundColor: canTokenLogin ? 'var(--accent-primary)' : 'var(--bg-dark)',
+            color: canTokenLogin ? 'var(--on-accent)' : 'var(--text-secondary)',
             border: 'none',
             borderRadius: '4px',
-            cursor: tokenInput.trim() && !isAuthenticating ? 'pointer' : 'not-allowed',
+            cursor: canTokenLogin ? 'pointer' : 'not-allowed',
             fontWeight: 600,
           }}
         >
@@ -213,16 +216,16 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
 
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
-            disabled={!oauthConfigured || isDeviceFlowRunning}
+            disabled={!canStartDeviceFlow}
             onClick={onStartDeviceFlowLogin}
             style={{
               flex: 1,
               padding: '8px',
-              backgroundColor: oauthConfigured && !isDeviceFlowRunning ? 'var(--accent-primary)' : 'var(--bg-dark)',
-              color: oauthConfigured && !isDeviceFlowRunning ? 'var(--on-accent)' : 'var(--text-secondary)',
+              backgroundColor: canStartDeviceFlow ? 'var(--accent-primary)' : 'var(--bg-dark)',
+              color: canStartDeviceFlow ? 'var(--on-accent)' : 'var(--text-secondary)',
               border: 'none',
               borderRadius: '4px',
-              cursor: oauthConfigured && !isDeviceFlowRunning ? 'pointer' : 'not-allowed',
+              cursor: canStartDeviceFlow ? 'pointer' : 'not-allowed',
               fontWeight: 600,
             }}
           >
@@ -268,15 +271,15 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         )}
 
         <button
-          disabled={isWebFlowRunning || isDeviceFlowRunning}
+          disabled={!canStartWebFlow}
           onClick={onStartWebFlowLogin}
           style={{
             padding: '8px',
-            backgroundColor: !isWebFlowRunning && !isDeviceFlowRunning ? 'var(--accent-primary)' : 'var(--bg-dark)',
-            color: !isWebFlowRunning && !isDeviceFlowRunning ? 'var(--on-accent)' : 'var(--text-secondary)',
+            backgroundColor: canStartWebFlow ? 'var(--accent-primary)' : 'var(--bg-dark)',
+            color: canStartWebFlow ? 'var(--on-accent)' : 'var(--text-secondary)',
             border: 'none',
             borderRadius: '4px',
-            cursor: !isWebFlowRunning && !isDeviceFlowRunning ? 'pointer' : 'not-allowed',
+            cursor: canStartWebFlow ? 'pointer' : 'not-allowed',
             fontWeight: 600,
           }}
         >

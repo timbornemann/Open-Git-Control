@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { githubClient } from '@/services/githubClient';
 
 type Params = {
@@ -21,14 +21,20 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
   const [tokenInput, setTokenInput] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const authGenerationRef = useRef(0);
+  const activeAuthOperationRef = useRef<number | null>(null);
 
   useEffect(() => {
     const loginWithSavedToken = async () => {
       if (!githubClient.isAvailable()) return;
+      const operationId = ++authGenerationRef.current;
+      activeAuthOperationRef.current = operationId;
+      const isCurrentOperation = () => authGenerationRef.current === operationId && activeAuthOperationRef.current === operationId;
 
       setIsAuthenticating(true);
       try {
         const status = await githubClient.getSavedAuthStatus();
+        if (!isCurrentOperation()) return;
         if (!status.hasSavedToken) {
           setIsAuthenticated(status.authenticated);
           setGithubUser(status.username);
@@ -37,39 +43,53 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
         }
 
         const loginResult = await githubClient.loginWithSavedToken();
+        if (!isCurrentOperation()) return;
         if (loginResult.success && loginResult.authenticated) {
           setIsAuthenticated(true);
           setGithubUser(loginResult.username);
           onAuthChanged?.(true);
           const reposResult = await githubClient.getRepositories();
-          if (reposResult.success) setGithubRepos(reposResult.data.repos || []);
+          if (isCurrentOperation() && reposResult.success) setGithubRepos(reposResult.data.repos || []);
         } else {
           setIsAuthenticated(false);
           setGithubUser(null);
           onAuthChanged?.(false);
         }
       } catch {
+        if (!isCurrentOperation()) return;
         setIsAuthenticated(false);
         setGithubUser(null);
         onAuthChanged?.(false);
       } finally {
-        setIsAuthenticating(false);
+        if (isCurrentOperation()) {
+          activeAuthOperationRef.current = null;
+          setIsAuthenticating(false);
+        }
       }
     };
 
-    loginWithSavedToken();
+    void loginWithSavedToken();
+    return () => {
+      authGenerationRef.current += 1;
+      activeAuthOperationRef.current = null;
+    };
   }, [onAuthChanged]);
 
   const handleTokenLogin = useCallback(async () => {
     if (!githubClient.isAvailable()) return;
     const token = tokenInput.trim();
     if (!token) return;
+    if (activeAuthOperationRef.current !== null) return;
+    const operationId = ++authGenerationRef.current;
+    activeAuthOperationRef.current = operationId;
+    const isCurrentOperation = () => authGenerationRef.current === operationId && activeAuthOperationRef.current === operationId;
 
     setIsAuthenticating(true);
     setAuthError(null);
 
     try {
       const success = await githubClient.auth(token);
+      if (!isCurrentOperation()) return;
       if (!success) {
         setAuthError('Token ungültig. Bitte prüfe die Berechtigungen.');
         return;
@@ -79,17 +99,26 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
       onAuthChanged?.(true);
       setTokenInput('');
       const status = await githubClient.checkAuthStatus();
+      if (!isCurrentOperation()) return;
       setGithubUser(status.username);
       const result = await githubClient.getRepositories();
-      if (result.success) setGithubRepos(result.data.repos || []);
+      if (isCurrentOperation() && result.success) setGithubRepos(result.data.repos || []);
     } catch {
+      if (!isCurrentOperation()) return;
       setAuthError('Fehler bei der Authentifizierung.');
     } finally {
-      setIsAuthenticating(false);
+      if (isCurrentOperation()) {
+        activeAuthOperationRef.current = null;
+        setIsAuthenticating(false);
+      }
     }
   }, [onAuthChanged, tokenInput]);
 
   const handleLogout = useCallback(async () => {
+    const operationId = ++authGenerationRef.current;
+    activeAuthOperationRef.current = operationId;
+    const isCurrentOperation = () => authGenerationRef.current === operationId && activeAuthOperationRef.current === operationId;
+    setIsAuthenticating(true);
     try {
       if (githubClient.isAvailable()) {
         await githubClient.logout();
@@ -97,11 +126,15 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     } catch (error) {
       console.error('GitHub logout failed:', error);
     } finally {
-      setIsAuthenticated(false);
-      onAuthChanged?.(false);
-      setGithubUser(null);
-      setGithubRepos([]);
-      setTokenInput('');
+      if (isCurrentOperation()) {
+        setIsAuthenticated(false);
+        onAuthChanged?.(false);
+        setGithubUser(null);
+        setGithubRepos([]);
+        setTokenInput('');
+        activeAuthOperationRef.current = null;
+        setIsAuthenticating(false);
+      }
     }
   }, [onAuthChanged]);
 

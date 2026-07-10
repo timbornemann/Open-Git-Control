@@ -125,6 +125,29 @@ describe('GitService forensic history commands', () => {
   });
 });
 
+describe('GitService file blame', () => {
+  it('does not run blame for a path that is absent from the requested commit', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValue('');
+    const hash = 'd'.repeat(40);
+
+    await expect(service.getFileBlame('src/deleted.ts', hash)).resolves.toBe('');
+
+    expect(runCommandSpy).toHaveBeenCalledTimes(1);
+    expect(runCommandSpy).toHaveBeenCalledWith(['ls-tree', '-r', '--name-only', hash, '--', ':(literal)src/deleted.ts']);
+  });
+
+  it('uses HEAD for working-tree blame only when the file exists there', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi.spyOn(service, 'runCommand').mockResolvedValueOnce('src/existing.ts\n').mockResolvedValueOnce('blame output');
+
+    await expect(service.getFileBlameRange('src/existing.ts', undefined, 1, 500)).resolves.toBe('blame output');
+
+    expect(runCommandSpy).toHaveBeenNthCalledWith(1, ['ls-tree', '-r', '--name-only', 'HEAD', '--', ':(literal)src/existing.ts']);
+    expect(runCommandSpy).toHaveBeenNthCalledWith(2, ['blame', '--line-porcelain', '-L1,500', '--', 'src/existing.ts']);
+  });
+});
+
 describe('GitService repo path normalization', () => {
   it('stores repository root when path is inside a git repo', () => {
     const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-git-root-'));

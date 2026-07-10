@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
@@ -40,6 +40,21 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
   const [remotes, setRemotes] = useState<RepositoryRemote[]>([]);
   const [hasRemoteOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
   const { t, tr } = useLanguageTranslations(language);
+  const activeRepoRef = useRef(activeRepo);
+
+  useEffect(() => {
+    activeRepoRef.current = activeRepo;
+  }, [activeRepo]);
+
+  const runRemoteMutation = useCallback(
+    async (repoAtDialogOpen: string | null, args: string[], successMsg: string) => {
+      // A dialog can be confirmed after the user switched repositories. Do not
+      // retarget a destructive remote mutation to the new active repository.
+      if (!repoAtDialogOpen || activeRepoRef.current !== repoAtDialogOpen) return false;
+      return runGitCommand(args, successMsg);
+    },
+    [runGitCommand],
+  );
 
   useEffect(() => {
     if (!activeRepo || !gitClient.isAvailable()) {
@@ -77,19 +92,21 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
   }, [activeRepo, refreshTrigger]);
 
   const handleAddRemote = async () => {
+    const repoAtDialogOpen = activeRepo;
     setInputDialog(
       buildAddRemoteDialog({
         activeRepo,
         t,
         tr,
         onAdd: async (name, url) => {
-          await runGitCommand(gitClient.buildAddRemoteArgs(name, url), tr(`Remote "${name}" hinzugefügt.`, `Added remote "${name}".`));
+          await runRemoteMutation(repoAtDialogOpen, gitClient.buildAddRemoteArgs(name, url), tr(`Remote "${name}" hinzugefügt.`, `Added remote "${name}".`));
         },
       }),
     );
   };
 
   const handleRemoveRemote = async (remoteName: string) => {
+    const repoAtDialogOpen = activeRepo;
     setConfirmDialog(
       buildRemoveRemoteDialog({
         activeRepo,
@@ -97,20 +114,26 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onRemove: async () => {
-          await runGitCommand(gitClient.buildRemoveRemoteArgs(remoteName), tr(`Remote "${remoteName}" entfernt.`, `Removed remote "${remoteName}".`));
+          await runRemoteMutation(
+            repoAtDialogOpen,
+            gitClient.buildRemoveRemoteArgs(remoteName),
+            tr(`Remote "${remoteName}" entfernt.`, `Removed remote "${remoteName}".`),
+          );
         },
       }),
     );
   };
 
   const handleRenameRemote = async (remoteName: string) => {
+    const repoAtDialogOpen = activeRepo;
     setInputDialog(
       buildRenameRemoteDialog({
         remoteName,
         t,
         tr,
         onRename: async (newName) => {
-          await runGitCommand(
+          await runRemoteMutation(
+            repoAtDialogOpen,
             gitClient.buildRenameRemoteArgs(remoteName, newName),
             tr(`Remote umbenannt: "${remoteName}" -> "${newName}".`, `Renamed remote: "${remoteName}" -> "${newName}".`),
           );
@@ -120,6 +143,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
   };
 
   const handleSetRemoteUrl = async (remoteName: string, currentUrl: string) => {
+    const repoAtDialogOpen = activeRepo;
     setInputDialog(
       buildSetRemoteUrlDialog({
         remoteName,
@@ -127,7 +151,8 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         t,
         tr,
         onSetUrl: async (url) => {
-          await runGitCommand(
+          await runRemoteMutation(
+            repoAtDialogOpen,
             gitClient.buildSetRemoteUrlArgs(remoteName, url),
             tr(`URL für "${remoteName}" aktualisiert.`, `Updated URL for "${remoteName}".`),
           );

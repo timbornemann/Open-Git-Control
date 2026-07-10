@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import type { GitFileBlameLineDto } from '@/types/git';
 import { gitClient } from '@/services/gitClient';
@@ -12,34 +12,41 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
   const [showBlame, setShowBlame] = useState(false);
   const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);
   const [isBlameLoading, setIsBlameLoading] = useState(false);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
     setShowBlame(false);
     setBlameData([]);
-  }, [request]);
+    setIsBlameLoading(false);
+  }, [repoPath, request]);
 
   useEffect(() => {
-    let cancelled = false;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;
+
+    if (!showBlame || !repoPath || !gitClient.isAvailable()) {
+      setIsBlameLoading(false);
+      return;
+    }
 
     const fetchBlame = async () => {
-      if (!showBlame || !repoPath || !gitClient.isAvailable()) return;
-
       setIsBlameLoading(true);
       try {
         const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
 
         const result = await gitClient.getFileBlame(request.path, commitHashForBlame);
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
         if (result.success) {
           setBlameData(result.data);
         } else {
           console.error('Failed to fetch blame data:', result.error);
         }
       } catch (err) {
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
         console.error('Error fetching blame data:', err);
       } finally {
-        if (!cancelled) {
+        if (isCurrentRequest()) {
           setIsBlameLoading(false);
         }
       }
@@ -47,7 +54,9 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
 
     void fetchBlame();
     return () => {
-      cancelled = true;
+      if (requestGenerationRef.current === requestGeneration) {
+        requestGenerationRef.current += 1;
+      }
     };
   }, [showBlame, repoPath, request]);
 

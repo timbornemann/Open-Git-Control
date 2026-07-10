@@ -24,6 +24,7 @@ type DiffContentPaneProps = {
   setHunkRef: (index: number, element: HTMLDivElement | null) => void;
   scrollToHunk: (index: number) => void;
   hunkOpError: string | null;
+  isHunkOperationRunning: boolean;
   applyHunk: (hunk: ParsedHunk, fileHeader: string[], op: HunkPatchOperation) => void;
   onRepoChanged?: () => void;
   showBlame: boolean;
@@ -48,6 +49,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   setHunkRef,
   scrollToHunk,
   hunkOpError,
+  isHunkOperationRunning,
   applyHunk,
   onRepoChanged,
   showBlame,
@@ -251,6 +253,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                     <>
                       <button
                         className="diff-hunk-action-btn"
+                        disabled={isHunkOperationRunning}
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'stage')}
                         title={t('generated.components.diff_viewer.diffcontentpane.stage_this_hunk_c97d4d48')}
                       >
@@ -258,6 +261,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                       </button>
                       <button
                         className="diff-hunk-action-btn diff-hunk-action-btn--danger"
+                        disabled={isHunkOperationRunning}
                         onClick={() => applyHunk(hunk, parsed.fileHeader, 'discard')}
                         title={t('generated.components.diff_viewer.diffcontentpane.discard_changes_in_this_hunk_b3969326')}
                       >
@@ -268,6 +272,7 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
                   {request.source === 'staged' && (
                     <button
                       className="diff-hunk-action-btn"
+                      disabled={isHunkOperationRunning}
                       onClick={() => applyHunk(hunk, parsed.fileHeader, 'unstage')}
                       title={t('generated.components.diff_viewer.diffcontentpane.unstage_this_hunk_0ac01911')}
                     >

@@ -36,11 +36,15 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const [activeGitCommand, setActiveGitCommand] = useState<string | null>(null);
   const isGitActionRunningRef = useRef(false);
+  const activeGitWorkflowRunRef = useRef<number | null>(null);
+  const nextGitWorkflowRunIdRef = useRef(0);
   const runGitCommandRef = useRef<GitCommandRunner | null>(null);
   const activeRepoRef = useRef<string | null>(workspace.activeRepo);
 
   useEffect(() => {
     activeRepoRef.current = workspace.activeRepo;
+    activeGitWorkflowRunRef.current = null;
+    isGitActionRunningRef.current = false;
     setIsGitActionRunning(false);
     setActiveGitCommand(null);
     setActiveGitActionLabel(null);
@@ -90,10 +94,24 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   });
 
   const runGitCommand = useCallback(
-    async (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions): Promise<boolean> => {
+    async (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions, internalContinuation = false): Promise<boolean> => {
       if (!gitClient.isAvailable() || !workspace.activeRepo || args.length === 0) return false;
+      if (!internalContinuation && (activeGitWorkflowRunRef.current !== null || isGitActionRunningRef.current)) return false;
       const repoAtStart = workspace.activeRepo;
+      const workflowRunId = ++nextGitWorkflowRunIdRef.current;
+      activeGitWorkflowRunRef.current = workflowRunId;
+      isGitActionRunningRef.current = true;
       const isStillActiveRepo = () => activeRepoRef.current === repoAtStart;
+      const releaseWorkflowRun = () => {
+        if (activeGitWorkflowRunRef.current !== workflowRunId) return;
+        activeGitWorkflowRunRef.current = null;
+        isGitActionRunningRef.current = false;
+        if (isStillActiveRepo()) {
+          setIsGitActionRunning(false);
+          setActiveGitCommand(null);
+          setActiveGitActionLabel(null);
+        }
+      };
 
       const command = args[0] as GitCommandNameDto;
       const tryAutoSetUpstreamPush = async (failureMessage: unknown): Promise<boolean> => {
@@ -112,6 +130,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           t('generated.components.layout.workflows.usegitcommandworkflow.pushed_branch_and_set_upstream_486b4c06'),
           t('generated.components.layout.workflows.usegitcommandworkflow.running_push_with_upstream_c4d07a1f'),
           { ...options, skipAutoSetUpstreamOnPushFailure: true },
+          true,
         );
         if (!isStillActiveRepo()) return false;
         return fallbackSuccess;
@@ -170,6 +189,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
               skipAutoInitialCommitOnPushFailure: true,
               skipAutoSetUpstreamOnPushFailure: true,
             },
+            true,
           );
         }
 
@@ -231,15 +251,34 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         return false;
       };
 
-      if (await maybeHandlePushWithoutOrigin({ command, options })) {
-        return false;
-      }
-      if (!isStillActiveRepo()) return false;
+      try {
+        if (await maybeHandlePushWithoutOrigin({ command, options })) {
+          releaseWorkflowRun();
+          return false;
+        }
+        if (!isStillActiveRepo()) {
+          releaseWorkflowRun();
+          return false;
+        }
 
-      if (await runGitCommandGuards({ args, command, repoPath: repoAtStart, successMsg, actionLabel, options })) {
+        if (await runGitCommandGuards({ args, command, repoPath: repoAtStart, successMsg, actionLabel, options })) {
+          releaseWorkflowRun();
+          return false;
+        }
+        if (!isStillActiveRepo()) {
+          releaseWorkflowRun();
+          return false;
+        }
+      } catch (error: any) {
+        if (isStillActiveRepo()) {
+          setGitActionToast({
+            msg: error?.message || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'),
+            isError: true,
+          });
+        }
+        releaseWorkflowRun();
         return false;
       }
-      if (!isStillActiveRepo()) return false;
       setIsGitActionRunning(true);
       setActiveGitCommand(command);
       setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
@@ -291,7 +330,6 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   );
 
   runGitCommandRef.current = runGitCommand;
-  isGitActionRunningRef.current = isGitActionRunning;
 
   return {
     activeGitActionLabel,

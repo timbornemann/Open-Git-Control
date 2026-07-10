@@ -16,6 +16,7 @@ import type { RunGitCommandOptions } from '@/components/layout/state/appStateSha
 import { stripGitSuffix } from './repoWorkflowUtils';
 import { useBareRepoRecoveryWorkflow } from './useBareRepoRecoveryWorkflow';
 import { useInitialCommitRecoveryWorkflow } from './useInitialCommitRecoveryWorkflow';
+import { useGithubConnectionGuard } from './useGithubConnectionGuard';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -69,15 +70,22 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
 
   const { t } = useLanguageTranslations(settings.language as AppLanguage);
 
+  const isStillActiveRepo = useCallback((repoPath: string | null) => Boolean(repoPath && activeRepoRef.current === repoPath), []);
+  const {
+    begin: beginGithubConnection,
+    isCurrent: isCurrentGithubConnection,
+    finish: finishGithubConnection,
+    invalidate: invalidateGithubConnection,
+  } = useGithubConnectionGuard(isStillActiveRepo, setIsConnectingGithubRepo);
+
   useEffect(() => {
     activeRepoRef.current = workspace.activeRepo;
+    invalidateGithubConnection();
     setNewRepoName('');
     setNewRepoDescription('');
     setConnectError(null);
     setForceGithubRepoCreationPrompt(false);
-  }, [workspace.activeRepo]);
-
-  const isStillActiveRepo = useCallback((repoPath: string | null) => Boolean(repoPath && activeRepoRef.current === repoPath), []);
+  }, [invalidateGithubConnection, workspace.activeRepo]);
 
   const { recoverBareRepoForPush } = useBareRepoRecoveryWorkflow({
     workspace,
@@ -310,14 +318,15 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
             if (!gitClient.isAvailable()) return;
             const confirmRepo = activeRepoRef.current;
             if (!confirmRepo) return;
-            setIsConnectingGithubRepo(true);
+            const connectionRun = beginGithubConnection(confirmRepo);
+            if (!connectionRun) return;
             try {
               const prepared = await ensureInitialCommitForPush();
-              if (!isStillActiveRepo(confirmRepo)) return;
+              if (!isCurrentGithubConnection(connectionRun)) return;
               if (!prepared) return;
 
               const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
-              if (!isStillActiveRepo(confirmRepo)) return;
+              if (!isCurrentGithubConnection(connectionRun)) return;
               if (!retryPushResult.success) {
                 throw new Error(
                   retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'),
@@ -331,11 +340,12 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
               setConnectError(null);
               triggerRefresh();
             } catch (confirmError: any) {
+              if (!isCurrentGithubConnection(connectionRun)) return;
               const message = confirmError?.message || t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_prepare_push_ca1050f2');
               setConnectError(message);
               setGitActionToast({ msg: message, isError: true });
             } finally {
-              setIsConnectingGithubRepo(false);
+              finishGithubConnection(connectionRun);
             }
           },
         });
@@ -365,7 +375,17 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       triggerRefresh();
       return { completed: true, showGenericSuccess: false };
     },
-    [ensureInitialCommitForPush, isStillActiveRepo, requestInitialCommitConfirmationIfNeeded, setGitActionToast, t, triggerRefresh],
+    [
+      beginGithubConnection,
+      ensureInitialCommitForPush,
+      finishGithubConnection,
+      isCurrentGithubConnection,
+      isStillActiveRepo,
+      requestInitialCommitConfirmationIfNeeded,
+      setGitActionToast,
+      t,
+      triggerRefresh,
+    ],
   );
 
   const createGithubRepoAndConnect = useCallback(
@@ -390,13 +410,15 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         return false;
       }
 
-      setIsConnectingGithubRepo(true);
-      setConnectError(null);
       const repoAtStart = workspace.activeRepo;
+      if (!repoAtStart) return false;
+      const connectionRun = beginGithubConnection(repoAtStart);
+      if (!connectionRun) return false;
+      setConnectError(null);
 
       try {
         const result = await githubClient.createRepository(name, description, newRepoPrivate);
-        if (!isStillActiveRepo(repoAtStart)) return false;
+        if (!isCurrentGithubConnection(connectionRun)) return false;
         if (!result.success) {
           throw new Error(
             result.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_creating_the_github_repository_8f0393dd'),
@@ -405,12 +427,12 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
 
         const remoteUrl = result.data.cloneUrl;
         await ensureOriginRemote(remoteUrl, replaceOriginIfExists);
-        if (!isStillActiveRepo(repoAtStart)) return false;
+        if (!isCurrentGithubConnection(connectionRun)) return false;
 
         let showGenericSuccess = true;
         if (pushAfterConnect) {
           const pushOutcome = await pushConnectedRepository(confirmedAutoInitialCommit);
-          if (!isStillActiveRepo(repoAtStart)) return false;
+          if (!isCurrentGithubConnection(connectionRun)) return false;
           if (!pushOutcome.completed) return false;
           showGenericSuccess = pushOutcome.showGenericSuccess;
         }
@@ -428,18 +450,21 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         triggerRefresh();
         return true;
       } catch (e: any) {
+        if (!isCurrentGithubConnection(connectionRun)) return false;
         const message =
           e?.message || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_creating_and_connecting_github_repository_7e19e737');
         setConnectError(message);
         setGitActionToast({ msg: message, isError: true });
         return false;
       } finally {
-        setIsConnectingGithubRepo(false);
+        finishGithubConnection(connectionRun);
       }
     },
     [
+      beginGithubConnection,
       ensureOriginRemote,
-      isStillActiveRepo,
+      finishGithubConnection,
+      isCurrentGithubConnection,
       newRepoDescription,
       newRepoName,
       newRepoPrivate,

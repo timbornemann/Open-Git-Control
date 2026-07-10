@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { parseDiff } from '@/utils/diffParser';
 import { gitClient } from '@/services/gitClient';
@@ -26,13 +26,22 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
   const [error, setError] = useState<string | null>(null);
   const [diffText, setDiffText] = useState('');
   const [sourceTruncated, setSourceTruncated] = useState(false);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;
+
+    if (!repoPath || !gitClient.isAvailable()) {
+      setIsLoading(false);
+      setError(null);
+      setDiffText('');
+      setSourceTruncated(false);
+      return;
+    }
 
     const fetchDiff = async () => {
-      if (!repoPath || !gitClient.isAvailable()) return;
-
       setIsLoading(true);
       setError(null);
       setDiffText('');
@@ -43,7 +52,7 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
           maxBytes: MAX_RENDER_CHARS,
           maxLines: MAX_RENDER_LINES,
         });
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
 
         if (!result.success) {
           setError(result.error || t('diffViewer.errors.diffLoadFailed'));
@@ -53,11 +62,11 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
         setDiffText(result.data.text);
         setSourceTruncated(result.data.truncated);
       } catch (fetchError: unknown) {
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
         console.error(fetchError);
         setError(t('diffViewer.errors.diffLoadFailed'));
       } finally {
-        if (!cancelled) {
+        if (isCurrentRequest()) {
           setIsLoading(false);
         }
       }
@@ -65,7 +74,9 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
 
     void fetchDiff();
     return () => {
-      cancelled = true;
+      if (requestGenerationRef.current === requestGeneration) {
+        requestGenerationRef.current += 1;
+      }
     };
   }, [repoPath, request, t]);
 

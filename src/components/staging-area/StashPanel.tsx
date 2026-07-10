@@ -35,10 +35,20 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   const [stashFiles, setStashFiles] = useState<Record<string, StashFileState>>({});
   const [error, setError] = useState<string | null>(null);
   const generationRef = useRef(0);
+  // State updates are asynchronous; refs make the guards effective for two clicks
+  // occurring in the same event turn.
+  const activeStashOperationRef = useRef<number | null>(null);
+  const activeStashFileOperationRef = useRef<number | null>(null);
+  const activeStashBranchOperationRef = useRef<number | null>(null);
+  const loadingStashFilesRef = useRef(new Set<string>());
+  const nextOperationIdRef = useRef(0);
 
-  const isCurrentGeneration = useCallback((generation: number, capturedRepoPath: string | null) => {
-    return generation === generationRef.current && capturedRepoPath === repoPath;
-  }, [repoPath]);
+  const isCurrentGeneration = useCallback(
+    (generation: number, capturedRepoPath: string | null) => {
+      return generation === generationRef.current && capturedRepoPath === repoPath;
+    },
+    [repoPath],
+  );
 
   useEffect(() => {
     generationRef.current += 1;
@@ -50,6 +60,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     setRunningStashOp(null);
     setPendingFileOp(null);
     setLoading(false);
+    activeStashOperationRef.current = null;
+    activeStashFileOperationRef.current = null;
+    activeStashBranchOperationRef.current = null;
+    loadingStashFilesRef.current.clear();
   }, [repoPath]);
 
   const load = useCallback(async () => {
@@ -78,9 +92,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
 
   const loadStashFiles = useCallback(
     async (stashName: string) => {
-      if (!repoPath || !gitClient.isAvailable()) return;
+      if (!repoPath || !gitClient.isAvailable() || loadingStashFilesRef.current.has(stashName)) return;
       const generation = generationRef.current;
       const capturedRepoPath = repoPath;
+      loadingStashFilesRef.current.add(stashName);
       setStashFiles((current) => ({
         ...current,
         [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
@@ -118,6 +133,8 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
           ...current,
           [stashName]: { loading: false, files: [], error: e.message },
         }));
+      } finally {
+        loadingStashFilesRef.current.delete(stashName);
       }
     },
     [isCurrentGeneration, repoPath, t],
@@ -128,9 +145,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   }, [collapsed, load, refreshTrigger]);
 
   const runStashOp = async (stashName: string, op: StashOp) => {
-    if (!repoPath || !gitClient.isAvailable() || runningStashOp) return;
+    if (!repoPath || !gitClient.isAvailable() || activeStashOperationRef.current !== null) return;
     const generation = generationRef.current;
     const capturedRepoPath = repoPath;
+    const operationId = ++nextOperationIdRef.current;
+    activeStashOperationRef.current = operationId;
     setRunningStashOp({ name: stashName, op });
     try {
       let args: string[];
@@ -158,6 +177,9 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       setError(e.message);
     } finally {
+      if (activeStashOperationRef.current === operationId) {
+        activeStashOperationRef.current = null;
+      }
       if (isCurrentGeneration(generation, capturedRepoPath)) {
         setRunningStashOp(null);
         setPendingOp(null);
@@ -208,23 +230,33 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         consequences: t('generated.components.staging_area.stashpanel.if_applying_succeeds_git_automatically_removes_the_stash_0f54e6bb'),
         confirmLabel: t('generated.components.staging_area.stashpanel.create_branch_f1e70a0b'),
         onSubmit: async (values) => {
-          if (!repoPath) return;
+          if (!repoPath || activeStashBranchOperationRef.current !== null) return;
           const generation = generationRef.current;
           const capturedRepoPath = repoPath;
+          const operationId = ++nextOperationIdRef.current;
+          activeStashBranchOperationRef.current = operationId;
           const branchName = String(values.branchName || '').trim();
           setError(null);
-          const result = await gitClient.gitStashBranch(stash.name, branchName);
-          if (!isCurrentGeneration(generation, capturedRepoPath)) return;
-
-          if (result.success) {
-            setExpandedFiles(new Set());
-            setStashFiles({});
-            await load();
+          try {
+            const result = await gitClient.gitStashBranch(stash.name, branchName);
             if (!isCurrentGeneration(generation, capturedRepoPath)) return;
-            onRepoChanged?.();
-            return;
+
+            if (result.success) {
+              setExpandedFiles(new Set());
+              setStashFiles({});
+              await load();
+              if (!isCurrentGeneration(generation, capturedRepoPath)) return;
+              onRepoChanged?.();
+              return;
+            }
+            setError(result.error || t('generated.components.staging_area.stashpanel.failed_to_create_branch_from_stash_1bbcc9af'));
+          } catch (e: any) {
+            if (isCurrentGeneration(generation, capturedRepoPath)) setError(e.message);
+          } finally {
+            if (activeStashBranchOperationRef.current === operationId) {
+              activeStashBranchOperationRef.current = null;
+            }
           }
-          setError(result.error || t('generated.components.staging_area.stashpanel.failed_to_create_branch_from_stash_1bbcc9af'));
         },
       });
     },
@@ -245,9 +277,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   };
 
   const restoreStashFile = async (stashName: string, filePath: string) => {
-    if (!repoPath || !gitClient.isAvailable() || pendingFileOp) return;
+    if (!repoPath || !gitClient.isAvailable() || activeStashFileOperationRef.current !== null) return;
     const generation = generationRef.current;
     const capturedRepoPath = repoPath;
+    const operationId = ++nextOperationIdRef.current;
+    activeStashFileOperationRef.current = operationId;
     setPendingFileOp({ stashName, path: filePath });
     setError(null);
     try {
@@ -265,6 +299,9 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       setError(e.message);
     } finally {
+      if (activeStashFileOperationRef.current === operationId) {
+        activeStashFileOperationRef.current = null;
+      }
       if (isCurrentGeneration(generation, capturedRepoPath)) {
         setPendingFileOp(null);
       }

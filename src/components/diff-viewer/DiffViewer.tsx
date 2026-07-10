@@ -31,7 +31,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
 
   const diffData = useDiffPreviewData({ repoPath, request, t });
   const blame = useDiffBlame({ repoPath, request });
-  const { hunkOpError, applyHunk } = useHunkPatchActions({ onRepoChanged, t });
+  const { hunkOpError, isHunkOperationRunning, applyHunk } = useHunkPatchActions({ repoPath, onRepoChanged, t });
   const { markdownPreview, handleMarkdownPreviewClick } = useMarkdownPreview({
     repoPath,
     request,
@@ -101,6 +101,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
           setHunkRef={setHunkRef}
           scrollToHunk={scrollToHunk}
           hunkOpError={hunkOpError}
+          isHunkOperationRunning={isHunkOperationRunning}
           applyHunk={applyHunk}
           onRepoChanged={onRepoChanged}
           showBlame={blame.showBlame}

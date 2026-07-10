@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
@@ -32,15 +32,22 @@ const EMPTY_MARKDOWN_PREVIEW: MarkdownPreviewState = {
 
 export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdownPreviewParams) => {
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownPreviewState>(EMPTY_MARKDOWN_PREVIEW);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
     setMarkdownPreview(EMPTY_MARKDOWN_PREVIEW);
-  }, [request]);
+  }, [repoPath, request]);
 
   useEffect(() => {
-    if (!repoPath || !gitClient.isAvailable() || !isActive) return;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;
 
-    let cancelled = false;
+    if (!repoPath || !gitClient.isAvailable() || !isActive) {
+      setMarkdownPreview(EMPTY_MARKDOWN_PREVIEW);
+      return;
+    }
+
     const loadPreview = async () => {
       setMarkdownPreview({ loading: true, error: null, html: '' });
 
@@ -52,7 +59,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
         });
 
         if (!markdownResult.success) {
-          if (!cancelled) {
+          if (isCurrentRequest()) {
             setMarkdownPreview({
               loading: false,
               error: markdownResult.error || t('diffViewer.errors.markdownPreviewLoadFailed'),
@@ -91,11 +98,11 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
         );
 
         const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource);
-        if (!cancelled) {
+        if (isCurrentRequest()) {
           setMarkdownPreview({ loading: false, error: null, html });
         }
       } catch (previewError: unknown) {
-        if (!cancelled) {
+        if (isCurrentRequest()) {
           const message = previewError instanceof Error ? previewError.message : t('diffViewer.errors.markdownPreviewLoadFailed');
           setMarkdownPreview({ loading: false, error: message, html: '' });
         }
@@ -104,7 +111,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
 
     void loadPreview();
     return () => {
-      cancelled = true;
+      if (requestGenerationRef.current === requestGeneration) requestGenerationRef.current += 1;
     };
   }, [isActive, repoPath, request, t]);
 

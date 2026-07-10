@@ -40,6 +40,14 @@ export class HistoryService {
     return '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%(decorate:prefix=,suffix=,separator=%x1d)%x00';
   }
 
+  private async existsAtRevision(filePath: string, revision: string): Promise<boolean> {
+    // `git blame <revision> -- <path>` reports a fatal error for a file deleted
+    // in that revision (or newly added only in the index). ls-tree instead
+    // returns an empty result, so callers can render an empty blame view.
+    const output = await this.runCommand(['ls-tree', '-r', '--name-only', revision, '--', toLiteralPathspec(filePath)]);
+    return output.trim().length > 0;
+  }
+
   async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0): Promise<string> {
     const format = this.getStructuredLogFormat();
     const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
@@ -126,10 +134,12 @@ export class HistoryService {
   async getFileBlame(filePath: string, commitHash?: string): Promise<string> {
     const args = ['blame', '--line-porcelain'];
     const normalizedHash = normalizeOptionalCommitHash(commitHash);
+    const revision = normalizedHash || 'HEAD';
+    if (!(await this.existsAtRevision(filePath, revision))) return '';
     if (normalizedHash) {
       args.push(normalizedHash);
     }
-    args.push('--', toLiteralPathspec(filePath));
+    args.push('--', normalizeRepositoryRelativePath(filePath));
     return this.runCommand(args);
   }
 
@@ -139,10 +149,15 @@ export class HistoryService {
     const endLine = safeStart + safeCount - 1;
     const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
     const normalizedHash = normalizeOptionalCommitHash(commitHash);
+    const revision = normalizedHash || 'HEAD';
+    if (!(await this.existsAtRevision(filePath, revision))) return '';
     if (normalizedHash) {
       args.push(normalizedHash);
     }
-    args.push('--', toLiteralPathspec(filePath));
+    // blame accepts a pathname after `--`, but does not interpret pathspec
+    // magic such as `:(literal)`. Keep the same strict validation without
+    // passing the magic prefix through to blame.
+    args.push('--', normalizeRepositoryRelativePath(filePath));
     return this.runCommand(args);
   }
 
