@@ -8,6 +8,7 @@ import { HistoryService, type CommitStats, type FileTimelineCommit } from './git
 import { CherryPickService } from './git/CherryPickService';
 import { MergeConflictService } from './git/MergeConflictService';
 import { RebaseService } from './git/RebaseService';
+import { RepositoryBareState } from './git/RepositoryBareState';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
 import { StashService } from './git/StashService';
 import { SubmoduleService } from './git/SubmoduleService';
@@ -19,7 +20,7 @@ const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'stat
 
 export class GitService {
   private repoPath: string | null = null;
-  private repoIsBare: boolean | null = null;
+  private readonly bareState = new RepositoryBareState((repoPath) => this.gitRunner.detectIsBareRepositorySync(repoPath));
   private readonly gitRunner: GitRunner;
   private readonly commitService: CommitService;
   private readonly historyService: HistoryService;
@@ -56,14 +57,13 @@ export class GitService {
 
   setRepoPath(newPath: string) {
     const resolvedRepoPath = this.resolveRepositoryPath(newPath);
-    const repoIsBare = this.detectIsBareRepositorySync(resolvedRepoPath);
     this.repoPath = resolvedRepoPath;
-    this.repoIsBare = repoIsBare;
+    this.bareState.setActive(resolvedRepoPath, this.gitRunner.detectIsBareRepositorySync(resolvedRepoPath));
   }
 
   clearRepoPath() {
     this.repoPath = null;
-    this.repoIsBare = null;
+    this.bareState.clear();
   }
 
   getRepoPath(): string | null {
@@ -114,22 +114,13 @@ export class GitService {
     return this.gitRunner.resolveRepositoryRootSync(candidatePath);
   }
 
-  private detectIsBareRepositorySync(candidatePath: string): boolean {
-    return this.gitRunner.detectIsBareRepositorySync(candidatePath);
-  }
-
-  private isCurrentRepositoryBare(repoPath: string): boolean {
-    if (typeof this.repoIsBare === 'boolean') {
-      return this.repoIsBare;
-    }
-    this.repoIsBare = this.detectIsBareRepositorySync(repoPath);
-    return this.repoIsBare;
-  }
-
   isBareRepository(): boolean {
-    const repoPath = this.repoPath;
-    if (!repoPath) return false;
-    return this.isCurrentRepositoryBare(repoPath);
+    return this.repoPath ? this.bareState.isBareAtPath(this.repoPath) : false;
+  }
+
+  /** Detects the bare status of an explicit repository path (not the active repo). */
+  isBareRepositoryAtPath(repoPath: string): boolean {
+    return this.bareState.isBareAtPath(repoPath);
   }
 
   private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
@@ -147,7 +138,7 @@ export class GitService {
    */
   async runCommand(args: string[]): Promise<string> {
     const repoPath = this.ensureRepoPath();
-    if (this.isCurrentRepositoryBare(repoPath) && shouldSuppressBareWorkTreeCommand(args)) {
+    if (this.bareState.isBareAtPath(repoPath) && shouldSuppressBareWorkTreeCommand(args)) {
       return '';
     }
     return this.gitRunner.run(repoPath, args);
@@ -220,7 +211,7 @@ export class GitService {
 
   async getStatusPorcelainAtPath(repoPath: string): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
-    if (normalizedPath && this.isCurrentRepositoryBare(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainArgs())) {
+    if (normalizedPath && this.bareState.isBareAtPath(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainArgs())) {
       return '';
     }
     return this.runCommandAtPath(repoPath, statusPorcelainArgs());
@@ -231,6 +222,14 @@ export class GitService {
    */
   async checkoutConflictVersion(filePath: string, side: 'ours' | 'theirs'): Promise<string> {
     return this.mergeConflictService.checkoutConflictVersion(filePath, side);
+  }
+
+  /**
+   * Loest einen Modify/Delete-Konflikt auf, indem die geloeschte Seite
+   * uebernommen wird (Datei wird entfernt und die Aufloesung gestaged).
+   */
+  async resolveConflictWithDeletion(filePath: string): Promise<string> {
+    return this.mergeConflictService.resolveConflictWithDeletion(filePath);
   }
 
   /**

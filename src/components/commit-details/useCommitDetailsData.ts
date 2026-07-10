@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
@@ -52,7 +52,14 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
   const [blameHasMore, setBlameHasMore] = useState(false);
 
+  // Bumped whenever the inspected commit changes. Every async fetch captures the
+  // current value and refuses to write state once it is stale, so a late
+  // response for one commit can never leak its files/description/blame into the
+  // view of a different commit.
+  const requestGenerationRef = useRef(0);
+
   useEffect(() => {
+    requestGenerationRef.current += 1;
     setSelectedFilePath(null);
     setSelectedFileCommitHash(null);
     setActiveTab('history');
@@ -66,6 +73,9 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   useEffect(() => {
     if (!normalizedHash || !gitClient.isAvailable()) return;
 
+    const generation = requestGenerationRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation;
+
     const fetchDetails = async () => {
       setLoadingFiles(true);
       setFilesError(null);
@@ -75,6 +85,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
 
       try {
         const parentsResult = await gitClient.runGitCommand('show', '-s', '--format=%P', normalizedHash);
+        if (!isCurrent()) return;
         const parents = parentsResult.success
           ? String(parentsResult.data || '')
               .trim()
@@ -85,11 +96,13 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
         setIsMergeCommit(mergeCommit);
 
         const messageResult = await gitClient.runGitCommand('show', '-s', '--format=%B', normalizedHash);
+        if (!isCurrent()) return;
         if (messageResult.success) {
           setCommitDescription(extractCommitDescription(String(messageResult.data || '')));
         }
 
         const detailResult = await gitClient.runGitCommand('commitDetails', normalizedHash);
+        if (!isCurrent()) return;
         if (!detailResult.success) {
           setFiles([]);
           setFilesError(detailResult.error || t('generated.components.commitdetails.could_not_load_commit_details_cf1a30a2'));
@@ -104,6 +117,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
 
         if (mergeCommit) {
           const mergeRangeResult = await gitClient.runGitCommand('diff', '--name-status', `${normalizedHash}^1`, normalizedHash);
+          if (!isCurrent()) return;
           if (mergeRangeResult.success) {
             const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
             if (mergedBranchFiles.length > 0) {
@@ -116,11 +130,12 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
 
         setFiles([]);
       } catch (fetchError) {
+        if (!isCurrent()) return;
         console.error(fetchError);
         setFiles([]);
         setFilesError(t('generated.components.commitdetails.could_not_load_commit_details_cf1a30a2'));
       } finally {
-        setLoadingFiles(false);
+        if (isCurrent()) setLoadingFiles(false);
       }
     };
 
@@ -136,6 +151,9 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   useEffect(() => {
     if (!selectedFile || !gitClient.isAvailable()) return;
 
+    const generation = requestGenerationRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation;
+
     const fetchHistory = async () => {
       if (activeTab !== 'history') return;
 
@@ -143,6 +161,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setHistoryError(null);
       try {
         const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80);
+        if (!isCurrent()) return;
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -150,11 +169,12 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
           setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
         }
       } catch (fetchError) {
+        if (!isCurrent()) return;
         console.error(fetchError);
         setHistoryEntries([]);
         setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
       } finally {
-        setHistoryLoading(false);
+        if (isCurrent()) setHistoryLoading(false);
       }
     };
 
@@ -163,6 +183,9 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
 
   useEffect(() => {
     if (!selectedFile || !gitClient.isAvailable()) return;
+
+    const generation = requestGenerationRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation;
 
     const fetchBlame = async () => {
       if (activeTab !== 'blame') return;
@@ -177,6 +200,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setBlameError(null);
       try {
         const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, 500);
+        if (!isCurrent()) return;
         if (result.success) {
           setBlameLines(result.data || []);
           setBlameHasMore((result.data || []).length === 500);
@@ -185,11 +209,12 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
           setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
         }
       } catch (fetchError) {
+        if (!isCurrent()) return;
         console.error(fetchError);
         setBlameLines([]);
         setBlameError(t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
       } finally {
-        setBlameLoading(false);
+        if (isCurrent()) setBlameLoading(false);
       }
     };
 
@@ -198,9 +223,11 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
 
   const loadMoreBlame = async () => {
     if (!selectedFile || blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
+    const generation = requestGenerationRef.current;
     setBlameLoading(true);
     try {
       const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, blameLines.length + 1, 500);
+      if (requestGenerationRef.current !== generation) return;
       if (!result.success) {
         setBlameError(result.error);
         return;
@@ -208,7 +235,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setBlameLines((current) => [...current, ...result.data]);
       setBlameHasMore(result.data.length === 500);
     } finally {
-      setBlameLoading(false);
+      if (requestGenerationRef.current === generation) setBlameLoading(false);
     }
   };
 

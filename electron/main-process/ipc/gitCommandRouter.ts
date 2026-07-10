@@ -66,6 +66,7 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   commitDetails: async ({ gitService, args }) => gitService.getCommitDetails(args[0]),
   conflictTakeOurs: async ({ gitService, args }) => gitService.checkoutConflictVersion(args[0], 'ours'),
   conflictTakeTheirs: async ({ gitService, args }) => gitService.checkoutConflictVersion(args[0], 'theirs'),
+  conflictTakeDeleted: async ({ gitService, args }) => gitService.resolveConflictWithDeletion(args[0]),
   conflictMarkResolved: async ({ gitService, args }) => gitService.addFile(args[0]),
   mergeContinue: async ({ gitService }) => gitService.continueMerge(),
   mergeAbort: async ({ gitService }) => gitService.abortMerge(),

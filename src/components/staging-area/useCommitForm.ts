@@ -63,13 +63,21 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
 
   useEffect(() => {
     if (!amendCommit || !repoPath || !gitClient.isAvailable()) return;
+    // Prefilling the form from HEAD is async. If the repository (or amend
+    // toggle) changes before it resolves, discard the result so the old repo's
+    // HEAD message cannot overwrite the new repo's commit form.
+    let cancelled = false;
     void gitClient.runGitCommand('show', '--format=%B', '-s', 'HEAD').then((r) => {
+      if (cancelled) return;
       if (r.success && typeof r.data === 'string') {
         const lines = r.data.trimEnd().split('\n');
         setCommitMsg(lines[0] || '');
         setCommitDescription(lines.slice(2).join('\n'));
       }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [amendCommit, repoPath, setCommitDescription, setCommitMsg]);
 
   const handleCommit = useCallback(async () => {

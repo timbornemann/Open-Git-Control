@@ -17,8 +17,13 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
 
   const hasLoadedReposOnceRef = useRef(false);
   const currentRepoSearchRef = useRef('');
+  // Bumped on each new search (reset) so a slower earlier search run — or a
+  // "load more" belonging to a previous search — cannot write its results into
+  // the list of the current search.
+  const requestGenerationRef = useRef(0);
 
   const resetRepositoryPages = useCallback((options: { clearRepos?: boolean } = {}) => {
+    requestGenerationRef.current += 1;
     setNextRepoPage(1);
     setGithubReposHasMore(false);
     setIsLoadingRepos(false);
@@ -35,6 +40,8 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
       if (!githubClient.isAvailable() || !isAuthenticated) return;
 
       const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+      const generation = requestGenerationRef.current;
+      const isCurrent = () => requestGenerationRef.current === generation;
 
       if (mode === 'reset') {
         setIsLoadingRepos(true);
@@ -48,6 +55,7 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
           perPage: 50,
           search,
         });
+        if (!isCurrent()) return;
 
         if (!result.success) {
           throw new Error(result.error || t('generated.components.layout.hooks.usegithubdomain.could_not_load_repositories_cec34760'));
@@ -69,12 +77,15 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
           });
         }
       } catch (error) {
+        if (!isCurrent()) return;
         console.error(error);
       } finally {
-        if (mode === 'reset') {
-          setIsLoadingRepos(false);
-        } else {
-          setIsLoadingMoreRepos(false);
+        if (isCurrent()) {
+          if (mode === 'reset') {
+            setIsLoadingRepos(false);
+          } else {
+            setIsLoadingMoreRepos(false);
+          }
         }
       }
     },
@@ -85,6 +96,7 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
     async (searchOverride?: string) => {
       const search = typeof searchOverride === 'string' ? searchOverride : currentRepoSearchRef.current;
       currentRepoSearchRef.current = search;
+      requestGenerationRef.current += 1;
       setNextRepoPage(1);
       await fetchReposPage('reset', 1, search);
     },

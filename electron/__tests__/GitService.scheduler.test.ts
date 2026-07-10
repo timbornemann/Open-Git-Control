@@ -130,8 +130,9 @@ describe('GitService bare repository handling', () => {
   it('suppresses worktree status polling commands for bare repositories', async () => {
     const fakeExec = vi.fn(async () => ({ stdout: 'unexpected\n', stderr: '' }));
     const service = new GitService(fakeExec as any);
-    (service as any).repoPath = path.join(os.tmpdir(), 'ogc-bare-test-repo.git');
-    (service as any).repoIsBare = true;
+    const bareRepoPath = path.join(os.tmpdir(), 'ogc-bare-test-repo.git');
+    (service as any).repoPath = bareRepoPath;
+    (service as any).bareState.setActive(bareRepoPath, true);
 
     await expect(service.runCommand(['status', '--short'])).resolves.toBe('');
     await expect(service.runCommand(['status', '--porcelain=v1', '--untracked-files=all'])).resolves.toBe('');

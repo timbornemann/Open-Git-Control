@@ -68,6 +68,49 @@ describe('GitScheduler', () => {
     expect(order.indexOf('write')).toBeLessThan(order.indexOf('polling'));
   });
 
+  it('serializes writes across trailing-slash path aliases of the same repository', async () => {
+    const scheduler = new GitScheduler();
+    const blocker = deferred<void>();
+    const order: string[] = [];
+    const first = scheduler.schedule('C:/repo', 'write', 'add', async () => {
+      order.push('first-start');
+      await blocker.promise;
+      order.push('first-end');
+    });
+    // Same repository via a trailing-separator alias -> must share the queue.
+    const second = scheduler.schedule('C:/repo/', 'write', 'commit', async () => {
+      order.push('second-start');
+    });
+
+    await Promise.resolve();
+    expect(order).toEqual(['first-start']);
+
+    blocker.resolve();
+    await Promise.all([first, second]);
+    expect(order).toEqual(['first-start', 'first-end', 'second-start']);
+  });
+
+  it('rejects an aborted queued job immediately without waiting for the active job', async () => {
+    const scheduler = new GitScheduler();
+    const blocker = deferred<void>();
+    const controller = new AbortController();
+    const ran = vi.fn();
+
+    const activeWrite = scheduler.schedule('C:/repo', 'write', 'add', async () => {
+      await blocker.promise;
+    });
+    const queued = scheduler.schedule('C:/repo', 'write', 'commit', async () => ran(), { signal: controller.signal });
+
+    // Abort while the first write is still blocking; the queued job must reject
+    // now, not only after the active job eventually completes.
+    controller.abort();
+    await expect(queued).rejects.toMatchObject({ name: 'AbortError' });
+    expect(ran).not.toHaveBeenCalled();
+
+    blocker.resolve();
+    await activeWrite;
+  });
+
   it('runs three background reads while reserving capacity for polling', async () => {
     const scheduler = new GitScheduler();
     const blockers = [deferred<void>(), deferred<void>(), deferred<void>(), deferred<void>()];

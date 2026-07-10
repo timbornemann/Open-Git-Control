@@ -84,14 +84,10 @@ export function registerAiHandlers({
 
     if (currentAiAutoCommitJob) {
       const message = 'KI Auto-Commit laeuft bereits. Bitte den laufenden Job erst abschliessen oder abbrechen.';
-      emitAiAutoCommitEvent(webContents, {
-        id: currentAiAutoCommitJob.id,
-        operation: IpcChannel.GitAiAutoCommit,
-        status: 'failed',
-        message,
-        details: { phase: 'failed', mode: 'normal', repoPath: currentAiAutoCommitJob.repoPath, generation: currentAiAutoCommitJob.generation },
-        timestamp: Date.now(),
-      });
+      // Do NOT emit through emitAiAutoCommitEvent here: that would overwrite the
+      // tracked latest event of the STILL-RUNNING job with a 'failed' status
+      // (its id), making the running job disappear from the UI. Only the caller
+      // of this duplicate start needs to learn it was rejected, via the return.
       return { success: false, error: message };
     }
 

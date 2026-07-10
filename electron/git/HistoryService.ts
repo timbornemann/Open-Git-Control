@@ -217,20 +217,26 @@ export class HistoryService {
         if (!statusToken) continue;
 
         const statusChar = statusToken[0];
-        let status: FileTimelineChange['status'] = 'modified';
-        if (statusChar === 'A') status = 'added';
-        else if (statusChar === 'D') status = 'deleted';
-        else if (statusChar === 'R') status = 'renamed';
 
-        if (status === 'renamed') {
+        // Both rename (`R###`) and copy (`C###`) statuses are followed by TWO
+        // path tokens (source + destination). A copy must consume both, or the
+        // destination path is misread as the next status token, producing a
+        // phantom entry (e.g. a file named "M") and dropping the real copy.
+        if (statusChar === 'R' || statusChar === 'C') {
           const oldPath = tokens[i] || '';
           const newPath = tokens[i + 1] || '';
           i += 2;
           if (newPath) {
-            currentCommit.changes.push({ status, path: newPath, oldPath });
+            // A rename moves a file; a copy leaves the source and creates a new
+            // file, so record the copy's destination as an added file.
+            currentCommit.changes.push(statusChar === 'R' ? { status: 'renamed', path: newPath, oldPath } : { status: 'added', path: newPath });
           }
           continue;
         }
+
+        let status: FileTimelineChange['status'] = 'modified';
+        if (statusChar === 'A') status = 'added';
+        else if (statusChar === 'D') status = 'deleted';
 
         const path = tokens[i] || '';
         i += 1;

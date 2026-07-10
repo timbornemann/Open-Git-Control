@@ -315,6 +315,11 @@ export const useCommitGraphData = ({
     loadMoreCommits,
   });
 
+  // Always reflects the latest repoPath so async stats responses can detect a
+  // repository change that happened while they were in flight.
+  const repoPathRef = useRef(repoPath);
+  repoPathRef.current = repoPath;
+
   const updateCommitStats = useCallback(
     (updates: Record<string, CommitStatsUpdate>) => {
       setLayout((current) => {
@@ -351,6 +356,9 @@ export const useCommitGraphData = ({
       if (!repoPath || hashes.length === 0) return;
       const unique = [...new Set(hashes)].slice(0, 500);
       const result = await gitClient.requestCommitStats(unique, priority);
+      // Drop a stats response that arrived after the repository changed, so one
+      // repository's stats never merge into another repository's graph or cache.
+      if (normalizeRepoPathKey(repoPathRef.current || '') !== normalizeRepoPathKey(repoPath)) return;
       if (!result.success) return;
       const updates: Record<string, CommitStatsUpdate> = {};
       for (const [hash, value] of Object.entries(result.data)) {

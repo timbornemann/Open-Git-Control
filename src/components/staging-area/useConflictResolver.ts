@@ -227,6 +227,38 @@ export const useConflictResolver = ({
     [conflictEditor, hasRawConflictMarkers, markConflictResolved, setToast, t],
   );
 
+  const resolveConflictByDeletion = useCallback(
+    async (filePath: string) => {
+      if (activeConflictActionRef.current !== null) return;
+      const actionId = ++nextConflictActionIdRef.current;
+      const repoGeneration = repoGenerationRef.current;
+      const editorSession = editorSessionRef.current;
+      activeConflictActionRef.current = actionId;
+      try {
+        // Accept the deletion side of a modify/delete conflict (`git rm`).
+        const didResolve = await git(
+          ['conflictTakeDeleted', filePath],
+          tr(`Geloeschte Seite fuer ${basename(filePath)} uebernommen`, `Took deleted side for ${basename(filePath)}`),
+        );
+        if (
+          !didResolve ||
+          repoGeneration !== repoGenerationRef.current ||
+          editorSession !== editorSessionRef.current ||
+          activeConflictActionRef.current !== actionId
+        ) {
+          return;
+        }
+        if (conflictEditor?.filePath === filePath) {
+          setConflictEditor(null);
+          setSelectedConflictBlockIndex(0);
+        }
+      } finally {
+        if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
+      }
+    },
+    [conflictEditor, git, tr],
+  );
+
   const resetConflictEditorDraft = useCallback(() => {
     if (!conflictEditor) return;
     setConflictEditor((prev) => {
@@ -386,6 +418,7 @@ export const useConflictResolver = ({
     applyConflictChoiceToSelected,
     applyConflictChoiceToAll,
     markConflictResolvedAndSync,
+    resolveConflictByDeletion,
     resetConflictEditorDraft,
     saveConflictEditor,
     mergeContinue,

@@ -15,13 +15,26 @@ export class MergeConflictService {
     return this.runCommand(['checkout', '--' + side, '--', toLiteralPathspec(filePath)]);
   }
 
+  /**
+   * Resolves a conflict by accepting the deletion side (e.g. a modify/delete
+   * conflict where the other side removed the file). `git rm` stages the
+   * removal and clears the unmerged entry; `-f` is required because the working
+   * tree still holds the modified copy.
+   */
+  resolveConflictWithDeletion(filePath: string): Promise<string> {
+    return this.runCommand(['rm', '-f', '--', toLiteralPathspec(filePath)]);
+  }
+
   async markFileResolved(filePath: string): Promise<string> {
     const resolvedPath = resolveExistingRepositoryPath(this.getRepoPath(), filePath, 'Conflict file path');
     const contents = await fs.promises.readFile(resolvedPath, 'utf8');
+    // A real unresolved conflict has BOTH an opening (`<<<<<<<`) and a closing
+    // (`>>>>>>>`) marker. Requiring both avoids false-positives on a legitimate
+    // lone `=======` line (e.g. a Markdown setext heading rule), which must not
+    // block marking the file as resolved.
     const hasStartMarker = /^<{7,}(?: .*)?\r?$/m.test(contents);
-    const hasSeparatorMarker = /^={7,}\r?$/m.test(contents);
     const hasEndMarker = /^>{7,}(?: .*)?\r?$/m.test(contents);
-    if (hasStartMarker || hasSeparatorMarker || hasEndMarker) {
+    if (hasStartMarker && hasEndMarker) {
       throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
     }
     return this.runCommand(['add', '--', toLiteralPathspec(filePath)]);

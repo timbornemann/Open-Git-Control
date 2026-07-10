@@ -18,6 +18,7 @@ type ConflictResolverPanelProps = {
   reloadActiveConflictEditor: () => Promise<void> | void;
   applyConflictChoiceToAll: (choice: ConflictResolutionChoice) => void;
   markConflictResolvedAndSync: (filePath: string) => Promise<void> | void;
+  resolveConflictByDeletion: (filePath: string) => Promise<void> | void;
   hasPreviousConflictTarget: boolean;
   hasNextConflictTarget: boolean;
   navigateToPreviousConflict: () => Promise<void> | void;
@@ -57,6 +58,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   reloadActiveConflictEditor,
   applyConflictChoiceToAll,
   markConflictResolvedAndSync,
+  resolveConflictByDeletion,
   hasPreviousConflictTarget,
   hasNextConflictTarget,
   navigateToPreviousConflict,
@@ -148,6 +150,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
             reloadActiveConflictEditor={reloadActiveConflictEditor}
             applyConflictChoiceToAll={applyConflictChoiceToAll}
             markConflictResolvedAndSync={markConflictResolvedAndSync}
+            resolveConflictByDeletion={resolveConflictByDeletion}
             isStructuredConflictViewLocked={isStructuredConflictViewLocked}
             conflictBlocks={conflictBlocks}
             selectedConflictBlock={selectedConflictBlock}

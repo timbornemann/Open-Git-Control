@@ -68,6 +68,10 @@ export const useReleaseWorkflow = ({
   const { t, tr } = useLanguageTranslations(language);
   const generationRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
+  // Distinguishes successive refreshReleaseContext calls (e.g. while typing
+  // targetCommitish) within one repo/branch generation, so a slower earlier
+  // request cannot overwrite the context produced by a newer one.
+  const refreshContextRequestRef = useRef(0);
   const [releasePendingAssets, setReleasePendingAssets] = useState<string[]>([]);
 
   useLayoutEffect(() => {
@@ -143,6 +147,8 @@ export const useReleaseWorkflow = ({
       setReleaseContextError(null);
       const generation = generationRef.current;
       const repoPath = activeRepoRef.current;
+      const requestId = ++refreshContextRequestRef.current;
+      const isCurrentRefresh = () => isCurrentGeneration(generation, repoPath) && refreshContextRequestRef.current === requestId;
 
       try {
         const targetCommitish = (targetCommitishOverride ?? releaseForm.targetCommitish ?? '').trim() || currentBranch;
@@ -152,7 +158,7 @@ export const useReleaseWorkflow = ({
           targetCommitish,
           repoPath: repoPath || undefined,
         });
-        if (!isCurrentGeneration(generation, repoPath)) return;
+        if (!isCurrentRefresh()) return;
 
         if (!result.success) {
           setReleaseContext(null);
@@ -181,11 +187,11 @@ export const useReleaseWorkflow = ({
           };
         });
       } catch (error: any) {
-        if (!isCurrentGeneration(generation, repoPath)) return;
+        if (!isCurrentRefresh()) return;
         setReleaseContext(null);
         setReleaseContextError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
       } finally {
-        if (isCurrentGeneration(generation, repoPath)) {
+        if (isCurrentRefresh()) {
           setReleaseContextLoading(false);
         }
       }

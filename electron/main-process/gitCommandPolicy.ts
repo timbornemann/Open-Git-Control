@@ -377,6 +377,7 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
       return assertCommitHash(args[0]);
     case 'conflictTakeOurs':
     case 'conflictTakeTheirs':
+    case 'conflictTakeDeleted':
     case 'conflictMarkResolved':
       if (args.length !== 1) throw new Error('A repository-relative file path is required.');
       return void normalizeRepositoryRelativePath(args[0]);

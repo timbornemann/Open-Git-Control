@@ -7,6 +7,11 @@ const MAX_CONTEXT_ITEMS_PER_HUNK = 3;
 const MAX_CONTEXT_HUNKS = 3;
 const MAX_CONTEXT_ITEMS_TOTAL = 12;
 const MAX_UNTRACKED_SNIPPET_LINES = 12;
+// Only a short prefix of an untracked file is ever used for AI context, so we
+// read at most this many bytes instead of loading the whole file. This keeps a
+// large (potentially multi-GB) untracked file from exhausting memory or
+// blocking the event loop.
+const MAX_UNTRACKED_SNIPPET_BYTES = 64 * 1024;
 
 export type Numstat = {
   additions: number;
@@ -172,13 +177,24 @@ export function buildFileSnippetContext(content: string): string[] {
 }
 
 export async function readUntrackedSnippet(repoPath: string, relativePath: string): Promise<string[]> {
+  let handle: fs.promises.FileHandle | undefined;
   try {
     const absolutePath = resolveExistingRepositoryPath(repoPath, relativePath);
     const stat = await fs.promises.stat(absolutePath);
     if (!stat.isFile()) return [];
-    const raw = await fs.promises.readFile(absolutePath, 'utf8');
-    return buildFileSnippetContext(raw);
+
+    // Read only a bounded prefix regardless of the file's size.
+    handle = await fs.promises.open(absolutePath, 'r');
+    const buffer = Buffer.alloc(MAX_UNTRACKED_SNIPPET_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, MAX_UNTRACKED_SNIPPET_BYTES, 0);
+    const prefix = buffer.subarray(0, bytesRead);
+
+    // Skip binary files (a NUL byte in the prefix): a snippet would be noise.
+    if (prefix.includes(0)) return [];
+    return buildFileSnippetContext(prefix.toString('utf8'));
   } catch {
     return [];
+  } finally {
+    await handle?.close().catch(() => {});
   }
 }

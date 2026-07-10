@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background';
 
 export type GitSchedulerDiagnostic = {
@@ -47,6 +50,7 @@ const abortError = (): Error => {
 export class GitScheduler {
   private readonly repos = new Map<string, RepoState>();
   private readonly diagnostics: GitSchedulerDiagnostic[] = [];
+  private readonly repoKeyCache = new Map<string, string>();
 
   schedule<T>(
     repoPath: string,
@@ -88,7 +92,16 @@ export class GitScheduler {
       if (options.signal.aborted) {
         controller.abort();
       } else {
-        options.signal.addEventListener('abort', () => controller.abort(), { once: true });
+        options.signal.addEventListener(
+          'abort',
+          () => {
+            controller.abort();
+            // Reject a still-queued job immediately instead of waiting for the
+            // blocking job to finish and the next pump() to sweep it out.
+            this.rejectIfQueued(state, entry as QueueEntry<unknown>);
+          },
+          { once: true },
+        );
       }
     }
 
@@ -104,7 +117,7 @@ export class GitScheduler {
   }
 
   private getState(repoPath: string): RepoState {
-    const key = process.platform === 'win32' ? repoPath.toLowerCase() : repoPath;
+    const key = this.canonicalRepoKey(repoPath);
     let state = this.repos.get(key);
     if (!state) {
       state = {
@@ -116,6 +129,37 @@ export class GitScheduler {
       this.repos.set(key, state);
     }
     return state;
+  }
+
+  /**
+   * Canonicalizes a repository path so aliases of the same repository share one
+   * queue: a trailing separator (`C:\repo` vs `C:\repo\`), and symlinks or
+   * Windows junctions are all resolved to the same physical path. Without this,
+   * two writes to aliases of one repo could run concurrently.
+   */
+  private canonicalRepoKey(repoPath: string): string {
+    const cached = this.repoKeyCache.get(repoPath);
+    if (cached) return cached;
+
+    let resolved: string;
+    try {
+      resolved = fs.realpathSync.native(repoPath);
+    } catch {
+      // The path may not exist yet (e.g. clone target); fall back to a
+      // lexical normalization which still collapses trailing separators.
+      resolved = path.resolve(repoPath);
+    }
+    const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    this.repoKeyCache.set(repoPath, key);
+    return key;
+  }
+
+  private rejectIfQueued(state: RepoState, entry: QueueEntry<unknown>): void {
+    const index = state.queue.indexOf(entry);
+    if (index < 0) return; // already started (or already removed)
+    state.queue.splice(index, 1);
+    this.finishCoalesced(state, entry);
+    entry.reject(abortError());
   }
 
   private abortBackground(state: RepoState): void {

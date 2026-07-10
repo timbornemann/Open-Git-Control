@@ -195,6 +195,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               reloadActiveConflictEditor={conflicts.reloadActiveConflictEditor}
               applyConflictChoiceToAll={conflicts.applyConflictChoiceToAll}
               markConflictResolvedAndSync={conflicts.markConflictResolvedAndSync}
+              resolveConflictByDeletion={conflicts.resolveConflictByDeletion}
               hasPreviousConflictTarget={conflicts.hasPreviousConflictTarget}
               hasNextConflictTarget={conflicts.hasNextConflictTarget}
               navigateToPreviousConflict={conflicts.navigateToPreviousConflict}

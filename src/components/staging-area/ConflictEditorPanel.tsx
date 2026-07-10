@@ -12,6 +12,7 @@ type ConflictEditorPanelProps = {
   reloadActiveConflictEditor: () => Promise<void> | void;
   applyConflictChoiceToAll: (choice: ConflictResolutionChoice) => void;
   markConflictResolvedAndSync: (filePath: string) => Promise<void> | void;
+  resolveConflictByDeletion: (filePath: string) => Promise<void> | void;
   isStructuredConflictViewLocked: boolean;
   conflictBlocks: ConflictBlock[];
   selectedConflictBlock: ConflictBlock | null;
@@ -30,6 +31,7 @@ export const ConflictEditorPanel = ({
   reloadActiveConflictEditor,
   applyConflictChoiceToAll,
   markConflictResolvedAndSync,
+  resolveConflictByDeletion,
   isStructuredConflictViewLocked,
   conflictBlocks,
   selectedConflictBlock,
@@ -69,6 +71,7 @@ export const ConflictEditorPanel = ({
           reloadActiveConflictEditor={reloadActiveConflictEditor}
           applyConflictChoiceToAll={applyConflictChoiceToAll}
           markConflictResolvedAndSync={markConflictResolvedAndSync}
+          resolveConflictByDeletion={resolveConflictByDeletion}
         />
 
         <div className="conflict-editor-content">

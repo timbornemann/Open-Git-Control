@@ -323,12 +323,28 @@ export class AiAutoCommitRunSession {
   }
 
   private async commitBatch(batchFiles: SnapshotFile[], queue: SnapshotFile[], groupIndex: number, totalFiles: number): Promise<void> {
+    // Do not begin a batch that has already been cancelled.
+    this.ensureNotCancelled();
     await this.stageBatchFiles(batchFiles);
-    const message = await this.buildMessageForBatch(batchFiles, groupIndex, queue.length, totalFiles);
-    this.ensureNotCancelled();
-    await this.commitBatchWithMessage(batchFiles, message);
-    this.ensureNotCancelled();
 
+    // From here until the commit is created, the batch is staged. A cancellation
+    // (or any error) in this window must roll the staging back so a cancel never
+    // leaves half-staged files behind.
+    let message: CommitMessage;
+    try {
+      message = await this.buildMessageForBatch(batchFiles, groupIndex, queue.length, totalFiles);
+      this.ensureNotCancelled();
+    } catch (error: unknown) {
+      await this.safeUnstageBatchFiles(batchFiles);
+      throw error;
+    }
+
+    await this.commitBatchWithMessage(batchFiles, message);
+
+    // The commit is now durable. Record it and advance the queue BEFORE any
+    // further cancellation check, so a cancel arriving right after the commit
+    // cannot make an already-created commit look like an unresolved batch (which
+    // would otherwise be re-committed on the next run).
     const hash = (await this.runGitCommand(['rev-parse', '--short', 'HEAD'])).trim();
     const subject = (await this.runGitCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
     this.state.commits.push({ hash, subject });
@@ -348,24 +364,39 @@ export class AiAutoCommitRunSession {
   }
 
   private async stageBatchFiles(batchFiles: SnapshotFile[]): Promise<void> {
+    // Staging is intentionally NOT interrupted by cancellation: a partially
+    // staged batch must never be left behind. The caller checks for
+    // cancellation after staging and rolls back if needed.
     const gitCapabilities: unknown = this.gitService;
     if (typeof this.gitService.stagePathsAtPath === 'function') {
       await this.gitService.stagePathsAtPath(
         this.repoPath,
         batchFiles.map((file) => file.path),
       );
-      this.ensureNotCancelled();
       return;
     }
     if (hasStagePaths(gitCapabilities)) {
       await gitCapabilities.stagePaths(batchFiles.map((file) => file.path));
-      this.ensureNotCancelled();
       return;
     }
 
     for (const file of batchFiles) {
       await this.runGitCommand(['add', '--', toLiteralPathspec(file.path)]);
-      this.ensureNotCancelled();
+    }
+  }
+
+  /**
+   * Best-effort rollback of a staged batch (e.g. after a cancellation before the
+   * commit was created). Resetting the paths restores them to unstaged; failures
+   * are swallowed so the original error/cancellation still surfaces.
+   */
+  private async safeUnstageBatchFiles(batchFiles: SnapshotFile[]): Promise<void> {
+    const paths = batchFiles.map((file) => file.path);
+    if (paths.length === 0) return;
+    try {
+      await this.runGitCommand(['reset', '-q', '--', ...paths.map((filePath) => toLiteralPathspec(filePath))]);
+    } catch {
+      // Ignore rollback failures; the caller re-throws the original error.
     }
   }
 

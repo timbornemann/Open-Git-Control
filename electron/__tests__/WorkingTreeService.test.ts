@@ -157,4 +157,26 @@ describe('WorkingTreeService', () => {
     expect(snapshot.changeCount).toBe(0);
     expect(getStatusPorcelainAtPath).not.toHaveBeenCalled();
   });
+
+  it('returns empty stats for a bare repository without running git diff', async () => {
+    const runPollingCommandAtPath = vi.fn();
+    const service = new WorkingTreeService({
+      getRepoPath: () => 'C:/bare.git',
+      isBareRepositoryAtPath: () => true,
+      getStatusPorcelainAtPath: vi.fn(),
+      runPollingCommandAtPath,
+    } as any);
+
+    const snapshot = await service.getSnapshot();
+    expect(snapshot.isBare).toBe(true);
+
+    const stats = await service.getStats(snapshot.snapshotId);
+    expect(stats).toEqual({
+      snapshotId: snapshot.snapshotId,
+      staged: { files: 0, additions: 0, deletions: 0 },
+      unstaged: { files: 0, additions: 0, deletions: 0 },
+    });
+    // git diff must never run on a bare repo (it fails on every poll otherwise).
+    expect(runPollingCommandAtPath).not.toHaveBeenCalled();
+  });
 });

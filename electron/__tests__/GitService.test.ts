@@ -94,6 +94,33 @@ describe('GitService file timeline data', () => {
       },
     ]);
   });
+
+  it('consumes both paths of a copy (C###) status so no phantom entry is produced', async () => {
+    const service = new GitService();
+    const recordSeparator = '\x1e';
+    const fieldSeparator = '\x1f';
+    const nullSeparator = '\x00';
+    const hash = 'b'.repeat(40);
+    vi.spyOn(service, 'runCommand').mockResolvedValue(
+      [
+        `${recordSeparator}${hash}${fieldSeparator}Bob${fieldSeparator}2026-02-02 09:00:00 +0000${fieldSeparator}chore: copy config`,
+        'C100',
+        'config/base.json',
+        'config/derived.json',
+        'M',
+        'src/app.ts',
+      ].join(nullSeparator),
+    );
+
+    const timeline = await service.getFileTimelineData(50);
+
+    // The copy is recorded as an added file at the destination, and the trailing
+    // modified file is parsed correctly (no phantom "M" entry, no dropped copy).
+    expect(timeline[0].changes).toEqual([
+      { status: 'added', path: 'config/derived.json' },
+      { status: 'modified', path: 'src/app.ts' },
+    ]);
+  });
 });
 
 describe('GitService forensic history commands', () => {

@@ -127,10 +127,18 @@ export class WorkingTreeService {
 
     const promise = (async () => {
       const startedAt = Date.now();
+      const bareChecker = this.gitService as {
+        isBareRepositoryAtPath?: (repoPath: string) => boolean;
+        isBareRepository?: () => boolean;
+      };
+      // Resolve the bare status of THIS snapshot's repository path, not whatever
+      // repository happens to be active when the async work runs.
       const isBare =
-        typeof (this.gitService as { isBareRepository?: () => boolean }).isBareRepository === 'function'
-          ? Boolean((this.gitService as { isBareRepository: () => boolean }).isBareRepository())
-          : false;
+        typeof bareChecker.isBareRepositoryAtPath === 'function'
+          ? Boolean(bareChecker.isBareRepositoryAtPath(repoPath))
+          : typeof bareChecker.isBareRepository === 'function'
+            ? Boolean(bareChecker.isBareRepository())
+            : false;
       const statusRaw = isBare ? '' : await this.gitService.getStatusPorcelainAtPath(repoPath);
       const durationMs = Date.now() - startedAt;
       const changeCount = statusRaw ? statusRaw.split(/\r?\n/).filter((line) => line.length >= 3).length : 0;
@@ -169,6 +177,18 @@ export class WorkingTreeService {
     const snapshot = this.latestSnapshot;
     if (!snapshot || snapshot.snapshotId !== snapshotId) {
       throw new Error('Working tree snapshot is stale.');
+    }
+
+    // A bare repository has no working tree, so `git diff --numstat` fails on
+    // every poll. Return empty stats instead of repeatedly erroring.
+    if (snapshot.isBare) {
+      const bareStats: WorkingTreeStats = {
+        snapshotId,
+        staged: { files: 0, additions: 0, deletions: 0 },
+        unstaged: { files: 0, additions: 0, deletions: 0 },
+      };
+      this.statsCache.set(snapshotId, bareStats);
+      return bareStats;
     }
 
     const promise = (async () => {

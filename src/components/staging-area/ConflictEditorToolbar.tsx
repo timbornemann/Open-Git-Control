@@ -10,6 +10,7 @@ type ConflictEditorToolbarProps = {
   reloadActiveConflictEditor: () => Promise<void> | void;
   applyConflictChoiceToAll: (choice: ConflictResolutionChoice) => void;
   markConflictResolvedAndSync: (filePath: string) => Promise<void> | void;
+  resolveConflictByDeletion: (filePath: string) => Promise<void> | void;
 };
 
 export const ConflictEditorToolbar = ({
@@ -19,6 +20,7 @@ export const ConflictEditorToolbar = ({
   reloadActiveConflictEditor,
   applyConflictChoiceToAll,
   markConflictResolvedAndSync,
+  resolveConflictByDeletion,
 }: ConflictEditorToolbarProps) => {
   const { t, tr } = useI18n();
 
@@ -50,6 +52,19 @@ export const ConflictEditorToolbar = ({
           {t('generated.components.staging_area.conflictresolverpanel.all_incoming_version_24786320')}
         </Button>
         <div className="conflict-toolbar-divider" />
+        <Button
+          variant="danger"
+          disabled={conflictEditor.isSaving}
+          onClick={() => {
+            void resolveConflictByDeletion(conflictEditor.filePath);
+          }}
+          title={tr(
+            'Loest den Konflikt, indem die Datei geloescht wird (geloeschte Seite uebernehmen).',
+            'Resolves the conflict by deleting the file (take the deleted side).',
+          )}
+        >
+          {tr('Loeschung uebernehmen', 'Take deleted side')}
+        </Button>
         <Button
           variant="success"
           disabled={conflictEditor.isSaving || hasUnresolvedConflictMarkers}

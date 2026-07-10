@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettingsDto, UpdaterStatusDto } from '@/types/appDtos';
 import type { TranslationVariables } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
@@ -26,6 +26,15 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
   const [updaterMessage, setUpdaterMessage] = useState<string | null>(null);
   const [isRunningUpdate, setIsRunningUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
+
+  // Bumped whenever the AI provider changes. A model list belongs to one
+  // provider; switching providers must clear it and invalidate any in-flight
+  // list request so another provider's models never appear.
+  const modelsGenerationRef = useRef(0);
+  useEffect(() => {
+    modelsGenerationRef.current += 1;
+    setModelOptions([]);
+  }, [settings.aiProvider]);
 
   const selectedModel =
     settings.aiProvider === 'gemini' ? settings.geminiModel : settings.aiProvider === 'openai' ? settings.openAiModel : settings.ollamaModel;
@@ -122,10 +131,13 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
 
   const loadModels = async () => {
     if (!aiClient.isAvailable()) return;
+    const generation = modelsGenerationRef.current;
+    const isCurrent = () => modelsGenerationRef.current === generation;
     setIsLoadingModels(true);
     setAiStatus(null);
     try {
       const result = await aiClient.listModels();
+      if (!isCurrent()) return;
       if (!result.success) {
         setAiStatus(tr(`Modelle konnten nicht geladen werden: ${result.error}`, `Could not load models: ${result.error}`));
         return;
@@ -136,9 +148,10 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
       }
       setAiStatus(tr(`${result.data.length} Modell(e) geladen.`, `${result.data.length} model(s) loaded.`));
     } catch (error: unknown) {
+      if (!isCurrent()) return;
       setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_models_c6582ed1'));
     } finally {
-      setIsLoadingModels(false);
+      if (isCurrent()) setIsLoadingModels(false);
     }
   };
 

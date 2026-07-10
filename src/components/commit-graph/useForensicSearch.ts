@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
@@ -25,6 +25,17 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
   const [forensicError, setForensicError] = useState<string | null>(null);
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
+
+  // Bumped on every repository change. A search started in repository A must not
+  // display its results in (or persist into) repository B.
+  const searchGenerationRef = useRef(0);
+
+  useEffect(() => {
+    searchGenerationRef.current += 1;
+    setForensicResults([]);
+    setForensicError(null);
+    setForensicLoading(false);
+  }, [repoPath]);
 
   useEffect(() => {
     try {
@@ -114,11 +125,15 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
       args.push(searchTerm, '0', '0', '200');
     }
 
+    const generation = searchGenerationRef.current;
+    const isCurrent = () => searchGenerationRef.current === generation;
+
     setForensicLoading(true);
     setForensicError(null);
 
     try {
       const { success, data, error } = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+      if (!isCurrent()) return;
       if (!success) {
         const message = String(error || t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
         const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
@@ -136,10 +151,11 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
         setForensicError(t('generated.components.commit_graph.useforensicsearch.no_matches_found_f24033f1'));
       }
     } catch (error: unknown) {
+      if (!isCurrent()) return;
       setForensicResults([]);
       setForensicError(error instanceof Error ? error.message : t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
     } finally {
-      setForensicLoading(false);
+      if (isCurrent()) setForensicLoading(false);
     }
   }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, t]);
 
