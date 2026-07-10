@@ -136,6 +136,7 @@ const createGithubSlice = (
   prFilter: state.prFilter,
   setPrFilter: state.setPrFilter,
   prLoading: state.prLoading,
+  prHasLoaded: state.prHasLoaded,
   prError: state.prError,
   pullRequests: state.pullRequests,
   prCiByNumber: state.prCiByNumber,

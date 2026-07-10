@@ -1,5 +1,23 @@
-import { describe, expect, it, vi } from 'vitest';
-import { loadPullRequests, parsePrOwnerRepoFromRemote, resolvePrOwnerRepo, submitPullRequest } from '@/hooks/usePullRequests';
+import { JSDOM } from 'jsdom';
+import { act, createElement, useState } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
+import { loadPullRequests, parsePrOwnerRepoFromRemote, resolvePrOwnerRepo, submitPullRequest, usePullRequests } from '@/hooks/usePullRequests';
+
+const flush = async () => {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('usePullRequests helpers', () => {
   it('erkennt owner/repo aus HTTPS- und SSH-Remote', () => {
@@ -143,5 +161,80 @@ describe('usePullRequests helpers', () => {
 
     expect(getRepoOriginUrl).toHaveBeenCalledWith('/tmp/repo');
     expect(resolved).toEqual({ owner: 'octo', repo: 'my-repo' });
+  });
+});
+
+describe('usePullRequests refresh lifecycle', () => {
+  it('does not restart a request when the parent supplies a new onError callback after each render', async () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>');
+    vi.stubGlobal('window', dom.window);
+    vi.stubGlobal('document', dom.window.document);
+    vi.stubGlobal('navigator', dom.window.navigator);
+    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'https://github.com/octo/repo.git' });
+    vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
+
+    let resolvePullRequests: ((value: { success: boolean; data: [] }) => void) | undefined;
+    const getPullRequests = vi.spyOn(githubClient, 'getPullRequests').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePullRequests = resolve;
+        }),
+    );
+
+    let domain: ReturnType<typeof usePullRequests> | null = null;
+    let rerender: (() => void) | null = null;
+    let refresh: (() => void) | null = null;
+    const root: Root = createRoot(document.createElement('div'));
+    const Harness = () => {
+      const [, setRenderVersion] = useState(0);
+      const [refreshTrigger, setRefreshTrigger] = useState(0);
+      rerender = () => setRenderVersion((version) => version + 1);
+      refresh = () => setRefreshTrigger((trigger) => trigger + 1);
+      domain = usePullRequests({
+        activeRepo: '/repo',
+        isAuthenticated: true,
+        refreshTrigger,
+        language: 'en',
+        onError: () => undefined,
+      });
+      return null;
+    };
+
+    act(() => {
+      root.render(createElement(Harness));
+    });
+    await vi.waitFor(() => expect(getPullRequests).toHaveBeenCalledTimes(1));
+    await flush();
+
+    expect(getPullRequests).toHaveBeenCalledTimes(1);
+
+    resolvePullRequests?.({ success: true, data: [] });
+    await flush();
+
+    expect(domain?.prLoading).toBe(false);
+    expect(domain?.prHasLoaded).toBe(true);
+    expect(domain?.pullRequests).toEqual([]);
+
+    act(() => {
+      rerender?.();
+    });
+    await flush();
+
+    expect(getPullRequests).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      refresh?.();
+    });
+    await vi.waitFor(() => expect(getPullRequests).toHaveBeenCalledTimes(2));
+
+    expect(domain?.prLoading).toBe(true);
+    expect(domain?.prHasLoaded).toBe(true);
+
+    resolvePullRequests?.({ success: true, data: [] });
+    await flush();
+    act(() => root.unmount());
   });
 });

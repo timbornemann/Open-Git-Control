@@ -57,6 +57,7 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
       prFilter={github.prFilter}
       setPrFilter={github.setPrFilter}
       prLoading={github.prLoading}
+      prHasLoaded={github.prHasLoaded}
       prError={github.prError}
       pullRequests={github.pullRequests}
       prCiByNumber={github.prCiByNumber}

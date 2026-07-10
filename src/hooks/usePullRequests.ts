@@ -51,6 +51,7 @@ const MAX_BACKOFF_INTERVAL_MS = 5 * 60_000;
 export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, githubHost = 'github.com', onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
+  const [prHasLoaded, setPrHasLoaded] = useState(false);
   const [prError, setPrError] = useState<string | null>(null);
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
   const [prFilter, setPrFilter] = useState<'open' | 'closed' | 'all'>('open');
@@ -58,6 +59,13 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   const ownerRepoKeyRef = useRef('');
   const activeRepoRef = useRef<string | null>(activeRepo);
   const prOwnerRepoRef = useRef<RepoOwnerRef | null>(null);
+  const callbacksRef = useRef({ onCreated, onError });
+  const prScopeKeyRef = useRef('');
+  const prScopeKey = prOwnerRepo ? `${prOwnerRepo.owner}/${prOwnerRepo.repo}:${prFilter}` : '';
+
+  useLayoutEffect(() => {
+    callbacksRef.current = { onCreated, onError };
+  }, [onCreated, onError]);
 
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
@@ -67,8 +75,18 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     setPullRequests([]);
     setPrCiByNumber({});
     setPrLoading(false);
+    setPrHasLoaded(false);
     setPrError(null);
   }, [activeRepo, githubHost, isAuthenticated]);
+
+  useLayoutEffect(() => {
+    if (prScopeKeyRef.current === prScopeKey) return;
+    prScopeKeyRef.current = prScopeKey;
+    setPullRequests([]);
+    setPrCiByNumber({});
+    setPrHasLoaded(false);
+    setPrError(null);
+  }, [prScopeKey]);
 
   useEffect(() => {
     let active = true;
@@ -106,6 +124,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     const fetchPRs = async () => {
       if (!prOwnerRepo || !isAuthenticated) {
         setPrLoading(false);
+        setPrHasLoaded(false);
         setPrError(null);
         return;
       }
@@ -120,8 +139,9 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
         setPrError(null);
       } else if (result && !result.ok) {
         setPrError(result.error);
-        onError?.(result.error);
+        callbacksRef.current.onError?.(result.error);
       }
+      setPrHasLoaded(true);
       setPrLoading(false);
     };
 
@@ -129,7 +149,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     return () => {
       active = false;
     };
-  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger, onError]);
+  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
 
   const openPrs = useMemo(() => pullRequests.filter((pr) => pr.state === 'open'), [pullRequests]);
 
@@ -205,19 +225,20 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       if (activeRepoRef.current !== repoAtStart || currentOwnerRepoKey !== ownerRepoKeyAtStart) return false;
 
       if (result.success) {
-        onCreated?.(result.number);
+        callbacksRef.current.onCreated?.(result.number);
         return true;
       }
 
-      onError?.(result.error);
+      callbacksRef.current.onError?.(result.error);
       return false;
     },
-    [activeRepo, language, onCreated, onError, prOwnerRepo],
+    [activeRepo, language, prOwnerRepo],
   );
 
   return {
     pullRequests,
     prLoading,
+    prHasLoaded,
     prError,
     prOwnerRepo,
     prFilter,

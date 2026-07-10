@@ -15,6 +15,7 @@ type RepoGithubActionsContentProps = Pick<
   | 'prFilter'
   | 'setPrFilter'
   | 'prLoading'
+  | 'prHasLoaded'
   | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
@@ -136,7 +137,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
           actions={
             <>
               <span
-                className={`repo-refresh-indicator ${props.prLoading && props.pullRequests.length > 0 ? '' : 'repo-refresh-indicator--idle'}`}
+                className={`repo-refresh-indicator ${props.prLoading ? '' : 'repo-refresh-indicator--idle'}`}
                 title={props.prLoading ? t('generated.components.layout.sidebar.repogithubactionscontent.refreshing_pull_requests_49129472') : undefined}
                 aria-label={props.prLoading ? t('generated.components.layout.sidebar.repogithubactionscontent.refreshing_pull_requests_5b1ab8b6') : undefined}
                 aria-hidden={!props.prLoading}
@@ -166,6 +167,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               prFilter={props.prFilter}
               setPrFilter={props.setPrFilter}
               prLoading={props.prLoading}
+              prHasLoaded={props.prHasLoaded}
               prError={props.prError}
               pullRequests={props.pullRequests}
               prCiByNumber={props.prCiByNumber}

@@ -13,6 +13,7 @@ type PullRequestPanelProps = {
   prFilter: 'open' | 'closed' | 'all';
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
+  prHasLoaded: boolean;
   prError?: string | null;
   pullRequests: PullRequestDto[];
   prCiByNumber: Record<number, PullRequestCiDto>;
@@ -64,6 +65,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
   prFilter,
   setPrFilter,
   prLoading,
+  prHasLoaded,
   prError = null,
   pullRequests,
   prCiByNumber,
@@ -88,6 +90,8 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
   const { t } = useI18n();
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
   const [mergingPrNumber, setMergingPrNumber] = useState<number | null>(null);
+  const isInitialLoad = !prHasLoaded && !prError;
+  const isRefreshing = prLoading && prHasLoaded;
 
   const prFilterOptions: Array<{ label: string; value: PullRequestFilter }> = [
     { value: 'open', label: t('generated.components.layout.sidebar.githubconnectedcontent.open_3213d9d8') },
@@ -103,6 +107,11 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
           <span className="github-panel-section-title">
             {t('generated.components.layout.sidebar.githubconnectedcontent.pull_requests_b5324949')} ({ownerRepo.owner}/{ownerRepo.repo})
           </span>
+          {isRefreshing && (
+            <span title={t('generated.components.layout.sidebar.repogithubactionscontent.refreshing_pull_requests_49129472')}>
+              <RefreshCw size={13} className="spin" />
+            </span>
+          )}
           <IconButton
             aria-label={t('generated.components.layout.sidebar.githubconnectedcontent.create_new_pr_e147bebb')}
             icon={<Plus size={13} />}
@@ -165,18 +174,18 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
         </Panel>
       )}
 
-      {prLoading && (
+      {isInitialLoad && (
         <div className="github-panel-loading">{t('generated.components.layout.sidebar.githubconnectedcontent.loading_pull_requests_f64f6445')}</div>
       )}
 
-      {!prLoading && prError && (
+      {!isInitialLoad && prError && (
         <div className="release-alert release-alert--danger" style={{ marginBottom: 8 }}>
           <XCircle size={16} />
           <div>{prError}</div>
         </div>
       )}
 
-      {!prLoading &&
+      {!isInitialLoad &&
         !prError &&
         pullRequests.map((pr) => {
           const ci = prCiByNumber[pr.number];
@@ -306,7 +315,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
           );
         })}
 
-      {!prLoading && !prError && pullRequests.length === 0 && (
+      {!isInitialLoad && !prError && pullRequests.length === 0 && (
         <EmptyState
           icon={<GitPullRequest size={32} />}
           title={t('generated.components.layout.sidebar.githubconnectedcontent.no_pull_requests_4e17ae83')}

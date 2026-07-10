@@ -193,6 +193,7 @@ export type GithubStateContract = {
   prFilter: 'open' | 'closed' | 'all';
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
+  prHasLoaded: boolean;
   prError: string | null;
   pullRequests: PullRequestDto[];
   prCiByNumber: Record<number, PullRequestCiDto>;

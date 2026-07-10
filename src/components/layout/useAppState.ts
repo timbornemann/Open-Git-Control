@@ -222,22 +222,32 @@ export const useAppState = () => {
     tr,
   });
 
-  const pullRequestDomain = usePullRequests({
-    activeRepo: workspace.activeRepo,
-    isAuthenticated: github.isAuthenticated,
-    refreshTrigger,
-    language: settings.language,
-    githubHost: settings.githubHost,
-    onCreated: (number) => {
+  const handlePullRequestCreated = useCallback(
+    (number: number) => {
       setGitActionToast({ msg: tr(`PR #${number} erstellt.`, `Created PR #${number}.`), isError: false });
       setShowCreatePR(false);
       setNewPRTitle('');
       setNewPRBody('');
       triggerRefresh();
     },
-    onError: (message) => {
+    [setGitActionToast, setNewPRBody, setNewPRTitle, setShowCreatePR, tr, triggerRefresh],
+  );
+
+  const handlePullRequestError = useCallback(
+    (message: string) => {
       setGitActionToast({ msg: message, isError: true });
     },
+    [setGitActionToast],
+  );
+
+  const pullRequestDomain = usePullRequests({
+    activeRepo: workspace.activeRepo,
+    isAuthenticated: github.isAuthenticated,
+    refreshTrigger,
+    language: settings.language,
+    githubHost: settings.githubHost,
+    onCreated: handlePullRequestCreated,
+    onError: handlePullRequestError,
   });
 
   const handleCreateGithubRepoForCurrent = async () => {
@@ -423,6 +433,7 @@ export const useAppState = () => {
     prFilter: pullRequestDomain.prFilter,
     setPrFilter: pullRequestDomain.setPrFilter,
     prLoading: pullRequestDomain.prLoading,
+    prHasLoaded: pullRequestDomain.prHasLoaded,
     prError: pullRequestDomain.prError,
     pullRequests: pullRequestDomain.pullRequests,
     prCiByNumber: pullRequestDomain.prCiByNumber,
