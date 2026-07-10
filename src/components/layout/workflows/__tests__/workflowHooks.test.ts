@@ -5,6 +5,7 @@ import { act } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { useGitCommandGuardWorkflow } from '@/components/layout/workflows/useGitCommandGuardWorkflow';
+import { useGitCommandWorkflow } from '@/components/layout/workflows/useGitCommandWorkflow';
 import { type GitCommandRunner, useGitSyncRecoveryWorkflow } from '@/components/layout/workflows/useGitSyncRecoveryWorkflow';
 import { useInitialCommitRecoveryWorkflow } from '@/components/layout/workflows/useInitialCommitRecoveryWorkflow';
 import { useRepoUnavailableWorkflow } from '@/components/layout/workflows/useRepoUnavailableWorkflow';
@@ -143,6 +144,7 @@ describe('workflow hooks', () => {
       expect.any(String),
       expect.any(String),
       expect.objectContaining({ skipRemoteAheadDirtyGuard: true, skipSecretScan: true }),
+      true,
     );
     expect(runGitCommand).toHaveBeenNthCalledWith(
       3,
@@ -150,8 +152,103 @@ describe('workflow hooks', () => {
       expect.any(String),
       expect.any(String),
       expect.objectContaining({ skipSecretScan: true }),
+      true,
     );
     expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
+
+    hook.unmount();
+  });
+
+  it('fuehrt Autostash-Pull als stash, pull und stash pop mit Continuation aus', async () => {
+    const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const hook = renderHook(() =>
+      useGitSyncRecoveryWorkflow({
+        runGitCommandRef: { current: runGitCommand },
+        setActiveTab: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast,
+        language: 'de',
+      }),
+    );
+
+    const handled = hook.current.maybeHandleSyncMismatchFailure({
+      command: 'pull',
+      failureMessage: 'Please commit your changes or stash them before you merge.',
+      args: ['pull', '--rebase'],
+      successMsg: 'pulled',
+      actionLabel: 'Pull...',
+    });
+    expect(handled).toBe(true);
+
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    await act(async () => {
+      await dialog.onConfirm?.();
+    });
+
+    expect(runGitCommand).toHaveBeenNthCalledWith(
+      1,
+      ['stash', 'push', '-u', '-m', 'Open Git Control autostash before pull: git pull --rebase'],
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ skipDirtyGuard: true, skipSyncMismatchRecovery: true }),
+    );
+    expect(runGitCommand).toHaveBeenNthCalledWith(2, ['pull', '--rebase'], 'pulled', 'Pull...', expect.objectContaining({ skipSecretScan: true }), true);
+    expect(runGitCommand).toHaveBeenNthCalledWith(
+      3,
+      ['stash', 'pop'],
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ skipSecretScan: true }),
+      true,
+    );
+    expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
+
+    hook.unmount();
+  });
+
+  it('gibt den Git-Workflow-Lock nach einem Befehl wieder frei', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    const runGitCommandSpy = vi.spyOn(gitClient, 'runGitCommand').mockResolvedValue({ success: true, data: '' });
+    const setGitActionToast = vi.fn();
+    const workspace = {
+      activeRepo: 'C:\\repos\\demo',
+      addOpenRepo: vi.fn().mockResolvedValue(undefined),
+      setActiveRepo: vi.fn(),
+      setActiveTab: vi.fn(),
+    };
+
+    const hook = renderHook(() =>
+      useGitCommandWorkflow({
+        workspace,
+        settings: {
+          confirmDangerousOps: false,
+          defaultBranch: 'main',
+          language: 'en',
+          secretScanBeforePushEnabled: false,
+        },
+        triggerRefresh: vi.fn(),
+        setConfirmDialog: vi.fn(),
+        setGitActionToast,
+        setConflictResolverPath: vi.fn(),
+      }),
+    );
+
+    let first = false;
+    let second = false;
+    await act(async () => {
+      first = await hook.current.runGitCommand(['fetch', '--all', '--prune', '--tags'], 'fetched');
+    });
+    await act(async () => {
+      second = await hook.current.runGitCommand(['fetch', '--all', '--prune', '--tags'], 'fetched again');
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    expect(runGitCommandSpy).toHaveBeenCalledTimes(2);
+    expect(hook.current.isGitActionRunning).toBe(false);
+    expect(hook.current.isGitActionRunningRef.current).toBe(false);
 
     hook.unmount();
   });

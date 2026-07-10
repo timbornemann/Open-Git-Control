@@ -8,7 +8,14 @@ import { gitWorkflowCommands } from './gitWorkflowCommands';
 
 type Toast = { msg: string; isError: boolean };
 
-export type GitCommandRunner = (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
+export type GitCommandRunner = (
+  args: string[],
+  successMsg: string,
+  actionLabel?: string,
+  options?: RunGitCommandOptions,
+  /** When true, skip the exclusive workflow-run lock (chained recovery steps). */
+  internalContinuation?: boolean,
+) => Promise<boolean>;
 
 type Params = {
   runGitCommandRef: MutableRefObject<GitCommandRunner | null>;
@@ -52,6 +59,8 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
       };
       const quickFixStashMessage = 'Open Git Control quick sync fix';
 
+      // First step acquires the normal workflow lock; later steps pass
+      // internalContinuation so a stuck/held lock cannot abort the chain mid-fix.
       const stashed = await runGitCommand(
         gitWorkflowCommands.stashPushAll(quickFixStashMessage),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_saved_changes_to_stash_5cd00a52'),
@@ -67,6 +76,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_pull_rebase_completed_acf1dc5f'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_running_pull_rebase_394092f9'),
         quickFixOptions,
+        true,
       );
       if (!pulled) {
         setGitActionToast({
@@ -81,6 +91,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_stash_reapplied_5491de8e'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.quick_fix_reapplying_stash_3a51c601'),
         quickFixOptions,
+        true,
       );
       if (!popped) {
         setGitActionToast({
@@ -129,7 +140,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         return;
       }
 
-      const pulled = await runGitCommand(args, successMsg, actionLabel, autostashOptions);
+      const pulled = await runGitCommand(args, successMsg, actionLabel, autostashOptions, true);
       if (!pulled) {
         setGitActionToast({
           msg: t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_stopped_pull_failed_your_changes_remain_safe_i_480071f0'),
@@ -143,6 +154,7 @@ export const useGitSyncRecoveryWorkflow = ({ runGitCommandRef, setActiveTab, set
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_stash_reapplied_34ac5813'),
         t('generated.components.layout.workflows.usegitsyncrecoveryworkflow.autostash_reapplying_stash_ebfb337f'),
         autostashOptions,
+        true,
       );
       if (!popped) {
         setGitActionToast({

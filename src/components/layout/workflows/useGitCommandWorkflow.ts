@@ -303,11 +303,10 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           e?.message || t('generated.components.layout.workflows.usegitcommandworkflow.error_while_running_git_69219c3a'),
         );
       } finally {
-        if (isStillActiveRepo()) {
-          setIsGitActionRunning(false);
-          setActiveGitCommand(null);
-          setActiveGitActionLabel(null);
-        }
+        // Always clear the run lock (refs + UI state). Previously only React state was
+        // reset here, which left isGitActionRunningRef/activeGitWorkflowRunRef stuck and
+        // silently blocked every subsequent non-continuation runGitCommand call.
+        releaseWorkflowRun();
       }
     },
     [
