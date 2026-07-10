@@ -102,13 +102,14 @@ export interface ElectronGitAPI {
   setRepoPath: (repoPath: string) => Promise<boolean>;
   clearRepoPath: () => Promise<boolean>;
   runGitCommand: (command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;
+  runGitCommandForRepo: (repoPath: string, command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;
   createCommit: (params: CreateCommitParamsDto) => Promise<IpcResult<string>>;
   getCommitLogPage: (params: CommitLogPageRequestDto) => Promise<IpcResult<CommitLogPageDto>>;
   requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto) => Promise<IpcResult<CommitStatsRequestResultDto>>;
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
   getWorkingTreeSnapshot: () => Promise<IpcResult<WorkingTreeSnapshotDto>>;
   getWorkingTreeStats: (snapshotId: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
-  stagePaths: (paths: string[]) => Promise<IpcResult<string>>;
+  stagePaths: (paths: string[], repoPath?: string) => Promise<IpcResult<string>>;
   getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto) => Promise<IpcResult<DiffPreviewDto>>;
   getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayloadDto) => void) => () => void;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FileEntry } from '@/utils/gitParsing';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
 import type { GitCommandNameDto, WorkingTreeStatsDto } from '@/types/gitDtos';
@@ -6,8 +6,10 @@ import type { DiffRequest } from '@/types/diff';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { EMPTY_DIFF_STATS, basename, parseConflictEntries, parseNumstatStats } from './utils';
 import type { ConfirmDialogState, DiffStats, FileSection, GitStatusWithConflicts, InputDialogState, StagingContextMenuState } from './types';
+import { useIgnoreRule } from './useIgnoreRule';
 
 type Params = {
   repoPath: string | null;
@@ -17,11 +19,16 @@ type Params = {
   onRepoChanged?: () => void;
   onStashChanged?: () => void;
   onOpenDiff?: (request: DiffRequest) => void;
+  /** Repository that owns the externally supplied working-tree state. */
+  externalRepoPath?: string | null;
   externalStatus?: GitStatusDetailed | null;
   externalStatusRaw?: string;
   externalStats?: WorkingTreeStatsDto | null;
   externalRefresh?: () => Promise<void>;
 };
+
+const isSameRepoPath = (left: string | null | undefined, right: string | null | undefined): boolean =>
+  Boolean(left && right && normalizeRepoPathKey(left) === normalizeRepoPathKey(right));
 
 export const useFileOperations = ({
   repoPath,
@@ -31,6 +38,7 @@ export const useFileOperations = ({
   onRepoChanged,
   onStashChanged,
   onOpenDiff,
+  externalRepoPath,
   externalStatus,
   externalStatusRaw,
   externalStats,
@@ -46,10 +54,30 @@ export const useFileOperations = ({
   const [mutationElapsedMs, setMutationElapsedMs] = useState(0);
   const mutationInFlightRef = useRef(false);
   const externalRefreshRef = useRef(externalRefresh);
-
-  useEffect(() => {
+  const repoGenerationRef = useRef(0);
+  const activeRepoPathRef = useRef<string | null>(repoPath);
+  const statusRepoPathRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
     externalRefreshRef.current = externalRefresh;
   }, [externalRefresh]);
+  useLayoutEffect(() => {
+    repoGenerationRef.current += 1;
+    activeRepoPathRef.current = repoPath;
+    statusRepoPathRef.current = null;
+    setStatus(null);
+    setStagedStats(EMPTY_DIFF_STATS);
+    setUnstagedStats(EMPTY_DIFF_STATS);
+    setSearchQuery('');
+    setContextMenu(null);
+  }, [repoPath]);
+
+  const isCurrentRepoGeneration = useCallback((generation: number, expectedRepoPath: string) => {
+    return generation === repoGenerationRef.current && isSameRepoPath(activeRepoPathRef.current, expectedRepoPath);
+  }, []);
+
+  const hasCurrentStatusForRepo = useCallback((expectedRepoPath: string) => {
+    return isSameRepoPath(activeRepoPathRef.current, expectedRepoPath) && isSameRepoPath(statusRepoPathRef.current, expectedRepoPath);
+  }, []);
 
   useEffect(() => {
     if (mutationStartedAt === null) {
@@ -63,7 +91,9 @@ export const useFileOperations = ({
   }, [mutationStartedAt]);
 
   const refresh = useCallback(async () => {
-    if (!repoPath || !gitClient.isAvailable()) return;
+    const repoAtStart = repoPath;
+    const generation = repoGenerationRef.current;
+    if (!repoAtStart || !gitClient.isAvailable() || !isCurrentRepoGeneration(generation, repoAtStart)) return;
     if (externalRefresh) {
       await externalRefresh();
       return;
@@ -74,7 +104,7 @@ export const useFileOperations = ({
         gitClient.runGitCommand('diff', '--numstat', '--cached'),
         gitClient.runGitCommand('diff', '--numstat'),
       ]);
-      if (externalRefreshRef.current) return;
+      if (!isCurrentRepoGeneration(generation, repoAtStart) || externalRefreshRef.current) return;
 
       if (statusResult.success) {
         const rawStatus = statusResult.data || '';
@@ -87,6 +117,10 @@ export const useFileOperations = ({
           staged: parsed.staged.filter((f) => !conflictPathSet.has(f.path)),
           unstaged: parsed.unstaged.filter((f) => !conflictPathSet.has(f.path)),
         });
+        statusRepoPathRef.current = repoAtStart;
+      } else {
+        statusRepoPathRef.current = null;
+        setStatus(null);
       }
 
       setStagedStats(stagedResult.success ? parseNumstatStats(stagedResult.data || '') : EMPTY_DIFF_STATS);
@@ -94,11 +128,12 @@ export const useFileOperations = ({
     } catch (e) {
       console.error(e);
     }
-  }, [externalRefresh, repoPath]);
+  }, [externalRefresh, isCurrentRepoGeneration, repoPath]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (externalStatus === undefined) return;
-    if (!externalStatus) {
+    if (!repoPath || externalRepoPath === null || (externalRepoPath !== undefined && !isSameRepoPath(externalRepoPath, repoPath)) || !externalStatus) {
+      statusRepoPathRef.current = null;
       setStatus(null);
       return;
     }
@@ -110,13 +145,19 @@ export const useFileOperations = ({
       staged: externalStatus.staged.filter((file) => !conflictPathSet.has(file.path)),
       unstaged: externalStatus.unstaged.filter((file) => !conflictPathSet.has(file.path)),
     });
-  }, [externalStatus, externalStatusRaw]);
+    statusRepoPathRef.current = repoPath;
+  }, [externalRepoPath, externalStatus, externalStatusRaw, repoPath]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (externalStats === undefined) return;
+    if (!repoPath || externalRepoPath === null || (externalRepoPath !== undefined && !isSameRepoPath(externalRepoPath, repoPath))) {
+      setStagedStats(EMPTY_DIFF_STATS);
+      setUnstagedStats(EMPTY_DIFF_STATS);
+      return;
+    }
     setStagedStats(externalStats?.staged || EMPTY_DIFF_STATS);
     setUnstagedStats(externalStats?.unstaged || EMPTY_DIFF_STATS);
-  }, [externalStats]);
+  }, [externalRepoPath, externalStats, repoPath]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -171,12 +212,23 @@ export const useFileOperations = ({
 
   const git = useCallback(
     async (args: string[], msg: string, notify = false) => {
-      if (!gitClient.isAvailable() || args.length === 0) return false;
+      const repoAtStart = repoPath;
+      const generation = repoGenerationRef.current;
+      if (
+        !repoAtStart ||
+        !gitClient.isAvailable() ||
+        args.length === 0 ||
+        !isCurrentRepoGeneration(generation, repoAtStart) ||
+        !hasCurrentStatusForRepo(repoAtStart)
+      ) {
+        return false;
+      }
       if (mutationInFlightRef.current) return false;
       mutationInFlightRef.current = true;
       setMutationStartedAt(Date.now());
       try {
-        const r = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+        const r = await gitClient.runGitCommandForRepo(repoAtStart, args[0] as GitCommandNameDto, ...args.slice(1));
+        if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
         if (r.success) {
           setToast({ msg, isError: false });
           if (notify && onRepoChanged) onRepoChanged();
@@ -194,7 +246,46 @@ export const useFileOperations = ({
         setMutationStartedAt(null);
       }
     },
-    [setToast, onRepoChanged, refresh, t],
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, refresh, repoPath, setToast, t],
+  );
+
+  const stagePathsForCurrentRepo = useCallback(
+    async (paths: string[], successMessage: string) => {
+      const repoAtStart = repoPath;
+      const generation = repoGenerationRef.current;
+      if (
+        !repoAtStart ||
+        !gitClient.isAvailable() ||
+        paths.length === 0 ||
+        !isCurrentRepoGeneration(generation, repoAtStart) ||
+        !hasCurrentStatusForRepo(repoAtStart)
+      ) {
+        return false;
+      }
+      if (mutationInFlightRef.current) return false;
+      mutationInFlightRef.current = true;
+      setMutationStartedAt(Date.now());
+      try {
+        const result = await gitClient.stagePaths(paths, repoAtStart);
+        if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+        if (!result.success) {
+          setToast({ msg: result.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+          return false;
+        }
+        setToast({ msg: successMessage, isError: false });
+        await refresh();
+        return true;
+      } catch (e: any) {
+        if (isCurrentRepoGeneration(generation, repoAtStart)) {
+          setToast({ msg: e.message, isError: true });
+        }
+        return false;
+      } finally {
+        mutationInFlightRef.current = false;
+        setMutationStartedAt(null);
+      }
+    },
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, refresh, repoPath, setToast, t],
   );
 
   const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
@@ -203,61 +294,27 @@ export const useFileOperations = ({
     setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
   }, []);
 
-  const addIgnoreRule = useCallback(
-    async (entry: FileEntry, section: FileSection, pattern: string) => {
-      if (!gitClient.isAvailable()) return;
-      const normalizedPattern = pattern.trim();
-      if (!normalizedPattern) return;
-      try {
-        const result = await gitClient.addIgnoreRule(normalizedPattern);
-        if (!result.success) {
-          setToast({ msg: result.error || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
-          return;
-        }
-        if (section === 'staged' && entry.x === 'A') {
-          await gitClient.runGitCommand('reset', 'HEAD', '--', entry.path);
-        }
-        setToast({
-          msg: result.added
-            ? tr(`Ignore-Regel hinzugefuegt: ${normalizedPattern}`, `Added ignore rule: ${normalizedPattern}`)
-            : tr(`Regel existiert bereits: ${normalizedPattern}`, `Rule already exists: ${normalizedPattern}`),
-          isError: false,
-        });
-        if (onRepoChanged) onRepoChanged();
-        await refresh();
-      } catch (e: any) {
-        setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
-      }
-    },
-    [setToast, tr, onRepoChanged, refresh, t],
-  );
+  const addIgnoreRule = useIgnoreRule({ setToast, tr, t, onRepoChanged, refresh });
 
-  const stageFile = useCallback((f: string) => git(['add', '--', f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)), [git, tr]);
+  const stageFile = useCallback(
+    (f: string) => stagePathsForCurrentRepo([f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)),
+    [stagePathsForCurrentRepo, tr],
+  );
   const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
-  const stageAll = useCallback(() => git(['add', '.'], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702')), [git, t]);
+  const stageAll = useCallback(() => {
+    const paths = [...(status?.unstaged || []), ...(status?.untracked || [])].map((entry) => entry.path);
+    return stagePathsForCurrentRepo([...new Set(paths)], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702'));
+  }, [stagePathsForCurrentRepo, status?.unstaged, status?.untracked, t]);
   const unstageAll = useCallback(() => git(['reset', 'HEAD'], t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313')), [git, t]);
 
-  const stageAllUntracked = useCallback(async () => {
-    if (!gitClient.isAvailable() || !status || status.untracked.length === 0) return;
-    if (mutationInFlightRef.current) return;
-    mutationInFlightRef.current = true;
-    setMutationStartedAt(Date.now());
-    try {
-      const result = await gitClient.stagePaths(status.untracked.map((entry) => entry.path));
-      if (!result.success) throw new Error(result.error);
-      const count = status.untracked.length;
-      setToast({
-        msg: tr(`${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, `Staged ${count} untracked file${count !== 1 ? 's' : ''}`),
-        isError: false,
-      });
-      await refresh();
-    } catch (e: any) {
-      setToast({ msg: e.message, isError: true });
-    } finally {
-      mutationInFlightRef.current = false;
-      setMutationStartedAt(null);
-    }
-  }, [status, setToast, refresh, tr]);
+  const stageAllUntracked = useCallback(() => {
+    const paths = status?.untracked.map((entry) => entry.path) || [];
+    const count = paths.length;
+    return stagePathsForCurrentRepo(
+      paths,
+      tr(`${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, `Staged ${count} untracked file${count !== 1 ? 's' : ''}`),
+    );
+  }, [stagePathsForCurrentRepo, status?.untracked, tr]);
 
   const discardFile = useCallback(
     (f: string) => {

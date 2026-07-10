@@ -116,6 +116,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
               onSelectFileInspect={handleSelectWorkingTreeFile}
               onOpenConflictResolver={handleOpenConflictResolver}
               settings={settingsState.settings}
+              workingTreeRepoPath={workingTree.dataRepoPath}
               workingTreeSnapshot={workingTree.snapshot}
               workingTreeStatus={workingTree.status}
               workingTreeStats={workingTree.stats}

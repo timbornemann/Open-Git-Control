@@ -13,7 +13,33 @@ import {
 
 type OctokitConstructor = new (options: { auth: string; baseUrl: string }) => GitHubOctokit;
 
+const GITHUB_REQUEST_TIMEOUT_MS = 20_000;
+
+export type GitHubAuthenticationFailure = {
+  message: string;
+  invalidCredentials: boolean;
+};
+
+const getErrorStatus = (error: unknown): number | null => {
+  if (!error || typeof error !== 'object') return null;
+  const candidate = error as { status?: unknown; response?: { status?: unknown } };
+  const status = Number(candidate.status ?? candidate.response?.status);
+  return Number.isInteger(status) ? status : null;
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
+};
+
+const isInvalidCredentialError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  return status === 401 || /bad credentials|invalid (access )?token/i.test(getErrorMessage(error, ''));
+};
+
 export class GitHubAuthService {
+  private lastAuthenticationFailure: GitHubAuthenticationFailure | null = null;
+
   private normalizeClientId(value: unknown): string | null {
     if (typeof value !== 'string') {
       return null;
@@ -65,7 +91,51 @@ export class GitHubAuthService {
     return Boolean(this.getOauthClientId(configuredClientId));
   }
 
-  async authenticate(token: string, configuredHost?: string | null): Promise<GitHubAuthSession | null> {
+  getLastAuthenticationFailure(): GitHubAuthenticationFailure | null {
+    return this.lastAuthenticationFailure;
+  }
+
+  private async runWithTimeout<T>(request: (signal: AbortSignal) => Promise<T>, operation: string, parentSignal?: AbortSignal): Promise<T> {
+    if (parentSignal?.aborted) {
+      throw new Error(`${operation} was cancelled.`);
+    }
+
+    const controller = new AbortController();
+    let timedOut = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new Error(`${operation} timed out.`));
+      }, GITHUB_REQUEST_TIMEOUT_MS);
+    });
+    const abortFromParent = () => controller.abort();
+    parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+
+    try {
+      return await Promise.race([request(controller.signal), timeoutPromise]);
+    } catch (error) {
+      if (timedOut) {
+        throw new Error(`${operation} timed out after ${Math.floor(GITHUB_REQUEST_TIMEOUT_MS / 1000)} seconds. Check your network connection and GitHub host.`);
+      }
+      throw error;
+    } finally {
+      if (timeout !== null) clearTimeout(timeout);
+      parentSignal?.removeEventListener('abort', abortFromParent);
+    }
+  }
+
+  private authenticationFailed(error: unknown): null {
+    this.lastAuthenticationFailure = {
+      message: getErrorMessage(error, 'GitHub authentication failed.'),
+      invalidCredentials: isInvalidCredentialError(error),
+    };
+    return null;
+  }
+
+  async authenticate(token: string, configuredHost?: string | null, signal?: AbortSignal): Promise<GitHubAuthSession | null> {
+    this.lastAuthenticationFailure = null;
     try {
       const host = this.normalizeHost(configuredHost);
 
@@ -74,15 +144,24 @@ export class GitHubAuthService {
       const { Octokit } = (await _importDynamic('octokit')) as { Octokit: OctokitConstructor };
       const octokit = new Octokit({ auth: token, baseUrl: this.getApiBaseUrl(host) });
 
-      await octokit.rest.rateLimit.get();
+      await this.runWithTimeout(
+        (requestSignal) => octokit.rest.rateLimit.get({ request: { signal: requestSignal } } as any),
+        'GitHub token validation',
+        signal,
+      );
 
       let username: string | null = null;
       try {
-        const { data } = await octokit.rest.users.getAuthenticated();
+        const { data } = await this.runWithTimeout<{ data?: { login?: string | null } }>(
+          (requestSignal) => octokit.rest.users.getAuthenticated({ request: { signal: requestSignal } } as any) as any,
+          'GitHub user lookup',
+          signal,
+        );
         username = data?.login || null;
         console.log('GitHub Authenticated as:', username, 'on host:', host);
-      } catch {
-        console.log('GitHub Authenticated (Token valid, but user scope not available). Host:', host);
+      } catch (error) {
+        if (getErrorStatus(error) !== 403) return this.authenticationFailed(error);
+        console.log('GitHub Authenticated (user lookup is not permitted for this token). Host:', host);
       }
 
       return {
@@ -93,7 +172,7 @@ export class GitHubAuthService {
       };
     } catch (e) {
       console.error('GitHub Auth Error:', (e as Error).message);
-      return null;
+      return this.authenticationFailed(e);
     }
   }
 
@@ -109,14 +188,19 @@ export class GitHubAuthService {
     params.set('client_id', clientId);
     params.set('scope', 'repo read:user');
 
-    const response = await fetch(oauthEndpointForHost(host, DEVICE_CODE_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
+    const response = await this.runWithTimeout(
+      (signal) =>
+        fetch(oauthEndpointForHost(host, DEVICE_CODE_PATH), {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+          signal,
+        }),
+      'GitHub Device Flow request',
+    );
 
     if (!response.ok) {
       throw new Error(`Device Flow konnte nicht gestartet werden (${response.status}).`);
@@ -166,14 +250,19 @@ export class GitHubAuthService {
     params.set('device_code', deviceCode);
     params.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code');
 
-    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
+    const response = await this.runWithTimeout(
+      (signal) =>
+        fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+          signal,
+        }),
+      'GitHub Device Flow token request',
+    );
 
     if (!response.ok) {
       return {
@@ -241,14 +330,19 @@ export class GitHubAuthService {
       body.set('client_secret', envClientSecret);
     }
 
-    const response = await fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: body.toString(),
-    });
+    const response = await this.runWithTimeout(
+      (signal) =>
+        fetch(oauthEndpointForHost(host, ACCESS_TOKEN_PATH), {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: body.toString(),
+          signal,
+        }),
+      'GitHub OAuth token exchange',
+    );
 
     if (!response.ok) {
       throw new Error(`OAuth Token-Austausch fehlgeschlagen (${response.status}).`);

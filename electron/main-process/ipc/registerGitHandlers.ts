@@ -107,7 +107,7 @@ export function registerGitHandlers({
     },
   );
 
-  ipcMain.handle(IpcChannel.GitStagePaths, async (event: any, paths: unknown) => {
+  ipcMain.handle(IpcChannel.GitStagePaths, async (event: any, paths: unknown, requestedRepoPath?: unknown) => {
     const jobId = createJobId('git-stage-paths');
     emitJobEvent(event.sender, {
       id: jobId,
@@ -116,9 +116,10 @@ export function registerGitHandlers({
       timestamp: Date.now(),
     });
     try {
-      commitStatsService.interruptBackgroundWork();
       const normalizedPaths = Array.isArray(paths) ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000) : [];
-      const data = await gitService.commits.stagePathsAtPath(gitService.requireActiveRepoPath(), normalizedPaths);
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      commitStatsService.interruptBackgroundWork();
+      const data = await gitService.commits.stagePathsAtPath(repoPath, normalizedPaths);
       emitJobEvent(event.sender, {
         id: jobId,
         operation: 'git:add',
@@ -282,6 +283,24 @@ export function registerGitHandlers({
     if (commandName === 'push') {
       const scanBlock = await requirePushSecretScanApproval(event, rawArgs);
       if (scanBlock) return scanBlock;
+    }
+    return handleGitCommand(event, gitService, commandName, ...rawArgs);
+  });
+
+  ipcMain.handle(IpcChannel.GitCommandForRepo, async (event: any, requestedRepoPath: unknown, commandName: unknown, ...rawArgs: unknown[]) => {
+    try {
+      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
+    }
+    if (commandName === 'push') {
+      const scanBlock = await requirePushSecretScanApproval(event, rawArgs);
+      if (scanBlock) return scanBlock;
+      try {
+        requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
+      }
     }
     return handleGitCommand(event, gitService, commandName, ...rawArgs);
   });

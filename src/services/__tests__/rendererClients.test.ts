@@ -267,9 +267,11 @@ describe('renderer service clients', () => {
     vi.spyOn(Date, 'now').mockReturnValue(10_000);
 
     await gitClient.runGitCommand('status' as any);
+    await gitClient.runGitCommandForRepo('C:/repo', 'status' as any);
     await gitClient.runGitArgs(['pull' as any, '--rebase']);
 
     expect(api.git.runGitCommand).toHaveBeenNthCalledWith(1, 'status');
+    expect(api.git.runGitCommandForRepo).toHaveBeenCalledWith('C:/repo', 'status');
     expect(api.git.runGitCommand).toHaveBeenNthCalledWith(2, 'pull', '--rebase');
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener).toHaveBeenCalledWith({ command: 'status', error: '[REPO_UNAVAILABLE] missing repo' });
@@ -314,7 +316,7 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.onCommitStats(vi.fn()), api.git.onCommitStats, [expect.any(Function)]);
     await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);
     await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, []);
-    await expectDelegation(() => gitClient.stagePaths(['a.ts']), api.git.stagePaths, [['a.ts']]);
+    await expectDelegation(() => gitClient.stagePaths(['a.ts'], 'C:/repo'), api.git.stagePaths, [['a.ts'], 'C:/repo']);
     await expectDelegation(() => gitClient.getDiffPreview({ path: 'a.ts' } as any), api.git.getDiffPreview, [{ path: 'a.ts' }]);
     await expectDelegation(() => gitClient.getFileBlameRange({ path: 'a.ts' } as any), api.git.getFileBlameRange, [{ path: 'a.ts' }]);
     await expectDelegation(() => gitClient.startInteractiveRebase({ base: 'main' } as any), api.git.startInteractiveRebase, [{ base: 'main' }]);

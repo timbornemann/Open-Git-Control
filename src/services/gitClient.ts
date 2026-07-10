@@ -53,6 +53,12 @@ export const gitClient = {
     return result;
   },
 
+  async runGitCommandForRepo(repoPath: string, commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
+    const result = await requireElectronGitApi().runGitCommandForRepo(repoPath, commandName, ...args);
+    notifyRepoUnavailableIfNeeded(result, commandName);
+    return result;
+  },
+
   async runGitArgs(args: GitCommandArgs): Promise<GitCommandResultDto> {
     const [commandName, ...rest] = args;
     return this.runGitCommand(commandName, ...rest);

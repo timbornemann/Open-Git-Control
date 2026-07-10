@@ -361,6 +361,46 @@ describe('registerGitHandlers', () => {
     expect(scanPushDiffs).not.toHaveBeenCalled();
   });
 
+  it('rejects staging paths from a repository that is no longer active', async () => {
+    const stagePathsAtPath = vi.fn();
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repos/current'),
+      commits: { stagePathsAtPath },
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const result = await handlers.get('git:stagePaths')!({ sender: { send: vi.fn() } }, ['stale-file.ts'], 'C:/repos/previous');
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(stagePathsAtPath).not.toHaveBeenCalled();
+  });
+
+  it('rejects repo-bound commands from a repository that is no longer active', async () => {
+    const runCommand = vi.fn();
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repos/current'),
+      runCommand,
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const result = await handlers.get('git:commandForRepo')!({ sender: { send: vi.fn() } }, 'C:/repos/previous', 'reset', 'HEAD');
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(runCommand).not.toHaveBeenCalled();
+  });
+
   it('does not replace the active repository when git init fails', async () => {
     const setRepoPath = vi.fn();
     const gitService = {

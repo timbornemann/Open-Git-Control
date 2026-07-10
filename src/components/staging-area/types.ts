@@ -17,6 +17,8 @@ export interface StagingAreaProps {
   viewMode?: 'default' | 'conflictOnly';
   initialConflictPath?: string | null;
   settings: AppSettingsDto;
+  /** Repository that owns the shared working-tree data, if it is current. */
+  workingTreeRepoPath?: string | null;
   workingTreeSnapshot?: WorkingTreeSnapshotDto | null;
   workingTreeStatus?: GitStatusDetailed | null;
   workingTreeStats?: WorkingTreeStatsDto | null;

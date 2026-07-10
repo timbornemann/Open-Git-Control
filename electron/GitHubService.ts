@@ -1,4 +1,4 @@
-import { GitHubAuthService } from './github/GitHubAuthService';
+import { GitHubAuthService, type GitHubAuthenticationFailure } from './github/GitHubAuthService';
 import { GitHubPullRequestService } from './github/GitHubPullRequestService';
 import { GitHubReleaseService } from './github/GitHubReleaseService';
 import { GitHubRepositoryService } from './github/GitHubRepositoryService';
@@ -23,6 +23,8 @@ export class GitHubService {
   private username: string | null = null;
   private host: string = DEFAULT_HOST;
   private authenticationGeneration = 0;
+  private activeAuthenticationController: AbortController | null = null;
+  private lastAuthenticationFailure: GitHubAuthenticationFailure | null = null;
 
   private readonly authService = new GitHubAuthService();
   private readonly repositories = new GitHubRepositoryService(() => this.requireOctokit());
@@ -53,24 +55,33 @@ export class GitHubService {
     return this.authenticationGeneration;
   }
 
+  getLastAuthenticationFailure(): GitHubAuthenticationFailure | null {
+    return this.lastAuthenticationFailure;
+  }
+
   cancelPendingAuthentication(): void {
     this.authenticationGeneration += 1;
+    this.activeAuthenticationController?.abort();
+    this.activeAuthenticationController = null;
   }
 
   async authenticate(token: string, configuredHost?: string | null, shouldApplySession: () => boolean = () => true): Promise<boolean> {
     const generation = ++this.authenticationGeneration;
-    const session = await this.authService.authenticate(token, configuredHost);
+    this.activeAuthenticationController?.abort();
+    const controller = new AbortController();
+    this.activeAuthenticationController = controller;
+    this.lastAuthenticationFailure = null;
+    const session = await this.authService.authenticate(token, configuredHost, controller.signal);
+    if (this.activeAuthenticationController === controller) this.activeAuthenticationController = null;
     if (generation !== this.authenticationGeneration || !shouldApplySession()) {
       return false;
     }
     if (!session) {
-      this.octokit = null;
-      this.token = null;
-      this.username = null;
-      this.host = DEFAULT_HOST;
+      this.lastAuthenticationFailure = this.authService.getLastAuthenticationFailure();
       return false;
     }
 
+    this.lastAuthenticationFailure = null;
     this.octokit = session.octokit;
     this.token = session.token;
     this.username = session.username;
@@ -98,11 +109,12 @@ export class GitHubService {
   }
 
   logout(): void {
-    this.authenticationGeneration += 1;
+    this.cancelPendingAuthentication();
     this.octokit = null;
     this.token = null;
     this.username = null;
     this.host = DEFAULT_HOST;
+    this.lastAuthenticationFailure = null;
   }
 
   getUsername(): string | null {

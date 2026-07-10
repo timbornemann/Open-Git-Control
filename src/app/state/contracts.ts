@@ -171,6 +171,7 @@ export type GithubStateContract = {
   isDeviceFlowRunning: boolean;
   deviceFlowError: string | null;
   onStartDeviceFlowLogin: () => void;
+  onCancelAuthentication: () => void;
   onCancelDeviceFlow: () => void;
   isWebFlowRunning: boolean;
   webFlowError: string | null;

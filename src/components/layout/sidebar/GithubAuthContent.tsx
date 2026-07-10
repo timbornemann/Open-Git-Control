@@ -17,6 +17,7 @@ type GithubAuthContentProps = Pick<
   | 'isDeviceFlowRunning'
   | 'deviceFlowError'
   | 'onStartDeviceFlowLogin'
+  | 'onCancelAuthentication'
   | 'onCancelDeviceFlow'
   | 'isWebFlowRunning'
   | 'webFlowError'
@@ -51,6 +52,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   isDeviceFlowRunning,
   deviceFlowError,
   onStartDeviceFlowLogin,
+  onCancelAuthentication,
   onCancelDeviceFlow,
   isWebFlowRunning,
   webFlowError,
@@ -119,7 +121,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
               setAuthError(null);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onTokenLogin();
+              if (e.key === 'Enter' && canTokenLogin) onTokenLogin();
             }}
             className="sidebar-filter-input"
             style={{
@@ -154,6 +156,22 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             ? t('generated.components.layout.sidebar.githubauthcontent.connecting_a77827d1')
             : t('generated.components.layout.sidebar.githubauthcontent.connect_with_token_85fe9356')}
         </button>
+        {isAuthenticating && (
+          <button
+            onClick={onCancelAuthentication}
+            style={{
+              padding: '8px',
+              backgroundColor: 'var(--bg-dark)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            {t('generated.components.confirm.cancel_035b7526')}
+          </button>
+        )}
       </div>
 
       <div className="sidebar-panel-block">
@@ -287,6 +305,24 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             ? t('generated.components.layout.sidebar.githubauthcontent.browser_login_in_progress_9cf3975c')
             : t('generated.components.layout.sidebar.githubauthcontent.sign_in_with_github_c275fc82')}
         </button>
+        {isWebFlowRunning && (
+          <button
+            onClick={onCancelAuthentication}
+            style={{
+              marginTop: '6px',
+              padding: '8px',
+              width: '100%',
+              backgroundColor: 'var(--bg-dark)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            {t('generated.components.confirm.cancel_035b7526')}
+          </button>
+        )}
       </div>
     </div>
   );

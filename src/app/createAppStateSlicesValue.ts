@@ -114,6 +114,7 @@ const createGithubSlice = (
   isDeviceFlowRunning: state.isDeviceFlowRunning,
   deviceFlowError: state.deviceFlowError,
   onStartDeviceFlowLogin: state.handleStartDeviceFlowLogin,
+  onCancelAuthentication: state.handleCancelAuthentication,
   onCancelDeviceFlow: state.handleCancelDeviceFlow,
   isWebFlowRunning: state.isWebFlowRunning,
   webFlowError: state.webFlowError,

@@ -19,6 +19,7 @@ const GithubAuthSidebarContainer: React.FC = React.memo(() => {
       isDeviceFlowRunning={github.isDeviceFlowRunning}
       deviceFlowError={github.deviceFlowError}
       onStartDeviceFlowLogin={github.onStartDeviceFlowLogin}
+      onCancelAuthentication={github.onCancelAuthentication}
       onCancelDeviceFlow={github.onCancelDeviceFlow}
       isWebFlowRunning={github.isWebFlowRunning}
       webFlowError={github.webFlowError}

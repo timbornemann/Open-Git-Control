@@ -20,6 +20,7 @@ export const enum IpcChannel {
   GitClearRepo = 'git:clearRepo',
   GitClone = 'git:clone',
   GitCommand = 'git:command',
+  GitCommandForRepo = 'git:commandForRepo',
   GitCommitLogPage = 'git:commitLogPage',
   GitCommitStats = 'git:commitStats',
   GitCreateCommit = 'git:createCommit',

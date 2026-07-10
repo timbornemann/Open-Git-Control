@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import { gitClient } from '@/services/gitClient';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 export type WorkingTreeState = {
+  /** Repository that owns the currently exposed working-tree data. */
+  dataRepoPath: string | null;
   snapshot: WorkingTreeSnapshotDto | null;
   status: GitStatusDetailed | null;
   stats: WorkingTreeStatsDto | null;
@@ -16,6 +18,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const [snapshot, setSnapshot] = useState<WorkingTreeSnapshotDto | null>(null);
   const [status, setStatus] = useState<GitStatusDetailed | null>(null);
   const [stats, setStats] = useState<WorkingTreeStatsDto | null>(null);
+  const [dataRepoPath, setDataRepoPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const inFlightRef = useRef<{ generation: number; promise: Promise<void> } | null>(null);
   const generationRef = useRef(0);
@@ -26,6 +29,19 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     if (!repoPath || !gitClient.isAvailable()) return;
     const generation = generationRef.current;
     if (inFlightRef.current?.generation === generation) return inFlightRef.current.promise;
+    const quickStatusRequest = snapshotRef.current ? null : gitClient.getStatusPorcelain().catch(() => null);
+    if (quickStatusRequest) {
+      void quickStatusRequest
+        .then((quickStatus) => {
+          if (generation !== generationRef.current || snapshotRef.current || !quickStatus?.success) return;
+          statsRef.current = null;
+          setSnapshot(null);
+          setDataRepoPath(repoPath);
+          setStatus(parseGitStatusDetailed(quickStatus.data || ''));
+          setStats(null);
+        })
+        .catch(() => undefined);
+    }
     let request!: Promise<void>;
     request = (async () => {
       setLoading((current) => current || !snapshotRef.current);
@@ -36,6 +52,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
           const nextSnapshot = result.data;
           snapshotRef.current = nextSnapshot;
           setSnapshot(nextSnapshot);
+          setDataRepoPath(nextSnapshot.repoPath);
           setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
           if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
             statsRef.current = null;
@@ -48,11 +65,13 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
           return;
         }
 
-        const fallback = await gitClient.getStatusPorcelain();
+        const quickStatus = quickStatusRequest ? await quickStatusRequest : null;
+        const fallback = quickStatus?.success ? quickStatus : await gitClient.getStatusPorcelain();
         if (generation !== generationRef.current || !fallback.success) return;
         snapshotRef.current = null;
         statsRef.current = null;
         setSnapshot(null);
+        setDataRepoPath(repoPath);
         setStatus(parseGitStatusDetailed(fallback.data || ''));
         setStats(null);
       } catch (error) {
@@ -70,7 +89,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     return request;
   }, [repoPath]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     generationRef.current += 1;
     snapshotRef.current = null;
     statsRef.current = null;
@@ -78,6 +97,10 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     setSnapshot(null);
     setStatus(null);
     setStats(null);
+    setDataRepoPath(null);
+  }, [repoPath]);
+
+  useEffect(() => {
     if (!repoPath) return;
 
     let cancelled = false;
@@ -112,5 +135,17 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     void refresh();
   }, [refresh, refreshTrigger, repoPath]);
 
-  return { snapshot, status, stats, loading, refresh };
+  const currentDataRepoPath = repoPath && dataRepoPath && normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(dataRepoPath) ? dataRepoPath : null;
+  const currentSnapshot = currentDataRepoPath ? snapshot : null;
+  const currentStatus = currentDataRepoPath ? status : null;
+  const currentStats = currentSnapshot && stats?.snapshotId === currentSnapshot.snapshotId ? stats : null;
+
+  return {
+    dataRepoPath: currentDataRepoPath,
+    snapshot: currentSnapshot,
+    status: currentStatus,
+    stats: currentStats,
+    loading: loading || Boolean(repoPath && !currentDataRepoPath),
+    refresh,
+  };
 };

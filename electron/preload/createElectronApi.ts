@@ -40,6 +40,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     clearRepoPath: () => ipcRenderer.invoke(IpcChannel.GitClearRepo),
     openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
     runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
+    runGitCommandForRepo: (repoPath: string, commandName: GitCommandNameDto, ...args: string[]) =>
+      ipcRenderer.invoke(IpcChannel.GitCommandForRepo, repoPath, commandName, ...args),
     createCommit: (params: { title: string; description?: string; amend?: boolean; signoff?: boolean; allowEmpty?: boolean }) =>
       invokeGitMutation(IpcChannel.GitCreateCommit, params),
     getCommitLogPage: (params: { limit: number; offset: number; scope: 'all' | 'head' }) => ipcRenderer.invoke(IpcChannel.GitCommitLogPage, params),
@@ -52,7 +54,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     getWorkingTreeSnapshot: () => ipcRenderer.invoke(IpcChannel.GitWorkingTreeSnapshot),
     getWorkingTreeStats: (snapshotId: string) => ipcRenderer.invoke(IpcChannel.GitWorkingTreeStats, snapshotId),
-    stagePaths: (paths: string[]) => ipcRenderer.invoke(IpcChannel.GitStagePaths, paths),
+    stagePaths: (paths: string[], repoPath?: string) => ipcRenderer.invoke(IpcChannel.GitStagePaths, paths, repoPath),
     getDiffPreview: (args: string[], limits?: { maxBytes?: number; maxLines?: number }) => ipcRenderer.invoke(IpcChannel.GitDiffPreview, args, limits || {}),
     getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
       ipcRenderer.invoke(IpcChannel.GitFileBlameRange, filePath, commitHash, startLine, lineCount),
@@ -199,6 +201,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       setRepoPath: flatApi.setRepoPath,
       clearRepoPath: flatApi.clearRepoPath,
       runGitCommand: flatApi.runGitCommand,
+      runGitCommandForRepo: flatApi.runGitCommandForRepo,
       createCommit: flatApi.createCommit,
       getCommitLogPage: flatApi.getCommitLogPage,
       requestCommitStats: flatApi.requestCommitStats,

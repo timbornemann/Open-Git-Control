@@ -80,7 +80,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       const run = beginAuthRun('bootstrap', true);
       if (!run) return;
 
-      setIsAuthenticating(true);
       try {
         const status = await githubClient.getSavedAuthStatus();
         if (!isCurrentAuthRun(run)) return;
@@ -105,13 +104,16 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
             );
           }
         } else {
-          setIsAuthenticated(false);
-          setGithubUser(null);
+          setIsAuthenticated(loginResult.authenticated);
+          setGithubUser(loginResult.username);
+          if (loginResult.authenticated) resetRepositoryPages();
+          if (loginResult.error) setAuthError(loginResult.error);
         }
-      } catch {
+      } catch (error: unknown) {
         if (!isCurrentAuthRun(run)) return;
         setIsAuthenticated(false);
         setGithubUser(null);
+        setAuthError(error instanceof Error ? error.message : t('generated.components.layout.hooks.usegithubdomain.authentication_error_a366cc27'));
       } finally {
         if (isCurrentAuthRun(run)) setIsAuthenticating(false);
         finishAuthRun(run);
@@ -125,8 +127,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     stoppedRef.current = false;
     return () => {
       stoppedRef.current = true;
-      nextAuthRunIdRef.current += 1;
-      activeAuthRunRef.current = null;
       clearDevicePolling();
     };
   }, []);
@@ -192,11 +192,11 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           );
         }
       } else {
-        setAuthError(t('generated.components.layout.hooks.usegithubdomain.invalid_token_please_check_permissions_73c7b36b'));
+        setAuthError(authResult.error || t('generated.components.layout.hooks.usegithubdomain.invalid_token_please_check_permissions_73c7b36b'));
       }
-    } catch {
+    } catch (error: unknown) {
       if (!isCurrentAuthRun(run)) return;
-      setAuthError(t('generated.components.layout.hooks.usegithubdomain.authentication_error_a366cc27'));
+      setAuthError(error instanceof Error ? error.message : t('generated.components.layout.hooks.usegithubdomain.authentication_error_a366cc27'));
     } finally {
       if (isCurrentAuthRun(run)) setIsAuthenticating(false);
       finishAuthRun(run);
@@ -278,6 +278,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
 
     clearDevicePolling();
     setIsAuthenticating(false);
+    setIsDeviceFlowRunning(true);
     setDeviceFlowError(null);
     setAuthError(null);
     setWebFlowError(null);
@@ -286,24 +287,28 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       const startResult = await githubClient.deviceStart();
       if (!isCurrentAuthRun(run)) return;
       if (!startResult.success) {
+        setIsDeviceFlowRunning(false);
         setDeviceFlowError(startResult.error || t('generated.components.layout.hooks.usegithubdomain.could_not_start_device_flow_4b39f59a'));
         return;
       }
 
       const flow = startResult.data;
       setDeviceFlow(flow);
-      setIsDeviceFlowRunning(true);
 
       await appClient.openExternalUrl(flow.verificationUri);
       if (!isCurrentAuthRun(run)) return;
       schedulePoll(flow.deviceCode, flow.interval, run);
     } catch (error: any) {
       if (isCurrentAuthRun(run)) {
+        setIsDeviceFlowRunning(false);
         setDeviceFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.could_not_start_device_flow_4b39f59a'));
       }
     } finally {
       // A successfully started device flow owns the run until polling completes.
-      if (isCurrentAuthRun(run) && !pollingRef.current) finishAuthRun(run);
+      if (isCurrentAuthRun(run) && pollingRef.current === null) {
+        setIsDeviceFlowRunning(false);
+        finishAuthRun(run);
+      }
     }
   };
 
@@ -351,15 +356,22 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     }
   };
 
-  const handleCancelDeviceFlow = () => {
+  const handleCancelAuthentication = () => {
     const activeRun = activeAuthRunRef.current;
-    if (activeRun?.kind !== 'device') return;
+    if (!activeRun || activeRun.kind === 'logout') return;
     if (githubClient.isAvailable()) {
       void githubClient.cancelAuth().catch((error) => console.error('GitHub authentication cancellation failed:', error));
     }
     invalidateAuthRuns();
+    setIsAuthenticating(false);
     setIsDeviceFlowRunning(false);
     setDeviceFlow(null);
+    setIsWebFlowRunning(false);
+  };
+
+  const handleCancelDeviceFlow = () => {
+    if (activeAuthRunRef.current?.kind !== 'device') return;
+    handleCancelAuthentication();
   };
 
   const handleLogout = async () => {
@@ -414,6 +426,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     isDeviceFlowRunning,
     deviceFlowError,
     handleStartDeviceFlowLogin,
+    handleCancelAuthentication,
     handleCancelDeviceFlow,
     isWebFlowRunning,
     webFlowError,

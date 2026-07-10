@@ -401,6 +401,7 @@ export const useAppState = () => {
     isDeviceFlowRunning: github.isDeviceFlowRunning,
     deviceFlowError: github.deviceFlowError,
     handleStartDeviceFlowLogin: github.handleStartDeviceFlowLogin,
+    handleCancelAuthentication: github.handleCancelAuthentication,
     handleCancelDeviceFlow: github.handleCancelDeviceFlow,
     isWebFlowRunning: github.isWebFlowRunning,
     webFlowError: github.webFlowError,

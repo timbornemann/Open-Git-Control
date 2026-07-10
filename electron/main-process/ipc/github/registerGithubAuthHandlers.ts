@@ -30,6 +30,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   const isCurrentAuthAttempt = (generation: number): boolean => generation === authGeneration;
   const serviceGeneration = (): number => githubService.getAuthenticationGeneration();
   const staleAuthError = () => ({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
+  const lastAuthenticationError = (): string | undefined => githubService.getLastAuthenticationFailure?.()?.message;
 
   ipcMain.handle(IpcChannel.GithubAuth, async (_event: IpcMainInvokeEvent, token: string, host?: string) => {
     const generation = beginAuthAttempt();
@@ -37,7 +38,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
     const normalizedHost = githubService.normalizeHost(host || settings.githubHost);
     const success = await githubService.authenticate(token, normalizedHost, () => isCurrentAuthAttempt(generation));
     if (!(success && isCurrentAuthAttempt(generation))) {
-      return { success: false };
+      return { success: false, error: isCurrentAuthAttempt(generation) ? lastAuthenticationError() : 'GitHub-Anmeldung wurde abgebrochen.' };
     }
     const persist = persistGithubToken(token, normalizedHost);
     return {
@@ -100,8 +101,17 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       return { success: false, authenticated: false, username: null, error: 'GitHub-Anmeldung wurde abgebrochen.' };
     }
     if (!success) {
-      clearSavedGithubTokenSecurely();
-      return { success: false, authenticated: false, username: null };
+      const failure = githubService.getLastAuthenticationFailure?.();
+      if (failure?.invalidCredentials) {
+        clearSavedGithubTokenSecurely();
+        githubService.logout();
+      }
+      return {
+        success: false,
+        authenticated: githubService.isAuthenticated(),
+        username: githubService.getUsername(),
+        error: failure?.message,
+      };
     }
     const persist = persistGithubToken(savedToken.token, normalizedHost);
 
@@ -159,7 +169,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       const authenticated = await githubService.authenticate(result.accessToken, normalizedHost, () => isCurrentAuthAttempt(generation));
       if (!isCurrentAuthAttempt(generation)) return staleAuthError();
       if (!authenticated) {
-        return { success: false, error: 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
+        return { success: false, error: lastAuthenticationError() || 'Authentifizierung mit Device-Flow Token fehlgeschlagen.' };
       }
 
       const persist = persistGithubToken(result.accessToken, normalizedHost);
@@ -190,7 +200,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       const authenticated = await githubService.authenticate(tokenResult.accessToken, normalizedHost, () => isCurrentAuthAttempt(generation));
       if (!isCurrentAuthAttempt(generation)) return staleAuthError();
       if (!authenticated) {
-        return { success: false, error: 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
+        return { success: false, error: lastAuthenticationError() || 'Authentifizierung mit GitHub CLI Token fehlgeschlagen.' };
       }
 
       const persist = persistGithubToken(tokenResult.accessToken, normalizedHost);

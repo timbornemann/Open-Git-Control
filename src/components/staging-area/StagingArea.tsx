@@ -3,6 +3,7 @@ import { useToastQueue } from '@/hooks/useToastQueue';
 import { useI18n } from '@/i18n';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { getCommitMessageStyleLabel } from '@/utils/commitMessagePreferences';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { ConflictResolverPanel } from './ConflictResolverPanel';
 import { StagingCommitPanel } from './StagingCommitPanel';
@@ -18,6 +19,21 @@ import { useConflictResolver } from './useConflictResolver';
 import { useFileOperations } from './useFileOperations';
 import { useVisibleStagingFiles } from './useVisibleStagingFiles';
 
+const sharedWorkingTreeMatchesRepository = ({
+  repoPath,
+  workingTreeRepoPath,
+  workingTreeSnapshot,
+  workingTreeStatus,
+}: Pick<StagingAreaProps, 'repoPath' | 'workingTreeRepoPath' | 'workingTreeSnapshot' | 'workingTreeStatus'>): boolean => {
+  if (!repoPath) return false;
+  if (workingTreeRepoPath !== undefined) {
+    return Boolean(workingTreeRepoPath && normalizeRepoPathKey(workingTreeRepoPath) === normalizeRepoPathKey(repoPath));
+  }
+  return Boolean(
+    workingTreeStatus !== undefined && (!workingTreeSnapshot || normalizeRepoPathKey(workingTreeSnapshot.repoPath) === normalizeRepoPathKey(repoPath)),
+  );
+};
+
 export const StagingArea: React.FC<StagingAreaProps> = ({
   repoPath,
   onRepoChanged,
@@ -29,6 +45,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   viewMode = 'default',
   initialConflictPath = null,
   settings,
+  workingTreeRepoPath,
   workingTreeSnapshot,
   workingTreeStatus,
   workingTreeStats,
@@ -44,7 +61,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setStashRefreshTrigger((value) => value + 1);
   }, []);
 
-  const hasSharedWorkingTreeStatus = workingTreeStatus !== null && workingTreeStatus !== undefined;
+  const hasSharedWorkingTree = onRefreshWorkingTree !== undefined;
+  const sharedWorkingTreeMatchesRepo = sharedWorkingTreeMatchesRepository({ repoPath, workingTreeRepoPath, workingTreeSnapshot, workingTreeStatus });
+  const sharedStatus = sharedWorkingTreeMatchesRepo ? (workingTreeStatus ?? null) : null;
+  const sharedSnapshot = sharedWorkingTreeMatchesRepo ? (workingTreeSnapshot ?? null) : null;
+
   const fileOps = useFileOperations({
     repoPath,
     setToast,
@@ -53,10 +74,11 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     onRepoChanged,
     onStashChanged: triggerStashRefresh,
     onOpenDiff,
-    externalStatus: hasSharedWorkingTreeStatus ? workingTreeStatus : undefined,
-    externalStatusRaw: hasSharedWorkingTreeStatus ? workingTreeSnapshot?.statusRaw : undefined,
-    externalStats: hasSharedWorkingTreeStatus ? workingTreeStats : undefined,
-    externalRefresh: hasSharedWorkingTreeStatus ? onRefreshWorkingTree : undefined,
+    externalRepoPath: hasSharedWorkingTree ? (sharedWorkingTreeMatchesRepo ? repoPath : null) : undefined,
+    externalStatus: hasSharedWorkingTree ? sharedStatus : undefined,
+    externalStatusRaw: sharedSnapshot?.statusRaw,
+    externalStats: hasSharedWorkingTree ? (sharedWorkingTreeMatchesRepo ? (workingTreeStats ?? null) : null) : undefined,
+    externalRefresh: onRefreshWorkingTree,
   });
 
   const commitForm = useCommitForm({
@@ -118,7 +140,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   }
 
   const status = fileOps.status;
-  const isBareRepository = Boolean(workingTreeSnapshot?.isBare);
+  const isBareRepository = Boolean(sharedSnapshot?.isBare);
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
   const isCommitInputDisabled =

@@ -147,9 +147,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                   </button>
                 </div>
                 <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">
-                    {t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}
-                  </span>
+                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}</span>
                   <button
                     className="staging-btn-sm conflict-action-btn"
                     onClick={workflow.onConflictCherryPickContinue}
@@ -253,6 +251,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             viewMode="conflictOnly"
             initialConflictPath={activeConflictPath}
             settings={settingsState.settings}
+            workingTreeRepoPath={workingTree.dataRepoPath}
             workingTreeSnapshot={workingTree.snapshot}
             workingTreeStatus={workingTree.status}
             workingTreeStats={workingTree.stats}

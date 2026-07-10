@@ -36,6 +36,98 @@ describe('registerGithubHandlers fork flow', () => {
     });
   });
 
+  it('keeps a saved token after a transient restore failure', async () => {
+    readSavedGithubTokenWithHostMock.mockReturnValue({ token: 'saved-token', host: 'github.com' });
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn().mockResolvedValue(false),
+      getLastAuthenticationFailure: vi.fn().mockReturnValue({
+        message: 'GitHub token validation timed out after 20 seconds.',
+        invalidCredentials: false,
+      }),
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:loginWithSavedToken')!({});
+
+    expect(result).toEqual({
+      success: false,
+      authenticated: false,
+      username: null,
+      error: 'GitHub token validation timed out after 20 seconds.',
+    });
+    expect(clearSavedGithubTokenSecurelyMock).not.toHaveBeenCalled();
+    expect(githubService.logout).not.toHaveBeenCalled();
+  });
+
+  it('removes a saved token only after confirmed invalid credentials', async () => {
+    readSavedGithubTokenWithHostMock.mockReturnValue({ token: 'invalid-token', host: 'github.com' });
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn().mockResolvedValue(false),
+      getLastAuthenticationFailure: vi.fn().mockReturnValue({
+        message: 'Bad credentials',
+        invalidCredentials: true,
+      }),
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:loginWithSavedToken')!({});
+
+    expect(result).toEqual({
+      success: false,
+      authenticated: false,
+      username: null,
+      error: 'Bad credentials',
+    });
+    expect(clearSavedGithubTokenSecurelyMock).toHaveBeenCalledTimes(1);
+    expect(githubService.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a validation failure to a personal-token login instead of leaving the renderer waiting', async () => {
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(false),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      authenticate: vi.fn().mockResolvedValue(false),
+      getLastAuthenticationFailure: vi.fn().mockReturnValue({
+        message: 'GitHub token validation timed out after 20 seconds.',
+        invalidCredentials: false,
+      }),
+      getUsername: vi.fn().mockReturnValue(null),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:auth')!({}, 'replacement-token', 'github.com');
+
+    expect(result).toEqual({ success: false, error: 'GitHub token validation timed out after 20 seconds.' });
+    expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+  });
+
   it('returns not authenticated for github:forkRepo when session is missing', async () => {
     const githubService = {
       isAuthenticated: vi.fn().mockReturnValue(false),
