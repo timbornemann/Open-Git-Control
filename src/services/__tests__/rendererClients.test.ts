@@ -309,6 +309,7 @@ describe('renderer service clients', () => {
 
   it('delegates rich git APIs and repo-unavailable guarded methods', async () => {
     await expectDelegation(() => gitClient.scanPushSecrets({ includeTags: true }), api.git.scanPushSecrets, [{ includeTags: true }]);
+    await expectDelegation(() => gitClient.approveSecretScanPush(['origin', 'HEAD']), api.git.approveSecretScanPush, [['origin', 'HEAD']]);
     await expectDelegation(() => gitClient.cancelSecretScan(), api.git.cancelSecretScan, []);
     await expectDelegation(() => gitClient.createCommit({ message: 'm' } as any), api.git.createCommit, [{ message: 'm' }]);
     await expectDelegation(() => gitClient.getCommitLogPage({ limit: 10 } as any), api.git.getCommitLogPage, [{ limit: 10 }]);

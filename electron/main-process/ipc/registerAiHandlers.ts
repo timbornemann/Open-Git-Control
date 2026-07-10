@@ -157,9 +157,7 @@ export function registerAiHandlers({
       const wasRepoSwitchCancel = error instanceof RepoJobCancelledError || (repoJob.signal.aborted && !cancelRequested);
       const wasUserCancel = cancelRequested || (!wasRepoSwitchCancel && /abgebrochen|cancelled/i.test(message));
       const wasCancelled = wasRepoSwitchCancel || wasUserCancel;
-      const cancelMessage = wasRepoSwitchCancel
-        ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.'
-        : 'KI Auto-Commit wurde abgebrochen.';
+      const cancelMessage = wasRepoSwitchCancel ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : 'KI Auto-Commit wurde abgebrochen.';
 
       emitAiAutoCommitEvent(webContents, {
         id: jobId,
@@ -256,16 +254,21 @@ export function registerAiHandlers({
         }
 
         const settings = readSettingsWithMigration();
-        const markdown = await aiService.generateReleaseNotes(settings, getGeminiApiKeyFromSecureStore, {
-          tagName,
-          releaseName,
-          lastReleaseTag: params?.lastReleaseTag || null,
-          commits,
-          repositoryHtmlUrl: typeof params?.repositoryHtmlUrl === 'string' ? params.repositoryHtmlUrl : null,
-          language,
-          versionBump,
-          hints,
-        }, getOpenAiApiKeyFromSecureStore);
+        const markdown = await aiService.generateReleaseNotes(
+          settings,
+          getGeminiApiKeyFromSecureStore,
+          {
+            tagName,
+            releaseName,
+            lastReleaseTag: params?.lastReleaseTag || null,
+            commits,
+            repositoryHtmlUrl: typeof params?.repositoryHtmlUrl === 'string' ? params.repositoryHtmlUrl : null,
+            language,
+            versionBump,
+            hints,
+          },
+          getOpenAiApiKeyFromSecureStore,
+        );
 
         return { success: true, data: { markdown } };
       } catch (error: any) {

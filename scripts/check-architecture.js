@@ -8,7 +8,23 @@ const ignoredDirs = new Set(['coverage', 'dist', 'dist-electron', 'node_modules'
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
 const importExtensions = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
-const maxLineExceptions = new Map([]);
+// Documented, intentional exceptions to the 500-line limit. Each entry is a
+// cohesive unit where splitting would fragment closely-coupled logic or shared
+// test setup without a real architectural benefit. The number records the size
+// at the time the exception was granted.
+const maxLineExceptions = new Map([
+  // Central composition hook: wires every domain/workflow hook together and
+  // assembles the single app-state object. Splitting scatters that wiring.
+  ['src/components/layout/useAppState.ts', 505],
+  // Single-run AI auto-commit orchestrator whose private steps all operate on
+  // one shared run state; extracting them would only add indirection.
+  ['electron/ai/AiAutoCommitRunSession.ts', 515],
+  // Cohesive test suite with substantial shared JSDOM/mocks setup; splitting it
+  // would duplicate that setup and risk the two halves drifting apart.
+  ['src/components/layout/workflows/__tests__/workflowHooks.test.ts', 567],
+  // Cohesive GitHub handler test suite with shared harness setup.
+  ['electron/main-process/ipc/__tests__/registerGithubHandlers.test.ts', 512],
+]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];
 const allowedElectronSrcPrefixes = ['src/shared/', 'src/types/'];

@@ -63,6 +63,15 @@ const SECRET_PATTERNS: PatternDefinition[] = [
     regex: /\bgh[pousr]_[A-Za-z0-9_]{20,255}\b/,
   },
   {
+    // Fine-grained personal access tokens (github_pat_...). These are not
+    // matched by the gh[pousr]_ rule and, being unquoted in typical .env
+    // assignments, are also missed by the credential-assignment rules.
+    id: 'github-fine-grained-pat',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bgithub_pat_[A-Za-z0-9_]{20,255}\b/,
+  },
+  {
     id: 'slack-token',
     minStrictness: 'low',
     severity: 'critical',

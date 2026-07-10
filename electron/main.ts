@@ -21,7 +21,11 @@ import { clearSavedPlanningApiAuthToken, generateSavedPlanningApiAuthToken, getP
 console.log('--- MAIN PROCESS START ---');
 console.log('ELECTRON_RUN_AS_NODE:', process.env.ELECTRON_RUN_AS_NODE);
 
-const isDev = process.env.NODE_ENV === 'development';
+// Development mode must never be reachable in an installed/packaged binary,
+// regardless of an inherited NODE_ENV. A packaged app in "dev mode" would load
+// the localhost dev server, open DevTools and apply the relaxed dev CSP.
+// app.isPackaged is the authoritative signal for a built application.
+const isDev = !app.isPackaged && process.env.NODE_ENV === 'development';
 const APP_DISPLAY_NAME = 'Open-Git-Control';
 const WINDOWS_APP_ID = 'com.opengitcontrol.app';
 

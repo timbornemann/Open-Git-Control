@@ -1,11 +1,7 @@
 import { useMemo } from 'react';
 import type { PaletteCommand } from '@/components/CommandPalette';
 import type { useAppState } from '@/components/layout/useAppState';
-import {
-  buildCherryPickAbortDialog,
-  buildMergeAbortDialog,
-  buildRebaseAbortDialog,
-} from '@/components/staging-area/conflictAbortDialogs';
+import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import type { TranslationVariables } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 

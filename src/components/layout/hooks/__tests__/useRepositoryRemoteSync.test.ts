@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe('useRepositoryRemoteSync', () => {
-  it('fetches only origin and never removes it after an ambiguous 404 response', async () => {
+  it('fetches only the resolved remote and never removes it after an ambiguous 404 response', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'getBranchStatusPorcelainV2').mockResolvedValue({ success: true, data: '# branch.head main\n' });
     const runGitCommand = vi.spyOn(gitClient, 'runGitCommand').mockResolvedValue({
@@ -62,7 +62,8 @@ describe('useRepositoryRemoteSync', () => {
         triggerRefresh,
         autoFetchIntervalMs: 60_000,
         language: 'en',
-        hasRemoteOrigin: true,
+        hasAnyRemote: true,
+        remotes: [{ name: 'origin', url: 'https://github.com/acme/demo.git' }],
         setGitActionToast,
         setActiveGitActionLabel,
         isGitActionRunningRef,
@@ -83,7 +84,7 @@ describe('useRepositoryRemoteSync', () => {
     hook.unmount();
   });
 
-  it('does not attempt a fetch when origin is known to be absent', async () => {
+  it('does not attempt a fetch when the repository has no remote', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'getBranchStatusPorcelainV2').mockResolvedValue({ success: true, data: '# branch.head main\n' });
     const runGitCommand = vi.spyOn(gitClient, 'runGitCommand').mockResolvedValue({ success: true, data: '' });
@@ -99,7 +100,8 @@ describe('useRepositoryRemoteSync', () => {
         triggerRefresh,
         autoFetchIntervalMs: 60_000,
         language: 'en',
-        hasRemoteOrigin: false,
+        hasAnyRemote: false,
+        remotes: [],
         setGitActionToast,
         setActiveGitActionLabel,
         isGitActionRunningRef,
@@ -111,6 +113,44 @@ describe('useRepositoryRemoteSync', () => {
     });
 
     expect(runGitCommand).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it('fetches the tracked upstream remote when it is not named origin', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'getBranchStatusPorcelainV2').mockResolvedValue({
+      success: true,
+      data: '# branch.head feature\n# branch.upstream upstream/feature\n# branch.ab +0 -0\n',
+    });
+    const runGitCommand = vi.spyOn(gitClient, 'runGitCommand').mockResolvedValue({ success: true, data: '' });
+    const triggerRefresh = vi.fn();
+    const setGitActionToast = vi.fn();
+    const setActiveGitActionLabel = vi.fn();
+    const isGitActionRunningRef = { current: false };
+
+    const hook = renderHook(() =>
+      useRepositoryRemoteSync({
+        activeRepo: 'C:\\repos\\fork',
+        refreshTrigger: 0,
+        triggerRefresh,
+        autoFetchIntervalMs: 60_000,
+        language: 'en',
+        hasAnyRemote: true,
+        remotes: [{ name: 'upstream', url: 'https://github.com/acme/demo.git' }],
+        setGitActionToast,
+        setActiveGitActionLabel,
+        isGitActionRunningRef,
+      }),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    expect(runGitCommand).toHaveBeenCalledWith('fetch', 'upstream', '--prune', '--tags', '--quiet');
+    expect(runGitCommand.mock.calls.some(([command, ...args]) => command === 'fetch' && args.includes('origin'))).toBe(false);
     hook.unmount();
   });
 });

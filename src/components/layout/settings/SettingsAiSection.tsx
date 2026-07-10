@@ -67,9 +67,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setGeminiApiKeyInput('');
                   await onUpdateSettings({});
                   if (keyToSave.trim() && !next.hasGeminiApiKey) {
-                    ai.setAiStatus(
-                      t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
-                    );
+                    ai.setAiStatus(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'));
                   }
                 } catch (error: unknown) {
                   const message =
@@ -141,9 +139,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setOpenAiApiKeyInput('');
                   await onUpdateSettings({});
                   if (keyToSave.trim() && !next.hasOpenAiApiKey) {
-                    ai.setAiStatus(
-                      t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
-                    );
+                    ai.setAiStatus(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'));
                   }
                 } catch (error: unknown) {
                   const message =

@@ -246,6 +246,7 @@ describe('porcelain v2 branch parsing', () => {
       ahead: 3,
       behind: 2,
       hasUpstream: true,
+      upstreamRemote: 'origin',
     });
     expect(countChangedEntriesFromPorcelainV2(output)).toBe(1);
   });
@@ -256,6 +257,7 @@ describe('porcelain v2 branch parsing', () => {
       ahead: 0,
       behind: 0,
       hasUpstream: false,
+      upstreamRemote: null,
     });
     expect(countChangedEntriesFromPorcelainV2(output)).toBe(0);
   });

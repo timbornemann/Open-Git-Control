@@ -21,8 +21,10 @@ export class CommitService {
     return [
       ...new Set(
         paths
-          .map((filePath) => String(filePath || '').trim())
-          .filter(Boolean)
+          // Preserve leading/trailing whitespace: it is significant in Git
+          // filenames. Only drop entries that are entirely empty/nullish.
+          .map((filePath) => (typeof filePath === 'string' ? filePath : filePath == null ? '' : String(filePath)))
+          .filter((filePath) => filePath.length > 0)
           .map((filePath) => toLiteralPathspec(filePath)),
       ),
     ];

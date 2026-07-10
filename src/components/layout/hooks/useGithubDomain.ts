@@ -99,8 +99,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           resetRepositoryPages();
           if (loginResult.tokenPersisted === false) {
             setAuthError(
-              loginResult.error ||
-                t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+              loginResult.error || t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
             );
           }
         } else {
@@ -187,8 +186,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         resetRepositoryPages();
         if (authResult.tokenPersisted === false) {
           setAuthError(
-            authResult.error ||
-              t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+            authResult.error || t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
           );
         }
       } else {
@@ -240,8 +238,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
           resetRepositoryPages();
           if (data.tokenPersisted === false || pollResult.error) {
             setAuthError(
-              pollResult.error ||
-                t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+              pollResult.error || t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
             );
           }
           finishAuthRun(run);
@@ -343,8 +340,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       resetRepositoryPages();
       if (loginResult.data.tokenPersisted === false || loginResult.error) {
         setAuthError(
-          loginResult.error ||
-            t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+          loginResult.error || t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
         );
       }
     } catch (error: any) {

@@ -173,12 +173,7 @@ export const ReleaseNotesWorkbench = ({
               <div className="release-publish-head" style={{ marginBottom: 8 }}>
                 <h4 style={{ margin: 0 }}>Assets</h4>
               </div>
-              <button
-                type="button"
-                className="staging-tool-btn"
-                onClick={() => void onAddPendingAssets()}
-                disabled={isEditorDisabled}
-              >
+              <button type="button" className="staging-tool-btn" onClick={() => void onAddPendingAssets()} disabled={isEditorDisabled}>
                 Dateien hinzufuegen
               </button>
               {pendingAssets.length > 0 && (

@@ -2,6 +2,7 @@ import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import type { GitService, RepositoryFileSource } from '../../../GitService';
 import { resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../../../git/RepositoryPathSafety';
+import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 
 type RegisterGitFileHandlersDeps = {
@@ -9,6 +10,10 @@ type RegisterGitFileHandlersDeps = {
 };
 
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
+
+// Never trim a repository-relative path: leading/trailing whitespace is a
+// significant part of a Git filename. Only reject an entirely empty value.
+const asRepositoryFilePath = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
 const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => {
   const source = String(value || '').trim();
@@ -21,12 +26,12 @@ const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => 
 export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersDeps): void {
   ipcMain.handle(IpcChannel.GitReadRepoFile, async (_event: unknown, filePath: unknown) => {
     try {
-      const normalizedPath = String(filePath || '').trim();
-      if (!normalizedPath) {
+      const repositoryFilePath = asRepositoryFilePath(filePath);
+      if (repositoryFilePath.length === 0) {
         return { success: false, error: 'File path is required' };
       }
 
-      const data = await gitService.files.readRepoFile(normalizedPath);
+      const data = await gitService.files.readRepoFile(repositoryFilePath);
       return { success: true, data };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -36,8 +41,8 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
   ipcMain.handle(IpcChannel.GitMarkdownPreviewFile, async (_event: unknown, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
     try {
       const source = normalizeRepositoryFileSource(params.source);
-      const filePath = String(params.path || '').trim();
-      if (!filePath) {
+      const filePath = asRepositoryFilePath(params.path);
+      if (filePath.length === 0) {
         return { success: false, error: 'File path is required' };
       }
 
@@ -55,8 +60,8 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
   ipcMain.handle(IpcChannel.GitRepoFileDataUrl, async (_event: unknown, params: { source?: unknown; path?: unknown; commitHash?: unknown } = {}) => {
     try {
       const source = normalizeRepositoryFileSource(params.source);
-      const filePath = String(params.path || '').trim();
-      if (!filePath) {
+      const filePath = asRepositoryFilePath(params.path);
+      if (filePath.length === 0) {
         return { success: false, error: 'File path is required' };
       }
 
@@ -73,12 +78,12 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
 
   ipcMain.handle(IpcChannel.GitWriteRepoFile, async (_event: unknown, filePath: unknown, content: unknown) => {
     try {
-      const normalizedPath = String(filePath || '').trim();
-      if (!normalizedPath) {
+      const repositoryFilePath = asRepositoryFilePath(filePath);
+      if (repositoryFilePath.length === 0) {
         return { success: false, error: 'File path is required' };
       }
 
-      await gitService.files.writeRepoFile(normalizedPath, typeof content === 'string' ? content : String(content ?? ''));
+      await gitService.files.writeRepoFile(repositoryFilePath, typeof content === 'string' ? content : String(content ?? ''));
       return { success: true };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -110,7 +115,7 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
     }
   });
 
-  ipcMain.handle(IpcChannel.GitAddIgnoreRule, async (_event: unknown, pattern: string) => {
+  ipcMain.handle(IpcChannel.GitAddIgnoreRule, async (_event: unknown, pattern: string, requestedRepoPath?: unknown) => {
     try {
       const normalizedPattern = String(pattern || '')
         .trim()
@@ -125,12 +130,12 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
         return { success: false, error: 'Pattern must be a single line' };
       }
 
-      const selectedRepo = gitService.getRepoPath();
-      if (!selectedRepo) {
-        return { success: false, error: 'No repository selected' };
-      }
+      // Pin the write to the repository the renderer requested, rejecting it if
+      // the active repository changed in the meantime, so the .gitignore edit
+      // and any follow-up unstage never target different repositories.
+      const selectedRepo = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
 
-      const repoRoot = await gitService.runCommand(['rev-parse', '--show-toplevel']);
+      const repoRoot = await gitService.runCommandAtPath(selectedRepo, ['rev-parse', '--show-toplevel']);
       const gitignorePath = resolveRepositoryPathForCreate(repoRoot, '.gitignore');
       const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
       const existingRules = new Set(

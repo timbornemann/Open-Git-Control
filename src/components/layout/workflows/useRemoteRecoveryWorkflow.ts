@@ -207,7 +207,10 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         .map((line) => line.trim())
         .filter(Boolean);
 
-      if (remoteNames.includes('origin')) {
+      // Any configured remote (origin, upstream, github, ...) means the push can
+      // target it, so the "create a GitHub repo because origin is missing"
+      // recovery must not fire. Only offer it when there is no remote at all.
+      if (remoteNames.length > 0) {
         return false;
       }
 

@@ -285,8 +285,8 @@ export const gitClient = {
     return requireElectronGitApi().scanPushSecrets(params);
   },
 
-  async approveSecretScanPush(): Promise<{ success: boolean }> {
-    return requireElectronGitApi().approveSecretScanPush();
+  async approveSecretScanPush(pushArgs?: string[]): Promise<{ success: boolean }> {
+    return requireElectronGitApi().approveSecretScanPush(pushArgs);
   },
 
   async cancelSecretScan(): Promise<{ success: boolean; cancelled: boolean }> {

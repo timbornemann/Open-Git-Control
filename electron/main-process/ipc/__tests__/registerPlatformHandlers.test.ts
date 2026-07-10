@@ -18,17 +18,21 @@ vi.mock('electron', () => ({
 const {
   clearSavedGeminiApiKeySecurelyMock,
   clearSavedGithubTokenSecurelyMock,
+  clearSavedOpenAiApiKeySecurelyMock,
   readSettingsWithMigrationMock,
   readStoreDataMock,
   saveGeminiApiKeySecurelyMock,
+  saveOpenAiApiKeySecurelyMock,
   writeSettingsMock,
   writeStoreDataMock,
 } = vi.hoisted(() => ({
   clearSavedGeminiApiKeySecurelyMock: vi.fn(),
   clearSavedGithubTokenSecurelyMock: vi.fn(),
+  clearSavedOpenAiApiKeySecurelyMock: vi.fn(),
   readSettingsWithMigrationMock: vi.fn(),
   readStoreDataMock: vi.fn(),
   saveGeminiApiKeySecurelyMock: vi.fn(),
+  saveOpenAiApiKeySecurelyMock: vi.fn(),
   writeSettingsMock: vi.fn(),
   writeStoreDataMock: vi.fn(),
 }));
@@ -46,8 +50,11 @@ vi.mock('../../settingsStore', () => ({
 vi.mock('../../secureStore', () => ({
   clearSavedGeminiApiKeySecurely: clearSavedGeminiApiKeySecurelyMock,
   clearSavedGithubTokenSecurely: clearSavedGithubTokenSecurelyMock,
+  clearSavedOpenAiApiKeySecurely: clearSavedOpenAiApiKeySecurelyMock,
   normalizeGeminiApiKey: (value: unknown) => (typeof value === 'string' ? value.trim().slice(0, 500) : ''),
+  normalizeOpenAiApiKey: (value: unknown) => (typeof value === 'string' ? value.trim().slice(0, 500) : ''),
   saveGeminiApiKeySecurely: saveGeminiApiKeySecurelyMock,
+  saveOpenAiApiKeySecurely: saveOpenAiApiKeySecurelyMock,
 }));
 
 const getRegisteredHandlers = () => {
@@ -69,6 +76,8 @@ describe('platform IPC handlers', () => {
     saveGeminiApiKeySecurelyMock.mockReset();
     clearSavedGeminiApiKeySecurelyMock.mockReset();
     clearSavedGithubTokenSecurelyMock.mockReset();
+    saveOpenAiApiKeySecurelyMock.mockReset();
+    clearSavedOpenAiApiKeySecurelyMock.mockReset();
   });
 
   it('wraps diagnostics report success and failure responses', async () => {
@@ -193,5 +202,37 @@ describe('platform IPC handlers', () => {
     await expect(handlers.get(IpcChannel.SettingsClearGeminiApiKey)?.({})).resolves.toEqual(expect.objectContaining({ hasGeminiApiKey: false }));
     expect(clearSavedGeminiApiKeySecurelyMock).toHaveBeenCalled();
     expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ hasGeminiApiKey: false }));
+  });
+
+  it('reads settings, manages the OpenAI key, and skips side effects when host/auto-update are unchanged', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    const currentSettings = {
+      language: 'de',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: false,
+      hasOpenAiApiKey: false,
+    };
+    readSettingsWithMigrationMock.mockReturnValue(currentSettings);
+    saveOpenAiApiKeySecurelyMock.mockReturnValue(true);
+    const updaterManager = { setAutoUpdatesEnabled: vi.fn() };
+    const githubService = { logout: vi.fn() };
+
+    registerRepoSettingsHandlers({ updaterManager, githubService } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsGet)?.({})).resolves.toEqual(currentSettings);
+
+    // Host and auto-update unchanged => no logout, token clear or updater toggle.
+    await handlers.get(IpcChannel.SettingsSet)?.({}, { language: 'en' });
+    expect(githubService.logout).not.toHaveBeenCalled();
+    expect(clearSavedGithubTokenSecurelyMock).not.toHaveBeenCalled();
+    expect(updaterManager.setAutoUpdatesEnabled).not.toHaveBeenCalled();
+
+    await expect(handlers.get(IpcChannel.SettingsSetOpenAiApiKey)?.({}, '  sk-test  ')).resolves.toEqual(expect.objectContaining({ hasOpenAiApiKey: true }));
+    expect(saveOpenAiApiKeySecurelyMock).toHaveBeenCalledWith('sk-test');
+
+    await expect(handlers.get(IpcChannel.SettingsClearOpenAiApiKey)?.({})).resolves.toEqual(expect.objectContaining({ hasOpenAiApiKey: false }));
+    expect(clearSavedOpenAiApiKeySecurelyMock).toHaveBeenCalled();
   });
 });

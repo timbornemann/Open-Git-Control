@@ -6,6 +6,7 @@ import type { FileEntry } from '@/utils/gitParsing';
 import type { FileSection } from './types';
 
 type Params = {
+  repoPath: string | null;
   setToast: (msg: ToastMessage | null) => void;
   tr: TranslateFn;
   t: CatalogTranslateFn;
@@ -13,20 +14,26 @@ type Params = {
   refresh: () => Promise<void>;
 };
 
-export const useIgnoreRule = ({ setToast, tr, t, onRepoChanged, refresh }: Params) => {
+export const useIgnoreRule = ({ repoPath, setToast, tr, t, onRepoChanged, refresh }: Params) => {
   return useCallback(
     async (entry: FileEntry, section: FileSection, pattern: string) => {
       if (!gitClient.isAvailable()) return;
+      // Pin the whole operation to the repository that was active when the rule
+      // was requested. Both the .gitignore write and the follow-up unstage are
+      // repo-scoped so that a concurrent repository switch cannot apply the
+      // .gitignore change to one repo and the unstage to another.
+      const repoAtStart = repoPath;
+      if (!repoAtStart) return;
       const normalizedPattern = pattern.trim();
       if (!normalizedPattern) return;
       try {
-        const result = await gitClient.addIgnoreRule(normalizedPattern);
+        const result = await gitClient.addIgnoreRule(normalizedPattern, repoAtStart);
         if (!result.success) {
           setToast({ msg: result.error || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
           return;
         }
         if (section === 'staged' && entry.x === 'A') {
-          await gitClient.runGitCommand('reset', 'HEAD', '--', entry.path);
+          await gitClient.runGitCommandForRepo(repoAtStart, 'reset', 'HEAD', '--', entry.path);
         }
         setToast({
           msg: result.added
@@ -40,6 +47,6 @@ export const useIgnoreRule = ({ setToast, tr, t, onRepoChanged, refresh }: Param
         setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
       }
     },
-    [setToast, tr, onRepoChanged, refresh, t],
+    [repoPath, setToast, tr, onRepoChanged, refresh, t],
   );
 };

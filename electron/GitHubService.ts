@@ -30,7 +30,10 @@ export class GitHubService {
   private readonly repositories = new GitHubRepositoryService(() => this.requireOctokit());
   private readonly pullRequests = new GitHubPullRequestService(() => this.requireOctokit());
   private readonly workflows = new GitHubWorkflowService(() => this.requireOctokit());
-  private readonly releases = new GitHubReleaseService(() => this.requireOctokit());
+  private readonly releases = new GitHubReleaseService(
+    () => this.requireOctokit(),
+    () => this.host,
+  );
 
   private requireOctokit(): GitHubOctokit {
     if (!this.octokit) {
@@ -176,13 +179,7 @@ export class GitHubService {
     return this.releases.createRelease(params);
   }
 
-  uploadReleaseAsset(params: {
-    owner: string;
-    repo: string;
-    releaseId: number;
-    filePath: string;
-    name?: string;
-  }) {
+  uploadReleaseAsset(params: { owner: string; repo: string; releaseId: number; filePath: string; name?: string }) {
     return this.releases.uploadReleaseAsset(params);
   }
 }

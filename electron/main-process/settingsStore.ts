@@ -3,12 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { AppSettings } from '../settings';
 import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
-import {
-  normalizeGeminiApiKey,
-  readSavedGeminiApiKey,
-  readSavedOpenAiApiKey,
-  saveGeminiApiKeySecurely,
-} from './secureStore';
+import { normalizeGeminiApiKey, readSavedGeminiApiKey, readSavedOpenAiApiKey, saveGeminiApiKeySecurely } from './secureStore';
 import { writeTextFileAtomically } from './atomicFile';
 
 export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };

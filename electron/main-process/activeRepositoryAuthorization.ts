@@ -1,6 +1,6 @@
 import * as path from 'path';
 
-const repositoryPathKey = (value: string): string => {
+export const repositoryPathKey = (value: string): string => {
   const resolved = path.resolve(value);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 };

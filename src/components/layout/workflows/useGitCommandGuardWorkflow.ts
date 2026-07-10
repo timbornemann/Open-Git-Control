@@ -64,7 +64,15 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
       if (shouldGuardForcePush && openForcePushGuard(request, runtime)) return true;
       if (shouldGuardRemoteAheadWithDirtyState && (await openRemoteAheadDirtyStateGuard(request, runtime))) return true;
       if (shouldGuard && (await openDirtyWorktreeGuard(request, runtime))) return true;
-      if (shouldSecretScan && (await runSecretScanGuard(request, runtime, args.some((arg) => arg === '--tags')))) return true;
+      if (
+        shouldSecretScan &&
+        (await runSecretScanGuard(
+          request,
+          runtime,
+          args.some((arg) => arg === '--tags'),
+        ))
+      )
+        return true;
       return false;
     },
     [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, t, tr],

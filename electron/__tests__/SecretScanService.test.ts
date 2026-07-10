@@ -50,6 +50,27 @@ describe('SecretScanService', () => {
     expect(result.findings.map((f) => f.source).sort()).toEqual(['staged', 'to-push']);
   });
 
+  it('detects fine-grained GitHub PATs in unquoted .env assignments', async () => {
+    const stagedDiff = [
+      'diff --git a/.env b/.env',
+      '+++ b/.env',
+      '@@ -0,0 +1 @@',
+      '+GITHUB_TOKEN=github_pat_11ABCDEFG0abcdefghijkl_1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN',
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
+        'rev-list --reverse --topo-order HEAD --not --remotes': '',
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings.map((finding) => finding.ruleId)).toContain('github-fine-grained-pat');
+    expect(result.findings.find((finding) => finding.ruleId === 'github-fine-grained-pat')?.source).toBe('staged');
+  });
+
   it('scans every outgoing commit so a secret removed by a later commit is still found', async () => {
     const secretCommit = '1111111111111111111111111111111111111111';
     const removalCommit = '2222222222222222222222222222222222222222';

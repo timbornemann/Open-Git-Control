@@ -294,7 +294,7 @@ export const useFileOperations = ({
     setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
   }, []);
 
-  const addIgnoreRule = useIgnoreRule({ setToast, tr, t, onRepoChanged, refresh });
+  const addIgnoreRule = useIgnoreRule({ repoPath, setToast, tr, t, onRepoChanged, refresh });
 
   const stageFile = useCallback(
     (f: string) => stagePathsForCurrentRepo([f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)),

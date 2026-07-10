@@ -68,7 +68,11 @@ export const ConflictResolverHeader = ({
             <button className="staging-btn-sm conflict-action-btn" onClick={onMergeContinue} disabled={isGitActionRunning || isNavigationBusy}>
               {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
             </button>
-            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onMergeAbort} disabled={isGitActionRunning || isNavigationBusy}>
+            <button
+              className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+              onClick={onMergeAbort}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
               {t('generated.components.confirm.cancel_035b7526')}
             </button>
           </div>
@@ -79,7 +83,11 @@ export const ConflictResolverHeader = ({
             <button className="staging-btn-sm conflict-action-btn" onClick={onRebaseContinue} disabled={isGitActionRunning || isNavigationBusy}>
               {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
             </button>
-            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onRebaseAbort} disabled={isGitActionRunning || isNavigationBusy}>
+            <button
+              className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+              onClick={onRebaseAbort}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
               {t('generated.components.confirm.cancel_035b7526')}
             </button>
           </div>

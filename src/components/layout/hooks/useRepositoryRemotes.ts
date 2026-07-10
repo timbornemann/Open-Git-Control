@@ -31,7 +31,9 @@ const parseRemotes = (rawRemoteOutput: string): { hasOrigin: boolean; remotes: R
   }
 
   return {
-    hasOrigin: lines.some((line) => line.startsWith('origin')),
+    // Exact match: a remote literally named "origin". `startsWith` would
+    // misclassify unrelated remotes such as "origin2" as origin.
+    hasOrigin: remotes.some((remote) => remote.name === 'origin'),
     remotes,
   };
 };
@@ -163,10 +165,15 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     );
   };
 
+  // Tri-state: null while remotes have not been loaded yet, then whether the
+  // repository has any remote at all (regardless of its name).
+  const hasAnyRemote = hasRemoteOrigin === null ? null : remotes.length > 0;
+
   return {
     remotes,
     setRemotes,
     hasRemoteOrigin,
+    hasAnyRemote,
     setHasRemoteOrigin,
     handleAddRemote,
     handleRemoveRemote,

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { DEFAULT_HOST } from './types';
 import type { CreateReleaseParams, GithubApiErrorLike, GitHubOctokitProvider, GitHubReleaseDto, RepositoryReleaseApi, RepositoryTagApi } from './types';
 
 export type UploadReleaseAssetParams = {
@@ -10,8 +11,27 @@ export type UploadReleaseAssetParams = {
   name?: string;
 };
 
+/**
+ * Release assets are uploaded to a dedicated upload host. Octokit hard-codes
+ * `https://uploads.github.com` for this endpoint, which would leak an
+ * Enterprise token and file to public GitHub. Derive the correct upload host
+ * from the configured GitHub host instead.
+ */
+export function uploadBaseUrlForHost(host: string): string {
+  const normalizedHost = String(host || '')
+    .trim()
+    .toLowerCase();
+  if (!normalizedHost || normalizedHost === DEFAULT_HOST) {
+    return 'https://uploads.github.com';
+  }
+  return `https://${normalizedHost}/api/uploads`;
+}
+
 export class GitHubReleaseService {
-  constructor(private readonly getOctokit: GitHubOctokitProvider) {}
+  constructor(
+    private readonly getOctokit: GitHubOctokitProvider,
+    private readonly getHost: () => string = () => DEFAULT_HOST,
+  ) {}
 
   async listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {
     const octokit = this.getOctokit();
@@ -148,6 +168,9 @@ export class GitHubReleaseService {
       release_id: releaseId,
       name: assetName,
       data: fs.createReadStream(filePath) as unknown as string,
+      // Override Octokit's hard-coded uploads.github.com so Enterprise tokens
+      // and files are sent to the configured GHES upload host, not public GitHub.
+      baseUrl: uploadBaseUrlForHost(this.getHost()),
       headers: {
         'content-type': 'application/octet-stream',
         'content-length': fs.statSync(filePath).size,

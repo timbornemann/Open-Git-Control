@@ -86,4 +86,32 @@ describe('registerDialogHandlers', () => {
       buttonLabel: 'Speicherort auswaehlen',
     });
   });
+
+  it('returns null when any dialog is canceled', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: true, filePaths: [] });
+    const gitService = { runCommandAtPath: vi.fn() } as any;
+    registerDialogHandlers({ gitService });
+
+    expect(await handlers.get('dialog:openDirectory')!()).toBeNull();
+    expect(await handlers.get('dialog:selectDirectory')!()).toBeNull();
+    expect(await handlers.get('dialog:selectProjectParentDirectory')!()).toBeNull();
+    expect(await handlers.get('dialog:selectFiles')!()).toBeNull();
+    expect(gitService.runCommandAtPath).not.toHaveBeenCalled();
+  });
+
+  it('returns the selected files for a multi-select file dialog', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['D:/a.txt', 'D:/b.txt'] });
+    const gitService = { runCommandAtPath: vi.fn() } as any;
+    registerDialogHandlers({ gitService });
+
+    const selectFilesHandler = handlers.get('dialog:selectFiles');
+    expect(selectFilesHandler).toBeTruthy();
+
+    const files = await selectFilesHandler!();
+    expect(files).toEqual(['D:/a.txt', 'D:/b.txt']);
+    expect(showOpenDialogMock).toHaveBeenLastCalledWith({
+      properties: ['openFile', 'multiSelections'],
+      title: 'Dateien auswaehlen',
+    });
+  });
 });

@@ -194,7 +194,6 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
   };
 
   const handleCloseRepo = async (repoPath: string) => {
-    const operationId = ++repoOperationSequenceRef.current;
     const next = openRepos.filter((r) => r !== repoPath);
     const nextMeta = { ...repoMeta };
     delete nextMeta[repoPath];
@@ -202,26 +201,34 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     setOpenRepos(next);
     setRepoMeta(nextMeta);
 
-    if (activeRepo === repoPath) {
-      if (next.length > 0) {
-        const sortedNext = sortRepoPaths(next, nextMeta, repoSortBy);
-        const newActive = sortedNext[0];
-        if (appClient.isAvailable()) {
-          await appClient.setRepoPath(newActive);
-        }
-        if (repoOperationSequenceRef.current !== operationId) return;
-        setActiveRepo(newActive);
-        touchRepo(newActive);
-        onRepoActivated();
-        triggerRefresh();
-      } else {
-        if (appClient.isAvailable()) {
-          await appClient.clearRepoPath();
-        }
-        if (repoOperationSequenceRef.current !== operationId) return;
-        setActiveRepo(null);
-        onNoActiveRepo();
+    // Closing a repository that is not the active one changes neither the active
+    // repository nor the main-process selection. It must therefore NOT bump the
+    // operation sequence, otherwise it would invalidate an in-flight switch to a
+    // different repository and leave the UI showing one repo while the main
+    // process operates on another.
+    if (activeRepo !== repoPath) {
+      return;
+    }
+
+    const operationId = ++repoOperationSequenceRef.current;
+    if (next.length > 0) {
+      const sortedNext = sortRepoPaths(next, nextMeta, repoSortBy);
+      const newActive = sortedNext[0];
+      if (appClient.isAvailable()) {
+        await appClient.setRepoPath(newActive);
       }
+      if (repoOperationSequenceRef.current !== operationId) return;
+      setActiveRepo(newActive);
+      touchRepo(newActive);
+      onRepoActivated();
+      triggerRefresh();
+    } else {
+      if (appClient.isAvailable()) {
+        await appClient.clearRepoPath();
+      }
+      if (repoOperationSequenceRef.current !== operationId) return;
+      setActiveRepo(null);
+      onNoActiveRepo();
     }
   };
 

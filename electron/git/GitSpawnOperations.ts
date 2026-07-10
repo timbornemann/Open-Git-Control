@@ -234,7 +234,14 @@ export class GitSpawnOperations {
           if (progressTail.length > 24) {
             progressTail.splice(0, progressTail.length - 24);
           }
-          onProgress(trimmed);
+          // Progress is delivered from a stream 'data' handler. A throwing
+          // consumer (e.g. sending to a destroyed window) must not surface as an
+          // uncaught exception outside the clone promise.
+          try {
+            onProgress(trimmed);
+          } catch {
+            // Ignore progress delivery failures; the clone itself continues.
+          }
         }
       };
 

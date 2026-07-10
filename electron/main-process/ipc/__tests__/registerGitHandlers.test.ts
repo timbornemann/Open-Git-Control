@@ -332,13 +332,65 @@ describe('registerGitHandlers', () => {
       readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
     });
 
-    await handlers.get('git:approveSecretScanPush')!({});
-    const result = await handlers.get('git:command')!({ sender: { send: vi.fn() } }, 'push');
+    await handlers.get('git:approveSecretScanPush')!({ sender: { id: 42 } }, []);
+    const result = await handlers.get('git:command')!({ sender: { id: 42, send: vi.fn() } }, 'push');
 
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(showMessageBoxMock).not.toHaveBeenCalled();
     expect(scanPushDiffs).not.toHaveBeenCalled();
     expect(gitService.runCommand).toHaveBeenCalledWith(['push']);
+  });
+
+  it('does not honor an approval granted for a different push destination', async () => {
+    const scanPushDiffs = vi.fn().mockResolvedValue({
+      scanned: true,
+      strictness: 'medium',
+      findings: [{ filePath: '.env', lineNumber: 1, contextLine: '[REDACTED_SECRET]' }],
+      notes: [],
+      stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
+    });
+    showMessageBoxMock.mockResolvedValue({ response: 0 });
+    const gitService = {
+      runCommand: vi.fn().mockResolvedValue('should not push'),
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      getStatus: vi.fn(),
+      getStatusPorcelain: vi.fn(),
+      getLog: vi.fn(),
+      getBranches: vi.fn(),
+      getCommitDetails: vi.fn(),
+      checkoutConflictVersion: vi.fn(),
+      addFile: vi.fn(),
+      continueMerge: vi.fn(),
+      abortMerge: vi.fn(),
+      continueRebase: vi.fn(),
+      abortRebase: vi.fn(),
+      getSubmoduleStatus: vi.fn(),
+      updateSubmodulesInitRecursive: vi.fn(),
+      syncSubmodulesRecursive: vi.fn(),
+      getReflog: vi.fn(),
+      getForensicHistoryByString: vi.fn(),
+      getForensicHistoryByRegex: vi.fn(),
+      getForensicHistoryByLineRange: vi.fn(),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    // Approval is granted for `git push origin feature`, but the actual push
+    // targets a different (default) destination, so the scan must still run.
+    await handlers.get('git:approveSecretScanPush')!({ sender: { id: 7 } }, ['origin', 'feature']);
+    const result = await handlers.get('git:command')!({ sender: { id: 7, send: vi.fn() } }, 'push');
+
+    expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
+    expect(scanPushDiffs).toHaveBeenCalled();
+    expect(showMessageBoxMock).toHaveBeenCalled();
+    expect(gitService.runCommand).not.toHaveBeenCalled();
   });
 
   it('rejects secret scans for a renderer-selected non-active repository', async () => {

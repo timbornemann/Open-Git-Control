@@ -134,6 +134,8 @@ export interface GitBranchSyncFromPorcelainV2 {
   ahead: number;
   behind: number;
   hasUpstream: boolean;
+  /** Remote name of the tracked upstream (e.g. `origin`, `upstream`), if any. */
+  upstreamRemote: string | null;
 }
 
 export function parseBranchSyncFromPorcelainV2(statusOutput: string): GitBranchSyncFromPorcelainV2 {
@@ -141,6 +143,7 @@ export function parseBranchSyncFromPorcelainV2(statusOutput: string): GitBranchS
     ahead: 0,
     behind: 0,
     hasUpstream: false,
+    upstreamRemote: null,
   };
 
   if (!statusOutput.trim()) return result;
@@ -151,6 +154,11 @@ export function parseBranchSyncFromPorcelainV2(statusOutput: string): GitBranchS
 
     if (line.startsWith('# branch.upstream ')) {
       result.hasUpstream = true;
+      // Upstream is "<remote>/<branch>"; remote names contain no slash, so the
+      // segment before the first slash is the tracked remote.
+      const upstreamRef = line.slice('# branch.upstream '.length).trim();
+      const slashIndex = upstreamRef.indexOf('/');
+      result.upstreamRemote = slashIndex > 0 ? upstreamRef.slice(0, slashIndex) : null;
       continue;
     }
 

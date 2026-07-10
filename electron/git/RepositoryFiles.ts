@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath } from './RepositoryPathSafety';
+import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile } from './RepositoryFileEncoding';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
 
@@ -43,7 +44,9 @@ export class RepositoryFiles {
       throw new Error('File is too large for inline conflict editing (>2MB).');
     }
 
-    return fs.readFileSync(resolvedPath, 'utf8');
+    // Decode with the file's detected encoding (not a hard-coded UTF-8) so that
+    // UTF-16/Latin-1/BOM content is not corrupted, and binary files are refused.
+    return decodeRepositoryFile(fs.readFileSync(resolvedPath)).text;
   }
 
   async readRepositoryFileTextAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
@@ -80,8 +83,17 @@ export class RepositoryFiles {
       throw new Error('Target path is not a file.');
     }
 
+    // Preserve the file's original byte encoding. Re-detecting from the current
+    // on-disk bytes means an unchanged conflict resolution is written back
+    // identically instead of being silently converted to UTF-8. Binary files
+    // are refused rather than corrupted.
+    const encoding = detectRepositoryFileEncoding(fs.readFileSync(resolvedPath));
+    if (encoding === 'binary') {
+      throw new Error('This file appears to be binary and cannot be edited as text.');
+    }
+
     const textValue = typeof content === 'string' ? content : String(content ?? '');
-    fs.writeFileSync(resolvedPath, textValue, 'utf8');
+    fs.writeFileSync(resolvedPath, encodeRepositoryFile(textValue, encoding));
   }
 
   private normalizeRepoRelativePath(relativePath: string): string {

@@ -118,12 +118,12 @@ export interface ElectronGitAPI {
   getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
   gitStashBranch: (stashName: string, branchName: string) => Promise<IpcResult<string>>;
   getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;
-  addIgnoreRule: (pattern: string) => Promise<AddIgnoreRuleResultDto>;
+  addIgnoreRule: (pattern: string, repoPath?: string) => Promise<AddIgnoreRuleResultDto>;
   gitFetch: () => Promise<GitCommandResultDto>;
   gitPull: () => Promise<GitCommandResultDto>;
   gitPush: () => Promise<GitCommandResultDto>;
   scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => Promise<IpcResult<SecretScanResultDto>>;
-  approveSecretScanPush: () => Promise<{ success: boolean }>;
+  approveSecretScanPush: (pushArgs?: string[]) => Promise<{ success: boolean }>;
   cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
   gitInit: (repoPath: string) => Promise<GitInitResultDto>;
