@@ -3,10 +3,13 @@ import type {
   DeviceFlowStartDto,
   GitHubCreateReleaseParamsDto,
   GitHubForkParamsDto,
+  GitHubReleaseAssetDto,
   GitHubReleaseContextDto,
   GitHubReleaseDto,
+  GitHubRepositoryDetailsDto,
   GitHubRepositoryDto,
   GitHubRepositoryPageDto,
+  GitHubUploadReleaseAssetParamsDto,
   GithubStatusChecksDto,
   GithubWorkflowRunDto,
   PullRequestDto,
@@ -96,9 +99,11 @@ export interface ElectronGithubAPI {
   githubLogout: () => Promise<{ success: true } | { success: false; error: string }>;
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
+  githubGetRepository: (owner: string, repo: string) => Promise<IpcResult<GitHubRepositoryDetailsDto>>;
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: CreatePullRequestParamsDto) => Promise<IpcResult<CreatePullRequestResultDto>>;
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
+  githubUploadReleaseAsset: (params: GitHubUploadReleaseAssetParamsDto) => Promise<IpcResult<GitHubReleaseAssetDto>>;
   githubGetReleaseContext: (params: {
     owner: string;
     repo: string;

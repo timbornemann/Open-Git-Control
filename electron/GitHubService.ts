@@ -117,6 +117,10 @@ export class GitHubService {
     return this.repositories.createRepository(name, description, isPrivate);
   }
 
+  getRepository(owner: string, repo: string) {
+    return this.repositories.getRepository(owner, repo);
+  }
+
   forkRepository(
     owner: string,
     repo: string,
@@ -158,6 +162,16 @@ export class GitHubService {
 
   createRelease(params: CreateReleaseParams): Promise<GitHubReleaseDto> {
     return this.releases.createRelease(params);
+  }
+
+  uploadReleaseAsset(params: {
+    owner: string;
+    repo: string;
+    releaseId: number;
+    filePath: string;
+    name?: string;
+  }) {
+    return this.releases.uploadReleaseAsset(params);
   }
 }
 

@@ -45,4 +45,13 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     if (canceled) return null;
     return filePaths[0];
   });
+
+  ipcMain.handle(IpcChannel.DialogSelectFiles, async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      title: 'Dateien auswaehlen',
+    });
+    if (canceled) return null;
+    return filePaths;
+  });
 }

@@ -8,6 +8,7 @@ import type { ConfirmDialogState, ConflictEditorState, ConflictResolutionChoice,
 import { useConflictAutoOpen } from './useConflictAutoOpen';
 import { useConflictBlockCounts } from './useConflictBlockCounts';
 import { useConflictNavigation } from './useConflictNavigation';
+import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from './conflictAbortDialogs';
 
 type Params = {
   repoPath: string | null;
@@ -299,18 +300,14 @@ export const useConflictResolver = ({
     [git, t],
   );
   const mergeAbort = useCallback(() => {
-    setConfirmDialog({
-      variant: 'danger',
-      title: t('generated.components.staging_area.useconflictresolver.abort_merge_b80580e6'),
-      message: t('generated.components.staging_area.useconflictresolver.the_active_merge_will_be_discarded_and_reset_to_the_pre_7fdcd8df'),
-      contextItems: [{ label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git merge --abort' }],
-      irreversible: true,
-      consequences: t('generated.components.staging_area.useconflictresolver.all_unsaved_merge_conflict_resolutions_will_be_lost_96aa2476'),
-      confirmLabel: t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66'),
-      onConfirm: async () => {
-        await git(['mergeAbort'], t('generated.components.staging_area.useconflictresolver.merge_aborted_1750e90f'), true);
-      },
-    });
+    setConfirmDialog(
+      buildMergeAbortDialog({
+        t,
+        onConfirm: async () => {
+          await git(['mergeAbort'], t('generated.components.staging_area.useconflictresolver.merge_aborted_1750e90f'), true);
+        },
+      }),
+    );
   }, [setConfirmDialog, t, git]);
 
   const rebaseContinue = useCallback(
@@ -318,18 +315,29 @@ export const useConflictResolver = ({
     [git, t],
   );
   const rebaseAbort = useCallback(() => {
-    setConfirmDialog({
-      variant: 'danger',
-      title: t('generated.components.staging_area.useconflictresolver.abort_rebase_1cf7416a'),
-      message: t('generated.components.staging_area.useconflictresolver.the_active_rebase_will_be_discarded_and_the_previous_bra_13fdc39c'),
-      contextItems: [{ label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git rebase --abort' }],
-      irreversible: true,
-      consequences: t('generated.components.staging_area.useconflictresolver.all_unsaved_rebase_resolutions_will_be_lost_8fee553e'),
-      confirmLabel: t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71'),
-      onConfirm: async () => {
-        await git(['rebaseAbort'], t('generated.components.staging_area.useconflictresolver.rebase_aborted_339ee787'), true);
-      },
-    });
+    setConfirmDialog(
+      buildRebaseAbortDialog({
+        t,
+        onConfirm: async () => {
+          await git(['rebaseAbort'], t('generated.components.staging_area.useconflictresolver.rebase_aborted_339ee787'), true);
+        },
+      }),
+    );
+  }, [setConfirmDialog, t, git]);
+
+  const cherryPickContinue = useCallback(
+    () => git(['cherryPickContinue'], t('generated.components.staging_area.useconflictresolver.cherry_pick_continued_f1a2b3c4'), true),
+    [git, t],
+  );
+  const cherryPickAbort = useCallback(() => {
+    setConfirmDialog(
+      buildCherryPickAbortDialog({
+        t,
+        onConfirm: async () => {
+          await git(['cherryPickAbort'], t('generated.components.staging_area.useconflictresolver.cherry_pick_aborted_d5e6f7a8'), true);
+        },
+      }),
+    );
   }, [setConfirmDialog, t, git]);
 
   const onConflictEditorContentChange = useCallback((filePath: string, nextContent: string) => {
@@ -384,6 +392,8 @@ export const useConflictResolver = ({
     mergeAbort,
     rebaseContinue,
     rebaseAbort,
+    cherryPickContinue,
+    cherryPickAbort,
     onConflictEditorContentChange,
     // Navigation
     conflictPaths: navigation.conflictPaths,

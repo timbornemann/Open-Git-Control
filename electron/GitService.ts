@@ -126,6 +126,12 @@ export class GitService {
     return this.repoIsBare;
   }
 
+  isBareRepository(): boolean {
+    const repoPath = this.repoPath;
+    if (!repoPath) return false;
+    return this.isCurrentRepositoryBare(repoPath);
+  }
+
   private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
     const repoPath = this.ensureRepoPath();
     return this.gitRunner.runBuffer(repoPath, ['show', revisionSpec], {
@@ -213,6 +219,10 @@ export class GitService {
   }
 
   async getStatusPorcelainAtPath(repoPath: string): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (normalizedPath && this.isCurrentRepositoryBare(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainArgs())) {
+      return '';
+    }
     return this.runCommandAtPath(repoPath, statusPorcelainArgs());
   }
 

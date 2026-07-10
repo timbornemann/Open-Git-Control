@@ -684,6 +684,7 @@
             "submodules_initialized_updated_76af1313": "Submodule initialisiert/aktualisiert.",
             "submodule_urls_synchronized_7dfc04ea": "Submodule-URLs synchronisiert.",
             "could_not_open_submodule_39e4c0fb": "Submodule konnte nicht geöffnet werden.",
+            "could_not_load_submodules_a1b2c3d4": "Submodules konnten nicht geladen werden.",
             "remote_check_failed_306695fe": "Remote-Check fehlgeschlagen",
             "no_remote_configured_c025d492": "Kein Remote konfiguriert",
             "this_repository_has_no_remote_yet_d5654811": "Dieses Repository hat noch kein Remote.",
@@ -1155,7 +1156,8 @@
         "stagingarea": {
           "loading_status_bff97099": "Lade Status...",
           "no_open_conflicts_a3f846f5": "Keine offenen Konflikte.",
-          "working_tree_is_clean_7d0c725c": "Working Tree ist sauber."
+          "working_tree_is_clean_7d0c725c": "Working Tree ist sauber.",
+          "bare_repository_no_working_tree_a1b2c3d4": "Bare-Repository — kein Working Tree. Zum Stagen und Committen bitte klonen oder in ein Worktree umwandeln."
         },
         "stagingcommitpanel": {
           "resolve_conflicts_then_commit_507014dd": "Konflikte aufloesen, danach committen...",
@@ -1290,7 +1292,11 @@
           "abort_rebase_1cf7416a": "Rebase abbrechen?",
           "the_active_rebase_will_be_discarded_and_the_previous_bra_13fdc39c": "Der laufende Rebase wird verworfen und der vorherige Branch-Zustand wiederhergestellt.",
           "all_unsaved_rebase_resolutions_will_be_lost_8fee553e": "Alle noch nicht gesicherten Rebase-Aufloesungen gehen verloren.",
-          "rebase_aborted_339ee787": "Rebase abgebrochen"
+          "rebase_aborted_339ee787": "Rebase abgebrochen",
+          "the_active_cherry_pick_will_be_discarded_a1b2c3d4": "Der laufende Cherry-Pick wird verworfen und auf den Zustand vor dem Cherry-Pick zurueckgesetzt.",
+          "all_unsaved_cherry_pick_resolutions_will_be_lost_e5f6a7b8": "Alle noch nicht gesicherten Cherry-Pick-Aufloesungen gehen verloren.",
+          "cherry_pick_continued_f1a2b3c4": "Cherry-Pick fortgesetzt",
+          "cherry_pick_aborted_d5e6f7a8": "Cherry-Pick abgebrochen"
         },
         "usefileoperations": {
           "could_not_update_gitignore_074773f8": "Konnte .gitignore nicht aktualisieren.",

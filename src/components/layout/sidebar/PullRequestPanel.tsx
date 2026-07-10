@@ -13,6 +13,7 @@ type PullRequestPanelProps = {
   prFilter: 'open' | 'closed' | 'all';
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
+  prError?: string | null;
   pullRequests: PullRequestDto[];
   prCiByNumber: Record<number, PullRequestCiDto>;
   showCreatePR: boolean;
@@ -63,6 +64,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
   prFilter,
   setPrFilter,
   prLoading,
+  prError = null,
   pullRequests,
   prCiByNumber,
   showCreatePR,
@@ -167,7 +169,15 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
         <div className="github-panel-loading">{t('generated.components.layout.sidebar.githubconnectedcontent.loading_pull_requests_f64f6445')}</div>
       )}
 
+      {!prLoading && prError && (
+        <div className="release-alert release-alert--danger" style={{ marginBottom: 8 }}>
+          <XCircle size={16} />
+          <div>{prError}</div>
+        </div>
+      )}
+
       {!prLoading &&
+        !prError &&
         pullRequests.map((pr) => {
           const ci = prCiByNumber[pr.number];
           const badge = ci?.badge || 'unknown';
@@ -296,7 +306,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
           );
         })}
 
-      {!prLoading && pullRequests.length === 0 && (
+      {!prLoading && !prError && pullRequests.length === 0 && (
         <EmptyState
           icon={<GitPullRequest size={32} />}
           title={t('generated.components.layout.sidebar.githubconnectedcontent.no_pull_requests_4e17ae83')}

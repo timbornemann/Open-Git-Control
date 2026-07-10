@@ -73,6 +73,7 @@ type RepoSidebarContentProps = Pick<
   | 'prFilter'
   | 'setPrFilter'
   | 'prLoading'
+  | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
   | 'onOpenPR'

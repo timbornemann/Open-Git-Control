@@ -161,7 +161,10 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     const token = tokenInput.trim();
     if (!token) return;
     const run = beginAuthRun('token', true);
-    if (!run) return;
+    if (!run) {
+      setAuthError('Eine Anmeldung laeuft bereits.');
+      return;
+    }
 
     clearDevicePolling();
     setIsDeviceFlowRunning(false);
@@ -255,8 +258,23 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
 
   const handleStartDeviceFlowLogin = async () => {
     if (!githubClient.isAvailable() || !appClient.isAvailable()) return;
-    const run = beginAuthRun('device', true);
-    if (!run) return;
+    let run = beginAuthRun('device', true);
+    if (!run) {
+      const activeRun = activeAuthRunRef.current;
+      if (activeRun?.kind === 'device') {
+        if (githubClient.isAvailable()) {
+          void githubClient.cancelAuth().catch((error) => console.error('GitHub authentication cancellation failed:', error));
+        }
+        invalidateAuthRuns();
+        setIsDeviceFlowRunning(false);
+        setDeviceFlow(null);
+        run = beginAuthRun('device', true);
+        if (!run) return;
+      } else {
+        setDeviceFlowError('Ein Anmeldefluss laeuft bereits.');
+        return;
+      }
+    }
 
     clearDevicePolling();
     setIsAuthenticating(false);
@@ -292,7 +310,10 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const handleStartWebFlowLogin = async () => {
     if (!githubClient.isAvailable()) return;
     const run = beginAuthRun('web', true);
-    if (!run) return;
+    if (!run) {
+      setWebFlowError('Ein Anmeldefluss laeuft bereits.');
+      return;
+    }
 
     clearDevicePolling();
     setIsAuthenticating(false);

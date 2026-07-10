@@ -80,6 +80,10 @@ export const githubClient = {
     return requireElectronGithubApi().githubForkRepo(params);
   },
 
+  async getRepository(owner: string, repo: string) {
+    return requireElectronGithubApi().githubGetRepository(owner, repo);
+  },
+
   async getPullRequests(owner: string, repo: string, state: string): Promise<IpcResult<PullRequestDto[]>> {
     return requireElectronGithubApi().githubGetPRs(owner, repo, state);
   },
@@ -117,6 +121,10 @@ export const githubClient = {
 
   async createRelease(params: GitHubCreateReleaseParamsDto): Promise<IpcResult<GitHubReleaseDto>> {
     return requireElectronGithubApi().githubCreateRelease(params);
+  },
+
+  async uploadReleaseAsset(...args: Parameters<ElectronAPI['githubUploadReleaseAsset']>): ReturnType<ElectronAPI['githubUploadReleaseAsset']> {
+    return requireElectronGithubApi().githubUploadReleaseAsset(...args);
   },
 
   async generateReleaseNotes(params: {

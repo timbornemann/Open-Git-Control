@@ -20,6 +20,24 @@ export function registerGithubRepositoryHandlers({ githubService }: RegisterGith
     }
   });
 
+  ipcMain.handle(IpcChannel.GithubGetRepository, async (_event: IpcMainInvokeEvent, params: { owner: string; repo: string }) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
+
+    const owner = String(params?.owner || '').trim();
+    const repo = String(params?.repo || '').trim();
+    if (!owner || !repo) {
+      return { success: false, error: 'Owner and repository are required.' };
+    }
+
+    try {
+      const repository = await githubService.getRepository(owner, repo);
+      return { success: true, data: repository };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Repository could not be loaded.') };
+    }
+  });
+
   ipcMain.handle(IpcChannel.GithubCreateRepo, async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
     const authError = assertGithubAuthenticated(githubService);
     if (authError) return authError;

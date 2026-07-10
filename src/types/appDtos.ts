@@ -77,6 +77,9 @@ export interface AppSettingsDto {
   ollamaModel: string;
   geminiModel: string;
   hasGeminiApiKey: boolean;
+  openAiBaseUrl: string;
+  openAiModel: string;
+  hasOpenAiApiKey: boolean;
   githubOauthClientId: string;
   githubHost: string;
 }

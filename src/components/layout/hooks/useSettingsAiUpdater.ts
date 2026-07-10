@@ -20,13 +20,15 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
+  const [openAiApiKeyInput, setOpenAiApiKeyInput] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(null);
   const [updaterMessage, setUpdaterMessage] = useState<string | null>(null);
   const [isRunningUpdate, setIsRunningUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
-  const selectedModel = settings.aiProvider === 'gemini' ? settings.geminiModel : settings.ollamaModel;
+  const selectedModel =
+    settings.aiProvider === 'gemini' ? settings.geminiModel : settings.aiProvider === 'openai' ? settings.openAiModel : settings.ollamaModel;
 
   const mergedModelOptions = useMemo(() => {
     const values = [...modelOptions, selectedModel].filter(Boolean);
@@ -74,6 +76,10 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
   const setSelectedModel = async (model: string) => {
     if (settings.aiProvider === 'gemini') {
       await onUpdateSettings({ geminiModel: model });
+      return;
+    }
+    if (settings.aiProvider === 'openai') {
+      await onUpdateSettings({ openAiModel: model });
       return;
     }
     await onUpdateSettings({ ollamaModel: model });
@@ -228,6 +234,8 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     modelOptions,
     geminiApiKeyInput,
     setGeminiApiKeyInput,
+    openAiApiKeyInput,
+    setOpenAiApiKeyInput,
     appVersion,
     updaterStatus,
     updaterMessage,

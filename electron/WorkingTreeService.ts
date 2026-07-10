@@ -10,6 +10,7 @@ export type WorkingTreeSnapshot = {
   changeCount: number;
   durationMs: number;
   largeMode: boolean;
+  isBare: boolean;
 };
 
 export type WorkingTreeStats = {
@@ -126,10 +127,14 @@ export class WorkingTreeService {
 
     const promise = (async () => {
       const startedAt = Date.now();
-      const statusRaw = await this.gitService.getStatusPorcelainAtPath(repoPath);
+      const isBare =
+        typeof (this.gitService as { isBareRepository?: () => boolean }).isBareRepository === 'function'
+          ? Boolean((this.gitService as { isBareRepository: () => boolean }).isBareRepository())
+          : false;
+      const statusRaw = isBare ? '' : await this.gitService.getStatusPorcelainAtPath(repoPath);
       const durationMs = Date.now() - startedAt;
       const changeCount = statusRaw ? statusRaw.split(/\r?\n/).filter((line) => line.length >= 3).length : 0;
-      const contentFingerprint = await this.getContentFingerprint(repoPath, statusRaw);
+      const contentFingerprint = isBare ? 'bare' : await this.getContentFingerprint(repoPath, statusRaw);
       const snapshotId = createHash('sha1').update(repoPath).update('\0').update(statusRaw).update('\0').update(contentFingerprint).digest('hex');
       const snapshot: WorkingTreeSnapshot = {
         snapshotId,
@@ -138,6 +143,7 @@ export class WorkingTreeService {
         changeCount,
         durationMs,
         largeMode: changeCount >= 250 || durationMs >= 500,
+        isBare,
       };
       if (this.gitService.getRepoPath() === repoPath) {
         this.latestSnapshot = snapshot;

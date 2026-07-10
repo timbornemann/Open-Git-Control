@@ -27,6 +27,7 @@ type GithubConnectedContentProps = Pick<
   | 'prFilter'
   | 'setPrFilter'
   | 'prLoading'
+  | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
   | 'onOpenPR'
@@ -74,6 +75,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   prFilter,
   setPrFilter,
   prLoading,
+  prError,
   pullRequests,
   prCiByNumber,
   onOpenPR,
@@ -154,6 +156,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             prFilter={prFilter}
             setPrFilter={setPrFilter}
             prLoading={prLoading}
+            prError={prError}
             pullRequests={pullRequests}
             prCiByNumber={prCiByNumber}
             showCreatePR={showCreatePR}

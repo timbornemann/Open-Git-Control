@@ -249,7 +249,7 @@ export const useAppState = () => {
     await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });
   };
 
-  const { closeReleaseCreator, generateReleaseNotesWithAI, handleCreateRelease, openReleaseCreator, refreshReleaseContext, setReleaseForm } =
+  const { closeReleaseCreator, generateReleaseNotesWithAI, handleCreateRelease, openReleaseCreator, refreshReleaseContext, setReleaseForm, releasePendingAssets, addReleasePendingAssets, removeReleasePendingAsset } =
     useReleaseWorkflow({
       activeRepo: workspace.activeRepo,
       isGithubAuthenticated: github.isAuthenticated,
@@ -422,6 +422,7 @@ export const useAppState = () => {
     prFilter: pullRequestDomain.prFilter,
     setPrFilter: pullRequestDomain.setPrFilter,
     prLoading: pullRequestDomain.prLoading,
+    prError: pullRequestDomain.prError,
     pullRequests: pullRequestDomain.pullRequests,
     prCiByNumber: pullRequestDomain.prCiByNumber,
     showCreatePR,
@@ -454,6 +455,9 @@ export const useAppState = () => {
     releaseNotesOptions,
     setReleaseNotesOptions,
     handleCreateRelease,
+    releasePendingAssets,
+    addReleasePendingAssets,
+    removeReleasePendingAsset,
     handleOpenPR,
     handleCopyPRUrl,
     handleCheckoutPR,

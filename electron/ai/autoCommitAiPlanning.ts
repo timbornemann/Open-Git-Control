@@ -14,6 +14,7 @@ export async function chooseFilesWithAi(
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
   timeoutMs = CHAT_TIMEOUT_MS,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<string[]> {
   if (candidateWindow.length <= 1) {
     return candidateWindow.map((file) => file.path);
@@ -41,7 +42,7 @@ export async function chooseFilesWithAi(
     'Return JSON only.',
   ].join('\n');
 
-  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
+  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs, getOpenAiApiKey);
   const parsed = parseJsonFromText(raw) || {};
   const selectedRaw = Array.isArray(parsed.selectedPaths) ? parsed.selectedPaths : [];
   const candidateSet = new Set(candidateWindow.map((file) => file.path));
@@ -62,6 +63,7 @@ export async function planGroupsWithAi(
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
   timeoutMs = CHAT_TIMEOUT_MS,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<string[][]> {
   if (files.length <= 1) {
     return [files.map((file) => file.path)];
@@ -88,7 +90,7 @@ export async function planGroupsWithAi(
     'Return JSON only.',
   ].join('\n');
 
-  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
+  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs, getOpenAiApiKey);
   const parsed = parseJsonFromText(raw) || {};
   const parsedGroupsRaw: unknown[] = Array.isArray(parsed.groups) ? parsed.groups : [];
 

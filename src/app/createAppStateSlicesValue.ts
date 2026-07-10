@@ -11,6 +11,7 @@ import type {
   WorkflowContextValue,
 } from '@/contexts/AppStateContext';
 import type { TranslationVariables } from '@/i18n';
+import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import { gitClient } from '@/services/gitClient';
 
 type AppState = ReturnType<typeof useAppState>;
@@ -134,6 +135,7 @@ const createGithubSlice = (
   prFilter: state.prFilter,
   setPrFilter: state.setPrFilter,
   prLoading: state.prLoading,
+  prError: state.prError,
   pullRequests: state.pullRequests,
   prCiByNumber: state.prCiByNumber,
   onOpenPR: state.handleOpenPR,
@@ -158,6 +160,9 @@ const createGithubSlice = (
   releaseError: state.releaseError,
   releaseSuccess: state.releaseSuccess,
   onCreateRelease: state.handleCreateRelease,
+  releasePendingAssets: state.releasePendingAssets,
+  onAddReleasePendingAssets: state.addReleasePendingAssets,
+  onRemoveReleasePendingAsset: state.removeReleasePendingAsset,
   showReleaseCreator: state.showReleaseCreator,
   onOpenReleaseCreator: state.openReleaseCreator,
   onCloseReleaseCreator: state.closeReleaseCreator,
@@ -225,13 +230,27 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
     void state.runGitCommand(gitClient.buildMergeContinueArgs(), t('generated.app.merge_continued_63b9ee36'), t('generated.app.continuing_merge_9ed78a88'));
   },
   onConflictMergeAbort: () => {
-    void state.runGitCommand(gitClient.buildMergeAbortArgs(), t('generated.app.merge_aborted_b602bf32'), t('generated.app.aborting_merge_4f4ac264'));
+    state.setConfirmDialog(
+      buildMergeAbortDialog({
+        t,
+        onConfirm: async () => {
+          await state.runGitCommand(gitClient.buildMergeAbortArgs(), t('generated.app.merge_aborted_b602bf32'), t('generated.app.aborting_merge_4f4ac264'));
+        },
+      }),
+    );
   },
   onConflictRebaseContinue: () => {
     void state.runGitCommand(gitClient.buildRebaseContinueArgs(), t('generated.app.rebase_continued_181b298d'), t('generated.app.continuing_rebase_21242ce6'));
   },
   onConflictRebaseAbort: () => {
-    void state.runGitCommand(gitClient.buildRebaseAbortArgs(), t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
+    state.setConfirmDialog(
+      buildRebaseAbortDialog({
+        t,
+        onConfirm: async () => {
+          await state.runGitCommand(gitClient.buildRebaseAbortArgs(), t('generated.app.rebase_aborted_74ce61c8'), t('generated.app.aborting_rebase_bd30693b'));
+        },
+      }),
+    );
   },
   onConflictCherryPickContinue: () => {
     void state.runGitCommand(
@@ -241,10 +260,17 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
     );
   },
   onConflictCherryPickAbort: () => {
-    void state.runGitCommand(
-      gitClient.buildCherryPickAbortArgs(),
-      t('generated.app.cherry_pick_aborted_c9d0e1f2'),
-      t('generated.app.aborting_cherry_pick_a3b4c5d6'),
+    state.setConfirmDialog(
+      buildCherryPickAbortDialog({
+        t,
+        onConfirm: async () => {
+          await state.runGitCommand(
+            gitClient.buildCherryPickAbortArgs(),
+            t('generated.app.cherry_pick_aborted_c9d0e1f2'),
+            t('generated.app.aborting_cherry_pick_a3b4c5d6'),
+          );
+        },
+      }),
     );
   },
 });

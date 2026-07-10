@@ -3,7 +3,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { AppSettings } from '../settings';
 import { DEFAULT_SETTINGS, normalizeSettings } from '../settings';
-import { normalizeGeminiApiKey, readSavedGeminiApiKey, saveGeminiApiKeySecurely } from './secureStore';
+import {
+  normalizeGeminiApiKey,
+  readSavedGeminiApiKey,
+  readSavedOpenAiApiKey,
+  saveGeminiApiKeySecurely,
+} from './secureStore';
 import { writeTextFileAtomically } from './atomicFile';
 
 export type RawSettingsWithLegacyKey = Partial<AppSettings> & { geminiApiKey?: unknown };
@@ -36,33 +41,41 @@ export function writeSettings(settings: AppSettings): void {
 
 export function readSettingsWithMigration(): AppSettings {
   const rawSettings = readRawSettings();
-  const settings = normalizeSettings(rawSettings);
+  let settings = normalizeSettings(rawSettings);
   const legacyGeminiApiKey = normalizeGeminiApiKey(rawSettings?.geminiApiKey);
+  let dirty = false;
 
   if (legacyGeminiApiKey) {
     const savedSecurely = saveGeminiApiKeySecurely(legacyGeminiApiKey);
-    const nextSettings = normalizeSettings({
+    settings = normalizeSettings({
       ...(rawSettings || {}),
       hasGeminiApiKey: savedSecurely,
+      hasOpenAiApiKey: settings.hasOpenAiApiKey,
     });
-    writeSettings(nextSettings);
-    return nextSettings;
-  }
-
-  if (rawSettings && Object.prototype.hasOwnProperty.call(rawSettings, 'geminiApiKey')) {
-    const nextSettings = normalizeSettings({
+    dirty = true;
+  } else if (rawSettings && Object.prototype.hasOwnProperty.call(rawSettings, 'geminiApiKey')) {
+    settings = normalizeSettings({
       ...rawSettings,
       hasGeminiApiKey: settings.hasGeminiApiKey,
+      hasOpenAiApiKey: settings.hasOpenAiApiKey,
     });
-    writeSettings(nextSettings);
-    return nextSettings;
+    dirty = true;
   }
 
-  const hasSavedKey = Boolean(readSavedGeminiApiKey());
-  if (settings.hasGeminiApiKey !== hasSavedKey) {
-    const nextSettings = normalizeSettings({ ...settings, hasGeminiApiKey: hasSavedKey });
-    writeSettings(nextSettings);
-    return nextSettings;
+  const hasSavedGeminiKey = Boolean(readSavedGeminiApiKey());
+  if (settings.hasGeminiApiKey !== hasSavedGeminiKey) {
+    settings = normalizeSettings({ ...settings, hasGeminiApiKey: hasSavedGeminiKey });
+    dirty = true;
+  }
+
+  const hasSavedOpenAiKey = Boolean(readSavedOpenAiApiKey());
+  if (settings.hasOpenAiApiKey !== hasSavedOpenAiKey) {
+    settings = normalizeSettings({ ...settings, hasOpenAiApiKey: hasSavedOpenAiKey });
+    dirty = true;
+  }
+
+  if (dirty) {
+    writeSettings(settings);
   }
 
   return settings;
@@ -72,6 +85,14 @@ export function getGeminiApiKeyFromSecureStore(): string {
   const key = readSavedGeminiApiKey();
   if (!key) {
     throw new Error('Gemini API key fehlt. Bitte in den Einstellungen speichern.');
+  }
+  return key;
+}
+
+export function getOpenAiApiKeyFromSecureStore(): string {
+  const key = readSavedOpenAiApiKey();
+  if (!key) {
+    throw new Error('OpenAI API key fehlt. Bitte in den Einstellungen speichern.');
   }
   return key;
 }

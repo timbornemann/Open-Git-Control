@@ -2,7 +2,7 @@ import type { AppSettings } from '../settings';
 import type { AiProviderClient } from './AiProviderClient';
 import type { ReleaseCommitInput, ReleaseVersionBump } from './aiServiceTypes';
 import { safeHttpUrl } from './jsonResponse';
-import { runProviderText } from './providerText';
+import { CHAT_TIMEOUT_MS, runProviderText } from './providerText';
 
 type GenerateReleaseNotesParams = {
   tagName: string;
@@ -20,6 +20,7 @@ export async function generateReleaseNotes(
   settings: AppSettings,
   getGeminiApiKey: () => string,
   params: GenerateReleaseNotesParams,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<string> {
   const commits = Array.isArray(params.commits) ? params.commits : [];
   const releaseTypeLabel = params.versionBump === 'major' ? 'Major' : params.versionBump === 'minor' ? 'Minor' : 'Patch';
@@ -72,7 +73,7 @@ export async function generateReleaseNotes(
   ].join('\n');
 
   try {
-    const result = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey);
+    const result = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, undefined, CHAT_TIMEOUT_MS, getOpenAiApiKey);
     const markdown = result.trim();
     if (markdown) return markdown;
   } catch {

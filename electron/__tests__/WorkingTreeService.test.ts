@@ -139,4 +139,22 @@ describe('WorkingTreeService', () => {
       snapshotId: newSnapshot.snapshotId,
     });
   });
+
+  it('marks bare repositories without treating empty status as a clean worktree', async () => {
+    const getStatusPorcelainAtPath = vi.fn(async () => {
+      throw new Error('this operation must be run in a work tree');
+    });
+    const service = new WorkingTreeService({
+      getRepoPath: () => 'C:/bare.git',
+      isBareRepository: () => true,
+      getStatusPorcelainAtPath,
+      runPollingCommandAtPath: vi.fn(),
+    } as any);
+
+    const snapshot = await service.getSnapshot();
+    expect(snapshot.isBare).toBe(true);
+    expect(snapshot.statusRaw).toBe('');
+    expect(snapshot.changeCount).toBe(0);
+    expect(getStatusPorcelainAtPath).not.toHaveBeenCalled();
+  });
 });

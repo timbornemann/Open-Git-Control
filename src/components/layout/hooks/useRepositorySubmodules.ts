@@ -35,6 +35,10 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
         if (cancelled) return;
         if (!response.success) {
           setSubmodules([]);
+          setGitActionToast({
+            msg: response.error || t('generated.components.layout.hooks.userepositorydomain.could_not_load_submodules_a1b2c3d4'),
+            isError: true,
+          });
           return;
         }
 
@@ -46,9 +50,13 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
           summary: item.summary,
         }));
         setSubmodules(parsed);
-      } catch {
+      } catch (error: unknown) {
         if (cancelled) return;
         setSubmodules([]);
+        setGitActionToast({
+          msg: error instanceof Error ? error.message : t('generated.components.layout.hooks.userepositorydomain.could_not_load_submodules_a1b2c3d4'),
+          isError: true,
+        });
       }
     };
 
@@ -56,7 +64,7 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
     return () => {
       cancelled = true;
     };
-  }, [activeRepo, refreshTrigger]);
+  }, [activeRepo, refreshTrigger, setGitActionToast, t]);
 
   const handleSubmoduleInitUpdate = async () => {
     await runGitCommand(

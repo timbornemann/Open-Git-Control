@@ -4,8 +4,10 @@ import * as path from 'path';
 
 const GITHUB_TOKEN_STORE_FILE = 'github-token.bin';
 const GEMINI_API_KEY_STORE_FILE = 'gemini-api-key.bin';
+const OPENAI_API_KEY_STORE_FILE = 'openai-api-key.bin';
 const PLANNING_API_TOKEN_STORE_FILE = 'planning-api-token.bin';
 const MAX_GEMINI_KEY_LENGTH = 500;
+const MAX_OPENAI_KEY_LENGTH = 500;
 const GITHUB_TOKEN_PAYLOAD_VERSION = 1;
 const PLANNING_API_TOKEN_PAYLOAD_VERSION = 1;
 
@@ -25,6 +27,13 @@ export function normalizeGeminiApiKey(value: unknown): string {
     return '';
   }
   return value.trim().slice(0, MAX_GEMINI_KEY_LENGTH);
+}
+
+export function normalizeOpenAiApiKey(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, MAX_OPENAI_KEY_LENGTH);
 }
 
 function overwriteAndDeleteFile(filePath: string): void {
@@ -54,6 +63,10 @@ function getGithubTokenStorePath(): string {
 
 function getGeminiApiKeyStorePath(): string {
   return path.join(app.getPath('userData'), GEMINI_API_KEY_STORE_FILE);
+}
+
+function getOpenAiApiKeyStorePath(): string {
+  return path.join(app.getPath('userData'), OPENAI_API_KEY_STORE_FILE);
 }
 
 function getPlanningApiTokenStorePath(): string {
@@ -166,6 +179,40 @@ export function readSavedGeminiApiKey(): string | null {
 
 export function clearSavedGeminiApiKeySecurely(): void {
   overwriteAndDeleteFile(getGeminiApiKeyStorePath());
+}
+
+export function saveOpenAiApiKeySecurely(apiKey: string): boolean {
+  const normalized = normalizeOpenAiApiKey(apiKey);
+  if (!normalized) {
+    clearSavedOpenAiApiKeySecurely();
+    return true;
+  }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('OS-backed encryption is not available. OpenAI API key will not be persisted.');
+    return false;
+  }
+
+  const encrypted = safeStorage.encryptString(normalized);
+  fs.writeFileSync(getOpenAiApiKeyStorePath(), encrypted, { mode: 0o600 });
+  return true;
+}
+
+export function readSavedOpenAiApiKey(): string | null {
+  const keyPath = getOpenAiApiKeyStorePath();
+  if (!fs.existsSync(keyPath)) return null;
+  if (!safeStorage.isEncryptionAvailable()) return null;
+
+  try {
+    const encrypted = fs.readFileSync(keyPath);
+    return normalizeOpenAiApiKey(safeStorage.decryptString(encrypted)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSavedOpenAiApiKeySecurely(): void {
+  overwriteAndDeleteFile(getOpenAiApiKeyStorePath());
 }
 
 function normalizeEpochMillis(value: unknown): number | null {

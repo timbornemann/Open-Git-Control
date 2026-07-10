@@ -12,13 +12,15 @@ import type {
   UpdaterStatusDto,
 } from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
-
-type RepoUnavailablePayload = {
-  command: string;
-  error: string;
-};
+import type { RepoUnavailablePayload } from '../../src/shared/git/errors';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
+
+// Repo-unavailable events are raised in the renderer (gitClient + shared bus).
+// Preload and renderer are separate JS contexts, so this API keeps a local
+// listener list for contract compatibility without importing renderer modules
+// (sandboxed preload cannot require ../../src/*).
+const preloadRepoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
 
 export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI => {
   const invokeGitCommand = async (commandName: GitCommandNameDto, ...args: string[]): Promise<GitCommandResultDto> => {
@@ -32,6 +34,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   const flatApi = {
     openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpenDirectory),
     selectDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectDirectory),
+    selectFiles: () => ipcRenderer.invoke(IpcChannel.DialogSelectFiles),
     selectProjectParentDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectProjectParentDirectory),
     setRepoPath: (repoPath: string) => ipcRenderer.invoke(IpcChannel.GitSetRepo, repoPath),
     clearRepoPath: () => ipcRenderer.invoke(IpcChannel.GitClearRepo),
@@ -54,8 +57,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) =>
       ipcRenderer.invoke(IpcChannel.GitFileBlameRange, filePath, commitHash, startLine, lineCount),
     onRepoUnavailable: (callback: (payload: RepoUnavailablePayload) => void) => {
-      void callback;
-      return () => undefined;
+      preloadRepoUnavailableListeners.add(callback);
+      return () => {
+        preloadRepoUnavailableListeners.delete(callback);
+      };
     },
     startInteractiveRebase: (baseHash: string, todoLines: string[]) => ipcRenderer.invoke(IpcChannel.GitInteractiveRebase, baseHash, todoLines),
     applyPatch: (patch: string, options?: { cached?: boolean; reverse?: boolean }) => ipcRenderer.invoke(IpcChannel.GitApplyPatch, patch, options || {}),
@@ -108,6 +113,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     setSettings: (partial: Partial<AppSettingsDto>) => ipcRenderer.invoke(IpcChannel.SettingsSet, partial),
     setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke(IpcChannel.SettingsSetGeminiApiKey, apiKey),
     clearGeminiApiKey: () => ipcRenderer.invoke(IpcChannel.SettingsClearGeminiApiKey),
+    setOpenAiApiKey: (apiKey: string) => ipcRenderer.invoke(IpcChannel.SettingsSetOpenAiApiKey, apiKey),
+    clearOpenAiApiKey: () => ipcRenderer.invoke(IpcChannel.SettingsClearOpenAiApiKey),
     getPlanningApiInfo: () => ipcRenderer.invoke(IpcChannel.PlanningApiGetInfo),
     generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => ipcRenderer.invoke(IpcChannel.PlanningApiGenerateToken, lifetime),
     clearPlanningApiToken: () => ipcRenderer.invoke(IpcChannel.PlanningApiClearSavedToken),
@@ -144,6 +151,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       ipcRenderer.invoke(IpcChannel.GithubCreateRepo, { name, description, isPrivate }),
     githubForkRepo: (params: { owner: string; repo: string; name?: string; defaultBranchOnly?: boolean }) =>
       ipcRenderer.invoke(IpcChannel.GithubForkRepo, params),
+    githubGetRepository: (owner: string, repo: string) => ipcRenderer.invoke(IpcChannel.GithubGetRepository, { owner, repo }),
     githubGetPRs: (owner: string, repo: string, state: string) => ipcRenderer.invoke(IpcChannel.GithubGetPrs, owner, repo, state),
     githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubCreatePr, params),
@@ -157,6 +165,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       draft?: boolean;
       prerelease?: boolean;
     }) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
+    githubUploadReleaseAsset: (params: { owner: string; repo: string; releaseId: number; filePath: string; name?: string }) =>
+      ipcRenderer.invoke(IpcChannel.GithubUploadReleaseAsset, params),
     githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubGetReleaseContext, params),
     aiGenerateReleaseNotes: (params: {
@@ -237,9 +247,11 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       githubLogout: flatApi.githubLogout,
       githubCreateRepo: flatApi.githubCreateRepo,
       githubForkRepo: flatApi.githubForkRepo,
+      githubGetRepository: flatApi.githubGetRepository,
       githubGetPRs: flatApi.githubGetPRs,
       githubCreatePR: flatApi.githubCreatePR,
       githubCreateRelease: flatApi.githubCreateRelease,
+      githubUploadReleaseAsset: flatApi.githubUploadReleaseAsset,
       githubGetReleaseContext: flatApi.githubGetReleaseContext,
       githubGetWorkflowRuns: flatApi.githubGetWorkflowRuns,
       githubGetStatusChecks: flatApi.githubGetStatusChecks,
@@ -262,10 +274,13 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       setSettings: flatApi.setSettings,
       setGeminiApiKey: flatApi.setGeminiApiKey,
       clearGeminiApiKey: flatApi.clearGeminiApiKey,
+      setOpenAiApiKey: flatApi.setOpenAiApiKey,
+      clearOpenAiApiKey: flatApi.clearOpenAiApiKey,
     },
     app: {
       openDirectory: flatApi.openDirectory,
       selectDirectory: flatApi.selectDirectory,
+      selectFiles: flatApi.selectFiles,
       selectProjectParentDirectory: flatApi.selectProjectParentDirectory,
       openExternalUrl: flatApi.openExternalUrl,
       getPlanningApiInfo: flatApi.getPlanningApiInfo,

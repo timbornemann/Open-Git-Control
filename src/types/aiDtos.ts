@@ -1,7 +1,7 @@
 export type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
 export type GitJobPhaseDto = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
 
-export type AiProviderDto = 'ollama' | 'gemini';
+export type AiProviderDto = 'ollama' | 'gemini' | 'openai';
 export type AiCommitMessageStyleDto = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguageDto = 'auto' | 'de' | 'en';
 export type AiAutoCommitModeDto = 'normal' | 'retry' | 'fallback';

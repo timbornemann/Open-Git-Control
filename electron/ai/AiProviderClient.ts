@@ -11,6 +11,11 @@ const geminiProvider = new GeminiProvider();
 const ollamaProvider = new OllamaProvider();
 const openAiProvider = new OpenAiProvider();
 
+export type AiApiKeyGetters = {
+  getGeminiApiKey: () => string;
+  getOpenAiApiKey: () => string;
+};
+
 export function getSelectedAiModel(settings: AppSettings): string {
   return getConfiguredProvider(settings).getSelectedModel(settings);
 }
@@ -19,13 +24,14 @@ export class AiProviderClient {
   async testConnection(
     settings: AppSettings,
     getGeminiApiKey: () => string,
+    getOpenAiApiKey: () => string = () => '',
   ): Promise<{ ok: true; provider: AppSettings['aiProvider']; model: string; detail: string }> {
-    const result = await getConfiguredProvider(settings).testConnection({ settings, getGeminiApiKey });
+    const result = await getConfiguredProvider(settings).testConnection({ settings, getGeminiApiKey, getOpenAiApiKey });
     return result as AiConnectionResult & { provider: AppSettings['aiProvider'] };
   }
 
-  async listModels(settings: AppSettings, getGeminiApiKey: () => string): Promise<string[]> {
-    return getConfiguredProvider(settings).listModels({ settings, getGeminiApiKey });
+  async listModels(settings: AppSettings, getGeminiApiKey: () => string, getOpenAiApiKey: () => string = () => ''): Promise<string[]> {
+    return getConfiguredProvider(settings).listModels({ settings, getGeminiApiKey, getOpenAiApiKey });
   }
 
   async generateText(request: AiTextRequest): Promise<string> {
@@ -37,9 +43,10 @@ const getConfiguredProvider = (settings: AppSettings): AiProvider => {
   switch (settings.aiProvider) {
     case 'gemini':
       return geminiProvider;
-    case 'ollama':
-      return ollamaProvider;
-    default:
+    case 'openai':
       return openAiProvider;
+    case 'ollama':
+    default:
+      return ollamaProvider;
   }
 };

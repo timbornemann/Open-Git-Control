@@ -684,6 +684,7 @@
             "submodules_initialized_updated_76af1313": "Submodules initialized/updated.",
             "submodule_urls_synchronized_7dfc04ea": "Submodule URLs synchronized.",
             "could_not_open_submodule_39e4c0fb": "Could not open submodule.",
+            "could_not_load_submodules_a1b2c3d4": "Could not load submodules.",
             "remote_check_failed_306695fe": "Remote check failed",
             "no_remote_configured_c025d492": "No remote configured",
             "this_repository_has_no_remote_yet_d5654811": "This repository has no remote yet.",
@@ -1155,7 +1156,8 @@
         "stagingarea": {
           "loading_status_bff97099": "Loading status...",
           "no_open_conflicts_a3f846f5": "No open conflicts.",
-          "working_tree_is_clean_7d0c725c": "Working tree is clean."
+          "working_tree_is_clean_7d0c725c": "Working tree is clean.",
+          "bare_repository_no_working_tree_a1b2c3d4": "Bare repository — no working tree. Clone or convert to a worktree to stage and commit changes."
         },
         "stagingcommitpanel": {
           "resolve_conflicts_then_commit_507014dd": "Resolve conflicts, then commit...",
@@ -1290,7 +1292,11 @@
           "abort_rebase_1cf7416a": "Abort rebase?",
           "the_active_rebase_will_be_discarded_and_the_previous_bra_13fdc39c": "The active rebase will be discarded and the previous branch state restored.",
           "all_unsaved_rebase_resolutions_will_be_lost_8fee553e": "All unsaved rebase resolutions will be lost.",
-          "rebase_aborted_339ee787": "Rebase aborted"
+          "rebase_aborted_339ee787": "Rebase aborted",
+          "the_active_cherry_pick_will_be_discarded_a1b2c3d4": "The active cherry-pick will be discarded and reset to the pre-cherry-pick state.",
+          "all_unsaved_cherry_pick_resolutions_will_be_lost_e5f6a7b8": "All unsaved cherry-pick resolutions will be lost.",
+          "cherry_pick_continued_f1a2b3c4": "Cherry-pick continued",
+          "cherry_pick_aborted_d5e6f7a8": "Cherry-pick aborted"
         },
         "usefileoperations": {
           "could_not_update_gitignore_074773f8": "Could not update .gitignore.",

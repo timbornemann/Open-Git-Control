@@ -202,7 +202,14 @@ export const useRepositoryBranches = ({
         t,
         tr,
         onMerge: async () => {
-          await runGitCommand(mergeArgs, tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`));
+          const successMsg =
+            mode === 'squash'
+              ? tr(
+                  `Squash-Merge von "${mergeTarget}" vorbereitet. Aenderungen sind gestaged — bitte committen.`,
+                  `Squash merge of "${mergeTarget}" prepared. Changes are staged — please commit.`,
+                )
+              : tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`);
+          await runGitCommand(mergeArgs, successMsg);
         },
       }),
     );

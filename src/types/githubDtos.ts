@@ -9,6 +9,27 @@ export interface GitHubRepositoryDto {
   updatedAt?: string;
 }
 
+export interface GitHubRepositoryDetailsDto {
+  owner: string;
+  repo: string;
+  fork: boolean;
+  parent: { owner: string; repo: string } | null;
+}
+
+export interface GitHubUploadReleaseAssetParamsDto {
+  owner: string;
+  repo: string;
+  releaseId: number;
+  filePath: string;
+  name?: string;
+}
+
+export interface GitHubReleaseAssetDto {
+  id: number;
+  name: string;
+  browserDownloadUrl: string;
+}
+
 export interface GitHubForkParamsDto {
   owner: string;
   repo: string;

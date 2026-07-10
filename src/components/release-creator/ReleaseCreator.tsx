@@ -20,6 +20,9 @@ type Props = {
   releaseError: string | null;
   releaseSuccess: GitHubReleaseDto | null;
   onCreateRelease: () => Promise<void>;
+  pendingAssets: string[];
+  onAddPendingAssets: () => Promise<void>;
+  onRemovePendingAsset: (filePath: string) => void;
   contextLoading: boolean;
   contextError: string | null;
   context: GitHubReleaseContextDto | null;
@@ -40,6 +43,9 @@ export const ReleaseCreator: React.FC<Props> = ({
   releaseError,
   releaseSuccess,
   onCreateRelease,
+  pendingAssets,
+  onAddPendingAssets,
+  onRemovePendingAsset,
   contextLoading,
   contextError,
   context,
@@ -184,6 +190,9 @@ export const ReleaseCreator: React.FC<Props> = ({
               onCreateRelease={onCreateRelease}
               bodyLineCount={bodyLineCount}
               bodyCharCount={bodyCharCount}
+              pendingAssets={pendingAssets}
+              onAddPendingAssets={onAddPendingAssets}
+              onRemovePendingAsset={onRemovePendingAsset}
             />
           </section>
         </main>

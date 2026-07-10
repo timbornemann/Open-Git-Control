@@ -21,6 +21,9 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
+  openAiBaseUrl: 'https://api.openai.com/v1',
+  openAiModel: 'gpt-4.1-mini',
+  hasOpenAiApiKey: false,
   githubOauthClientId: '',
   githubHost: 'github.com',
 };

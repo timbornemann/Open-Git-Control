@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
+import { appClient } from '@/services/appClient';
 import { githubClient } from '@/services/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { RepoOwnerRef } from '@/types/git';
@@ -94,10 +95,12 @@ export const useReleaseWorkflow = ({
   const { t, tr } = useLanguageTranslations(language);
   const generationRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
+  const [releasePendingAssets, setReleasePendingAssets] = useState<string[]>([]);
 
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     generationRef.current += 1;
+    setReleasePendingAssets([]);
   }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo]);
 
   const isCurrentGeneration = useCallback((generation: number, repoPath: string | null) => {
@@ -134,6 +137,7 @@ export const useReleaseWorkflow = ({
         prerelease: false,
       });
       setReleaseError(null);
+      setReleasePendingAssets([]);
       if (clearSuccess) {
         setReleaseSuccess(null);
       }
@@ -308,6 +312,22 @@ export const useReleaseWorkflow = ({
           return;
         }
 
+        const assetsToUpload = [...releasePendingAssets];
+        for (const filePath of assetsToUpload) {
+          const uploadResult = await githubClient.uploadReleaseAsset({
+            owner: ownerRepo.owner,
+            repo: ownerRepo.repo,
+            releaseId: result.data.id,
+            filePath,
+          });
+          if (!isCurrentGeneration(generation, repoPath)) return;
+          if (!uploadResult.success) {
+            setReleaseError(uploadResult.error || 'Release-Asset konnte nicht hochgeladen werden.');
+            setReleaseSuccess(result.data);
+            return;
+          }
+        }
+
         setReleaseSuccess(result.data);
         setGitActionToast({
           msg: tr(`Release ${result.data.tagName} erstellt.`, `Release ${result.data.tagName} created.`),
@@ -338,6 +358,7 @@ export const useReleaseWorkflow = ({
       releaseForm.releaseName,
       releaseForm.tagName,
       releaseForm.targetCommitish,
+      releasePendingAssets,
       resetReleaseDraft,
       setConfirmDialog,
       setGitActionToast,
@@ -438,6 +459,17 @@ export const useReleaseWorkflow = ({
     ],
   );
 
+  const addReleasePendingAssets = useCallback(async () => {
+    if (!appClient.isAvailable()) return;
+    const selected = await appClient.selectFiles();
+    if (!selected || selected.length === 0) return;
+    setReleasePendingAssets((prev) => [...new Set([...prev, ...selected])]);
+  }, []);
+
+  const removeReleasePendingAsset = useCallback((filePath: string) => {
+    setReleasePendingAssets((prev) => prev.filter((path) => path !== filePath));
+  }, []);
+
   const openReleaseCreator = useCallback(() => {
     setActiveTab('repo');
     resetReleaseDraft({ clearContext: true, clearSuccess: true });
@@ -461,5 +493,8 @@ export const useReleaseWorkflow = ({
     refreshReleaseContext,
     resetReleaseDraft,
     setReleaseForm,
+    releasePendingAssets,
+    addReleasePendingAssets,
+    removeReleasePendingAsset,
   };
 };

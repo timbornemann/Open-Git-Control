@@ -65,6 +65,7 @@ export interface WorkingTreeSnapshotDto {
   changeCount: number;
   durationMs: number;
   largeMode: boolean;
+  isBare: boolean;
 }
 
 export interface WorkingTreeStatsDto {

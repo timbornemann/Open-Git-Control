@@ -4,7 +4,15 @@ import { normalizeSettings } from '../../settings';
 import type { StoredData } from '../repoStore';
 import { readStoreData, writeStoreData } from '../repoStore';
 import { IpcChannel } from '../../../src/types/ipcContract';
-import { clearSavedGeminiApiKeySecurely, clearSavedGithubTokenSecurely, normalizeGeminiApiKey, saveGeminiApiKeySecurely } from '../secureStore';
+import {
+  clearSavedGeminiApiKeySecurely,
+  clearSavedGithubTokenSecurely,
+  clearSavedOpenAiApiKeySecurely,
+  normalizeGeminiApiKey,
+  normalizeOpenAiApiKey,
+  saveGeminiApiKeySecurely,
+  saveOpenAiApiKeySecurely,
+} from '../secureStore';
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
 import type { UpdaterManager } from '../updaterManager';
 import type { GitHubService } from '../../GitHubService';
@@ -33,14 +41,19 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     const partialWithoutSecrets = { ...partial } as Partial<AppSettings> & {
       geminiApiKey?: unknown;
       hasGeminiApiKey?: unknown;
+      openAiApiKey?: unknown;
+      hasOpenAiApiKey?: unknown;
     };
     delete partialWithoutSecrets.geminiApiKey;
     delete partialWithoutSecrets.hasGeminiApiKey;
+    delete partialWithoutSecrets.openAiApiKey;
+    delete partialWithoutSecrets.hasOpenAiApiKey;
 
     const next = normalizeSettings({
       ...current,
       ...partialWithoutSecrets,
       hasGeminiApiKey: current.hasGeminiApiKey,
+      hasOpenAiApiKey: current.hasOpenAiApiKey,
     });
 
     writeSettings(next);
@@ -73,6 +86,29 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     const current = readSettingsWithMigration();
     clearSavedGeminiApiKeySecurely();
     const next = normalizeSettings({ ...current, hasGeminiApiKey: false });
+    writeSettings(next);
+    return next;
+  });
+
+  ipcMain.handle(IpcChannel.SettingsSetOpenAiApiKey, async (_event: any, apiKey: unknown) => {
+    const normalized = normalizeOpenAiApiKey(apiKey);
+    const current = readSettingsWithMigration();
+    const saved = saveOpenAiApiKeySecurely(normalized);
+    if (normalized && !saved) {
+      throw new Error('OS-backed encryption is not available. The OpenAI API key was not saved.');
+    }
+    const next = normalizeSettings({
+      ...current,
+      hasOpenAiApiKey: Boolean(normalized),
+    });
+    writeSettings(next);
+    return next;
+  });
+
+  ipcMain.handle(IpcChannel.SettingsClearOpenAiApiKey, async () => {
+    const current = readSettingsWithMigration();
+    clearSavedOpenAiApiKeySecurely();
+    const next = normalizeSettings({ ...current, hasOpenAiApiKey: false });
     writeSettings(next);
     return next;
   });

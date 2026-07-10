@@ -1,4 +1,4 @@
-export type AiProvider = 'ollama' | 'gemini';
+export type AiProvider = 'ollama' | 'gemini' | 'openai';
 export type AiCommitMessageStyle = 'conventional' | 'plain' | 'detailed';
 export type AiCommitMessageLanguage = 'auto' | 'de' | 'en';
 export type AppTheme =
@@ -36,6 +36,9 @@ export interface AppSettings {
   ollamaModel: string;
   geminiModel: string;
   hasGeminiApiKey: boolean;
+  openAiBaseUrl: string;
+  openAiModel: string;
+  hasOpenAiApiKey: boolean;
   githubOauthClientId: string;
   githubHost: string;
 }
@@ -61,6 +64,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ollamaModel: '',
   geminiModel: 'gemini-3-flash-preview',
   hasGeminiApiKey: false,
+  openAiBaseUrl: 'https://api.openai.com/v1',
+  openAiModel: 'gpt-4.1-mini',
+  hasOpenAiApiKey: false,
   githubOauthClientId: '',
   githubHost: 'github.com',
 };
@@ -133,7 +139,8 @@ function normalizeCommitTemplate(value: unknown): string {
 }
 
 function normalizeAiProvider(value: unknown): AiProvider {
-  return value === 'gemini' ? 'gemini' : 'ollama';
+  if (value === 'gemini' || value === 'openai') return value;
+  return 'ollama';
 }
 
 function normalizeAiCommitMessageStyle(value: unknown): AiCommitMessageStyle {
@@ -167,14 +174,14 @@ function normalizeSecretScanAllowlist(value: unknown): string {
   return value.slice(0, MAX_SECRET_SCAN_ALLOWLIST_LENGTH);
 }
 
-function normalizeOllamaBaseUrl(value: unknown): string {
+function normalizeHttpBaseUrl(value: unknown, fallback: string): string {
   if (typeof value !== 'string') {
-    return DEFAULT_SETTINGS.ollamaBaseUrl;
+    return fallback;
   }
 
   const trimmed = value.trim();
   if (!trimmed) {
-    return DEFAULT_SETTINGS.ollamaBaseUrl;
+    return fallback;
   }
 
   const capped = trimmed.slice(0, MAX_OLLAMA_BASE_URL_LENGTH).replace(/\/+$/, '');
@@ -182,12 +189,20 @@ function normalizeOllamaBaseUrl(value: unknown): string {
     const parsed = new URL(capped);
     const protocol = parsed.protocol.toLowerCase();
     if (protocol !== 'http:' && protocol !== 'https:') {
-      return DEFAULT_SETTINGS.ollamaBaseUrl;
+      return fallback;
     }
     return parsed.toString().replace(/\/+$/, '');
   } catch {
-    return DEFAULT_SETTINGS.ollamaBaseUrl;
+    return fallback;
   }
+}
+
+function normalizeOllamaBaseUrl(value: unknown): string {
+  return normalizeHttpBaseUrl(value, DEFAULT_SETTINGS.ollamaBaseUrl);
+}
+
+function normalizeOpenAiBaseUrl(value: unknown): string {
+  return normalizeHttpBaseUrl(value, DEFAULT_SETTINGS.openAiBaseUrl);
 }
 
 function normalizeModel(value: unknown, fallback = ''): string {
@@ -246,6 +261,9 @@ export function normalizeSettings(input: Partial<AppSettings> | null | undefined
     ollamaModel: normalizeModel(value.ollamaModel),
     geminiModel: normalizeModel(value.geminiModel, DEFAULT_SETTINGS.geminiModel),
     hasGeminiApiKey: normalizeBoolean(value.hasGeminiApiKey, false),
+    openAiBaseUrl: normalizeOpenAiBaseUrl(value.openAiBaseUrl),
+    openAiModel: normalizeModel(value.openAiModel, DEFAULT_SETTINGS.openAiModel),
+    hasOpenAiApiKey: normalizeBoolean(value.hasOpenAiApiKey, false),
     githubOauthClientId: normalizeGithubOauthClientId(value.githubOauthClientId),
     githubHost: normalizeGithubHost(value.githubHost),
   };

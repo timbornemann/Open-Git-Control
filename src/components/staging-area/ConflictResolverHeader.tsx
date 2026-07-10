@@ -1,5 +1,16 @@
 import { useI18n } from '@/i18n';
 
+type ConflictOperationActions = {
+  showOperationActions?: boolean;
+  isGitActionRunning?: boolean;
+  onMergeContinue?: () => void;
+  onMergeAbort?: () => void;
+  onRebaseContinue?: () => void;
+  onRebaseAbort?: () => void;
+  onCherryPickContinue?: () => void;
+  onCherryPickAbort?: () => void;
+};
+
 type ConflictResolverHeaderProps = {
   isCompact: boolean;
   isNavigationBusy: boolean;
@@ -15,7 +26,7 @@ type ConflictResolverHeaderProps = {
   conflictPathsCount: number;
   conflictBlocksCount: number;
   safeSelectedConflictBlockIndex: number;
-};
+} & ConflictOperationActions;
 
 export const ConflictResolverHeader = ({
   isCompact,
@@ -32,6 +43,14 @@ export const ConflictResolverHeader = ({
   conflictPathsCount,
   conflictBlocksCount,
   safeSelectedConflictBlockIndex,
+  showOperationActions = false,
+  isGitActionRunning = false,
+  onMergeContinue,
+  onMergeAbort,
+  onRebaseContinue,
+  onRebaseAbort,
+  onCherryPickContinue,
+  onCherryPickAbort,
 }: ConflictResolverHeaderProps) => {
   const { t, tr } = useI18n();
   const conflictCountTitle = t('generated.components.staging_area.conflictresolverpanel.conflict_blocks_in_visible_files_not_only_file_count_47a797f8');
@@ -39,6 +58,49 @@ export const ConflictResolverHeader = ({
     `${visibleConflictCount} Datei${visibleConflictCount !== 1 ? 'en' : ''}`,
     `${visibleConflictCount} file${visibleConflictCount !== 1 ? 's' : ''}`,
   );
+
+  const operationActions =
+    showOperationActions && (onMergeContinue || onRebaseContinue || onCherryPickContinue) ? (
+      <div className="conflict-global-actions-rail conflict-global-actions-rail--embedded">
+        {onMergeContinue && onMergeAbort ? (
+          <div className="conflict-action-group">
+            <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
+            <button className="staging-btn-sm conflict-action-btn" onClick={onMergeContinue} disabled={isGitActionRunning || isNavigationBusy}>
+              {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+            </button>
+            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onMergeAbort} disabled={isGitActionRunning || isNavigationBusy}>
+              {t('generated.components.confirm.cancel_035b7526')}
+            </button>
+          </div>
+        ) : null}
+        {onRebaseContinue && onRebaseAbort ? (
+          <div className="conflict-action-group">
+            <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.rebase_26c8effa')}</span>
+            <button className="staging-btn-sm conflict-action-btn" onClick={onRebaseContinue} disabled={isGitActionRunning || isNavigationBusy}>
+              {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+            </button>
+            <button className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger" onClick={onRebaseAbort} disabled={isGitActionRunning || isNavigationBusy}>
+              {t('generated.components.confirm.cancel_035b7526')}
+            </button>
+          </div>
+        ) : null}
+        {onCherryPickContinue && onCherryPickAbort ? (
+          <div className="conflict-action-group">
+            <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}</span>
+            <button className="staging-btn-sm conflict-action-btn" onClick={onCherryPickContinue} disabled={isGitActionRunning || isNavigationBusy}>
+              {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
+            </button>
+            <button
+              className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
+              onClick={onCherryPickAbort}
+              disabled={isGitActionRunning || isNavigationBusy}
+            >
+              {t('generated.components.confirm.cancel_035b7526')}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
 
   const countBadge = (
     <>
@@ -52,7 +114,12 @@ export const ConflictResolverHeader = ({
   );
 
   if (isCompact) {
-    return <div className="staging-section-header conflict-summary-header">{countBadge}</div>;
+    return (
+      <div className="staging-section-header conflict-summary-header">
+        {countBadge}
+        {operationActions}
+      </div>
+    );
   }
 
   return (
@@ -100,7 +167,10 @@ export const ConflictResolverHeader = ({
         </button>
       </div>
 
-      <div className="staging-section-header conflict-section-header">{countBadge}</div>
+      <div className="staging-section-header conflict-section-header">
+        {countBadge}
+        {operationActions}
+      </div>
     </div>
   );
 };

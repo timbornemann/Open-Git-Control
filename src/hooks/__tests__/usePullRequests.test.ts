@@ -37,7 +37,25 @@ describe('usePullRequests helpers', () => {
     const prs = await loadPullRequests({ owner: 'octo', repo: 'my-repo' }, true, 'closed', { github: { isAvailable: () => true, getPullRequests } as any });
 
     expect(getPullRequests).toHaveBeenCalledWith('octo', 'my-repo', 'closed');
-    expect(prs).toHaveLength(1);
+    expect(prs).toEqual({
+      ok: true,
+      data: [
+        {
+          number: 1,
+          title: 'PR',
+          state: 'open',
+          user: 'u',
+          createdAt: '',
+          updatedAt: '',
+          head: 'a',
+          headSha: 'abc',
+          base: 'b',
+          merged: false,
+          htmlUrl: '',
+          draft: false,
+        },
+      ],
+    });
   });
 
   it('signalisiert fehlgeschlagene refreshes ohne eine leere liste vorzutäuschen', async () => {
@@ -48,8 +66,42 @@ describe('usePullRequests helpers', () => {
       github: { isAvailable: () => true, getPullRequests: vi.fn().mockRejectedValue(new Error('offline')) } as any,
     });
 
-    expect(failedResult).toBeNull();
-    expect(thrownResult).toBeNull();
+    expect(failedResult).toEqual({ ok: false, error: 'temporary failure' });
+    expect(thrownResult).toEqual({ ok: false, error: 'offline' });
+  });
+
+  it('erstellt pull request gegen upstream bei fork', async () => {
+    const createPullRequest = vi.fn().mockResolvedValue({
+      success: true,
+      data: { number: 7, title: 'x', htmlUrl: '', state: 'open' },
+    });
+    const getRepository = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        owner: 'me',
+        repo: 'my-fork',
+        fork: true,
+        parent: { owner: 'octo', repo: 'upstream' },
+      },
+    });
+
+    const result = await submitPullRequest(
+      { owner: 'me', repo: 'my-fork' },
+      { title: 'PR', body: '', head: 'feature', base: 'main', currentBranch: 'feature' },
+      'de',
+      { github: { isAvailable: () => true, createPullRequest, getRepository } as any },
+    );
+
+    expect(getRepository).toHaveBeenCalledWith('me', 'my-fork');
+    expect(createPullRequest).toHaveBeenCalledWith({
+      owner: 'octo',
+      repo: 'upstream',
+      title: 'PR',
+      body: '',
+      head: 'me:feature',
+      base: 'main',
+    });
+    expect(result).toEqual({ success: true, number: 7 });
   });
 
   it('erstellt pull request und nutzt fallback branch', async () => {

@@ -199,6 +199,13 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         }
         if (!isStillActiveRepo()) return false;
         if (missingUpstream) {
+          setGitActionToast({
+            msg: tr(
+              'Push fehlgeschlagen: Upstream konnte nicht automatisch gesetzt werden. Bitte Upstream manuell setzen und erneut pushen.',
+              'Push failed: could not set upstream automatically. Please set upstream manually and push again.',
+            ),
+            isError: true,
+          });
           return false;
         }
         if (await maybeRecoverRemoteSetup({ command, options, failureMessage: errorMessage })) {

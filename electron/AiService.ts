@@ -15,7 +15,7 @@ export { buildStructuredDiffContext } from './ai/diffContext';
 
 const aiProviderClient = new AiProviderClient();
 
-const assertGenerationConfigured = (settings: AppSettings, getGeminiApiKey: () => string) => {
+const assertGenerationConfigured = (settings: AppSettings, getGeminiApiKey: () => string, getOpenAiApiKey: () => string = () => '') => {
   const model = getSelectedAiModel(settings);
   if (!model) {
     throw new Error('Kein KI-Modell konfiguriert.');
@@ -25,6 +25,13 @@ const assertGenerationConfigured = (settings: AppSettings, getGeminiApiKey: () =
     const apiKey = getGeminiApiKey().trim();
     if (!apiKey) {
       throw new Error('Gemini API key fehlt.');
+    }
+  }
+
+  if (settings.aiProvider === 'openai') {
+    const apiKey = getOpenAiApiKey().trim();
+    if (!apiKey) {
+      throw new Error('OpenAI API key fehlt.');
     }
   }
 };
@@ -39,17 +46,26 @@ export class AiService {
     this.autoCommitRunner = new AiAutoCommitRunner(gitService, providerClient);
   }
 
-  async testConnection(settings: AppSettings, getGeminiApiKey: () => string): Promise<{ ok: true; provider: AiProvider; model: string; detail: string }> {
-    return this.providerClient.testConnection(settings, getGeminiApiKey);
+  async testConnection(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    getOpenAiApiKey: () => string = () => '',
+  ): Promise<{ ok: true; provider: AiProvider; model: string; detail: string }> {
+    return this.providerClient.testConnection(settings, getGeminiApiKey, getOpenAiApiKey);
   }
 
-  async listModels(settings: AppSettings, getGeminiApiKey: () => string): Promise<string[]> {
-    return this.providerClient.listModels(settings, getGeminiApiKey);
+  async listModels(settings: AppSettings, getGeminiApiKey: () => string, getOpenAiApiKey: () => string = () => ''): Promise<string[]> {
+    return this.providerClient.listModels(settings, getGeminiApiKey, getOpenAiApiKey);
   }
 
-  async generateCommitMessageFromUserNotes(settings: AppSettings, getGeminiApiKey: () => string, params: { notes: string }): Promise<CommitMessage> {
-    assertGenerationConfigured(settings, getGeminiApiKey);
-    return generateCommitMessageFromUserNotesCore(this.providerClient, settings, getGeminiApiKey, params);
+  async generateCommitMessageFromUserNotes(
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    params: { notes: string },
+    getOpenAiApiKey: () => string = () => '',
+  ): Promise<CommitMessage> {
+    assertGenerationConfigured(settings, getGeminiApiKey, getOpenAiApiKey);
+    return generateCommitMessageFromUserNotesCore(this.providerClient, settings, getGeminiApiKey, params, undefined, getOpenAiApiKey);
   }
 
   async generateReleaseNotes(
@@ -65,8 +81,9 @@ export class AiService {
       versionBump: ReleaseVersionBump;
       hints?: string[];
     },
+    getOpenAiApiKey: () => string = () => '',
   ): Promise<string> {
-    return generateReleaseNotesCore(this.providerClient, settings, getGeminiApiKey, params);
+    return generateReleaseNotesCore(this.providerClient, settings, getGeminiApiKey, params, getOpenAiApiKey);
   }
 
   async runAutoCommit(
@@ -75,19 +92,22 @@ export class AiService {
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
+    getOpenAiApiKey?: () => string,
   ): Promise<AiAutoCommitResult>;
   async runAutoCommit(
     settings: AppSettings,
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
+    getOpenAiApiKey?: () => string,
   ): Promise<AiAutoCommitResult>;
   async runAutoCommit(
     repoPathOrSettings: string | AppSettings,
     settingsOrGetGeminiApiKey: AppSettings | (() => string),
     getGeminiApiKeyOrOnProgress?: (() => string) | ((update: AiProgressUpdate) => void),
     onProgressOrShouldCancel?: ((update: AiProgressUpdate) => void) | (() => boolean),
-    shouldCancel?: () => boolean,
+    shouldCancelOrGetOpenAiApiKey?: (() => boolean) | (() => string),
+    maybeGetOpenAiApiKey?: () => string,
   ): Promise<AiAutoCommitResult> {
     if (typeof repoPathOrSettings === 'string') {
       const repoPath = this.gitService.resolveRepositoryPath(repoPathOrSettings);
@@ -96,7 +116,8 @@ export class AiService {
         settingsOrGetGeminiApiKey as AppSettings,
         getGeminiApiKeyOrOnProgress as () => string,
         onProgressOrShouldCancel as ((update: AiProgressUpdate) => void) | undefined,
-        shouldCancel,
+        shouldCancelOrGetOpenAiApiKey as (() => boolean) | undefined,
+        maybeGetOpenAiApiKey || (() => ''),
       );
     }
 
@@ -108,6 +129,7 @@ export class AiService {
       settingsOrGetGeminiApiKey as () => string,
       getGeminiApiKeyOrOnProgress as ((update: AiProgressUpdate) => void) | undefined,
       onProgressOrShouldCancel as (() => boolean) | undefined,
+      (shouldCancelOrGetOpenAiApiKey as (() => string) | undefined) || (() => ''),
     );
   }
 }

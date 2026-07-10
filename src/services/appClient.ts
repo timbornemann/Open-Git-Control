@@ -14,6 +14,10 @@ export const appClient = {
     return requireElectronAppApi().selectDirectory(...args);
   },
 
+  async selectFiles(...args: Parameters<ElectronAPI['selectFiles']>): ReturnType<ElectronAPI['selectFiles']> {
+    return requireElectronAppApi().selectFiles(...args);
+  },
+
   async selectProjectParentDirectory(
     ...args: Parameters<ElectronAPI['selectProjectParentDirectory']>
   ): ReturnType<ElectronAPI['selectProjectParentDirectory']> {
@@ -38,6 +42,14 @@ export const appClient = {
 
   async clearGeminiApiKey(...args: Parameters<ElectronAPI['clearGeminiApiKey']>): ReturnType<ElectronAPI['clearGeminiApiKey']> {
     return requireElectronSettingsApi().clearGeminiApiKey(...args);
+  },
+
+  async setOpenAiApiKey(...args: Parameters<ElectronAPI['setOpenAiApiKey']>): ReturnType<ElectronAPI['setOpenAiApiKey']> {
+    return requireElectronSettingsApi().setOpenAiApiKey(...args);
+  },
+
+  async clearOpenAiApiKey(...args: Parameters<ElectronAPI['clearOpenAiApiKey']>): ReturnType<ElectronAPI['clearOpenAiApiKey']> {
+    return requireElectronSettingsApi().clearOpenAiApiKey(...args);
   },
 
   async getPlanningApiInfo(...args: Parameters<ElectronAPI['getPlanningApiInfo']>): ReturnType<ElectronAPI['getPlanningApiInfo']> {

@@ -23,6 +23,9 @@ type ReleaseNotesWorkbenchProps = {
   onCreateRelease: () => Promise<void>;
   bodyLineCount: number;
   bodyCharCount: number;
+  pendingAssets: string[];
+  onAddPendingAssets: () => Promise<void>;
+  onRemovePendingAsset: (filePath: string) => void;
 };
 
 export const ReleaseNotesWorkbench = ({
@@ -43,6 +46,9 @@ export const ReleaseNotesWorkbench = ({
   onCreateRelease,
   bodyLineCount,
   bodyCharCount,
+  pendingAssets,
+  onAddPendingAssets,
+  onRemovePendingAsset,
 }: ReleaseNotesWorkbenchProps) => {
   const { t } = useI18n();
   const isEditorDisabled = !hasOwnerRepo || releaseSubmitting;
@@ -161,6 +167,41 @@ export const ReleaseNotesWorkbench = ({
                   <small>{t('generated.components.releasecreator.marks_this_version_as_an_early_preview_beta_rc_02a7aae9')}</small>
                 </span>
               </label>
+            </div>
+
+            <div className="release-assets-panel">
+              <div className="release-publish-head" style={{ marginBottom: 8 }}>
+                <h4 style={{ margin: 0 }}>Assets</h4>
+              </div>
+              <button
+                type="button"
+                className="staging-tool-btn"
+                onClick={() => void onAddPendingAssets()}
+                disabled={isEditorDisabled}
+              >
+                Dateien hinzufuegen
+              </button>
+              {pendingAssets.length > 0 && (
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                  {pendingAssets.map((filePath) => {
+                    const fileName = filePath.replace(/^.*[\\/]/, '');
+                    return (
+                      <li key={filePath} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                        <span title={filePath}>{fileName}</span>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          onClick={() => onRemovePendingAsset(filePath)}
+                          disabled={isEditorDisabled}
+                          aria-label="Remove asset"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
             <button className="release-primary-btn" onClick={() => void onCreateRelease()} disabled={!canCreateRelease}>

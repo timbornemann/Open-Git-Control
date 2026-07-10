@@ -192,6 +192,7 @@ export type GithubStateContract = {
   prFilter: 'open' | 'closed' | 'all';
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
+  prError: string | null;
   pullRequests: PullRequestDto[];
   prCiByNumber: Record<number, PullRequestCiDto>;
   onOpenPR: (url: string) => void;
@@ -216,6 +217,9 @@ export type GithubStateContract = {
   releaseError: string | null;
   releaseSuccess: GitHubReleaseDto | null;
   onCreateRelease: () => Promise<void>;
+  releasePendingAssets: string[];
+  onAddReleasePendingAssets: () => Promise<void>;
+  onRemoveReleasePendingAsset: (filePath: string) => void;
 };
 
 export type WorkflowStateContract = {

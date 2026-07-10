@@ -14,6 +14,7 @@ export type BasicActionResultDto = {
 export interface ElectronAppAPI {
   openDirectory: () => Promise<DirectoryOpenResultDto | null>;
   selectDirectory: () => Promise<string | null>;
+  selectFiles: () => Promise<string[] | null>;
   selectProjectParentDirectory: () => Promise<string | null>;
   openExternalUrl: (url: string) => Promise<BasicActionResultDto>;
   getPlanningApiInfo: () => Promise<PlanningApiInfoDto>;

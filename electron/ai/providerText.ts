@@ -11,12 +11,14 @@ export async function runProviderText(
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
   timeoutMs = CHAT_TIMEOUT_MS,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<string> {
   return providerClient.generateText({
     settings,
     systemPrompt,
     userPrompt,
     getGeminiApiKey,
+    getOpenAiApiKey,
     shouldCancel,
     timeoutMs,
   });

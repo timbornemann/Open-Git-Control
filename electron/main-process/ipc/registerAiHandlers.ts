@@ -13,6 +13,7 @@ type RegisterAiHandlersDeps = {
   aiService: AiService;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
+  getOpenAiApiKeyFromSecureStore: () => string;
   getActiveRepoPath: () => string | null;
   repoJobRegistry?: RepoJobRegistry;
 };
@@ -21,6 +22,7 @@ export function registerAiHandlers({
   aiService,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
+  getOpenAiApiKeyFromSecureStore,
   getActiveRepoPath,
   repoJobRegistry = defaultRepoJobRegistry,
 }: RegisterAiHandlersDeps): void {
@@ -35,7 +37,7 @@ export function registerAiHandlers({
   ipcMain.handle(IpcChannel.AiTestConnection, async () => {
     try {
       const settings = readSettingsWithMigration();
-      const result = await aiService.testConnection(settings, getGeminiApiKeyFromSecureStore);
+      const result = await aiService.testConnection(settings, getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore);
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI-Verbindung fehlgeschlagen.';
@@ -46,7 +48,7 @@ export function registerAiHandlers({
   ipcMain.handle(IpcChannel.AiListModels, async () => {
     try {
       const settings = readSettingsWithMigration();
-      const models = await aiService.listModels(settings, getGeminiApiKeyFromSecureStore);
+      const models = await aiService.listModels(settings, getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore);
       return { success: true, data: models };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI-Modelle konnten nicht geladen werden.';
@@ -62,7 +64,7 @@ export function registerAiHandlers({
       }
 
       const settings = readSettingsWithMigration();
-      const message = await aiService.generateCommitMessageFromUserNotes(settings, getGeminiApiKeyFromSecureStore, { notes });
+      const message = await aiService.generateCommitMessageFromUserNotes(settings, getGeminiApiKeyFromSecureStore, { notes }, getOpenAiApiKeyFromSecureStore);
 
       return { success: true, data: message };
     } catch (error: unknown) {
@@ -127,6 +129,7 @@ export function registerAiHandlers({
           });
         },
         () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
+        getOpenAiApiKeyFromSecureStore,
       );
       repoJob.ensureActive();
 
@@ -150,18 +153,24 @@ export function registerAiHandlers({
       return { success: true, data: result };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'KI Auto-Commit fehlgeschlagen.';
-      const wasCancelled = error instanceof RepoJobCancelledError || repoJob.signal.aborted || /abgebrochen|cancelled/i.test(message);
+      const cancelRequested = currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested;
+      const wasRepoSwitchCancel = error instanceof RepoJobCancelledError || (repoJob.signal.aborted && !cancelRequested);
+      const wasUserCancel = cancelRequested || (!wasRepoSwitchCancel && /abgebrochen|cancelled/i.test(message));
+      const wasCancelled = wasRepoSwitchCancel || wasUserCancel;
+      const cancelMessage = wasRepoSwitchCancel
+        ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.'
+        : 'KI Auto-Commit wurde abgebrochen.';
 
       emitAiAutoCommitEvent(webContents, {
         id: jobId,
         operation: IpcChannel.GitAiAutoCommit,
         status: wasCancelled ? 'cancelled' : 'failed',
-        message: wasCancelled ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : message,
+        message: wasCancelled ? cancelMessage : message,
         details: { phase: wasCancelled ? 'cancelled' : 'failed', mode: 'normal', repoPath: repoJob.repoPath, generation: repoJob.generation },
         timestamp: Date.now(),
       });
 
-      return { success: false, error: wasCancelled ? 'KI Auto-Commit wurde wegen Repository-Wechsel abgebrochen.' : message };
+      return { success: false, error: wasCancelled ? cancelMessage : message };
     } finally {
       repoJob.complete();
       if (currentAiAutoCommitJob?.id === jobId) {
@@ -256,7 +265,7 @@ export function registerAiHandlers({
           language,
           versionBump,
           hints,
-        });
+        }, getOpenAiApiKeyFromSecureStore);
 
         return { success: true, data: { markdown } };
       } catch (error: any) {

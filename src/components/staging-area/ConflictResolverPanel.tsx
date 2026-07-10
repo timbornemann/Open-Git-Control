@@ -34,6 +34,14 @@ type ConflictResolverPanelProps = {
   isConflictEditorDirty: boolean;
   conflictManualScrollRef: React.RefObject<HTMLDivElement>;
   onConflictEditorContentChange: (filePath: string, nextContent: string) => void;
+  showOperationActions?: boolean;
+  isGitActionRunning?: boolean;
+  onMergeContinue?: () => void;
+  onMergeAbort?: () => void;
+  onRebaseContinue?: () => void;
+  onRebaseAbort?: () => void;
+  onCherryPickContinue?: () => void;
+  onCherryPickAbort?: () => void;
 };
 
 export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
@@ -65,6 +73,14 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   isConflictEditorDirty,
   conflictManualScrollRef,
   onConflictEditorContentChange,
+  showOperationActions = false,
+  isGitActionRunning = false,
+  onMergeContinue,
+  onMergeAbort,
+  onRebaseContinue,
+  onRebaseAbort,
+  onCherryPickContinue,
+  onCherryPickAbort,
 }) => {
   if (visibleConflicts.length === 0) {
     return null;
@@ -90,6 +106,14 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
         conflictPathsCount={conflictPaths.length}
         conflictBlocksCount={conflictBlocks.length}
         safeSelectedConflictBlockIndex={safeSelectedConflictBlockIndex}
+        showOperationActions={showOperationActions}
+        isGitActionRunning={isGitActionRunning}
+        onMergeContinue={onMergeContinue}
+        onMergeAbort={onMergeAbort}
+        onRebaseContinue={onRebaseContinue}
+        onRebaseAbort={onRebaseAbort}
+        onCherryPickContinue={onCherryPickContinue}
+        onCherryPickAbort={onCherryPickAbort}
       />
 
       {isCompact ? (

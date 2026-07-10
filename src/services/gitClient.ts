@@ -4,6 +4,7 @@ import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';
+import { notifyRepoUnavailable, onRepoUnavailable as subscribeRepoUnavailable } from './repoUnavailableBus';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -28,20 +29,6 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
-const repoUnavailableListeners = new Set<(payload: RepoUnavailablePayload) => void>();
-let lastRepoUnavailableNotifyAt = 0;
-
-const notifyRepoUnavailable = (payload: RepoUnavailablePayload) => {
-  const now = Date.now();
-  if (now - lastRepoUnavailableNotifyAt < 1200) {
-    return;
-  }
-  lastRepoUnavailableNotifyAt = now;
-  for (const listener of repoUnavailableListeners) {
-    listener(payload);
-  }
-};
-
 const notifyRepoUnavailableIfNeeded = (result: { success?: boolean; error?: string } | null | undefined, commandName: string) => {
   if (result && result.success === false && isRepoUnavailableError(result.error)) {
     notifyRepoUnavailable({
@@ -57,10 +44,7 @@ export const gitClient = {
   },
 
   onRepoUnavailable(callback: (payload: RepoUnavailablePayload) => void): () => void {
-    repoUnavailableListeners.add(callback);
-    return () => {
-      repoUnavailableListeners.delete(callback);
-    };
+    return subscribeRepoUnavailable(callback);
   },
 
   async runGitCommand(commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {

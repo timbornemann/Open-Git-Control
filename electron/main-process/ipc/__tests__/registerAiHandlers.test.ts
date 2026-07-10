@@ -54,6 +54,7 @@ describe('registerAiHandlers', () => {
       aiService,
       readSettingsWithMigration: vi.fn(() => ({ aiAutoCommitEnabled: true })) as any,
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
+      getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
       getActiveRepoPath: () => '/tmp/repo',
     });
 
@@ -93,6 +94,7 @@ describe('registerAiHandlers', () => {
       aiService,
       readSettingsWithMigration: vi.fn(() => ({})) as any,
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
+      getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
       getActiveRepoPath: () => '/tmp/active-repo',
     });
 

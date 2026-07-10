@@ -86,6 +86,52 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
   );
 
   ipcMain.handle(
+    IpcChannel.GithubUploadReleaseAsset,
+    async (
+      _event: IpcMainInvokeEvent,
+      params: {
+        owner: string;
+        repo: string;
+        releaseId: number;
+        filePath: string;
+        name?: string;
+      },
+    ) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
+
+      const owner = String(params?.owner || '').trim();
+      const repo = String(params?.repo || '').trim();
+      const filePath = String(params?.filePath || '').trim();
+      const releaseId = Number(params?.releaseId);
+      const name = String(params?.name || '').trim();
+
+      if (!owner || !repo) {
+        return { success: false, error: 'Owner und Repository sind erforderlich.' };
+      }
+      if (!Number.isFinite(releaseId) || releaseId <= 0) {
+        return { success: false, error: 'Release-ID ist erforderlich.' };
+      }
+      if (!filePath) {
+        return { success: false, error: 'Dateipfad ist erforderlich.' };
+      }
+
+      try {
+        const asset = await githubService.uploadReleaseAsset({
+          owner,
+          repo,
+          releaseId,
+          filePath,
+          ...(name ? { name } : {}),
+        });
+        return { success: true, data: asset };
+      } catch (error: unknown) {
+        return { success: false, error: toErrorMessage(error, 'Release-Asset konnte nicht hochgeladen werden.') };
+      }
+    },
+  );
+
+  ipcMain.handle(
     IpcChannel.GithubGetReleaseContext,
     async (
       _event: IpcMainInvokeEvent,

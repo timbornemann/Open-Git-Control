@@ -88,6 +88,35 @@ export class GitHubRepositoryService {
     return mapRepository(data as GithubRepositoryApi);
   }
 
+  async getRepository(owner: string, repo: string) {
+    const octokit = this.getOctokit();
+    const normalizedOwner = String(owner || '').trim();
+    const normalizedRepo = String(repo || '').trim();
+
+    if (!normalizedOwner || !normalizedRepo) {
+      throw new Error('Owner and repository are required.');
+    }
+
+    const { data } = await octokit.rest.repos.get({
+      owner: normalizedOwner,
+      repo: normalizedRepo,
+    });
+
+    const parent = data.parent
+      ? {
+          owner: String(data.parent.owner?.login || '').trim(),
+          repo: String(data.parent.name || '').trim(),
+        }
+      : null;
+
+    return {
+      owner: String(data.owner?.login || normalizedOwner).trim(),
+      repo: String(data.name || normalizedRepo).trim(),
+      fork: Boolean(data.fork),
+      parent: parent?.owner && parent?.repo ? parent : null,
+    };
+  }
+
   async forkRepository(
     owner: string,
     repo: string,

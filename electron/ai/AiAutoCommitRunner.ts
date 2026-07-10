@@ -16,7 +16,17 @@ export class AiAutoCommitRunner {
     getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
+    getOpenAiApiKey: () => string = () => '',
   ): Promise<AiAutoCommitResult> {
-    return new AiAutoCommitRunSession(this.gitService, this.providerClient, repoPath, settings, getGeminiApiKey, onProgress, shouldCancel).run();
+    return new AiAutoCommitRunSession(
+      this.gitService,
+      this.providerClient,
+      repoPath,
+      settings,
+      getGeminiApiKey,
+      onProgress,
+      shouldCancel,
+      getOpenAiApiKey,
+    ).run();
   }
 }

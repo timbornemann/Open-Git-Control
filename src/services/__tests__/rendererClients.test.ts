@@ -114,6 +114,7 @@ describe('renderer service clients', () => {
   it('delegates app, settings and repo operations to their Electron domains', async () => {
     await expectDelegation(() => appClient.openDirectory('C:/repo'), api.app.openDirectory, ['C:/repo']);
     await expectDelegation(() => appClient.selectDirectory(), api.app.selectDirectory, []);
+    await expectDelegation(() => appClient.selectFiles(), api.app.selectFiles, []);
     await expectDelegation(() => appClient.selectProjectParentDirectory('C:/projects'), api.app.selectProjectParentDirectory, ['C:/projects']);
     await expectDelegation(() => appClient.openExternalUrl('https://example.test'), api.app.openExternalUrl, ['https://example.test']);
     await expectDelegation(() => appClient.getPlanningApiInfo(), api.app.getPlanningApiInfo, []);
@@ -130,6 +131,8 @@ describe('renderer service clients', () => {
     await expectDelegation(() => appClient.setSettings({ language: 'de' } as any), api.settings.setSettings, [{ language: 'de' }]);
     await expectDelegation(() => appClient.setGeminiApiKey('secret'), api.settings.setGeminiApiKey, ['secret']);
     await expectDelegation(() => appClient.clearGeminiApiKey(), api.settings.clearGeminiApiKey, []);
+    await expectDelegation(() => appClient.setOpenAiApiKey('sk-test'), api.settings.setOpenAiApiKey, ['sk-test']);
+    await expectDelegation(() => appClient.clearOpenAiApiKey(), api.settings.clearOpenAiApiKey, []);
 
     await expectDelegation(() => appClient.getStoredRepos(), api.repos.getStoredRepos, []);
     await expectDelegation(() => appClient.setStoredRepos({ repos: [] } as any), api.repos.setStoredRepos, [{ repos: [] }]);
@@ -195,6 +198,12 @@ describe('renderer service clients', () => {
     await expectDelegation(() => githubClient.createRelease({ owner: 'octo', repo: 'hello' } as any), api.github.githubCreateRelease, [
       { owner: 'octo', repo: 'hello' },
     ]);
+    await expectDelegation(
+      () => githubClient.uploadReleaseAsset({ owner: 'octo', repo: 'hello', releaseId: 1, filePath: 'C:/a.zip' }),
+      api.github.githubUploadReleaseAsset,
+      [{ owner: 'octo', repo: 'hello', releaseId: 1, filePath: 'C:/a.zip' }],
+    );
+    await expectDelegation(() => githubClient.getRepository('octo', 'hello'), api.github.githubGetRepository, ['octo', 'hello']);
     await expectDelegation(
       () => githubClient.generateReleaseNotes({ tagName: 'v1', releaseName: 'v1', commits: [], language: 'de', versionBump: 'patch' }),
       api.ai.aiGenerateReleaseNotes,

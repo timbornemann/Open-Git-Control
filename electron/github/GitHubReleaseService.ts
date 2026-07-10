@@ -1,4 +1,14 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { CreateReleaseParams, GithubApiErrorLike, GitHubOctokitProvider, GitHubReleaseDto, RepositoryReleaseApi, RepositoryTagApi } from './types';
+
+export type UploadReleaseAssetParams = {
+  owner: string;
+  repo: string;
+  releaseId: number;
+  filePath: string;
+  name?: string;
+};
 
 export class GitHubReleaseService {
   constructor(private readonly getOctokit: GitHubOctokitProvider) {}
@@ -106,5 +116,48 @@ export class GitHubReleaseService {
 
       throw new Error(apiMessage || fallbackMessage || 'Release konnte nicht erstellt werden.');
     }
+  }
+
+  async uploadReleaseAsset(params: UploadReleaseAssetParams): Promise<{ id: number; name: string; browserDownloadUrl: string }> {
+    const octokit = this.getOctokit();
+    const owner = (params.owner || '').trim();
+    const repo = (params.repo || '').trim();
+    const filePath = (params.filePath || '').trim();
+    const releaseId = Number(params.releaseId);
+    const assetName = (params.name || path.basename(filePath) || '').trim();
+
+    if (!owner || !repo) {
+      throw new Error('Owner und Repository sind erforderlich.');
+    }
+    if (!Number.isFinite(releaseId) || releaseId <= 0) {
+      throw new Error('Release-ID ist erforderlich.');
+    }
+    if (!filePath) {
+      throw new Error('Dateipfad ist erforderlich.');
+    }
+    if (!assetName) {
+      throw new Error('Asset-Name ist erforderlich.');
+    }
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      throw new Error('Asset-Datei wurde nicht gefunden.');
+    }
+
+    const { data } = await octokit.rest.repos.uploadReleaseAsset({
+      owner,
+      repo,
+      release_id: releaseId,
+      name: assetName,
+      data: fs.createReadStream(filePath) as unknown as string,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-length': fs.statSync(filePath).size,
+      },
+    });
+
+    return {
+      id: data.id,
+      name: data.name,
+      browserDownloadUrl: data.browser_download_url,
+    };
   }
 }

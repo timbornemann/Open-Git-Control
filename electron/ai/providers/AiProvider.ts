@@ -1,12 +1,13 @@
 import type { AppSettings, AiProvider as ConfiguredAiProvider } from '../../settings';
 
-export type AiProviderName = ConfiguredAiProvider | 'openai';
+export type AiProviderName = ConfiguredAiProvider;
 
 export type AiTextRequest = {
   settings: AppSettings;
   systemPrompt: string;
   userPrompt: string;
   getGeminiApiKey: () => string;
+  getOpenAiApiKey: () => string;
   shouldCancel?: () => boolean;
   timeoutMs: number;
 };
@@ -14,11 +15,13 @@ export type AiTextRequest = {
 export type AiModelListRequest = {
   settings: AppSettings;
   getGeminiApiKey: () => string;
+  getOpenAiApiKey: () => string;
 };
 
 export type AiConnectionTestRequest = {
   settings: AppSettings;
   getGeminiApiKey: () => string;
+  getOpenAiApiKey: () => string;
 };
 
 export type AiConnectionResult = {

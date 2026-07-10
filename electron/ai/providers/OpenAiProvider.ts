@@ -2,28 +2,16 @@ import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
 import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
-type OpenAiSettings = AppSettings & {
-  openAiBaseUrl?: string;
-  openAiModel?: string;
-  openAiApiKey?: string;
-};
-
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
 
-const openAiSettings = (settings: AppSettings): OpenAiSettings => settings as OpenAiSettings;
-
 const getOpenAiBaseUrl = (settings: AppSettings): string => {
-  const configured = openAiSettings(settings).openAiBaseUrl?.trim().replace(/\/+$/, '');
+  const configured = settings.openAiBaseUrl?.trim().replace(/\/+$/, '');
   return configured || DEFAULT_OPENAI_BASE_URL;
 };
 
 const getOpenAiModel = (settings: AppSettings): string => {
-  return openAiSettings(settings).openAiModel?.trim() || DEFAULT_OPENAI_MODEL;
-};
-
-const getOpenAiApiKey = (settings: AppSettings): string => {
-  return openAiSettings(settings).openAiApiKey?.trim() || process.env.OPENAI_API_KEY?.trim() || '';
+  return settings.openAiModel?.trim() || DEFAULT_OPENAI_MODEL;
 };
 
 export class OpenAiProvider implements AiProvider {
@@ -33,8 +21,8 @@ export class OpenAiProvider implements AiProvider {
     return getOpenAiModel(settings);
   }
 
-  async testConnection({ settings }: AiConnectionTestRequest): Promise<AiConnectionResult> {
-    const apiKey = getOpenAiApiKey(settings);
+  async testConnection({ settings, getOpenAiApiKey }: AiConnectionTestRequest): Promise<AiConnectionResult> {
+    const apiKey = getOpenAiApiKey().trim();
     if (!apiKey) {
       throw new Error('OpenAI API key fehlt.');
     }
@@ -51,8 +39,8 @@ export class OpenAiProvider implements AiProvider {
     return { ok: true, provider: this.id, model, detail: 'OpenAI API erreichbar' };
   }
 
-  async listModels({ settings }: AiModelListRequest): Promise<string[]> {
-    const apiKey = getOpenAiApiKey(settings);
+  async listModels({ settings, getOpenAiApiKey }: AiModelListRequest): Promise<string[]> {
+    const apiKey = getOpenAiApiKey().trim();
     if (!apiKey) {
       throw new Error('OpenAI API key fehlt.');
     }
@@ -70,8 +58,8 @@ export class OpenAiProvider implements AiProvider {
     return uniqueSorted(models.map((model) => safeString(model.id).trim()).filter(Boolean));
   }
 
-  async generateText({ settings, systemPrompt, userPrompt, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {
-    const apiKey = getOpenAiApiKey(settings);
+  async generateText({ settings, systemPrompt, userPrompt, getOpenAiApiKey, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {
+    const apiKey = getOpenAiApiKey().trim();
     if (!apiKey) {
       throw new Error('OpenAI API key fehlt.');
     }

@@ -140,6 +140,7 @@ export async function generateCommitMessageWithAi(
   getGeminiApiKey: () => string,
   shouldCancel?: () => boolean,
   timeoutMs = CHAT_TIMEOUT_MS,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<CommitMessage> {
   const systemPrompt = [
     'You write concise and factual git commit messages.',
@@ -167,7 +168,7 @@ export async function generateCommitMessageWithAi(
   ].join('\n');
 
   try {
-    const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs);
+    const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, timeoutMs, getOpenAiApiKey);
     const parsed = parseJsonFromText(raw) || {};
     const titleRaw = safeString(parsed.title, '').trim();
     const title = clipCommitTitle(titleRaw);
@@ -186,6 +187,8 @@ export async function generateCommitMessageFromUserNotes(
   settings: AppSettings,
   getGeminiApiKey: () => string,
   params: { notes: string },
+  shouldCancel?: () => boolean,
+  getOpenAiApiKey: () => string = () => '',
 ): Promise<CommitMessage> {
   const notes = normalizeUserCommitNotes(params?.notes);
   if (!notes) {
@@ -205,7 +208,7 @@ export async function generateCommitMessageFromUserNotes(
 
   const userPrompt = ['User change notes:', notes, 'Return JSON only.'].join('\n');
 
-  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey);
+  const raw = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, shouldCancel, CHAT_TIMEOUT_MS, getOpenAiApiKey);
   const parsed = parseJsonFromText(raw) || {};
   const titleRaw = safeString(parsed.title, '').trim();
   if (!titleRaw) {

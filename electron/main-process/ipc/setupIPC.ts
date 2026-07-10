@@ -27,6 +27,7 @@ type SetupIpcDeps = {
   updaterManager: UpdaterManager;
   readSettingsWithMigration: () => AppSettings;
   getGeminiApiKeyFromSecureStore: () => string;
+  getOpenAiApiKeyFromSecureStore: () => string;
   buildDiagnosticsReport: () => Promise<{
     generatedAt: string;
     appVersion: string;
@@ -46,6 +47,7 @@ export function setupIPC({
   updaterManager,
   readSettingsWithMigration,
   getGeminiApiKeyFromSecureStore,
+  getOpenAiApiKeyFromSecureStore,
   buildDiagnosticsReport,
 }: SetupIpcDeps): void {
   registerDialogHandlers({ gitService });
@@ -64,6 +66,7 @@ export function setupIPC({
     aiService,
     readSettingsWithMigration,
     getGeminiApiKeyFromSecureStore,
+    getOpenAiApiKeyFromSecureStore,
     getActiveRepoPath: () => gitService.getRepoPath(),
     repoJobRegistry,
   });

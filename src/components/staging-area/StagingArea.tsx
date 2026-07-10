@@ -118,6 +118,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   }
 
   const status = fileOps.status;
+  const isBareRepository = Boolean(workingTreeSnapshot?.isBare);
   const totalChanges = status.staged.length + status.unstaged.length + status.untracked.length + status.conflicts.length;
   const hasOpenConflicts = status.conflicts.length > 0;
   const isCommitInputDisabled =
@@ -145,58 +146,76 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       )}
 
       <div className="staging-files">
-        {totalChanges === 0 && (
+        {isBareRepository ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            {isConflictOnly
-              ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5')
-              : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
+            {t('generated.components.staging_area.stagingarea.bare_repository_no_working_tree_a1b2c3d4')}
           </div>
+        ) : (
+          <>
+            {totalChanges === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                {isConflictOnly
+                  ? t('generated.components.staging_area.stagingarea.no_open_conflicts_a3f846f5')
+                  : t('generated.components.staging_area.stagingarea.working_tree_is_clean_7d0c725c')}
+              </div>
+            ) : null}
+
+            <ConflictResolverPanel
+              visibleConflicts={visibleConflicts}
+              isConflictOnly={isConflictOnly}
+              onOpenConflictResolver={onOpenConflictResolver}
+              isConflictBlockCountPending={conflicts.isConflictBlockCountPending}
+              totalConflictBlocksInView={totalConflictBlocksInView}
+              conflictEditor={conflicts.conflictEditor}
+              isConflictEditorLoading={conflicts.isConflictEditorLoading}
+              blockCountForPath={conflicts.blockCountForPath}
+              openConflictEditor={conflicts.openConflictEditor}
+              reloadActiveConflictEditor={conflicts.reloadActiveConflictEditor}
+              applyConflictChoiceToAll={conflicts.applyConflictChoiceToAll}
+              markConflictResolvedAndSync={conflicts.markConflictResolvedAndSync}
+              hasPreviousConflictTarget={conflicts.hasPreviousConflictTarget}
+              hasNextConflictTarget={conflicts.hasNextConflictTarget}
+              navigateToPreviousConflict={conflicts.navigateToPreviousConflict}
+              navigateToNextConflict={conflicts.navigateToNextConflict}
+              isStructuredConflictViewLocked={conflicts.isStructuredConflictViewLocked}
+              activeConflictFileIndex={conflicts.activeConflictFileIndex}
+              conflictPaths={conflicts.conflictPaths}
+              conflictBlocks={conflicts.conflictBlocks}
+              selectedConflictBlock={conflicts.selectedConflictBlock}
+              safeSelectedConflictBlockIndex={conflicts.safeSelectedConflictBlockIndex}
+              applyConflictChoiceToSelected={conflicts.applyConflictChoiceToSelected}
+              resetConflictEditorDraft={conflicts.resetConflictEditorDraft}
+              saveConflictEditor={conflicts.saveConflictEditor}
+              isConflictEditorDirty={conflicts.isConflictEditorDirty}
+              conflictManualScrollRef={conflicts.conflictManualScrollRef}
+              onConflictEditorContentChange={conflicts.onConflictEditorContentChange}
+              showOperationActions={hasOpenConflicts}
+              isGitActionRunning={fileOps.isMutating}
+              onMergeContinue={conflicts.mergeContinue}
+              onMergeAbort={conflicts.mergeAbort}
+              onRebaseContinue={conflicts.rebaseContinue}
+              onRebaseAbort={conflicts.rebaseAbort}
+              onCherryPickContinue={conflicts.cherryPickContinue}
+              onCherryPickAbort={conflicts.cherryPickAbort}
+            />
+
+            <StagingFileSections
+              visibleStaged={visibleStaged}
+              visibleUnstaged={visibleUnstaged}
+              visibleUntracked={visibleUntracked}
+              fileOps={fileOps}
+              maxListHeight={maxListHeight}
+              onSelectFileInspect={onSelectFileInspect}
+            />
+          </>
         )}
-
-        <ConflictResolverPanel
-          visibleConflicts={visibleConflicts}
-          isConflictOnly={isConflictOnly}
-          onOpenConflictResolver={onOpenConflictResolver}
-          isConflictBlockCountPending={conflicts.isConflictBlockCountPending}
-          totalConflictBlocksInView={totalConflictBlocksInView}
-          conflictEditor={conflicts.conflictEditor}
-          isConflictEditorLoading={conflicts.isConflictEditorLoading}
-          blockCountForPath={conflicts.blockCountForPath}
-          openConflictEditor={conflicts.openConflictEditor}
-          reloadActiveConflictEditor={conflicts.reloadActiveConflictEditor}
-          applyConflictChoiceToAll={conflicts.applyConflictChoiceToAll}
-          markConflictResolvedAndSync={conflicts.markConflictResolvedAndSync}
-          hasPreviousConflictTarget={conflicts.hasPreviousConflictTarget}
-          hasNextConflictTarget={conflicts.hasNextConflictTarget}
-          navigateToPreviousConflict={conflicts.navigateToPreviousConflict}
-          navigateToNextConflict={conflicts.navigateToNextConflict}
-          isStructuredConflictViewLocked={conflicts.isStructuredConflictViewLocked}
-          activeConflictFileIndex={conflicts.activeConflictFileIndex}
-          conflictPaths={conflicts.conflictPaths}
-          conflictBlocks={conflicts.conflictBlocks}
-          selectedConflictBlock={conflicts.selectedConflictBlock}
-          safeSelectedConflictBlockIndex={conflicts.safeSelectedConflictBlockIndex}
-          applyConflictChoiceToSelected={conflicts.applyConflictChoiceToSelected}
-          resetConflictEditorDraft={conflicts.resetConflictEditorDraft}
-          saveConflictEditor={conflicts.saveConflictEditor}
-          isConflictEditorDirty={conflicts.isConflictEditorDirty}
-          conflictManualScrollRef={conflicts.conflictManualScrollRef}
-          onConflictEditorContentChange={conflicts.onConflictEditorContentChange}
-        />
-
-        <StagingFileSections
-          visibleStaged={visibleStaged}
-          visibleUnstaged={visibleUnstaged}
-          visibleUntracked={visibleUntracked}
-          fileOps={fileOps}
-          maxListHeight={maxListHeight}
-          onSelectFileInspect={onSelectFileInspect}
-        />
       </div>
 
-      {!isConflictOnly && <StashPanel repoPath={repoPath} onRepoChanged={onRepoChanged} setInputDialog={setInputDialog} refreshTrigger={stashRefreshTrigger} />}
+      {!isBareRepository && !isConflictOnly && (
+        <StashPanel repoPath={repoPath} onRepoChanged={onRepoChanged} setInputDialog={setInputDialog} refreshTrigger={stashRefreshTrigger} />
+      )}
 
-      {!isConflictOnly && (
+      {!isBareRepository && !isConflictOnly && (
         <StagingCommitPanel
           status={status}
           fileOps={fileOps}

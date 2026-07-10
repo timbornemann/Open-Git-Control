@@ -42,6 +42,7 @@ export class AiAutoCommitRunSession {
     private readonly getGeminiApiKey: () => string,
     onProgress?: (update: AiProgressUpdate) => void,
     private readonly shouldCancel?: () => boolean,
+    private readonly getOpenAiApiKey: () => string = () => '',
   ) {
     this.state = new AiAutoCommitRunState(onProgress);
     this.groupRecovery = new AiAutoCommitGroupRecovery(this.state);
@@ -60,6 +61,7 @@ export class AiAutoCommitRunSession {
     if (!this.settings.aiAutoCommitEnabled) throw new Error('AI Auto-Commit ist in den Einstellungen deaktiviert.');
     if (!getSelectedAiModel(this.settings)) throw new Error('Kein KI-Modell konfiguriert.');
     if (this.settings.aiProvider === 'gemini' && !this.getGeminiApiKey().trim()) throw new Error('Gemini API key fehlt.');
+    if (this.settings.aiProvider === 'openai' && !this.getOpenAiApiKey().trim()) throw new Error('OpenAI API key fehlt.');
   }
   private async prepareSnapshotFiles(): Promise<SnapshotFile[]> {
     this.ensureNotCancelled();
@@ -153,7 +155,15 @@ export class AiAutoCommitRunSession {
       this.ensureNotCancelled();
       this.state.modelTurns += 1;
       const aiCallStartedAt = Date.now();
-      const plannedGroups = await planGroupsWithAi(this.providerClient, this.settings, snapshotFiles, this.getGeminiApiKey, this.shouldCancel, planTimeoutMs);
+      const plannedGroups = await planGroupsWithAi(
+        this.providerClient,
+        this.settings,
+        snapshotFiles,
+        this.getGeminiApiKey,
+        this.shouldCancel,
+        planTimeoutMs,
+        this.getOpenAiApiKey,
+      );
       this.state.consumeAiBudget(aiCallStartedAt, 'Gruppenplanung');
       this.ensureNotCancelled();
       return plannedGroups;
@@ -273,7 +283,15 @@ export class AiAutoCommitRunSession {
       }
 
       const aiCallStartedAt = Date.now();
-      const selectedPaths = await chooseFilesWithAi(this.providerClient, this.settings, windowFiles, this.getGeminiApiKey, this.shouldCancel, selectTimeoutMs);
+      const selectedPaths = await chooseFilesWithAi(
+        this.providerClient,
+        this.settings,
+        windowFiles,
+        this.getGeminiApiKey,
+        this.shouldCancel,
+        selectTimeoutMs,
+        this.getOpenAiApiKey,
+      );
       this.state.consumeAiBudget(aiCallStartedAt, 'Dateiauswahl');
       this.ensureNotCancelled();
       return selectedPaths;
@@ -380,6 +398,7 @@ export class AiAutoCommitRunSession {
         this.getGeminiApiKey,
         this.shouldCancel,
         messageTimeoutMs,
+        this.getOpenAiApiKey,
       );
       this.state.consumeAiBudget(aiCallStartedAt, 'Commit-Message');
       this.ensureNotCancelled();

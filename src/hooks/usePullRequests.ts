@@ -24,7 +24,10 @@ type Params = {
 };
 
 type PullRequestGitClient = Pick<typeof gitClient, 'isAvailable' | 'getRepoOriginUrl'>;
-type PullRequestGithubClient = Pick<typeof githubClient, 'isAvailable' | 'getPullRequests' | 'getWorkflowRuns' | 'getStatusChecks' | 'createPullRequest'>;
+type PullRequestGithubClient = Pick<
+  typeof githubClient,
+  'isAvailable' | 'getPullRequests' | 'getWorkflowRuns' | 'getStatusChecks' | 'createPullRequest' | 'getRepository'
+>;
 
 type PullRequestClientDeps = {
   git?: PullRequestGitClient;
@@ -48,6 +51,7 @@ const MAX_BACKOFF_INTERVAL_MS = 5 * 60_000;
 export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, githubHost = 'github.com', onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
+  const [prError, setPrError] = useState<string | null>(null);
   const [prOwnerRepo, setPrOwnerRepo] = useState<RepoOwnerRef | null>(null);
   const [prFilter, setPrFilter] = useState<'open' | 'closed' | 'all'>('open');
   const [prCiByNumber, setPrCiByNumber] = useState<Record<number, PullRequestCiDto>>({});
@@ -63,6 +67,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     setPullRequests([]);
     setPrCiByNumber({});
     setPrLoading(false);
+    setPrError(null);
   }, [activeRepo, githubHost, isAuthenticated]);
 
   useEffect(() => {
@@ -101,15 +106,21 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     const fetchPRs = async () => {
       if (!prOwnerRepo || !isAuthenticated) {
         setPrLoading(false);
+        setPrError(null);
         return;
       }
 
       setPrLoading(true);
-      const data = await loadPullRequests(prOwnerRepo, isAuthenticated, prFilter);
+      setPrError(null);
+      const result = await loadPullRequests(prOwnerRepo, isAuthenticated, prFilter);
       if (!active) return;
 
-      if (data !== null) {
-        setPullRequests(data);
+      if (result?.ok) {
+        setPullRequests(result.data);
+        setPrError(null);
+      } else if (result && !result.ok) {
+        setPrError(result.error);
+        onError?.(result.error);
       }
       setPrLoading(false);
     };
@@ -118,7 +129,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     return () => {
       active = false;
     };
-  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
+  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger, onError]);
 
   const openPrs = useMemo(() => pullRequests.filter((pr) => pr.state === 'open'), [pullRequests]);
 
@@ -207,6 +218,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
   return {
     pullRequests,
     prLoading,
+    prError,
     prOwnerRepo,
     prFilter,
     setPrFilter,
@@ -300,16 +312,21 @@ export const loadPullRequests = async (
   isAuthenticated: boolean,
   prFilter: 'open' | 'closed' | 'all',
   deps?: PullRequestClientDeps,
-): Promise<PullRequestDto[] | null> => {
+): Promise<{ ok: true; data: PullRequestDto[] } | { ok: false; error: string } | null> => {
   const { github } = getPullRequestClients(deps);
   if (!prOwnerRepo || !github.isAvailable() || !isAuthenticated) return null;
 
   try {
     const result = await github.getPullRequests(prOwnerRepo.owner, prOwnerRepo.repo, prFilter);
-    if (!result.success) return null;
-    return result.data || [];
-  } catch {
-    return null;
+    if (!result.success) {
+      return { ok: false, error: result.error || 'Pull Requests konnten nicht geladen werden.' };
+    }
+    return { ok: true, data: result.data || [] };
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Pull Requests konnten nicht geladen werden.',
+    };
   }
 };
 
@@ -385,12 +402,26 @@ export const submitPullRequest = async (
   }
 
   try {
+    let owner = prOwnerRepo.owner;
+    let repo = prOwnerRepo.repo;
+    let head = input.head || input.currentBranch;
+
+    if (github.getRepository) {
+      const repositoryResult = await github.getRepository(prOwnerRepo.owner, prOwnerRepo.repo);
+      if (repositoryResult.success && repositoryResult.data.fork && repositoryResult.data.parent) {
+        owner = repositoryResult.data.parent.owner;
+        repo = repositoryResult.data.parent.repo;
+        const branch = (input.head || input.currentBranch || '').trim();
+        head = `${prOwnerRepo.owner}:${branch}`;
+      }
+    }
+
     const result = await github.createPullRequest({
-      owner: prOwnerRepo.owner,
-      repo: prOwnerRepo.repo,
+      owner,
+      repo,
       title: input.title.trim(),
       body: input.body.trim(),
-      head: input.head || input.currentBranch,
+      head,
       base: input.base || 'main',
     });
 

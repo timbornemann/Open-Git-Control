@@ -4,7 +4,9 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { GitReflogEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
+import { useToastQueue } from '@/hooks/useToastQueue';
 import { gitClient } from '@/services/gitClient';
+import { ActionToastViewport } from './ActionToastViewport';
 import { DangerConfirm } from './DangerConfirm';
 
 type Props = {
@@ -21,7 +23,8 @@ type DangerAction = {
 } | null;
 
 export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged, settings }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const { toasts, setToast, dismiss } = useToastQueue(4000);
   const [entries, setEntries] = useState<GitReflogEntryDto[]>([]);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -35,15 +38,25 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
       const result = await gitClient.runGitCommand('reflog', '300');
       if (!result.success) {
         setEntries([]);
+        setToast({
+          msg: result.error || tr('Reflog konnte nicht geladen werden.', 'Could not load reflog.'),
+          isError: true,
+        });
         return;
       }
       const parsed = parseGitReflog(String(result.data || ''));
       setEntries(parsed);
       setSelectedHash((current) => (current && parsed.some((e) => e.hash === current) ? current : (parsed[0]?.hash ?? null)));
+    } catch (error: unknown) {
+      setEntries([]);
+      setToast({
+        msg: error instanceof Error ? error.message : tr('Reflog konnte nicht geladen werden.', 'Could not load reflog.'),
+        isError: true,
+      });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setToast, tr]);
 
   useEffect(() => {
     void loadReflog();
@@ -62,11 +75,20 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
       if (!gitClient.isAvailable() || args.length === 0) return;
       const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
       if (result.success) {
+        setToast({
+          msg: tr('Wiederherstellungsaktion erfolgreich.', 'Recovery action succeeded.'),
+          isError: false,
+        });
         onRepoChanged();
         await loadReflog();
+        return;
       }
+      setToast({
+        msg: result.error || tr('Wiederherstellungsaktion fehlgeschlagen.', 'Recovery action failed.'),
+        isError: true,
+      });
     },
-    [loadReflog, onRepoChanged],
+    [loadReflog, onRepoChanged, setToast, tr],
   );
 
   const runDangerAware = useCallback(
@@ -195,6 +217,7 @@ export const RecoveryCenter: React.FC<Props> = ({ refreshTrigger, onRepoChanged,
           }}
         />
       )}
+      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 };

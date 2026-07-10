@@ -15,6 +15,7 @@ type RepoGithubActionsContentProps = Pick<
   | 'prFilter'
   | 'setPrFilter'
   | 'prLoading'
+  | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
   | 'onOpenPR'
@@ -165,6 +166,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               prFilter={props.prFilter}
               setPrFilter={props.setPrFilter}
               prLoading={props.prLoading}
+              prError={props.prError}
               pullRequests={props.pullRequests}
               prCiByNumber={props.prCiByNumber}
               showCreatePR={props.showCreatePR}

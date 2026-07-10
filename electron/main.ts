@@ -8,7 +8,7 @@ import { SecretScanService } from './SecretScanService';
 import { WorkingTreeService } from './WorkingTreeService';
 import { buildDiagnosticsReportFactory } from './main-process/diagnostics';
 import { setupIPC } from './main-process/ipc/setupIPC';
-import { getGeminiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
+import { getGeminiApiKeyFromSecureStore, getOpenAiApiKeyFromSecureStore, readSettingsWithMigration } from './main-process/settingsStore';
 import { UpdaterManager } from './main-process/updaterManager';
 import { createMainWindow } from './main-process/windowFactory';
 import type { PlanningApiServerHandle } from './main-process/planningApiServer';
@@ -113,6 +113,7 @@ app.whenReady().then(() => {
     updaterManager,
     readSettingsWithMigration,
     getGeminiApiKeyFromSecureStore,
+    getOpenAiApiKeyFromSecureStore,
     buildDiagnosticsReport,
   });
 

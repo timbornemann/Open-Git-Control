@@ -21,10 +21,11 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
         <select
           className={inputClass(variant)}
           value={settings.aiProvider}
-          onChange={(event) => void onUpdateSettings({ aiProvider: event.target.value as 'ollama' | 'gemini' })}
+          onChange={(event) => void onUpdateSettings({ aiProvider: event.target.value as 'ollama' | 'gemini' | 'openai' })}
         >
           <option value="ollama">Ollama</option>
           <option value="gemini">Google Gemini</option>
+          <option value="openai">OpenAI</option>
         </select>
       </label>
 
@@ -105,6 +106,80 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
         </>
       )}
 
+      {settings.aiProvider === 'openai' && (
+        <>
+          <label className={fieldClass(variant)}>
+            OpenAI Base URL
+            <input
+              className={inputClass(variant)}
+              type="text"
+              value={settings.openAiBaseUrl}
+              onChange={(event) => void onUpdateSettings({ openAiBaseUrl: event.target.value })}
+              placeholder="https://api.openai.com/v1"
+            />
+          </label>
+          <label className={fieldClass(variant)}>
+            OpenAI API Key
+            <input
+              className={inputClass(variant)}
+              type="password"
+              value={ai.openAiApiKeyInput}
+              onChange={(event) => ai.setOpenAiApiKeyInput(event.target.value)}
+              placeholder={
+                settings.hasOpenAiApiKey ? t('generated.components.layout.settingsmaincontent.already_saved_enter_again_to_replace_fe7e9790') : 'sk-...'
+              }
+            />
+          </label>
+          <div className={actionRowClass(variant)}>
+            <button
+              className="staging-tool-btn"
+              onClick={async () => {
+                if (!appClient.isAvailable()) return;
+                const keyToSave = ai.openAiApiKeyInput;
+                try {
+                  const next = await appClient.setOpenAiApiKey(keyToSave);
+                  ai.setOpenAiApiKeyInput('');
+                  await onUpdateSettings({});
+                  if (keyToSave.trim() && !next.hasOpenAiApiKey) {
+                    ai.setAiStatus(
+                      t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'),
+                    );
+                  }
+                } catch (error: unknown) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad');
+                  ai.setAiStatus(message);
+                }
+              }}
+            >
+              {t('generated.components.layout.settingsmaincontent.save_api_key_5cb25ffc')}
+            </button>
+            <button
+              className="staging-tool-btn"
+              onClick={async () => {
+                if (!appClient.isAvailable()) return;
+                await appClient.clearOpenAiApiKey();
+                ai.setOpenAiApiKeyInput('');
+                await onUpdateSettings({});
+              }}
+              disabled={!settings.hasOpenAiApiKey}
+            >
+              {variant === 'sidebar'
+                ? t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')
+                : t('generated.components.layout.settingsmaincontent.remove_api_key_fe7c209e')}
+            </button>
+          </div>
+          <p className={hintClass(variant)}>
+            {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}:{' '}
+            {settings.hasOpenAiApiKey
+              ? t('generated.components.layout.settingsmaincontent.saved_e74d9834')
+              : t('generated.components.layout.settingsmaincontent.not_saved_d99fcb70')}
+          </p>
+        </>
+      )}
+
       <div className={actionRowClass(variant)}>
         <button className="staging-tool-btn" onClick={ai.testConnection} disabled={ai.isTestingAi}>
           {ai.isTestingAi
@@ -153,9 +228,11 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ? variant === 'sidebar'
                     ? 'gemini-2.0-flash'
                     : t('generated.components.layout.settingsmaincontent.e_g_gemini_3_flash_preview_a0298c24')
-                  : variant === 'sidebar'
-                    ? 'llama3.1:8b'
-                    : t('generated.components.layout.settingsmaincontent.e_g_llama3_1_8b_4b26492e')
+                  : settings.aiProvider === 'openai'
+                    ? 'gpt-4.1-mini'
+                    : variant === 'sidebar'
+                      ? 'llama3.1:8b'
+                      : t('generated.components.layout.settingsmaincontent.e_g_llama3_1_8b_4b26492e')
               }
             />
             <datalist id={modelListId}>
