@@ -238,7 +238,7 @@ export class GitSpawnOperations {
         }
       };
 
-      const proc = spawn('git', ['clone', '--progress', cloneUrl, repoPath], {
+      const proc = spawn('git', ['clone', '--progress', '--', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 

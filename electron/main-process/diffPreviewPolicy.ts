@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { sanitizeArg } from './gitCommandPolicy';
+import { toLiteralPathspec } from '../git/RepositoryPathSafety';
 
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
 
@@ -18,7 +19,7 @@ function normalizeRepoRelativePath(value: unknown): string {
     throw new Error('Diff path must be repository-relative.');
   }
 
-  return filePath;
+  return toLiteralPathspec(filePath, 'Diff path');
 }
 
 export function normalizeDiffPreviewArgs(args: unknown): string[] {

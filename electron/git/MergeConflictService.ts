@@ -1,4 +1,5 @@
 import type { GitRunner } from './GitRunner';
+import { toLiteralPathspec } from './RepositoryPathSafety';
 
 export type ActiveRepoCommand = (args: string[]) => Promise<string>;
 
@@ -10,11 +11,11 @@ export class MergeConflictService {
   ) {}
 
   checkoutConflictVersion(filePath: string, side: 'ours' | 'theirs'): Promise<string> {
-    return this.runCommand(['checkout', '--' + side, '--', filePath]);
+    return this.runCommand(['checkout', '--' + side, '--', toLiteralPathspec(filePath)]);
   }
 
   markFileResolved(filePath: string): Promise<string> {
-    return this.runCommand(['add', '--', filePath]);
+    return this.runCommand(['add', '--', toLiteralPathspec(filePath)]);
   }
 
   continueMerge(): Promise<string> {

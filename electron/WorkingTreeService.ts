@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
-import * as path from 'path';
 import type { GitService } from './GitService';
+import { resolveExistingRepositoryPath } from './git/RepositoryPathSafety';
 
 export type WorkingTreeSnapshot = {
   snapshotId: string;
@@ -214,7 +214,7 @@ export class WorkingTreeService {
       const entries = await Promise.all(
         batch.map(async (filePath) => {
           try {
-            const stat = await fs.promises.stat(path.resolve(repoPath, filePath), { bigint: true });
+            const stat = await fs.promises.stat(resolveExistingRepositoryPath(repoPath, filePath), { bigint: true });
             return `${filePath}\0${stat.size}\0${stat.mtimeNs}\0${stat.ctimeNs}\0${stat.mode}`;
           } catch {
             return `${filePath}\0missing`;

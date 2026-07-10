@@ -1,5 +1,5 @@
 import type { GitService } from '../../GitService';
-import { assertAllowedGitCommand, createJobId, normalizeArgs, validateCommandArgs, type GitCommandName } from '../gitCommandPolicy';
+import { assertAllowedGitCommand, createJobId, normalizeCommandArgs, type GitCommandName } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
 
 type GitCommandRouterEvent = {
@@ -91,8 +91,7 @@ export const handleGitCommand = async (event: GitCommandRouterEvent, gitService:
 
   try {
     assertAllowedGitCommand(commandName);
-    const args = normalizeArgs(rawArgs);
-    validateCommandArgs(commandName, args);
+    const args = normalizeCommandArgs(commandName, rawArgs);
 
     jobId = LONG_RUNNING_COMMANDS.has(commandName) ? createJobId(`git-${commandName}`) : null;
     if (jobId) {

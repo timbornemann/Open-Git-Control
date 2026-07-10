@@ -103,7 +103,7 @@ describe('GitService forensic history commands', () => {
 
     await service.getForensicHistoryByString('needle', 'src/main.ts', 120);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-S', 'needle', '--', 'src/main.ts', '-120']));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-S', 'needle', '--', ':(literal)src/main.ts', '-120']));
   });
 
   it('builds -G regex search command with path separator', async () => {
@@ -112,7 +112,7 @@ describe('GitService forensic history commands', () => {
 
     await service.getForensicHistoryByRegex('foo.*bar', 'src/App.tsx', 80);
 
-    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-G', 'foo.*bar', '--', 'src/App.tsx', '-80']));
+    expect(runCommandSpy).toHaveBeenCalledWith(expect.arrayContaining(['log', '-G', 'foo.*bar', '--', ':(literal)src/App.tsx', '-80']));
   });
 
   it('builds -L line range search command', async () => {
@@ -153,6 +153,36 @@ describe('GitService repo path normalization', () => {
 });
 
 describe('GitService Markdown preview reads', () => {
+  it('rejects read and write requests through a symlink that escapes the repository', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-symlink-repo-'));
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-symlink-outside-'));
+    const outsideFile = path.join(outsideDir, 'secret.txt');
+    const linkedFile = path.join(repoDir, 'linked-secret.txt');
+    fs.writeFileSync(outsideFile, 'do not expose', 'utf8');
+
+    try {
+      try {
+        fs.symlinkSync(outsideFile, linkedFile, 'file');
+      } catch (error: any) {
+        // Windows installations without Developer Mode or symlink permission
+        // cannot create the fixture. The production containment check is still
+        // covered on every platform where symlinks are available.
+        if (error?.code === 'EPERM' || error?.code === 'EACCES') return;
+        throw error;
+      }
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+
+      await expect(service.readRepoFile('linked-secret.txt')).rejects.toThrow('outside the current repository');
+      await expect(service.writeRepoFile('linked-secret.txt', 'overwrite')).rejects.toThrow('outside the current repository');
+      expect(fs.readFileSync(outsideFile, 'utf8')).toBe('do not expose');
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
   it('reads Markdown text and linked image assets from working tree, index, and commit', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-markdown-preview-'));
     try {

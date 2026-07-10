@@ -91,8 +91,8 @@ describe('AiService context extraction and prompts', () => {
 
     await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
 
-    expect(commandLog).toContain('diff --numstat HEAD -- src/app.ts');
-    expect(commandLog).toContain('diff --no-color --unified=3 HEAD -- src/app.ts');
+    expect(commandLog).toContain('diff --numstat HEAD -- :(literal)src/app.ts');
+    expect(commandLog).toContain('diff --no-color --unified=3 HEAD -- :(literal)src/app.ts');
     expect(commandLog.some((cmd) => cmd.includes('diff --cached -- src/app.ts'))).toBe(false);
     expect(commandLog.some((cmd) => cmd.includes('diff --numstat -- src/app.ts'))).toBe(false);
   });
@@ -324,8 +324,8 @@ describe('AiService context extraction and prompts', () => {
       .map((call) => (Array.isArray(call[0]) ? call[0].join(' ') : ''))
       .filter((cmd) => cmd.startsWith('diff ') && cmd.includes('src/app.ts'));
     expect(diffCommands.length).toBeLessThanOrEqual(2);
-    expect(diffCommands).toContain('diff --numstat HEAD -- src/app.ts');
-    expect(diffCommands).toContain('diff --no-color --unified=3 HEAD -- src/app.ts');
+    expect(diffCommands).toContain('diff --numstat HEAD -- :(literal)src/app.ts');
+    expect(diffCommands).toContain('diff --no-color --unified=3 HEAD -- :(literal)src/app.ts');
   });
 
   it('aborts pending AI requests quickly when cancellation is requested', async () => {

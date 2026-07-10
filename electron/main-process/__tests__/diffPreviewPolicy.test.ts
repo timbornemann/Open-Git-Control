@@ -3,15 +3,15 @@ import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
 
 describe('normalizeDiffPreviewArgs', () => {
   it('allows the supported staged, unstaged, and commit preview commands', () => {
-    expect(normalizeDiffPreviewArgs(['diff', '--', 'src/app.ts'])).toEqual(['diff', '--', 'src/app.ts']);
-    expect(normalizeDiffPreviewArgs(['diff', '--cached', '--', 'src/app.ts'])).toEqual(['diff', '--cached', '--', 'src/app.ts']);
+    expect(normalizeDiffPreviewArgs(['diff', '--', 'src/app.ts'])).toEqual(['diff', '--', ':(literal)src/app.ts']);
+    expect(normalizeDiffPreviewArgs(['diff', '--cached', '--', 'src/app.ts'])).toEqual(['diff', '--cached', '--', ':(literal)src/app.ts']);
     expect(normalizeDiffPreviewArgs(['show', '--format=', '--binary', 'a'.repeat(40), '--', 'src/app.ts'])).toEqual([
       'show',
       '--format=',
       '--binary',
       'a'.repeat(40),
       '--',
-      'src/app.ts',
+      ':(literal)src/app.ts',
     ]);
   });
 

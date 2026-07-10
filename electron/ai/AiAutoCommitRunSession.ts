@@ -1,4 +1,5 @@
 import type { GitService } from '../GitService';
+import { toLiteralPathspec } from '../git/RepositoryPathSafety';
 import type { AppSettings } from '../settings';
 import { AutoCommitPlanner } from './AutoCommitPlanner';
 import type { AiProviderClient } from './AiProviderClient';
@@ -335,7 +336,10 @@ export class AiAutoCommitRunSession {
   private async stageBatchFiles(batchFiles: SnapshotFile[]): Promise<void> {
     const gitCapabilities: unknown = this.gitService;
     if (typeof this.gitService.stagePathsAtPath === 'function') {
-      await this.gitService.stagePathsAtPath(this.repoPath, batchFiles.map((file) => file.path));
+      await this.gitService.stagePathsAtPath(
+        this.repoPath,
+        batchFiles.map((file) => file.path),
+      );
       this.ensureNotCancelled();
       return;
     }
@@ -346,7 +350,7 @@ export class AiAutoCommitRunSession {
     }
 
     for (const file of batchFiles) {
-      await this.runGitCommand(['add', '--', file.path]);
+      await this.runGitCommand(['add', '--', toLiteralPathspec(file.path)]);
       this.ensureNotCancelled();
     }
   }
@@ -439,7 +443,7 @@ export class AiAutoCommitRunSession {
     if (message.description.trim()) {
       commitArgs.push('-m', message.description.trim());
     }
-    commitArgs.push('--', ...batchPaths);
+    commitArgs.push('--', ...batchPaths.map((filePath) => toLiteralPathspec(filePath)));
     return commitArgs;
   }
 

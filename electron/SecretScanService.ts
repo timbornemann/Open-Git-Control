@@ -49,8 +49,6 @@ const STRICTNESS_RANK: Record<SecretScanStrictness, number> = {
   high: 3,
 };
 
-const DEFAULT_IGNORED_PATH_PARTS = ['node_modules/', 'dist/', 'coverage/', '.min.js', '.min.css', '.map', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
-
 const SECRET_PATTERNS: PatternDefinition[] = [
   {
     id: 'aws-access-key-id',
@@ -104,11 +102,6 @@ const SECRET_PATTERNS: PatternDefinition[] = [
 
 function normalizePathForMatch(filePath: string): string {
   return (filePath || '').replace(/\\/g, '/').toLowerCase();
-}
-
-function shouldIgnorePath(filePath: string): boolean {
-  const normalized = normalizePathForMatch(filePath);
-  return DEFAULT_IGNORED_PATH_PARTS.some((segment) => normalized.includes(segment));
 }
 
 function parseAllowlist(rawAllowlist: string): ParsedAllowlistRule[] {
@@ -178,11 +171,67 @@ function patternEnabledForStrictness(pattern: PatternDefinition, strictness: Sec
 
 function sanitizeContextLine(line: string): string {
   const replacedQuotedValues = line.replace(/(["'])([^"'\\]{8,})(\1)/g, (_full, quote: string) => `${quote}[REDACTED]${quote}`);
+  return SECRET_PATTERNS.reduce((sanitized, pattern) => {
+    const flags = `${pattern.regex.flags.replace('g', '')}g`;
+    return sanitized.replace(new RegExp(pattern.regex.source, flags), '[REDACTED_SECRET]');
+  }, replacedQuotedValues);
+}
 
-  return replacedQuotedValues
-    .replace(/\bgh[pousr]_[A-Za-z0-9_]{20,255}\b/g, '[REDACTED_TOKEN]')
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]')
-    .replace(/\bxox[baprs]-[A-Za-z0-9-]{10,255}\b/g, '[REDACTED_SLACK_TOKEN]');
+function decodeGitQuotedPath(rawPath: string): string | null {
+  const value = rawPath.trim();
+  if (!value) return null;
+  if (!(value.startsWith('"') && value.endsWith('"'))) return value;
+
+  const escaped = value.slice(1, -1);
+  const bytes: number[] = [];
+  let decoded = '';
+  const flushBytes = () => {
+    if (bytes.length === 0) return;
+    decoded += Buffer.from(bytes).toString('utf8');
+    bytes.length = 0;
+  };
+
+  for (let index = 0; index < escaped.length; index += 1) {
+    const char = escaped[index];
+    if (char !== '\\') {
+      flushBytes();
+      decoded += char;
+      continue;
+    }
+
+    const next = escaped[index + 1];
+    if (!next) return null;
+    if (/[0-7]/.test(next)) {
+      const octal = escaped.slice(index + 1, index + 4);
+      if (!/^[0-7]{3}$/.test(octal)) return null;
+      bytes.push(Number.parseInt(octal, 8));
+      index += 3;
+      continue;
+    }
+
+    flushBytes();
+    const escapes: Record<string, string> = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v', '\\': '\\', '"': '"' };
+    decoded += escapes[next] ?? next;
+    index += 1;
+  }
+  flushBytes();
+  return decoded;
+}
+
+function parsePatchTargetPath(line: string): string | null {
+  const match = line.match(/^\+\+\+\s+(.+)$/);
+  if (!match) return null;
+  const decoded = decodeGitQuotedPath(match[1]);
+  if (!decoded || decoded === '/dev/null') return null;
+  return decoded.startsWith('b/') ? decoded.slice(2) : decoded;
+}
+
+function normalizeSecretScanRevision(value: unknown, label: string): string {
+  const revision = String(value || '').trim();
+  if (!revision || revision.length > 255 || revision.startsWith('-') || /[\0\r\n]/.test(revision)) {
+    throw new Error(`Invalid ${label} for secret scan.`);
+  }
+  return revision;
 }
 
 export class SecretScanService {
@@ -195,6 +244,7 @@ export class SecretScanService {
     signal?: AbortSignal;
     onProgress?: (checkedLines: number) => void;
     includeTags?: boolean;
+    revisions?: string[];
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -206,13 +256,12 @@ export class SecretScanService {
     let findingLimitNoted = false;
 
     const scanCandidate = (candidate: DiffCandidateLine) => {
+      if (options.signal?.aborted) return;
       if (candidate.source === 'staged') stagedLines += 1;
       else if (candidate.source === 'tag') tagLines += 1;
       else toPushLines += 1;
       const checkedLines = stagedLines + toPushLines + tagLines;
       if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
-      if (shouldIgnorePath(candidate.filePath)) return;
-
       for (const pattern of SECRET_PATTERNS) {
         if (!patternEnabledForStrictness(pattern, strictness)) continue;
         if (!pattern.regex.test(candidate.line)) continue;
@@ -243,15 +292,16 @@ export class SecretScanService {
         options.repoPath,
         args,
         (line) => {
-          const diffFileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-          if (diffFileMatch) {
-            currentFile = diffFileMatch[2] || diffFileMatch[1] || '';
+          if (line.startsWith('diff --git ')) {
+            // Never retain the prior file for a malformed or quoted header.
+            // The following +++ line provides the authoritative target path.
+            currentFile = '';
             currentNewLineNumber = 0;
             return;
           }
-          const plusFileMatch = line.match(/^\+\+\+ b\/(.+)$/);
-          if (plusFileMatch) {
-            currentFile = plusFileMatch[1] || currentFile;
+          const patchTargetPath = parsePatchTargetPath(line);
+          if (patchTargetPath !== null) {
+            currentFile = patchTargetPath;
             return;
           }
           const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
@@ -283,7 +333,10 @@ export class SecretScanService {
           aborted.name = 'AbortError';
           throw aborted;
         }
-        await streamDiff(['show', '--format=', '--no-color', '--unified=0', '--find-renames', '--find-copies', commitHash], source);
+        await streamDiff(
+          ['show', '--format=', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', '--find-renames', '--find-copies', commitHash],
+          source,
+        );
       }
     };
 
@@ -293,32 +346,61 @@ export class SecretScanService {
         .map((line) => line.trim())
         .filter((line) => /^[0-9a-f]{40}$/i.test(line));
 
-    await streamDiff(['diff', '--cached', '--no-color', '--unified=0'], 'staged');
-    try {
-      const upstreamRef = await this.gitService.runCommandAtPath(options.repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
-      if (upstreamRef) {
-        await streamDiff(['diff', '--no-color', '--unified=0', `${upstreamRef}..HEAD`], 'to-push');
-      }
-    } catch (error) {
-      if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
-      try {
-        const unpushedCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', 'HEAD', '--not', '--remotes']);
-        const unpushedCommits = parseCommitList(unpushedCommitsRaw);
-        await scanCommits(unpushedCommits, 'to-push');
+    const normalizeRequestedRevisions = (revisions: string[] | undefined): string[] =>
+      [...new Set((revisions || []).map((revision) => String(revision || '').trim()).filter(Boolean))].map((revision) =>
+        normalizeSecretScanRevision(revision, 'push source revision'),
+      );
+
+    const scanRequestedRevisions = async (revisions: string[]) => {
+      for (const revision of revisions) {
+        const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', revision, '--not', '--remotes']);
+        const commits = parseCommitList(commitsRaw);
+        await scanCommits(commits, 'to-push');
         notes.push(
-          unpushedCommits.length > 0
-            ? `No upstream tracking branch available; scanned ${unpushedCommits.length} HEAD commit(s) not reachable from remotes.`
-            : 'No upstream tracking branch available; no unpushed HEAD commits were found outside remote refs.',
+          commits.length > 0
+            ? `Scanned ${commits.length} commit(s) from requested push source ${revision}.`
+            : `No unpublished commits found for requested push source ${revision}.`,
         );
-      } catch (fallbackError) {
-        if (options.signal?.aborted || (fallbackError as any)?.name === 'AbortError') throw fallbackError;
-        notes.push('No upstream tracking branch available, and fallback to-push scan failed.');
+      }
+    };
+
+    await streamDiff(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0'], 'staged');
+    const requestedRevisions = normalizeRequestedRevisions(options.revisions);
+    if (requestedRevisions.length > 0) {
+      try {
+        await scanRequestedRevisions(requestedRevisions);
+      } catch (error) {
+        if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
+        throw new Error('Could not determine commits for the requested push source in the secret scan.');
+      }
+    } else {
+      try {
+        const upstreamRefRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+        const upstreamRef = normalizeSecretScanRevision(upstreamRefRaw, 'upstream revision');
+        if (upstreamRef) {
+          await streamDiff(['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', `${upstreamRef}..HEAD`], 'to-push');
+        }
+      } catch (error) {
+        if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
+        try {
+          await scanRequestedRevisions(['HEAD']);
+        } catch (fallbackError) {
+          if (options.signal?.aborted || (fallbackError as any)?.name === 'AbortError') throw fallbackError;
+          throw new Error('Could not determine commits that would be pushed for the secret scan.');
+        }
       }
     }
 
     if (options.includeTags) {
       try {
-        const tagOnlyCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, ['rev-list', '--reverse', '--topo-order', '--tags', '--not', '--remotes']);
+        const tagOnlyCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
+          'rev-list',
+          '--reverse',
+          '--topo-order',
+          '--tags',
+          '--not',
+          '--remotes',
+        ]);
         const tagOnlyCommits = parseCommitList(tagOnlyCommitsRaw);
         await scanCommits(tagOnlyCommits, 'tag');
 
@@ -327,7 +409,7 @@ export class SecretScanService {
         }
       } catch (error) {
         if (options.signal?.aborted || (error as any)?.name === 'AbortError') throw error;
-        notes.push('Could not scan tag-only commits before pushing tags.');
+        throw new Error('Could not determine tag commits that would be pushed for the secret scan.');
       }
     }
 

@@ -1,7 +1,7 @@
 import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
-import * as path from 'path';
 import type { GitService, RepositoryFileSource } from '../../../GitService';
+import { resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../../../git/RepositoryPathSafety';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 
 type RegisterGitFileHandlersDeps = {
@@ -97,11 +97,7 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
         return { success: false, error: 'No repository path set.' };
       }
 
-      const resolvedPath = path.resolve(repoPath, relativePath);
-      const relativeFromRepo = path.relative(repoPath, resolvedPath);
-      if (relativeFromRepo.startsWith('..') || path.isAbsolute(relativeFromRepo)) {
-        return { success: false, error: 'Submodule path is outside the current repository.' };
-      }
+      const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath, 'Submodule path');
 
       const openError = await shell.openPath(resolvedPath);
       if (openError) {
@@ -135,7 +131,7 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
       }
 
       const repoRoot = await gitService.runCommand(['rev-parse', '--show-toplevel']);
-      const gitignorePath = path.join(repoRoot, '.gitignore');
+      const gitignorePath = resolveRepositoryPathForCreate(repoRoot, '.gitignore');
       const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
       const existingRules = new Set(
         existing

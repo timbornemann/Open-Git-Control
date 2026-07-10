@@ -1,4 +1,5 @@
 import type { GitService } from '../GitService';
+import { toLiteralPathspec } from '../git/RepositoryPathSafety';
 import type { SnapshotFile } from './aiServiceTypes';
 import { getExtension, getTopDirectory } from './gitStatusSnapshot';
 import { buildStructuredDiffContext, clipContextLine, deriveStatsFromDiff, parseNumstatLine, parseNumstatReport, readUntrackedSnippet } from './diffContext';
@@ -25,7 +26,7 @@ export class AutoCommitSnapshotHydrator {
 
     let numstatRaw = '';
     try {
-      numstatRaw = await this.runGitCommand(['diff', '--numstat', 'HEAD', '--', file.path]);
+      numstatRaw = await this.runGitCommand(['diff', '--numstat', 'HEAD', '--', toLiteralPathspec(file.path)]);
     } catch {
       numstatRaw = '';
     }
@@ -34,7 +35,7 @@ export class AutoCommitSnapshotHydrator {
 
     let previewRaw = '';
     try {
-      previewRaw = await this.runGitCommand(['diff', '--no-color', '--unified=3', 'HEAD', '--', file.path]);
+      previewRaw = await this.runGitCommand(['diff', '--no-color', '--unified=3', 'HEAD', '--', toLiteralPathspec(file.path)]);
     } catch {
       previewRaw = '';
     }

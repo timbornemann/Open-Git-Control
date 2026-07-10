@@ -4,6 +4,9 @@ import { registerGitHandlers } from '../registerGitHandlers';
 const { handleMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
 }));
+const { showMessageBoxMock } = vi.hoisted(() => ({
+  showMessageBoxMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -11,6 +14,9 @@ vi.mock('electron', () => ({
   },
   shell: {
     openPath: vi.fn(),
+  },
+  dialog: {
+    showMessageBox: showMessageBoxMock,
   },
 }));
 
@@ -20,6 +26,7 @@ describe('registerGitHandlers', () => {
   beforeEach(() => {
     handlers.clear();
     handleMock.mockReset();
+    showMessageBoxMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -182,5 +189,104 @@ describe('registerGitHandlers', () => {
       }),
     );
     expect(new Set(jobEvents.map((event) => event.id)).size).toBe(1);
+  });
+
+  it('runs the secret scan in the main process before a push and only proceeds when it is clean', async () => {
+    const send = vi.fn();
+    const scanPushDiffs = vi.fn().mockResolvedValue({
+      scanned: true,
+      strictness: 'medium',
+      findings: [],
+      notes: [],
+      stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 },
+    });
+    const gitService = {
+      runCommand: vi.fn().mockResolvedValue('push ok'),
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      getStatus: vi.fn(),
+      getStatusPorcelain: vi.fn(),
+      getLog: vi.fn(),
+      getBranches: vi.fn(),
+      getCommitDetails: vi.fn(),
+      checkoutConflictVersion: vi.fn(),
+      addFile: vi.fn(),
+      continueMerge: vi.fn(),
+      abortMerge: vi.fn(),
+      continueRebase: vi.fn(),
+      abortRebase: vi.fn(),
+      getSubmoduleStatus: vi.fn(),
+      updateSubmodulesInitRecursive: vi.fn(),
+      syncSubmodulesRecursive: vi.fn(),
+      getReflog: vi.fn(),
+      getForensicHistoryByString: vi.fn(),
+      getForensicHistoryByRegex: vi.fn(),
+      getForensicHistoryByLineRange: vi.fn(),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    const commandHandler = handlers.get('git:command');
+    const result = await commandHandler!({ sender: { send } }, 'push', '--tags');
+
+    expect(result).toEqual({ success: true, data: 'push ok' });
+    expect(scanPushDiffs).toHaveBeenCalledWith(expect.objectContaining({ repoPath: 'C:/repo', includeTags: true, strictness: 'medium' }));
+    expect(gitService.runCommand).toHaveBeenCalledWith(['push', '--tags']);
+    expect(showMessageBoxMock).not.toHaveBeenCalled();
+  });
+
+  it('requires a native confirmation for push findings instead of trusting a renderer flag', async () => {
+    const scanPushDiffs = vi.fn().mockResolvedValue({
+      scanned: true,
+      strictness: 'medium',
+      findings: [{ filePath: '.env', lineNumber: 1, contextLine: '[REDACTED_SECRET]' }],
+      notes: [],
+      stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
+    });
+    showMessageBoxMock.mockResolvedValue({ response: 0 });
+    const gitService = {
+      runCommand: vi.fn().mockResolvedValue('should not push'),
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      getStatus: vi.fn(),
+      getStatusPorcelain: vi.fn(),
+      getLog: vi.fn(),
+      getBranches: vi.fn(),
+      getCommitDetails: vi.fn(),
+      checkoutConflictVersion: vi.fn(),
+      addFile: vi.fn(),
+      continueMerge: vi.fn(),
+      abortMerge: vi.fn(),
+      continueRebase: vi.fn(),
+      abortRebase: vi.fn(),
+      getSubmoduleStatus: vi.fn(),
+      updateSubmodulesInitRecursive: vi.fn(),
+      syncSubmodulesRecursive: vi.fn(),
+      getReflog: vi.fn(),
+      getForensicHistoryByString: vi.fn(),
+      getForensicHistoryByRegex: vi.fn(),
+      getForensicHistoryByLineRange: vi.fn(),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    const commandHandler = handlers.get('git:command');
+    const result = await commandHandler!({ sender: { send: vi.fn() } }, 'push');
+
+    expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
+    expect(showMessageBoxMock).toHaveBeenCalledWith(expect.objectContaining({ buttons: ['Cancel', 'Push anyway'] }));
+    expect(gitService.runCommand).not.toHaveBeenCalled();
   });
 });

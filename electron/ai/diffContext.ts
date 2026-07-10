@@ -1,6 +1,6 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { decodePorcelainPath } from './gitStatusSnapshot';
+import { resolveExistingRepositoryPath } from '../git/RepositoryPathSafety';
 
 const MAX_CONTEXT_LINE_CHARS = 140;
 const MAX_CONTEXT_ITEMS_PER_HUNK = 3;
@@ -172,13 +172,8 @@ export function buildFileSnippetContext(content: string): string[] {
 }
 
 export async function readUntrackedSnippet(repoPath: string, relativePath: string): Promise<string[]> {
-  const absolutePath = path.resolve(repoPath, relativePath);
-  const relative = path.relative(repoPath, absolutePath);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return [];
-  }
-
   try {
+    const absolutePath = resolveExistingRepositoryPath(repoPath, relativePath);
     const stat = await fs.promises.stat(absolutePath);
     if (!stat.isFile()) return [];
     const raw = await fs.promises.readFile(absolutePath, 'utf8');

@@ -1,3 +1,16 @@
+import { normalizeRepositoryRelativePath, toLiteralPathspec } from './RepositoryPathSafety';
+
+const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
+
+const normalizeOptionalCommitHash = (value: string | undefined): string | undefined => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return undefined;
+  if (!COMMIT_HASH_RE.test(normalized)) {
+    throw new Error('Invalid commit hash.');
+  }
+  return normalized;
+};
+
 export type CommitStats = { files: number; additions: number; deletions: number };
 
 export type FileTimelineChange = {
@@ -42,13 +55,35 @@ export class HistoryService {
   async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
     const format = this.getStructuredLogFormat();
-    return this.runCommand(['log', '-z', `-${safeLimit}`, '--date=iso', `--pretty=format:${format}`, '--numstat', '-S', search, '--', filePath]);
+    return this.runCommand([
+      'log',
+      '-z',
+      `-${safeLimit}`,
+      '--date=iso',
+      `--pretty=format:${format}`,
+      '--numstat',
+      '-S',
+      search,
+      '--',
+      toLiteralPathspec(filePath),
+    ]);
   }
 
   async getForensicHistoryByRegex(regex: string, filePath: string, limit: number = 200): Promise<string> {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 200;
     const format = this.getStructuredLogFormat();
-    return this.runCommand(['log', '-z', `-${safeLimit}`, '--date=iso', `--pretty=format:${format}`, '--numstat', '-G', regex, '--', filePath]);
+    return this.runCommand([
+      'log',
+      '-z',
+      `-${safeLimit}`,
+      '--date=iso',
+      `--pretty=format:${format}`,
+      '--numstat',
+      '-G',
+      regex,
+      '--',
+      toLiteralPathspec(filePath),
+    ]);
   }
 
   async getForensicHistoryByLineRange(filePath: string, startLine: number, endLine: number, limit: number = 200): Promise<string> {
@@ -58,7 +93,7 @@ export class HistoryService {
       `-${safeLimit}`,
       '--date=iso',
       '--pretty=format:%H%x1f%h%x1f%an%x1f%ad%x1f%s%x1f%P%x1f%x00',
-      `-L${startLine},${endLine}:${filePath}`,
+      `-L${startLine},${endLine}:${normalizeRepositoryRelativePath(filePath)}`,
     ]);
   }
 
@@ -69,7 +104,9 @@ export class HistoryService {
   }
 
   async getCommitDetails(hash: string): Promise<string> {
-    return this.runCommand(['show', '--name-status', '--format=', hash]);
+    const normalizedHash = normalizeOptionalCommitHash(hash);
+    if (!normalizedHash) throw new Error('Invalid commit hash.');
+    return this.runCommand(['show', '--name-status', '--format=', normalizedHash]);
   }
 
   async getFileHistory(filePath: string, limit: number = 100, commitHash?: string): Promise<string> {
@@ -77,20 +114,22 @@ export class HistoryService {
     const format = '%H%x1f%h%x1f%an%x1f%ad%x1f%s%x00';
     const args = ['log', '--follow', '-z', `-${safeLimit}`, `--pretty=format:${format}`, '--date=iso'];
 
-    if (commitHash) {
-      args.push(commitHash);
+    const normalizedHash = normalizeOptionalCommitHash(commitHash);
+    if (normalizedHash) {
+      args.push(normalizedHash);
     }
 
-    args.push('--', filePath);
+    args.push('--', toLiteralPathspec(filePath));
     return this.runCommand(args);
   }
 
   async getFileBlame(filePath: string, commitHash?: string): Promise<string> {
     const args = ['blame', '--line-porcelain'];
-    if (commitHash) {
-      args.push(commitHash);
+    const normalizedHash = normalizeOptionalCommitHash(commitHash);
+    if (normalizedHash) {
+      args.push(normalizedHash);
     }
-    args.push('--', filePath);
+    args.push('--', toLiteralPathspec(filePath));
     return this.runCommand(args);
   }
 
@@ -99,10 +138,11 @@ export class HistoryService {
     const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 500)) : 500;
     const endLine = safeStart + safeCount - 1;
     const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
-    if (commitHash) {
-      args.push(commitHash);
+    const normalizedHash = normalizeOptionalCommitHash(commitHash);
+    if (normalizedHash) {
+      args.push(normalizedHash);
     }
-    args.push('--', filePath);
+    args.push('--', toLiteralPathspec(filePath));
     return this.runCommand(args);
   }
 

@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import * as path from 'path';
+import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath } from './RepositoryPathSafety';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
 
@@ -33,15 +33,7 @@ export class RepositoryFiles {
 
   async readRepoFile(relativePath: string): Promise<string> {
     const repoPath = this.getRepoPath();
-    const normalizedRelativePath = (relativePath || '').trim();
-    if (!normalizedRelativePath) {
-      throw new Error('File path is required.');
-    }
-
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
+    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
@@ -81,15 +73,7 @@ export class RepositoryFiles {
 
   async writeRepoFile(relativePath: string, content: string): Promise<void> {
     const repoPath = this.getRepoPath();
-    const normalizedRelativePath = (relativePath || '').trim();
-    if (!normalizedRelativePath) {
-      throw new Error('File path is required.');
-    }
-
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
+    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
@@ -100,31 +84,8 @@ export class RepositoryFiles {
     fs.writeFileSync(resolvedPath, textValue, 'utf8');
   }
 
-  private isPathInsideRepo(repoPath: string, filePath: string): boolean {
-    const relative = path.relative(repoPath, filePath);
-    return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
-  }
-
   private normalizeRepoRelativePath(relativePath: string): string {
-    const rawPath = String(relativePath || '').trim();
-    if (!rawPath) {
-      throw new Error('File path is required.');
-    }
-
-    const normalizedForCheck = rawPath.replace(/\\/g, '/');
-    const segments = normalizedForCheck.split('/');
-    if (
-      path.isAbsolute(rawPath) ||
-      path.win32.isAbsolute(rawPath) ||
-      normalizedForCheck.startsWith('/') ||
-      normalizedForCheck.startsWith(':(') ||
-      segments.includes('..') ||
-      /[\0\r\n]/.test(rawPath)
-    ) {
-      throw new Error('File path must be repository-relative.');
-    }
-
-    return normalizedForCheck;
+    return normalizeRepositoryRelativePath(relativePath);
   }
 
   private getImageMimeType(relativePath: string): string {
@@ -157,10 +118,7 @@ export class RepositoryFiles {
   private readWorkingTreeFileBuffer(relativePath: string, maxBytes: number): Buffer {
     const repoPath = this.getRepoPath();
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
-    const resolvedPath = path.resolve(repoPath, normalizedRelativePath);
-    if (!this.isPathInsideRepo(repoPath, resolvedPath)) {
-      throw new Error('File path is outside the current repository.');
-    }
+    const resolvedPath = resolveExistingRepositoryPath(repoPath, normalizedRelativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {

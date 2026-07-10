@@ -1,5 +1,6 @@
 import * as path from 'path';
 import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from './PrivateTempFiles';
+import { toLiteralPathspec } from './RepositoryPathSafety';
 
 export type CommitMessageInput = {
   title: string;
@@ -17,11 +18,14 @@ export class CommitService {
   constructor(private readonly executeGit: ExecuteGitCommand) {}
 
   private normalizePathspecEntries(paths: string[]): string[] {
-    const normalized = [...new Set(paths.map((filePath) => String(filePath || '').trim()).filter(Boolean))];
-    if (normalized.some((filePath) => /[\0\r\n]/.test(filePath))) {
-      throw new Error('Pathspec entries must not contain control characters.');
-    }
-    return normalized;
+    return [
+      ...new Set(
+        paths
+          .map((filePath) => String(filePath || '').trim())
+          .filter(Boolean)
+          .map((filePath) => toLiteralPathspec(filePath)),
+      ),
+    ];
   }
 
   private createPathspecFile(tempPrefix: string, paths: string[]): { tempDir: string; pathspecFile: string } {

@@ -37,9 +37,9 @@ describe('SecretScanService', () => {
 
     const service = new SecretScanService(
       createGitServiceMock({
-        'diff --cached --no-color --unified=0': stagedDiff,
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
-        'diff --no-color --unified=0 origin/main..HEAD': outgoingDiff,
+        'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': outgoingDiff,
       }),
     );
 
@@ -58,7 +58,7 @@ describe('SecretScanService', () => {
 
     const service = new SecretScanService(
       createGitServiceMock({
-        'diff --cached --no-color --unified=0': stagedDiff,
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
       }),
     );
@@ -78,10 +78,10 @@ describe('SecretScanService', () => {
 
     const service = new SecretScanService(
       createGitServiceMock({
-        'diff --cached --no-color --unified=0': '',
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
         'rev-list --reverse --topo-order HEAD --not --remotes': commitHash,
-        [`show --format= --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: outgoingCommitDiff,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: outgoingCommitDiff,
       }),
     );
 
@@ -89,7 +89,7 @@ describe('SecretScanService', () => {
 
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].source).toBe('to-push');
-    expect(result.notes.join('\n')).toContain('No upstream tracking branch available; scanned 1 HEAD commit');
+    expect(result.notes.join('\n')).toContain('Scanned 1 commit(s) from requested push source HEAD.');
   });
 
   it('scans commits that would only be published by push --tags', async () => {
@@ -98,11 +98,11 @@ describe('SecretScanService', () => {
 
     const service = new SecretScanService(
       createGitServiceMock({
-        'diff --cached --no-color --unified=0': '',
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
-        'diff --no-color --unified=0 origin/main..HEAD': '',
+        'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': '',
         'rev-list --reverse --topo-order --tags --not --remotes': tagCommit,
-        [`show --format= --no-color --unified=0 --find-renames --find-copies ${tagCommit}`]: tagDiff,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${tagCommit}`]: tagDiff,
       }),
     );
 
@@ -116,5 +116,87 @@ describe('SecretScanService', () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0].source).toBe('tag');
     expect(result.stats.tagLines).toBe(1);
+  });
+
+  it('scans paths that were previously skipped by built-in ignore rules and redacts every matched secret', async () => {
+    const exposedKey = 'sk_live_1234567890abcdefghijklmnop';
+    const stagedDiff = ['diff --git a/dist/runtime.js b/dist/runtime.js', '+++ b/dist/runtime.js', '@@ -0,0 +1 @@', `+window.runtimeKey = ${exposedKey};`].join(
+      '\n',
+    );
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+        'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': '',
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ filePath: 'dist/runtime.js', contextLine: expect.stringContaining('[REDACTED_SECRET]') });
+    expect(result.findings[0].contextLine).not.toContain(exposedKey);
+  });
+
+  it('decodes quoted patch file headers instead of skipping secrets in special file names', async () => {
+    const stagedDiff = [
+      'diff --git "a/secrets\\tconfig.env" "b/secrets\\tconfig.env"',
+      '+++ "b/secrets\\tconfig.env"',
+      '@@ -0,0 +1 @@',
+      '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF',
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+        'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': '',
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].filePath).toBe('secrets\tconfig.env');
+  });
+
+  it('fails closed when it cannot enumerate outgoing commits without an upstream', async () => {
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
+        'rev-list --reverse --topo-order HEAD --not --remotes': new Error('repository unavailable'),
+      }),
+    );
+
+    await expect(service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' })).rejects.toThrow(
+      'Could not determine commits that would be pushed',
+    );
+  });
+
+  it('scans the local source branch selected by an explicit push refspec', async () => {
+    const commitHash = 'cccccccccccccccccccccccccccccccccccccccc';
+    const branchDiff = [
+      'diff --git a/config/release.ts b/config/release.ts',
+      '+++ b/config/release.ts',
+      '@@ -0,0 +1 @@',
+      '+const token = "ghp_abcdefghijklmnopqrstuvwxyz123456";',
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'rev-list --reverse --topo-order release-candidate --not --remotes': commitHash,
+        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: branchDiff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({
+      repoPath: '/tmp/repo',
+      strictness: 'low',
+      allowlistText: '',
+      revisions: ['release-candidate'],
+    });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.notes.join('\n')).toContain('requested push source release-candidate');
   });
 });

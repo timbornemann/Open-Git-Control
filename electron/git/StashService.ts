@@ -1,5 +1,7 @@
 import type { ActiveRepoCommand } from './MergeConflictService';
 
+const STASH_REF_RE = /^stash@\{\d+\}$/;
+
 export class StashService {
   constructor(private readonly runCommand: ActiveRepoCommand) {}
 
@@ -11,8 +13,8 @@ export class StashService {
   async createBranchFromStash(stashName: string, branchName: string): Promise<string> {
     const normalizedStashName = String(stashName || '').trim();
     const normalizedBranchName = String(branchName || '').trim();
-    if (!normalizedStashName) {
-      throw new Error('Stash name is required.');
+    if (!STASH_REF_RE.test(normalizedStashName)) {
+      throw new Error('Invalid stash reference.');
     }
     if (!normalizedBranchName) {
       throw new Error('Branch name is required.');

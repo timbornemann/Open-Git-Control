@@ -78,7 +78,7 @@ describe('GitService commitWithMessage', () => {
       expect(pathspecArg).toBeTruthy();
       pathspecFilePath = String(pathspecArg).slice('--pathspec-from-file='.length);
       expect(fs.readFileSync(messageFilePath, 'utf8')).toBe('Batch commit');
-      expect(fs.readFileSync(pathspecFilePath, 'utf8')).toBe('src/app.ts\0docs/read me.md\0');
+      expect(fs.readFileSync(pathspecFilePath, 'utf8')).toBe(':(literal)src/app.ts\0:(literal)docs/read me.md\0');
       return { stdout: 'committed\n', stderr: '' };
     });
     const service = new GitService(runner as any);
@@ -129,6 +129,21 @@ describe('GitService status and stash helpers', () => {
 
       expect(runner).toHaveBeenNthCalledWith(1, 'git', ['check-ref-format', '--branch', 'feature/stashed'], expect.any(Object));
       expect(runner).toHaveBeenNthCalledWith(2, 'git', ['stash', 'branch', 'feature/stashed', 'stash@{0}'], expect.any(Object));
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects arbitrary stash arguments before passing them to Git', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-stash-ref-'));
+    const runner = vi.fn();
+    const service = new GitService(runner as any);
+    (service as any).repoPath = repoDir;
+    (service as any).repoIsBare = false;
+
+    try {
+      await expect(service.createBranchFromStash('--help', 'feature/stashed')).rejects.toThrow('Invalid stash reference.');
+      expect(runner).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }

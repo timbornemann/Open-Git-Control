@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import type { CommitStatsService } from '../../CommitStatsService';
 import type { GitService } from '../../GitService';
 import type { SecretScanService } from '../../SecretScanService';
@@ -13,6 +13,7 @@ import { handleGitCommand } from './gitCommandRouter';
 import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { emitJobEvent } from './jobEvents';
+import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
 
 type RegisterGitHandlersDeps = {
   gitService: GitService;
@@ -54,10 +55,6 @@ export function registerGitHandlers({
     commitStatsService.setActiveRepo('');
     return true;
   });
-
-  ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) =>
-    handleGitCommand(event, gitService, commandName, ...rawArgs),
-  );
 
   ipcMain.handle(
     IpcChannel.GitCreateCommit,
@@ -153,9 +150,9 @@ export function registerGitHandlers({
     }
   });
 
-  ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown } = {}) => {
+  const scanPushSecrets = async (event: any, params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown } = {}) => {
     activeSecretScanController?.abort();
-    const requestedRepoPath = String((params as { repoPath?: unknown })?.repoPath || gitService.getRepoPath() || '').trim();
+    const requestedRepoPath = String(params.repoPath || gitService.getRepoPath() || '').trim();
     if (!requestedRepoPath) {
       return { success: false, error: 'Repository path is required.' };
     }
@@ -181,6 +178,7 @@ export function registerGitHandlers({
         strictness: settings.secretScanStrictness,
         allowlistText: settings.secretScanAllowlist,
         includeTags: params?.includeTags === true,
+        revisions: Array.isArray(params.revisions) ? params.revisions.map((revision) => String(revision || '')).slice(0, 8) : undefined,
         signal: controller.signal,
         onProgress: (checkedLines) => {
           emitJobEvent(event.sender, {
@@ -230,7 +228,54 @@ export function registerGitHandlers({
       repoJob.complete();
       if (activeSecretScanController === controller) activeSecretScanController = null;
     }
+  };
+
+  const requirePushSecretScanApproval = async (event: any, rawArgs: unknown[]) => {
+    const settings = readSettingsWithMigration();
+    if (!settings?.secretScanBeforePushEnabled) return null;
+
+    const positionalArgs = rawArgs.filter((arg): arg is string => typeof arg === 'string' && !arg.startsWith('-'));
+    const refspec = positionalArgs.length >= 2 ? positionalArgs[1] : '';
+    const sourceRevision = refspec && !refspec.startsWith(':') ? refspec.split(':', 1)[0] || 'HEAD' : '';
+    const scanResult = await scanPushSecrets(event, {
+      includeTags: rawArgs.some((arg) => arg === '--tags'),
+      repoPath: gitService.getRepoPath(),
+      revisions: sourceRevision && sourceRevision !== 'HEAD' ? [sourceRevision] : undefined,
+    });
+    if (!scanResult.success || !scanResult.data) return scanResult;
+    if (scanResult.data.findings.length === 0) return null;
+
+    const findings = scanResult.data.findings;
+    const fileCount = new Set(findings.map((finding) => finding.filePath)).size;
+    const preview = findings
+      .slice(0, 8)
+      .map((finding) => `${finding.filePath}:${finding.lineNumber}`)
+      .join('\n');
+    const confirmation = await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Potential secrets detected before push',
+      message: `${findings.length} potential secret hit(s) were found in ${fileCount} file(s).`,
+      detail: `${preview}${findings.length > 8 ? '\n...' : ''}\n\nReview the changes before publishing.`,
+      buttons: ['Cancel', 'Push anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (confirmation.response === 1) return null;
+    return { success: false, error: 'Push cancelled after secret scan findings.' };
+  };
+
+  ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
+    if (commandName === 'push') {
+      const scanBlock = await requirePushSecretScanApproval(event, rawArgs);
+      if (scanBlock) return scanBlock;
+    }
+    return handleGitCommand(event, gitService, commandName, ...rawArgs);
   });
+
+  ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown } = {}) =>
+    scanPushSecrets(event, params),
+  );
 
   ipcMain.handle(IpcChannel.GitCancelSecretScan, async () => {
     const cancelled = Boolean(activeSecretScanController);
@@ -245,18 +290,7 @@ export function registerGitHandlers({
         return { success: false, error: 'Invalid base commit hash.' };
       }
 
-      if (!Array.isArray(todoLines) || todoLines.length === 0) {
-        return { success: false, error: 'Rebase todo list is empty.' };
-      }
-
-      const normalizedTodo = todoLines
-        .map((line) => String(line || '').trim())
-        .filter(Boolean)
-        .slice(0, 500);
-
-      if (normalizedTodo.length === 0) {
-        return { success: false, error: 'Rebase todo list is empty.' };
-      }
+      const normalizedTodo = normalizeInteractiveRebaseTodo(todoLines);
 
       const data = await gitService.startInteractiveRebase(normalizedBase, normalizedTodo);
       return { success: true, data };

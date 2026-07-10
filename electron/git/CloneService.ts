@@ -11,6 +11,14 @@ export type CloneRepositoryResult = {
 export class CloneService {
   constructor(private readonly gitRunner: Pick<GitRunner, 'cloneWithProgress'>) {}
 
+  private normalizeCloneSource(value: string): string {
+    const source = String(value || '').trim();
+    if (!source || source.length > 2_000 || /[\0\r\n]/.test(source)) {
+      throw new Error('Clone source is invalid.');
+    }
+    return source;
+  }
+
   sanitizeCloneTargetName(value: string): string {
     const normalized = String(value || '')
       .trim()
@@ -60,8 +68,10 @@ export class CloneService {
   cloneRepo(cloneUrl: string, targetDir: string, onProgress: (line: string) => void, targetName?: string): Promise<CloneRepositoryResult> {
     return new Promise((resolve) => {
       let repoPath = '';
+      let normalizedCloneUrl = '';
       try {
-        repoPath = this.resolveCloneTargetPath(cloneUrl, targetDir, targetName);
+        normalizedCloneUrl = this.normalizeCloneSource(cloneUrl);
+        repoPath = this.resolveCloneTargetPath(normalizedCloneUrl, targetDir, targetName);
       } catch (error: any) {
         resolve({
           success: false,
@@ -80,7 +90,7 @@ export class CloneService {
         return;
       }
 
-      void this.gitRunner.cloneWithProgress(cloneUrl, repoPath, onProgress).then((result) => {
+      void this.gitRunner.cloneWithProgress(normalizedCloneUrl, repoPath, onProgress).then((result) => {
         resolve({
           success: result.success,
           repoPath,

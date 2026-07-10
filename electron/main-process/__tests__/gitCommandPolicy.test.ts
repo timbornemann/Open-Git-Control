@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertAllowedGitCommand, normalizeArgs, validateCommandArgs } from '../gitCommandPolicy';
+import { assertAllowedGitCommand, normalizeArgs, normalizeCommandArgs, validateCommandArgs } from '../gitCommandPolicy';
 
 describe('gitCommandPolicy', () => {
   it('allows known command names', () => {
@@ -24,6 +24,26 @@ describe('gitCommandPolicy', () => {
 
   it('allows commit args produced by amend/signoff/title/body UI combinations', () => {
     expect(() => validateCommandArgs('commit', ['--amend', '--signoff', '-m', 'Title', '-m', 'Body'])).not.toThrow();
+  });
+
+  it('rejects unapproved Git options that could alter the execution environment', () => {
+    expect(() => validateCommandArgs('fetch', ['--upload-pack=cmd.exe'])).toThrow('Unsupported argument for git fetch.');
+    expect(() => validateCommandArgs('show', ['--textconv', 'HEAD'])).toThrow('Unsupported argument for git show.');
+    expect(() => validateCommandArgs('checkout', ['--orphan', 'unsafe'])).toThrow('Unsupported argument combination for git checkout.');
+  });
+
+  it('converts accepted IPC pathspecs to literal form and rejects pathspec magic', () => {
+    expect(normalizeCommandArgs('checkout', ['stash@{0}', '--', 'docs/[draft].md'])).toEqual(['stash@{0}', '--', ':(literal)docs/[draft].md']);
+    expect(normalizeCommandArgs('clean', ['-f', '--', 'generated/[temp].txt'])).toEqual(['-f', '--', ':(literal)generated/[temp].txt']);
+    expect(normalizeCommandArgs('stash', ['push', '--include-untracked', '-m', 'partial', '--', 'src/[draft].ts'])).toEqual([
+      'push',
+      '--include-untracked',
+      '-m',
+      'partial',
+      '--',
+      ':(literal)src/[draft].ts',
+    ]);
+    expect(() => normalizeCommandArgs('checkout', ['stash@{0}', '--', ':(glob)**/*.env'])).toThrow('Pathspec must be repository-relative.');
   });
 
   it('validates forensic line range queries', () => {
