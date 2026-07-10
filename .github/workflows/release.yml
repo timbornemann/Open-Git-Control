@@ -1,23 +1,57 @@
 name: Release
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and publish (for example v1.2.3)
+        required: true
+        type: string
 
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 concurrency:
-  group: release-${{ github.event.release.tag_name || github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Build + Publish (${{ matrix.label }})
+  prepare:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - id: release
+        name: Derive release version from tag
+        shell: bash
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          if ! git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+            echo "Release tag does not exist: $TAG"
+            exit 1
+          fi
+          if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            echo "Invalid release tag: $TAG (expected vX.Y.Z)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build + verify (${{ matrix.label }})
+    needs: prepare
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -27,31 +61,23 @@ jobs:
             label: Windows
             platform: windows
             script: dist:win
-            upload_files: |
-              release/latest.yml
-              release/*.exe
-              release/*.blockmap
+            requires_signing: true
           - os: ubuntu-latest
             label: Linux
             platform: linux
             script: dist:linux
-            upload_files: |
-              release/latest-linux.yml
-              release/*.AppImage
-              release/*.deb
+            requires_signing: false
           - os: macos-latest
             label: macOS
             platform: macos
             script: dist:mac
-            upload_files: |
-              release/latest-mac.yml
-              release/*.dmg
-              release/*.zip
-              release/*.blockmap
+            requires_signing: true
 
     steps:
-      - name: Checkout
+      - name: Checkout release tag
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -59,58 +85,139 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Derive release version from tag
-        shell: bash
-        run: |
-          TAG="${{ github.event.release.tag_name }}"
-          if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-          elif [[ "$TAG" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-          else
-            echo "Invalid release tag: $TAG (expected vX.Y.Z or X.Y.Z)"
-            exit 1
-          fi
-          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "Using release version: $VERSION"
-
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare distribution legal notices
+        run: npm run legal:prepare
+
       - name: Prepare package version
-        run: node scripts/prepare-release-version.js "${{ env.RELEASE_VERSION }}"
+        run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
+
+      - name: Validate required Windows signing secrets
+        if: matrix.platform == 'windows'
+        run: node scripts/validate-release-signing.js windows
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+
+      - name: Validate required macOS signing and notarization secrets
+        if: matrix.platform == 'macos'
+        run: node scripts/validate-release-signing.js macos
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build release assets
         run: npm run ${{ matrix.script }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_LINK || matrix.platform == 'macos' && secrets.MACOS_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || matrix.platform == 'macos' && secrets.MACOS_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Validate release artifacts
-        run: node scripts/validate-release-assets.js "${{ env.RELEASE_VERSION }}" "${{ matrix.platform }}"
+        run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
 
-      - name: Attach assets to GitHub Release
+      - name: Verify Windows Authenticode signature
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem release -Filter '*.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'Windows installer was not created.' }
+          $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+          if ($signature.Status -ne 'Valid') { throw "Windows installer signature is not valid: $($signature.Status)" }
+
+      - name: Verify signed and notarized macOS app
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          ZIP_FILE="$(find release -maxdepth 1 -name '*.zip' -print -quit)"
+          test -n "$ZIP_FILE"
+          mkdir -p signed-app-check
+          ditto -x -k "$ZIP_FILE" signed-app-check
+          APP_PATH="$(find signed-app-check -maxdepth 2 -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
+
+      - name: Upload verified release artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ matrix.platform }}
+          path: release/**
+          if-no-files-found: error
+
+  publish:
+    name: Publish verified release
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies and prepare legal notices
+        run: |
+          npm ci
+          npm run legal:prepare
+
+      - name: Download verified artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Validate complete cross-platform release
+        run: |
+          node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" windows
+          node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" linux
+          node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" macos
+
+      - name: Generate SHA-256 checksums
+        run: node scripts/generate-release-checksums.js release
+
+      - name: Create and publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: ${{ matrix.upload_files }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Open-Git-Control ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            release/latest.yml
+            release/latest-linux.yml
+            release/latest-mac.yml
+            release/*.exe
+            release/*.blockmap
+            release/*.AppImage
+            release/*.deb
+            release/*.dmg
+            release/*.zip
+            release/SHA256SUMS.txt
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload workflow artifacts
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: release-${{ matrix.label }}
-          path: release/**
-          if-no-files-found: ignore
-
   sync-readme-release-links:
     name: Sync README release links
+    needs:
+      - prepare
+      - publish
     runs-on: ubuntu-latest
-    needs: publish
-    if: ${{ !github.event.release.prerelease && !github.event.release.draft }}
     steps:
       - name: Checkout default branch
         uses: actions/checkout@v6

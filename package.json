@@ -4,6 +4,8 @@
   "private": true,
   "version": "1.1.1",
   "description": "Desktop app for organizing and controlling Git repositories.",
+  "license": "GPL-3.0-only",
+  "copyright": "Copyright © 2026 Tim Bornemann",
   "author": {
     "name": "Tim Bornemann",
     "email": "tim@timbornemann.de"
@@ -21,19 +23,21 @@
     "lint": "eslint src electron && npm run arch:check",
     "arch:check": "node scripts/check-architecture.js",
     "format:check": "prettier --check .",
-    "dist": "npm run build && electron-builder --publish never",
-    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
-    "dist:mac": "npm run build && electron-builder --mac dmg zip --x64 --publish never",
-    "release:win": "npm run build && electron-builder --win nsis --x64 --publish always",
-    "release:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish always",
-    "release:mac": "npm run build && electron-builder --mac dmg zip --x64 --publish always",
+    "legal:prepare": "node scripts/prepare-distribution-legal-files.js",
+    "legal:check": "node scripts/prepare-distribution-legal-files.js --check",
+    "dist": "npm run legal:prepare && npm run build && electron-builder --publish never",
+    "dist:win": "npm run legal:prepare && npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run legal:prepare && npm run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "dist:mac": "npm run legal:prepare && npm run build && electron-builder --mac dmg zip --x64 --publish never",
+    "release:win": "npm run legal:prepare && node scripts/validate-release-signing.js windows && npm run build && electron-builder --win nsis --x64 --publish never",
+    "release:linux": "npm run dist:linux",
+    "release:mac": "npm run legal:prepare && node scripts/validate-release-signing.js macos && npm run build && electron-builder --mac dmg zip --x64 --publish never",
     "preview": "vite preview",
     "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
     "test": "npm run test:unit",
     "test:unit": "node scripts/run-tests.js",
     "test:coverage": "node scripts/run-tests.js --coverage",
-    "test:ci": "npm run lint && npm run format:check && npm run build:electron && npm run test:coverage && npm run build",
+    "test:ci": "npm run legal:prepare && npm run legal:check && npm run lint && npm run format:check && npm run build:electron && npm run test:coverage && npm run build",
     "docs:release-links": "node scripts/update-readme-release-links.js"
   },
   "dependencies": {
@@ -71,7 +75,8 @@
     "appId": "com.opengitcontrol.app",
     "productName": "Open-Git-Control",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**",
@@ -79,6 +84,16 @@
       "package.json",
       "logo.ico",
       "logo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "build/THIRD_PARTY_NOTICES.txt",
+        "to": "THIRD_PARTY_NOTICES.txt"
+      }
     ],
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "publish": [
@@ -103,7 +118,8 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "license": "build/LICENSE.txt"
     },
     "linux": {
       "maintainer": "Tim Bornemann <tim@timbornemann.de>",
@@ -139,7 +155,14 @@
           ]
         }
       ],
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": true
+    },
+    "dmg": {
+      "license": "build/LICENSE.txt"
     }
   }
 }

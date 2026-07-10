@@ -17,9 +17,17 @@ if (!platformLabel) {
 }
 
 const releaseDir = path.resolve(process.cwd(), 'release');
+const legalFiles = [path.resolve(process.cwd(), 'build', 'LICENSE.txt'), path.resolve(process.cwd(), 'build', 'THIRD_PARTY_NOTICES.txt')];
 if (!fs.existsSync(releaseDir)) {
   console.error(`Release directory not found: ${releaseDir}`);
   process.exit(1);
+}
+
+for (const legalFile of legalFiles) {
+  if (!fs.existsSync(legalFile) || fs.statSync(legalFile).size === 0) {
+    console.error(`Missing required generated legal file: ${path.relative(process.cwd(), legalFile)}`);
+    process.exit(1);
+  }
 }
 
 const productName = 'Open-Git-Control';

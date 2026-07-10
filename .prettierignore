@@ -3,6 +3,9 @@ dist/
 dist-electron/
 node_modules/
 release/
+build/
+.gitignore
+.prettierignore
 
 *.ico
 *.png
