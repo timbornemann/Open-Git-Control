@@ -7,7 +7,7 @@ import {
   getCommitMessageStyleLabel,
   getCommitMessageStyleOptions,
 } from '@/utils/commitMessagePreferences';
-import { translateFromCatalog, type CatalogTranslateFn } from '@/i18n';
+import { translateFromCatalog, type CatalogTranslateFn } from '@/i18nCore';
 
 const de: CatalogTranslateFn = (key, variables) => translateFromCatalog('de', key, variables);
 const en: CatalogTranslateFn = (key, variables) => translateFromCatalog('en', key, variables);

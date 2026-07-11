@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
-import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18n';
+import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18nCore';
 import { appClient } from '@/services/appClient';
 import { DEFAULT_SETTINGS } from './defaultSettings';
 

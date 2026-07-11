@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildCommitMenuActions } from '@/components/commit-graph/commitGraphMenuActions';
-import { trByLanguage, translateFromCatalog, type AppLanguage } from '@/i18n';
+import { trByLanguage, translateFromCatalog, type AppLanguage } from '@/i18nCore';
 import type { GraphNode } from '@/utils/graphLayout';
 
 const HASH = 'a'.repeat(40);
