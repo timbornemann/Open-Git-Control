@@ -114,9 +114,6 @@ export const useCommitGraphData = ({
         pendingScrollTopRef.current = forceTopOnRefresh || isQuick ? 0 : scrollContainer.scrollTop;
         pendingScrollHeightRef.current = isSync && !forceTopOnRefresh ? scrollContainer.scrollHeight : null;
         pendingScrollModeRef.current = forceTopOnRefresh ? 'reset' : isAppend ? 'append' : isQuick ? 'quick' : 'sync';
-        if (forceTopOnRefresh) {
-          forceScrollToTopOnNextResetRef.current = false;
-        }
         if (isAppend) {
           appendInFlightRef.current = true;
           setLoadingMore(true);
@@ -125,9 +122,6 @@ export const useCommitGraphData = ({
         pendingScrollTopRef.current = forceTopOnRefresh ? 0 : scrollContainer ? scrollContainer.scrollTop : null;
         pendingScrollHeightRef.current = null;
         pendingScrollModeRef.current = 'reset';
-        if (forceTopOnRefresh) {
-          forceScrollToTopOnNextResetRef.current = false;
-        }
         if (shouldShowLoadingState) {
           setLoading(true);
         }
@@ -346,6 +340,13 @@ export const useCommitGraphData = ({
       scrollContainer.scrollTop = Math.max(0, previousTop + deltaHeight);
     } else {
       scrollContainer.scrollTop = previousTop;
+    }
+
+    // A repository change can trigger several refreshes before any resulting
+    // layout commits. Keep every one of those refreshes pinned to the top; only
+    // release the marker after the first new layout was actually rendered.
+    if (restoreMode === 'reset') {
+      forceScrollToTopOnNextResetRef.current = false;
     }
 
     pendingScrollTopRef.current = null;
