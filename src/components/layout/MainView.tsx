@@ -58,7 +58,7 @@ const MainViewComponent: React.FC = () => {
     onNavigateToCommit,
   });
 
-  const { isInspectorPaneVisible, toggleInspectorPane, hideInspectorPane } = useInspectorPaneVisibility();
+  const { isInspectorPaneVisible, toggleInspectorPane } = useInspectorPaneVisibility();
 
   const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
     activeRepo,
@@ -111,7 +111,6 @@ const MainViewComponent: React.FC = () => {
           <MainInspectorPane
             isContentResizing={isContentResizing}
             onContentResizeStart={handleContentResizeStart}
-            onHideInspectorPane={hideInspectorPane}
             workingTree={workingTree}
             commitHistoryStack={commitHistoryStack}
             workingTreeSelection={workingTreeSelection}

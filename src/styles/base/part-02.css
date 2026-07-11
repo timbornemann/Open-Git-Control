@@ -210,10 +210,6 @@
   padding: 16px;
 }
 
-.inspector-pane-close {
-  padding: 3px;
-}
-
 /* Konflikt-Resolver: volle Pane-Hoehe, kein zusaetzlicher Scroll durch kleines max-height */
 .pane-content:has(.staging-container--conflict) {
   display: flex;

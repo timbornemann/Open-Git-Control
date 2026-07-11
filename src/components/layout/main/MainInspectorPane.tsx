@@ -1,5 +1,4 @@
 import React from 'react';
-import { PanelRightClose } from 'lucide-react';
 import { CommitDetails } from '@/components/commit-details/CommitDetails';
 import { StagingArea } from '@/components/staging-area';
 import { WorkingTreeFileDetails } from '@/components/WorkingTreeFileDetails';
@@ -17,7 +16,6 @@ type WorkingTreeSelection = {
 type MainInspectorPaneProps = {
   isContentResizing: boolean;
   onContentResizeStart: (event: React.PointerEvent<HTMLDivElement>) => void;
-  onHideInspectorPane: () => void;
   workingTree: WorkingTreeState;
   commitHistoryStack: string[];
   workingTreeSelection: WorkingTreeSelection | null;
@@ -34,7 +32,6 @@ type MainInspectorPaneProps = {
 export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   isContentResizing,
   onContentResizeStart,
-  onHideInspectorPane,
   workingTree,
   commitHistoryStack,
   workingTreeSelection,
@@ -83,14 +80,6 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
                 </button>
               </>
             )}
-            <button
-              className="icon-btn inspector-pane-close"
-              onClick={onHideInspectorPane}
-              title={t('generated.components.layout.main.maininspectorpane.hide_inspector_afb783c1')}
-              aria-label={t('generated.components.layout.main.maininspectorpane.hide_inspector_afb783c1')}
-            >
-              <PanelRightClose size={16} />
-            </button>
           </div>
         </div>
         <div className="pane-content" style={{ overflow: 'hidden' }}>
