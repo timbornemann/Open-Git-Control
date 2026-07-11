@@ -206,6 +206,21 @@ describe('GitService repo path normalization', () => {
     fs.rmSync(rootDir, { recursive: true, force: true });
   });
 
+  it('resolves a nested repository path asynchronously', async () => {
+    const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-git-root-'));
+    const nestedDir = path.join(rootDir, 'src', 'nested');
+    fs.mkdirSync(nestedDir, { recursive: true });
+    execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+
+    try {
+      const service = new GitService();
+      const resolvedPath = await service.resolveRepositoryPathAsync(nestedDir);
+      expect(path.normalize(resolvedPath)).toBe(path.resolve(rootDir));
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it('keeps original path when root lookup fails', () => {
     const plainDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-non-repo-'));
     const service = new GitService();

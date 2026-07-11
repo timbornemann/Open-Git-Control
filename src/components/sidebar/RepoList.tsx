@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, FolderGit2, Pin, PinOff, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderGit2, Loader2, Pin, PinOff, Search, X } from 'lucide-react';
 import type { RepoSortByDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 
 type Props = {
   openRepos: string[];
+  isRestoringRepos: boolean;
   repoMeta: Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
   sortBy: RepoSortByDto;
   onSortChange: (sortBy: RepoSortByDto) => void;
@@ -20,6 +21,7 @@ type Props = {
 
 export const RepoList: React.FC<Props> = ({
   openRepos,
+  isRestoringRepos,
   repoMeta,
   sortBy,
   onSortChange,
@@ -126,6 +128,15 @@ export const RepoList: React.FC<Props> = ({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            {isRestoringRepos && (
+              <div
+                aria-live="polite"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px', color: 'var(--text-secondary)', fontSize: '0.78rem' }}
+              >
+                <Loader2 size={14} className="spin" aria-hidden="true" />
+                {tr('Gespeicherte Repositories werden überprüft …', 'Checking saved repositories …')}
+              </div>
+            )}
             {filteredRepos.map((repoPath) => {
               const name = repoPath.split(/[\\/]/).pop() || repoPath;
               const isActive = repoPath === activeRepo;
@@ -208,7 +219,7 @@ export const RepoList: React.FC<Props> = ({
               </div>
             )}
 
-            {openRepos.length === 0 && (
+            {openRepos.length === 0 && !isRestoringRepos && (
               <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                 <FolderGit2 size={36} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
                 {t('generated.components.sidebar.repolist.no_repository_opened_97f33d44')}

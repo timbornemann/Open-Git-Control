@@ -9,6 +9,7 @@ export const LocalReposSidebarContainer: React.FC = React.memo(() => {
   return (
     <LocalReposSidebarContent
       openRepos={repository.openRepos}
+      isRestoringRepos={repository.isRestoringRepos}
       repoMeta={repository.repoMeta}
       repoSortBy={repository.repoSortBy}
       activeRepo={repository.activeRepo}

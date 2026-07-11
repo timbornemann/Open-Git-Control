@@ -82,6 +82,16 @@ export class GitService {
     return this.resolveRepoRoot(normalizedPath);
   }
 
+  async resolveRepositoryPathAsync(repoPath: string): Promise<string> {
+    const normalizedPath = path.resolve(String(repoPath || '').trim() || '.');
+    try {
+      const rootPath = (await this.gitRunner.run(normalizedPath, ['rev-parse', '--show-toplevel'])).trim();
+      return rootPath || normalizedPath;
+    } catch {
+      return normalizedPath;
+    }
+  }
+
   private ensureRepoPath(): string {
     if (!this.repoPath) {
       throw new Error('No repository path set.');

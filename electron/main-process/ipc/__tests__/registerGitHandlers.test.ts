@@ -205,7 +205,7 @@ describe('registerGitHandlers', () => {
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
       getRepoPath: vi.fn(() => 'C:/repo'),
-      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -255,7 +255,7 @@ describe('registerGitHandlers', () => {
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
-      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -303,7 +303,7 @@ describe('registerGitHandlers', () => {
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
       getRepoPath: vi.fn(() => 'C:/repo'),
-      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -357,7 +357,7 @@ describe('registerGitHandlers', () => {
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
-      resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
+      resolveRepositoryPathAsync: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -569,7 +569,7 @@ describe('registerGitHandlers', () => {
 
   it('resolves a stored repository alias without changing the active repository', async () => {
     const gitService = {
-      resolveRepositoryPath: vi.fn().mockReturnValue('C:/work/repo'),
+      resolveRepositoryPathAsync: vi.fn().mockResolvedValue('C:/work/repo'),
       setRepoPath: vi.fn(),
     } as any;
     registerGitHandlers({
@@ -581,7 +581,7 @@ describe('registerGitHandlers', () => {
     });
 
     await expect(handlers.get('git:resolveRepoPath')!({}, 'C:/work/repo/packages/app')).resolves.toBe('C:/work/repo');
-    expect(gitService.resolveRepositoryPath).toHaveBeenCalledWith('C:/work/repo/packages/app');
+    expect(gitService.resolveRepositoryPathAsync).toHaveBeenCalledWith('C:/work/repo/packages/app');
     expect(gitService.setRepoPath).not.toHaveBeenCalled();
   });
 

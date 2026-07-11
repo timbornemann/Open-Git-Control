@@ -190,28 +190,64 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     hook.unmount();
   });
 
-  it('does not lose stored repositories when a newer add wins during canonical loading', async () => {
+  it('shows stored repositories before a background path canonicalization completes', async () => {
+    vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
+      repos: [
+        { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
+        { path: 'C:/repo-b/packages/app', lastOpened: 1, pinned: false, createdAt: 1 },
+      ],
+      activeRepo: 'C:/repo-a',
+      sortBy: 'lastOpenedDesc',
+    });
+    let resolveBackgroundPath!: (repoPath: string) => void;
+    vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveBackgroundPath = resolve;
+        }),
+    );
+    vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
+
+    const hook = renderWorkspace();
+    await flushEffects();
+    await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
+
+    expect(hook.current.openRepos).toEqual(['C:/repo-a', 'C:/repo-b/packages/app']);
+    expect(hook.current.isRestoringRepos).toBe(true);
+
+    await act(async () => {
+      resolveBackgroundPath('C:/repo-b');
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(hook.current.isRestoringRepos).toBe(false));
+    expect(hook.current.openRepos).toEqual(['C:/repo-a', 'C:/repo-b']);
+    hook.unmount();
+  });
+
+  it('does not lose stored repositories when a newer add wins during active repository validation', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [{ path: 'C:/repo-a', lastOpened: 1, pinned: false, createdAt: 1 }],
       activeRepo: 'C:/repo-a',
       sortBy: 'lastOpenedDesc',
     });
-    let resolveCanonical!: (repoPath: string) => void;
-    vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(
-      () =>
-        new Promise<string>((resolve) => {
-          resolveCanonical = resolve;
-        }),
-    );
-    vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-b');
+    let resolveInitialActive!: (repoPath: string) => void;
+    vi.spyOn(appClient, 'setRepoPath')
+      .mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            resolveInitialActive = resolve;
+          }),
+      )
+      .mockResolvedValueOnce('C:/repo-b');
     const hook = renderWorkspace();
     await flushEffects();
 
+    expect(hook.current.openRepos).toEqual(['C:/repo-a']);
     await act(async () => {
       await hook.current.addOpenRepo('C:/repo-b');
     });
     await act(async () => {
-      resolveCanonical('C:/repo-a');
+      resolveInitialActive('C:/repo-a');
       await Promise.resolve();
     });
 

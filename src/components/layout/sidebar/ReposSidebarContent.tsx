@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n';
 type ReposSidebarContentProps = Pick<
   AppSidebarProps,
   | 'openRepos'
+  | 'isRestoringRepos'
   | 'repoMeta'
   | 'repoSortBy'
   | 'activeRepo'
@@ -70,6 +71,7 @@ type ReposSidebarContentProps = Pick<
 
 export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   openRepos,
+  isRestoringRepos,
   repoMeta,
   repoSortBy,
   activeRepo,
@@ -132,6 +134,7 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <RepoList
         openRepos={openRepos}
+        isRestoringRepos={isRestoringRepos}
         repoMeta={repoMeta}
         activeRepo={activeRepo}
         onSwitchRepo={onSwitchRepo}

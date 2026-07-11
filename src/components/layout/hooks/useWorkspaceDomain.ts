@@ -31,6 +31,7 @@ type SortableRepo = {
 };
 
 const DEFAULT_REPO_SORT_BY: RepoSortByDto = 'lastOpenedDesc';
+const BACKGROUND_REPO_RESOLUTION_CONCURRENCY = 4;
 
 const toRepoName = (repoPath: string): string => (repoPath.split(/[\\/]/).pop() || repoPath).toLowerCase();
 
@@ -98,12 +99,13 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
   const [repoSortBy, setRepoSortBy] = useState<RepoSortByDto>(DEFAULT_REPO_SORT_BY);
   const [reposLoaded, setReposLoaded] = useState(false);
+  const [isRestoringRepos, setIsRestoringRepos] = useState(true);
   const repoOperationSequenceRef = useRef(0);
+  const repoRestoreSequenceRef = useRef(0);
   const openReposRef = useRef(openRepos);
   const activeRepoRef = useRef(activeRepo);
   const repoMetaRef = useRef(repoMeta);
   const repoSortByRef = useRef(repoSortBy);
-  const pendingStoredReposRef = useRef<{ paths: string[]; meta: Record<string, RepoMetaEntry> } | null>(null);
 
   // Dialog callbacks can outlive the render in which they were created. Keep
   // repository mutations anchored to the latest committed workspace state
@@ -144,14 +146,18 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     setOpenRepos((previous) => {
       const seen = new Set<string>();
       const next: string[] = [];
+      let found = false;
       for (const repoPath of previous) {
         const pathKey = normalizeRepoPathKey(repoPath);
-        const candidate = pathKey === requestedKey || pathKey === canonicalKey ? canonicalPath : repoPath;
+        const isAlias = pathKey === requestedKey || pathKey === canonicalKey;
+        if (isAlias) found = true;
+        const candidate = isAlias ? canonicalPath : repoPath;
         const candidateKey = normalizeRepoPathKey(candidate);
         if (seen.has(candidateKey)) continue;
         seen.add(candidateKey);
         next.push(candidate);
       }
+      if (!found) return previous;
       openReposRef.current = next;
       return next;
     });
@@ -163,11 +169,14 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
         if (pathKey === requestedKey || pathKey === canonicalKey) merged.push(meta);
         else next[repoPath] = meta;
       }
+      if (merged.length === 0) return previous;
       const now = Date.now();
+      const lastOpened = Math.max(...merged.map((meta) => normalizeTimestamp(meta.lastOpened, 0)), 0);
+      const createdAt = Math.min(...merged.map((meta) => normalizeTimestamp(meta.createdAt, lastOpened || now)));
       next[canonicalPath] = {
         pinned: merged.some((meta) => meta.pinned),
-        lastOpened: Math.max(...merged.map((meta) => normalizeTimestamp(meta.lastOpened, now)), now),
-        createdAt: Math.min(...merged.map((meta) => normalizeTimestamp(meta.createdAt, now)), now),
+        lastOpened: lastOpened || now,
+        createdAt: createdAt || lastOpened || now,
       };
       repoMetaRef.current = next;
       return next;
@@ -183,7 +192,12 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
 
   useEffect(() => {
     const loadStored = async () => {
-      if (!appClient.isAvailable()) return;
+      const restoreId = ++repoRestoreSequenceRef.current;
+      if (!appClient.isAvailable()) {
+        setReposLoaded(true);
+        if (repoRestoreSequenceRef.current === restoreId) setIsRestoringRepos(false);
+        return;
+      }
       const operationId = ++repoOperationSequenceRef.current;
       try {
         const data = await appClient.getStoredRepos();
@@ -194,81 +208,65 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
         repoSortByRef.current = storedSortBy;
         setRepoSortBy(storedSortBy);
         if (data.repos.length > 0) {
-          // Retain a provisional copy in refs before canonical probes. A slow
-          // or unavailable saved path must not let a concurrent Open/Clone
-          // action overwrite all other stored repositories. It intentionally
-          // stays out of rendered state until the backend paths are canonical.
-          const provisionalPaths = data.repos.map((repo) => repo.path);
+          // Render the persisted entries immediately. Path canonicalization is
+          // deliberately deferred, so a slow drive or a long repository list
+          // never presents a misleading empty-state screen during startup.
+          const provisionalPaths: string[] = [];
           const provisionalMeta: Record<string, RepoMetaEntry> = {};
           for (const repo of data.repos) {
+            const path = String(repo.path || '').trim();
+            if (!path || provisionalPaths.some((candidate) => normalizeRepoPathKey(candidate) === normalizeRepoPathKey(path))) continue;
             const lastOpened = normalizeTimestamp(repo.lastOpened, Date.now());
-            provisionalMeta[repo.path] = {
+            provisionalPaths.push(path);
+            provisionalMeta[path] = {
               lastOpened,
               pinned: Boolean(repo.pinned),
               createdAt: normalizeTimestamp(repo.createdAt, lastOpened),
             };
           }
-          pendingStoredReposRef.current = { paths: provisionalPaths, meta: provisionalMeta };
+          openReposRef.current = provisionalPaths;
+          repoMetaRef.current = provisionalMeta;
+          setOpenRepos(provisionalPaths);
+          setRepoMeta(provisionalMeta);
+          setReposLoaded(true);
 
-          const resolvedRepos = await Promise.all(
-            data.repos.map(async (repo) => {
-              try {
-                const resolvedPath = await appClient.resolveRepoPath(repo.path);
-                return { repo, canonicalPath: String(resolvedPath || '').trim() || repo.path };
-              } catch {
-                // Keep an unavailable entry so the existing recovery workflow
-                // can offer removal instead of silently dropping user state.
-                return { repo, canonicalPath: repo.path };
-              }
-            }),
-          );
-          if (repoOperationSequenceRef.current !== operationId) {
-            return;
-          }
-
-          const paths: string[] = [];
-          const meta: Record<string, RepoMetaEntry> = {};
-          const canonicalPathByKey = new Map<string, string>();
-          const canonicalPathByRequestedKey = new Map<string, string>();
-          for (const { repo, canonicalPath } of resolvedRepos) {
-            const canonicalKey = normalizeRepoPathKey(canonicalPath);
-            canonicalPathByRequestedKey.set(normalizeRepoPathKey(repo.path), canonicalPath);
-            const lastOpened = normalizeTimestamp(repo.lastOpened, Date.now());
-            const createdAt = normalizeTimestamp(repo.createdAt, lastOpened);
-            const existingPath = canonicalPathByKey.get(canonicalKey);
-            if (existingPath) {
-              const existingMeta = meta[existingPath];
-              existingMeta.lastOpened = Math.max(existingMeta.lastOpened, lastOpened);
-              existingMeta.createdAt = Math.min(existingMeta.createdAt, createdAt);
-              existingMeta.pinned = existingMeta.pinned || Boolean(repo.pinned);
-              continue;
+          if (provisionalPaths.length === 0) {
+            await appClient.clearRepoPath();
+            if (repoOperationSequenceRef.current === operationId) {
+              setActiveRepo(null);
+              onNoActiveRepo();
             }
-
-            canonicalPathByKey.set(canonicalKey, canonicalPath);
-            paths.push(canonicalPath);
-            meta[canonicalPath] = {
-              lastOpened,
-              pinned: Boolean(repo.pinned),
-              createdAt,
-            };
-          }
-
-          const storedActiveKey = data.activeRepo ? normalizeRepoPathKey(data.activeRepo) : '';
-          const resolvedStoredActive = storedActiveKey ? canonicalPathByRequestedKey.get(storedActiveKey) || canonicalPathByKey.get(storedActiveKey) : null;
-          const active = resolvedStoredActive ? canonicalPathByKey.get(normalizeRepoPathKey(resolvedStoredActive)) || paths[0] : paths[0];
-          const canonicalActive = await appClient.setRepoPath(active);
-          if (repoOperationSequenceRef.current === operationId) {
-            pendingStoredReposRef.current = null;
-            repoMetaRef.current = meta;
-            openReposRef.current = paths;
-            setRepoMeta(meta);
-            setOpenRepos(paths);
+          } else {
+            const storedActiveKey = data.activeRepo ? normalizeRepoPathKey(data.activeRepo) : '';
+            const active = provisionalPaths.find((repoPath) => normalizeRepoPathKey(repoPath) === storedActiveKey) || provisionalPaths[0];
+            const canonicalActive = await appClient.setRepoPath(active);
+            if (repoOperationSequenceRef.current !== operationId) {
+              if (repoRestoreSequenceRef.current === restoreId) setIsRestoringRepos(false);
+              return;
+            }
             migrateRepoPathToCanonical(active, canonicalActive);
             activeRepoRef.current = canonicalActive;
             setActiveRepo(canonicalActive);
+
+            // The selected repository is ready now. Resolve every remaining
+            // entry in bounded async workers without delaying the graph or list.
+            const remainingPaths = provisionalPaths.filter((repoPath) => normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(active));
+            let nextPathIndex = 0;
+            const resolveNextPath = async () => {
+              while (nextPathIndex < remainingPaths.length) {
+                const repoPath = remainingPaths[nextPathIndex++];
+                try {
+                  const canonicalPath = String((await appClient.resolveRepoPath(repoPath)) || '').trim() || repoPath;
+                  migrateRepoPathToCanonical(repoPath, canonicalPath);
+                } catch {
+                  // Keep unavailable entries visible so their existing recovery
+                  // workflow can offer removal instead of silently dropping them.
+                }
+              }
+            };
+            await Promise.all(Array.from({ length: Math.min(BACKGROUND_REPO_RESOLUTION_CONCURRENCY, remainingPaths.length) }, resolveNextPath));
           }
         } else {
-          pendingStoredReposRef.current = null;
           await appClient.clearRepoPath();
           if (repoOperationSequenceRef.current === operationId) {
             setActiveRepo(null);
@@ -279,15 +277,17 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
         console.error(e);
       }
       if (repoOperationSequenceRef.current === operationId) {
-        pendingStoredReposRef.current = null;
         setReposLoaded(true);
+      }
+      if (repoRestoreSequenceRef.current === restoreId) {
+        setIsRestoringRepos(false);
       }
     };
     loadStored();
   }, [migrateRepoPathToCanonical, onNoActiveRepo]);
 
   useEffect(() => {
-    if (!reposLoaded || !appClient.isAvailable()) return;
+    if (!reposLoaded || isRestoringRepos || !appClient.isAvailable()) return;
 
     const now = Date.now();
     const repos = sortedOpenRepos.map((repoPath) => ({
@@ -302,7 +302,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
       activeRepo,
       sortBy: repoSortBy,
     });
-  }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded]);
+  }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos]);
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!appClient.isAvailable() || normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(activeRepoRef.current || '')) return;
@@ -384,9 +384,8 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
   const ensureRepoPresent = (repoPath: string) => {
     const now = Date.now();
     const repoKey = normalizeRepoPathKey(repoPath);
-    const pendingStored = pendingStoredReposRef.current;
     const seenRepoKeys = new Set<string>();
-    const previousRepos = [...(pendingStored?.paths || []), ...openReposRef.current].filter((candidate) => {
+    const previousRepos = openReposRef.current.filter((candidate) => {
       const candidateKey = normalizeRepoPathKey(candidate);
       if (seenRepoKeys.has(candidateKey)) return false;
       seenRepoKeys.add(candidateKey);
@@ -396,7 +395,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     openReposRef.current = nextRepos;
     setOpenRepos(nextRepos);
 
-    const previousMeta = { ...(pendingStored?.meta || {}), ...repoMetaRef.current };
+    const previousMeta = repoMetaRef.current;
     const nextMeta = {
       ...previousMeta,
       [repoPath]: {
@@ -407,7 +406,6 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     };
     repoMetaRef.current = nextMeta;
     setRepoMeta(nextMeta);
-    pendingStoredReposRef.current = null;
   };
 
   const handleOpenFolder = async () => {
@@ -511,6 +509,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     setOpenRepos,
     activeRepo,
     setActiveRepo,
+    isRestoringRepos,
     repoSortBy,
     setRepoSortBy: handleSetRepoSortBy,
     handleSwitchRepo,

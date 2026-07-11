@@ -5,6 +5,7 @@ import { RepoList } from '@/components/sidebar/RepoList';
 type LocalReposSidebarContentProps = Pick<
   AppSidebarProps,
   | 'openRepos'
+  | 'isRestoringRepos'
   | 'repoMeta'
   | 'repoSortBy'
   | 'activeRepo'
@@ -21,6 +22,7 @@ type LocalReposSidebarContentProps = Pick<
 
 export const LocalReposSidebarContent: React.FC<LocalReposSidebarContentProps> = ({
   openRepos,
+  isRestoringRepos,
   repoMeta,
   repoSortBy,
   activeRepo,
@@ -36,6 +38,7 @@ export const LocalReposSidebarContent: React.FC<LocalReposSidebarContentProps> =
 }) => (
   <RepoList
     openRepos={openRepos}
+    isRestoringRepos={isRestoringRepos}
     repoMeta={repoMeta}
     activeRepo={activeRepo}
     onSwitchRepo={(repoPath) => {

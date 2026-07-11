@@ -39,6 +39,7 @@ const createSettingsSlice = (state: AppState, settingsTab: SettingsTabId, setSet
 const createRepositorySlice = (state: AppState, tr: (deText: string, enText: string) => string): RepositoryContextValue => ({
   activeRepo: state.activeRepo,
   openRepos: state.openRepos,
+  isRestoringRepos: state.isRestoringRepos,
   repoMeta: state.repoMeta,
   repoSortBy: state.repoSortBy,
   onSetRepoSortBy: state.setRepoSortBy,

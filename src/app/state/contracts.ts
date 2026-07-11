@@ -113,6 +113,7 @@ export type SettingsStateContract = {
 export type RepositoryStateContract = {
   activeRepo: string | null;
   openRepos: string[];
+  isRestoringRepos: boolean;
   repoMeta: RepoMetaMap;
   repoSortBy: RepoSortByDto;
   onSetRepoSortBy: (sortBy: RepoSortByDto) => void;

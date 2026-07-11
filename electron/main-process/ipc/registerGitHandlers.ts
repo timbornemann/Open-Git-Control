@@ -52,7 +52,7 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {
     const requestedRepoPath = String(repoPath || '').trim();
     if (!requestedRepoPath) throw new Error('Repository path is required.');
-    return gitService.resolveRepositoryPath(requestedRepoPath);
+    return gitService.resolveRepositoryPathAsync(requestedRepoPath);
   });
 
   ipcMain.handle(IpcChannel.GitSetRepo, async (_event: any, repoPath: string) => {
