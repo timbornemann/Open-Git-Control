@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
@@ -8,6 +8,7 @@ import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projec
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
 import { usePlannerAiActions } from './usePlannerAiActions';
+import { PlannerItemContextMenu, type PlannerItemContextMenuState } from './PlannerItemContextMenu';
 import '@/styles/project-planner.css';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
@@ -51,6 +52,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [itemDialogOpen, setItemDialogOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<PlannerItem | null>(null);
   const [newItemStatus, setNewItemStatus] = React.useState<PlannerStatus>('idea');
+  const [itemContextMenu, setItemContextMenu] = React.useState<PlannerItemContextMenuState | null>(null);
   const [materializeParent, setMaterializeParent] = React.useState<string | null>(null);
   const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
   const selectedProjectIdRef = React.useRef(selectedProject?.id || null);
@@ -85,6 +87,7 @@ export const ProjectPlannerView: React.FC = () => {
     setEditingProject(false);
     setItemDialogOpen(false);
     setEditingItem(null);
+    setItemContextMenu(null);
     setMaterializeParent(null);
     projectDialogProjectIdRef.current = null;
     itemDialogProjectIdRef.current = null;
@@ -308,6 +311,10 @@ export const ProjectPlannerView: React.FC = () => {
                   <article
                     key={item.id}
                     className={`planner-card planner-priority-${item.priority}`}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setItemContextMenu({ x: event.clientX, y: event.clientY, item });
+                    }}
                     onClick={() => {
                       itemDialogProjectIdRef.current = selectedProject.id;
                       setEditingItem(item);
@@ -316,16 +323,6 @@ export const ProjectPlannerView: React.FC = () => {
                   >
                     <div className="planner-card-header">
                       <span className={`planner-priority-badge ${item.priority}`}>{labels.priority[item.priority]}</span>
-                      <button
-                        className="planner-card-delete"
-                        title={t('generated.components.project_planner.projectplannerview.delete_item_afc7d611')}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          requestDeleteItem(item.id);
-                        }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
                     </div>
                     <h3>{item.title}</h3>
                     {item.description && <p>{item.description}</p>}
@@ -338,21 +335,6 @@ export const ProjectPlannerView: React.FC = () => {
                         ))}
                       </div>
                     )}
-                    <select
-                      value={item.status}
-                      aria-label={t('generated.components.project_planner.projectplannerview.change_status_a62b7a50')}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(event) => {
-                        event.stopPropagation();
-                        void updateItem(item.id, { status: event.target.value as PlannerStatus });
-                      }}
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {labels.status[option]}
-                        </option>
-                      ))}
-                    </select>
                   </article>
                 ))}
                 {statusItems.length === 0 && (
@@ -365,6 +347,19 @@ export const ProjectPlannerView: React.FC = () => {
           );
         })}
       </div>
+
+      <PlannerItemContextMenu
+        contextMenu={itemContextMenu}
+        busy={busy}
+        canGenerateCommitMessage={Boolean(selectedProject.repoPath)}
+        isAiCommitGenerating={plannerAiActions.isAiCommitGenerating}
+        onClose={() => setItemContextMenu(null)}
+        onCopyAgentPrompt={(item) => void plannerAiActions.copyItemPrompt(item)}
+        onGenerateCommitMessage={(item) => plannerAiActions.generateCommitMessageForItem(item)}
+        onChangePriority={(itemId, priority) => void updateItem(itemId, { priority })}
+        onChangeStatus={(itemId, status) => void updateItem(itemId, { status })}
+        onDelete={requestDeleteItem}
+      />
 
       <ProjectDialog
         open={projectDialogOpen}

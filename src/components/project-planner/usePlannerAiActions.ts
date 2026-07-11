@@ -8,7 +8,7 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { PlannerProject } from '@/types/projectPlanner';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { openStagingCommitArea } from '@/utils/layoutPreferences';
-import { buildPlannerAgentPrompt, buildPlannerCommitNotes, type PlannerPromptItem } from '@/utils/plannerAiPrompts';
+import { buildPlannerAgentPrompt, buildPlannerCommitNotes, sortPlannerPromptItemsByPriority, type PlannerPromptItem } from '@/utils/plannerAiPrompts';
 
 type UsePlannerAiActionsParams = {
   project: PlannerProject | null;
@@ -103,7 +103,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
 
   return {
     copyItemPrompt: (item: PlannerPromptItem) => copyPrompt([item]),
-    copyStatusPrompt: copyPrompt,
+    copyStatusPrompt: (items: PlannerPromptItem[]) => copyPrompt(sortPlannerPromptItemsByPriority(items)),
     generateCommitMessageForItem: (item: PlannerPromptItem) => generateCommitMessage([item]),
     generateCommitMessageForStatus: generateCommitMessage,
     isAiCommitGenerating,

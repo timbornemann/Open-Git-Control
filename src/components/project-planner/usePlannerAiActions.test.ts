@@ -99,7 +99,7 @@ describe('usePlannerAiActions', () => {
       await actions!.copyItemPrompt(item);
     });
 
-    expect(copyTextToClipboard).toHaveBeenCalledWith(expect.stringContaining('Title: Fix copy detection'));
+    expect(copyTextToClipboard).toHaveBeenCalledWith(expect.stringContaining('<title>Fix copy detection</title>'));
     expect(notify).toHaveBeenCalledWith('Agent-Prompt kopiert.', false);
   });
 
@@ -112,6 +112,22 @@ describe('usePlannerAiActions', () => {
     });
 
     expect(notify).toHaveBeenCalledWith('Agent-Prompt konnte nicht kopiert werden.', true);
+  });
+
+  it('orders visible status items by priority before copying their prompt', async () => {
+    render();
+
+    await act(async () => {
+      await actions!.copyStatusPrompt([
+        { ...item, title: 'Low priority', priority: 'low' },
+        { ...item, title: 'Urgent priority', priority: 'urgent' },
+        { ...item, title: 'High priority', priority: 'high' },
+      ]);
+    });
+
+    const prompt = vi.mocked(copyTextToClipboard).mock.calls[0]?.[0] || '';
+    expect(prompt.indexOf('<title>Urgent priority</title>')).toBeLessThan(prompt.indexOf('<title>High priority</title>'));
+    expect(prompt.indexOf('<title>High priority</title>')).toBeLessThan(prompt.indexOf('<title>Low priority</title>'));
   });
 
   it('generates a commit message, stores it as a draft, and opens staging', async () => {
