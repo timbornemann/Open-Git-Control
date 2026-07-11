@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background';
+export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network';
 
 export type GitSchedulerDiagnostic = {
   repoPath: string;
@@ -28,6 +28,7 @@ type RepoState = {
   queue: QueueEntry<unknown>[];
   activeReads: Set<QueueEntry<unknown>>;
   activeWrite: QueueEntry<unknown> | null;
+  activeNetwork: QueueEntry<unknown> | null;
   coalesced: Map<string, Promise<unknown>>;
 };
 
@@ -36,6 +37,9 @@ const PRIORITY: Record<GitJobKind, number> = {
   interactive: 1,
   polling: 2,
   background: 3,
+  // Network jobs run in their own lane and are picked by kind, so this value
+  // only affects tie-break ordering among queued jobs.
+  network: 4,
 };
 
 const MAX_CONCURRENT_READS = 4;
@@ -124,6 +128,7 @@ export class GitScheduler {
         queue: [],
         activeReads: new Set(),
         activeWrite: null,
+        activeNetwork: null,
         coalesced: new Map(),
       };
       this.repos.set(key, state);
@@ -176,8 +181,6 @@ export class GitScheduler {
   }
 
   private pump(repoPath: string, state: RepoState): void {
-    if (state.activeWrite) return;
-
     state.queue = state.queue.filter((entry) => {
       if (!entry.controller.signal.aborted) return true;
       this.finishCoalesced(state, entry);
@@ -185,12 +188,28 @@ export class GitScheduler {
       return false;
     });
 
+    // Network jobs (fetch/push) neither read the working tree nor touch the
+    // index, so they run in an independent single-slot lane. A slow or offline
+    // remote therefore can never block local reads (log, file tree, diff) or
+    // local writes (checkout, commit, ...). This runs before the activeWrite
+    // gate so a network job may start even while a local write is in flight.
+    if (!state.activeNetwork) {
+      const networkIndex = state.queue.findIndex((entry) => entry.kind === 'network');
+      if (networkIndex >= 0) {
+        const [entry] = state.queue.splice(networkIndex, 1);
+        state.activeNetwork = entry;
+        void this.execute(repoPath, state, entry, 'network');
+      }
+    }
+
+    if (state.activeWrite) return;
+
     const nextWriteIndex = state.queue.findIndex((entry) => entry.kind === 'write');
     if (nextWriteIndex >= 0) {
       if (state.activeReads.size > 0) return;
       const [entry] = state.queue.splice(nextWriteIndex, 1);
       state.activeWrite = entry;
-      void this.execute(repoPath, state, entry, true);
+      void this.execute(repoPath, state, entry, 'write');
       return;
     }
 
@@ -198,7 +217,7 @@ export class GitScheduler {
       const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background').length;
       const hasActiveInteractiveRead = [...state.activeReads].some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
-        if (entry.kind === 'write') return false;
+        if (entry.kind === 'write' || entry.kind === 'network') return false;
         if (entry.kind === 'background') {
           return !hasActiveInteractiveRead && activeBackgroundCount < MAX_BACKGROUND_READS;
         }
@@ -207,11 +226,11 @@ export class GitScheduler {
       if (nextIndex < 0) return;
       const [entry] = state.queue.splice(nextIndex, 1);
       state.activeReads.add(entry);
-      void this.execute(repoPath, state, entry, false);
+      void this.execute(repoPath, state, entry, 'read');
     }
   }
 
-  private async execute(repoPath: string, state: RepoState, entry: QueueEntry<unknown>, isWrite: boolean): Promise<void> {
+  private async execute(repoPath: string, state: RepoState, entry: QueueEntry<unknown>, lane: 'write' | 'read' | 'network'): Promise<void> {
     const startedAt = Date.now();
     let aborted = false;
     let resultBytes = 0;
@@ -224,8 +243,10 @@ export class GitScheduler {
       aborted = entry.controller.signal.aborted || (error as any)?.name === 'AbortError';
       entry.reject(aborted ? abortError() : error);
     } finally {
-      if (isWrite) {
+      if (lane === 'write') {
         state.activeWrite = null;
+      } else if (lane === 'network') {
+        state.activeNetwork = null;
       } else {
         state.activeReads.delete(entry);
       }

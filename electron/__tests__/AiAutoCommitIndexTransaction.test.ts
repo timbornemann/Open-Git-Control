@@ -60,7 +60,9 @@ describe('AI auto-commit isolated index transaction', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     for (const root of tempRoots.splice(0)) {
-      fs.rmSync(root, { recursive: true, force: true });
+      // Windows can briefly hold a handle to a just-exited git subprocess's
+      // directory under parallel load; retry the removal instead of failing.
+      fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 
@@ -92,7 +94,7 @@ describe('AI auto-commit isolated index transaction', () => {
       () => cancelRequested,
     );
 
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled(), { timeout: 5_000 });
     cancelRequested = true;
     await expect(run).rejects.toThrow('abgebrochen');
 

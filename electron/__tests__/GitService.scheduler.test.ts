@@ -85,6 +85,59 @@ describe('GitService command queue', () => {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }
   });
+
+  it('runs network jobs (fetch/push) in a lane that never blocks local reads or writes', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-4-'));
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+
+    const fakeExec = vi.fn(async (_file: string, args: string[]) => {
+      if (args[0] === 'fetch') {
+        // Simulate an offline/hanging remote: the fetch stays in flight until
+        // explicitly released.
+        await fetchGate;
+        return { stdout: '', stderr: '' };
+      }
+      return { stdout: `${args[0]}-ok\n`, stderr: '' };
+    });
+
+    const service = new GitService(fakeExec as any);
+    (service as any).repoPath = repoDir;
+
+    try {
+      // Start a fetch that will hang, then confirm a local read and a local
+      // write both complete without waiting for it.
+      const fetchPromise = service.runCommand(['fetch', 'origin', '--prune']);
+      await expect(service.runCommand(['log', '-1'])).resolves.toContain('log-ok');
+      await expect(service.runCommand(['commit', '-m', 'local'])).resolves.toContain('commit-ok');
+
+      releaseFetch();
+      await fetchPromise;
+
+      const kinds = service.getSchedulerDiagnostics().map((entry) => `${entry.command}:${entry.kind}`);
+      expect(kinds).toContain('fetch:network');
+      expect(kinds).toContain('log:interactive');
+      expect(kinds).toContain('commit:write');
+    } finally {
+      releaseFetch();
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies push as a network job', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-5-'));
+    const service = new GitService((async () => ({ stdout: '', stderr: '' })) as any);
+    (service as any).repoPath = repoDir;
+
+    try {
+      await service.runCommand(['push', 'origin', 'main']);
+      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual(['network']);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('GitService scheduler classification', () => {
