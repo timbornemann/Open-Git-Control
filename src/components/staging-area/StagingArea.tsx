@@ -140,7 +140,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setInputDialog,
   });
 
-  const { visibleFiles, visibleTotal } = useVisibleStagingFiles({
+  const { visibleFiles } = useVisibleStagingFiles({
     status: fileOps.status,
     searchQuery: fileOps.searchQuery,
   });
@@ -168,7 +168,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const visibleUntracked = visibleFiles.untracked;
   const visibleConflicts = visibleFiles.conflicts;
   const totalConflictBlocksInView = visibleConflicts.reduce((sum, file) => sum + conflicts.blockCountForPath(file.path), 0);
-  const totalConflictBlocksAll = status.conflicts.reduce((sum, file) => sum + conflicts.blockCountForPath(file.path), 0);
   const sequencerActionProps = getSequencerActionProps(conflicts.sequencerOperation, {
     onMergeContinue: conflicts.mergeContinue,
     onMergeAbort: conflicts.mergeAbort,
@@ -230,17 +229,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 
   return (
     <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
-      {!isConflictOnly && (
-        <StagingToolbar
-          searchQuery={fileOps.searchQuery}
-          setSearchQuery={fileOps.setSearchQuery}
-          stagedStats={fileOps.stagedStats}
-          unstagedStats={fileOps.unstagedStats}
-          isMutating={fileOps.isMutating}
-          mutationElapsedMs={fileOps.mutationElapsedMs}
-          visibleTotal={visibleTotal}
-        />
-      )}
+      {!isConflictOnly && <StagingToolbar searchQuery={fileOps.searchQuery} setSearchQuery={fileOps.setSearchQuery} />}
 
       <div className="staging-files">
         {isBareRepository ? (
@@ -273,7 +262,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
           commitForm={commitForm}
           aiCommit={aiCommit}
           hasOpenConflicts={hasOpenConflicts}
-          totalConflictBlocksAll={totalConflictBlocksAll}
           isCommitInputDisabled={isCommitInputDisabled}
           aiConfigEnabled={Boolean(settings.aiAutoCommitEnabled)}
           aiCommitMessageStyleLabel={aiCommitMessageStyleLabel}

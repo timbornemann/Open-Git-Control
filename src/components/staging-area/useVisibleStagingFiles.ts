@@ -22,10 +22,7 @@ export const useVisibleStagingFiles = ({ status, searchQuery }: UseVisibleStagin
     };
   }, [searchQuery, status]);
 
-  const visibleTotal = visibleFiles.staged.length + visibleFiles.unstaged.length + visibleFiles.untracked.length + visibleFiles.conflicts.length;
-
   return {
     visibleFiles,
-    visibleTotal,
   };
 };

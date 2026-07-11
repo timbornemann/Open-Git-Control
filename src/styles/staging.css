@@ -39,13 +39,6 @@
   border-color: var(--accent-primary-border);
 }
 
-.staging-toolbar-stats {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
 .staging-tool-btn {
   background: var(--bg-dark);
   border: 1px solid var(--border-color);
@@ -59,22 +52,6 @@
 .staging-tool-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
-}
-
-.staging-stat-chip {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
-  color: var(--status-info);
-  background: var(--status-info-soft);
-  border: 1px solid var(--status-info-border);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.staging-visible-count {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
 }
 
 .staging-files {

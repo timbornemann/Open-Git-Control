@@ -3,7 +3,6 @@ import type { GitStatusWithConflicts } from './types';
 import type { useAiCommit } from './useAiCommit';
 import type { useCommitForm } from './useCommitForm';
 import type { useFileOperations } from './useFileOperations';
-import { formatDiffStats } from './utils';
 
 type StagingCommitPanelProps = {
   status: GitStatusWithConflicts;
@@ -11,7 +10,6 @@ type StagingCommitPanelProps = {
   commitForm: ReturnType<typeof useCommitForm>;
   aiCommit: ReturnType<typeof useAiCommit>;
   hasOpenConflicts: boolean;
-  totalConflictBlocksAll: number;
   isCommitInputDisabled: boolean;
   aiConfigEnabled: boolean;
   aiCommitMessageStyleLabel: string;
@@ -40,7 +38,6 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   commitForm,
   aiCommit,
   hasOpenConflicts,
-  totalConflictBlocksAll,
   isCommitInputDisabled,
   aiConfigEnabled,
   aiCommitMessageStyleLabel,
@@ -220,10 +217,10 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
           }
         >
           {hasOpenConflicts
-            ? tr(`Konflikte (${totalConflictBlocksAll})`, `Conflicts (${totalConflictBlocksAll})`)
+            ? tr('Konflikte', 'Conflicts')
             : commitForm.isCommitting
               ? t('generated.components.staging_area.stagingcommitpanel.committing_1888ee3c')
-              : `${t('generated.components.commit_graph.commitgraph.commit_b9ec78bd')} (${status.staged.length} | ${formatDiffStats(fileOps.stagedStats)})`}
+              : t('generated.components.commit_graph.commitgraph.commit_b9ec78bd')}
         </button>
       </div>
     </div>
