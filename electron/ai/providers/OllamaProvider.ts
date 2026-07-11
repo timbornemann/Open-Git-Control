@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 export class OllamaProvider implements AiProvider {
   readonly id = 'ollama' as const;
@@ -10,23 +10,44 @@ export class OllamaProvider implements AiProvider {
   }
 
   async testConnection({ settings }: AiConnectionTestRequest): Promise<AiConnectionResult> {
-    const response = await fetch(`${settings.ollamaBaseUrl}/api/version`);
+    const model = this.getSelectedModel(settings);
+    if (!model) throw new Error('Ollama Modell fehlt.');
+
+    const response = await fetchWithTimeout(`${settings.ollamaBaseUrl}/api/version`, {}, AI_DISCOVERY_TIMEOUT_MS);
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Ollama nicht erreichbar (${response.status}): ${text || response.statusText}`);
     }
 
     const json = (await response.json()) as { version?: unknown };
+    const showResponse = await fetchWithTimeout(
+      `${settings.ollamaBaseUrl}/api/show`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      },
+      AI_DISCOVERY_TIMEOUT_MS,
+    );
+    if (!showResponse.ok) {
+      const text = await showResponse.text();
+      throw new Error(`Ollama Modell "${model}" ist nicht verfuegbar (${showResponse.status}): ${text || showResponse.statusText}`);
+    }
+    const modelInfo = (await showResponse.json()) as { capabilities?: unknown };
+    const capabilities = Array.isArray(modelInfo.capabilities) ? modelInfo.capabilities : [];
+    if (capabilities.length > 0 && !capabilities.includes('completion')) {
+      throw new Error(`Ollama Modell "${model}" unterstuetzt keine Textgenerierung.`);
+    }
     return {
       ok: true,
       provider: this.id,
-      model: settings.ollamaModel,
+      model,
       detail: `Ollama ${safeString(json.version, 'unknown')}`,
     };
   }
 
   async listModels({ settings }: AiModelListRequest): Promise<string[]> {
-    const response = await fetch(`${settings.ollamaBaseUrl}/api/tags`);
+    const response = await fetchWithTimeout(`${settings.ollamaBaseUrl}/api/tags`, {}, AI_DISCOVERY_TIMEOUT_MS);
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Ollama Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);

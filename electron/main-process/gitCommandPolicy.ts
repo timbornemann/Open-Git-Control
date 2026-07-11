@@ -5,7 +5,7 @@ export type { GitCommandName };
 
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
 const STASH_REF_RE = /^stash@\{\d+\}(?:\^\d+)?$/;
-const PATHSPEC_COMMANDS = new Set<GitCommandName>(['add', 'checkout', 'clean', 'diff', 'reset', 'show', 'stash']);
+const PATHSPEC_COMMANDS = new Set<GitCommandName>(['add', 'checkout', 'clean', 'diff', 'reset', 'rm', 'show', 'stash']);
 
 export function createJobId(operation: string): string {
   return operation + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
@@ -293,7 +293,15 @@ const validateStashArgs = (args: string[]): void => {
   }
   if (before.length === 1 && before[0] === 'pop') return;
   if (before.length === 2 && ['apply', 'pop', 'drop'].includes(before[0]) && STASH_REF_RE.test(before[1])) return;
-  if (before.length === 4 && before[0] === 'show' && before[1] === '-u' && before[2] === '--name-only' && STASH_REF_RE.test(before[3])) return;
+  if (
+    (before.length === 4 || before.length === 5) &&
+    before[0] === 'show' &&
+    before[1] === '-u' &&
+    before[2] === '--name-only' &&
+    (before.length === 4 || before[3] === '-z') &&
+    STASH_REF_RE.test(before[before.length - 1])
+  )
+    return;
   if ((before.length === 3 || before.length === 4) && before[0] === 'push') {
     const offset = before[1] === '-u' || before[1] === '--include-untracked' ? 1 : 0;
     if (before.length === 3 + offset && before[1 + offset] === '-m' && before[2 + offset]) return;
@@ -304,7 +312,7 @@ const validateStashArgs = (args: string[]): void => {
 const validateDiffArgs = (args: string[]): void => {
   const { before } = splitPathspecTail(args, 'diff');
   const options = before.filter((arg) => arg.startsWith('-'));
-  if (options.some((arg) => !['--numstat', '--cached', '--name-status', '--stat', '--no-color'].includes(arg) && !/^--unified=\d+$/.test(arg))) {
+  if (options.some((arg) => !['--numstat', '--cached', '--name-status', '--stat', '--no-color', '-M', '-z'].includes(arg) && !/^--unified=\d+$/.test(arg))) {
     throw new Error('Unsupported argument for git diff.');
   }
   const refs = before.filter((arg) => !arg.startsWith('-'));
@@ -399,6 +407,13 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
       return validateCommitArgs(args);
     case 'reset':
       return validateResetArgs(args);
+    case 'rm': {
+      const { before } = splitPathspecTail(args, 'rm');
+      if (before.length !== 2 || !before.includes('--cached') || !before.includes('-f')) {
+        throw new Error('Only forced cached removal is supported for git rm.');
+      }
+      return;
+    }
     case 'clean': {
       const { before } = splitPathspecTail(args, 'clean');
       return assertAllOptions(before, new Set(['-f', '-d', '-x', '-X']), 'clean');

@@ -2,6 +2,7 @@ import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
+import { parsePrOwnerRepoFromRemote } from '@/hooks/usePullRequests';
 import type { RepoOwnerRef } from '@/types/git';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -13,6 +14,8 @@ type CreatePullRequest = (input: { title: string; body: string; head: string; ba
 type RunGitCommand = (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
 
 type Params = {
+  activeRepo: string | null;
+  githubHost: string;
   ownerRepo: RepoOwnerRef | null;
   createPullRequest: CreatePullRequest;
   currentBranch: string;
@@ -30,6 +33,8 @@ type Params = {
 };
 
 export const usePullRequestWorkflow = ({
+  activeRepo,
+  githubHost,
   ownerRepo,
   createPullRequest,
   currentBranch,
@@ -50,6 +55,8 @@ export const usePullRequestWorkflow = ({
   const ownerRepoScope = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : '';
   const ownerRepoScopeRef = useRef(ownerRepoScope);
   ownerRepoScopeRef.current = ownerRepoScope;
+  const activeRepoRef = useRef(activeRepo);
+  activeRepoRef.current = activeRepo;
 
   const handleCreatePR = useCallback(async () => {
     await createPullRequest({
@@ -83,11 +90,22 @@ export const usePullRequestWorkflow = ({
       if (!githubClient.isAvailable() || !ownerRepo) return;
       const mergeKey = `${ownerRepo.owner}/${ownerRepo.repo}#${prNumber}`;
       const scopeAtStart = ownerRepoScope;
+      const repoAtStart = activeRepo;
 
       const executeMerge = async () => {
         if (mergeInFlightRef.current.has(mergeKey)) return;
         mergeInFlightRef.current.add(mergeKey);
         try {
+          if (!repoAtStart || !gitClient.isAvailable()) return;
+          const authorization = await gitClient.getRepoOriginUrl(repoAtStart);
+          if (activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+          if (!authorization.success) {
+            setGitActionToast({
+              msg: authorization.error || tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'),
+              isError: true,
+            });
+            return;
+          }
           const result = await githubClient.mergePullRequest({
             owner: ownerRepo.owner,
             repo: ownerRepo.repo,
@@ -142,25 +160,54 @@ export const usePullRequestWorkflow = ({
 
       await executeMerge();
     },
-    [confirmDangerousOps, ownerRepo, ownerRepoScope, refreshRemoteState, setConfirmDialog, setGitActionToast, t, tr, triggerRefresh],
+    [activeRepo, confirmDangerousOps, ownerRepo, ownerRepoScope, refreshRemoteState, setConfirmDialog, setGitActionToast, t, tr, triggerRefresh],
   );
 
   const handleCheckoutPR = useCallback(
     async (prNumber: number, headRef: string) => {
+      const repoAtStart = activeRepo;
+      const scopeAtStart = ownerRepoScope;
+      if (!repoAtStart || !gitClient.isAvailable()) return;
       const targetBranch = gitClient.getPullRequestBranchName(prNumber, headRef);
+      let fetchRemote = 'origin';
+      if (ownerRepo?.headOwner) {
+        const remotesResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote', '-v');
+        if (activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+        if (!remotesResult.success) {
+          setGitActionToast({
+            msg: remotesResult.error || tr('Remotes konnten nicht geladen werden.', 'Could not load remotes.'),
+            isError: true,
+          });
+          return;
+        }
+        const matchingRemote = String(remotesResult.data || '')
+          .split(/\r?\n/)
+          .map((line) => line.match(/^(\S+)\s+(\S+)\s+\(fetch\)$/))
+          .find((match) => {
+            if (!match) return false;
+            const parsed = parsePrOwnerRepoFromRemote(match[2], githubHost);
+            return parsed?.owner === ownerRepo.owner && parsed.repo === ownerRepo.repo;
+          });
+        const normalizedHost =
+          githubHost
+            .trim()
+            .replace(/^https?:\/\//i, '')
+            .replace(/\/+$/, '') || 'github.com';
+        fetchRemote = matchingRemote?.[1] || `https://${normalizedHost}/${encodeURIComponent(ownerRepo.owner)}/${encodeURIComponent(ownerRepo.repo)}.git`;
+      }
       const fetched = await runGitCommand(
-        gitClient.buildFetchPullRequestBranchArgs(prNumber),
+        gitClient.buildFetchPullRequestBranchArgs(prNumber, fetchRemote),
         tr(`PR #${prNumber} Branch geladen.`, `Loaded branch for PR #${prNumber}.`),
         tr(`PR #${prNumber} wird geladen...`, `Loading PR #${prNumber}...`),
         { skipDirtyGuard: true },
       );
-      if (!fetched) return;
+      if (!fetched || activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
       await runGitCommand(
         gitClient.buildCheckoutPullRequestBranchArgs(targetBranch),
         tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
       );
     },
-    [runGitCommand, tr],
+    [activeRepo, githubHost, ownerRepo, ownerRepoScope, runGitCommand, setGitActionToast, tr],
   );
 
   return {

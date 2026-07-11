@@ -2,6 +2,7 @@ import type { PlannerItem, PlannerItemInput, PlannerPriority, PlannerProject, Pl
 import {
   PLANNER_PRIORITIES,
   PLANNER_STATUSES,
+  createPlannerItemInData,
   ensureRepositoryProject,
   ensureRepositoryProjectInData,
   getRepositoryProjectKey,
@@ -299,6 +300,18 @@ export const itemInputFromBody = (body: JsonObject, defaultStatus?: PlannerStatu
     status: parseStatus(body.status ?? body.tab) || defaultStatus || 'idea',
     tags: normalizeTagsInput(body.tags) || [],
   };
+};
+
+/** Creates the optional repository project and its todo as one transaction. */
+export const createTodoFromBody = (body: JsonObject, defaultStatus?: PlannerStatus): EnrichedTodo => {
+  // Validation must happen before resolving repoPath, because resolution may
+  // add a repository project to this in-memory transaction.
+  const input = itemInputFromBody(body, defaultStatus);
+  const data = readProjectPlannerData();
+  const project = resolveProjectLocatorInData(body, data);
+  const item = createPlannerItemInData(data, project.id, input);
+  writeProjectPlannerData(data);
+  return enrichTodos([item], data.projects)[0];
 };
 
 export const itemUpdateFromBody = (body: JsonObject): Partial<PlannerItemInput> => {

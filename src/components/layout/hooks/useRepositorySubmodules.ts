@@ -1,21 +1,24 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GitSubmoduleInfo } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { parseGitSubmoduleStatus } from '@/utils/gitParsing';
 import { getElectronApi } from '@/services/electronApi';
 import { gitClient } from '@/services/gitClient';
 import type { GitActionToast } from './repositoryDomainTypes';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 type Params = {
   activeRepo: string | null;
   refreshTrigger: number;
   language: AppLanguage;
   setGitActionToast: (toast: GitActionToast) => void;
-  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
 };
 
 export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, setGitActionToast, runGitCommand }: Params) => {
   const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
+  const activeRepoRef = useRef(activeRepo);
+  activeRepoRef.current = activeRepo;
   const { t } = useLanguageTranslations(language);
 
   useLayoutEffect(() => {
@@ -31,7 +34,7 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
       }
 
       try {
-        const response = await gitClient.runGitCommand('submoduleStatus');
+        const response = await gitClient.runGitCommandForRepo(activeRepo, 'submoduleStatus');
         if (cancelled) return;
         if (!response.success) {
           setSubmodules([]);
@@ -67,23 +70,31 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
   }, [activeRepo, refreshTrigger, setGitActionToast, t]);
 
   const handleSubmoduleInitUpdate = async () => {
+    if (!activeRepo) return;
     await runGitCommand(
       gitClient.buildSubmoduleUpdateInitRecursiveArgs(),
       t('generated.components.layout.hooks.userepositorydomain.submodules_initialized_updated_76af1313'),
+      undefined,
+      { expectedRepoPath: activeRepo },
     );
   };
 
   const handleSubmoduleSync = async () => {
+    if (!activeRepo) return;
     await runGitCommand(
       gitClient.buildSubmoduleSyncRecursiveArgs(),
       t('generated.components.layout.hooks.userepositorydomain.submodule_urls_synchronized_7dfc04ea'),
+      undefined,
+      { expectedRepoPath: activeRepo },
     );
   };
 
   const handleOpenSubmodule = async (submodulePath: string) => {
     const electronApi = getElectronApi();
-    if (!electronApi) return;
-    const result = await electronApi.openSubmodule(submodulePath);
+    const repoAtStart = activeRepo;
+    if (!electronApi || !repoAtStart) return;
+    const result = await electronApi.openSubmodule(submodulePath, repoAtStart);
+    if (activeRepoRef.current !== repoAtStart) return;
     if (!result.success) {
       setGitActionToast({
         msg: result.error || t('generated.components.layout.hooks.userepositorydomain.could_not_open_submodule_39e4c0fb'),

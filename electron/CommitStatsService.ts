@@ -1,14 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import type { CommitStats, GitService } from './GitService';
 
-const CACHE_SCHEMA = 1;
+const CACHE_SCHEMA = 2;
 const MAX_CACHE_ENTRIES = 100_000;
 const COMPACTED_CACHE_ENTRIES = 75_000;
 const MAX_CACHE_BYTES = 25 * 1024 * 1024;
 
 type CacheEntry = {
   schema: number;
+  namespace: string;
   objectFormat: string;
   hash: string;
   stats: CommitStats;
@@ -24,6 +26,7 @@ export type CommitStatsUpdate = {
 
 type QueueEntry = {
   repoPath: string;
+  namespace: string;
   objectFormat: string;
   hash: string;
   key: string;
@@ -61,6 +64,7 @@ export class CommitStatsService {
   private listeners = new Set<(update: CommitStatsUpdate) => void>();
   private diagnostics: DiagnosticEntry[] = [];
   private objectFormats = new Map<string, string>();
+  private namespaces = new Map<string, { shallowFingerprint: string; value: string }>();
   private lastAccessedAt = 0;
 
   constructor(
@@ -87,11 +91,11 @@ export class CommitStatsService {
   }
 
   setActiveRepo(repoPath: string): void {
-    const normalized = String(repoPath || '').toLowerCase();
-    this.queue = this.queue.filter((entry) => entry.repoPath.toLowerCase() === normalized);
+    const normalized = this.repoPathKey(repoPath);
+    this.queue = this.queue.filter((entry) => this.repoPathKey(entry.repoPath) === normalized);
     this.queuedKeys = new Set(this.queue.map((entry) => entry.key));
     for (const active of this.active.values()) {
-      if (active.entry.repoPath.toLowerCase() !== normalized) {
+      if (this.repoPathKey(active.entry.repoPath) !== normalized) {
         active.controller.abort();
       }
     }
@@ -104,18 +108,20 @@ export class CommitStatsService {
   async requestStats(
     hashes: string[],
     priority: CommitStatsPriority = 'background',
+    requestedRepoPath?: string,
   ): Promise<Record<string, { state: 'ready' | 'queued'; stats: CommitStats | null }>> {
     this.ensureLoaded();
-    const repoPath = this.gitService.getRepoPath();
+    const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath) return {};
     const objectFormat = await this.getObjectFormat(repoPath);
+    const namespace = await this.getNamespace(repoPath);
     const result: Record<string, { state: 'ready' | 'queued'; stats: CommitStats | null }> = {};
     const requestedKeys = new Set<string>();
 
     for (const rawHash of hashes) {
       const hash = String(rawHash || '').trim();
       if (!/^[0-9a-f]{7,64}$/i.test(hash)) continue;
-      const key = this.cacheKey(objectFormat, hash);
+      const key = this.cacheKey(namespace, objectFormat, hash);
       requestedKeys.add(key);
       const cached = this.cache.get(key);
       if (cached) {
@@ -129,7 +135,7 @@ export class CommitStatsService {
       if (queued) {
         if (PRIORITY[priority] < PRIORITY[queued.priority]) queued.priority = priority;
       } else if (!this.active.has(key)) {
-        this.queue.push({ repoPath, objectFormat, hash, key, priority });
+        this.queue.push({ repoPath, namespace, objectFormat, hash, key, priority });
         this.queuedKeys.add(key);
       }
     }
@@ -145,14 +151,15 @@ export class CommitStatsService {
     return result;
   }
 
-  async getCachedStats(hashes: string[]): Promise<Record<string, CommitStats>> {
+  async getCachedStats(hashes: string[], requestedRepoPath?: string): Promise<Record<string, CommitStats>> {
     this.ensureLoaded();
-    const repoPath = this.gitService.getRepoPath();
+    const repoPath = requestedRepoPath || this.gitService.getRepoPath();
     if (!repoPath || hashes.length === 0) return {};
     const objectFormat = await this.getObjectFormat(repoPath);
+    const namespace = await this.getNamespace(repoPath);
     const result: Record<string, CommitStats> = {};
     for (const hash of hashes) {
-      const entry = this.cache.get(this.cacheKey(objectFormat, hash));
+      const entry = this.cache.get(this.cacheKey(namespace, objectFormat, hash));
       if (!entry) continue;
       entry.accessedAt = this.nextAccessedAt();
       result[hash] = entry.stats;
@@ -161,20 +168,45 @@ export class CommitStatsService {
   }
 
   private async getObjectFormat(repoPath: string): Promise<string> {
-    const cached = this.objectFormats.get(repoPath);
+    const pathKey = this.repoPathKey(repoPath);
+    const cached = this.objectFormats.get(pathKey);
     if (cached) return cached;
     try {
       const format = (await this.gitService.runCommandAtPath(repoPath, ['rev-parse', '--show-object-format'])).trim() || 'sha1';
-      this.objectFormats.set(repoPath, format);
+      this.objectFormats.set(pathKey, format);
       return format;
     } catch {
-      this.objectFormats.set(repoPath, 'sha1');
+      this.objectFormats.set(pathKey, 'sha1');
       return 'sha1';
     }
   }
 
-  private cacheKey(objectFormat: string, hash: string): string {
-    return `${CACHE_SCHEMA}:${objectFormat}:${hash}`;
+  private async getNamespace(repoPath: string): Promise<string> {
+    const pathKey = this.repoPathKey(repoPath);
+    let commonDir = path.resolve(repoPath, '.git');
+    try {
+      const rawCommonDir = (await this.gitService.runCommandAtPath(repoPath, ['rev-parse', '--git-common-dir'])).trim();
+      if (rawCommonDir) commonDir = path.resolve(repoPath, rawCommonDir);
+    } catch {
+      // The subsequent stats command will surface repository errors. A stable
+      // lexical fallback still prevents cache sharing with another checkout.
+    }
+    const shallowPath = path.join(commonDir, 'shallow');
+    let shallowFingerprint = 'full';
+    try {
+      shallowFingerprint = createHash('sha256').update(fs.readFileSync(shallowPath)).digest('hex');
+    } catch {
+      // No shallow boundary means this checkout has full parent information.
+    }
+    const cached = this.namespaces.get(pathKey);
+    if (cached?.shallowFingerprint === shallowFingerprint) return cached.value;
+    const value = createHash('sha256').update(this.repoPathKey(commonDir)).update('\0').update(shallowFingerprint).digest('hex');
+    this.namespaces.set(pathKey, { shallowFingerprint, value });
+    return value;
+  }
+
+  private cacheKey(namespace: string, objectFormat: string, hash: string): string {
+    return `${CACHE_SCHEMA}:${namespace}:${objectFormat}:${hash}`;
   }
 
   private ensureLoaded(): void {
@@ -187,11 +219,11 @@ export class CommitStatsService {
         if (!line.trim()) continue;
         try {
           const entry = JSON.parse(line) as CacheEntry;
-          if (entry.schema !== CACHE_SCHEMA || !/^[0-9a-f]{7,64}$/i.test(entry.hash) || !entry.stats) {
+          if (entry.schema !== CACHE_SCHEMA || !entry.namespace || !/^[0-9a-f]{7,64}$/i.test(entry.hash) || !entry.stats) {
             malformed = true;
             break;
           }
-          this.cache.set(this.cacheKey(entry.objectFormat, entry.hash), entry);
+          this.cache.set(this.cacheKey(entry.namespace, entry.objectFormat, entry.hash), entry);
           this.lastAccessedAt = Math.max(this.lastAccessedAt, entry.accessedAt);
         } catch {
           malformed = true;
@@ -231,6 +263,7 @@ export class CommitStatsService {
       const stats = await this.gitService.getCommitStatsAtPath(entry.repoPath, entry.hash, controller.signal);
       const cacheEntry: CacheEntry = {
         schema: CACHE_SCHEMA,
+        namespace: entry.namespace,
         objectFormat: entry.objectFormat,
         hash: entry.hash,
         stats,
@@ -249,7 +282,8 @@ export class CommitStatsService {
       this.recordDiagnostic(Date.now() - startedAt, false, aborted);
       if (aborted) {
         const wasInterrupted = this.interruptedActiveKeys.delete(entry.key);
-        const isStillActiveRepo = this.gitService.getRepoPath()?.toLowerCase() === entry.repoPath.toLowerCase();
+        const activeRepo = this.gitService.getRepoPath();
+        const isStillActiveRepo = Boolean(activeRepo && this.repoPathKey(activeRepo) === this.repoPathKey(entry.repoPath));
         if (!wasInterrupted && isStillActiveRepo) {
           this.queue.push(entry);
           this.queuedKeys.add(entry.key);
@@ -298,7 +332,7 @@ export class CommitStatsService {
       }
       throw error;
     }
-    this.cache = new Map(retained.map((entry) => [this.cacheKey(entry.objectFormat, entry.hash), entry]));
+    this.cache = new Map(retained.map((entry) => [this.cacheKey(entry.namespace, entry.objectFormat, entry.hash), entry]));
   }
 
   private emit(update: CommitStatsUpdate): void {
@@ -325,5 +359,10 @@ export class CommitStatsService {
     if (this.diagnostics.length > 100) {
       this.diagnostics.splice(0, this.diagnostics.length - 100);
     }
+  }
+
+  private repoPathKey(repoPath: string): string {
+    const resolved = path.resolve(String(repoPath || ''));
+    return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
   }
 }

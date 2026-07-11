@@ -2,6 +2,8 @@ import type { FileChangeType } from './gitStatusSnapshot';
 
 export type SnapshotFile = {
   path: string;
+  /** Previous pathname when this snapshot entry represents a rename/copy. */
+  originalPath?: string;
   changeType: FileChangeType;
   additions: number;
   deletions: number;
@@ -78,3 +80,9 @@ export type ReleaseCommitInput = {
 };
 
 export type ReleaseVersionBump = 'major' | 'minor' | 'patch';
+
+export type GeneratedReleaseNotes = {
+  markdown: string;
+  source: 'ai' | 'fallback';
+  warning?: string;
+};

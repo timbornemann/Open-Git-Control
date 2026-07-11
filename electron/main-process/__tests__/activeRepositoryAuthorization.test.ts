@@ -10,4 +10,9 @@ describe('requireActiveRepositoryPath', () => {
     expect(() => requireActiveRepositoryPath('C:/work/other', 'C:/work/repo')).toThrow('not the active repository');
     expect(() => requireActiveRepositoryPath('C:/work/repo', null)).toThrow('No repository selected');
   });
+
+  it('accepts a saved subdirectory path that Git canonicalized to the active root', () => {
+    expect(requireActiveRepositoryPath('/work/repo/packages/app', '/work/repo')).toBe('/work/repo');
+    expect(() => requireActiveRepositoryPath('/work/repository-other', '/work/repo')).toThrow('not the active repository');
+  });
 });

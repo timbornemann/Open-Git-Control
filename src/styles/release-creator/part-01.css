@@ -4,6 +4,8 @@
   overflow: hidden;
   padding: 0;
   background: var(--bg-darker);
+  container-name: release-creator;
+  container-type: inline-size;
 }
 
 .release-layout-clean {

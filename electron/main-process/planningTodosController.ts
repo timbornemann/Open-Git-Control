@@ -1,14 +1,6 @@
-import { createPlannerItem, deletePlannerItem } from './projectPlannerStore';
+import { deletePlannerItem } from './projectPlannerStore';
 import type { RequestContext } from './planningApiTypes';
-import {
-  getTodoById,
-  getTodos,
-  itemInputFromBody,
-  moveTodoFromBody,
-  queryOptionsFromUrl,
-  resolveProjectLocator,
-  updateTodoFromBody,
-} from './planningApiDomain';
+import { createTodoFromBody, getTodoById, getTodos, moveTodoFromBody, queryOptionsFromUrl, updateTodoFromBody } from './planningApiDomain';
 import type { RouteHandlerResult } from './planningApiControllerTypes';
 import { routeHandled, routeNotHandled } from './planningApiControllerTypes';
 
@@ -20,9 +12,7 @@ export const handleTodosRoute = async (ctx: RequestContext): Promise<RouteHandle
     return routeHandled({ todos: getTodos(queryOptionsFromUrl(ctx.url)) });
   }
   if (!idOrAction && ctx.method === 'POST') {
-    const project = resolveProjectLocator(ctx.body);
-    const item = createPlannerItem(project.id, itemInputFromBody(ctx.body));
-    return routeHandled(getTodoById(item.id));
+    return routeHandled(createTodoFromBody(ctx.body));
   }
   if (idOrAction === 'next' && ctx.method === 'GET') {
     return routeHandled({ todos: getTodos(queryOptionsFromUrl(ctx.url, { includeDone: false, limit: 20 })) });

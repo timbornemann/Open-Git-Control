@@ -29,7 +29,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     if (!repoPath || !gitClient.isAvailable()) return;
     const generation = generationRef.current;
     if (inFlightRef.current?.generation === generation) return inFlightRef.current.promise;
-    const quickStatusRequest = snapshotRef.current ? null : gitClient.getStatusPorcelain().catch(() => null);
+    const quickStatusRequest = snapshotRef.current ? null : gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain').catch(() => null);
     if (quickStatusRequest) {
       void quickStatusRequest
         .then((quickStatus) => {
@@ -46,7 +46,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     request = (async () => {
       setLoading((current) => current || !snapshotRef.current);
       try {
-        const result = await gitClient.getWorkingTreeSnapshot();
+        const result = await gitClient.getWorkingTreeSnapshot(repoPath);
         if (generation !== generationRef.current) return;
         if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
           const nextSnapshot = result.data;
@@ -57,7 +57,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
           if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
             statsRef.current = null;
             setStats(null);
-            const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId);
+            const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId, repoPath);
             if (generation !== generationRef.current || !statsResult.success || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId) return;
             statsRef.current = statsResult.data;
             setStats(statsResult.data);
@@ -66,7 +66,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
         }
 
         const quickStatus = quickStatusRequest ? await quickStatusRequest : null;
-        const fallback = quickStatus?.success ? quickStatus : await gitClient.getStatusPorcelain();
+        const fallback = quickStatus?.success ? quickStatus : await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
         if (generation !== generationRef.current || !fallback.success) return;
         snapshotRef.current = null;
         statsRef.current = null;

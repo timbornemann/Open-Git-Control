@@ -74,6 +74,12 @@ export interface WorkingTreeStatsDto {
   unstaged: CommitStatsDto;
 }
 
+export type GitSequencerOperationDto = 'merge' | 'rebase' | 'cherry-pick';
+
+export interface GitSequencerStateDto {
+  operation: GitSequencerOperationDto | null;
+}
+
 export interface DiffPreviewDto {
   text: string;
   truncated: boolean;
@@ -105,4 +111,5 @@ export type FileTimelineCommitDto = {
   date: string;
   subject: string;
   changes: FileTimelineChangeDto[];
+  baselineFiles?: string[];
 };

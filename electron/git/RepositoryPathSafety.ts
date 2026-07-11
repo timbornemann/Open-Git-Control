@@ -49,12 +49,27 @@ const isInside = (rootPath: string, targetPath: string, allowRoot = false): bool
   return !relative.startsWith('..') && !path.isAbsolute(relative);
 };
 
+const assertOutsideGitMetadata = (relativePath: string, label: string): void => {
+  const segments = relativePath.replace(/\\/g, '/').split('/');
+  // Win32 strips trailing dots/spaces and supports NTFS alternate-stream
+  // suffixes. Treat those aliases as `.git` as well so a create operation
+  // cannot bypass the metadata boundary before the target exists.
+  const aliasesGitMetadata = (segment: string) => {
+    const normalized = segment.toLowerCase().replace(/[. ]+$/g, '');
+    return normalized === '.git' || normalized.startsWith('.git:');
+  };
+  if (segments.some(aliasesGitMetadata)) {
+    throw new Error(`${label} cannot access Git metadata.`);
+  }
+};
+
 /**
  * Resolves a repository-relative, existing path through all symlinks and
  * rejects targets outside of the physical repository root.
  */
 export function resolveExistingRepositoryPath(repoPath: string, relativePath: unknown, label = 'File path'): string {
   const normalizedPath = normalizeRepositoryRelativePath(relativePath, label);
+  assertOutsideGitMetadata(normalizedPath, label);
   const physicalRepoPath = fs.realpathSync(repoPath);
   const candidatePath = path.resolve(physicalRepoPath, normalizedPath);
   const physicalTargetPath = fs.realpathSync(candidatePath);
@@ -62,6 +77,7 @@ export function resolveExistingRepositoryPath(repoPath: string, relativePath: un
   if (!isInside(physicalRepoPath, physicalTargetPath)) {
     throw new Error(`${label} is outside the current repository.`);
   }
+  assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalTargetPath), label);
 
   return physicalTargetPath;
 }
@@ -72,6 +88,7 @@ export function resolveExistingRepositoryPath(repoPath: string, relativePath: un
  */
 export function resolveRepositoryPathForCreate(repoPath: string, relativePath: unknown, label = 'File path'): string {
   const normalizedPath = normalizeRepositoryRelativePath(relativePath, label);
+  assertOutsideGitMetadata(normalizedPath, label);
   const physicalRepoPath = fs.realpathSync(repoPath);
   const candidatePath = path.resolve(physicalRepoPath, normalizedPath);
 
@@ -88,6 +105,7 @@ export function resolveRepositoryPathForCreate(repoPath: string, relativePath: u
   if (!isInside(physicalRepoPath, physicalParent, true)) {
     throw new Error(`${label} is outside the current repository.`);
   }
+  assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalParent), label);
 
   return candidatePath;
 }

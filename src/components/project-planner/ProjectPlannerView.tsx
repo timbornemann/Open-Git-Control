@@ -47,21 +47,35 @@ export const ProjectPlannerView: React.FC = () => {
   const [newItemStatus, setNewItemStatus] = React.useState<PlannerStatus>('idea');
   const [materializeParent, setMaterializeParent] = React.useState<string | null>(null);
   const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
+  const selectedProjectIdRef = React.useRef(selectedProject?.id || null);
+  const projectDialogProjectIdRef = React.useRef<string | null>(null);
+  const itemDialogProjectIdRef = React.useRef<string | null>(null);
+  const materializeProjectIdRef = React.useRef<string | null>(null);
+  selectedProjectIdRef.current = selectedProject?.id || null;
 
   React.useEffect(() => {
     if (createProjectRequestId === 0 || createProjectRequestId === handledCreateProjectRequestRef.current) {
       return;
     }
     handledCreateProjectRequestRef.current = createProjectRequestId;
+    projectDialogProjectIdRef.current = null;
     setEditingProject(false);
     setProjectDialogOpen(true);
   }, [createProjectRequestId]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     setSearch('');
     setPriorityFilter('all');
     setStatusFilter('all');
     setTagFilter('all');
+    setProjectDialogOpen(false);
+    setEditingProject(false);
+    setItemDialogOpen(false);
+    setEditingItem(null);
+    setMaterializeParent(null);
+    projectDialogProjectIdRef.current = null;
+    itemDialogProjectIdRef.current = null;
+    materializeProjectIdRef.current = null;
   }, [selectedProject?.id]);
 
   const allTags = React.useMemo(
@@ -80,7 +94,26 @@ export const ProjectPlannerView: React.FC = () => {
     });
   }, [itemsForSelectedProject, priorityFilter, search, statusFilter, tagFilter]);
 
+  const liveEditingItem = React.useMemo(
+    () => (editingItem ? itemsForSelectedProject.find((item) => item.id === editingItem.id) || null : null),
+    [editingItem, itemsForSelectedProject],
+  );
+
+  React.useLayoutEffect(() => {
+    if (!itemDialogOpen || !editingItem) return;
+    const projectId = itemDialogProjectIdRef.current;
+    // An external API/MCP update may edit or move the item while this dialog
+    // contains an older draft. Close it instead of silently overwriting newer
+    // data with stale form fields.
+    if (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt) {
+      itemDialogProjectIdRef.current = null;
+      setItemDialogOpen(false);
+      setEditingItem(null);
+    }
+  }, [editingItem, itemDialogOpen, liveEditingItem]);
+
   const openNewItem = (status: PlannerStatus = 'idea') => {
+    itemDialogProjectIdRef.current = selectedProjectIdRef.current;
     setEditingItem(null);
     setNewItemStatus(status);
     setItemDialogOpen(true);
@@ -88,8 +121,12 @@ export const ProjectPlannerView: React.FC = () => {
 
   const handleSelectParent = async () => {
     if (!selectedProject || !appClient.isAvailable()) return;
+    const projectId = selectedProject.id;
     const parentDirectory = await appClient.selectProjectParentDirectory();
-    if (parentDirectory) setMaterializeParent(parentDirectory);
+    if (selectedProjectIdRef.current === projectId && parentDirectory) {
+      materializeProjectIdRef.current = projectId;
+      setMaterializeParent(parentDirectory);
+    }
   };
 
   if (loading) {
@@ -144,6 +181,7 @@ export const ProjectPlannerView: React.FC = () => {
           <button
             className="planner-btn planner-btn-secondary"
             onClick={() => {
+              projectDialogProjectIdRef.current = selectedProject.id;
               setEditingProject(true);
               setProjectDialogOpen(true);
             }}
@@ -229,6 +267,7 @@ export const ProjectPlannerView: React.FC = () => {
                     key={item.id}
                     className={`planner-card planner-priority-${item.priority}`}
                     onClick={() => {
+                      itemDialogProjectIdRef.current = selectedProject.id;
                       setEditingItem(item);
                       setItemDialogOpen(true);
                     }}
@@ -289,18 +328,29 @@ export const ProjectPlannerView: React.FC = () => {
         open={projectDialogOpen}
         project={editingProject ? selectedProject : null}
         busy={busy}
-        onClose={() => setProjectDialogOpen(false)}
+        onClose={() => {
+          projectDialogProjectIdRef.current = null;
+          setProjectDialogOpen(false);
+        }}
         onDelete={
           editingProject
             ? () => {
+                const projectId = projectDialogProjectIdRef.current;
+                if (!projectId || projectId !== selectedProjectIdRef.current) return;
+                projectDialogProjectIdRef.current = null;
                 setProjectDialogOpen(false);
-                requestDeleteProject(selectedProject.id);
+                requestDeleteProject(projectId);
               }
             : undefined
         }
         onSubmit={async (input) => {
-          const ok = editingProject ? await updateProject(selectedProject.id, input) : Boolean(await createProject(input));
-          if (ok) setProjectDialogOpen(false);
+          const projectId = projectDialogProjectIdRef.current;
+          if (editingProject && (!projectId || projectId !== selectedProjectIdRef.current)) return;
+          const ok = editingProject ? await updateProject(projectId!, input) : Boolean(await createProject(input));
+          if (ok) {
+            projectDialogProjectIdRef.current = null;
+            setProjectDialogOpen(false);
+          }
         }}
       />
 
@@ -309,10 +359,24 @@ export const ProjectPlannerView: React.FC = () => {
         item={editingItem}
         defaultStatus={newItemStatus}
         busy={busy}
-        onClose={() => setItemDialogOpen(false)}
+        onClose={() => {
+          itemDialogProjectIdRef.current = null;
+          setItemDialogOpen(false);
+        }}
         onSubmit={async (input) => {
-          const ok = editingItem ? await updateItem(editingItem.id, input) : await createItem(selectedProject.id, input);
-          if (ok) setItemDialogOpen(false);
+          const projectId = itemDialogProjectIdRef.current;
+          if (!projectId || projectId !== selectedProjectIdRef.current) return;
+          if (editingItem && (!liveEditingItem || liveEditingItem.projectId !== projectId || liveEditingItem.updatedAt !== editingItem.updatedAt)) {
+            itemDialogProjectIdRef.current = null;
+            setItemDialogOpen(false);
+            setEditingItem(null);
+            return;
+          }
+          const ok = editingItem ? await updateItem(editingItem.id, input) : await createItem(projectId, input);
+          if (ok) {
+            itemDialogProjectIdRef.current = null;
+            setItemDialogOpen(false);
+          }
         }}
       />
 
@@ -321,11 +385,18 @@ export const ProjectPlannerView: React.FC = () => {
         project={selectedProject}
         parentDirectory={materializeParent || ''}
         busy={busy}
-        onClose={() => setMaterializeParent(null)}
+        onClose={() => {
+          materializeProjectIdRef.current = null;
+          setMaterializeParent(null);
+        }}
         onSubmit={async (folderName) => {
-          if (!materializeParent) return;
-          const ok = await materializeProject(selectedProject.id, materializeParent, folderName);
-          if (ok) setMaterializeParent(null);
+          const projectId = materializeProjectIdRef.current;
+          if (!materializeParent || !projectId || projectId !== selectedProjectIdRef.current) return;
+          const ok = await materializeProject(projectId, materializeParent, folderName);
+          if (ok) {
+            materializeProjectIdRef.current = null;
+            setMaterializeParent(null);
+          }
         }}
       />
     </div>

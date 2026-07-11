@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
@@ -24,6 +24,17 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   const [signoffCommit, setSignoffCommit] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const isCommittingRef = useRef(false);
+  const repoGenerationRef = useRef(0);
+  const nextCommitOperationIdRef = useRef(0);
+  const activeCommitOperationIdRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    repoGenerationRef.current += 1;
+    activeCommitOperationIdRef.current = null;
+    isCommittingRef.current = false;
+    setIsCommitting(false);
+    setAmendCommit(false);
+  }, [repoPath]);
 
   const setCommitMsg = useCallback(
     (value: string) => {
@@ -67,7 +78,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
     // toggle) changes before it resolves, discard the result so the old repo's
     // HEAD message cannot overwrite the new repo's commit form.
     let cancelled = false;
-    void gitClient.runGitCommand('show', '--format=%B', '-s', 'HEAD').then((r) => {
+    void gitClient.runGitCommandForRepo(repoPath, 'show', '--format=%B', '-s', 'HEAD').then((r) => {
       if (cancelled) return;
       if (r.success && typeof r.data === 'string') {
         const lines = r.data.trimEnd().split('\n');
@@ -81,7 +92,7 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
   }, [amendCommit, repoPath, setCommitDescription, setCommitMsg]);
 
   const handleCommit = useCallback(async () => {
-    if (isCommittingRef.current || !commitMsg.trim() || !gitClient.isAvailable() || !status) return;
+    if (isCommittingRef.current || !repoPath || !commitMsg.trim() || !gitClient.isAvailable() || !status) return;
 
     if (status.conflicts.length > 0) {
       setToast({ msg: t('generated.components.staging_area.useaicommit.please_resolve_all_conflicts_first_9e29c688'), isError: true });
@@ -93,33 +104,46 @@ export const useCommitForm = ({ repoPath, status, setToast, refresh, onRepoChang
       return;
     }
 
+    const repoAtStart = repoPath;
+    const repoGeneration = repoGenerationRef.current;
+    const operationId = ++nextCommitOperationIdRef.current;
+    const isCurrentOperation = () => repoGenerationRef.current === repoGeneration && activeCommitOperationIdRef.current === operationId;
+    activeCommitOperationIdRef.current = operationId;
     isCommittingRef.current = true;
     setIsCommitting(true);
     try {
       const title = commitMsg.trim();
       const description = commitDescription.trim();
       const r = await gitClient.createCommit({
+        repoPath: repoAtStart,
         title,
         description,
         amend: amendCommit,
         signoff: signoffCommit,
       });
       if (r.success) {
-        const nextDraft = resetCommitFormDraft(repoPath, settings.commitTemplate || '');
+        const nextDraft = resetCommitFormDraft(repoAtStart, settings.commitTemplate || '');
+        if (!isCurrentOperation()) return;
         setCommitMsgState(nextDraft.commitMsg);
         setCommitDescriptionState(nextDraft.commitDescription);
+        setAmendCommit(false);
         setToast({ msg: t('generated.components.staging_area.usecommitform.commit_successful_155eebd2'), isError: false });
         if (onCommitsCreated) onCommitsCreated();
         else if (onRepoChanged) onRepoChanged();
         await refresh();
       } else {
-        setToast({ msg: r.error || t('generated.components.staging_area.usecommitform.commit_failed_5c16676c'), isError: true });
+        if (isCurrentOperation()) {
+          setToast({ msg: r.error || t('generated.components.staging_area.usecommitform.commit_failed_5c16676c'), isError: true });
+        }
       }
     } catch (e: any) {
-      setToast({ msg: e.message, isError: true });
+      if (isCurrentOperation()) setToast({ msg: e.message, isError: true });
     } finally {
-      isCommittingRef.current = false;
-      setIsCommitting(false);
+      if (activeCommitOperationIdRef.current === operationId) {
+        activeCommitOperationIdRef.current = null;
+        isCommittingRef.current = false;
+        if (repoGenerationRef.current === repoGeneration) setIsCommitting(false);
+      }
     }
   }, [
     commitMsg,

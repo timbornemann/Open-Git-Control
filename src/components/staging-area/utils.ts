@@ -1,5 +1,6 @@
 import type { ConflictBlock, ConflictEntry, ConflictResolutionChoice, DiffStats } from './types';
 import { parsePorcelainPath } from '@/utils/gitParsing';
+import { escapeGitignoreLiteralPath } from './gitignorePattern';
 
 const CONFLICT_CODES = new Set(['UU', 'AA', 'DD', 'AU', 'UA', 'DU', 'UD']);
 
@@ -80,10 +81,25 @@ export const extensionPattern = (p: string) => {
   const name = basename(p);
   const idx = name.lastIndexOf('.');
   if (idx <= 0 || idx === name.length - 1) return null;
-  return `*${name.slice(idx)}`;
+  return `*${escapeGitignoreLiteralPath(name.slice(idx))}`;
 };
 
-export const detectLineEnding = (value: string): string => (value.includes('\r\n') ? '\r\n' : '\n');
+export type LineEnding = '\r\n' | '\n' | '\r';
+
+export const detectLineEnding = (value: string): LineEnding => {
+  const crlf = value.indexOf('\r\n');
+  const lf = value.indexOf('\n');
+  const cr = value.indexOf('\r');
+  if (crlf >= 0 && (lf < 0 || crlf <= lf) && (cr < 0 || crlf <= cr)) return '\r\n';
+  if (lf >= 0 && (cr < 0 || lf < cr)) return '\n';
+  if (cr >= 0) return '\r';
+  return '\n';
+};
+
+export const convertLineEndings = (value: string, lineEnding: LineEnding): string => {
+  const withLf = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return lineEnding === '\n' ? withLf : withLf.replace(/\n/g, lineEnding);
+};
 
 type IndexedConflictLine = {
   text: string;
@@ -132,6 +148,12 @@ const getConflictStartLabel = (line: string): string | null => {
   return trimmed.slice(7).trim();
 };
 
+const getConflictBaseLabel = (line: string): string | null => {
+  const trimmed = line.trimEnd();
+  if (!trimmed.startsWith('|||||||')) return null;
+  return trimmed.slice(7).trim();
+};
+
 const isConflictSeparatorLine = (line: string): boolean => line.trim() === '=======';
 
 const getConflictEndLabel = (line: string): string | null => {
@@ -140,13 +162,17 @@ const getConflictEndLabel = (line: string): string | null => {
   return trimmed.slice(7).trim();
 };
 
-export const countConflictMarkerLines = (content: string): { starts: number; separators: number; ends: number } => {
-  const stats = { starts: 0, separators: 0, ends: 0 };
+export const countConflictMarkerLines = (content: string): { starts: number; bases: number; separators: number; ends: number } => {
+  const stats = { starts: 0, bases: 0, separators: 0, ends: 0 };
   if (!content) return stats;
 
   for (const line of content.split(/\r?\n/)) {
     if (line.trimEnd().startsWith('<<<<<<<')) {
       stats.starts += 1;
+      continue;
+    }
+    if (line.trimEnd().startsWith('|||||||')) {
+      stats.bases += 1;
       continue;
     }
     if (line.trim() === '=======') {
@@ -159,6 +185,11 @@ export const countConflictMarkerLines = (content: string): { starts: number; sep
   }
 
   return stats;
+};
+
+export const hasConflictMarkerLines = (content: string): boolean => {
+  const stats = countConflictMarkerLines(content);
+  return stats.starts + stats.bases + stats.separators + stats.ends > 0;
 };
 
 export const parseConflictBlocks = (content: string): ConflictBlock[] => {
@@ -175,13 +206,23 @@ export const parseConflictBlocks = (content: string): ConflictBlock[] => {
       continue;
     }
 
+    let baseIndex = -1;
     let separatorIndex = -1;
     let nestedStartBeforeSeparator = -1;
+    let malformedBaseSection = false;
 
     for (let j = i + 1; j < lines.length; j += 1) {
       if (getConflictStartLabel(lines[j].text) !== null) {
         nestedStartBeforeSeparator = j;
         break;
+      }
+      if (getConflictBaseLabel(lines[j].text) !== null) {
+        if (baseIndex >= 0) {
+          malformedBaseSection = true;
+          break;
+        }
+        baseIndex = j;
+        continue;
       }
       if (isConflictSeparatorLine(lines[j].text)) {
         separatorIndex = j;
@@ -192,7 +233,7 @@ export const parseConflictBlocks = (content: string): ConflictBlock[] => {
       }
     }
 
-    if (separatorIndex < 0) {
+    if (separatorIndex < 0 || malformedBaseSection) {
       i = nestedStartBeforeSeparator >= 0 ? nestedStartBeforeSeparator : i + 1;
       continue;
     }
@@ -225,8 +266,11 @@ export const parseConflictBlocks = (content: string): ConflictBlock[] => {
       end,
       marker: content.slice(start, end),
       oursLabel: startLabel,
+      ...(baseIndex >= 0
+        ? { baseLabel: getConflictBaseLabel(lines[baseIndex].text) || '', base: content.slice(lines[baseIndex].end, lines[separatorIndex].start) }
+        : {}),
       theirsLabel,
-      ours: content.slice(lines[i].end, lines[separatorIndex].start),
+      ours: content.slice(lines[i].end, (baseIndex >= 0 ? lines[baseIndex] : lines[separatorIndex]).start),
       theirs: content.slice(lines[separatorIndex].end, lines[endIndex].start),
       startLine: lines[i].lineNumber,
       endLine: lines[endIndex].lineNumber,

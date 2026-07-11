@@ -24,6 +24,30 @@ const maxLineExceptions = new Map([
   ['src/components/layout/workflows/__tests__/workflowHooks.test.ts', 567],
   // Cohesive GitHub handler test suite with shared harness setup.
   ['electron/main-process/ipc/__tests__/registerGithubHandlers.test.ts', 512],
+  // Workspace domain hook: resolves the active repository plus its branches,
+  // remotes, tags and submodules through one shared generation guard; the parts
+  // share too much state to split without threading it back together.
+  ['src/components/layout/hooks/useWorkspaceDomain.ts', 523],
+  // Release workflow: create/generate/context callbacks share the same repo
+  // generation guard, refs and setters; splitting would duplicate that binding.
+  ['src/components/layout/workflows/useReleaseWorkflow.ts', 578],
+  // Staging file operations hook: stage/unstage/discard/stash all operate on one
+  // shared status-refresh and stale-response guard.
+  ['src/components/staging-area/useFileOperations.ts', 579],
+  // Pull-request hook: owner/repo resolution, fork upstream retargeting, CI
+  // polling and creation share one set of scope refs and cache invalidation.
+  ['src/hooks/usePullRequests.ts', 558],
+  // Central Git service facade delegating to the specialised git/* services; the
+  // surface is the aggregation point and intentionally broad.
+  ['electron/GitService.ts', 538],
+  // Cohesive Git handler test suite with shared IPC harness setup.
+  ['electron/main-process/ipc/__tests__/registerGitHandlers.test.ts', 622],
+  // Secret scanner: strictness/pattern config, allowlist parsing, quoted-path
+  // decoding, the combined-diff line state machine and push-plan resolution form
+  // one security-critical unit that is clearer read top to bottom.
+  ['electron/SecretScanService.ts', 604],
+  // Cohesive test suite for the AI index transaction with shared git fixtures.
+  ['electron/__tests__/AiAutoCommitIndexTransaction.test.ts', 524],
 ]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];

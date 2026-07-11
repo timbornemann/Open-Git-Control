@@ -18,6 +18,7 @@ export type FileTimelineCommit = {
     path: string;
     oldPath?: string;
   }>;
+  baselineFiles?: string[];
 };
 
 export type FileTimelineDimensions = {

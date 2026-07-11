@@ -136,7 +136,7 @@ export const githubClient = {
     language: 'de' | 'en';
     versionBump: 'major' | 'minor' | 'patch';
     hints?: string[];
-  }): Promise<IpcResult<{ markdown: string }>> {
+  }): Promise<IpcResult<{ markdown: string; source: 'ai' | 'fallback'; warning?: string }>> {
     return requireElectronAiApi().aiGenerateReleaseNotes(params);
   },
 };

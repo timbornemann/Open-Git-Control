@@ -43,7 +43,105 @@ const SERIALIZED_GIT_COMMANDS = new Set<string>([
   'fetch',
   'pull',
   'push',
+  'rm',
+  'mv',
+  'init',
+  'update-ref',
+  'worktree',
+  'restore',
+  'switch',
+  'read-tree',
+  'update-index',
+  'write-tree',
+  'mktree',
+  'commit-tree',
+  'pack-refs',
+  'index-pack',
+  'unpack-objects',
+  'replace',
+  'notes',
+  'gc',
+  'repack',
+  'prune',
+  'maintenance',
+  'bisect',
+  'am',
+  'sparse-checkout',
 ]);
+
+const BRANCH_LIST_FLAGS = new Set([
+  '-a',
+  '--all',
+  '-r',
+  '--remotes',
+  '-l',
+  '--list',
+  '-v',
+  '--verbose',
+  '--show-current',
+  '--contains',
+  '--no-contains',
+  '--merged',
+  '--no-merged',
+  '--points-at',
+  '--format',
+  '--sort',
+  '--column',
+  '--no-column',
+]);
+
+const BRANCH_MUTATION_FLAGS = new Set([
+  '-d',
+  '-m',
+  '-c',
+  '-f',
+  '--delete',
+  '--move',
+  '--copy',
+  '--force',
+  '--edit-description',
+  '-u',
+  '--set-upstream-to',
+  '--unset-upstream',
+  '--track',
+  '--no-track',
+]);
+
+const optionName = (value: string): string => value.split('=', 1)[0];
+
+const GIT_GLOBAL_OPTIONS_WITH_VALUE = new Set(['-c', '-C', '--config-env', '--exec-path', '--git-dir', '--namespace', '--super-prefix', '--work-tree']);
+const GIT_GLOBAL_FLAG_OPTIONS = new Set([
+  '--bare',
+  '--html-path',
+  '--info-path',
+  '--literal-pathspecs',
+  '--man-path',
+  '--no-lazy-fetch',
+  '--no-optional-locks',
+  '--no-pager',
+  '--no-replace-objects',
+  '--paginate',
+  '-p',
+  '--version',
+]);
+
+const commandArguments = (args: string[]): string[] => {
+  let index = 0;
+  while (index < args.length) {
+    const token = String(args[index]);
+    if (GIT_GLOBAL_OPTIONS_WITH_VALUE.has(token)) {
+      index += 2;
+      continue;
+    }
+    const name = optionName(token);
+    if (GIT_GLOBAL_OPTIONS_WITH_VALUE.has(name) || GIT_GLOBAL_FLAG_OPTIONS.has(token)) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return args.slice(index);
+};
 
 export class GitRunner {
   private readonly processExecutor: GitProcessExecutor;
@@ -151,7 +249,7 @@ export class GitRunner {
 
   classifyCommand(args: string[], requestedKind?: GitJobKind): GitJobKind {
     if (requestedKind) return requestedKind;
-    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
+    const commandArgs = commandArguments(args);
     const primary = String(commandArgs[0] || '')
       .trim()
       .toLowerCase();
@@ -159,17 +257,38 @@ export class GitRunner {
       .trim()
       .toLowerCase();
     if (primary === 'branch') {
-      return ['-d', '-D', '-m', '-M', '-c', '-C', '--delete', '--move', '--copy', '--edit-description'].some((flag) => commandArgs.slice(1).includes(flag))
-        ? 'write'
-        : 'polling';
+      const flags = commandArgs.slice(1).map((value) => String(value).toLowerCase());
+      if (flags.some((flag) => BRANCH_MUTATION_FLAGS.has(optionName(flag)))) return 'write';
+      if (flags.length === 0 || flags.some((flag) => BRANCH_LIST_FLAGS.has(optionName(flag)))) return 'polling';
+      // A positional branch name creates a branch. Unknown future branch
+      // modes are serialized conservatively instead of racing the ref store.
+      return 'write';
     }
     if (primary === 'remote') {
-      return ['add', 'remove', 'rename', 'set-url', 'set-head', 'update', 'prune'].includes(secondary) ? 'write' : 'polling';
+      return !secondary || ['-v', '--verbose', 'show', 'get-url'].includes(secondary) ? 'polling' : 'write';
     }
     if (primary === 'tag') {
-      const isList = commandArgs.length === 1 || ['-l', '--list', '--contains', '--points-at'].includes(secondary);
+      const isList =
+        commandArgs.length === 1 ||
+        ['-l', '--list', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format'].includes(optionName(secondary));
       return isList ? 'polling' : 'write';
     }
+    if (primary === 'config') {
+      const flags = commandArgs.slice(1).map((value) => optionName(String(value).toLowerCase()));
+      if (flags.some((flag) => ['--unset', '--unset-all', '--rename-section', '--remove-section', '--add', '--replace-all', '--edit', '-e'].includes(flag))) {
+        return 'write';
+      }
+      if (flags.some((flag) => ['--get', '--get-all', '--get-regexp', '--get-urlmatch', '--list', '-l'].includes(flag))) return 'polling';
+      return commandArgs.length <= 2 ? 'polling' : 'write';
+    }
+    if (primary === 'symbolic-ref') {
+      const values = commandArgs.slice(1).filter((value) => !String(value).startsWith('-'));
+      return commandArgs.includes('--delete') || values.length >= 2 ? 'write' : 'polling';
+    }
+    if (primary === 'reflog') {
+      return ['expire', 'delete', 'write'].includes(secondary) ? 'write' : 'polling';
+    }
+    if (primary === 'hash-object' && commandArgs.includes('-w')) return 'write';
     if (primary === 'submodule' && secondary === 'status') return 'polling';
     if (this.shouldSerializeCommand(commandArgs)) return 'write';
     if (primary === 'status') return 'polling';
@@ -187,7 +306,7 @@ export class GitRunner {
   }
 
   private shouldSerializeCommand(args: string[]): boolean {
-    const commandArgs = args[0] === '-c' ? args.slice(2) : args;
+    const commandArgs = commandArguments(args);
     const firstToken = String(commandArgs?.[0] || '')
       .trim()
       .toLowerCase();

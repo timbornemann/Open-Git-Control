@@ -8,10 +8,11 @@ export type HunkPatchOperation = 'stage' | 'unstage' | 'discard';
 type UseHunkPatchActionsParams = {
   repoPath: string | null;
   onRepoChanged?: () => void;
+  onApplied?: () => void;
   t: CatalogTranslateFn;
 };
 
-export const useHunkPatchActions = ({ repoPath, onRepoChanged, t }: UseHunkPatchActionsParams) => {
+export const useHunkPatchActions = ({ repoPath, onRepoChanged, onApplied, t }: UseHunkPatchActionsParams) => {
   const [hunkOpError, setHunkOpError] = useState<string | null>(null);
   const [isHunkOperationRunning, setIsHunkOperationRunning] = useState(false);
   const operationRef = useRef<number | null>(null);
@@ -37,14 +38,15 @@ export const useHunkPatchActions = ({ repoPath, onRepoChanged, t }: UseHunkPatch
         const patch = buildHunkPatch(fileHeader, hunk);
         const result =
           op === 'stage'
-            ? await gitClient.applyPatch(patch, { cached: true })
+            ? await gitClient.applyPatch(patch, { cached: true }, repoPath)
             : op === 'unstage'
-              ? await gitClient.applyPatch(patch, { cached: true, reverse: true })
-              : await gitClient.applyPatch(patch, { reverse: true });
+              ? await gitClient.applyPatch(patch, { cached: true, reverse: true }, repoPath)
+              : await gitClient.applyPatch(patch, { reverse: true }, repoPath);
 
         if (generation !== generationRef.current || operationRef.current !== operationId) return;
         if (result.success) {
           onRepoChanged?.();
+          onApplied?.();
         } else {
           setHunkOpError(result.error || t('diffViewer.errors.hunkOperationFailed'));
         }
@@ -58,7 +60,7 @@ export const useHunkPatchActions = ({ repoPath, onRepoChanged, t }: UseHunkPatch
         }
       }
     },
-    [onRepoChanged, repoPath, t],
+    [onApplied, onRepoChanged, repoPath, t],
   );
 
   return {

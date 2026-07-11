@@ -51,7 +51,11 @@ describe('useFileOperations repository switch isolation', () => {
     const container = document.getElementById('root')!;
     const root: Root = createRoot(container);
     const stagePaths = vi.spyOn(gitClient, 'stagePaths').mockResolvedValue({ success: true, data: '' });
-    const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
+    const runGitCommandForRepo = vi
+      .spyOn(gitClient, 'runGitCommandForRepo')
+      .mockImplementation(async (_repo, command) =>
+        command === 'status' ? { success: true, data: '# branch.oid (initial)\n# branch.head main' } : { success: true, data: '' },
+      );
     const HookHarness = () => {
       current = useFileOperations(params);
       return null;
@@ -83,6 +87,62 @@ describe('useFileOperations repository switch isolation', () => {
 
     expect(stagePaths).not.toHaveBeenCalled();
     expect(runGitCommandForRepo).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  });
+
+  it('unstages unborn-branch entries without HEAD and resets both sides of a rename', async () => {
+    const renamed = { path: 'src/new-name.ts', originalPath: 'src/old-name.ts', x: 'R', y: ' ' };
+    const added = { path: 'src/first-commit.ts', x: 'A', y: ' ' };
+    let params: HookParams = {
+      ...createParams(repoA, repoA),
+      externalStatus: { staged: [added], unstaged: [], untracked: [] },
+    };
+    let current: ReturnType<typeof useFileOperations> | null = null;
+    const root: Root = createRoot(document.getElementById('root')!);
+    const runGitCommandForRepo = vi
+      .spyOn(gitClient, 'runGitCommandForRepo')
+      .mockImplementation(async (_repo, command) =>
+        command === 'status' ? { success: true, data: '# branch.oid (initial)\n# branch.head main' } : { success: true, data: '' },
+      );
+    const Harness = () => {
+      current = useFileOperations(params);
+      return null;
+    };
+    act(() => root.render(createElement(Harness)));
+
+    await act(async () => {
+      await current!.unstageFile(added);
+    });
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(repoA, 'rm', '--cached', '-f', '--', 'src/first-commit.ts');
+    expect(runGitCommandForRepo.mock.calls.flat()).not.toContain('HEAD');
+
+    runGitCommandForRepo.mockClear();
+    await act(async () => {
+      await current!.unstageAll();
+    });
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(repoA, 'rm', '--cached', '-f', '--', 'src/first-commit.ts');
+    expect(runGitCommandForRepo.mock.calls.flat()).not.toContain('HEAD');
+
+    params = {
+      ...createParams(repoA, repoA),
+      externalStatus: { staged: [renamed, added], unstaged: [], untracked: [] },
+    };
+    act(() => root.render(createElement(Harness)));
+    runGitCommandForRepo.mockClear();
+    runGitCommandForRepo.mockImplementation(async (_repo, command) =>
+      command === 'status' ? { success: true, data: `# branch.oid ${'a'.repeat(40)}\n# branch.head main` } : { success: true, data: '' },
+    );
+    await act(async () => {
+      await current!.unstageFile(renamed);
+    });
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(repoA, 'reset', '--', 'src/old-name.ts', 'src/new-name.ts');
+
+    runGitCommandForRepo.mockClear();
+    await act(async () => {
+      await current!.unstageAll();
+    });
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(repoA, 'reset', 'HEAD');
+    expect(runGitCommandForRepo.mock.calls.filter((call) => call[1] === 'reset')).toHaveLength(1);
     act(() => root.unmount());
   });
 });

@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult } from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
+import { redactGitSensitiveText } from './GitErrorFormatter';
 
 export class GitSpawnOperations {
   runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions, signal: AbortSignal): Promise<Buffer> {
@@ -38,7 +39,7 @@ export class GitSpawnOperations {
           return;
         }
         if (code !== 0) {
-          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }
         resolve(Buffer.concat(chunks));
@@ -79,7 +80,7 @@ export class GitSpawnOperations {
           return;
         }
 
-        const message = (stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim();
+        const message = redactGitSensitiveText((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim());
         reject(new Error(message));
       });
 
@@ -126,7 +127,7 @@ export class GitSpawnOperations {
           return;
         }
         if (code !== 0 && !truncated && closeSignal == null) {
-          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }
         let text = Buffer.concat(chunks).toString('utf8');
@@ -155,7 +156,7 @@ export class GitSpawnOperations {
         pending += chunk.toString('utf8');
         let newlineIndex = pending.indexOf('\n');
         while (newlineIndex >= 0) {
-          onLine(pending.slice(0, newlineIndex).replace(/\r$/, ''));
+          onLine(redactGitSensitiveText(pending.slice(0, newlineIndex).replace(/\r$/, '')));
           pending = pending.slice(newlineIndex + 1);
           newlineIndex = pending.indexOf('\n');
         }
@@ -171,10 +172,10 @@ export class GitSpawnOperations {
           return;
         }
         if (code !== 0) {
-          reject(new Error((stderr || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }
-        if (pending) onLine(pending.replace(/\r$/, ''));
+        if (pending) onLine(redactGitSensitiveText(pending.replace(/\r$/, '')));
         resolve();
       });
     });
@@ -210,11 +211,11 @@ export class GitSpawnOperations {
 
         const stdoutTail = stdoutPending.value.trim();
         const stderrTail = stderrPending.value.trim();
-        if (stdoutTail) onLine(stdoutTail);
-        if (stderrTail) onLine(stderrTail);
+        if (stdoutTail) onLine(redactGitSensitiveText(stdoutTail));
+        if (stderrTail) onLine(redactGitSensitiveText(stderrTail));
 
         if (code !== 0) {
-          reject(new Error((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim()));
+          reject(new Error(redactGitSensitiveText((stderr || stdout || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }
         resolve(stdout.trimEnd());
@@ -228,7 +229,7 @@ export class GitSpawnOperations {
       const collectProgress = (data: Buffer) => {
         const lines = data.toString().split(/\r?\n|\r/);
         for (const line of lines) {
-          const trimmed = line.trim();
+          const trimmed = redactGitSensitiveText(line.trim());
           if (!trimmed) continue;
           progressTail.push(trimmed);
           if (progressTail.length > 24) {
@@ -261,12 +262,12 @@ export class GitSpawnOperations {
         const details = progressTail.slice(-4).join('\n').trim();
         resolve({
           success: false,
-          error: details || `Git clone exited with code ${code} (source: ${cloneUrl}, target: ${repoPath})`,
+          error: details || redactGitSensitiveText(`Git clone exited with code ${code} (source: ${cloneUrl}, target: ${repoPath})`),
         });
       });
 
       proc.on('error', (err) => {
-        resolve({ success: false, error: err.message });
+        resolve({ success: false, error: redactGitSensitiveText(err.message) });
       });
     });
   }
@@ -280,6 +281,6 @@ const emitLines = (chunk: Buffer, pendingRef: { value: string }, onLine: (line: 
   pendingRef.value = parts.pop() ?? '';
   for (const part of parts) {
     const line = part.trim();
-    if (line) onLine(line);
+    if (line) onLine(redactGitSensitiveText(line));
   }
 };

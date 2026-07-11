@@ -4,12 +4,13 @@ import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildAddRemoteDialog, buildRemoveRemoteDialog, buildRenameRemoteDialog, buildSetRemoteUrlDialog } from './repositoryDomainDialogs';
 import type { RepositoryRemote } from './repositoryDomainTypes';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 type Params = {
   activeRepo: string | null;
   refreshTrigger: number;
   language: AppLanguage;
-  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
 };
@@ -55,7 +56,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
       // A dialog can be confirmed after the user switched repositories. Do not
       // retarget a destructive remote mutation to the new active repository.
       if (!repoAtDialogOpen || activeRepoRef.current !== repoAtDialogOpen) return false;
-      return runGitCommand(args, successMsg);
+      return runGitCommand(args, successMsg, undefined, { expectedRepoPath: repoAtDialogOpen });
     },
     [runGitCommand],
   );
@@ -70,7 +71,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     let cancelled = false;
     const checkRemote = async () => {
       try {
-        const result = await gitClient.runGitCommand('remote', '-v');
+        const result = await gitClient.runGitCommandForRepo(activeRepo, 'remote', '-v');
         if (cancelled) return;
         if (!result.success) return;
 

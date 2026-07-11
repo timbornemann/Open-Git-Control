@@ -8,6 +8,7 @@ import { BlamePanel } from '@/components/file-details/BlamePanel';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 
 interface CommitDetailsProps {
+  repoPath: string | null;
   hash: string;
   onSelectCommit?: (hash: string) => void;
   onOpenDiff?: (request: DiffRequest) => void;
@@ -15,7 +16,7 @@ interface CommitDetailsProps {
 
 export { extractCommitDescription } from '@/components/commit-details/useCommitDetailsData';
 
-export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectCommit, onOpenDiff }) => {
+export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, onSelectCommit, onOpenDiff }) => {
   const { t } = useI18n();
   const {
     activeTab,
@@ -42,7 +43,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ hash, onSelectComm
     setActiveTab,
     setSelectedFileCommitHash,
     setSelectedFilePath,
-  } = useCommitDetailsData({ hash, onOpenDiff });
+  } = useCommitDetailsData({ repoPath, hash, onOpenDiff });
 
   const getIconForStatus = (status: string) => {
     switch (status[0]) {

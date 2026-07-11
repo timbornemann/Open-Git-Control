@@ -104,11 +104,13 @@ export function parseSavedGithubTokenPayload(raw: string): SavedGithubToken | nu
         host: typeof parsed.host === 'string' && parsed.host.trim() ? parsed.host.trim().toLowerCase() : null,
       };
     }
+    // A syntactically valid JSON value is a structured payload, not a legacy
+    // token. Reject unsupported versions and corrupted schemas explicitly.
+    return null;
   } catch {
     // Legacy payloads are plain encrypted token strings.
+    return { token: value, host: null };
   }
-
-  return { token: value, host: null };
 }
 
 export function serializeGithubTokenPayload(token: string, host: string): string {

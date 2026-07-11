@@ -4,9 +4,11 @@ import type { CatalogTranslateFn } from '@/i18n';
 import type { ToastMessage } from '@/types/git';
 import { isCherryPickInProgressError, isMergeInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { gitClient } from '@/services/gitClient';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 type UseCommitGraphGitActionsParams = {
-  onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  repoPath: string | null;
+  onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   onOpenConflictResolverForPath?: (path: string) => void;
   refreshCommits: () => Promise<void> | void;
   refreshWorkingTreeStatus: () => Promise<void> | void;
@@ -15,6 +17,7 @@ type UseCommitGraphGitActionsParams = {
 };
 
 export const useCommitGraphGitActions = ({
+  repoPath,
   onRunGitCommand,
   onOpenConflictResolverForPath,
   refreshCommits,
@@ -25,7 +28,8 @@ export const useCommitGraphGitActions = ({
   const openConflictResolverFromFailure = useCallback(
     async (message: string | undefined) => {
       try {
-        const statusAfter = await gitClient.getStatusPorcelain();
+        if (!repoPath) return false;
+        const statusAfter = await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
         const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
         const conflictPath = resolveConflictPathAfterGitFailure(porcelain, message);
         if (conflictPath && onOpenConflictResolverForPath) {
@@ -37,14 +41,14 @@ export const useCommitGraphGitActions = ({
       }
       return false;
     },
-    [onOpenConflictResolverForPath],
+    [onOpenConflictResolverForPath, repoPath],
   );
 
   return useCallback(
     async (args: string[], successMsg: string) => {
-      if (!gitClient.isAvailable() || args.length === 0) return;
+      if (!gitClient.isAvailable() || !repoPath || args.length === 0) return;
       if (onRunGitCommand) {
-        const success = await onRunGitCommand(args, successMsg);
+        const success = await onRunGitCommand(args, successMsg, undefined, { expectedRepoPath: repoPath });
         if (success) {
           refreshCommits();
           refreshWorkingTreeStatus();
@@ -53,7 +57,7 @@ export const useCommitGraphGitActions = ({
       }
 
       try {
-        const result = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+        const result = await gitClient.runGitCommandForRepo(repoPath, args[0] as GitCommandNameDto, ...args.slice(1));
         if (result.success) {
           setToast({ msg: successMsg, isError: false });
           refreshCommits();
@@ -107,6 +111,6 @@ export const useCommitGraphGitActions = ({
         setToast({ msg: message, isError: true });
       }
     },
-    [onRunGitCommand, openConflictResolverFromFailure, refreshCommits, refreshWorkingTreeStatus, setToast, t],
+    [onRunGitCommand, openConflictResolverFromFailure, refreshCommits, refreshWorkingTreeStatus, repoPath, setToast, t],
   );
 };

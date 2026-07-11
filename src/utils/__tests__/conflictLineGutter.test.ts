@@ -12,6 +12,11 @@ describe('getConflictLineGutterKinds', () => {
     expect(getConflictLineGutterKinds(lines)).toEqual(['neutral', 'marker-start', 'ours', 'ours', 'marker-separator', 'theirs', 'marker-end', 'neutral']);
   });
 
+  it('classifies diff3 base markers separately from the current side', () => {
+    const lines = ['<<<<<<< HEAD', 'ours', '||||||| parent', 'base', '=======', 'theirs', '>>>>>>> topic'];
+    expect(getConflictLineGutterKinds(lines)).toEqual(['marker-start', 'ours', 'marker-base', 'base', 'marker-separator', 'theirs', 'marker-end']);
+  });
+
   it('marks malformed starts without separator as marker and continues at nested start', () => {
     const lines = ['<<<<<<< HEAD', 'ours line', '<<<<<<< nested', 'nested ours', '=======', 'nested theirs', '>>>>>>> nested'];
 

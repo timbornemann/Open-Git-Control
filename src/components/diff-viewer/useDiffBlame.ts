@@ -35,7 +35,8 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
       try {
         const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
 
-        const result = await gitClient.getFileBlame(request.path, commitHashForBlame);
+        const workingTreeSource = request.source === 'staged' || request.source === 'unstaged' ? request.source : undefined;
+        const result = await gitClient.getFileBlame(request.path, commitHashForBlame, repoPath, workingTreeSource);
         if (!isCurrentRequest()) return;
         if (result.success) {
           setBlameData(result.data);

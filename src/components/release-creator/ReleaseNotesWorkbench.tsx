@@ -51,7 +51,7 @@ export const ReleaseNotesWorkbench = ({
   onRemovePendingAsset,
 }: ReleaseNotesWorkbenchProps) => {
   const { t } = useI18n();
-  const isEditorDisabled = !hasOwnerRepo || releaseSubmitting;
+  const isEditorDisabled = !hasOwnerRepo || releaseSubmitting || notesGenerating;
 
   return (
     <section className="release-step-clean release-step-clean--notes-workbench">

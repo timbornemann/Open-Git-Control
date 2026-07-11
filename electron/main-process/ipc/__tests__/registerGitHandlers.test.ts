@@ -35,7 +35,8 @@ describe('registerGitHandlers', () => {
   it('keeps the same job id between start and failed events for long-running git commands', async () => {
     const send = vi.fn();
     const gitService = {
-      runCommand: vi.fn().mockRejectedValue(new Error('push failed')),
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      runCommandAtPath: vi.fn().mockRejectedValue(new Error('push failed')),
       getStatus: vi.fn(),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -85,7 +86,8 @@ describe('registerGitHandlers', () => {
 
   it('forwards explicit status args to git instead of always using short status', async () => {
     const gitService = {
-      runCommand: vi.fn().mockResolvedValue('# branch.oid abc'),
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      runCommandAtPath: vi.fn().mockResolvedValue('# branch.oid abc'),
       getStatus: vi.fn().mockResolvedValue('short output'),
       getStatusPorcelain: vi.fn(),
       getLog: vi.fn(),
@@ -122,15 +124,15 @@ describe('registerGitHandlers', () => {
 
     const result = await commandHandler!({ sender: { send: vi.fn() } }, 'status', '--porcelain=v2', '--branch');
     expect(result).toEqual({ success: true, data: '# branch.oid abc' });
-    expect(gitService.runCommand).toHaveBeenCalledWith(['status', '--porcelain=v2', '--branch']);
+    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['status', '--porcelain=v2', '--branch']);
     expect(gitService.getStatus).not.toHaveBeenCalled();
   });
 
   it('streams pull progress through job events', async () => {
     const send = vi.fn();
     const gitService = {
-      runCommand: vi.fn(),
-      streamCommandOutput: vi.fn(async (_args: string[], onLine: (line: string) => void) => {
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      streamCommandOutputAtPath: vi.fn(async (_repoPath: string, _args: string[], onLine: (line: string) => void) => {
         onLine('Receiving objects: 50% (5/10), 1.00 MiB | 2.00 MiB/s');
         onLine('Resolving deltas: 25% (2/8)');
         return 'pull ok';
@@ -171,7 +173,7 @@ describe('registerGitHandlers', () => {
 
     const result = await commandHandler!({ sender: { send } }, 'pull', '--rebase');
     expect(result).toEqual({ success: true, data: 'pull ok' });
-    expect(gitService.streamCommandOutput).toHaveBeenCalledWith(['pull', '--progress', '--rebase'], expect.any(Function));
+    expect(gitService.streamCommandOutputAtPath).toHaveBeenCalledWith('C:/repo', ['pull', '--progress', '--rebase'], expect.any(Function));
 
     const jobEvents = send.mock.calls.filter((call) => call[0] === 'job:event').map((call) => call[1]);
 
@@ -201,7 +203,7 @@ describe('registerGitHandlers', () => {
       stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 },
     });
     const gitService = {
-      runCommand: vi.fn().mockResolvedValue('push ok'),
+      runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
@@ -237,7 +239,7 @@ describe('registerGitHandlers', () => {
 
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(scanPushDiffs).toHaveBeenCalledWith(expect.objectContaining({ repoPath: 'C:/repo', includeTags: true, strictness: 'medium' }));
-    expect(gitService.runCommand).toHaveBeenCalledWith(['push', '--tags']);
+    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push', '--tags']);
     expect(showMessageBoxMock).not.toHaveBeenCalled();
   });
 
@@ -251,7 +253,7 @@ describe('registerGitHandlers', () => {
     });
     showMessageBoxMock.mockResolvedValue({ response: 0 });
     const gitService = {
-      runCommand: vi.fn().mockResolvedValue('should not push'),
+      runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
@@ -287,7 +289,7 @@ describe('registerGitHandlers', () => {
 
     expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
     expect(showMessageBoxMock).toHaveBeenCalledWith(expect.objectContaining({ buttons: ['Cancel', 'Push anyway'] }));
-    expect(gitService.runCommand).not.toHaveBeenCalled();
+    expect(gitService.runCommandAtPath.mock.calls.some((call: any[]) => call[1]?.[0] === 'push')).toBe(false);
   });
 
   it('skips the native secret-scan dialog after an in-app approval', async () => {
@@ -299,7 +301,7 @@ describe('registerGitHandlers', () => {
       stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
     });
     const gitService = {
-      runCommand: vi.fn().mockResolvedValue('push ok'),
+      runCommandAtPath: vi.fn().mockResolvedValue('push ok'),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
@@ -332,13 +334,15 @@ describe('registerGitHandlers', () => {
       readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
     });
 
-    await handlers.get('git:approveSecretScanPush')!({ sender: { id: 42 } }, []);
+    await handlers.get('git:scanPushSecrets')!({ sender: { id: 42, send: vi.fn() } }, { repoPath: 'C:/repo', pushArgs: [] });
+    const approval = await handlers.get('git:approveSecretScanPush')!({ sender: { id: 42 } }, [], 'C:/repo');
+    expect(approval).toEqual({ success: true });
     const result = await handlers.get('git:command')!({ sender: { id: 42, send: vi.fn() } }, 'push');
 
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(showMessageBoxMock).not.toHaveBeenCalled();
-    expect(scanPushDiffs).not.toHaveBeenCalled();
-    expect(gitService.runCommand).toHaveBeenCalledWith(['push']);
+    expect(scanPushDiffs).toHaveBeenCalledTimes(1);
+    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push']);
   });
 
   it('does not honor an approval granted for a different push destination', async () => {
@@ -351,7 +355,7 @@ describe('registerGitHandlers', () => {
     });
     showMessageBoxMock.mockResolvedValue({ response: 0 });
     const gitService = {
-      runCommand: vi.fn().mockResolvedValue('should not push'),
+      runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
       getStatus: vi.fn(),
@@ -384,13 +388,15 @@ describe('registerGitHandlers', () => {
 
     // Approval is granted for `git push origin feature`, but the actual push
     // targets a different (default) destination, so the scan must still run.
-    await handlers.get('git:approveSecretScanPush')!({ sender: { id: 7 } }, ['origin', 'feature']);
+    await handlers.get('git:scanPushSecrets')!({ sender: { id: 7, send: vi.fn() } }, { repoPath: 'C:/repo', pushArgs: ['origin', 'feature'] });
+    const approval = await handlers.get('git:approveSecretScanPush')!({ sender: { id: 7 } }, ['origin', 'feature'], 'C:/repo');
+    expect(approval).toEqual({ success: true });
     const result = await handlers.get('git:command')!({ sender: { id: 7, send: vi.fn() } }, 'push');
 
     expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
     expect(scanPushDiffs).toHaveBeenCalled();
     expect(showMessageBoxMock).toHaveBeenCalled();
-    expect(gitService.runCommand).not.toHaveBeenCalled();
+    expect(gitService.runCommandAtPath.mock.calls.some((call: any[]) => call[1]?.[0] === 'push')).toBe(false);
   });
 
   it('rejects secret scans for a renderer-selected non-active repository', async () => {
@@ -433,6 +439,50 @@ describe('registerGitHandlers', () => {
     expect(stagePathsAtPath).not.toHaveBeenCalled();
   });
 
+  it('allows read-only origin lookup for an inactive main-owned workspace repository', async () => {
+    const getRepoOriginUrl = vi.fn().mockResolvedValue('https://github.com/acme/repo-b.git');
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repos/repo-a'),
+      getRepoOriginUrl,
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+      readStoredRepoPaths: () => ['C:/repos/repo-a', 'C:/repos/repo-b'],
+    });
+
+    await expect(handlers.get('git:repoOriginUrl')!({}, 'C:/repos/repo-b')).resolves.toEqual({
+      success: true,
+      data: 'https://github.com/acme/repo-b.git',
+    });
+    expect(getRepoOriginUrl).toHaveBeenCalledWith('C:/repos/repo-b');
+  });
+
+  it('rejects origin lookup for an arbitrary renderer-supplied repository path', async () => {
+    const getRepoOriginUrl = vi.fn();
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repos/repo-a'),
+      getRepoOriginUrl,
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+      readStoredRepoPaths: () => ['C:/repos/repo-a', 'C:/repos/repo-b'],
+    });
+
+    await expect(handlers.get('git:repoOriginUrl')!({}, 'C:/private/other')).resolves.toEqual({
+      success: false,
+      error: 'Requested repository is not an open repository.',
+    });
+    expect(getRepoOriginUrl).not.toHaveBeenCalled();
+  });
+
   it('rejects repo-bound commands from a repository that is no longer active', async () => {
     const runCommand = vi.fn();
     const gitService = {
@@ -453,6 +503,25 @@ describe('registerGitHandlers', () => {
     expect(runCommand).not.toHaveBeenCalled();
   });
 
+  it('does not let a stale timeout cancel a secret scan in the newly active repository', async () => {
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repos/current'),
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    await expect(handlers.get('git:cancelSecretScan')!({}, 'C:/repos/previous')).resolves.toEqual({
+      success: false,
+      cancelled: false,
+      error: 'Requested repository is not the active repository.',
+    });
+  });
+
   it('does not replace the active repository when git init fails', async () => {
     const setRepoPath = vi.fn();
     const gitService = {
@@ -471,5 +540,82 @@ describe('registerGitHandlers', () => {
 
     expect(result).toEqual({ success: false, error: 'init failed' });
     expect(setRepoPath).not.toHaveBeenCalled();
+  });
+
+  it('returns the canonical repository root selected by GitSetRepo', async () => {
+    let activeRepo = 'C:/old-repo';
+    const gitService = {
+      setRepoPath: vi.fn(() => {
+        activeRepo = 'C:/work/repo';
+      }),
+      getRepoPath: vi.fn(() => activeRepo),
+    } as any;
+    const cancelForRepoChange = vi.fn();
+    const setActiveRepo = vi.fn();
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn(), setActiveRepo } as any,
+      workingTreeService: { setActiveRepo: vi.fn() } as any,
+      readSettingsWithMigration: vi.fn() as any,
+      repoJobRegistry: { cancelForRepoChange } as any,
+    });
+
+    await expect(handlers.get('git:setRepo')!({}, 'C:/work/repo/packages/app')).resolves.toBe('C:/work/repo');
+    expect(gitService.setRepoPath).toHaveBeenCalledWith('C:/work/repo/packages/app');
+    expect(cancelForRepoChange).toHaveBeenCalledWith('C:/work/repo');
+    expect(setActiveRepo).toHaveBeenCalledWith('C:/work/repo');
+  });
+
+  it('resolves a stored repository alias without changing the active repository', async () => {
+    const gitService = {
+      resolveRepositoryPath: vi.fn().mockReturnValue('C:/work/repo'),
+      setRepoPath: vi.fn(),
+    } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    await expect(handlers.get('git:resolveRepoPath')!({}, 'C:/work/repo/packages/app')).resolves.toBe('C:/work/repo');
+    expect(gitService.resolveRepositoryPath).toHaveBeenCalledWith('C:/work/repo/packages/app');
+    expect(gitService.setRepoPath).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty GitSetRepo request before changing backend state', async () => {
+    const gitService = { setRepoPath: vi.fn() } as any;
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    await expect(handlers.get('git:setRepo')!({}, '  ')).rejects.toThrow('Repository path is required.');
+    expect(gitService.setRepoPath).not.toHaveBeenCalled();
+  });
+
+  it('initializes an explicit target without changing the selected repository', async () => {
+    const gitService = {
+      runCommandAtPath: vi.fn().mockResolvedValue('initialized'),
+      setRepoPath: vi.fn(),
+    } as any;
+    const cancelForRepoChange = vi.fn();
+    registerGitHandlers({
+      gitService,
+      secretScanService: {} as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn(), setActiveRepo: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+      repoJobRegistry: { cancelForRepoChange } as any,
+    });
+
+    await expect(handlers.get('git:init')!({}, 'C:/new-repo')).resolves.toEqual({ success: true, data: 'initialized' });
+    expect(gitService.setRepoPath).not.toHaveBeenCalled();
+    expect(cancelForRepoChange).not.toHaveBeenCalled();
   });
 });

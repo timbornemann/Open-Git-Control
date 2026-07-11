@@ -47,6 +47,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
       setMarkdownPreview(EMPTY_MARKDOWN_PREVIEW);
       return;
     }
+    const repoAtStart = repoPath;
 
     const loadPreview = async () => {
       setMarkdownPreview({ loading: true, error: null, html: '' });
@@ -56,6 +57,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
           source: request.source,
           path: request.path,
           commitHash: request.commitHash,
+          repoPath: repoAtStart,
         });
 
         if (!markdownResult.success) {
@@ -82,12 +84,14 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
               source: request.source,
               path: assetPath,
               commitHash: request.commitHash,
+              repoPath: repoAtStart,
             });
 
             if (!assetResult.success && request.source === 'staged') {
               assetResult = await gitClient.getRepoFileDataUrl({
                 source: 'unstaged',
                 path: assetPath,
+                repoPath: repoAtStart,
               });
             }
 

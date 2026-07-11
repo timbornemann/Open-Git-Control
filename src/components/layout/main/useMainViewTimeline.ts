@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { AppTabId } from '@/app/state/contracts';
@@ -19,14 +19,18 @@ export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCr
   // Bumped on repository change so a timeline load started in one repository
   // cannot open (or populate) after switching to another.
   const requestGenerationRef = useRef(0);
+  const activeRepoRef = useRef(activeRepo);
+  activeRepoRef.current = activeRepo;
 
   const openTimeline = useCallback(async () => {
     if (!activeRepo || !gitClient.isAvailable()) return;
-    const generation = requestGenerationRef.current;
+    const repoAtStart = activeRepo;
+    // Each invocation supersedes the previous one, even inside the same repo.
+    const generation = ++requestGenerationRef.current;
     setIsTimelineLoading(true);
     try {
-      const result = await gitClient.getFileTimelineData(1500);
-      if (requestGenerationRef.current !== generation) return;
+      const result = await gitClient.getFileTimelineData(1500, repoAtStart);
+      if (requestGenerationRef.current !== generation || activeRepoRef.current !== repoAtStart) return;
       if (result.success) {
         setTimelineCommits([...result.data].reverse());
         onCloseReleaseCreator();
@@ -36,16 +40,19 @@ export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCr
         alert(result.error || t('timeline.errors.loadDataFailed'));
       }
     } catch (err: unknown) {
-      if (requestGenerationRef.current !== generation) return;
+      if (requestGenerationRef.current !== generation || activeRepoRef.current !== repoAtStart) return;
       alert(err instanceof Error ? err.message : t('timeline.errors.loadFailed'));
     } finally {
-      if (requestGenerationRef.current === generation) setIsTimelineLoading(false);
+      if (requestGenerationRef.current === generation && activeRepoRef.current === repoAtStart) setIsTimelineLoading(false);
     }
   }, [activeRepo, onCloseReleaseCreator, setActiveTab, t]);
 
-  useEffect(() => {
+  // Layout timing closes the render-to-effect window in which a stale promise
+  // could otherwise navigate the newly selected repository.
+  useLayoutEffect(() => {
     requestGenerationRef.current += 1;
     setShowTimeline(false);
+    setIsTimelineLoading(false);
     setTimelineCommits([]);
   }, [activeRepo]);
 

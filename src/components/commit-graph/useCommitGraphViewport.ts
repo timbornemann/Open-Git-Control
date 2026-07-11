@@ -94,6 +94,20 @@ export const useCommitGraphViewport = ({
     resetCommitListScroll();
   }, [navigationRequest, repoPath, resetCommitListScroll]);
 
+  const scrollToCommitIndex = useCallback(
+    (nodeIndex: number) => {
+      const container = logContainerRef.current?.parentElement;
+      if (!container || nodeIndex < 0) return;
+      const workingTreeRowOffset =
+        workingTreeStatus && (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0) ? 1 : 0;
+      const rowTop = (nodeIndex + workingTreeRowOffset) * ROW_HEIGHT;
+      const targetTop = Math.max(0, rowTop - Math.max(0, (container.clientHeight - ROW_HEIGHT) / 2));
+      container.scrollTo({ top: targetTop, behavior: 'smooth' });
+      setScrollTop(targetTop);
+    },
+    [logContainerRef, workingTreeStatus],
+  );
+
   useLayoutEffect(() => {
     if (!layout) return;
     const container = logContainerRef.current?.parentElement;
@@ -256,5 +270,6 @@ export const useCommitGraphViewport = ({
   return {
     scrollTop,
     containerHeight,
+    scrollToCommitIndex,
   };
 };

@@ -9,6 +9,7 @@ import { ReleaseMiniForm } from './ReleaseMiniForm';
 type GithubConnectedContentProps = Pick<
   AppSidebarProps,
   | 'githubUser'
+  | 'authError'
   | 'githubRepos'
   | 'githubReposHasMore'
   | 'isLoadingGithubRepos'
@@ -51,6 +52,7 @@ type GithubConnectedContentProps = Pick<
   | 'releaseForm'
   | 'setReleaseForm'
   | 'releaseSubmitting'
+  | 'releaseNotesGenerating'
   | 'releaseError'
   | 'releaseSuccess'
   | 'onCreateRelease'
@@ -58,6 +60,7 @@ type GithubConnectedContentProps = Pick<
 
 export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   githubUser,
+  authError,
   githubRepos,
   githubReposHasMore,
   isLoadingGithubRepos,
@@ -100,11 +103,13 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
+  releaseNotesGenerating,
   releaseError,
   releaseSuccess,
   onCreateRelease,
 }) => {
   const { t } = useI18n();
+  const releaseOwnerRepo = prOwnerRepo?.headOwner ? { owner: prOwnerRepo.headOwner, repo: prOwnerRepo.headRepo || prOwnerRepo.repo } : prOwnerRepo;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -134,6 +139,21 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           <LogOut size={14} />
         </button>
       </div>
+      {authError && (
+        <div
+          role="status"
+          style={{
+            padding: '8px',
+            borderRadius: '6px',
+            border: '1px solid var(--status-warning-border)',
+            background: 'var(--status-warning-soft)',
+            color: 'var(--status-warning)',
+            fontSize: '0.78rem',
+          }}
+        >
+          {authError}
+        </div>
+      )}
 
       <GithubRepoList
         repos={githubRepos}
@@ -181,10 +201,11 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             onMergePR={onMergePR}
           />
           <ReleaseMiniForm
-            ownerRepo={prOwnerRepo}
+            ownerRepo={releaseOwnerRepo}
             releaseForm={releaseForm}
             setReleaseForm={setReleaseForm}
             releaseSubmitting={releaseSubmitting}
+            releaseNotesGenerating={releaseNotesGenerating}
             releaseError={releaseError}
             releaseSuccess={releaseSuccess}
             onCreateRelease={onCreateRelease}

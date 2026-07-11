@@ -10,6 +10,10 @@ export const plannerClient = {
     return requireElectronPlannerApi().plannerGetData(...args);
   },
 
+  onDataChanged(callback: () => void): () => void {
+    return requireElectronPlannerApi().onPlannerDataChanged(callback);
+  },
+
   async ensureRepositoryProject(...args: Parameters<ElectronAPI['plannerEnsureRepositoryProject']>): ReturnType<ElectronAPI['plannerEnsureRepositoryProject']> {
     return requireElectronPlannerApi().plannerEnsureRepositoryProject(...args);
   },

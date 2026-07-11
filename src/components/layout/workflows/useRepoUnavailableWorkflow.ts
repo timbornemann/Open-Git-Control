@@ -3,6 +3,7 @@ import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { plannerClient } from '@/services/plannerClient';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -22,9 +23,9 @@ export const useRepoUnavailableWorkflow = ({ activeRepo, handleCloseRepo, setPla
   useEffect(() => {
     if (!gitClient.isAvailable()) return;
 
-    const unsubscribe = gitClient.onRepoUnavailable(() => {
-      const repoPath = activeRepo;
-      if (!repoPath) return;
+    const unsubscribe = gitClient.onRepoUnavailable((payload) => {
+      const repoPath = payload.repoPath;
+      if (!activeRepo || normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(activeRepo)) return;
       if (handlingRef.current === repoPath) return;
 
       handlingRef.current = repoPath;

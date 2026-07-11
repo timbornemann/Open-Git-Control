@@ -7,17 +7,27 @@ const gutterClassForKind = (kind: ConflictGutterKind): string => {
       return 'conflict-gutter-num conflict-gutter-num--ours';
     case 'theirs':
       return 'conflict-gutter-num conflict-gutter-num--theirs';
+    case 'base':
+      return 'conflict-gutter-num conflict-gutter-num--neutral';
     case 'marker':
       return 'conflict-gutter-num conflict-gutter-num--marker';
     case 'marker-start':
       return 'conflict-gutter-num conflict-gutter-num--marker-start';
     case 'marker-separator':
       return 'conflict-gutter-num conflict-gutter-num--marker-separator';
+    case 'marker-base':
+      return 'conflict-gutter-num conflict-gutter-num--marker';
     case 'marker-end':
       return 'conflict-gutter-num conflict-gutter-num--marker-end';
     default:
       return 'conflict-gutter-num conflict-gutter-num--neutral';
   }
+};
+
+const visualKindForConflictGutter = (kind: ConflictGutterKind): ConflictGutterKind => {
+  if (kind === 'base') return 'neutral';
+  if (kind === 'marker-base') return 'marker';
+  return kind;
 };
 
 export const ConflictSidePreview: React.FC<{ text: string; variant: 'ours' | 'theirs' }> = ({ text, variant }) => {
@@ -61,8 +71,9 @@ export const ConflictManualEditor = React.forwardRef<
         <div className="conflict-manual-gutter-col" aria-hidden>
           {lines.map((_, i) => {
             const kind = gutterKinds[i] || 'neutral';
+            const visualKind = visualKindForConflictGutter(kind);
             return (
-              <div key={i} className={`conflict-manual-gutter-line conflict-manual-gutter-line--${kind}`}>
+              <div key={i} className={`conflict-manual-gutter-line conflict-manual-gutter-line--${visualKind}`}>
                 <span className={gutterClassForKind(kind)}>{i + 1}</span>
               </div>
             );
@@ -72,7 +83,8 @@ export const ConflictManualEditor = React.forwardRef<
           <div className="conflict-manual-code-bg" aria-hidden>
             {lines.map((_, i) => {
               const kind = gutterKinds[i] || 'neutral';
-              return <div key={i} className={`conflict-manual-code-bg-line conflict-manual-code-bg-line--${kind}`} />;
+              const visualKind = visualKindForConflictGutter(kind);
+              return <div key={i} className={`conflict-manual-code-bg-line conflict-manual-code-bg-line--${visualKind}`} />;
             })}
           </div>
           <textarea

@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_OPENAI_MODEL = 'gpt-4.1-mini';
@@ -27,6 +27,20 @@ const getOpenAiModel = (settings: AppSettings): string => {
   return settings.openAiModel?.trim() || DEFAULT_OPENAI_MODEL;
 };
 
+const NON_TEXT_MODEL_PATTERNS = [
+  /(^|[-_.])(embedding|embed)([-_.]|$)/i,
+  /(^|[-_.])(whisper|transcri(?:be|ption))([-_.]|$)/i,
+  /(^|[-_.])(tts|speech)([-_.]|$)/i,
+  /(^|[-_.])(dall-e|image|vision-preview)([-_.]|$)/i,
+  /(^|[-_.])(moderation)([-_.]|$)/i,
+  /(^|[-_.])(realtime|audio)([-_.]|$)/i,
+];
+
+export const isLikelyTextChatModel = (modelId: string): boolean => {
+  const normalized = modelId.trim();
+  return Boolean(normalized) && !NON_TEXT_MODEL_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
 export class OpenAiProvider implements AiProvider {
   readonly id = 'openai' as const;
 
@@ -41,9 +55,29 @@ export class OpenAiProvider implements AiProvider {
     }
 
     const model = this.getSelectedModel(settings);
-    const response = await fetch(`${getOpenAiBaseUrl(settings)}/models/${encodeURIComponent(model)}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    if (!isLikelyTextChatModel(model)) {
+      throw new Error(`OpenAI Modell "${model}" ist kein unterstuetztes Text-Chat-Modell.`);
+    }
+
+    // Use the same endpoint as generation. GET /models only proves that an ID
+    // exists; embedding/image/audio models otherwise appeared as healthy even
+    // though every real chat request failed.
+    const response = await fetchWithTimeout(
+      `${getOpenAiBaseUrl(settings)}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'Reply with OK.' }],
+          max_completion_tokens: 1,
+        }),
+      },
+      AI_DISCOVERY_TIMEOUT_MS,
+    );
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`OpenAI nicht erreichbar (${response.status}): ${text || response.statusText}`);
@@ -58,9 +92,11 @@ export class OpenAiProvider implements AiProvider {
       throw new Error('OpenAI API key fehlt.');
     }
 
-    const response = await fetch(`${getOpenAiBaseUrl(settings)}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const response = await fetchWithTimeout(
+      `${getOpenAiBaseUrl(settings)}/models`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+      AI_DISCOVERY_TIMEOUT_MS,
+    );
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`OpenAI Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);
@@ -68,7 +104,7 @@ export class OpenAiProvider implements AiProvider {
 
     const data = (await response.json()) as { data?: Array<{ id?: unknown }> };
     const models = Array.isArray(data.data) ? data.data : [];
-    return uniqueSorted(models.map((model) => safeString(model.id).trim()).filter(Boolean));
+    return uniqueSorted(models.map((model) => safeString(model.id).trim()).filter(isLikelyTextChatModel));
   }
 
   async generateText({ settings, systemPrompt, userPrompt, getOpenAiApiKey, shouldCancel, timeoutMs }: AiTextRequest): Promise<string> {

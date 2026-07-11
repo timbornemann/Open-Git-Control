@@ -99,8 +99,44 @@ describe('GitService scheduler classification', () => {
       await service.runCommandAtPath(repoPath, ['tag', '-l']);
       await service.runCommandAtPath(repoPath, ['submodule', 'status', '--recursive']);
       await service.runCommandAtPath(repoPath, ['branch', '-d', 'old-branch']);
+      await service.runCommandAtPath(repoPath, ['branch', '--set-upstream-to=origin/main', 'main']);
+      await service.runCommandAtPath(repoPath, ['branch', 'new-branch']);
+      await service.runCommandAtPath(repoPath, ['branch', '--track', 'tracked-branch', 'origin/main']);
+      await service.runCommandAtPath(repoPath, ['branch', '--list', 'feature/*']);
+      await service.runCommandAtPath(repoPath, ['remote', 'set-branches', 'origin', 'main']);
+      await service.runCommandAtPath(repoPath, ['rm', '-f', '--', 'gone.txt']);
+      await service.runCommandAtPath(repoPath, ['init']);
+      await service.runCommandAtPath(repoPath, ['update-ref', 'refs/heads/main', 'a'.repeat(40)]);
+      await service.runCommandAtPath(repoPath, ['symbolic-ref', 'HEAD']);
+      await service.runCommandAtPath(repoPath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+      await service.runCommandAtPath(repoPath, ['config', '--get', 'user.name']);
+      await service.runCommandAtPath(repoPath, ['config', 'user.name', 'Scheduler Test']);
+      await service.runCommandAtPath(repoPath, ['restore', '--', 'file.txt']);
+      await service.runCommandAtPath(repoPath, ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'configured']);
+      await service.runCommandAtPath(repoPath, ['--no-pager', 'status', '--short']);
 
-      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual(['polling', 'polling', 'polling', 'polling', 'write']);
+      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual([
+        'polling',
+        'polling',
+        'polling',
+        'polling',
+        'write',
+        'write',
+        'write',
+        'write',
+        'polling',
+        'write',
+        'write',
+        'write',
+        'write',
+        'polling',
+        'write',
+        'polling',
+        'write',
+        'write',
+        'write',
+        'polling',
+      ]);
     } finally {
       fs.rmSync(repoPath, { recursive: true, force: true });
     }

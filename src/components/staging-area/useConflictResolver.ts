@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { normalizeMergeConflictFileContent } from '@/utils/conflictLineGutter';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { basename, buildConflictResolution, countConflictMarkerLines, detectLineEnding, parseConflictBlocks, replaceConflictBlock } from './utils';
+import {
+  basename,
+  buildConflictResolution,
+  convertLineEndings,
+  countConflictMarkerLines,
+  detectLineEnding,
+  hasConflictMarkerLines,
+  parseConflictBlocks,
+  replaceConflictBlock,
+} from './utils';
 import type { ConfirmDialogState, ConflictEditorState, ConflictResolutionChoice, GitStatusWithConflicts } from './types';
 import { useConflictAutoOpen } from './useConflictAutoOpen';
 import { useConflictBlockCounts } from './useConflictBlockCounts';
 import { useConflictNavigation } from './useConflictNavigation';
+import { useSequencerOperation } from './useSequencerOperation';
 import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from './conflictAbortDialogs';
 
 type Params = {
@@ -39,8 +48,11 @@ export const useConflictResolver = ({
   const [conflictEditor, setConflictEditor] = useState<ConflictEditorState | null>(null);
   const [isConflictEditorLoading, setIsConflictEditorLoading] = useState(false);
   const [selectedConflictBlockIndex, setSelectedConflictBlockIndex] = useState(0);
+  const sequencerOperation = useSequencerOperation(repoPath);
 
   const conflictManualScrollRef = useRef<HTMLDivElement>(null);
+  const conflictEditorRef = useRef<ConflictEditorState | null>(null);
+  conflictEditorRef.current = conflictEditor;
   const repoGenerationRef = useRef(0);
   const editorRequestRef = useRef(0);
   const editorSessionRef = useRef(0);
@@ -65,9 +77,9 @@ export const useConflictResolver = ({
     }
   }, [status?.conflicts]);
 
-  const openConflictEditor = useCallback(
+  const loadConflictEditor = useCallback(
     async (filePath: string, initialBlockIndex = 0) => {
-      if (!gitClient.isAvailable()) return;
+      if (!repoPath || !gitClient.isAvailable()) return;
       const repoGeneration = repoGenerationRef.current;
       const requestId = ++editorRequestRef.current;
       const editorSession = ++editorSessionRef.current;
@@ -75,17 +87,17 @@ export const useConflictResolver = ({
         repoGeneration === repoGenerationRef.current && requestId === editorRequestRef.current && editorSession === editorSessionRef.current;
       setIsConflictEditorLoading(true);
       try {
-        const result = await gitClient.readRepoFile(filePath);
+        const result = await gitClient.readRepoFile(filePath, repoPath);
         if (!isCurrentRequest()) return;
         if (!result.success || typeof result.data !== 'string') {
           setToast({ msg: result.error || tr(`Datei konnte nicht geladen werden: ${filePath}`, `Could not load file: ${filePath}`), isError: true });
           return;
         }
-        const normalized = normalizeMergeConflictFileContent(result.data);
-        const parsedBlocks = parseConflictBlocks(normalized);
+        const content = result.data;
+        const parsedBlocks = parseConflictBlocks(content);
         const requestedIndex = Number.isFinite(initialBlockIndex) ? Math.max(0, Math.floor(initialBlockIndex)) : 0;
         const boundedIndex = parsedBlocks.length > 0 ? Math.min(requestedIndex, parsedBlocks.length - 1) : 0;
-        setConflictEditor({ filePath, originalContent: normalized, content: normalized, isSaving: false });
+        setConflictEditor({ filePath, originalContent: content, content, lineEnding: detectLineEnding(content), isSaving: false });
         setSelectedConflictBlockIndex(boundedIndex);
       } catch (error: any) {
         if (!isCurrentRequest()) return;
@@ -94,7 +106,38 @@ export const useConflictResolver = ({
         if (isCurrentRequest()) setIsConflictEditorLoading(false);
       }
     },
-    [setToast, tr],
+    [repoPath, setToast, tr],
+  );
+
+  const openConflictEditor = useCallback(
+    async (filePath: string, initialBlockIndex = 0) => {
+      if (conflictEditor && conflictEditor.filePath !== filePath && conflictEditor.content !== conflictEditor.originalContent) {
+        const sourcePath = conflictEditor.filePath;
+        const repoGeneration = repoGenerationRef.current;
+        setConfirmDialog({
+          variant: 'confirm',
+          title: tr('Ungespeicherte Konfliktloesung verwerfen?', 'Discard unsaved conflict resolution?'),
+          message: tr(
+            'Der sichtbare Konfliktentwurf wurde noch nicht gespeichert. Beim Wechsel zur anderen Datei gehen diese Aenderungen verloren.',
+            'The visible conflict draft has not been saved. Switching files will discard these changes.',
+          ),
+          contextItems: [
+            { label: tr('Aktuelle Datei', 'Current file'), value: sourcePath },
+            { label: tr('Zieldatei', 'Target file'), value: filePath },
+          ],
+          irreversible: true,
+          consequences: tr('Nicht gespeicherte Editor-Aenderungen werden verworfen.', 'Unsaved editor changes will be discarded.'),
+          confirmLabel: tr('Entwurf verwerfen', 'Discard draft'),
+          onConfirm: async () => {
+            if (repoGenerationRef.current !== repoGeneration || conflictEditorRef.current?.filePath !== sourcePath) return;
+            await loadConflictEditor(filePath, initialBlockIndex);
+          },
+        });
+        return;
+      }
+      await loadConflictEditor(filePath, initialBlockIndex);
+    },
+    [conflictEditor, loadConflictEditor, setConfirmDialog, tr],
   );
 
   const reloadActiveConflictEditor = useCallback(async () => {
@@ -114,12 +157,15 @@ export const useConflictResolver = ({
   }, [conflictBlocks, selectedConflictBlockIndex]);
 
   const conflictMarkerStats = useMemo(() => {
-    if (!conflictEditor) return { starts: 0, separators: 0, ends: 0 };
+    if (!conflictEditor) return { starts: 0, bases: 0, separators: 0, ends: 0 };
     return countConflictMarkerLines(conflictEditor.content);
   }, [conflictEditor]);
 
-  const hasRawConflictMarkers = conflictMarkerStats.starts + conflictMarkerStats.separators + conflictMarkerStats.ends > 0;
-  const hasBalancedConflictMarkers = conflictMarkerStats.starts === conflictMarkerStats.separators && conflictMarkerStats.starts === conflictMarkerStats.ends;
+  const hasRawConflictMarkers = conflictMarkerStats.starts + conflictMarkerStats.bases + conflictMarkerStats.separators + conflictMarkerStats.ends > 0;
+  const hasBalancedConflictMarkers =
+    conflictMarkerStats.starts === conflictMarkerStats.separators &&
+    conflictMarkerStats.starts === conflictMarkerStats.ends &&
+    conflictMarkerStats.bases <= conflictMarkerStats.starts;
   const isStructuredConflictViewLocked = hasRawConflictMarkers && (!hasBalancedConflictMarkers || conflictBlocks.length !== conflictMarkerStats.starts);
   const isConflictEditorDirty = Boolean(conflictEditor && conflictEditor.content !== conflictEditor.originalContent);
 
@@ -187,46 +233,6 @@ export const useConflictResolver = ({
     [conflictEditor, setToast, t, tr],
   );
 
-  const markConflictResolved = useCallback(
-    (filePath: string) => git(['conflictMarkResolved', filePath], tr(`${basename(filePath)} als geloest markiert`, `Marked ${basename(filePath)} as resolved`)),
-    [git, tr],
-  );
-
-  const markConflictResolvedAndSync = useCallback(
-    async (filePath: string) => {
-      if (activeConflictActionRef.current !== null) return;
-      if (conflictEditor?.filePath === filePath && hasRawConflictMarkers) {
-        setToast({
-          msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'),
-          isError: true,
-        });
-        return;
-      }
-      const actionId = ++nextConflictActionIdRef.current;
-      const repoGeneration = repoGenerationRef.current;
-      const editorSession = editorSessionRef.current;
-      activeConflictActionRef.current = actionId;
-      try {
-        const didResolve = await markConflictResolved(filePath);
-        if (
-          !didResolve ||
-          repoGeneration !== repoGenerationRef.current ||
-          editorSession !== editorSessionRef.current ||
-          activeConflictActionRef.current !== actionId
-        ) {
-          return;
-        }
-        if (conflictEditor?.filePath === filePath) {
-          setConflictEditor(null);
-          setSelectedConflictBlockIndex(0);
-        }
-      } finally {
-        if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
-      }
-    },
-    [conflictEditor, hasRawConflictMarkers, markConflictResolved, setToast, t],
-  );
-
   const resolveConflictByDeletion = useCallback(
     async (filePath: string) => {
       if (activeConflictActionRef.current !== null) return;
@@ -270,9 +276,8 @@ export const useConflictResolver = ({
 
   const saveConflictEditor = useCallback(
     async (markResolvedAfterSave: boolean) => {
-      if (!gitClient.isAvailable() || !conflictEditor || activeConflictActionRef.current !== null) return;
-      const pendingBlocks = parseConflictBlocks(conflictEditor.content);
-      if (markResolvedAfterSave && pendingBlocks.length > 0) {
+      if (!repoPath || !gitClient.isAvailable() || !conflictEditor || activeConflictActionRef.current !== null) return;
+      if (markResolvedAfterSave && hasConflictMarkerLines(conflictEditor.content)) {
         setToast({
           msg: t('generated.components.staging_area.useconflictresolver.before_save_mark_as_resolved_all_conflict_markers_must_b_f4e68eaf'),
           isError: true,
@@ -280,7 +285,7 @@ export const useConflictResolver = ({
         return;
       }
       const targetPath = conflictEditor.filePath;
-      const targetContent = conflictEditor.content;
+      const targetContent = convertLineEndings(conflictEditor.content, conflictEditor.lineEnding);
       const repoGeneration = repoGenerationRef.current;
       const editorSession = editorSessionRef.current;
       const actionId = ++nextConflictActionIdRef.current;
@@ -292,19 +297,20 @@ export const useConflictResolver = ({
         return { ...prev, isSaving: true };
       });
       try {
-        const writeResult = await gitClient.writeRepoFile(targetPath, targetContent);
+        const writeResult = await gitClient.writeRepoFile(targetPath, targetContent, repoPath);
         if (!isCurrentAction()) return;
         if (!writeResult.success) throw new Error(writeResult.error || t('generated.components.staging_area.useconflictresolver.could_not_save_file_6d41241a'));
+        setConflictEditor((prev) => {
+          if (!prev || prev.filePath !== targetPath) return prev;
+          return { ...prev, content: targetContent, originalContent: targetContent, isSaving: markResolvedAfterSave };
+        });
         if (markResolvedAfterSave) {
-          const stageResult = await gitClient.runGitCommand('conflictMarkResolved', targetPath);
+          const stageResult = await gitClient.runGitCommandForRepo(repoPath, 'conflictMarkResolved', targetPath);
           if (!isCurrentAction()) return;
           if (!stageResult.success)
             throw new Error(stageResult.error || t('generated.components.staging_area.useconflictresolver.could_not_mark_file_as_resolved_f7ee9c12'));
         }
-        setConflictEditor((prev) => {
-          if (!prev || prev.filePath !== targetPath) return prev;
-          return { ...prev, content: targetContent, originalContent: targetContent, isSaving: false };
-        });
+        setConflictEditor((prev) => (prev?.filePath === targetPath ? { ...prev, isSaving: false } : prev));
         setToast({
           msg: markResolvedAfterSave
             ? tr(`${basename(targetPath)} gespeichert + geloest`, `Saved ${basename(targetPath)} + resolved`)
@@ -313,6 +319,10 @@ export const useConflictResolver = ({
         });
         if (onRepoChanged) onRepoChanged();
         await refresh();
+        if (markResolvedAfterSave && isCurrentAction()) {
+          setConflictEditor(null);
+          setSelectedConflictBlockIndex(0);
+        }
       } catch (error: any) {
         if (!isCurrentAction()) return;
         setConflictEditor((prev) => {
@@ -324,7 +334,18 @@ export const useConflictResolver = ({
         if (activeConflictActionRef.current === actionId) activeConflictActionRef.current = null;
       }
     },
-    [conflictEditor, onRepoChanged, refresh, setToast, t, tr],
+    [conflictEditor, onRepoChanged, refresh, repoPath, setToast, t, tr],
+  );
+
+  const markConflictResolvedAndSync = useCallback(
+    async (filePath: string) => {
+      if (!conflictEditor || conflictEditor.filePath !== filePath) return;
+      // The stage step must always follow persistence of the exact draft shown
+      // in the editor. Staging the existing working-tree file directly can
+      // otherwise commit conflict markers that the user already resolved here.
+      await saveConflictEditor(true);
+    },
+    [conflictEditor, saveConflictEditor],
   );
 
   const mergeContinue = useCallback(
@@ -413,6 +434,7 @@ export const useConflictResolver = ({
     conflictMarkerStats,
     isStructuredConflictViewLocked,
     isConflictEditorDirty,
+    sequencerOperation,
     openConflictEditor,
     reloadActiveConflictEditor,
     applyConflictChoiceToSelected,

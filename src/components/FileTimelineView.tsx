@@ -59,6 +59,10 @@ export const FileTimelineView: React.FC<FileTimelineViewProps> = ({ onClose, com
     // Build the flat list of active files up to the current index
     const activeFiles = new Map<string, 'added' | 'modified' | 'deleted' | 'renamed' | 'unchanged'>();
 
+    for (const filePath of commits[0]?.baselineFiles || []) {
+      activeFiles.set(filePath, 'unchanged');
+    }
+
     for (let i = 0; i <= currentIndex; i++) {
       const commit = commits[i];
       if (!commit) continue;

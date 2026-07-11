@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getElectronApi } from '@/services/electronApi';
@@ -11,7 +11,6 @@ type Toast = { msg: string; isError: boolean };
 type WorkspaceBridge = {
   activeRepo: string | null;
   addOpenRepo: (repoPath: string) => Promise<void>;
-  setActiveRepo: Dispatch<SetStateAction<string | null>>;
   setActiveTab: (tab: AppTabId) => void;
 };
 
@@ -41,7 +40,7 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
 
     let existingOriginUrl: string | null = null;
     try {
-      const originResult = await gitClient.getRemoteUrl('origin');
+      const originResult = await gitClient.runGitCommandForRepo(sourceRepoPath, 'remote', 'get-url', 'origin');
       if (originResult.success) {
         const rawOrigin = String(originResult.data || '').trim();
         existingOriginUrl = rawOrigin || null;
@@ -79,23 +78,19 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
     }
 
     const switchedPath = cloneResult.repoPath;
-    const ensureRecoveredRepoSelected = async () => {
-      await electronApi.setRepoPath(switchedPath);
-      workspace.setActiveRepo(switchedPath);
-    };
-
+    // addOpenRepo performs the single sequenced/canonical repository switch.
+    // Re-selecting the path before every follow-up command used to bypass the
+    // workspace transition guard and could switch back after the user had
+    // deliberately selected another repository.
     await workspace.addOpenRepo(switchedPath);
-    await ensureRecoveredRepoSelected();
     // Keep the original bare repo open to avoid a close/switch race that could
     // accidentally redirect follow-up commands to an unrelated repository.
     triggerRefresh();
 
-    await ensureRecoveredRepoSelected();
-
-    const headAfterCloneResult = await gitClient.runGitCommand('show', '--quiet', '--format=%H', 'HEAD');
+    const headAfterCloneResult = await gitClient.runGitCommandForRepo(switchedPath, 'show', '--quiet', '--format=%H', 'HEAD');
     const hasLocalCommit = Boolean(headAfterCloneResult.success && String(headAfterCloneResult.data || '').trim());
     if (!hasLocalCommit) {
-      const remoteBranchesResult = await gitClient.runGitCommand('branch', '-r');
+      const remoteBranchesResult = await gitClient.runGitCommandForRepo(switchedPath, 'branch', '-r');
       const remoteBranches = remoteBranchesResult.success
         ? String(remoteBranchesResult.data || '')
             .split('\n')
@@ -110,12 +105,11 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
 
       if (preferredRemoteBranch) {
         const localBranchName = preferredRemoteBranch.replace(/^origin\//, '').trim();
-        await ensureRecoveredRepoSelected();
-        const checkoutTracked = await gitClient.checkoutRemoteBranch(preferredRemoteBranch, localBranchName);
+        const checkoutArgs = gitClient.buildCheckoutRemoteBranchArgs(preferredRemoteBranch, localBranchName);
+        const checkoutTracked = await gitClient.runGitCommandForRepo(switchedPath, checkoutArgs[0], ...checkoutArgs.slice(1));
 
         if (!checkoutTracked.success) {
-          await ensureRecoveredRepoSelected();
-          const checkoutForced = await gitClient.runGitCommand('checkout', '-B', localBranchName, preferredRemoteBranch);
+          const checkoutForced = await gitClient.runGitCommandForRepo(switchedPath, 'checkout', '-B', localBranchName, preferredRemoteBranch);
           if (!checkoutForced.success) {
             workspace.setActiveTab('repo');
             setGitActionToast({
@@ -136,8 +130,7 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
     const originPointsToSource = Boolean(existingOriginUrl) && currentOriginPointer === sourcePointer;
 
     if (!existingOriginUrl || originPointsToSource) {
-      await ensureRecoveredRepoSelected();
-      const removeOriginResult = await gitClient.removeRemote('origin');
+      const removeOriginResult = await gitClient.runGitCommandForRepo(switchedPath, 'remote', 'remove', 'origin');
       if (!removeOriginResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({
@@ -149,8 +142,7 @@ export const useBareRepoRecoveryWorkflow = ({ workspace, settings, triggerRefres
         return false;
       }
     } else {
-      await ensureRecoveredRepoSelected();
-      const setUrlResult = await gitClient.setRemoteUrl('origin', existingOriginUrl);
+      const setUrlResult = await gitClient.runGitCommandForRepo(switchedPath, 'remote', 'set-url', 'origin', existingOriginUrl);
       if (!setUrlResult.success) {
         workspace.setActiveTab('repo');
         setGitActionToast({

@@ -14,6 +14,8 @@ describe('shared git error classification', () => {
   it('does not classify ordinary git failures as repository unavailable', () => {
     expect(isRepoUnavailableError('fatal: bad revision HEAD~12')).toBe(false);
     expect(isRepoUnavailableError('merge conflict in src/App.tsx')).toBe(false);
+    expect(isRepoUnavailableError('fatal: pathspec missing.txt: No such file or directory')).toBe(false);
+    expect(isRepoUnavailableError('spawn git ENOENT: No such file or directory')).toBe(false);
     expect(isRepoUnavailableError('')).toBe(false);
     expect(isRepoUnavailableError(null)).toBe(false);
   });

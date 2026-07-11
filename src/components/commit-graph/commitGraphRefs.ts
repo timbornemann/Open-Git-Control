@@ -4,16 +4,17 @@ import { graphEdgeKey } from './CommitGraphSvg';
 
 export type RefKind = 'head' | 'local' | 'remote' | 'tag' | 'head-pointer';
 
-export const getRefKind = (ref: string): RefKind => {
+export const getRefKind = (ref: string, localBranchNames?: ReadonlySet<string>): RefKind => {
   if (ref.startsWith('tag:')) return 'tag';
   if (ref.startsWith('HEAD ->')) return 'head';
   if (ref === 'HEAD') return 'head-pointer';
+  if (localBranchNames?.has(ref)) return 'local';
   if (ref.includes('/')) return 'remote';
   return 'local';
 };
 
-const getRefPriority = (ref: string) => {
-  const kind = getRefKind(ref);
+const getRefPriority = (ref: string, localBranchNames?: ReadonlySet<string>) => {
+  const kind = getRefKind(ref, localBranchNames);
   if (kind === 'head') return 0;
   if (kind === 'local') return 1;
   if (kind === 'remote') return 2;
@@ -21,9 +22,9 @@ const getRefPriority = (ref: string) => {
   return 4;
 };
 
-export const sortRefs = (refs: string[]) =>
+export const sortRefs = (refs: string[], localBranchNames?: ReadonlySet<string>) =>
   [...refs].sort((a, b) => {
-    const prioDiff = getRefPriority(a) - getRefPriority(b);
+    const prioDiff = getRefPriority(a, localBranchNames) - getRefPriority(b, localBranchNames);
     return prioDiff !== 0 ? prioDiff : a.localeCompare(b);
   });
 

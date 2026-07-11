@@ -1,4 +1,5 @@
 export type RepoUnavailablePayload = {
+  repoPath: string;
   command: string;
   error: string;
 };
@@ -11,8 +12,6 @@ export const REPO_UNAVAILABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /no repository path set/i,
   /cannot change to/i,
   /unable to get current working directory/i,
-  /no such file or directory/i,
-  /the system cannot find the path specified/i,
   /\buv_cwd\b/i,
 ];
 

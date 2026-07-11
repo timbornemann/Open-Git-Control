@@ -210,7 +210,7 @@ describe('workflow hooks', () => {
 
   it('gibt den Git-Workflow-Lock nach einem Befehl wieder frei', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
-    const runGitCommandSpy = vi.spyOn(gitClient, 'runGitCommand').mockResolvedValue({ success: true, data: '' });
+    const runGitCommandSpy = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
     const setGitActionToast = vi.fn();
     const workspace = {
       activeRepo: 'C:\\repos\\demo',
@@ -329,22 +329,13 @@ describe('workflow hooks', () => {
   });
 
   it('fragt vor automatischem Initial-Commit nach, wenn lokale Aenderungen vorhanden sind', async () => {
-    (
-      window as unknown as {
-        electronAPI: {
-          runGitCommand: ReturnType<typeof vi.fn>;
-        };
-      }
-    ).electronAPI = {
-      runGitCommand: vi.fn().mockResolvedValue({
-        success: true,
-        data: '?? README.md\n M src/app.ts',
-      }),
-    };
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '?? README.md\n M src/app.ts' });
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();
     const hook = renderHook(() =>
       useInitialCommitRecoveryWorkflow({
+        getActiveRepo: () => 'C:\\repos\\demo',
         recoverBareRepoForPush: vi.fn().mockResolvedValue(false),
         setActiveTab,
         setConfirmDialog,
@@ -373,7 +364,7 @@ describe('workflow hooks', () => {
   });
 
   it('raeumt ein nicht mehr verfuegbares Repository samt Planungsdaten auf', async () => {
-    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    let repoUnavailableListener: ((payload: { repoPath: string; command: string; error: string }) => void) | undefined;
     const unsubscribe = vi.fn();
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
@@ -402,8 +393,8 @@ describe('workflow hooks', () => {
     );
 
     act(() => {
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] not a git repository' });
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] repeated' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] not a git repository' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] repeated' });
     });
 
     expect(setConfirmDialog).toHaveBeenCalledTimes(1);
@@ -431,7 +422,7 @@ describe('workflow hooks', () => {
   });
 
   it('ignoriert Repo-unavailable Events ohne aktives Repository oder Git-Client', () => {
-    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    let repoUnavailableListener: ((payload: { repoPath: string; command: string; error: string }) => void) | undefined;
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
       repoUnavailableListener = callback;
@@ -451,7 +442,7 @@ describe('workflow hooks', () => {
     );
 
     act(() => {
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] missing' });
     });
 
     expect(setConfirmDialog).not.toHaveBeenCalled();
@@ -474,7 +465,7 @@ describe('workflow hooks', () => {
   });
 
   it('setzt den Repo-unavailable Guard bei Cancel zurueck und kann ohne Planner aufraeumen', async () => {
-    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    let repoUnavailableListener: ((payload: { repoPath: string; command: string; error: string }) => void) | undefined;
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
       repoUnavailableListener = callback;
@@ -498,12 +489,12 @@ describe('workflow hooks', () => {
     );
 
     act(() => {
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] missing' });
     });
     const firstDialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
     act(() => {
       firstDialog.onCancel?.();
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] still missing' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] still missing' });
     });
 
     expect(setConfirmDialog).toHaveBeenCalledTimes(2);
@@ -520,7 +511,7 @@ describe('workflow hooks', () => {
   });
 
   it('meldet Planner-Cleanup-Fehler beim Repo-unavailable Aufraeumen', async () => {
-    let repoUnavailableListener: ((payload: { command: string; error: string }) => void) | undefined;
+    let repoUnavailableListener: ((payload: { repoPath: string; command: string; error: string }) => void) | undefined;
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'onRepoUnavailable').mockImplementation((callback) => {
       repoUnavailableListener = callback;
@@ -546,7 +537,7 @@ describe('workflow hooks', () => {
     );
 
     act(() => {
-      repoUnavailableListener?.({ command: 'status', error: '[REPO_UNAVAILABLE] missing' });
+      repoUnavailableListener?.({ repoPath: 'C:\\repos\\demo', command: 'status', error: '[REPO_UNAVAILABLE] missing' });
     });
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
 

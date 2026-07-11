@@ -65,7 +65,7 @@ describe('StashPanel operation guards', () => {
   it('runs a confirmed drop only once when the confirmation is clicked twice', async () => {
     vi.spyOn(gitClient, 'getStashes').mockResolvedValue({ success: true, data: [stash('stash@{0}', 'first stash')] });
     const dropResult = deferred<{ success: true; data: string }>();
-    const runGitCommand = vi.spyOn(gitClient, 'runGitCommand').mockImplementation(() => dropResult.promise);
+    const runGitCommand = vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(() => dropResult.promise);
     const panel = renderPanel('C:\\repos\\a');
 
     act(() => panel.container.querySelector<HTMLButtonElement>('[title="Show stashes"]')!.click());
@@ -78,7 +78,7 @@ describe('StashPanel operation guards', () => {
     });
 
     expect(runGitCommand).toHaveBeenCalledTimes(1);
-    expect(runGitCommand).toHaveBeenCalledWith('stash', 'drop', 'stash@{0}');
+    expect(runGitCommand).toHaveBeenCalledWith('C:\\repos\\a', 'stash', 'drop', 'stash@{0}');
     await act(async () => {
       dropResult.resolve({ success: true, data: '' });
       await dropResult.promise;

@@ -84,7 +84,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   onCherryPickContinue,
   onCherryPickAbort,
 }) => {
-  if (visibleConflicts.length === 0) {
+  if (visibleConflicts.length === 0 && !showOperationActions) {
     return null;
   }
 
@@ -118,7 +118,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
         onCherryPickAbort={onCherryPickAbort}
       />
 
-      {isCompact ? (
+      {visibleConflicts.length === 0 ? null : isCompact ? (
         <ConflictFileList
           visibleConflicts={visibleConflicts}
           conflictEditor={conflictEditor}

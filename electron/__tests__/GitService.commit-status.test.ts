@@ -114,6 +114,26 @@ describe('GitService stagePaths', () => {
       fs.rmSync(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   });
+
+  it('unstages an unborn-branch file with later working-tree edits without deleting it', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-unborn-unstage-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
+      const filePath = path.join(repoDir, 'first file.txt');
+      fs.writeFileSync(filePath, 'staged\n', 'utf8');
+      execFileSync('git', ['add', 'first file.txt'], { cwd: repoDir, stdio: 'ignore' });
+      fs.writeFileSync(filePath, 'edited after staging\n', 'utf8');
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+      await expect(service.runCommand(['rm', '--cached', '-f', '--', 'first file.txt'])).resolves.toBe("rm 'first file.txt'");
+
+      expect(fs.readFileSync(filePath, 'utf8')).toBe('edited after staging\n');
+      expect(execFileSync('git', ['status', '--porcelain=v1'], { cwd: repoDir, encoding: 'utf8' }).trim()).toBe('?? "first file.txt"');
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
+  });
 });
 
 describe('GitService status and stash helpers', () => {

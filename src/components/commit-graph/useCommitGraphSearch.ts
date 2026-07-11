@@ -9,10 +9,11 @@ type UseCommitGraphSearchParams = {
   layout: GraphLayout | null;
   selectedHash?: string | null;
   onSelectCommit?: (hash: string | null) => void;
+  revealCommit?: (hash: string) => void;
   t: CatalogTranslateFn;
 };
 
-export const useCommitGraphSearch = ({ layout, selectedHash, onSelectCommit, t }: UseCommitGraphSearchParams) => {
+export const useCommitGraphSearch = ({ layout, selectedHash, onSelectCommit, revealCommit, t }: UseCommitGraphSearchParams) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [activeSearchPanel, setActiveSearchPanel] = useState<SearchPanel>('commits');
@@ -74,12 +75,17 @@ export const useCommitGraphSearch = ({ layout, selectedHash, onSelectCommit, t }
       const hash = matchedNodes[nextIndex].commit.hash;
       onSelectCommit?.(hash);
 
+      if (revealCommit) {
+        revealCommit(hash);
+        return;
+      }
+
       requestAnimationFrame(() => {
         const row = document.querySelector('[data-commit-hash="' + hash + '"]') as HTMLElement | null;
         row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       });
     },
-    [matchCursor, matchedNodes, onSelectCommit],
+    [matchCursor, matchedNodes, onSelectCommit, revealCommit],
   );
 
   return {

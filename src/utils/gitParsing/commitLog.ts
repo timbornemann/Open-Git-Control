@@ -43,6 +43,40 @@ function splitGitLogRecord(record: string): string[] {
 export function parseGitLog(logOutput: string): GitCommit[] {
   if (!logOutput) return [];
 
+  // `git log -L` interleaves patches with headers. HistoryService prefixes
+  // those headers with RS (0x1e), allowing us to isolate each header up to its
+  // terminating NUL and ignore the patch without corrupting the next hash.
+  if (logOutput.startsWith('\x1e')) {
+    return logOutput
+      .split('\x1e')
+      .slice(1)
+      .map((record) => {
+        const terminator = record.indexOf(LOG_RECORD_SEPARATOR);
+        return record.slice(0, terminator >= 0 ? terminator : record.length);
+      })
+      .filter(Boolean)
+      .map((header) => {
+        const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(header);
+        return {
+          hash,
+          abbrevHash,
+          author,
+          date,
+          subject,
+          parentHashes: parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [],
+          refs: refsRaw
+            ? refsRaw
+                .split(LOG_REF_SEPARATOR)
+                .map((ref) => ref.trim())
+                .filter(Boolean)
+            : [],
+          stats: null,
+          statsState: 'missing' as const,
+        };
+      })
+      .filter((commit) => /^[0-9a-f]{7,64}$/i.test(commit.hash));
+  }
+
   const tokens = logOutput.split(LOG_RECORD_SEPARATOR);
   const commits: GitCommit[] = [];
   let current: GitCommit | null = null;
@@ -114,21 +148,43 @@ export function parseGitLog(logOutput: string): GitCommit[] {
 export interface CommitFileDetail {
   status: string;
   path: string;
+  oldPath?: string;
 }
 
 export function parseCommitDetails(showOutput: string): CommitFileDetail[] {
-  if (!showOutput.trim()) return [];
+  if (!showOutput) return [];
 
   const files: CommitFileDetail[] = [];
+
+  if (showOutput.includes('\x00')) {
+    const tokens = showOutput.split('\x00').filter((token) => token.length > 0);
+    for (let index = 0; index < tokens.length;) {
+      const status = tokens[index++] || '';
+      if (!/^[A-Z][0-9]*$/.test(status)) continue;
+      if (status.startsWith('R') || status.startsWith('C')) {
+        const oldPath = tokens[index++] || '';
+        const path = tokens[index++] || '';
+        if (path) files.push({ status, path, oldPath });
+        continue;
+      }
+      const path = tokens[index++] || '';
+      if (path) files.push({ status, path });
+    }
+    return files;
+  }
+
+  if (!showOutput.trim()) return [];
   const lines = showOutput.split('\n');
 
   for (const line of lines) {
     if (!line.trim()) continue;
-    const match = line.match(/^([A-Z0-9]+)\s+(.+)$/);
+    const match = line.match(/^([A-Z][0-9]*)\s+(.+)$/);
     if (match) {
+      const renameParts = /^(R\d*|C\d*)$/.test(match[1]) ? match[2].split('\t') : [];
       files.push({
         status: match[1],
-        path: match[2],
+        path: renameParts.length >= 2 ? renameParts.at(-1) || '' : match[2],
+        ...(renameParts.length >= 2 ? { oldPath: renameParts[0] } : {}),
       });
     }
   }

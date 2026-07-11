@@ -4,6 +4,7 @@ import type { GitStatusDetailed } from '@/utils/gitParsing';
 import type { GraphNode } from '@/utils/graphLayout';
 import { getRefKind, resolveHighlightableBranchRef, sortRefs } from './commitGraphRefs';
 import { ROW_HEIGHT } from './commitGraphConstants';
+import type { WorkingTreeChangeSummary } from './commitGraphWorkingTree';
 
 type CommitGraphRowStyle = CSSProperties & {
   '--branch-focus-color'?: string;
@@ -20,6 +21,7 @@ type CommitGraphRowsProps = {
   isWorkingTreeSelected: boolean;
   workingTreeLabel: string;
   workingTreeCount: number;
+  workingTreeSummary: WorkingTreeChangeSummary;
   topSpacerHeight: number;
   bottomSpacerHeight: number;
   visibleNodes: GraphNode[];
@@ -33,6 +35,7 @@ type CommitGraphRowsProps = {
   currentPathColor: string;
   selectedPathColor: string;
   branchTipByRef: Map<string, GraphNode>;
+  localBranchNames: ReadonlySet<string>;
   activeHighlightedBranch: string | null;
   selectedBranchTarget?: string;
   hasSelectedCommitFocus: boolean;
@@ -81,6 +84,7 @@ export const CommitGraphRows = ({
   isWorkingTreeSelected,
   workingTreeLabel,
   workingTreeCount,
+  workingTreeSummary,
   topSpacerHeight,
   bottomSpacerHeight,
   visibleNodes,
@@ -94,6 +98,7 @@ export const CommitGraphRows = ({
   currentPathColor,
   selectedPathColor,
   branchTipByRef,
+  localBranchNames,
   activeHighlightedBranch,
   selectedBranchTarget,
   hasSelectedCommitFocus,
@@ -126,9 +131,10 @@ export const CommitGraphRows = ({
           <span className="commit-hash">WORKDIR</span>
           <div className="commit-main">
             <div className="commit-refs">
-              {workingTreeStatus.staged.length > 0 && <span className="branch-label tag">{workingTreeStatus.staged.length} staged</span>}
-              {workingTreeStatus.unstaged.length > 0 && <span className="branch-label working-tree">{workingTreeStatus.unstaged.length} unstaged</span>}
-              {workingTreeStatus.untracked.length > 0 && <span className="branch-label remote">{workingTreeStatus.untracked.length} untracked</span>}
+              {workingTreeSummary.conflicts > 0 && <span className="branch-label working-tree">{workingTreeSummary.conflicts} conflicts</span>}
+              {workingTreeSummary.staged > 0 && <span className="branch-label tag">{workingTreeSummary.staged} staged</span>}
+              {workingTreeSummary.unstaged > 0 && <span className="branch-label working-tree">{workingTreeSummary.unstaged} unstaged</span>}
+              {workingTreeSummary.untracked > 0 && <span className="branch-label remote">{workingTreeSummary.untracked} untracked</span>}
             </div>
             <div className="commit-subject-row">
               <span className="commit-subject">{workingTreeLabel}</span>
@@ -153,7 +159,7 @@ export const CommitGraphRows = ({
       const resetsToDefaultFocus = node.commit.hash === headNode.commit.hash;
       const isLatestCommitFocus = hasPassiveHeadFocus && resetsToDefaultFocus;
       const isMutedByPathFocus = hasAnyPathHighlight && !isOnCurrentPath && !isOnSelectedPath && !isSelected;
-      const sortedRefs = sortRefs(node.commit.refs);
+      const sortedRefs = sortRefs(node.commit.refs, localBranchNames);
       const rowStyle: CommitGraphRowStyle = {
         height: ROW_HEIGHT,
         paddingLeft: graphWidth,
@@ -202,7 +208,7 @@ export const CommitGraphRows = ({
 
                     if (!branchTarget) {
                       return (
-                        <span key={index} className={`branch-label ${getRefKind(ref)}`}>
+                        <span key={index} className={`branch-label ${getRefKind(ref, localBranchNames)}`}>
                           {ref}
                         </span>
                       );
@@ -212,7 +218,7 @@ export const CommitGraphRows = ({
                       <button
                         key={index}
                         type="button"
-                        className={`branch-label ${getRefKind(ref)} branch-toggle ${isActiveBranchRef ? 'active' : ''}`}
+                        className={`branch-label ${getRefKind(ref, localBranchNames)} branch-toggle ${isActiveBranchRef ? 'active' : ''}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           onToggleBranchHighlight(branchTarget);

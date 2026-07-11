@@ -26,6 +26,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const { setConfirmDialog } = useUIContext();
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
+  const [diffRefreshTrigger, setDiffRefreshTrigger] = useState(0);
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const requestScope = `${repoPath || ''}\0${request.source}\0${request.commitHash || ''}\0${request.path}`;
   const requestScopeRef = useRef<string | null>(requestScope);
@@ -34,9 +35,14 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const isMarkdownFile = useMemo(() => isMarkdownFilePath(request.path), [request.path]);
   const isMarkdownPreviewMode = viewMode === 'preview' && isMarkdownFile;
 
-  const diffData = useDiffPreviewData({ repoPath, request, t });
+  const diffData = useDiffPreviewData({ repoPath, request, refreshTrigger: diffRefreshTrigger, t });
   const blame = useDiffBlame({ repoPath, request });
-  const { hunkOpError, isHunkOperationRunning, applyHunk } = useHunkPatchActions({ repoPath, onRepoChanged, t });
+  const { hunkOpError, isHunkOperationRunning, applyHunk } = useHunkPatchActions({
+    repoPath,
+    onRepoChanged,
+    onApplied: () => setDiffRefreshTrigger((value) => value + 1),
+    t,
+  });
   const { markdownPreview, handleMarkdownPreviewClick } = useMarkdownPreview({
     repoPath,
     request,
@@ -47,7 +53,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   useEffect(() => {
     setActiveHunkIndex(0);
     hunkRefs.current = [];
-  }, [request]);
+  }, [diffRefreshTrigger, request]);
 
   useEffect(
     () => () => {

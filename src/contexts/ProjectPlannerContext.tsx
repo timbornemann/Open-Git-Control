@@ -3,6 +3,7 @@ import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput
 import type { ConfirmDialogState } from '@/app/state/contracts';
 import { useI18n } from '@/i18n';
 import { plannerClient } from '@/services/plannerClient';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 type ProjectPlannerContextValue = {
   data: ProjectPlannerData;
@@ -40,10 +41,7 @@ type ProjectPlannerProviderProps = {
 const EMPTY_DATA: ProjectPlannerData = { version: 1, projects: [], items: [] };
 const ProjectPlannerContext = createContext<ProjectPlannerContextValue | null>(null);
 
-const repoKey = (repoPath: string): string => {
-  const normalized = repoPath.replace(/[\\/]+$/, '');
-  return /^win/i.test(navigator.platform) ? normalized.toLocaleLowerCase() : normalized;
-};
+const repoKey = normalizeRepoPathKey;
 
 export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   activeRepo,
@@ -54,7 +52,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   setConfirmDialog,
   children,
 }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const [data, setData] = useState<ProjectPlannerData>(EMPTY_DATA);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +110,31 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       }
     };
     void load();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!plannerClient.isAvailable()) return;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let unsubscribe: () => void = () => {};
+    try {
+      unsubscribe = plannerClient.onDataChanged(() => {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => {
+          refreshTimer = null;
+          void refresh().catch(() => {
+            // The visible error state explains how to recover.
+          });
+        }, 25);
+      });
+    } catch {
+      // A renderer kept alive across a development preload rebuild may not yet
+      // expose the event. The regular refresh path remains available.
+      return;
+    }
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      unsubscribe();
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -180,7 +203,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
           onToast(result.error, true);
           return null;
         }
-        await refresh();
+        try {
+          await refresh();
+        } catch (refreshError) {
+          const message = refreshError instanceof Error ? refreshError.message : String(refreshError);
+          // The write succeeded. Report the refresh problem without turning
+          // the mutation into a false failure that users may retry.
+          onToast(tr(`Aenderung gespeichert, Aktualisierung fehlgeschlagen: ${message}`, `Change saved, but refresh failed: ${message}`), true);
+        }
         return result.data;
       } catch (mutationError) {
         const message = mutationError instanceof Error ? mutationError.message : String(mutationError);
@@ -191,7 +221,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         setBusy(false);
       }
     },
-    [onToast, refresh],
+    [onToast, refresh, tr],
   );
 
   const createProject = useCallback(
@@ -313,10 +343,19 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       const result = await runMutation(() => plannerClient.materializeProject(projectId, parentDirectory, folderName));
       if (!result) return false;
       setSelectedProjectId(result.project.id);
-      await onRepositoryMaterialized(result.repoPath);
+      try {
+        await onRepositoryMaterialized(result.repoPath);
+      } catch (activationError: unknown) {
+        const message = activationError instanceof Error ? activationError.message : String(activationError);
+        // Materialization is already persisted at this point. Treat a
+        // follow-up workspace activation failure as a partial success so a
+        // retry cannot create a duplicate repository or report the write as
+        // failed.
+        onToast(tr(`Repository erstellt, aber nicht aktiviert: ${message}`, `Repository was created, but could not be activated: ${message}`), true);
+      }
       return true;
     },
-    [onRepositoryMaterialized, runMutation],
+    [onRepositoryMaterialized, onToast, runMutation, tr],
   );
 
   const selectedProject = useMemo(() => data.projects.find((project) => project.id === selectedProjectId) || null, [data.projects, selectedProjectId]);

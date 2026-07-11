@@ -14,6 +14,7 @@ import type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, ProgressPhase
 import { AiAutoCommitGroupRecovery, type GroupState } from './AiAutoCommitGroupRecovery';
 import { AiAutoCommitRunState } from './AiAutoCommitRunState';
 import { buildAiAutoCommitRunResult } from './AiAutoCommitRunSummary';
+import { AiAutoCommitIndexTransaction } from './AiAutoCommitIndexTransaction';
 
 const MAX_COMMIT_FILES_NORMAL = 5;
 const MAX_COMMIT_FILES_RETRY = 3;
@@ -34,6 +35,7 @@ export class AiAutoCommitRunSession {
     maxFilesFallback: MAX_COMMIT_FILES_FALLBACK,
     maxNetLinesPerCommit: MAX_NET_LINES_PER_COMMIT,
   });
+  private readonly indexTransaction: AiAutoCommitIndexTransaction;
   constructor(
     private readonly gitService: GitService,
     private readonly providerClient: AiProviderClient,
@@ -46,15 +48,24 @@ export class AiAutoCommitRunSession {
   ) {
     this.state = new AiAutoCommitRunState(onProgress);
     this.groupRecovery = new AiAutoCommitGroupRecovery(this.state);
+    this.indexTransaction = new AiAutoCommitIndexTransaction(this.gitService, this.repoPath);
   }
   async run(): Promise<AiAutoCommitResult> {
-    this.validateInputs();
-    this.state.emitProgress({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: this.state.buildProgressDetails(0) });
-    const snapshotFiles = await this.prepareSnapshotFiles();
-    const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, this.repoPath, () => this.ensureNotCancelled());
-    const groups = await this.planGroups(snapshotFiles, snapshotHydrator);
-    await this.processGroups(groups, snapshotFiles, snapshotHydrator);
-    return buildAiAutoCommitRunResult(this.gitService, this.repoPath, snapshotFiles, groups, this.state);
+    try {
+      this.validateInputs();
+      this.state.emitProgress({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: this.state.buildProgressDetails(0) });
+      const snapshotFiles = await this.prepareSnapshotFiles();
+      const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, this.repoPath, () => this.ensureNotCancelled());
+      const groups = await this.planGroups(snapshotFiles, snapshotHydrator);
+      await this.processGroups(groups, snapshotFiles, snapshotHydrator);
+      if (this.state.commits.length === 0) {
+        const diagnostic = this.state.diagnostics[this.state.diagnostics.length - 1];
+        throw new Error(diagnostic || 'KI Auto-Commit konnte keinen Commit erstellen.');
+      }
+      return buildAiAutoCommitRunResult(this.gitService, this.repoPath, snapshotFiles, groups, this.state);
+    } finally {
+      this.indexTransaction.dispose();
+    }
   }
   private validateInputs(): void {
     if (!this.repoPath.trim()) throw new Error('No repository selected.');
@@ -74,6 +85,10 @@ export class AiAutoCommitRunSession {
     if (statusEntries.length === 0) {
       throw new Error('Working Tree ist sauber. Keine Commits noetig.');
     }
+
+    // Capture every changed path in a private index before any provider call.
+    // The live index is not touched while messages are being generated.
+    await this.indexTransaction.initialize(statusEntries);
 
     const snapshotFiles = statusEntries.map((entry): SnapshotFile => this.toSnapshotFile(entry));
     if (snapshotFiles.length >= LARGE_BATCH_THRESHOLD) {
@@ -95,8 +110,13 @@ export class AiAutoCommitRunSession {
   private toSnapshotFile(entry: ReturnType<typeof parseStatusPorcelain>[number]): SnapshotFile {
     const pathValue = entry.path;
     const changeType = detectChangeType(entry);
+    // A rename batch must also remove its source path. A copy must not include
+    // the source: it can have an independent modification/status entry and is
+    // otherwise already present in the batch's HEAD base tree.
+    const renamedFrom = entry.x === 'R' || entry.y === 'R' ? entry.originalPath : undefined;
     return {
       path: pathValue,
+      ...(renamedFrom ? { originalPath: renamedFrom } : {}),
       changeType,
       additions: 0,
       deletions: 0,
@@ -317,36 +337,43 @@ export class AiAutoCommitRunSession {
       return true;
     } catch (error: unknown) {
       this.ensureNotCancelled();
-      this.state.diagnostics.push(error instanceof Error ? error.message : 'Commit fehlgeschlagen.');
-      return this.groupRecovery.handleCommitFailure(groupState, groupIndex, queue.length, snapshotFiles);
+      const message = error instanceof Error ? error.message : 'Commit fehlgeschlagen.';
+      this.state.diagnostics.push(message);
+      throw new Error(`KI Auto-Commit konnte den Commit nicht erstellen: ${message}`);
     }
   }
 
   private async commitBatch(batchFiles: SnapshotFile[], queue: SnapshotFile[], groupIndex: number, totalFiles: number): Promise<void> {
     // Do not begin a batch that has already been cancelled.
     this.ensureNotCancelled();
-    await this.stageBatchFiles(batchFiles);
-
-    // From here until the commit is created, the batch is staged. A cancellation
-    // (or any error) in this window must roll the staging back so a cancel never
-    // leaves half-staged files behind.
     let message: CommitMessage;
-    try {
+    let committedRevision = 'HEAD';
+    if (this.indexTransaction.supported) {
+      // The private snapshot index already contains the immutable blobs. No
+      // live staging occurs before or during the provider request.
       message = await this.buildMessageForBatch(batchFiles, groupIndex, queue.length, totalFiles);
       this.ensureNotCancelled();
-    } catch (error: unknown) {
-      await this.safeUnstageBatchFiles(batchFiles);
-      throw error;
+      committedRevision = await this.indexTransaction.commit(batchFiles, message);
+    } else {
+      // Compatibility path for lightweight test/service adapters. Production
+      // GitService always supports the isolated index transaction.
+      await this.stageBatchFiles(batchFiles);
+      try {
+        message = await this.buildMessageForBatch(batchFiles, groupIndex, queue.length, totalFiles);
+        this.ensureNotCancelled();
+        await this.commitBatchWithMessage(batchFiles, message);
+      } catch (error: unknown) {
+        await this.safeUnstageBatchFiles(batchFiles);
+        throw error;
+      }
     }
-
-    await this.commitBatchWithMessage(batchFiles, message);
 
     // The commit is now durable. Record it and advance the queue BEFORE any
     // further cancellation check, so a cancel arriving right after the commit
     // cannot make an already-created commit look like an unresolved batch (which
     // would otherwise be re-committed on the next run).
-    const hash = (await this.runGitCommand(['rev-parse', '--short', 'HEAD'])).trim();
-    const subject = (await this.runGitCommand(['show', '-s', '--format=%s', 'HEAD'])).trim();
+    const hash = (await this.runGitCommand(['rev-parse', '--short', committedRevision])).trim();
+    const subject = (await this.runGitCommand(['show', '-s', '--format=%s', committedRevision])).trim();
     this.state.commits.push({ hash, subject });
     this.removeCommittedFiles(queue, batchFiles);
     this.state.processedFiles += batchFiles.length;
@@ -459,9 +486,13 @@ export class AiAutoCommitRunSession {
 
   private async getStatusPorcelain(): Promise<string> {
     const gitCapabilities = this.gitService as GitService & {
+      getStatusPorcelainZAtPath?: (repoPath: string) => Promise<string>;
       getStatusPorcelainAtPath?: (repoPath: string) => Promise<string>;
       getStatusPorcelain?: () => Promise<string>;
     };
+    if (typeof gitCapabilities.getStatusPorcelainZAtPath === 'function') {
+      return gitCapabilities.getStatusPorcelainZAtPath(this.repoPath);
+    }
     if (typeof gitCapabilities.getStatusPorcelainAtPath === 'function') {
       return gitCapabilities.getStatusPorcelainAtPath(this.repoPath);
     }

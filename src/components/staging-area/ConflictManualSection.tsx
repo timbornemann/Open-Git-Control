@@ -6,6 +6,7 @@ import type { ConflictEditorState } from './types';
 type ConflictManualSectionProps = {
   conflictEditor: ConflictEditorState;
   conflictBlocksCount: number;
+  hasUnresolvedConflictMarkers: boolean;
   isConflictEditorDirty: boolean;
   conflictManualScrollRef: React.RefObject<HTMLDivElement>;
   resetConflictEditorDraft: () => void;
@@ -16,6 +17,7 @@ type ConflictManualSectionProps = {
 export const ConflictManualSection = ({
   conflictEditor,
   conflictBlocksCount,
+  hasUnresolvedConflictMarkers,
   isConflictEditorDirty,
   conflictManualScrollRef,
   resetConflictEditorDraft,
@@ -50,7 +52,7 @@ export const ConflictManualSection = ({
             onClick={() => {
               void saveConflictEditor(true);
             }}
-            disabled={conflictEditor.isSaving || conflictBlocksCount > 0}
+            disabled={conflictEditor.isSaving || conflictBlocksCount > 0 || hasUnresolvedConflictMarkers}
           >
             {t('generated.components.staging_area.conflictresolverpanel.save_resolved_20637e12')}
           </button>

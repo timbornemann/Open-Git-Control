@@ -1,6 +1,6 @@
 import type { AppSettings } from '../settings';
 import type { AiProviderClient } from './AiProviderClient';
-import type { ReleaseCommitInput, ReleaseVersionBump } from './aiServiceTypes';
+import type { GeneratedReleaseNotes, ReleaseCommitInput, ReleaseVersionBump } from './aiServiceTypes';
 import { safeHttpUrl } from './jsonResponse';
 import { CHAT_TIMEOUT_MS, runProviderText } from './providerText';
 
@@ -21,13 +21,21 @@ export async function generateReleaseNotes(
   getGeminiApiKey: () => string,
   params: GenerateReleaseNotesParams,
   getOpenAiApiKey: () => string = () => '',
-): Promise<string> {
+): Promise<GeneratedReleaseNotes> {
   const commits = Array.isArray(params.commits) ? params.commits : [];
   const releaseTypeLabel = params.versionBump === 'major' ? 'Major' : params.versionBump === 'minor' ? 'Minor' : 'Patch';
   if (commits.length === 0) {
-    return params.language === 'en'
-      ? `# ${params.releaseName}\n\nThis ${releaseTypeLabel.toLowerCase()} release has no new commits since the previous release.`
-      : `# ${params.releaseName}\n\nDieses ${releaseTypeLabel} Release enthaelt seit dem vorherigen Release keine neuen Commits.`;
+    return {
+      markdown:
+        params.language === 'en'
+          ? `# ${params.releaseName}\n\nThis ${releaseTypeLabel.toLowerCase()} release has no new commits since the previous release.`
+          : `# ${params.releaseName}\n\nDieses ${releaseTypeLabel} Release enthaelt seit dem vorherigen Release keine neuen Commits.`,
+      source: 'fallback',
+      warning:
+        params.language === 'en'
+          ? 'No commits were available; deterministic release notes were generated.'
+          : 'Es waren keine Commits verfuegbar; deterministische Release Notes wurden erstellt.',
+    };
   }
 
   const systemPrompt = [
@@ -72,12 +80,13 @@ export async function generateReleaseNotes(
     'Output valid Markdown only.',
   ].join('\n');
 
+  let providerFailure = 'Der KI-Provider lieferte keine Release Notes.';
   try {
     const result = await runProviderText(providerClient, settings, systemPrompt, userPrompt, getGeminiApiKey, undefined, CHAT_TIMEOUT_MS, getOpenAiApiKey);
     const markdown = result.trim();
-    if (markdown) return markdown;
-  } catch {
-    // Fallback below
+    if (markdown) return { markdown, source: 'ai' };
+  } catch (error: unknown) {
+    providerFailure = error instanceof Error ? error.message : providerFailure;
   }
 
   const heading = `# ${params.releaseName}`;
@@ -93,5 +102,12 @@ export async function generateReleaseNotes(
     })
     .join('\n');
 
-  return `${heading}${intro}${changelog}`.trim();
+  return {
+    markdown: `${heading}${intro}${changelog}`.trim(),
+    source: 'fallback',
+    warning:
+      params.language === 'en'
+        ? `AI generation failed; deterministic release notes were generated instead. ${providerFailure}`
+        : `KI-Generierung fehlgeschlagen; stattdessen wurden deterministische Release Notes erstellt. ${providerFailure}`,
+  };
 }

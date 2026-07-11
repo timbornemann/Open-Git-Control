@@ -1,6 +1,6 @@
 import type { AppSettings } from '../../settings';
 import type { AiConnectionResult, AiConnectionTestRequest, AiModelListRequest, AiProvider, AiTextRequest } from './AiProvider';
-import { fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
+import { AI_DISCOVERY_TIMEOUT_MS, fetchWithTimeout, safeString, uniqueSorted } from './providerUtils';
 
 export function normalizeGeminiModel(model: string): string {
   const trimmed = model.trim();
@@ -26,10 +26,20 @@ export class GeminiProvider implements AiProvider {
       throw new Error('Gemini Modell fehlt.');
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`);
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${encodeURIComponent(apiKey)}`,
+      {},
+      AI_DISCOVERY_TIMEOUT_MS,
+    );
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Gemini nicht erreichbar (${response.status}): ${text || response.statusText}`);
+    }
+
+    const data = (await response.json()) as { supportedGenerationMethods?: unknown };
+    const methods = Array.isArray(data.supportedGenerationMethods) ? data.supportedGenerationMethods : [];
+    if (!methods.includes('generateContent')) {
+      throw new Error(`Gemini Modell "${model}" unterstuetzt keine Textgenerierung.`);
     }
 
     return { ok: true, provider: this.id, model, detail: 'Gemini API erreichbar' };
@@ -41,7 +51,11 @@ export class GeminiProvider implements AiProvider {
       throw new Error('Gemini API key fehlt.');
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+      {},
+      AI_DISCOVERY_TIMEOUT_MS,
+    );
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Gemini Modelle konnten nicht geladen werden (${response.status}): ${text || response.statusText}`);

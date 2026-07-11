@@ -103,9 +103,12 @@ export const ReleaseCreator: React.FC<Props> = ({
   const bodyCharCount = (releaseForm.body || '').length;
   const targetForContext = trimmedTarget || context?.commitsTarget || t('generated.components.releasecreator.unknown_e814b0a7');
   const repositoryLabel = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : t('generated.components.releasecreator.no_github_repository_mapping_65df7317');
+  const contextMatchesTarget = Boolean(context) && (!trimmedTarget || context?.commitsTarget === trimmedTarget);
 
-  const canGenerateNotes = Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName) && commitsCount > 0;
-  const canCreateRelease = Boolean(ownerRepo) && !releaseSubmitting && !tagAlreadyExists && validation.valid;
+  const canGenerateNotes =
+    Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && !contextLoading && contextMatchesTarget && Boolean(trimmedTagName) && commitsCount > 0;
+  const canCreateRelease =
+    Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && !contextLoading && contextMatchesTarget && !tagAlreadyExists && validation.valid;
 
   const applySuggestedTag = (nextTag: string) => {
     setReleaseForm((prev) => {
@@ -163,7 +166,7 @@ export const ReleaseCreator: React.FC<Props> = ({
               releaseForm={releaseForm}
               setReleaseForm={setReleaseForm}
               hasOwnerRepo={Boolean(ownerRepo)}
-              releaseSubmitting={releaseSubmitting}
+              releaseSubmitting={releaseSubmitting || notesGenerating}
               versionBump={versionBump}
               suggestedTag={suggestedTag}
               tagAlreadyExists={tagAlreadyExists}
@@ -202,7 +205,7 @@ export const ReleaseCreator: React.FC<Props> = ({
           commitsCount={commitsCount}
           contextLoading={contextLoading}
           ownerRepo={ownerRepo}
-          releaseSubmitting={releaseSubmitting}
+          releaseSubmitting={releaseSubmitting || notesGenerating}
           onRefreshContext={onRefreshContext}
         />
       </div>

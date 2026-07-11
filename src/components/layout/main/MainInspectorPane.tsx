@@ -96,12 +96,14 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
         <div className="pane-content" style={{ overflow: 'hidden' }}>
           {isCommitInspectorOpen && repository.selectedCommit ? (
             <CommitDetails
+              repoPath={workingTree.dataRepoPath}
               hash={repository.selectedCommit}
               onSelectCommit={(hash) => handleSelectCommitFromHistory(hash, repository.selectedCommit)}
               onOpenDiff={handleOpenDiff}
             />
           ) : workingTreeSelection ? (
             <WorkingTreeFileDetails
+              repoPath={workingTree.dataRepoPath!}
               path={workingTreeSelection.path}
               source={workingTreeSelection.source}
               onSelectCommit={handleSelectCommitFromWorkingTree}

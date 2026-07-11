@@ -2,6 +2,7 @@ import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { writeTextFileAtomically } from './atomicFile';
+import { repositoryPathKey } from './activeRepositoryAuthorization';
 
 export interface StoredRepoEntry {
   path: string;
@@ -56,22 +57,32 @@ function resolveRepoCreatedAt(repoPath: string, fallbackTimestamp: number): numb
 
 export function normalizeStoredData(input: Partial<StoredData> | null | undefined): StoredData {
   const reposInput = Array.isArray(input?.repos) ? input.repos : [];
-  const seen = new Set<string>();
   const sortBy = normalizeRepoSortBy(input?.sortBy);
+  const repos: StoredRepoEntry[] = [];
+  const entriesByKey = new Map<string, StoredRepoEntry>();
 
-  const repos: StoredRepoEntry[] = reposInput
-    .map((repo: any) => {
-      const pathValue = typeof repo?.path === 'string' ? repo.path.trim() : '';
-      if (!pathValue || seen.has(pathValue)) return null;
-      seen.add(pathValue);
-      const lastOpened = Number.isFinite(repo?.lastOpened) ? Number(repo.lastOpened) : Date.now();
-      const pinned = typeof repo?.pinned === 'boolean' ? repo.pinned : false;
-      const createdAt = Number.isFinite(repo?.createdAt) ? Math.floor(Number(repo.createdAt)) : resolveRepoCreatedAt(pathValue, lastOpened);
-      return { path: pathValue, lastOpened, pinned, createdAt };
-    })
-    .filter((repo: StoredRepoEntry | null): repo is StoredRepoEntry => repo !== null);
+  for (const repo of reposInput as any[]) {
+    const pathValue = typeof repo?.path === 'string' ? repo.path.trim() : '';
+    if (!pathValue) continue;
+    const lastOpened = Number.isFinite(repo?.lastOpened) ? Number(repo.lastOpened) : Date.now();
+    const pinned = typeof repo?.pinned === 'boolean' ? repo.pinned : false;
+    const createdAt = Number.isFinite(repo?.createdAt) ? Math.floor(Number(repo.createdAt)) : resolveRepoCreatedAt(pathValue, lastOpened);
+    const key = repositoryPathKey(pathValue);
+    const existing = entriesByKey.get(key);
+    if (existing) {
+      existing.lastOpened = Math.max(existing.lastOpened, lastOpened);
+      existing.createdAt = Math.min(existing.createdAt, createdAt);
+      existing.pinned = existing.pinned || pinned;
+      continue;
+    }
 
-  const activeRepo = typeof input?.activeRepo === 'string' && input.activeRepo.trim().length > 0 ? input.activeRepo : null;
+    const entry = { path: pathValue, lastOpened, pinned, createdAt };
+    entriesByKey.set(key, entry);
+    repos.push(entry);
+  }
+
+  const requestedActiveRepo = typeof input?.activeRepo === 'string' && input.activeRepo.trim().length > 0 ? input.activeRepo.trim() : null;
+  const activeRepo = requestedActiveRepo ? entriesByKey.get(repositoryPathKey(requestedActiveRepo))?.path || requestedActiveRepo : null;
 
   return { repos, activeRepo, sortBy };
 }

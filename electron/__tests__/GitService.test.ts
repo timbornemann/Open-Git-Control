@@ -42,7 +42,7 @@ describe('GitService commit statistics', () => {
       deletions: 2,
     });
     expect(run).toHaveBeenCalledTimes(1);
-    expect(run.mock.calls[0][1]).toEqual(['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', 'a'.repeat(40)]);
+    expect(run.mock.calls[0][1]).toEqual(['show', '--root', '-m', '--first-parent', '--format=', '--numstat', '-r', '-M', 'a'.repeat(40)]);
   });
 
   it('uses only the first parent for normal and merge commits', async () => {
@@ -54,7 +54,7 @@ describe('GitService commit statistics', () => {
     await expect(service.getCommitStatsAtPath('C:/repo', hash, signal)).resolves.toEqual({ files: 1, additions: 1, deletions: 1 });
     await expect(service.getCommitStatsAtPath('C:/repo', hash, signal)).resolves.toEqual({ files: 1, additions: 2, deletions: 3 });
     expect(run).toHaveBeenCalledTimes(2);
-    expect(run.mock.calls[1][1]).toEqual(['show', '--root', '--first-parent', '--format=', '--numstat', '-r', '-M', hash]);
+    expect(run.mock.calls[1][1]).toEqual(['show', '--root', '-m', '--first-parent', '--format=', '--numstat', '-r', '-M', hash]);
   });
 });
 
@@ -67,7 +67,7 @@ describe('GitService file timeline data', () => {
     const hash = 'a'.repeat(40);
     const runCommandSpy = vi
       .spyOn(service, 'runCommand')
-      .mockResolvedValue(
+      .mockResolvedValueOnce(
         [
           `${recordSeparator}${hash}${fieldSeparator}Alice${fieldSeparator}2026-01-01 12:00:00 +0000${fieldSeparator}feat: keep | pipe`,
           'M',
@@ -76,7 +76,11 @@ describe('GitService file timeline data', () => {
           'src/old name.ts',
           'src/new name.ts',
         ].join(nullSeparator),
-      );
+      )
+      // The oldest commit's parent lookup (`show -s --format=%P`) returns empty
+      // here, so the timeline is treated as reaching the root and no baseline
+      // tree is seeded; this test only asserts the record/path parsing.
+      .mockResolvedValue('');
 
     const timeline = await service.getFileTimelineData(50);
 
@@ -101,16 +105,19 @@ describe('GitService file timeline data', () => {
     const fieldSeparator = '\x1f';
     const nullSeparator = '\x00';
     const hash = 'b'.repeat(40);
-    vi.spyOn(service, 'runCommand').mockResolvedValue(
-      [
-        `${recordSeparator}${hash}${fieldSeparator}Bob${fieldSeparator}2026-02-02 09:00:00 +0000${fieldSeparator}chore: copy config`,
-        'C100',
-        'config/base.json',
-        'config/derived.json',
-        'M',
-        'src/app.ts',
-      ].join(nullSeparator),
-    );
+    vi.spyOn(service, 'runCommand')
+      .mockResolvedValueOnce(
+        [
+          `${recordSeparator}${hash}${fieldSeparator}Bob${fieldSeparator}2026-02-02 09:00:00 +0000${fieldSeparator}chore: copy config`,
+          'C100',
+          'config/base.json',
+          'config/derived.json',
+          'M',
+          'src/app.ts',
+        ].join(nullSeparator),
+      )
+      // Oldest-commit parent lookup returns empty → root, no baseline seeded.
+      .mockResolvedValue('');
 
     const timeline = await service.getFileTimelineData(50);
 

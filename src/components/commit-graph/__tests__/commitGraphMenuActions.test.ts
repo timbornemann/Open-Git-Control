@@ -25,19 +25,23 @@ const node: GraphNode = {
   isMerge: false,
 };
 
-const buildActions = (language: AppLanguage) => {
+const buildActions = (
+  language: AppLanguage,
+  targetNode: GraphNode = node,
+  branches = [
+    { name: 'main', isHead: true, scope: 'local' as const },
+    { name: 'feature', isHead: false, scope: 'local' as const },
+  ],
+) => {
   let confirmDialog: ConfirmDialogState | null = null;
   let inputDialog: InputDialogState | null = null;
   const runGitAction = vi.fn();
   const setToast = vi.fn();
   const actions = buildCommitMenuActions({
-    node,
-    branches: [
-      { name: 'main', isHead: true, scope: 'local' },
-      { name: 'feature', isHead: false, scope: 'local' },
-    ],
+    node: targetNode,
+    branches,
     currentBranch: 'main',
-    layout: { nodes: [node], edges: [], maxLane: 0 },
+    layout: { nodes: [targetNode], edges: [], maxLane: 0 },
     reachableFromHead: new Set([HASH]),
     runGitAction,
     setConfirmDialog: (value) => {
@@ -118,5 +122,26 @@ describe('commit graph menu localization', () => {
       title: 'Hard Reset ausfuehren?',
       consequences: 'Lokale nicht-gesicherte Aenderungen gehen verloren.',
     });
+  });
+
+  it('offers only the mainline-aware revert for merge commits', () => {
+    const mergeNode: GraphNode = {
+      ...node,
+      isMerge: true,
+      commit: { ...node.commit, parentHashes: [PARENT_HASH, 'c'.repeat(40)] },
+    };
+    const result = buildActions('en', mergeNode);
+    expect(result.actions.some((action) => action.icon === 'RV')).toBe(false);
+    expect(result.actions.filter((action) => action.icon === 'MR')).toHaveLength(1);
+  });
+
+  it('checks out slash-containing local branches as local refs', () => {
+    const localSlashNode: GraphNode = { ...node, commit: { ...node.commit, refs: ['HEAD -> main', 'feature/nested'] } };
+    const result = buildActions('en', localSlashNode, [
+      { name: 'main', isHead: true, scope: 'local' },
+      { name: 'feature/nested', isHead: false, scope: 'local' },
+    ]);
+    result.actions.find((action) => action.label === 'Check out branch: feature/nested')?.action();
+    expect(result.runGitAction).toHaveBeenCalledWith(['checkout', 'feature/nested'], 'Checked out branch "feature/nested".');
   });
 });

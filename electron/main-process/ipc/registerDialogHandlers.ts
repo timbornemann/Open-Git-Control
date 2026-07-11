@@ -17,15 +17,18 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     }
 
     const selectedPath = filePaths[0];
+    if (!selectedPath) return null;
     let isRepo = false;
+    let repositoryPath = selectedPath;
     try {
       await gitService.runCommandAtPath(selectedPath, ['rev-parse', '--is-inside-work-tree']);
       isRepo = true;
+      repositoryPath = gitService.resolveRepositoryPath(selectedPath);
     } catch {
       isRepo = false;
     }
 
-    return { path: selectedPath, isRepo };
+    return { path: repositoryPath, isRepo };
   });
 
   ipcMain.handle(IpcChannel.DialogSelectDirectory, async () => {

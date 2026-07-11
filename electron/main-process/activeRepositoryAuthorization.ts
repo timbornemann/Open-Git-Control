@@ -17,7 +17,16 @@ export function requireActiveRepositoryPath(requestedRepoPath: unknown, activeRe
   }
 
   const requestedPath = String(requestedRepoPath || activePath).trim();
-  if (!requestedPath || repositoryPathKey(requestedPath) !== repositoryPathKey(activePath)) {
+  const activeKey = repositoryPathKey(activePath);
+  const requestedKey = repositoryPathKey(requestedPath);
+  // Older saved entries (and folder-picker selections) may point at a
+  // subdirectory while Git canonicalizes the backend path to the repository
+  // root. A descendant still identifies this same active repository and grants
+  // no authority outside that root.
+  const relativeToActive = path.relative(activeKey, requestedKey);
+  const escapesActiveRepository = relativeToActive === '..' || relativeToActive.startsWith(`..${path.sep}`) || path.isAbsolute(relativeToActive);
+  const identifiesActiveRepository = requestedKey === activeKey || (relativeToActive.length > 0 && !escapesActiveRepository);
+  if (!requestedPath || !identifiesActiveRepository) {
     throw new Error('Requested repository is not the active repository.');
   }
 

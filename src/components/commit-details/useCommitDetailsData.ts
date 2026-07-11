@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
@@ -11,6 +11,7 @@ import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '../file-details/blamePagi
 export type DetailsTab = 'history' | 'blame' | 'patch';
 
 type Params = {
+  repoPath: string | null;
   hash: string;
   onOpenDiff?: (request: DiffRequest) => void;
 };
@@ -27,7 +28,7 @@ export const extractCommitDescription = (message: string): string => {
   return bodyLines.join('\n');
 };
 
-export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
+export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => {
   const { t, tr, locale } = useI18n();
 
   const normalizedHash = useMemo(() => {
@@ -58,9 +59,16 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   // response for one commit can never leak its files/description/blame into the
   // view of a different commit.
   const requestGenerationRef = useRef(0);
+  const fileRequestGenerationRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     requestGenerationRef.current += 1;
+    setLoadingFiles(false);
+    setFiles([]);
+    setFilesError(null);
+    setFilesSourceHint(null);
+    setIsMergeCommit(false);
+    setCommitDescription('');
     setSelectedFilePath(null);
     setSelectedFileCommitHash(null);
     setActiveTab('history');
@@ -69,10 +77,22 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
     setBlameHasMore(false);
     setHistoryError(null);
     setBlameError(null);
-  }, [normalizedHash]);
+  }, [normalizedHash, repoPath]);
+
+  useLayoutEffect(() => {
+    fileRequestGenerationRef.current += 1;
+    setHistoryLoading(false);
+    setHistoryEntries([]);
+    setHistoryError(null);
+    setBlameLoading(false);
+    setBlameLines([]);
+    setBlameHasMore(false);
+    setBlameError(null);
+  }, [normalizedHash, repoPath, selectedFileCommitHash, selectedFilePath]);
 
   useEffect(() => {
-    if (!normalizedHash || !gitClient.isAvailable()) return;
+    if (!repoPath || !normalizedHash || !gitClient.isAvailable()) return;
+    const repoAtStart = repoPath;
 
     const generation = requestGenerationRef.current;
     const isCurrent = () => requestGenerationRef.current === generation;
@@ -85,7 +105,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setCommitDescription('');
 
       try {
-        const parentsResult = await gitClient.runGitCommand('show', '-s', '--format=%P', normalizedHash);
+        const parentsResult = await gitClient.runGitCommandForRepo(repoAtStart, 'show', '-s', '--format=%P', normalizedHash);
         if (!isCurrent()) return;
         const parents = parentsResult.success
           ? String(parentsResult.data || '')
@@ -96,13 +116,13 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
         const mergeCommit = parents.length > 1;
         setIsMergeCommit(mergeCommit);
 
-        const messageResult = await gitClient.runGitCommand('show', '-s', '--format=%B', normalizedHash);
+        const messageResult = await gitClient.runGitCommandForRepo(repoAtStart, 'show', '-s', '--format=%B', normalizedHash);
         if (!isCurrent()) return;
         if (messageResult.success) {
           setCommitDescription(extractCommitDescription(String(messageResult.data || '')));
         }
 
-        const detailResult = await gitClient.runGitCommand('commitDetails', normalizedHash);
+        const detailResult = await gitClient.runGitCommandForRepo(repoAtStart, 'commitDetails', normalizedHash);
         if (!isCurrent()) return;
         if (!detailResult.success) {
           setFiles([]);
@@ -117,7 +137,15 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
         }
 
         if (mergeCommit) {
-          const mergeRangeResult = await gitClient.runGitCommand('diff', '--name-status', `${normalizedHash}^1`, normalizedHash);
+          const mergeRangeResult = await gitClient.runGitCommandForRepo(
+            repoAtStart,
+            'diff',
+            '--name-status',
+            '-M',
+            '-z',
+            `${normalizedHash}^1`,
+            normalizedHash,
+          );
           if (!isCurrent()) return;
           if (mergeRangeResult.success) {
             const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
@@ -141,7 +169,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
     };
 
     fetchDetails();
-  }, [normalizedHash, t]);
+  }, [normalizedHash, repoPath, t]);
 
   const selectedFile = useMemo(
     () => (selectedFileCommitHash === normalizedHash ? (files.find((file) => file.path === selectedFilePath) ?? null) : null),
@@ -150,10 +178,10 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
   const isDeletedFile = selectedFile?.status.startsWith('D') ?? false;
 
   useEffect(() => {
-    if (!selectedFile || !gitClient.isAvailable()) return;
+    if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
 
-    const generation = requestGenerationRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation;
+    const generation = fileRequestGenerationRef.current;
+    const isCurrent = () => fileRequestGenerationRef.current === generation;
 
     const fetchHistory = async () => {
       if (activeTab !== 'history') return;
@@ -161,7 +189,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80);
+        const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80, repoPath);
         if (!isCurrent()) return;
         if (result.success) {
           setHistoryEntries(result.data || []);
@@ -180,13 +208,13 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
     };
 
     fetchHistory();
-  }, [activeTab, normalizedHash, selectedFile, t]);
+  }, [activeTab, normalizedHash, repoPath, selectedFile, t]);
 
   useEffect(() => {
-    if (!selectedFile || !gitClient.isAvailable()) return;
+    if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
 
-    const generation = requestGenerationRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation;
+    const generation = fileRequestGenerationRef.current;
+    const isCurrent = () => fileRequestGenerationRef.current === generation;
 
     const fetchBlame = async () => {
       if (activeTab !== 'blame') return;
@@ -200,7 +228,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, BLAME_LOOKAHEAD_COUNT);
+        const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, BLAME_LOOKAHEAD_COUNT, repoPath);
         if (!isCurrent()) return;
         if (result.success) {
           const page = splitBlamePage(result.data || []);
@@ -221,15 +249,16 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
     };
 
     fetchBlame();
-  }, [activeTab, normalizedHash, isDeletedFile, selectedFile, t]);
+  }, [activeTab, normalizedHash, isDeletedFile, repoPath, selectedFile, t]);
 
   const loadMoreBlame = async () => {
-    if (!selectedFile || blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
-    const generation = requestGenerationRef.current;
+    if (!repoPath || !selectedFile || blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
+    const generation = fileRequestGenerationRef.current;
+    const selectedPath = selectedFile.path;
     setBlameLoading(true);
     try {
-      const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT);
-      if (requestGenerationRef.current !== generation) return;
+      const result = await gitClient.getFileBlameRange(selectedPath, normalizedHash, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT, repoPath);
+      if (fileRequestGenerationRef.current !== generation) return;
       if (!result.success) {
         setBlameError(result.error);
         return;
@@ -238,7 +267,7 @@ export const useCommitDetailsData = ({ hash, onOpenDiff }: Params) => {
       setBlameLines((current) => [...current, ...page.lines]);
       setBlameHasMore(page.hasMore);
     } finally {
-      if (requestGenerationRef.current === generation) setBlameLoading(false);
+      if (fileRequestGenerationRef.current === generation) setBlameLoading(false);
     }
   };
 

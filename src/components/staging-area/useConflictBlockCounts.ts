@@ -34,7 +34,7 @@ export const useConflictBlockCounts = ({ repoPath, status }: Params) => {
       const next: Record<string, number> = {};
       try {
         for (const path of paths) {
-          const result = await gitClient.readRepoFile(path);
+          const result = await gitClient.readRepoFile(path, repoPath);
           if (cancelled) return;
           next[path] = result.success && typeof result.data === 'string' ? parseConflictBlocks(normalizeMergeConflictFileContent(result.data)).length : 0;
         }

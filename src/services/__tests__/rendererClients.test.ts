@@ -136,6 +136,7 @@ describe('renderer service clients', () => {
 
     await expectDelegation(() => appClient.getStoredRepos(), api.repos.getStoredRepos, []);
     await expectDelegation(() => appClient.setStoredRepos({ repos: [] } as any), api.repos.setStoredRepos, [{ repos: [] }]);
+    await expectDelegation(() => appClient.resolveRepoPath('C:/repo/nested'), api.repos.resolveRepoPath, ['C:/repo/nested']);
     await expectDelegation(() => appClient.setRepoPath('C:/repo'), api.repos.setRepoPath, ['C:/repo']);
     await expectDelegation(() => appClient.clearRepoPath(), api.repos.clearRepoPath, []);
   });
@@ -152,6 +153,8 @@ describe('renderer service clients', () => {
 
   it('delegates planner operations to the planner Electron domain', async () => {
     await expectDelegation(() => plannerClient.getData(), api.planner.plannerGetData, []);
+    const onChanged = vi.fn();
+    await expectDelegation(() => plannerClient.onDataChanged(onChanged), api.planner.onPlannerDataChanged, [onChanged]);
     await expectDelegation(() => plannerClient.ensureRepositoryProject('C:/repo'), api.planner.plannerEnsureRepositoryProject, ['C:/repo']);
     await expectDelegation(() => plannerClient.createProject({ name: 'Project' } as any), api.planner.plannerCreateProject, [{ name: 'Project' }]);
     await expectDelegation(() => plannerClient.updateProject('p1', { name: 'Next' } as any), api.planner.plannerUpdateProject, ['p1', { name: 'Next' }]);
@@ -261,11 +264,12 @@ describe('renderer service clients', () => {
     expect(gitClient.buildSubmoduleSyncRecursiveArgs()).toEqual(['submoduleSyncRecursive']);
   });
 
-  it('delegates git commands and notifies repo-unavailable listeners once per debounce window', async () => {
+  it('delegates git commands and subscribes to repository-scoped unavailable events', async () => {
     const listener = vi.fn();
+    const unsubscribeMock = vi.fn();
+    api.git.onRepoUnavailable.mockReturnValue(unsubscribeMock);
     const unsubscribe = gitClient.onRepoUnavailable(listener);
     api.git.runGitCommand.mockResolvedValue({ success: false, error: '[REPO_UNAVAILABLE] missing repo' });
-    vi.spyOn(Date, 'now').mockReturnValue(10_000);
 
     await gitClient.runGitCommand('status' as any);
     await gitClient.runGitCommandForRepo('C:/repo', 'status' as any);
@@ -274,10 +278,11 @@ describe('renderer service clients', () => {
     expect(api.git.runGitCommand).toHaveBeenNthCalledWith(1, 'status');
     expect(api.git.runGitCommandForRepo).toHaveBeenCalledWith('C:/repo', 'status');
     expect(api.git.runGitCommand).toHaveBeenNthCalledWith(2, 'pull', '--rebase');
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith({ command: 'status', error: '[REPO_UNAVAILABLE] missing repo' });
+    expect(api.git.onRepoUnavailable).toHaveBeenCalledWith(listener);
+    expect(listener).not.toHaveBeenCalled();
 
     unsubscribe();
+    expect(unsubscribeMock).toHaveBeenCalledTimes(1);
   });
 
   it('delegates high-level git helpers to the git Electron domain', async () => {
@@ -309,22 +314,28 @@ describe('renderer service clients', () => {
   });
 
   it('delegates rich git APIs and repo-unavailable guarded methods', async () => {
-    await expectDelegation(() => gitClient.scanPushSecrets({ includeTags: true }), api.git.scanPushSecrets, [{ includeTags: true }]);
-    await expectDelegation(() => gitClient.approveSecretScanPush(['origin', 'HEAD']), api.git.approveSecretScanPush, [['origin', 'HEAD']]);
-    await expectDelegation(() => gitClient.cancelSecretScan(), api.git.cancelSecretScan, []);
+    await expectDelegation(() => gitClient.scanPushSecrets({ repoPath: 'C:/repo', includeTags: true }), api.git.scanPushSecrets, [
+      { repoPath: 'C:/repo', includeTags: true },
+    ]);
+    await expectDelegation(() => gitClient.approveSecretScanPush(['origin', 'HEAD'], 'C:/repo'), api.git.approveSecretScanPush, [
+      ['origin', 'HEAD'],
+      'C:/repo',
+    ]);
+    await expectDelegation(() => gitClient.cancelSecretScan('C:/repo'), api.git.cancelSecretScan, ['C:/repo']);
     await expectDelegation(() => gitClient.createCommit({ message: 'm' } as any), api.git.createCommit, [{ message: 'm' }]);
     await expectDelegation(() => gitClient.getCommitLogPage({ limit: 10 } as any), api.git.getCommitLogPage, [{ limit: 10 }]);
     await expectDelegation(() => gitClient.requestCommitStats(['a'] as any), api.git.requestCommitStats, [['a']]);
     await expectDelegation(() => gitClient.onCommitStats(vi.fn()), api.git.onCommitStats, [expect.any(Function)]);
     await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);
     await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, []);
+    await expectDelegation(() => gitClient.getSequencerState('C:/repo'), api.git.getSequencerState, ['C:/repo']);
     await expectDelegation(() => gitClient.stagePaths(['a.ts'], 'C:/repo'), api.git.stagePaths, [['a.ts'], 'C:/repo']);
     await expectDelegation(() => gitClient.getDiffPreview({ path: 'a.ts' } as any), api.git.getDiffPreview, [{ path: 'a.ts' }]);
     await expectDelegation(() => gitClient.getFileBlameRange({ path: 'a.ts' } as any), api.git.getFileBlameRange, [{ path: 'a.ts' }]);
     await expectDelegation(() => gitClient.startInteractiveRebase({ base: 'main' } as any), api.git.startInteractiveRebase, [{ base: 'main' }]);
     await expectDelegation(() => gitClient.applyPatch({ patch: 'diff' } as any), api.git.applyPatch, [{ patch: 'diff' }]);
     await expectDelegation(() => gitClient.getStashes(), api.git.getStashes, []);
-    await expectDelegation(() => gitClient.gitStashBranch({ stash: 'stash@{0}' } as any), api.git.gitStashBranch, [{ stash: 'stash@{0}' }]);
+    await expectDelegation(() => gitClient.gitStashBranch('stash@{0}', 'stash-work'), api.git.gitStashBranch, ['stash@{0}', 'stash-work']);
     await expectDelegation(() => gitClient.getRepoOriginUrl('C:/repo'), api.git.getRepoOriginUrl, ['C:/repo']);
     await expectDelegation(() => gitClient.addIgnoreRule('dist/'), api.git.addIgnoreRule, ['dist/']);
     await expectDelegation(() => gitClient.gitFetch(), api.git.gitFetch, []);

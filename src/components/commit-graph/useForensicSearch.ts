@@ -87,6 +87,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
 
   const runForensicSearch = useCallback(async () => {
     if (!repoPath || !gitClient.isAvailable()) return;
+    const repoAtStart = repoPath;
 
     const normalizedPath = forensicPath.trim();
     if (!normalizedPath) {
@@ -132,7 +133,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
     setForensicError(null);
 
     try {
-      const { success, data, error } = await gitClient.runGitCommand(args[0] as GitCommandNameDto, ...args.slice(1));
+      const { success, data, error } = await gitClient.runGitCommandForRepo(repoAtStart, args[0] as GitCommandNameDto, ...args.slice(1));
       if (!isCurrent()) return;
       if (!success) {
         const message = String(error || t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));

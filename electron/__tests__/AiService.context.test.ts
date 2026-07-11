@@ -17,7 +17,22 @@ describe('AiService porcelain path parsing', () => {
     const entries = parseStatusPorcelain('R  "Docs/Old Name.png" -> "Docs/App Overview.png"\n');
     expect(entries).toHaveLength(1);
     expect(entries[0].path).toBe('Docs/App Overview.png');
+    expect(entries[0].originalPath).toBe('Docs/Old Name.png');
     expect(entries[0].code).toBe('R ');
+  });
+
+  it('parses NUL-delimited rename/copy records and preserves significant whitespace', () => {
+    const entries = parseStatusPorcelain('R  new -> name.txt\0 old name.txt\0??  leading and trailing  \0C  copy.txt\0source.txt\0');
+
+    expect(entries).toEqual([
+      { path: 'new -> name.txt', originalPath: ' old name.txt', x: 'R', y: ' ', code: 'R ' },
+      { path: ' leading and trailing  ', x: '?', y: '?', code: '??' },
+      { path: 'copy.txt', originalPath: 'source.txt', x: 'C', y: ' ', code: 'C ' },
+    ]);
+  });
+
+  it('does not interpret an arrow in an ordinary filename as rename syntax', () => {
+    expect(parseStatusPorcelain('?? foo -> bar.txt\n')[0].path).toBe('foo -> bar.txt');
   });
 
   it('decodes escaped quotes from porcelain output', () => {
@@ -450,12 +465,11 @@ describe('AiService context extraction and prompts', () => {
     const fetchMock = vi.fn(async () => okJsonResponse({ message: { content: '{"title":"chore(src): retry commit","description":""}' } }));
     vi.stubGlobal('fetch', fetchMock as any);
 
-    const result = await service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
+    const run = service.runAutoCommit({ ...baseSettings, aiProvider: 'ollama', ollamaModel: 'test-model' }, () => '');
+
+    await expect(run).rejects.toThrow(/Commit nicht erstellen.*pre-commit hook failed/i);
 
     const commitAttempts = runCommand.mock.calls.map((call) => (Array.isArray(call[0]) ? call[0][0] : '')).filter((command) => command === 'commit').length;
-
-    expect(commitAttempts).toBeLessThanOrEqual(8);
-    expect(result.commits).toHaveLength(0);
-    expect(result.warnings.some((warning) => warning.includes('wiederholten Commit-Fehlern'))).toBe(true);
+    expect(commitAttempts).toBe(1);
   });
 });

@@ -18,6 +18,7 @@ export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
 export type { RepositoryFileDataUrl, RepositoryFileSource };
 const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'];
+const statusPorcelainZArgs = (): string[] => [...statusPorcelainArgs(), '-z'];
 
 export class GitService {
   private repoPath: string | null = null;
@@ -39,10 +40,12 @@ export class GitService {
     this.historyService = new HistoryService(
       (args) => this.runCommand(args),
       (repoPath, args, signal) => this.runCommandAtPathWithSignal(repoPath, args, signal),
+      (repoPath, args, input) => this.gitRunner.runWithInput(repoPath, args, input, { commandName: 'blame' }),
+      (repoPath, revisionSpec, maxBytes) => this.readGitFileBufferAtPath(repoPath, revisionSpec, maxBytes),
     );
     this.repositoryFiles = new RepositoryFiles(
       () => this.ensureRepoPath(),
-      (revisionSpec, maxBytes) => this.readGitFileBuffer(revisionSpec, maxBytes),
+      (repoPath, revisionSpec, maxBytes) => this.readGitFileBufferAtPath(repoPath, revisionSpec, maxBytes),
     );
     this.cloneService = new CloneService(this.gitRunner);
     this.mergeConflictService = new MergeConflictService(
@@ -52,7 +55,10 @@ export class GitService {
     );
     this.rebaseService = new RebaseService(() => this.ensureRepoPath(), this.gitRunner);
     this.cherryPickService = new CherryPickService(() => this.ensureRepoPath(), this.gitRunner);
-    this.stashService = new StashService((args) => this.runCommand(args));
+    this.stashService = new StashService(
+      (args) => this.runCommand(args),
+      (repoPath, args) => this.runCommandAtPath(repoPath, args),
+    );
     this.submoduleService = new SubmoduleService((args) => this.runCommand(args));
   }
 
@@ -124,8 +130,7 @@ export class GitService {
     return this.bareState.isBareAtPath(repoPath);
   }
 
-  private readGitFileBuffer(revisionSpec: string, maxBytes: number): Promise<Buffer> {
-    const repoPath = this.ensureRepoPath();
+  private readGitFileBufferAtPath(repoPath: string, revisionSpec: string, maxBytes: number): Promise<Buffer> {
     return this.gitRunner.runBuffer(repoPath, ['show', revisionSpec], {
       maxBytes,
       tooLargeMessage: 'File is too large for Markdown preview.',
@@ -154,6 +159,20 @@ export class GitService {
       throw new Error('Repository path is required.');
     }
     return this.gitRunner.run(normalizedPath, args);
+  }
+
+  /**
+   * Runs a Git command against an explicit repository with process-local
+   * environment overrides. This is intentionally kept on the main-process
+   * service so callers still go through the repository scheduler and the
+   * standard Git error normalization path.
+   */
+  async runCommandAtPathWithEnv(repoPath: string, args: string[], envOverrides: NodeJS.ProcessEnv): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (!normalizedPath) {
+      throw new Error('Repository path is required.');
+    }
+    return this.gitRunner.run(normalizedPath, args, { envOverrides });
   }
 
   async runPollingCommandAtPath(repoPath: string, args: string[], coalesceKey?: string): Promise<string> {
@@ -216,6 +235,15 @@ export class GitService {
       return '';
     }
     return this.runCommandAtPath(repoPath, statusPorcelainArgs());
+  }
+
+  /** Unambiguous NUL-delimited status for backend parsers. */
+  async getStatusPorcelainZAtPath(repoPath: string): Promise<string> {
+    const normalizedPath = (repoPath || '').trim();
+    if (normalizedPath && this.bareState.isBareAtPath(normalizedPath) && shouldSuppressBareWorkTreeCommand(statusPorcelainZArgs())) {
+      return '';
+    }
+    return this.runCommandAtPath(repoPath, statusPorcelainZArgs());
   }
 
   /**
@@ -311,6 +339,10 @@ export class GitService {
     return this.rebaseService.startInteractiveRebase(baseHash, todoLines);
   }
 
+  async startInteractiveRebaseAtPath(repoPath: string, baseHash: string, todoLines: string[]): Promise<string> {
+    return this.rebaseService.startInteractiveRebaseAtPath(repoPath, baseHash, todoLines);
+  }
+
   async commitWithMessage(input: CommitMessageInput): Promise<string> {
     return this.commitWithMessageAtPath(this.ensureRepoPath(), input);
   }
@@ -327,7 +359,10 @@ export class GitService {
    * Wendet ein Patch auf Working Tree oder Index an.
    */
   async applyPatch(patchText: string, options?: { cached?: boolean; reverse?: boolean }): Promise<string> {
-    const repoPath = this.ensureRepoPath();
+    return this.applyPatchAtPath(this.ensureRepoPath(), patchText, options);
+  }
+
+  async applyPatchAtPath(repoPath: string, patchText: string, options?: { cached?: boolean; reverse?: boolean }): Promise<string> {
     const patch = String(patchText || '');
     if (!patch.trim()) {
       throw new Error('Patch content is empty.');
@@ -366,6 +401,10 @@ export class GitService {
 
   async createBranchFromStash(stashName: string, branchName: string): Promise<string> {
     return this.stashService.createBranchFromStash(stashName, branchName);
+  }
+
+  async createBranchFromStashAtPath(repoPath: string, stashName: string, branchName: string): Promise<string> {
+    return this.stashService.createBranchFromStashAtPath(repoPath, stashName, branchName);
   }
 
   async getSubmoduleStatus(): Promise<string> {

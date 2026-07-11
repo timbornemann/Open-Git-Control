@@ -250,7 +250,7 @@ export function registerAiHandlers({
         }
 
         const settings = readSettingsWithMigration();
-        const markdown = await aiService.generateReleaseNotes(
+        const generated = await aiService.generateReleaseNotes(
           settings,
           getGeminiApiKeyFromSecureStore,
           {
@@ -266,7 +266,7 @@ export function registerAiHandlers({
           getOpenAiApiKeyFromSecureStore,
         );
 
-        return { success: true, data: { markdown } };
+        return { success: true, data: generated };
       } catch (error: any) {
         return { success: false, error: error?.message || 'KI Release Notes konnten nicht erstellt werden.' };
       }

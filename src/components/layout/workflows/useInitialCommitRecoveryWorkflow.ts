@@ -8,6 +8,7 @@ import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 type Toast = { msg: string; isError: boolean };
 
 type Params = {
+  getActiveRepo: () => string | null;
   recoverBareRepoForPush: () => Promise<boolean>;
   setActiveTab: (tab: AppTabId) => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
@@ -15,11 +16,20 @@ type Params = {
   language: AppLanguage;
 };
 
-export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setActiveTab, setConfirmDialog, setGitActionToast, language }: Params) => {
+export const useInitialCommitRecoveryWorkflow = ({
+  getActiveRepo,
+  recoverBareRepoForPush,
+  setActiveTab,
+  setConfirmDialog,
+  setGitActionToast,
+  language,
+}: Params) => {
   const { t, tr } = useLanguageTranslations(language);
   const ensureInitialCommitForPush = useCallback(
-    async (options: { skipBareRepoRecovery?: boolean } = {}): Promise<boolean> => {
+    async (options: { skipBareRepoRecovery?: boolean; expectedRepoPath?: string } = {}): Promise<boolean> => {
       if (!gitClient.isAvailable()) return false;
+      const repoPath = options.expectedRepoPath || getActiveRepo();
+      if (!repoPath || getActiveRepo() !== repoPath) return false;
 
       const commitMessage = t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.initial_commit_de27cf34');
       const isIdentityMissingError = (message: string) =>
@@ -29,11 +39,11 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
         /user\.email/i.test(message);
       const isNothingToCommitError = (message: string) => /nothing to commit/i.test(message) || /working tree clean/i.test(message);
 
-      const statusResult = await gitClient.getStatusPorcelain();
+      const statusResult = await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
       const hasChanges = Boolean(statusResult.success && String(statusResult.data || '').trim().length > 0);
 
       if (hasChanges) {
-        const addResult = await gitClient.stageAll();
+        const addResult = await gitClient.runGitCommandForRepo(repoPath, 'add', '-A');
         if (!addResult.success) {
           setGitActionToast({
             msg: addResult.error || t('generated.components.layout.workflows.useinitialcommitrecoveryworkflow.could_not_stage_changes_automatically_b576daaf'),
@@ -43,14 +53,16 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
         }
       }
 
-      const commitResult = hasChanges ? await gitClient.commitMessage(commitMessage) : await gitClient.commitAllowEmpty(commitMessage);
+      const commitResult = hasChanges
+        ? await gitClient.runGitCommandForRepo(repoPath, 'commit', '-m', commitMessage)
+        : await gitClient.runGitCommandForRepo(repoPath, 'commit', '--allow-empty', '-m', commitMessage);
       if (commitResult.success) {
         return true;
       }
 
       const commitError = String(commitResult.error || '');
       if (isNothingToCommitError(commitError)) {
-        const emptyCommitResult = await gitClient.commitAllowEmpty(commitMessage);
+        const emptyCommitResult = await gitClient.runGitCommandForRepo(repoPath, 'commit', '--allow-empty', '-m', commitMessage);
         if (emptyCommitResult.success) {
           return true;
         }
@@ -60,7 +72,7 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
           if (!recovered) {
             return false;
           }
-          return ensureInitialCommitForPush({ skipBareRepoRecovery: true });
+          return ensureInitialCommitForPush({ skipBareRepoRecovery: true, expectedRepoPath: getActiveRepo() || undefined });
         }
         if (isIdentityMissingError(String(emptyCommitResult.error || ''))) {
           setActiveTab('repo');
@@ -82,7 +94,7 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
         if (!recovered) {
           return false;
         }
-        return ensureInitialCommitForPush({ skipBareRepoRecovery: true });
+        return ensureInitialCommitForPush({ skipBareRepoRecovery: true, expectedRepoPath: getActiveRepo() || undefined });
       }
 
       if (isIdentityMissingError(commitError)) {
@@ -100,16 +112,18 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
       });
       return false;
     },
-    [recoverBareRepoForPush, setActiveTab, setGitActionToast, t],
+    [getActiveRepo, recoverBareRepoForPush, setActiveTab, setGitActionToast, t],
   );
 
   const requestInitialCommitConfirmationIfNeeded = useCallback(
-    async (params: { commandLabel: string; confirmLabel: string; onConfirm: () => Promise<void> }): Promise<boolean> => {
+    async (params: { commandLabel: string; confirmLabel: string; onConfirm: () => Promise<void>; repoPath?: string }): Promise<boolean> => {
       if (!gitClient.isAvailable()) return false;
+      const repoPath = params.repoPath || getActiveRepo();
+      if (!repoPath || getActiveRepo() !== repoPath) return false;
 
       let changedFiles: number | null = null;
       try {
-        const statusResult = await gitClient.getStatusPorcelain();
+        const statusResult = await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
         if (statusResult.success) {
           changedFiles = String(statusResult.data || '')
             .split('\n')
@@ -148,11 +162,14 @@ export const useInitialCommitRecoveryWorkflow = ({ recoverBareRepoForPush, setAc
           'generated.components.layout.workflows.useinitialcommitrecoveryworkflow.please_check_first_that_the_working_tree_does_not_contai_a7038b17',
         ),
         confirmLabel: params.confirmLabel,
-        onConfirm: params.onConfirm,
+        onConfirm: async () => {
+          if (getActiveRepo() !== repoPath) return;
+          await params.onConfirm();
+        },
       });
       return true;
     },
-    [setActiveTab, setConfirmDialog, t, tr],
+    [getActiveRepo, setActiveTab, setConfirmDialog, t, tr],
   );
 
   return {

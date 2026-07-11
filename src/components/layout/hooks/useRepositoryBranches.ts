@@ -8,6 +8,7 @@ import { gitClient } from '@/services/gitClient';
 import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildMergeBranchDialog, buildRenameBranchDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 type Params = {
   activeRepo: string | null;
@@ -15,7 +16,7 @@ type Params = {
   hasRemoteOrigin: boolean | null;
   language: AppLanguage;
   setGitActionToast: (toast: GitActionToast) => void;
-  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   triggerRefresh: () => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
@@ -72,7 +73,7 @@ export const useRepositoryBranches = ({
     let cancelled = false;
     const fetchBranches = async () => {
       try {
-        const { success, data } = await gitClient.runGitCommand('branch', '-a');
+        const { success, data } = await gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a');
         if (cancelled) return;
         if (!success || !data) return;
 
@@ -119,6 +120,8 @@ export const useRepositoryBranches = ({
   }, [branchContextMenu]);
 
   const handleCreateBranch = async (branchName: string) => {
+    const repoAtStart = activeRepo;
+    if (!repoAtStart) return;
     const name = branchName.trim();
     if (!name) return;
     if (validateBranchName(name)) {
@@ -130,17 +133,22 @@ export const useRepositoryBranches = ({
     }
 
     setIsCreatingBranch(false);
-    const created = await runGitCommand(gitClient.buildCreateBranchArgs(name), tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`));
+    const created = await runGitCommand(gitClient.buildCreateBranchArgs(name), tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`), undefined, {
+      expectedRepoPath: repoAtStart,
+    });
     if (!created || !hasRemoteOrigin) return;
 
     await runGitCommand(
       gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: name, setUpstream: true }),
       tr(`Branch "${name}" erstellt, auf origin veroeffentlicht und Upstream gesetzt.`, `Created branch "${name}", pushed to origin, and set upstream.`),
       tr(`Neuer Branch "${name}" wird auf origin veroeffentlicht...`, `Publishing new branch "${name}" to origin...`),
+      { expectedRepoPath: repoAtStart },
     );
   };
 
   const handleDeleteBranch = async (branchName: string) => {
+    const repoAtStart = activeRepo;
+    if (!repoAtStart) return;
     setConfirmDialog(
       buildDeleteBranchDialog({
         branchName,
@@ -151,7 +159,7 @@ export const useRepositoryBranches = ({
           if (!gitClient.isAvailable()) return;
           const deleteArgs = gitClient.buildDeleteBranchArgs(branchName);
           const [command, ...rest] = deleteArgs;
-          const result = await gitClient.runGitCommand(command, ...rest);
+          const result = await gitClient.runGitCommandForRepo(repoAtStart, command, ...rest);
           if (result.success) {
             setGitActionToast({
               msg: tr(`Branch "${branchName}" gelöscht.`, `Deleted branch "${branchName}".`),
@@ -171,6 +179,8 @@ export const useRepositoryBranches = ({
                   await runGitCommand(
                     gitClient.buildDeleteBranchArgs(branchName, { force: true }),
                     tr(`Branch "${branchName}" force-gelöscht.`, `Force-deleted branch "${branchName}".`),
+                    undefined,
+                    { expectedRepoPath: repoAtStart },
                   );
                 },
               }),
@@ -188,6 +198,8 @@ export const useRepositoryBranches = ({
   };
 
   const handleMergeBranch = async (branchName: string, mode: GitMergeMode = 'default') => {
+    const repoAtStart = activeRepo;
+    if (!repoAtStart) return;
     const mergeTarget = normalizeBranchRefForMerge(branchName);
     const flags = mergeModeArgs(mode);
     const mergeArgs = gitClient.buildMergeBranchArgs(mergeTarget, flags);
@@ -209,13 +221,15 @@ export const useRepositoryBranches = ({
                   `Squash merge of "${mergeTarget}" prepared. Changes are staged — please commit.`,
                 )
               : tr(`Branch "${mergeTarget}" gemergt.`, `Merged branch "${mergeTarget}".`);
-          await runGitCommand(mergeArgs, successMsg);
+          await runGitCommand(mergeArgs, successMsg, undefined, { expectedRepoPath: repoAtStart });
         },
       }),
     );
   };
 
   const handleRenameBranch = async (oldName: string) => {
+    const repoAtStart = activeRepo;
+    if (!repoAtStart) return;
     setInputDialog(
       buildRenameBranchDialog({
         oldName,
@@ -225,6 +239,8 @@ export const useRepositoryBranches = ({
           await runGitCommand(
             gitClient.buildRenameBranchArgs(oldName, newName),
             tr(`Branch umbenannt: "${oldName}" -> "${newName}".`, `Renamed branch: "${oldName}" -> "${newName}".`),
+            undefined,
+            { expectedRepoPath: repoAtStart },
           );
         },
       }),

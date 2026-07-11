@@ -103,4 +103,33 @@ describe('registerAiHandlers', () => {
     expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
     expect(aiService.runAutoCommit).not.toHaveBeenCalled();
   });
+
+  it('preserves explicit release-note fallback metadata for the renderer', async () => {
+    const generated = {
+      markdown: '# v1.0.1\n\n## Changelog\n- fix',
+      source: 'fallback' as const,
+      warning: 'AI generation failed; deterministic release notes were generated instead.',
+    };
+    const aiService = { generateReleaseNotes: vi.fn().mockResolvedValue(generated) } as any;
+    registerAiHandlers({
+      aiService,
+      readSettingsWithMigration: vi.fn(() => ({})) as any,
+      getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
+      getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
+      getActiveRepoPath: () => '/tmp/repo',
+    });
+
+    const result = await handlers.get('ai:generateReleaseNotes')!(
+      {},
+      {
+        tagName: 'v1.0.1',
+        releaseName: 'v1.0.1',
+        commits: [{ hash: 'abc', shortHash: 'abc', subject: 'fix', author: 'A', date: '2026-07-11' }],
+        language: 'en',
+        versionBump: 'patch',
+      },
+    );
+
+    expect(result).toEqual({ success: true, data: generated });
+  });
 });

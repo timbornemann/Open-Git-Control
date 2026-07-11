@@ -5,6 +5,7 @@ import { isFullGitObjectId } from '@/utils/gitObjectId';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
 import { buildCreateTagDialog, buildDeleteTagDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 type Params = {
   activeRepo: string | null;
@@ -12,7 +13,7 @@ type Params = {
   currentBranch: string;
   language: AppLanguage;
   setGitActionToast: (toast: GitActionToast) => void;
-  runGitCommand: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  runGitCommand: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
   onNavigateToCommit: (hash: string) => void;
@@ -53,7 +54,7 @@ export const useRepositoryTags = ({
     let cancelled = false;
     const fetchTags = async () => {
       try {
-        const byVersion = await gitClient.runGitCommand('tag', '-l', '--sort=-v:refname');
+        const byVersion = await gitClient.runGitCommandForRepo(activeRepo, 'tag', '-l', '--sort=-v:refname');
         if (cancelled) return;
         setTags(byVersion.success ? parseTags(byVersion.data) : []);
       } catch {
@@ -69,6 +70,8 @@ export const useRepositoryTags = ({
   }, [activeRepo, refreshTrigger]);
 
   const handleCreateTag = async () => {
+    const repoAtDialogOpen = activeRepo;
+    if (!repoAtDialogOpen) return;
     setInputDialog(
       buildCreateTagDialog({
         currentBranch,
@@ -76,9 +79,13 @@ export const useRepositoryTags = ({
         tr,
         onCreate: async (name, message) => {
           if (message) {
-            await runGitCommand(gitClient.buildCreateTagArgs(name, { message }), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
+            await runGitCommand(gitClient.buildCreateTagArgs(name, { message }), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`), undefined, {
+              expectedRepoPath: repoAtDialogOpen,
+            });
           } else {
-            await runGitCommand(gitClient.buildCreateTagArgs(name), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`));
+            await runGitCommand(gitClient.buildCreateTagArgs(name), tr(`Tag "${name}" erstellt.`, `Created tag "${name}".`), undefined, {
+              expectedRepoPath: repoAtDialogOpen,
+            });
           }
         },
       }),
@@ -86,13 +93,17 @@ export const useRepositoryTags = ({
   };
 
   const handleDeleteTag = async (tagName: string) => {
+    const repoAtDialogOpen = activeRepo;
+    if (!repoAtDialogOpen) return;
     setConfirmDialog(
       buildDeleteTagDialog({
         tagName,
         t,
         tr,
         onDelete: async () => {
-          await runGitCommand(gitClient.buildDeleteTagArgs(tagName), tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`));
+          await runGitCommand(gitClient.buildDeleteTagArgs(tagName), tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`), undefined, {
+            expectedRepoPath: repoAtDialogOpen,
+          });
         },
       }),
     );
@@ -105,7 +116,7 @@ export const useRepositoryTags = ({
       try {
         const repoAtStart = activeRepo;
         const tagRef = `refs/tags/${tagName}^{commit}`;
-        const result = await gitClient.runGitCommand('show', '--quiet', '--format=%H', tagRef);
+        const result = await gitClient.runGitCommandForRepo(repoAtStart, 'show', '--quiet', '--format=%H', tagRef);
         if (repoAtStart !== activeRepoRef.current) return;
         const hash =
           String(result.data || '')
@@ -132,7 +143,10 @@ export const useRepositoryTags = ({
   );
 
   const handlePushTags = async () => {
-    await runGitCommand(gitClient.buildPushTagsArgs(), t('generated.components.layout.hooks.userepositorydomain.pushed_tags_d74ebef5'));
+    if (!activeRepo) return;
+    await runGitCommand(gitClient.buildPushTagsArgs(), t('generated.components.layout.hooks.userepositorydomain.pushed_tags_d74ebef5'), undefined, {
+      expectedRepoPath: activeRepo,
+    });
   };
 
   return {

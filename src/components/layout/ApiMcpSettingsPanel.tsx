@@ -217,9 +217,9 @@ export const ApiMcpSettingsPanel: React.FC = () => {
   );
 
   const nextTodosCurl = `curl "${baseUrl}/api/agent/next?repoPath=<REPO_PATH_URL_ENCODED>&limit=10" ${authHeader}`;
-  const createTodoCurl = `curl -X POST "${baseUrl}/api/todos" ${authHeader} -H "content-type: application/json" -d "{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"title\\":\\"Naechste Arbeit\\",\\"status\\":\\"planned\\",\\"priority\\":\\"high\\"}"`;
+  const createTodoCurl = `curl -X POST "${baseUrl}/api/todos" ${authHeader} -H "content-type: application/json" -d "{\\"repoPath\\":\\"<REPO_PATH>\\",\\"title\\":\\"Naechste Arbeit\\",\\"status\\":\\"planned\\",\\"priority\\":\\"high\\"}"`;
   const listToolsCurl = `curl -X POST "${mcpUrl}" ${authHeader} -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"tools/list\\"}"`;
-  const callToolCurl = `curl -X POST "${mcpUrl}" ${authHeader} -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":2,\\"method\\":\\"tools/call\\",\\"params\\":{\\"name\\":\\"get_next_todos\\",\\"arguments\\":{\\"repoPath\\":\\"D:\\\\\\\\Projects\\\\\\\\Software\\\\\\\\Open-Git-Control\\",\\"limit\\":5}}}"`;
+  const callToolCurl = `curl -X POST "${mcpUrl}" ${authHeader} -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":2,\\"method\\":\\"tools/call\\",\\"params\\":{\\"name\\":\\"get_next_todos\\",\\"arguments\\":{\\"repoPath\\":\\"<REPO_PATH>\\",\\"limit\\":5}}}"`;
   const mcpConfig = buildAgentConfig(mcpUrl, authHeaderName, authToken);
 
   return (

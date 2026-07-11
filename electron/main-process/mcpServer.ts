@@ -1,23 +1,14 @@
-import {
-  PLANNER_PRIORITIES,
-  PLANNER_STATUSES,
-  createPlannedProject,
-  createPlannerItem,
-  deletePlannerItem,
-  ensureRepositoryProject,
-} from './projectPlannerStore';
+import { PLANNER_PRIORITIES, PLANNER_STATUSES, createPlannedProject, deletePlannerItem, ensureRepositoryProject } from './projectPlannerStore';
 import type { JsonObject } from './planningApiTypes';
 import { MCP_PROTOCOL_VERSION, SERVER_NAME, ApiError } from './planningApiTypes';
 import {
   cleanString,
   getRepositories,
   getTabs,
-  getTodoById,
+  createTodoFromBody,
   getTodos,
-  itemInputFromBody,
   listProjectsForTool,
   moveTodoFromBody,
-  resolveProjectLocator,
   toolTodoOptions,
   updateTodoFromBody,
 } from './planningApiDomain';
@@ -42,9 +33,7 @@ export const callMcpTool = async (name: string, args: JsonObject): Promise<unkno
     case 'ensure_repository_project':
       return ensureRepositoryProject(cleanString(args.repoPath));
     case 'create_todo': {
-      const project = resolveProjectLocator(args);
-      const item = createPlannerItem(project.id, itemInputFromBody(args));
-      return getTodoById(item.id);
+      return createTodoFromBody(args);
     }
     case 'update_todo': {
       const itemId = cleanString(args.itemId);

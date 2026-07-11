@@ -48,6 +48,15 @@ const BASE_POLL_INTERVAL_MS = 60_000;
 const PENDING_POLL_INTERVAL_MS = 15_000;
 const MAX_BACKOFF_INTERVAL_MS = 5 * 60_000;
 
+export const retainCiForCurrentHeads = (previous: Record<number, PullRequestCiDto>, pullRequests: PullRequestDto[]): Record<number, PullRequestCiDto> => {
+  const next: Record<number, PullRequestCiDto> = {};
+  for (const pr of pullRequests) {
+    const cached = previous[pr.number];
+    if (cached?.headSha === pr.headSha) next[pr.number] = cached;
+  }
+  return next;
+};
+
 export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, language, githubHost = 'github.com', onCreated, onError }: Params) => {
   const [pullRequests, setPullRequests] = useState<PullRequestDto[]>([]);
   const [prLoading, setPrLoading] = useState(false);
@@ -105,7 +114,13 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
 
       prOwnerRepoRef.current = ownerRepo;
       setPrOwnerRepo((previous) => {
-        if (previous?.owner === ownerRepo?.owner && previous?.repo === ownerRepo?.repo) {
+        if (
+          previous?.owner === ownerRepo?.owner &&
+          previous?.repo === ownerRepo?.repo &&
+          previous?.headOwner === ownerRepo?.headOwner &&
+          previous?.headRepo === ownerRepo?.headRepo &&
+          previous?.defaultBranch === ownerRepo?.defaultBranch
+        ) {
           return previous;
         }
         return ownerRepo;
@@ -131,11 +146,12 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
 
       setPrLoading(true);
       setPrError(null);
-      const result = await loadPullRequests(prOwnerRepo, isAuthenticated, prFilter);
+      const result = await loadPullRequests(prOwnerRepo, isAuthenticated, prFilter, undefined, language);
       if (!active) return;
 
       if (result?.ok) {
         setPullRequests(result.data);
+        setPrCiByNumber((previous) => retainCiForCurrentHeads(previous, result.data));
         setPrError(null);
       } else if (result && !result.ok) {
         setPrError(result.error);
@@ -149,7 +165,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     return () => {
       active = false;
     };
-  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger]);
+  }, [prOwnerRepo, isAuthenticated, prFilter, refreshTrigger, language]);
 
   const openPrs = useMemo(() => pullRequests.filter((pr) => pr.state === 'open'), [pullRequests]);
 
@@ -166,7 +182,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       try {
         const ciEntries = await Promise.all(
           openPrs.map(async (pr) => {
-            const ci = await loadPullRequestCi(prOwnerRepo, pr);
+            const ci = await loadPullRequestCi(prOwnerRepo, pr, undefined, language);
             return [pr.number, ci] as const;
           }),
         );
@@ -200,7 +216,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [isAuthenticated, openPrs, prOwnerRepo]);
+  }, [isAuthenticated, language, openPrs, prOwnerRepo]);
 
   const createPR = useCallback(
     async ({ title, body, head, base, currentBranch }: CreatePRInput) => {
@@ -208,6 +224,16 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
       const repoAtStart = activeRepo;
       const ownerRepoAtStart = prOwnerRepo;
       const ownerRepoKeyAtStart = ownerRepoAtStart ? `${ownerRepoAtStart.owner}/${ownerRepoAtStart.repo}` : '';
+
+      if (!repoAtStart || !gitClient.isAvailable()) return false;
+      const authorization = await gitClient.getRepoOriginUrl(repoAtStart);
+      const ownerRepoAfterAuthorization = prOwnerRepoRef.current;
+      const ownerRepoKeyAfterAuthorization = ownerRepoAfterAuthorization ? `${ownerRepoAfterAuthorization.owner}/${ownerRepoAfterAuthorization.repo}` : '';
+      if (activeRepoRef.current !== repoAtStart || ownerRepoKeyAfterAuthorization !== ownerRepoKeyAtStart) return false;
+      if (!authorization.success) {
+        callbacksRef.current.onError?.(authorization.error || 'Requested repository is no longer active.');
+        return false;
+      }
 
       const result = await submitPullRequest(
         ownerRepoAtStart,
@@ -244,6 +270,7 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
     prFilter,
     setPrFilter,
     prCiByNumber,
+    prDefaultBranch: prOwnerRepo?.defaultBranch || '',
     createPR,
   };
 };
@@ -310,7 +337,7 @@ const resolvePrOwnerRepoForRefresh = async (
   githubHost: string,
   deps?: PullRequestClientDeps,
 ): Promise<{ resolved: true; ownerRepo: RepoOwnerRef | null } | { resolved: false }> => {
-  const { git } = getPullRequestClients(deps);
+  const { git, github } = getPullRequestClients(deps);
   if (!activeRepo || !git.isAvailable() || !isAuthenticated) {
     return { resolved: true, ownerRepo: null };
   }
@@ -319,9 +346,38 @@ const resolvePrOwnerRepoForRefresh = async (
     const response = await git.getRepoOriginUrl(activeRepo);
     if (!response.success) return { resolved: false };
     if (!response.data) return { resolved: true, ownerRepo: null };
+    const origin = parsePrOwnerRepoFromRemote(String(response.data), githubHost);
+    if (!origin || !github.isAvailable()) return { resolved: true, ownerRepo: origin };
+
+    let originResult: Awaited<ReturnType<PullRequestGithubClient['getRepository']>>;
+    try {
+      originResult = await github.getRepository(origin.owner, origin.repo);
+    } catch {
+      return { resolved: false };
+    }
+    if (!originResult.success) return { resolved: false };
+    const details = originResult.data;
+    if (!details.fork || !details.parent) {
+      return { resolved: true, ownerRepo: { ...origin, defaultBranch: details.defaultBranch || 'main' } };
+    }
+
+    let upstreamResult: Awaited<ReturnType<PullRequestGithubClient['getRepository']>> | null = null;
+    try {
+      upstreamResult = await github.getRepository(details.parent.owner, details.parent.repo);
+    } catch {
+      // Listing against the upstream is still correct; only its default branch
+      // metadata is temporarily unavailable.
+    }
+    const defaultBranch = upstreamResult?.success ? upstreamResult.data.defaultBranch : details.defaultBranch;
     return {
       resolved: true,
-      ownerRepo: parsePrOwnerRepoFromRemote(String(response.data), githubHost),
+      ownerRepo: {
+        owner: details.parent.owner,
+        repo: details.parent.repo,
+        headOwner: origin.owner,
+        headRepo: origin.repo,
+        defaultBranch: defaultBranch || 'main',
+      },
     };
   } catch {
     return { resolved: false };
@@ -333,20 +389,22 @@ export const loadPullRequests = async (
   isAuthenticated: boolean,
   prFilter: 'open' | 'closed' | 'all',
   deps?: PullRequestClientDeps,
+  language: AppLanguage = 'de',
 ): Promise<{ ok: true; data: PullRequestDto[] } | { ok: false; error: string } | null> => {
   const { github } = getPullRequestClients(deps);
+  const { tr } = createLanguageTranslations(language);
   if (!prOwnerRepo || !github.isAvailable() || !isAuthenticated) return null;
 
   try {
     const result = await github.getPullRequests(prOwnerRepo.owner, prOwnerRepo.repo, prFilter);
     if (!result.success) {
-      return { ok: false, error: result.error || 'Pull Requests konnten nicht geladen werden.' };
+      return { ok: false, error: result.error || tr('Pull Requests konnten nicht geladen werden.', 'Pull requests could not be loaded.') };
     }
     return { ok: true, data: result.data || [] };
   } catch (error: unknown) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Pull Requests konnten nicht geladen werden.',
+      error: error instanceof Error ? error.message : tr('Pull Requests konnten nicht geladen werden.', 'Pull requests could not be loaded.'),
     };
   }
 };
@@ -355,6 +413,7 @@ export const loadPullRequestCi = async (
   prOwnerRepo: RepoOwnerRef | null,
   pr: PullRequestDto,
   deps?: PullRequestClientDeps,
+  language: AppLanguage = 'en',
 ): Promise<PullRequestCiDto | null> => {
   const { github } = getPullRequestClients(deps);
   if (!github.isAvailable() || !prOwnerRepo || !pr.headSha) return null;
@@ -367,11 +426,19 @@ export const loadPullRequestCi = async (
 
     const workflowRuns = workflowResult.success ? workflowResult.data : [];
     const statusChecks = checksResult.success ? checksResult.data : null;
-    const badge = computeCiBadge(workflowRuns, statusChecks);
+    const partialBadge = computeCiBadge(workflowRuns, statusChecks);
+    const incomplete = !workflowResult.success || !checksResult.success;
+    const badge = incomplete && partialBadge !== 'failure' ? 'unknown' : partialBadge;
+    const summary = incomplete
+      ? language === 'de'
+        ? 'CI-Status unvollstaendig: Mindestens eine GitHub-Abfrage ist fehlgeschlagen.'
+        : 'CI status incomplete: at least one GitHub query failed.'
+      : buildCiSummary(badge, workflowRuns, statusChecks, language);
 
     return {
+      headSha: pr.headSha,
       badge,
-      summary: buildCiSummary(badge, workflowRuns, statusChecks),
+      summary,
       workflowRuns,
       statusChecks,
       updatedAt: Date.now(),
@@ -381,32 +448,46 @@ export const loadPullRequestCi = async (
   }
 };
 
-function computeCiBadge(workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): CiBadgeStateDto {
+export function computeCiBadge(workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): CiBadgeStateDto {
   const conclusions = workflows.map((w) => w.conclusion).filter(Boolean);
-  const hasFailure = conclusions.some((c) => c === 'failure' || c === 'cancelled' || c === 'timed_out' || c === 'action_required');
+  const checkRunConclusions = checks?.checkRuns.map((run) => run.conclusion).filter(Boolean) || [];
+  const failureStates = new Set(['failure', 'cancelled', 'timed_out', 'action_required', 'startup_failure']);
+  const hasFailure =
+    conclusions.some((conclusion) => failureStates.has(String(conclusion))) ||
+    checkRunConclusions.some((conclusion) => failureStates.has(String(conclusion))) ||
+    checks?.statusContexts.some((status) => status.state === 'failure' || status.state === 'error') === true;
   const hasPendingWorkflow = workflows.some((w) => w.status !== 'completed' || !w.conclusion);
+  const hasPendingCheckRun = checks?.checkRuns.some((run) => run.status !== 'completed' || !run.conclusion) === true;
 
   if (hasFailure) return 'failure';
 
-  if (checks) {
+  if (checks && checks.statusContexts.length > 0) {
     if (checks.state === 'failure' || checks.state === 'error') return 'failure';
     if (checks.state === 'pending') return 'pending';
   }
 
-  if (hasPendingWorkflow) return 'pending';
-  if (conclusions.some((c) => c === 'success')) return 'success';
-  if (checks?.state === 'success') return 'success';
+  if (hasPendingWorkflow || hasPendingCheckRun) return 'pending';
+  if (conclusions.some((c) => c === 'success') || checkRunConclusions.some((c) => c === 'success')) return 'success';
+  if (checks?.statusContexts.length && checks.state === 'success') return 'success';
 
-  return workflows.length === 0 && !checks ? 'unknown' : 'neutral';
+  const hasAnyChecks = Boolean(checks && (checks.checkRuns.length > 0 || checks.statusContexts.length > 0));
+  return workflows.length === 0 && !hasAnyChecks ? 'unknown' : 'neutral';
 }
 
-function buildCiSummary(badge: CiBadgeStateDto, workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null): string {
+function buildCiSummary(badge: CiBadgeStateDto, workflows: GithubWorkflowRunDto[], checks: GithubStatusChecksDto | null, language: AppLanguage): string {
   const checkCount = checks?.checkRuns.length || 0;
   const statusCount = checks?.statusContexts.length || 0;
-  if (badge === 'success') return `CI passed (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
-  if (badge === 'failure') return `CI failed (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
-  if (badge === 'pending') return `CI pending (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
-  return `CI status (${workflows.length} workflows, ${checkCount + statusCount} checks)`;
+  const counts = `(${workflows.length} Workflows, ${checkCount + statusCount} Checks)`;
+  if (language === 'de') {
+    if (badge === 'success') return `CI erfolgreich ${counts}`;
+    if (badge === 'failure') return `CI fehlgeschlagen ${counts}`;
+    if (badge === 'pending') return `CI ausstehend ${counts}`;
+    return `CI-Status ${counts}`;
+  }
+  if (badge === 'success') return `CI passed ${counts}`;
+  if (badge === 'failure') return `CI failed ${counts}`;
+  if (badge === 'pending') return `CI pending ${counts}`;
+  return `CI status ${counts}`;
 }
 
 export const submitPullRequest = async (
@@ -426,14 +507,27 @@ export const submitPullRequest = async (
     let owner = prOwnerRepo.owner;
     let repo = prOwnerRepo.repo;
     let head = input.head || input.currentBranch;
+    let defaultBranch = prOwnerRepo.defaultBranch || 'main';
 
-    if (github.getRepository) {
+    if (prOwnerRepo.headOwner) {
+      const branch = (input.head || input.currentBranch || '').trim();
+      head = branch.includes(':') ? branch : `${prOwnerRepo.headOwner}:${branch}`;
+    }
+
+    if (!prOwnerRepo.headOwner && github.getRepository) {
       const repositoryResult = await github.getRepository(prOwnerRepo.owner, prOwnerRepo.repo);
-      if (repositoryResult.success && repositoryResult.data.fork && repositoryResult.data.parent) {
-        owner = repositoryResult.data.parent.owner;
-        repo = repositoryResult.data.parent.repo;
-        const branch = (input.head || input.currentBranch || '').trim();
-        head = `${prOwnerRepo.owner}:${branch}`;
+      if (repositoryResult.success) {
+        defaultBranch = repositoryResult.data.defaultBranch || defaultBranch;
+        if (repositoryResult.data.fork && repositoryResult.data.parent) {
+          owner = repositoryResult.data.parent.owner;
+          repo = repositoryResult.data.parent.repo;
+          const branch = (input.head || input.currentBranch || '').trim();
+          head = `${prOwnerRepo.owner}:${branch}`;
+          if (!input.base.trim()) {
+            const upstreamResult = await github.getRepository(owner, repo);
+            if (upstreamResult?.success) defaultBranch = upstreamResult.data.defaultBranch || defaultBranch;
+          }
+        }
       }
     }
 
@@ -443,7 +537,7 @@ export const submitPullRequest = async (
       title: input.title.trim(),
       body: input.body.trim(),
       head,
-      base: input.base || 'main',
+      base: input.base.trim() || defaultBranch,
     });
 
     if (!result.success) {

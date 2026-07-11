@@ -8,7 +8,7 @@ import type {
   PullRequestCiDto,
   PullRequestDto,
 } from '@/types/githubDtos';
-import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '@/types/git';
+import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState, RepoOwnerRef } from '@/types/git';
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
 export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
@@ -71,6 +71,8 @@ export type InputDialogState = {
 };
 
 export type RunGitCommandOptions = {
+  /** Repository captured when an asynchronous workflow/dialog was opened. */
+  expectedRepoPath?: string;
   skipDirtyGuard?: boolean;
   skipRemoteAheadDirtyGuard?: boolean;
   skipSecretScan?: boolean;
@@ -189,7 +191,7 @@ export type GithubStateContract = {
   onClone: (cloneUrl: string, repoName: string) => void;
   onForkByUrl: () => void;
   isCloning: boolean;
-  prOwnerRepo: { owner: string; repo: string } | null;
+  prOwnerRepo: RepoOwnerRef | null;
   prFilter: 'open' | 'closed' | 'all';
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
@@ -216,6 +218,7 @@ export type GithubStateContract = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
+  releaseNotesGenerating: boolean;
   releaseError: string | null;
   releaseSuccess: GitHubReleaseDto | null;
   onCreateRelease: () => Promise<void>;

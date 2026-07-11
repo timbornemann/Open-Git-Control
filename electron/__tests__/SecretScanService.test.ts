@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SecretScanService } from '../SecretScanService';
 
 function createGitServiceMock(outputs: Record<string, string | Error>) {
@@ -41,7 +41,8 @@ describe('SecretScanService', () => {
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
         'rev-list --reverse --topo-order origin/main..HEAD': outgoingCommit,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${outgoingCommit}`]: outgoingDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${outgoingCommit}`]:
+          outgoingDiff,
       }),
     );
 
@@ -81,8 +82,10 @@ describe('SecretScanService', () => {
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
         'rev-list --reverse --topo-order origin/main..HEAD': `${secretCommit}\n${removalCommit}`,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${secretCommit}`]: secretDiff,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${removalCommit}`]: removalDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${secretCommit}`]:
+          secretDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${removalCommit}`]:
+          removalDiff,
       }),
     );
 
@@ -101,7 +104,7 @@ describe('SecretScanService', () => {
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
         'rev-list --reverse --topo-order origin/main..HEAD': sha256Commit,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${sha256Commit}`]: diff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${sha256Commit}`]: diff,
       }),
     );
 
@@ -143,7 +146,8 @@ describe('SecretScanService', () => {
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': new Error('no upstream'),
         'rev-list --reverse --topo-order HEAD --not --remotes': commitHash,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: outgoingCommitDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]:
+          outgoingCommitDiff,
       }),
     );
 
@@ -164,7 +168,7 @@ describe('SecretScanService', () => {
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
         'diff --no-ext-diff --no-textconv --no-color --unified=0 origin/main..HEAD': '',
         'rev-list --reverse --topo-order --tags --not --remotes': tagCommit,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${tagCommit}`]: tagDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${tagCommit}`]: tagDiff,
       }),
     );
 
@@ -247,7 +251,7 @@ describe('SecretScanService', () => {
       createGitServiceMock({
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-list --reverse --topo-order release-candidate --not --remotes=backup': commitHash,
-        [`show --format= --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: branchDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: branchDiff,
       }),
     );
 
@@ -261,5 +265,101 @@ describe('SecretScanService', () => {
 
     expect(result.findings).toHaveLength(1);
     expect(result.notes.join('\n')).toContain('requested push source release-candidate');
+  });
+
+  it('detects conflict-resolution-only secrets in a merge combined diff', async () => {
+    const mergeCommit = 'e'.repeat(40);
+    const combinedDiff = [
+      'diff --cc .env',
+      '--- a/.env',
+      '+++ b/.env',
+      '@@@ -1,1 -1,1 +1,2 @@@',
+      '  SAFE=value',
+      '++AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF',
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
+        'rev-list --reverse --topo-order origin/main..HEAD': mergeCommit,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${mergeCommit}`]:
+          combinedDiff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ filePath: '.env', lineNumber: 2, source: 'to-push' });
+  });
+
+  it('honors remote push refspecs for a no-refspec push', async () => {
+    const commitHash = 'f'.repeat(40);
+    const diff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+        'config --get-all remote.origin.push': 'refs/heads/release:refs/heads/release',
+        'rev-list --reverse --topo-order refs/heads/release --not --remotes=origin': commitHash,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: diff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '', pushArgs: [] });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.notes.join('\n')).toContain('refs/heads/release');
+  });
+
+  it('honors push.default=matching instead of scanning only HEAD', async () => {
+    const commitHash = '1'.repeat(40);
+    const diff = ['diff --git a/feature.env b/feature.env', '+++ b/feature.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+        'config --get push.default': 'matching',
+        'for-each-ref --format=%(refname) refs/heads': 'refs/heads/main\nrefs/heads/feature',
+        'for-each-ref --format=%(refname) refs/remotes/origin/': 'refs/remotes/origin/main\nrefs/remotes/origin/feature',
+        'rev-list --reverse --topo-order refs/heads/main --not --remotes=origin': '',
+        'rev-list --reverse --topo-order refs/heads/feature --not --remotes=origin': commitHash,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: diff,
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '', pushArgs: [] });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.notes.join('\n')).toContain('refs/heads/feature');
+  });
+
+  it('does not scan an unrelated upstream for an explicit deletion refspec', async () => {
+    const runCommandAtPath = vi.fn(async (_repoPath: string, args: string[]) => {
+      const key = args.join(' ');
+      const values: Record<string, string> = {
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+      };
+      return values[key] || '';
+    });
+    const streamCommandLinesAtPath = vi.fn(async (_repoPath: string, args: string[], _onLine: (line: string) => void) => {
+      if (args[0] === 'diff') return;
+      throw new Error(`Unexpected commit scan: ${args.join(' ')}`);
+    });
+    const service = new SecretScanService({ runCommandAtPath, streamCommandLinesAtPath } as any);
+
+    const result = await service.scanPushDiffs({
+      repoPath: '/tmp/repo',
+      strictness: 'low',
+      allowlistText: '',
+      pushArgs: ['origin', ':refs/heads/obsolete'],
+    });
+
+    expect(result.findings).toEqual([]);
+    expect(result.notes).toContain('The requested push has no branch commit source to scan.');
+    expect(runCommandAtPath.mock.calls.some(([, args]) => args.includes('@{upstream}'))).toBe(false);
   });
 });

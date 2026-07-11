@@ -1,3 +1,5 @@
+import { redactGitSensitiveText } from '../git/GitErrorFormatter';
+
 export interface FileHistoryEntry {
   hash: string;
   abbrevHash: string;
@@ -141,6 +143,28 @@ export function parseReleaseCommits(raw: string): ReleaseCommit[] {
 export function parseStashList(stashOutput: string): StashEntry[] {
   if (!stashOutput.trim()) return [];
 
+  if (stashOutput.includes('\x1f')) {
+    return stashOutput
+      .split('\x00')
+      .map((record) => record.replace(/^\s+|\s+$/g, ''))
+      .filter(Boolean)
+      .map((record): StashEntry | null => {
+        const [name = '', hash = '', ...subjectParts] = record.split('\x1f');
+        const refMatch = name.match(/^stash@\{(\d+)\}$/);
+        if (!refMatch || !/^[0-9a-f]{7,64}$/i.test(hash)) return null;
+        const subject = subjectParts.join('\x1f').trim();
+        const conventional = subject.match(/^(?:On|WIP on)\s+([^:]+):\s*(.*)$/i);
+        return {
+          index: Number(refMatch[1]),
+          name,
+          hash,
+          branch: conventional?.[1]?.trim() || '',
+          subject: conventional?.[2]?.trim() || subject,
+        };
+      })
+      .filter((entry): entry is StashEntry => entry !== null);
+  }
+
   return stashOutput
     .split('\n')
     .map((line) => line.trim())
@@ -169,6 +193,5 @@ export function parseStashList(stashOutput: string): StashEntry[] {
 }
 
 export function sanitizeRemoteUrl(value: string): string {
-  if (!value) return value;
-  return value.replace(/:\/\/[^@\s]+@/g, '://***@');
+  return redactGitSensitiveText(value).replace(/\[REDACTED\]/g, '***');
 }

@@ -7,6 +7,8 @@ export interface GitStatus {
 
 export interface FileEntry {
   path: string;
+  /** Source path for a porcelain-v1 rename/copy entry. */
+  originalPath?: string;
   x: string;
   y: string;
 }
@@ -18,7 +20,7 @@ export interface GitStatusDetailed {
 }
 
 function decodePorcelainPathToken(rawToken: string): string {
-  const token = rawToken.trim();
+  const token = rawToken;
   if (!token) return '';
   if (!(token.startsWith('"') && token.endsWith('"') && token.length >= 2)) {
     return token;
@@ -116,18 +118,42 @@ function splitRenamePayload(pathPayload: string): [string, string] | null {
   return null;
 }
 
+const isRenameOrCopyStatus = (line: string): boolean => line[0] === 'R' || line[0] === 'C' || line[1] === 'R' || line[1] === 'C';
+
+const hasExplicitQuotedRenameSyntax = (payload: string): boolean => /^"(?:\\.|[^"\\])*" -> "(?:\\.|[^"\\])*"$/.test(payload);
+
+const getRenameParts = (line: string, payload: string): [string, string] | null =>
+  isRenameOrCopyStatus(line) || hasExplicitQuotedRenameSyntax(payload) ? splitRenamePayload(payload) : null;
+
 export function parsePorcelainPath(line: string): string {
   if (line.length < 3) return '';
 
-  const payload = line.slice(3).trim();
+  const rawPayload = line.slice(3);
+  const payload = rawPayload.endsWith('\r') ? rawPayload.slice(0, -1) : rawPayload;
   if (!payload) return '';
 
-  const renameParts = splitRenamePayload(payload);
+  const renameParts = getRenameParts(line, payload);
   if (renameParts) {
     return decodePorcelainPathToken(renameParts[1]);
   }
 
   return decodePorcelainPathToken(payload);
+}
+
+export function parsePorcelainPathDetails(line: string): { path: string; originalPath?: string } | null {
+  if (line.length < 3) return null;
+  const rawPayload = line.slice(3);
+  const payload = rawPayload.endsWith('\r') ? rawPayload.slice(0, -1) : rawPayload;
+  if (!payload) return null;
+  const renameParts = getRenameParts(line, payload);
+  if (!renameParts) {
+    const path = decodePorcelainPathToken(payload);
+    return path ? { path } : null;
+  }
+  const originalPath = decodePorcelainPathToken(renameParts[0]);
+  const path = decodePorcelainPathToken(renameParts[1]);
+  if (!path) return null;
+  return originalPath ? { path, originalPath } : { path };
 }
 
 export interface GitBranchSyncFromPorcelainV2 {
@@ -190,9 +216,9 @@ export function parseGitStatusDetailed(statusOutput: string): GitStatusDetailed 
     if (line.length < 3) continue;
     const x = line[0];
     const y = line[1];
-    const filePath = parsePorcelainPath(line);
-    if (!filePath) continue;
-    const entry: FileEntry = { path: filePath, x, y };
+    const pathDetails = parsePorcelainPathDetails(line);
+    if (!pathDetails) continue;
+    const entry: FileEntry = { ...pathDetails, x, y };
 
     if (x === '?' && y === '?') {
       result.untracked.push(entry);

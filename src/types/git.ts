@@ -23,6 +23,10 @@ export type RemoteInfo = {
 export type RepoOwnerRef = {
   owner: string;
   repo: string;
+  /** Origin owner for a fork when PRs are managed on the upstream repository. */
+  headOwner?: string;
+  headRepo?: string;
+  defaultBranch?: string;
 };
 
 export type ToastMessage = {

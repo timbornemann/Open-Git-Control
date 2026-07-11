@@ -6,6 +6,7 @@ import type {
   DiffPreviewDto,
   FileTimelineCommitDto,
   GitCommandResultDto,
+  GitSequencerStateDto,
   GitStashEntryDto,
   MarkdownPreviewFileDto,
   RepoFileDataUrlDto,
@@ -19,11 +20,13 @@ import type { GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
 
 export type RepoUnavailablePayloadDto = {
+  repoPath: string;
   command: string;
   error: string;
 };
 
 export type CreateCommitParamsDto = {
+  repoPath?: string;
   title: string;
   description?: string;
   amend?: boolean;
@@ -32,6 +35,7 @@ export type CreateCommitParamsDto = {
 };
 
 export type CommitLogPageRequestDto = {
+  repoPath?: string;
   limit: number;
   offset: number;
   scope: 'all' | 'head';
@@ -57,10 +61,13 @@ export type PatchApplyOptionsDto = {
   reverse?: boolean;
 };
 
+export type FileBlameSourceDto = 'staged' | 'unstaged';
+
 export type RepositoryFileRequestDto = {
   source: RepositoryFileSourceDto;
   path: string;
   commitHash?: string;
+  repoPath?: string;
 };
 
 export type AddIgnoreRuleResultDto = {
@@ -99,42 +106,50 @@ export type OpenSubmoduleResultDto = {
 };
 
 export interface ElectronGitAPI {
-  setRepoPath: (repoPath: string) => Promise<boolean>;
+  setRepoPath: (repoPath: string) => Promise<string>;
   clearRepoPath: () => Promise<boolean>;
   runGitCommand: (command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;
   runGitCommandForRepo: (repoPath: string, command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;
   createCommit: (params: CreateCommitParamsDto) => Promise<IpcResult<string>>;
   getCommitLogPage: (params: CommitLogPageRequestDto) => Promise<IpcResult<CommitLogPageDto>>;
-  requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto) => Promise<IpcResult<CommitStatsRequestResultDto>>;
+  requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto, repoPath?: string) => Promise<IpcResult<CommitStatsRequestResultDto>>;
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
-  getWorkingTreeSnapshot: () => Promise<IpcResult<WorkingTreeSnapshotDto>>;
-  getWorkingTreeStats: (snapshotId: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
+  getWorkingTreeSnapshot: (repoPath?: string) => Promise<IpcResult<WorkingTreeSnapshotDto>>;
+  getWorkingTreeStats: (snapshotId: string, repoPath?: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
+  getSequencerState: (repoPath?: string) => Promise<IpcResult<GitSequencerStateDto>>;
   stagePaths: (paths: string[], repoPath?: string) => Promise<IpcResult<string>>;
-  getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto) => Promise<IpcResult<DiffPreviewDto>>;
-  getFileBlameRange: (filePath: string, commitHash: string | undefined, startLine: number, lineCount: number) => Promise<IpcResult<GitFileBlameLineDto[]>>;
+  getDiffPreview: (args: string[], limits?: DiffPreviewLimitsDto, repoPath?: string) => Promise<IpcResult<DiffPreviewDto>>;
+  getFileBlameRange: (
+    filePath: string,
+    commitHash: string | undefined,
+    startLine: number,
+    lineCount: number,
+    repoPath?: string,
+    source?: FileBlameSourceDto,
+  ) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   onRepoUnavailable: (callback: (payload: RepoUnavailablePayloadDto) => void) => () => void;
-  startInteractiveRebase: (baseHash: string, todoLines: string[]) => Promise<IpcResult<string>>;
-  applyPatch: (patch: string, options?: PatchApplyOptionsDto) => Promise<IpcResult<string>>;
-  getStashes: () => Promise<IpcResult<GitStashEntryDto[]>>;
-  gitStashBranch: (stashName: string, branchName: string) => Promise<IpcResult<string>>;
+  startInteractiveRebase: (baseHash: string, todoLines: string[], repoPath?: string) => Promise<IpcResult<string>>;
+  applyPatch: (patch: string, options?: PatchApplyOptionsDto, repoPath?: string) => Promise<IpcResult<string>>;
+  getStashes: (repoPath?: string) => Promise<IpcResult<GitStashEntryDto[]>>;
+  gitStashBranch: (stashName: string, branchName: string, repoPath?: string) => Promise<IpcResult<string>>;
   getRepoOriginUrl: (repoPath: string) => Promise<IpcResult<string | null>>;
   addIgnoreRule: (pattern: string, repoPath?: string) => Promise<AddIgnoreRuleResultDto>;
   gitFetch: () => Promise<GitCommandResultDto>;
   gitPull: () => Promise<GitCommandResultDto>;
   gitPush: () => Promise<GitCommandResultDto>;
-  scanPushSecrets: (params?: { includeTags?: boolean; repoPath?: string }) => Promise<IpcResult<SecretScanResultDto>>;
-  approveSecretScanPush: (pushArgs?: string[]) => Promise<{ success: boolean }>;
-  cancelSecretScan: () => Promise<{ success: boolean; cancelled: boolean }>;
+  scanPushSecrets: (params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }) => Promise<IpcResult<SecretScanResultDto>>;
+  approveSecretScanPush: (pushArgs: string[] | undefined, repoPath: string) => Promise<{ success: boolean }>;
+  cancelSecretScan: (repoPath: string) => Promise<{ success: boolean; cancelled: boolean; error?: string }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
   gitInit: (repoPath: string) => Promise<GitInitResultDto>;
-  getFileHistory: (filePath: string, commitHash?: string, limit?: number) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
-  getFileBlame: (filePath: string, commitHash?: string) => Promise<IpcResult<GitFileBlameLineDto[]>>;
-  getFileTimelineData: (limit?: number) => Promise<IpcResult<FileTimelineCommitDto[]>>;
-  readRepoFile: (filePath: string) => Promise<RepoFileReadResultDto>;
+  getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
+  getFileBlame: (filePath: string, commitHash?: string, repoPath?: string, source?: FileBlameSourceDto) => Promise<IpcResult<GitFileBlameLineDto[]>>;
+  getFileTimelineData: (limit?: number, repoPath?: string) => Promise<IpcResult<FileTimelineCommitDto[]>>;
+  readRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileReadResultDto>;
   getMarkdownPreviewFile: (params: RepositoryFileRequestDto) => Promise<IpcResult<MarkdownPreviewFileDto>>;
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;
-  writeRepoFile: (filePath: string, content: string) => Promise<RepoFileWriteResultDto>;
-  openSubmodule: (submodulePath: string) => Promise<OpenSubmoduleResultDto>;
+  writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
+  openSubmodule: (submodulePath: string, repoPath?: string) => Promise<OpenSubmoduleResultDto>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
   onJobEvent: (callback: (event: GitJobEventDto) => void) => () => void;
 }

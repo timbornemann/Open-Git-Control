@@ -184,6 +184,23 @@ describe('parseGitLog', () => {
   });
 });
 
+describe('parseGitLog line-range records', () => {
+  it('separates headers that are interleaved with -L patches', () => {
+    const first = 'a'.repeat(40);
+    const second = 'b'.repeat(40);
+    const output =
+      `\x1e${first}\x1faaaaaaa\x1fAlice\x1f2026-01-02\x1ffirst\x1f\x1f\x00\n` +
+      `diff --git a/file b/file\n@@ -1 +1 @@\n-old\n+new\n` +
+      `\x1e${second}\x1fbbbbbbb\x1fBob\x1f2026-01-01\x1fsecond\x1f${first}\x1f\x00\n` +
+      `diff --git a/file b/file\n@@ -1 +1 @@\n-before\n+old\n`;
+
+    const parsed = parseGitLog(output);
+
+    expect(parsed.map((commit) => commit.hash)).toEqual([first, second]);
+    expect(parsed[1].parentHashes).toEqual([first]);
+  });
+});
+
 describe('parseGitStatusDetailed', () => {
   it('returns empty buckets for empty input', () => {
     expect(parseGitStatusDetailed('   ')).toEqual({ staged: [], unstaged: [], untracked: [] });
@@ -203,9 +220,21 @@ describe('parseGitStatusDetailed', () => {
     const output = ['R  "src/old name.ts" -> "src/new name.ts"', '?? "docs/with spaces.md"', ' M "src/\\303\\244\\303\\266\\303\\274.txt"'].join('\n');
 
     const parsed = parseGitStatusDetailed(output);
-    expect(parsed.staged.map((entry) => entry.path)).toEqual(['src/new name.ts']);
+    expect(parsed.staged).toContainEqual({ path: 'src/new name.ts', originalPath: 'src/old name.ts', x: 'R', y: ' ' });
     expect(parsed.untracked.map((entry) => entry.path)).toEqual(['docs/with spaces.md']);
     expect(parsed.unstaged.map((entry) => entry.path)).toEqual(['src/äöü.txt']);
+  });
+
+  it('keeps literal arrow text in ordinary filenames', () => {
+    const parsed = parseGitStatusDetailed('?? "literal -> name.txt"\n M "another -> file.txt"');
+    expect(parsed.untracked[0]?.path).toBe('literal -> name.txt');
+    expect(parsed.unstaged[0]?.path).toBe('another -> file.txt');
+    expect(parsed.untracked[0]?.originalPath).toBeUndefined();
+  });
+
+  it('preserves significant leading and trailing whitespace in porcelain paths', () => {
+    const parsed = parseGitStatusDetailed('??  leading-and-trailing.txt \n?? " quoted-leading-and-trailing.txt "');
+    expect(parsed.untracked.map((entry) => entry.path)).toEqual([' leading-and-trailing.txt ', ' quoted-leading-and-trailing.txt ']);
   });
 });
 
@@ -283,6 +312,13 @@ describe('parseCommitDetails', () => {
 
   it('returns an empty array for blank output', () => {
     expect(parseCommitDetails('  \n')).toEqual([]);
+  });
+
+  it('parses NUL-delimited rename records into an actionable destination path', () => {
+    expect(parseCommitDetails(`R100\x00old name.ts\x00new name.ts\x00M\x00src/app.ts\x00`)).toEqual([
+      { status: 'R100', oldPath: 'old name.ts', path: 'new name.ts' },
+      { status: 'M', path: 'src/app.ts' },
+    ]);
   });
 });
 

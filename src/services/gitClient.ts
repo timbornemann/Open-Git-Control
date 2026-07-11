@@ -3,8 +3,7 @@ import type { GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
 import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
-import { isRepoUnavailableError, type RepoUnavailablePayload } from './repoUnavailableClassifier';
-import { notifyRepoUnavailable, onRepoUnavailable as subscribeRepoUnavailable } from './repoUnavailableBus';
+import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -29,33 +28,22 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
-const notifyRepoUnavailableIfNeeded = (result: { success?: boolean; error?: string } | null | undefined, commandName: string) => {
-  if (result && result.success === false && isRepoUnavailableError(result.error)) {
-    notifyRepoUnavailable({
-      command: commandName,
-      error: String(result.error || ''),
-    });
-  }
-};
-
 export const gitClient = {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
 
   onRepoUnavailable(callback: (payload: RepoUnavailablePayload) => void): () => void {
-    return subscribeRepoUnavailable(callback);
+    return requireElectronGitApi().onRepoUnavailable(callback);
   },
 
   async runGitCommand(commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
     const result = await requireElectronGitApi().runGitCommand(commandName, ...args);
-    notifyRepoUnavailableIfNeeded(result, commandName);
     return result;
   },
 
   async runGitCommandForRepo(repoPath: string, commandName: GitCommandName, ...args: string[]): Promise<GitCommandResultDto> {
     const result = await requireElectronGitApi().runGitCommandForRepo(repoPath, commandName, ...args);
-    notifyRepoUnavailableIfNeeded(result, commandName);
     return result;
   },
 
@@ -289,21 +277,20 @@ export const gitClient = {
     return this.runGitCommand('commit', '--allow-empty', '-m', message);
   },
 
-  async scanPushSecrets(params?: { includeTags?: boolean; repoPath?: string }): Promise<IpcResult<SecretScanResultDto>> {
+  async scanPushSecrets(params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
   },
 
-  async approveSecretScanPush(pushArgs?: string[]): Promise<{ success: boolean }> {
-    return requireElectronGitApi().approveSecretScanPush(pushArgs);
+  async approveSecretScanPush(pushArgs: string[] | undefined, repoPath: string): Promise<{ success: boolean }> {
+    return requireElectronGitApi().approveSecretScanPush(pushArgs, repoPath);
   },
 
-  async cancelSecretScan(): Promise<{ success: boolean; cancelled: boolean }> {
-    return requireElectronGitApi().cancelSecretScan();
+  async cancelSecretScan(repoPath: string): Promise<{ success: boolean; cancelled: boolean; error?: string }> {
+    return requireElectronGitApi().cancelSecretScan(repoPath);
   },
 
   async createCommit(...args: Parameters<ElectronAPI['createCommit']>): ReturnType<ElectronAPI['createCommit']> {
     const result = await requireElectronGitApi().createCommit(...args);
-    notifyRepoUnavailableIfNeeded(result, 'commit');
     return result;
   },
 
@@ -327,9 +314,12 @@ export const gitClient = {
     return requireElectronGitApi().getWorkingTreeStats(...args);
   },
 
+  async getSequencerState(...args: Parameters<ElectronAPI['getSequencerState']>): ReturnType<ElectronAPI['getSequencerState']> {
+    return requireElectronGitApi().getSequencerState(...args);
+  },
+
   async stagePaths(...args: Parameters<ElectronAPI['stagePaths']>): ReturnType<ElectronAPI['stagePaths']> {
     const result = await requireElectronGitApi().stagePaths(...args);
-    notifyRepoUnavailableIfNeeded(result, 'add');
     return result;
   },
 
@@ -347,7 +337,6 @@ export const gitClient = {
 
   async applyPatch(...args: Parameters<ElectronAPI['applyPatch']>): ReturnType<ElectronAPI['applyPatch']> {
     const result = await requireElectronGitApi().applyPatch(...args);
-    notifyRepoUnavailableIfNeeded(result, 'apply');
     return result;
   },
 
@@ -355,9 +344,10 @@ export const gitClient = {
     return requireElectronGitApi().getStashes(...args);
   },
 
-  async gitStashBranch(...args: Parameters<ElectronAPI['gitStashBranch']>): ReturnType<ElectronAPI['gitStashBranch']> {
-    const result = await requireElectronGitApi().gitStashBranch(...args);
-    notifyRepoUnavailableIfNeeded(result, 'stash branch');
+  async gitStashBranch(stashName: string, branchName: string, repoPath?: string): Promise<IpcResult<string>> {
+    const result = repoPath
+      ? await requireElectronGitApi().gitStashBranch(stashName, branchName, repoPath)
+      : await requireElectronGitApi().gitStashBranch(stashName, branchName);
     return result;
   },
 
@@ -367,25 +357,21 @@ export const gitClient = {
 
   async addIgnoreRule(...args: Parameters<ElectronAPI['addIgnoreRule']>): ReturnType<ElectronAPI['addIgnoreRule']> {
     const result = await requireElectronGitApi().addIgnoreRule(...args);
-    notifyRepoUnavailableIfNeeded(result, 'ignore');
     return result;
   },
 
   async gitFetch(): ReturnType<ElectronAPI['gitFetch']> {
     const result = await requireElectronGitApi().gitFetch();
-    notifyRepoUnavailableIfNeeded(result, 'fetch');
     return result;
   },
 
   async gitPull(): ReturnType<ElectronAPI['gitPull']> {
     const result = await requireElectronGitApi().gitPull();
-    notifyRepoUnavailableIfNeeded(result, 'pull');
     return result;
   },
 
   async gitPush(): ReturnType<ElectronAPI['gitPush']> {
     const result = await requireElectronGitApi().gitPush();
-    notifyRepoUnavailableIfNeeded(result, 'push');
     return result;
   },
 
@@ -423,7 +409,6 @@ export const gitClient = {
 
   async writeRepoFile(...args: Parameters<ElectronAPI['writeRepoFile']>): ReturnType<ElectronAPI['writeRepoFile']> {
     const result = await requireElectronGitApi().writeRepoFile(...args);
-    notifyRepoUnavailableIfNeeded(result, 'write');
     return result;
   },
 

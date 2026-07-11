@@ -46,13 +46,25 @@ export const buildCommitRefMenuActions = ({
   const checkoutCandidates: { label: string; args: GitCommandArgs; successMessage: string }[] = [];
   const seenCheckoutTargets = new Set<string>();
 
-  for (const ref of sortRefs(node.commit.refs)) {
+  for (const ref of sortRefs(node.commit.refs, localBranchNames)) {
     const mergeTarget = mergeTargetFromDecoratedRef(ref);
     if (!mergeTarget) continue;
     const normalizedTarget = mergeTarget.trim();
     if (!normalizedTarget) continue;
     if (normalizedTarget === currentBranch) continue;
     if (normalizedTarget.endsWith('/HEAD')) continue;
+
+    if (localBranchNames.has(normalizedTarget)) {
+      const localKey = `local:${normalizedTarget}`;
+      if (seenCheckoutTargets.has(localKey)) continue;
+      seenCheckoutTargets.add(localKey);
+      checkoutCandidates.push({
+        label: normalizedTarget,
+        args: gitClient.buildCheckoutBranchArgs(normalizedTarget),
+        successMessage: tr(`Branch "${normalizedTarget}" ausgecheckt.`, `Checked out branch "${normalizedTarget}".`),
+      });
+      continue;
+    }
 
     const parsedRemote = parseRemoteBranchRef(normalizedTarget);
     if (parsedRemote) {

@@ -56,12 +56,55 @@ export class GitHubWorkflowService {
       throw new Error('Ref is required');
     }
 
-    const [checksResponse, statusesResponse] = await Promise.all([
-      octokit.rest.checks.listForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
-      octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: normalizedRef, per_page: 100 }),
-    ]);
+    const perPage = 100;
+    const maxPages = 100;
+    const loadCheckRuns = async () => {
+      const runs = new Map<number, CheckRunApi>();
+      let reportedTotal: number | null = null;
+      for (let page = 1; page <= maxPages; page += 1) {
+        const response = await octokit.rest.checks.listForRef({ owner, repo, ref: normalizedRef, per_page: perPage, page });
+        const pageRuns = (response.data.check_runs || []) as CheckRunApi[];
+        const currentTotal = Number(response.data.total_count);
+        if (Number.isFinite(currentTotal)) reportedTotal = Math.max(reportedTotal ?? 0, currentTotal);
+        pageRuns.forEach((run) => runs.set(run.id, run));
 
-    const checkRuns = ((checksResponse.data.check_runs || []) as CheckRunApi[]).map((run): GithubCheckRunDto => ({
+        if ((reportedTotal !== null && runs.size >= reportedTotal) || pageRuns.length < perPage) break;
+        if (page === maxPages) throw new Error('GitHub returned too many check runs to verify completely.');
+      }
+      if (reportedTotal !== null && runs.size < reportedTotal) {
+        throw new Error(`GitHub check-run response was incomplete (${runs.size}/${reportedTotal}).`);
+      }
+      return [...runs.values()];
+    };
+
+    const loadStatusContexts = async () => {
+      const contexts = new Map<number, StatusContextApi>();
+      let reportedTotal: number | null = null;
+      let state = 'pending';
+      let sha = normalizedRef;
+      for (let page = 1; page <= maxPages; page += 1) {
+        const response = await octokit.rest.repos.getCombinedStatusForRef({ owner, repo, ref: normalizedRef, per_page: perPage, page });
+        if (page === 1) {
+          state = response.data.state || 'pending';
+          sha = response.data.sha || normalizedRef;
+        }
+        const pageContexts = (response.data.statuses || []) as StatusContextApi[];
+        const currentTotal = Number(response.data.total_count);
+        if (Number.isFinite(currentTotal)) reportedTotal = Math.max(reportedTotal ?? 0, currentTotal);
+        pageContexts.forEach((status) => contexts.set(status.id, status));
+
+        if ((reportedTotal !== null && contexts.size >= reportedTotal) || pageContexts.length < perPage) break;
+        if (page === maxPages) throw new Error('GitHub returned too many status contexts to verify completely.');
+      }
+      if (reportedTotal !== null && contexts.size < reportedTotal) {
+        throw new Error(`GitHub status response was incomplete (${contexts.size}/${reportedTotal}).`);
+      }
+      return { contexts: [...contexts.values()], sha, state };
+    };
+
+    const [checkRunData, statusData] = await Promise.all([loadCheckRuns(), loadStatusContexts()]);
+
+    const checkRuns = checkRunData.map((run): GithubCheckRunDto => ({
       id: run.id,
       name: run.name || run.app?.name || 'Check',
       status: (run.status || 'pending') as CheckRunStatus,
@@ -72,7 +115,7 @@ export class GitHubWorkflowService {
       completedAt: run.completed_at || null,
     }));
 
-    const statusContexts = ((statusesResponse.data.statuses || []) as StatusContextApi[]).map((status): GithubStatusContextDto => ({
+    const statusContexts = statusData.contexts.map((status): GithubStatusContextDto => ({
       id: status.id,
       context: status.context || 'status',
       state: status.state || 'pending',
@@ -83,8 +126,8 @@ export class GitHubWorkflowService {
     }));
 
     return {
-      state: statusesResponse.data.state || 'pending',
-      sha: statusesResponse.data.sha || normalizedRef,
+      state: statusData.state,
+      sha: statusData.sha,
       checkRuns,
       statusContexts,
     };

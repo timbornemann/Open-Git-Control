@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
 import type { DiffRequest, DiffSource } from '@/types/diff';
 import { useI18n } from '@/i18n';
@@ -10,13 +10,14 @@ import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from './file-details/blamePagin
 type DetailsTab = 'history' | 'blame' | 'patch';
 
 interface WorkingTreeFileDetailsProps {
+  repoPath: string;
   path: string;
   source: Extract<DiffSource, 'staged' | 'unstaged'>;
   onSelectCommit?: (hash: string) => void;
   onOpenDiff?: (request: DiffRequest) => void;
 }
 
-export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ path, source, onSelectCommit, onOpenDiff }) => {
+export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ repoPath, path, source, onSelectCommit, onOpenDiff }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -26,6 +27,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   const [blameError, setBlameError] = useState<string | null>(null);
   const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
   const [blameHasMore, setBlameHasMore] = useState(false);
+  const requestGenerationRef = useRef(0);
 
   const { t, locale } = useI18n();
 
@@ -37,23 +39,29 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
     [source, t],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    requestGenerationRef.current += 1;
     setActiveTab('history');
+    setHistoryLoading(false);
     setHistoryError(null);
     setHistoryEntries([]);
     setBlameError(null);
+    setBlameLoading(false);
     setBlameLines([]);
     setBlameHasMore(false);
-  }, [path, source]);
+  }, [path, repoPath, source]);
 
   useEffect(() => {
     if (activeTab !== 'history' || !path || !gitClient.isAvailable()) return;
+    const generation = requestGenerationRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation;
 
     const fetchHistory = async () => {
       setHistoryLoading(true);
       setHistoryError(null);
       try {
-        const result = await gitClient.getFileHistory(path, undefined, 80);
+        const result = await gitClient.getFileHistory(path, undefined, 80, repoPath);
+        if (!isCurrent()) return;
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
@@ -61,25 +69,29 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
         }
       } catch (fetchError) {
+        if (!isCurrent()) return;
         console.error(fetchError);
         setHistoryEntries([]);
         setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
       } finally {
-        setHistoryLoading(false);
+        if (isCurrent()) setHistoryLoading(false);
       }
     };
 
     fetchHistory();
-  }, [activeTab, path, t]);
+  }, [activeTab, path, repoPath, t]);
 
   useEffect(() => {
     if (activeTab !== 'blame' || !path || !gitClient.isAvailable()) return;
+    const generation = requestGenerationRef.current;
+    const isCurrent = () => requestGenerationRef.current === generation;
 
     const fetchBlame = async () => {
       setBlameLoading(true);
       setBlameError(null);
       try {
-        const result = await gitClient.getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT);
+        const result = await gitClient.getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT, repoPath, source);
+        if (!isCurrent()) return;
         if (result.success) {
           const page = splitBlamePage(result.data || []);
           setBlameLines(page.lines);
@@ -89,22 +101,26 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
           setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
         }
       } catch (fetchError) {
+        if (!isCurrent()) return;
         console.error(fetchError);
         setBlameLines([]);
         setBlameError(t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
       } finally {
-        setBlameLoading(false);
+        if (isCurrent()) setBlameLoading(false);
       }
     };
 
     fetchBlame();
-  }, [activeTab, path, t]);
+  }, [activeTab, path, repoPath, source, t]);
 
   const loadMoreBlame = async () => {
     if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
+    const generation = requestGenerationRef.current;
+    const pathAtStart = path;
     setBlameLoading(true);
     try {
-      const result = await gitClient.getFileBlameRange(path, undefined, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT);
+      const result = await gitClient.getFileBlameRange(pathAtStart, undefined, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT, repoPath, source);
+      if (requestGenerationRef.current !== generation) return;
       if (!result.success) {
         setBlameError(result.error);
         return;
@@ -113,7 +129,7 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       setBlameLines((current) => [...current, ...page.lines]);
       setBlameHasMore(page.hasMore);
     } finally {
-      setBlameLoading(false);
+      if (requestGenerationRef.current === generation) setBlameLoading(false);
     }
   };
 

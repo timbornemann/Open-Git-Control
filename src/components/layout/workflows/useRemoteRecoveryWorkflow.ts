@@ -17,7 +17,6 @@ type Toast = { msg: string; isError: boolean };
 type WorkspaceBridge = {
   activeRepo: string | null;
   addOpenRepo: (repoPath: string) => Promise<void>;
-  setActiveRepo: Dispatch<SetStateAction<string | null>>;
   setActiveTab: (tab: AppTabId) => void;
 };
 
@@ -52,6 +51,9 @@ const parseRemoteNames = (value: unknown): string[] =>
     .split('\n')
     .map((line: string) => line.trim())
     .filter(Boolean);
+
+const runAtRepo = (repoPath: string, args: ReturnType<typeof gitClient.buildPushCurrentBranchArgs>) =>
+  gitClient.runGitCommandForRepo(repoPath, args[0], ...args.slice(1));
 
 export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh, setConfirmDialog, setGitActionToast }: Params) => {
   const [isConnectingGithubRepo, setIsConnectingGithubRepo] = useState(false);
@@ -89,6 +91,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
   });
 
   const { ensureInitialCommitForPush, requestInitialCommitConfirmationIfNeeded } = useInitialCommitRecoveryWorkflow({
+    getActiveRepo: () => activeRepoRef.current,
     recoverBareRepoForPush,
     setActiveTab: workspace.setActiveTab,
     setConfirmDialog,
@@ -196,7 +199,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         return false;
       }
 
-      const remotesResult = await gitClient.listRemotes();
+      const remotesResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote');
       if (!isStillActiveRepo(repoAtStart)) return false;
       if (!remotesResult.success) {
         return false;
@@ -238,12 +241,12 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       if (!repoAtStart) {
         throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_setting_git_remote_2d2ed41d'));
       }
-      const remotesResult = await gitClient.listRemotes();
+      const remotesResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote');
       if (!isStillActiveRepo(repoAtStart)) return;
       const remoteNames = remotesResult.success ? parseRemoteNames(remotesResult.data) : [];
 
       if (!remoteNames.includes('origin')) {
-        const addRemoteResult = await gitClient.addRemote('origin', remoteUrl);
+        const addRemoteResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote', 'add', 'origin', remoteUrl);
         if (!isStillActiveRepo(repoAtStart)) return;
         if (!addRemoteResult.success) {
           throw new Error(
@@ -253,7 +256,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         return;
       }
 
-      const originUrlResult = await gitClient.getRemoteUrl('origin');
+      const originUrlResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote', 'get-url', 'origin');
       if (!isStillActiveRepo(repoAtStart)) return;
       const currentOriginUrl = originUrlResult.success ? String(originUrlResult.data || '').trim() : '';
       if (currentOriginUrl === remoteUrl) return;
@@ -262,7 +265,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.remote_origin_already_exists_with_a_different_url_06d60d88'));
       }
 
-      const setUrlResult = await gitClient.setRemoteUrl('origin', remoteUrl);
+      const setUrlResult = await gitClient.runGitCommandForRepo(repoAtStart, 'remote', 'set-url', 'origin', remoteUrl);
       if (!isStillActiveRepo(repoAtStart)) return;
       if (!setUrlResult.success) {
         throw new Error(setUrlResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_updating_remote_origin_74dca838'));
@@ -275,7 +278,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
     async (confirmedAutoInitialCommit: boolean): Promise<PushConnectedRepositoryResult> => {
       const repoAtStart = activeRepoRef.current;
       if (!repoAtStart) return { completed: false, showGenericSuccess: false };
-      const pushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+      const pushResult = await runAtRepo(repoAtStart, gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: 'HEAD', setUpstream: true }));
       if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (pushResult.success) {
         return { completed: true, showGenericSuccess: true };
@@ -289,19 +292,20 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       if (!confirmedAutoInitialCommit) {
         const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
           commandLabel: 'git push -u origin HEAD',
+          repoPath: repoAtStart,
           confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
           onConfirm: async () => {
             if (!gitClient.isAvailable()) return;
             const confirmRepo = activeRepoRef.current;
-            if (!confirmRepo) return;
+            if (!confirmRepo || confirmRepo !== repoAtStart) return;
             const connectionRun = beginGithubConnection(confirmRepo);
             if (!connectionRun) return;
             try {
-              const prepared = await ensureInitialCommitForPush();
+              const prepared = await ensureInitialCommitForPush({ expectedRepoPath: repoAtStart });
               if (!isCurrentGithubConnection(connectionRun)) return;
               if (!prepared) return;
 
-              const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+              const retryPushResult = await runAtRepo(repoAtStart, gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: 'HEAD', setUpstream: true }));
               if (!isCurrentGithubConnection(connectionRun)) return;
               if (!retryPushResult.success) {
                 throw new Error(
@@ -330,13 +334,13 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
         }
       }
 
-      const prepared = await ensureInitialCommitForPush();
+      const prepared = await ensureInitialCommitForPush({ expectedRepoPath: repoAtStart });
       if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (!prepared) {
         throw new Error(t('generated.components.layout.workflows.useremoterecoveryworkflow.could_not_auto_prepare_push_15a11b83'));
       }
 
-      const retryPushResult = await gitClient.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+      const retryPushResult = await runAtRepo(repoAtStart, gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: 'HEAD', setUpstream: true }));
       if (!isStillActiveRepo(repoAtStart)) return { completed: false, showGenericSuccess: false };
       if (!retryPushResult.success) {
         throw new Error(retryPushResult.error || t('generated.components.layout.workflows.useremoterecoveryworkflow.error_while_pushing_to_github_f44c5f17'));

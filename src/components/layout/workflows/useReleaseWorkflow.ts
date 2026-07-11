@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatc
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
+import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { RepoOwnerRef } from '@/types/git';
@@ -30,6 +31,7 @@ type Params = {
   setReleaseSubmitting: Dispatch<SetStateAction<boolean>>;
   showReleaseCreator: boolean;
   setShowReleaseCreator: Dispatch<SetStateAction<boolean>>;
+  releaseNotesGenerating: boolean;
   setReleaseNotesGenerating: Dispatch<SetStateAction<boolean>>;
   releaseNotesLanguage: 'de' | 'en';
   releaseNotesOptions: ReleaseNotesOptions;
@@ -56,6 +58,7 @@ export const useReleaseWorkflow = ({
   setReleaseSubmitting,
   showReleaseCreator,
   setShowReleaseCreator,
+  releaseNotesGenerating,
   setReleaseNotesGenerating,
   releaseNotesLanguage,
   releaseNotesOptions,
@@ -72,13 +75,25 @@ export const useReleaseWorkflow = ({
   // targetCommitish) within one repo/branch generation, so a slower earlier
   // request cannot overwrite the context produced by a newer one.
   const refreshContextRequestRef = useRef(0);
+  const releaseNotesGeneratingRef = useRef(releaseNotesGenerating);
+  const releaseContextLoadingRef = useRef(false);
   const [releasePendingAssets, setReleasePendingAssets] = useState<string[]>([]);
+
+  useLayoutEffect(() => {
+    releaseNotesGeneratingRef.current = releaseNotesGenerating;
+  }, [releaseNotesGenerating]);
 
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     generationRef.current += 1;
+    refreshContextRequestRef.current += 1;
+    releaseNotesGeneratingRef.current = false;
+    releaseContextLoadingRef.current = false;
+    setReleaseContextLoading(false);
+    setReleaseNotesGenerating(false);
+    setReleaseSubmitting(false);
     setReleasePendingAssets([]);
-  }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo]);
+  }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo, setReleaseContextLoading, setReleaseNotesGenerating, setReleaseSubmitting]);
 
   const isCurrentGeneration = useCallback((generation: number, repoPath: string | null) => {
     return generation === generationRef.current && activeRepoRef.current === repoPath;
@@ -137,12 +152,17 @@ export const useReleaseWorkflow = ({
 
   const refreshReleaseContext = useCallback(
     async (targetCommitishOverride?: string) => {
+      if (releaseNotesGeneratingRef.current) return;
       if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
+        refreshContextRequestRef.current += 1;
+        releaseContextLoadingRef.current = false;
+        setReleaseContextLoading(false);
         setReleaseContext(null);
         setReleaseContextError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
         return;
       }
 
+      releaseContextLoadingRef.current = true;
       setReleaseContextLoading(true);
       setReleaseContextError(null);
       const generation = generationRef.current;
@@ -192,6 +212,7 @@ export const useReleaseWorkflow = ({
         setReleaseContextError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
       } finally {
         if (isCurrentRefresh()) {
+          releaseContextLoadingRef.current = false;
           setReleaseContextLoading(false);
         }
       }
@@ -217,6 +238,11 @@ export const useReleaseWorkflow = ({
         return;
       }
 
+      if (releaseNotesGeneratingRef.current) {
+        setReleaseError(tr('Bitte warte, bis die Release-Notes-Generierung abgeschlossen ist.', 'Please wait until release-note generation has finished.'));
+        return;
+      }
+
       const validation = validateGithubReleaseInput({
         tagName: releaseForm.tagName,
         releaseName: releaseForm.releaseName,
@@ -235,8 +261,7 @@ export const useReleaseWorkflow = ({
         return;
       }
 
-      const releaseNotes = (releaseForm.body || '').trim();
-      if (!releaseNotes && !confirmedEmptyReleaseNotes) {
+      const showEmptyReleaseNotesConfirm = () => {
         const releaseMode = releaseForm.draft
           ? t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')
           : t('generated.components.layout.workflows.usereleaseworkflow.published_adbe9c8a');
@@ -264,6 +289,11 @@ export const useReleaseWorkflow = ({
             await handleCreateRelease(true);
           },
         });
+      };
+
+      const releaseNotes = (releaseForm.body || '').trim();
+      if (!releaseNotes && !confirmedEmptyReleaseNotes) {
+        showEmptyReleaseNotesConfirm();
         return;
       }
 
@@ -272,18 +302,53 @@ export const useReleaseWorkflow = ({
       setReleaseSuccess(null);
       const generation = generationRef.current;
       const repoPath = activeRepoRef.current;
+      const createParams = {
+        owner: ownerRepo.owner,
+        repo: ownerRepo.repo,
+        tagName: releaseForm.tagName.trim(),
+        targetCommitish: (releaseForm.targetCommitish || '').trim() || currentBranch,
+        releaseName: releaseForm.releaseName.trim(),
+        body: (releaseForm.body || '').trim(),
+        draft: Boolean(releaseForm.draft),
+        prerelease: Boolean(releaseForm.prerelease),
+      };
 
-      try {
-        const result = await githubClient.createRelease({
-          owner: ownerRepo.owner,
-          repo: ownerRepo.repo,
-          tagName: releaseForm.tagName.trim(),
-          targetCommitish: (releaseForm.targetCommitish || '').trim() || currentBranch,
-          releaseName: releaseForm.releaseName.trim(),
-          body: (releaseForm.body || '').trim(),
-          draft: Boolean(releaseForm.draft),
-          prerelease: Boolean(releaseForm.prerelease),
-        });
+      // Uploads every pending asset to the created release. Returns false when
+      // the repository switched mid-upload or an upload failed (both cases stop
+      // the success path without overwriting the error already surfaced here).
+      const uploadPendingAssets = async (releaseData: GitHubReleaseDto): Promise<boolean> => {
+        for (const filePath of [...releasePendingAssets]) {
+          const uploadResult = await githubClient.uploadReleaseAsset({
+            owner: createParams.owner,
+            repo: createParams.repo,
+            releaseId: releaseData.id,
+            filePath,
+          });
+          if (!isCurrentGeneration(generation, repoPath)) return false;
+          if (!uploadResult.success) {
+            setReleaseError(uploadResult.error || t('generated.components.releasecreator.release_asset_could_not_be_uploaded_e97d42d5'));
+            setReleaseSuccess(releaseData);
+            return false;
+          }
+        }
+        return true;
+      };
+
+      const performReleaseCreation = async (): Promise<void> => {
+        if (!repoPath || !gitClient.isAvailable()) {
+          throw new Error(tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'));
+        }
+        // GitHub writes do not inherently carry a local repository path. Use a
+        // cheap main-process authorization barrier immediately before the
+        // irreversible request so a confirmation from repo A cannot publish a
+        // release after a concurrent switch has already activated repo B.
+        const authorization = await gitClient.getRepoOriginUrl(repoPath);
+        if (!isCurrentGeneration(generation, repoPath)) return;
+        if (!authorization.success) {
+          throw new Error(authorization.error || tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'));
+        }
+
+        const result = await githubClient.createRelease(createParams);
         if (!isCurrentGeneration(generation, repoPath)) return;
 
         if (!result.success) {
@@ -291,21 +356,7 @@ export const useReleaseWorkflow = ({
           return;
         }
 
-        const assetsToUpload = [...releasePendingAssets];
-        for (const filePath of assetsToUpload) {
-          const uploadResult = await githubClient.uploadReleaseAsset({
-            owner: ownerRepo.owner,
-            repo: ownerRepo.repo,
-            releaseId: result.data.id,
-            filePath,
-          });
-          if (!isCurrentGeneration(generation, repoPath)) return;
-          if (!uploadResult.success) {
-            setReleaseError(uploadResult.error || t('generated.components.releasecreator.release_asset_could_not_be_uploaded_e97d42d5'));
-            setReleaseSuccess(result.data);
-            return;
-          }
-        }
+        if (!(await uploadPendingAssets(result.data))) return;
 
         setReleaseSuccess(result.data);
         setGitActionToast({
@@ -315,6 +366,10 @@ export const useReleaseWorkflow = ({
         triggerRefresh();
         resetReleaseDraft({ clearContext: true, clearSuccess: false });
         await refreshReleaseContext(currentBranch || undefined);
+      };
+
+      try {
+        await performReleaseCreation();
       } catch (error: any) {
         if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0'));
@@ -357,6 +412,10 @@ export const useReleaseWorkflow = ({
         setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
         return;
       }
+      if (releaseContextLoadingRef.current) {
+        setReleaseError(tr('Bitte warte, bis der Release-Kontext aktualisiert wurde.', 'Please wait until the release context has refreshed.'));
+        return;
+      }
 
       const sourceCommits = releaseContext?.commitsSinceLastRelease || [];
       if (sourceCommits.length === 0) {
@@ -372,13 +431,25 @@ export const useReleaseWorkflow = ({
         setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.please_set_a_tag_name_first_9512c3ad'));
         return;
       }
+      const effectiveTarget = (releaseForm.targetCommitish || '').trim() || currentBranch;
+      if (!releaseContext || releaseContext.commitsTarget !== effectiveTarget) {
+        setReleaseError(
+          tr(
+            'Der Release-Kontext passt nicht mehr zum Ziel. Bitte aktualisiere ihn zuerst.',
+            'The release context no longer matches the target. Refresh it first.',
+          ),
+        );
+        return;
+      }
 
       setReleaseNotesGenerating(true);
+      releaseNotesGeneratingRef.current = true;
+      setConfirmDialog(null);
       setReleaseError(null);
       const generation = generationRef.current;
       const repoPath = activeRepoRef.current;
 
-      try {
+      const runGeneration = async (): Promise<void> => {
         const result = await githubClient.generateReleaseNotes({
           tagName,
           releaseName,
@@ -396,6 +467,14 @@ export const useReleaseWorkflow = ({
           return;
         }
 
+        if (!repoPath || !gitClient.isAvailable()) return;
+        const authorization = await gitClient.getRepoOriginUrl(repoPath);
+        if (!isCurrentGeneration(generation, repoPath)) return;
+        if (!authorization.success) {
+          setReleaseError(authorization.error || tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'));
+          return;
+        }
+
         let markdown = result.data.markdown || '';
         if (releaseNotesOptions.appendAlgorithmicChangeList) {
           const automaticList = buildAlgorithmicChangeListMarkdown(commits, releaseNotesLanguage, releaseNotesOptions.includeHashesInAlgorithmicList);
@@ -409,12 +488,26 @@ export const useReleaseWorkflow = ({
           releaseName: prev.releaseName || releaseName,
           body: markdown,
         }));
-        setGitActionToast({ msg: t('generated.components.layout.workflows.usereleaseworkflow.ai_release_notes_generated_c784fbf3'), isError: false });
+        // Only an explicit backend AI provenance may show the AI-success toast.
+        // Missing/legacy metadata is treated conservatively as fallback.
+        const usedFallback = result.data.source !== 'ai';
+        setGitActionToast({
+          msg: usedFallback
+            ? result.data.warning ||
+              tr('KI nicht verfuegbar; deterministische Release Notes wurden erstellt.', 'AI unavailable; deterministic release notes were generated.')
+            : t('generated.components.layout.workflows.usereleaseworkflow.ai_release_notes_generated_c784fbf3'),
+          isError: usedFallback,
+        });
+      };
+
+      try {
+        await runGeneration();
       } catch (error: any) {
         if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_generate_ai_release_notes_0402ba88'));
       } finally {
         if (isCurrentGeneration(generation, repoPath)) {
+          releaseNotesGeneratingRef.current = false;
           setReleaseNotesGenerating(false);
         }
       }
@@ -422,28 +515,32 @@ export const useReleaseWorkflow = ({
     [
       isCurrentGeneration,
       isGithubAuthenticated,
+      currentBranch,
       ownerRepo,
-      releaseContext?.commitsSinceLastRelease,
-      releaseContext?.lastReleaseTag,
-      releaseContext?.repositoryHtmlUrl,
+      releaseContext,
       releaseNotesOptions,
       releaseNotesLanguage,
       releaseForm.tagName,
       releaseForm.releaseName,
+      releaseForm.targetCommitish,
       setReleaseNotesGenerating,
+      setConfirmDialog,
       setReleaseError,
       t,
       setReleaseFormState,
       setGitActionToast,
+      tr,
     ],
   );
 
   const addReleasePendingAssets = useCallback(async () => {
     if (!appClient.isAvailable()) return;
+    const generation = generationRef.current;
+    const repoPath = activeRepoRef.current;
     const selected = await appClient.selectFiles();
-    if (!selected || selected.length === 0) return;
+    if (!isCurrentGeneration(generation, repoPath) || !selected || selected.length === 0) return;
     setReleasePendingAssets((prev) => [...new Set([...prev, ...selected])]);
-  }, []);
+  }, [isCurrentGeneration]);
 
   const removeReleasePendingAsset = useCallback((filePath: string) => {
     setReleasePendingAssets((prev) => prev.filter((path) => path !== filePath));
@@ -456,8 +553,14 @@ export const useReleaseWorkflow = ({
   }, [resetReleaseDraft, setActiveTab, setShowReleaseCreator]);
 
   const closeReleaseCreator = useCallback(() => {
+    generationRef.current += 1;
+    refreshContextRequestRef.current += 1;
+    releaseNotesGeneratingRef.current = false;
+    releaseContextLoadingRef.current = false;
+    setReleaseContextLoading(false);
+    setReleaseNotesGenerating(false);
     setShowReleaseCreator(false);
-  }, [setShowReleaseCreator]);
+  }, [setReleaseContextLoading, setReleaseNotesGenerating, setShowReleaseCreator]);
 
   useEffect(() => {
     if (!showReleaseCreator) return;

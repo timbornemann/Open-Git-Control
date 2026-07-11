@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { CatalogTranslateFn, TranslateFn } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { ToastMessage } from '@/types/git';
@@ -15,6 +15,9 @@ type Params = {
 };
 
 export const useIgnoreRule = ({ repoPath, setToast, tr, t, onRepoChanged, refresh }: Params) => {
+  const activeRepoRef = useRef(repoPath);
+  activeRepoRef.current = repoPath;
+
   return useCallback(
     async (entry: FileEntry, section: FileSection, pattern: string) => {
       if (!gitClient.isAvailable()) return;
@@ -24,8 +27,8 @@ export const useIgnoreRule = ({ repoPath, setToast, tr, t, onRepoChanged, refres
       // .gitignore change to one repo and the unstage to another.
       const repoAtStart = repoPath;
       if (!repoAtStart) return;
-      const normalizedPattern = pattern.trim();
-      if (!normalizedPattern) return;
+      const normalizedPattern = pattern;
+      if (!normalizedPattern.trim()) return;
       try {
         const result = await gitClient.addIgnoreRule(normalizedPattern, repoAtStart);
         if (!result.success) {
@@ -33,8 +36,19 @@ export const useIgnoreRule = ({ repoPath, setToast, tr, t, onRepoChanged, refres
           return;
         }
         if (section === 'staged' && entry.x === 'A') {
-          await gitClient.runGitCommandForRepo(repoAtStart, 'reset', 'HEAD', '--', entry.path);
+          const statusResult = await gitClient.runGitCommandForRepo(repoAtStart, 'status', '--porcelain=v2', '--branch');
+          if (!statusResult.success) {
+            throw new Error(statusResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'));
+          }
+          const isUnbornBranch = /^# branch\.oid \(initial\)$/m.test(statusResult.data || '');
+          const unstageResult = isUnbornBranch
+            ? await gitClient.runGitCommandForRepo(repoAtStart, 'rm', '--cached', '-f', '--', entry.path)
+            : await gitClient.runGitCommandForRepo(repoAtStart, 'reset', 'HEAD', '--', entry.path);
+          if (!unstageResult.success) {
+            throw new Error(unstageResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'));
+          }
         }
+        if (activeRepoRef.current !== repoAtStart) return;
         setToast({
           msg: result.added
             ? tr(`Ignore-Regel hinzugefuegt: ${normalizedPattern}`, `Added ignore rule: ${normalizedPattern}`)
@@ -44,6 +58,7 @@ export const useIgnoreRule = ({ repoPath, setToast, tr, t, onRepoChanged, refres
         if (onRepoChanged) onRepoChanged();
         await refresh();
       } catch (e: any) {
+        if (activeRepoRef.current !== repoAtStart) return;
         setToast({ msg: e.message || t('generated.components.staging_area.usefileoperations.could_not_update_gitignore_074773f8'), isError: true });
       }
     },

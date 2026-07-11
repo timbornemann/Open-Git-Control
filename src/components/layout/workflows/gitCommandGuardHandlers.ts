@@ -18,6 +18,7 @@ export type GitCommandGuardRequest = {
 };
 
 export type GitCommandGuardRuntime = {
+  isRepoCurrent: (repoPath?: string | null) => boolean;
   runRemoteAheadQuickFix: (params: { command: string; options?: RunGitCommandOptions }) => Promise<void>;
   runWithOptions: (args: string[], successMsg: string, actionLabel: string | undefined, options: RunGitCommandOptions | undefined) => Promise<void>;
   setConfirmDialog: SetConfirmDialog;
@@ -27,11 +28,17 @@ export type GitCommandGuardRuntime = {
 };
 
 const commandLabel = (args: string[]) => `git ${args.join(' ')}`;
+const boundOptions = (request: GitCommandGuardRequest, additions: RunGitCommandOptions = {}): RunGitCommandOptions => ({
+  ...request.options,
+  ...additions,
+  expectedRepoPath: request.repoPath || request.options?.expectedRepoPath,
+});
 
 export const openForcePushGuard = (request: GitCommandGuardRequest, runtime: GitCommandGuardRuntime): boolean => {
-  const { args, successMsg, actionLabel, options } = request;
+  const { args, successMsg, actionLabel } = request;
   const { runWithOptions, setConfirmDialog, t } = runtime;
 
+  if (!runtime.isRepoCurrent(request.repoPath)) return true;
   setConfirmDialog({
     variant: 'danger',
     title: t('generated.components.layout.workflows.usegitcommandguardworkflow.confirm_force_push_dd412d80'),
@@ -48,8 +55,7 @@ export const openForcePushGuard = (request: GitCommandGuardRequest, runtime: Git
     confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_force_push_5ddf4b4d'),
     onConfirm: async () => {
       await runWithOptions(args, successMsg, actionLabel, {
-        ...options,
-        skipDirtyGuard: true,
+        ...boundOptions(request, { skipDirtyGuard: true }),
       });
     },
   });
@@ -57,11 +63,13 @@ export const openForcePushGuard = (request: GitCommandGuardRequest, runtime: Git
 };
 
 export const openRemoteAheadDirtyStateGuard = async (request: GitCommandGuardRequest, runtime: GitCommandGuardRuntime): Promise<boolean> => {
-  const { args, command, successMsg, actionLabel, options } = request;
+  const { args, command, successMsg, actionLabel } = request;
   const { runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, t, tr } = runtime;
 
   try {
-    const statusResult = await gitClient.getBranchStatusPorcelainV2();
+    if (!request.repoPath) return false;
+    const statusResult = await gitClient.runGitCommandForRepo(request.repoPath, 'status', '--porcelain=v2', '--branch');
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     const statusText = statusResult.success ? String(statusResult.data || '') : '';
     const remoteSyncState = parseBranchSyncFromPorcelainV2(statusText);
     const changedFiles = countChangedEntriesFromPorcelainV2(statusText);
@@ -99,27 +107,29 @@ export const openRemoteAheadDirtyStateGuard = async (request: GitCommandGuardReq
       secondaryActionLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_quick_fix_3c2a62d8'),
       secondaryActionVariant: 'default',
       onSecondaryAction: async () => {
-        await runRemoteAheadQuickFix({ command, options });
+        await runRemoteAheadQuickFix({ command, options: boundOptions(request) });
       },
       onConfirm: async () => {
         await runWithOptions(args, successMsg, actionLabel, {
-          ...options,
-          skipRemoteAheadDirtyGuard: true,
+          ...boundOptions(request, { skipRemoteAheadDirtyGuard: true }),
         });
       },
     });
     return true;
   } catch {
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     return false;
   }
 };
 
 export const openDirtyWorktreeGuard = async (request: GitCommandGuardRequest, runtime: GitCommandGuardRuntime): Promise<boolean> => {
-  const { args, successMsg, actionLabel, options } = request;
+  const { args, successMsg, actionLabel } = request;
   const { runWithOptions, setConfirmDialog, t, tr } = runtime;
 
   try {
-    const status = await gitClient.getStatusPorcelain();
+    if (!request.repoPath) return false;
+    const status = await gitClient.runGitCommandForRepo(request.repoPath, 'statusPorcelain');
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     const hasLocalChanges = Boolean(status.success && String(status.data || '').trim().length > 0);
     if (!hasLocalChanges) return false;
 
@@ -138,21 +148,25 @@ export const openDirtyWorktreeGuard = async (request: GitCommandGuardRequest, ru
       consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.depending_on_the_operation_unstaged_or_staged_changes_ma_9d5cf90f'),
       confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.run_anyway_bc5dff81'),
       onConfirm: async () => {
-        await runWithOptions(args, successMsg, actionLabel, { ...options, skipDirtyGuard: true });
+        await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipDirtyGuard: true }));
       },
     });
     return true;
   } catch {
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     return false;
   }
 };
 
 export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtime: GitCommandGuardRuntime, includeTags: boolean): Promise<boolean> => {
-  const { args, successMsg, actionLabel, options } = request;
+  const { args, successMsg, actionLabel } = request;
   const { runWithOptions, setConfirmDialog, setGitActionToast, t, tr } = runtime;
 
+  if (!request.repoPath || !runtime.isRepoCurrent(request.repoPath)) return true;
+  const repoPath = request.repoPath;
   try {
-    const scanResult = await scanPushSecretsWithTimeout(includeTags, request.repoPath || undefined);
+    const scanResult = await scanPushSecretsWithTimeout(includeTags, repoPath, args.slice(1));
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     if (!scanResult.success) {
       setGitActionToast({
         msg: scanResult.error || t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_before_push_failed_a33eb357'),
@@ -182,17 +196,31 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
       confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
       onConfirm: async () => {
         // Bind the approval to this exact push (args after the `push` command).
-        await gitClient.approveSecretScanPush(args.slice(1));
-        await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
+        const approval = await gitClient.approveSecretScanPush(args.slice(1), repoPath);
+        if (!approval.success || !runtime.isRepoCurrent(request.repoPath)) {
+          if (runtime.isRepoCurrent(request.repoPath)) {
+            setGitActionToast({
+              msg: tr(
+                'Der Repository-Zustand hat sich geaendert. Bitte fuehre den Secret-Scan erneut aus.',
+                'The repository state changed. Run the secret scan again before pushing.',
+              ),
+              isError: true,
+            });
+          }
+          return;
+        }
+        await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipSecretScan: true }));
       },
     });
     return true;
   } catch (error: any) {
     if (error?.message === '__timeout__') {
-      await gitClient.cancelSecretScan();
+      if (request.repoPath) await gitClient.cancelSecretScan(request.repoPath);
+      if (!runtime.isRepoCurrent(request.repoPath)) return true;
       return openSecretScanTimeoutDialog(request, runtime);
     }
 
+    if (!runtime.isRepoCurrent(request.repoPath)) return true;
     setGitActionToast({
       msg: error?.message || t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_before_push_failed_a33eb357'),
       isError: true,
@@ -201,7 +229,11 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
   }
 };
 
-const scanPushSecretsWithTimeout = async (includeTags: boolean, repoPath?: string): Promise<Awaited<ReturnType<typeof gitClient.scanPushSecrets>>> => {
+const scanPushSecretsWithTimeout = async (
+  includeTags: boolean,
+  repoPath: string,
+  pushArgs?: string[],
+): Promise<Awaited<ReturnType<typeof gitClient.scanPushSecrets>>> => {
   const scanTimeoutMs = 15000;
   let scanTimeoutId: number | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -209,28 +241,35 @@ const scanPushSecretsWithTimeout = async (includeTags: boolean, repoPath?: strin
   });
 
   try {
-    return await Promise.race([gitClient.scanPushSecrets({ includeTags, repoPath }), timeoutPromise]);
+    return await Promise.race([gitClient.scanPushSecrets({ includeTags, repoPath, pushArgs }), timeoutPromise]);
   } finally {
     if (scanTimeoutId !== null) window.clearTimeout(scanTimeoutId);
   }
 };
 
 const openSecretScanTimeoutDialog = (request: GitCommandGuardRequest, runtime: GitCommandGuardRuntime): boolean => {
-  const { args, successMsg, actionLabel, options } = request;
-  const { runWithOptions, setConfirmDialog, t } = runtime;
+  const { args, successMsg, actionLabel } = request;
+  const { runWithOptions, setConfirmDialog, t, tr } = runtime;
 
+  if (!request.repoPath || !runtime.isRepoCurrent(request.repoPath)) return true;
+  const repoPath = request.repoPath;
   setConfirmDialog({
     variant: 'danger',
     title: t('generated.components.layout.workflows.usegitcommandguardworkflow.secret_scan_timed_out_307b8b8c'),
-    message: t('generated.components.layout.workflows.usegitcommandguardworkflow.the_secret_scan_took_too_long_15s_and_was_cancelled_push_a1137d02'),
+    message: tr(
+      'Der Secret-Scan hat zu lange gedauert und wurde abgebrochen. Soll ein neuer Scan gestartet werden?',
+      'The secret scan timed out and was cancelled. Start a fresh scan?',
+    ),
     contextItems: [],
     irreversible: false,
-    consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.without_a_secret_scan_sensitive_data_could_be_pushed_eda26acb'),
-    confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
+    consequences: tr(
+      'Der Push wird erst nach einem neuen, vollstaendigen Secret-Scan fortgesetzt.',
+      'The push will continue only after a new secret scan completes.',
+    ),
+    confirmLabel: tr('Secret-Scan erneut starten', 'Retry secret scan'),
     onConfirm: async () => {
-      // Bind the approval to this exact push (args after the `push` command).
-      await gitClient.approveSecretScanPush(args.slice(1));
-      await runWithOptions(args, successMsg, actionLabel, { ...options, skipSecretScan: true });
+      if (!runtime.isRepoCurrent(repoPath)) return;
+      await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipSecretScan: false }));
     },
   });
   return true;

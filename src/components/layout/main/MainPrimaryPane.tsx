@@ -105,69 +105,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {activeConflictPath ? (
-            <div className="pane-header-main-center">
-              <div className="conflict-global-actions-rail conflict-global-actions-rail--topbar">
-                <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.merge_83b759bf')}</span>
-                  <button
-                    className="staging-btn-sm conflict-action-btn"
-                    onClick={workflow.onConflictMergeContinue}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.complete_merge_a4b16236')}
-                  >
-                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
-                  </button>
-                  <button
-                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
-                    onClick={workflow.onConflictMergeAbort}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.abort_merge_8f3c2f66')}
-                  >
-                    {t('generated.components.confirm.cancel_035b7526')}
-                  </button>
-                </div>
-                <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.rebase_26c8effa')}</span>
-                  <button
-                    className="staging-btn-sm conflict-action-btn"
-                    onClick={workflow.onConflictRebaseContinue}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.continue_rebase_828a1cd9')}
-                  >
-                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
-                  </button>
-                  <button
-                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
-                    onClick={workflow.onConflictRebaseAbort}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.abort_rebase_c924fd71')}
-                  >
-                    {t('generated.components.confirm.cancel_035b7526')}
-                  </button>
-                </div>
-                <div className="conflict-action-group">
-                  <span className="conflict-action-group-label">{t('generated.components.layout.main.mainprimarypane.cherry_pick_7f8a9b0c')}</span>
-                  <button
-                    className="staging-btn-sm conflict-action-btn"
-                    onClick={workflow.onConflictCherryPickContinue}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.continue_cherry_pick_1d2e3f4a')}
-                  >
-                    {t('generated.components.layout.main.mainprimarypane.continue_6c41ab57')}
-                  </button>
-                  <button
-                    className="staging-btn-sm danger conflict-action-btn conflict-action-btn--danger"
-                    onClick={workflow.onConflictCherryPickAbort}
-                    disabled={workflow.isGitActionRunning}
-                    title={t('generated.components.layout.main.mainprimarypane.abort_cherry_pick_5b6c7d8e')}
-                  >
-                    {t('generated.components.confirm.cancel_035b7526')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
           {isSettingsView ? null : isReleaseView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={github.onCloseReleaseCreator}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
@@ -215,7 +152,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         ) : isReleaseView ? (
           <React.Suspense fallback={lazyPaneFallback}>
             <ReleaseCreator
-              ownerRepo={github.prOwnerRepo}
+              ownerRepo={
+                github.prOwnerRepo?.headOwner
+                  ? { owner: github.prOwnerRepo.headOwner, repo: github.prOwnerRepo.headRepo || github.prOwnerRepo.repo }
+                  : github.prOwnerRepo
+              }
               releaseForm={github.releaseForm}
               setReleaseForm={github.setReleaseForm}
               releaseSubmitting={github.releaseSubmitting}
@@ -304,7 +245,12 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
         ) : showGithubGuide ? (
           <GithubAuthGuide method={github.selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>} onClose={ui.onClearGithubAuthHelpMethod} />
         ) : showRecoveryCenter ? (
-          <RecoveryCenter refreshTrigger={repository.refreshTrigger} onRepoChanged={repository.triggerRefresh} settings={settingsState.settings} />
+          <RecoveryCenter
+            repoPath={repository.activeRepo}
+            refreshTrigger={repository.refreshTrigger}
+            onRepoChanged={repository.triggerRefresh}
+            settings={settingsState.settings}
+          />
         ) : null}
       </div>
     </div>

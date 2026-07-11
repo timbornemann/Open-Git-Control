@@ -116,5 +116,5 @@ export interface ElectronGithubAPI {
 }
 
 export interface ElectronReleaseNotesAPI {
-  aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => Promise<IpcResult<{ markdown: string }>>;
+  aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => Promise<IpcResult<{ markdown: string; source: 'ai' | 'fallback'; warning?: string }>>;
 }

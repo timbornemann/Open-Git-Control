@@ -8,7 +8,7 @@ describe('gitCommandPolicy', () => {
   });
 
   it('rejects unknown command names', () => {
-    expect(() => assertAllowedGitCommand('rm')).toThrow('Git command not allowed.');
+    expect(() => assertAllowedGitCommand('config')).toThrow('Git command not allowed.');
   });
 
   it('normalizes valid args and rejects control characters', () => {
@@ -47,6 +47,24 @@ describe('gitCommandPolicy', () => {
       ':(literal)src/[draft].ts',
     ]);
     expect(normalizeCommandArgs('checkout', ['stash@{0}', '--', ':(glob)**/*.env'])).toEqual(['stash@{0}', '--', ':(literal):(glob)**/*.env']);
+    expect(normalizeCommandArgs('rm', ['--cached', '-f', '--', 'first commit.txt'])).toEqual(['--cached', '-f', '--', ':(literal)first commit.txt']);
+  });
+
+  it('allows only forced index-only git rm operations', () => {
+    expect(() => validateCommandArgs('rm', ['--cached', '-f', '--', 'file.txt'])).not.toThrow();
+    expect(() => validateCommandArgs('rm', ['-f', '--', 'file.txt'])).toThrow('Only forced cached removal');
+    expect(() => validateCommandArgs('rm', ['--cached', '-f', '--ignore-unmatch', '--', 'file.txt'])).toThrow();
+  });
+
+  it('allows the NUL-delimited stash file listing used by the stash panel', () => {
+    expect(() => validateCommandArgs('stash', ['show', '-u', '--name-only', '-z', 'stash@{0}'])).not.toThrow();
+    expect(() => validateCommandArgs('stash', ['show', '-u', '--name-only', '--format=unsafe', 'stash@{0}'])).toThrow(
+      'Unsupported argument combination for git stash.',
+    );
+  });
+
+  it('allows NUL-delimited rename-aware file diffs', () => {
+    expect(() => validateCommandArgs('diff', ['--name-status', '-M', '-z', 'a'.repeat(40), 'b'.repeat(40)])).not.toThrow();
   });
 
   it('validates forensic line range queries', () => {

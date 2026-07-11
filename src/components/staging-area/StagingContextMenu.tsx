@@ -2,6 +2,7 @@ import { useI18n } from '@/i18n';
 import type { FileSection, StagingContextMenuState } from './types';
 import type { useFileOperations } from './useFileOperations';
 import { dirname, extensionPattern, toGitPath } from './utils';
+import { escapeGitignoreLiteralPath } from './gitignorePattern';
 
 type StagingContextMenuProps = {
   contextMenu: StagingContextMenuState | null;
@@ -51,7 +52,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
           className="ctx-menu-item"
           onClick={() => {
             closeContextMenu();
-            fileOps.addIgnoreRule(contextEntry, contextSection, toGitPath(contextEntry.path));
+            fileOps.addIgnoreRule(contextEntry, contextSection, escapeGitignoreLiteralPath(toGitPath(contextEntry.path)));
           }}
         >
           <span className="ctx-menu-icon">IG</span>
@@ -62,7 +63,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
             className="ctx-menu-item"
             onClick={() => {
               closeContextMenu();
-              fileOps.addIgnoreRule(contextEntry, contextSection, `${contextDir}/`);
+              fileOps.addIgnoreRule(contextEntry, contextSection, `${escapeGitignoreLiteralPath(contextDir)}/`);
             }}
           >
             <span className="ctx-menu-icon">DIR</span>
@@ -74,7 +75,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
             className="ctx-menu-item"
             onClick={() => {
               closeContextMenu();
-              fileOps.addIgnoreRule(contextEntry, contextSection, `${contextTopDir}/`);
+              fileOps.addIgnoreRule(contextEntry, contextSection, `${escapeGitignoreLiteralPath(contextTopDir)}/`);
             }}
           >
             <span className="ctx-menu-icon">TOP</span>

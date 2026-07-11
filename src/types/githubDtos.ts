@@ -14,6 +14,7 @@ export interface GitHubRepositoryDetailsDto {
   repo: string;
   fork: boolean;
   parent: { owner: string; repo: string } | null;
+  defaultBranch: string;
 }
 
 export interface GitHubUploadReleaseAssetParamsDto {
@@ -144,6 +145,7 @@ export interface GithubStatusChecksDto {
 }
 
 export interface PullRequestCiDto {
+  headSha: string;
   badge: CiBadgeStateDto;
   summary: string;
   workflowRuns: GithubWorkflowRunDto[];

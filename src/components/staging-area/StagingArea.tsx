@@ -18,6 +18,23 @@ import { useCommitForm } from './useCommitForm';
 import { useConflictResolver } from './useConflictResolver';
 import { useFileOperations } from './useFileOperations';
 import { useVisibleStagingFiles } from './useVisibleStagingFiles';
+import type { SequencerOperation } from './sequencerState';
+
+type SequencerActionProps = {
+  onMergeContinue?: () => void;
+  onMergeAbort?: () => void;
+  onRebaseContinue?: () => void;
+  onRebaseAbort?: () => void;
+  onCherryPickContinue?: () => void;
+  onCherryPickAbort?: () => void;
+};
+
+const getSequencerActionProps = (operation: SequencerOperation | null, actions: Required<SequencerActionProps>): SequencerActionProps => {
+  if (operation === 'merge') return { onMergeContinue: actions.onMergeContinue, onMergeAbort: actions.onMergeAbort };
+  if (operation === 'rebase') return { onRebaseContinue: actions.onRebaseContinue, onRebaseAbort: actions.onRebaseAbort };
+  if (operation === 'cherry-pick') return { onCherryPickContinue: actions.onCherryPickContinue, onCherryPickAbort: actions.onCherryPickAbort };
+  return {};
+};
 
 const sharedWorkingTreeMatchesRepository = ({
   repoPath,
@@ -152,6 +169,14 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const visibleConflicts = visibleFiles.conflicts;
   const totalConflictBlocksInView = visibleConflicts.reduce((sum, file) => sum + conflicts.blockCountForPath(file.path), 0);
   const totalConflictBlocksAll = status.conflicts.reduce((sum, file) => sum + conflicts.blockCountForPath(file.path), 0);
+  const sequencerActionProps = getSequencerActionProps(conflicts.sequencerOperation, {
+    onMergeContinue: conflicts.mergeContinue,
+    onMergeAbort: conflicts.mergeAbort,
+    onRebaseContinue: conflicts.rebaseContinue,
+    onRebaseAbort: conflicts.rebaseAbort,
+    onCherryPickContinue: conflicts.cherryPickContinue,
+    onCherryPickAbort: conflicts.cherryPickAbort,
+  });
 
   return (
     <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
@@ -212,14 +237,9 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               isConflictEditorDirty={conflicts.isConflictEditorDirty}
               conflictManualScrollRef={conflicts.conflictManualScrollRef}
               onConflictEditorContentChange={conflicts.onConflictEditorContentChange}
-              showOperationActions={hasOpenConflicts}
+              showOperationActions={conflicts.sequencerOperation !== null}
               isGitActionRunning={fileOps.isMutating}
-              onMergeContinue={conflicts.mergeContinue}
-              onMergeAbort={conflicts.mergeAbort}
-              onRebaseContinue={conflicts.rebaseContinue}
-              onRebaseAbort={conflicts.rebaseAbort}
-              onCherryPickContinue={conflicts.cherryPickContinue}
-              onCherryPickAbort={conflicts.cherryPickAbort}
+              {...sequencerActionProps}
             />
 
             <StagingFileSections

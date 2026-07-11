@@ -61,6 +61,62 @@ describe('CommitStatsService', () => {
     expect(secondGitService.getCommitStatsAtPath).not.toHaveBeenCalled();
   });
 
+  it('does not reuse a commit statistic from a different repository checkout', async () => {
+    const cachePath = createTempCache();
+    const hash = 'c'.repeat(40);
+    let activeRepo = 'C:/repo-one';
+    const getCommitStatsAtPath = vi.fn(async (repo: string) => ({ files: repo.endsWith('one') ? 1 : 2, additions: 1, deletions: 0 }));
+    const gitService = {
+      getRepoPath: () => activeRepo,
+      runCommandAtPath: vi.fn(async (_repo: string, args: string[]) => (args.includes('--show-object-format') ? 'sha1' : '.git')),
+      getCommitStatsAtPath,
+    } as any;
+    const service = new CommitStatsService(gitService, () => cachePath);
+    const ready: any[] = [];
+    service.onUpdate((update) => update.state === 'ready' && ready.push(update));
+
+    await service.requestStats([hash]);
+    await waitFor(() => ready.length === 1);
+    activeRepo = 'C:/repo-two';
+    service.setActiveRepo(activeRepo);
+    expect(await service.requestStats([hash])).toEqual({ [hash]: { state: 'queued', stats: null } });
+    await waitFor(() => ready.length === 2);
+
+    expect(getCommitStatsAtPath).toHaveBeenCalledTimes(2);
+    expect(ready[1].stats.files).toBe(2);
+  });
+
+  it('invalidates cached statistics when a shallow boundary changes', async () => {
+    const cachePath = createTempCache();
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-shallow-stats-'));
+    tempDirs.push(repoPath);
+    const gitDir = path.join(repoPath, '.git');
+    fs.mkdirSync(gitDir);
+    const shallowPath = path.join(gitDir, 'shallow');
+    fs.writeFileSync(shallowPath, `${'a'.repeat(40)}\n`, 'utf8');
+    const hash = 'd'.repeat(40);
+    let files = 10;
+    const getCommitStatsAtPath = vi.fn(async () => ({ files, additions: 1, deletions: 0 }));
+    const gitService = {
+      getRepoPath: () => repoPath,
+      runCommandAtPath: vi.fn(async (_repo: string, args: string[]) => (args.includes('--show-object-format') ? 'sha1' : '.git')),
+      getCommitStatsAtPath,
+    } as any;
+    const service = new CommitStatsService(gitService, () => cachePath);
+    const ready: any[] = [];
+    service.onUpdate((update) => update.state === 'ready' && ready.push(update));
+
+    await service.requestStats([hash]);
+    await waitFor(() => ready.length === 1);
+    files = 2;
+    fs.writeFileSync(shallowPath, `${'b'.repeat(40)}\n`, 'utf8');
+    expect(await service.requestStats([hash])).toEqual({ [hash]: { state: 'queued', stats: null } });
+    await waitFor(() => ready.length === 2);
+
+    expect(getCommitStatsAtPath).toHaveBeenCalledTimes(2);
+    expect(ready[1].stats.files).toBe(2);
+  });
+
   it('atomically compacts to the configured most recent entry limit', async () => {
     const cachePath = createTempCache();
     const updates: any[] = [];

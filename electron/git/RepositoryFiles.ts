@@ -29,11 +29,14 @@ const IMAGE_MIME_TYPES = new Map<string, string>([
 export class RepositoryFiles {
   constructor(
     private readonly getRepoPath: () => string,
-    private readonly readGitFileBuffer: (revisionSpec: string, maxBytes: number) => Promise<Buffer>,
+    private readonly readGitFileBuffer: (repoPath: string, revisionSpec: string, maxBytes: number) => Promise<Buffer>,
   ) {}
 
   async readRepoFile(relativePath: string): Promise<string> {
-    const repoPath = this.getRepoPath();
+    return this.readRepoFileAtPath(this.getRepoPath(), relativePath);
+  }
+
+  async readRepoFileAtPath(repoPath: string, relativePath: string): Promise<string> {
     const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
@@ -50,22 +53,35 @@ export class RepositoryFiles {
   }
 
   async readRepositoryFileTextAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
+    return this.readRepositoryFileTextAtSourceAndPath(this.getRepoPath(), source, relativePath, commitHash);
+  }
+
+  async readRepositoryFileTextAtSourceAndPath(repoPath: string, source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     if (source === 'unstaged') {
-      return this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES).toString('utf8');
+      return decodeRepositoryFile(this.readWorkingTreeFileBuffer(repoPath, normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).text;
     }
 
     const revisionSpec = this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash);
-    return (await this.readGitFileBuffer(revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).toString('utf8');
+    return decodeRepositoryFile(await this.readGitFileBuffer(repoPath, revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).text;
   }
 
   async readRepositoryImageDataUrlAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<RepositoryFileDataUrl> {
+    return this.readRepositoryImageDataUrlAtSourceAndPath(this.getRepoPath(), source, relativePath, commitHash);
+  }
+
+  async readRepositoryImageDataUrlAtSourceAndPath(
+    repoPath: string,
+    source: RepositoryFileSource,
+    relativePath: string,
+    commitHash?: string,
+  ): Promise<RepositoryFileDataUrl> {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     const mimeType = this.getImageMimeType(normalizedRelativePath);
     const buffer =
       source === 'unstaged'
-        ? this.readWorkingTreeFileBuffer(normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
-        : await this.readGitFileBuffer(this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash), MAX_MARKDOWN_PREVIEW_ASSET_BYTES);
+        ? this.readWorkingTreeFileBuffer(repoPath, normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
+        : await this.readGitFileBuffer(repoPath, this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash), MAX_MARKDOWN_PREVIEW_ASSET_BYTES);
 
     return {
       dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
@@ -75,7 +91,10 @@ export class RepositoryFiles {
   }
 
   async writeRepoFile(relativePath: string, content: string): Promise<void> {
-    const repoPath = this.getRepoPath();
+    return this.writeRepoFileAtPath(this.getRepoPath(), relativePath, content);
+  }
+
+  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string): Promise<void> {
     const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
@@ -127,8 +146,7 @@ export class RepositoryFiles {
     throw new Error('Working tree files are not addressed by a Git revision spec.');
   }
 
-  private readWorkingTreeFileBuffer(relativePath: string, maxBytes: number): Buffer {
-    const repoPath = this.getRepoPath();
+  private readWorkingTreeFileBuffer(repoPath: string, relativePath: string, maxBytes: number): Buffer {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     const resolvedPath = resolveExistingRepositoryPath(repoPath, normalizedRelativePath);
 

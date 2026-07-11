@@ -92,6 +92,10 @@ export const appClient = {
     return requireElectronReposApi().setStoredRepos(...args);
   },
 
+  async resolveRepoPath(...args: Parameters<ElectronAPI['resolveRepoPath']>): ReturnType<ElectronAPI['resolveRepoPath']> {
+    return requireElectronReposApi().resolveRepoPath(...args);
+  },
+
   async setRepoPath(...args: Parameters<ElectronAPI['setRepoPath']>): ReturnType<ElectronAPI['setRepoPath']> {
     return requireElectronReposApi().setRepoPath(...args);
   },

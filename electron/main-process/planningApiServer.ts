@@ -1,17 +1,7 @@
-import { PLANNER_PRIORITIES, PLANNER_STATUSES, createPlannerItem, ensureRepositoryProject } from './projectPlannerStore';
+import { PLANNER_PRIORITIES, PLANNER_STATUSES, ensureRepositoryProject } from './projectPlannerStore';
 import { AUTH_HEADER_NAME, ApiError, SERVER_NAME } from './planningApiTypes';
 import type { PlanningApiServerHandle, JsonObject, PlanningApiServerOptions, RequestContext } from './planningApiTypes';
-import {
-  getRepositories,
-  getTabs,
-  getTodoById,
-  getTodos,
-  itemInputFromBody,
-  parseStatus,
-  queryOptionsFromUrl,
-  resolveProjectLocator,
-  cleanString,
-} from './planningApiDomain';
+import { getRepositories, getTabs, createTodoFromBody, getTodos, parseStatus, queryOptionsFromUrl, cleanString } from './planningApiDomain';
 import { handleProjectsRoute } from './planningProjectsController';
 import { handleTodosRoute } from './planningTodosController';
 import { startPlanningApiHost } from './planningApiServerHost';
@@ -51,9 +41,7 @@ const handleTabsRoute = (ctx: RequestContext, resource: string | undefined, idOr
     return { handled: true, value: { todos: getTodos(queryOptionsFromUrl(ctx.url, { status: parseStatus(idOrAction, 'tab') })) } };
   }
   if (idOrAction && nested === 'todos' && ctx.method === 'POST') {
-    const project = resolveProjectLocator(ctx.body);
-    const item = createPlannerItem(project.id, itemInputFromBody(ctx.body, parseStatus(idOrAction, 'tab')));
-    return { handled: true, value: getTodoById(item.id) };
+    return { handled: true, value: createTodoFromBody(ctx.body, parseStatus(idOrAction, 'tab')) };
   }
   return unhandledRoute();
 };

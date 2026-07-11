@@ -3,14 +3,18 @@ import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
+import type { RepoOwnerRef } from '@/types/git';
 import { usePullRequestWorkflow } from './usePullRequestWorkflow';
 
 const renderWorkflow = (setGitActionToast = vi.fn()) => {
   let hook: ReturnType<typeof usePullRequestWorkflow> | null = null;
   const root = createRoot(document.createElement('div'));
   const params = {
-    ownerRepo: { owner: 'acme', repo: 'project' },
+    activeRepo: 'C:/repo',
+    githubHost: 'github.com',
+    ownerRepo: { owner: 'acme', repo: 'project' } as RepoOwnerRef,
     createPullRequest: vi.fn().mockResolvedValue(true),
     currentBranch: 'feature',
     newPRTitle: '',
@@ -55,6 +59,8 @@ beforeEach(() => {
   vi.stubGlobal('navigator', dom.window.navigator);
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
+  vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+  vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'https://github.com/acme/project.git' });
 });
 
 afterEach(() => {
@@ -79,6 +85,30 @@ describe('usePullRequestWorkflow merge guards', () => {
       'Checked out PR branch pr-42-feature-new-thing.',
     );
     rendered.unmount();
+  });
+
+  it('fetches fork PR refs from the upstream repository rather than the fork origin', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({
+      success: true,
+      data: 'origin\thttps://github.com/me/project-fork.git (fetch)\nupstream\tgit@github.com:acme/project.git (fetch)',
+    });
+    const rendered = renderWorkflow();
+    rendered.params.ownerRepo = { owner: 'acme', repo: 'project', headOwner: 'me', headRepo: 'project-fork' };
+    rendered.unmount();
+
+    let hook: ReturnType<typeof usePullRequestWorkflow> | null = null;
+    const root = createRoot(document.createElement('div'));
+    const TestComponent = () => {
+      hook = usePullRequestWorkflow(rendered.params);
+      return null;
+    };
+    act(() => root.render(createElement(TestComponent)));
+    await act(async () => hook!.handleCheckoutPR(42, 'feature'));
+
+    expect(rendered.params.runGitCommand).toHaveBeenNthCalledWith(1, ['fetch', 'upstream', 'pull/42/head'], expect.any(String), expect.any(String), {
+      skipDirtyGuard: true,
+    });
+    act(() => root.unmount());
   });
 
   it('reports a successful HTTP response with merged=false as a failed merge', async () => {
@@ -114,7 +144,7 @@ describe('usePullRequestWorkflow merge guards', () => {
     await act(async () => {
       const first = rendered.hook.handleMergePR(42, 'merge');
       const second = rendered.hook.handleMergePR(42, 'merge');
-      expect(merge).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(merge).toHaveBeenCalledTimes(1));
       if (!resolveMerge) throw new Error('Merge request did not start.');
       resolveMerge({ success: true, data: { sha: 'abc', merged: true, message: 'Merged' } });
       await Promise.all([first, second]);

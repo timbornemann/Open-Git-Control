@@ -6,6 +6,7 @@ import { gitClient } from '@/services/gitClient';
 import type { MenuAction } from './CommitContextMenu';
 
 type BuildCommitHistoryMenuActionsParams = {
+  repoPath: string | null;
   node: GraphNode;
   layout: GraphLayout | null;
   reachableFromHead: Set<string>;
@@ -19,6 +20,7 @@ type BuildCommitHistoryMenuActionsParams = {
 };
 
 export const buildCommitHistoryMenuActions = ({
+  repoPath,
   node,
   layout,
   reachableFromHead,
@@ -45,15 +47,19 @@ export const buildCommitHistoryMenuActions = ({
       action: () =>
         runGitAction(gitClient.buildCherryPickCommitArgs(hash), tr(`Cherry-Pick von ${shortHash} erfolgreich.`, `Successfully cherry-picked ${shortHash}.`)),
     },
-    {
-      label: tr(`Revert ${shortHash}`, `Revert ${shortHash}`),
-      icon: 'RV',
-      action: () =>
-        runGitAction(
-          gitClient.buildRevertCommitArgs(hash, { noEdit: true }),
-          tr(`Revert von ${shortHash} erfolgreich.`, `Successfully reverted ${shortHash}.`),
-        ),
-    },
+    ...(node.isMerge
+      ? []
+      : [
+          {
+            label: tr(`Revert ${shortHash}`, `Revert ${shortHash}`),
+            icon: 'RV',
+            action: () =>
+              runGitAction(
+                gitClient.buildRevertCommitArgs(hash, { noEdit: true }),
+                tr(`Revert von ${shortHash} erfolgreich.`, `Successfully reverted ${shortHash}.`),
+              ),
+          },
+        ]),
     {
       label: '',
       icon: '',
@@ -214,7 +220,8 @@ export const buildCommitHistoryMenuActions = ({
 
             if (lines.length === 0 || !gitClient.isAvailable()) return;
 
-            const result = await gitClient.startInteractiveRebase(baseHash, lines);
+            if (!repoPath) return;
+            const result = await gitClient.startInteractiveRebase(baseHash, lines, repoPath);
             if (!result.success) {
               setToast({ msg: result.error || tr('Interaktiver Rebase fehlgeschlagen.', 'Interactive rebase failed.'), isError: true });
               return;
@@ -244,7 +251,7 @@ export const buildCommitHistoryMenuActions = ({
   ];
 
   if (node.isMerge) {
-    actions.splice(3, 0, {
+    actions.splice(2, 0, {
       label: tr(`Merge ${shortHash} reverten`, `Revert merge ${shortHash}`),
       icon: 'MR',
       action: () => {

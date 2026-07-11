@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isSecureStorageAvailable } from '../secureStore';
+import { isSecureStorageAvailable, parseSavedGithubTokenPayload } from '../secureStore';
 
 const { getSelectedStorageBackendMock, isEncryptionAvailableMock } = vi.hoisted(() => ({
   getSelectedStorageBackendMock: vi.fn(),
@@ -47,5 +47,14 @@ describe('isSecureStorageAvailable', () => {
     isEncryptionAvailableMock.mockReturnValue(false);
     expect(isSecureStorageAvailable()).toBe(false);
     expect(getSelectedStorageBackendMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('parseSavedGithubTokenPayload', () => {
+  it('accepts legacy raw tokens but rejects valid JSON with an unsupported schema', () => {
+    expect(parseSavedGithubTokenPayload('ghp_legacy_token')).toEqual({ token: 'ghp_legacy_token', host: null });
+    expect(parseSavedGithubTokenPayload(JSON.stringify({ version: 999, token: 'ghp_future' }))).toBeNull();
+    expect(parseSavedGithubTokenPayload(JSON.stringify({ version: 1, host: 'github.com' }))).toBeNull();
+    expect(parseSavedGithubTokenPayload(JSON.stringify('ghp_not_a_legacy_payload'))).toBeNull();
   });
 });

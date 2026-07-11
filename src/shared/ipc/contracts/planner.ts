@@ -3,6 +3,7 @@ import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput
 
 export interface ElectronPlannerAPI {
   plannerGetData: () => Promise<IpcResult<ProjectPlannerData>>;
+  onPlannerDataChanged: (callback: () => void) => () => void;
   plannerEnsureRepositoryProject: (repoPath: string) => Promise<IpcResult<PlannerProject>>;
   plannerCreateProject: (input: PlannerProjectInput) => Promise<IpcResult<PlannerProject>>;
   plannerUpdateProject: (projectId: string, input: Partial<PlannerProjectInput>) => Promise<IpcResult<PlannerProject>>;

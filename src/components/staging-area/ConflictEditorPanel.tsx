@@ -118,6 +118,7 @@ export const ConflictEditorPanel = ({
           <ConflictManualSection
             conflictEditor={conflictEditor}
             conflictBlocksCount={conflictBlocks.length}
+            hasUnresolvedConflictMarkers={conflictBlocks.length > 0 || isStructuredConflictViewLocked}
             isConflictEditorDirty={isConflictEditorDirty}
             conflictManualScrollRef={conflictManualScrollRef}
             resetConflictEditorDraft={resetConflictEditorDraft}

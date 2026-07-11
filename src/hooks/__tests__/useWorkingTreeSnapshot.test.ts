@@ -48,9 +48,9 @@ describe('useWorkingTreeSnapshot', () => {
     vi.spyOn(gitClient, 'getWorkingTreeSnapshot')
       .mockImplementationOnce(() => resultA.promise)
       .mockImplementationOnce(() => resultB.promise);
-    vi.spyOn(gitClient, 'getStatusPorcelain')
-      .mockImplementationOnce(() => quickA.promise)
-      .mockResolvedValueOnce({ success: true, data: ' M src/new-repo.ts\n' });
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation((repoPath) =>
+      repoPath === repoA ? quickA.promise : Promise.resolve({ success: true, data: ' M src/new-repo.ts\n' }),
+    );
     vi.spyOn(gitClient, 'getWorkingTreeStats').mockResolvedValue({
       success: true,
       data: { snapshotId: 'b', staged: { additions: 0, deletions: 0 }, unstaged: { additions: 1, deletions: 0 } },

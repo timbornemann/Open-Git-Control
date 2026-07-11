@@ -39,6 +39,7 @@ describe('registerDialogHandlers', () => {
     showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['D:/tmp/example'] });
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('true'),
+      resolveRepositoryPath: vi.fn().mockReturnValue('D:/tmp/example'),
       setRepoPath: vi.fn(),
       checkIsRepo: vi.fn(),
     } as any;
@@ -51,8 +52,21 @@ describe('registerDialogHandlers', () => {
     const result = await handler!();
     expect(result).toEqual({ path: 'D:/tmp/example', isRepo: true });
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith('D:/tmp/example', ['rev-parse', '--is-inside-work-tree']);
+    expect(gitService.resolveRepositoryPath).toHaveBeenCalledWith('D:/tmp/example');
     expect(gitService.setRepoPath).not.toHaveBeenCalled();
     expect(gitService.checkIsRepo).not.toHaveBeenCalled();
+  });
+
+  it('returns the canonical repository root for a selected subdirectory', async () => {
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['D:/tmp/example/packages/app'] });
+    const gitService = {
+      runCommandAtPath: vi.fn().mockResolvedValue('true'),
+      resolveRepositoryPath: vi.fn().mockReturnValue('D:/tmp/example'),
+    } as any;
+
+    registerDialogHandlers({ gitService });
+
+    await expect(handlers.get('dialog:openDirectory')!()).resolves.toEqual({ path: 'D:/tmp/example', isRepo: true });
   });
 
   it('returns a clean clone directory title and keeps isRepo false when probe fails', async () => {

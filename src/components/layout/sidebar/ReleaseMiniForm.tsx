@@ -9,6 +9,7 @@ type ReleaseMiniFormProps = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
+  releaseNotesGenerating: boolean;
   releaseError: string | null;
   releaseSuccess: GitHubReleaseDto | null;
   onCreateRelease: () => Promise<void>;
@@ -20,6 +21,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
+  releaseNotesGenerating,
   releaseError,
   releaseSuccess,
   onCreateRelease,
@@ -30,7 +32,8 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
     tagName: releaseForm.tagName || '',
     releaseName: releaseForm.releaseName || '',
   });
-  const releaseSubmitDisabled = !ownerRepo || releaseSubmitting || !releaseValidation.valid;
+  const formDisabled = !ownerRepo || releaseSubmitting || releaseNotesGenerating;
+  const releaseSubmitDisabled = formDisabled || !releaseValidation.valid;
 
   return (
     <Panel className="release-mini-form" disabled={!ownerRepo}>
@@ -40,21 +43,21 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
         placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.tag_name_required_f52acebf')}
         value={releaseForm.tagName || ''}
         onChange={(e) => setReleaseForm((prev) => ({ ...prev, tagName: e.target.value }))}
-        disabled={!ownerRepo || releaseSubmitting}
+        disabled={formDisabled}
       />
       <TextField
         type="text"
         placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.release_name_required_cbead0c8')}
         value={releaseForm.releaseName || ''}
         onChange={(e) => setReleaseForm((prev) => ({ ...prev, releaseName: e.target.value }))}
-        disabled={!ownerRepo || releaseSubmitting}
+        disabled={formDisabled}
       />
       <TextField
         type="text"
         placeholder={t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}
         value={releaseForm.targetCommitish || ''}
         onChange={(e) => setReleaseForm((prev) => ({ ...prev, targetCommitish: e.target.value }))}
-        disabled={!ownerRepo || releaseSubmitting}
+        disabled={formDisabled}
       />
       <TextField
         as="textarea"
@@ -62,7 +65,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
         value={releaseForm.body || ''}
         onChange={(e) => setReleaseForm((prev) => ({ ...prev, body: e.target.value }))}
         rows={3}
-        disabled={!ownerRepo || releaseSubmitting}
+        disabled={formDisabled}
       />
       <div className="release-mini-form__checks">
         <label className="release-mini-form__check">
@@ -70,7 +73,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
             type="checkbox"
             checked={Boolean(releaseForm.draft)}
             onChange={(e) => setReleaseForm((prev) => ({ ...prev, draft: e.target.checked }))}
-            disabled={!ownerRepo || releaseSubmitting}
+            disabled={formDisabled}
           />
           {t('generated.components.layout.sidebar.githubconnectedcontent.draft_03fcb5d9')}
         </label>
@@ -79,7 +82,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
             type="checkbox"
             checked={Boolean(releaseForm.prerelease)}
             onChange={(e) => setReleaseForm((prev) => ({ ...prev, prerelease: e.target.checked }))}
-            disabled={!ownerRepo || releaseSubmitting}
+            disabled={formDisabled}
           />
           {t('generated.components.layout.sidebar.githubconnectedcontent.pre_release_4bb763f1')}
         </label>

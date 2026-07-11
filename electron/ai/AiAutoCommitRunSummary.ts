@@ -11,13 +11,16 @@ export const buildAiAutoCommitRunResult = async (
   state: AiAutoCommitRunState,
 ): Promise<AiAutoCommitResult> => {
   const gitCapabilities = gitService as GitService & {
+    getStatusPorcelainZAtPath?: (path: string) => Promise<string>;
     getStatusPorcelainAtPath?: (path: string) => Promise<string>;
     getStatusPorcelain?: () => Promise<string>;
   };
   const finalStatus =
-    typeof gitCapabilities.getStatusPorcelainAtPath === 'function'
-      ? await gitCapabilities.getStatusPorcelainAtPath(repoPath)
-      : (await gitCapabilities.getStatusPorcelain?.()) || '';
+    typeof gitCapabilities.getStatusPorcelainZAtPath === 'function'
+      ? await gitCapabilities.getStatusPorcelainZAtPath(repoPath)
+      : typeof gitCapabilities.getStatusPorcelainAtPath === 'function'
+        ? await gitCapabilities.getStatusPorcelainAtPath(repoPath)
+        : (await gitCapabilities.getStatusPorcelain?.()) || '';
   const remainingEntries = parseStatusPorcelain(finalStatus);
   const remainingFiles = remainingEntries.length;
   const summary = state.commits.length === 0 ? 'Keine Commits erstellt.' : `KI Auto-Commit abgeschlossen: ${state.commits.length} Commit(s) erstellt.`;

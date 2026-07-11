@@ -43,26 +43,28 @@ export function clipContextLine(line: string, maxChars = MAX_CONTEXT_LINE_CHARS)
 }
 
 const extractNumstatTargetPath = (rawPath: string): string => {
+  // A quoted numstat pathname is one literal path. In particular, text such as
+  // " => " or " -> " inside that filename must never be parsed as a rename.
+  if (rawPath.startsWith('"') && rawPath.endsWith('"')) return rawPath;
   // `git diff --numstat` abbreviates renames as `old => new` and can retain
   // their shared prefix/suffix as `src/{old => new}.ts`. Expand brace forms
   // before handling the plain variant so stats are indexed under the actual
   // destination path from the status snapshot.
   const expandedPath = rawPath.replace(/\{([^{}]*) => ([^{}]*)\}/g, (_match, _oldPart: string, newPart: string) => newPart);
-  const renameSeparator = expandedPath.lastIndexOf(' => ') >= 0 ? ' => ' : ' -> ';
-  const renameSeparatorIndex = expandedPath.lastIndexOf(renameSeparator);
-  return renameSeparatorIndex >= 0 ? expandedPath.slice(renameSeparatorIndex + renameSeparator.length) : expandedPath;
+  const renameSeparatorIndex = expandedPath.lastIndexOf(' => ');
+  return renameSeparatorIndex >= 0 ? expandedPath.slice(renameSeparatorIndex + 4) : expandedPath;
 };
 
 export function parseNumstatReport(numstatOutput: string): Map<string, Numstat> {
   const byPath = new Map<string, Numstat>();
   const lines = (numstatOutput || '').split(/\r?\n/);
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const parsed = parseNumstatLine(trimmed);
-    const match = trimmed.match(/^(\d+|-)\s+(\d+|-)\s+(.+)$/);
+    const record = line.endsWith('\r') ? line.slice(0, -1) : line;
+    if (!record) continue;
+    const parsed = parseNumstatLine(record);
+    const match = record.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
     if (!match) continue;
-    const rawPath = match[3].trim();
+    const rawPath = match[3];
     const targetPath = extractNumstatTargetPath(rawPath);
     const decodedPath = decodePorcelainPath(targetPath);
     if (!decodedPath) continue;

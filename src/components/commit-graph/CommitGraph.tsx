@@ -24,7 +24,9 @@ import { useCommitGraphContextMenu } from './useCommitGraphContextMenu';
 import { CommitGraphContextMenuLayer } from './CommitGraphContextMenuLayer';
 import { CommitGraphRows } from './CommitGraphRows';
 import { formatCommitDate, formatCommitStats } from './commitGraphFormatters';
+import { summarizeWorkingTreeChanges } from './commitGraphWorkingTree';
 import '@/styles/commit-graph.css';
+import type { RunGitCommandOptions } from '@/app/state/contracts';
 
 export { buildGraphHighlightData, findCommitIndexByNavigationTarget } from './commitGraphRefs';
 
@@ -42,7 +44,7 @@ interface CommitGraphProps {
   currentBranch?: string;
   branches?: BranchInfo[];
   onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
-  onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string) => Promise<boolean>;
+  onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   /** Wenn ein Git-Befehl hier direkt fehlschlaegt (Fallback ohne zentralen Runner), Konflikt-Resolver oeffnen */
   onOpenConflictResolverForPath?: (path: string) => void;
   workingTreeStatus?: GitStatusDetailed | null;
@@ -101,7 +103,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       externalWorkingTreeStatus,
       onRefreshWorkingTree,
     });
-  const { scrollTop, containerHeight } = useCommitGraphViewport({
+  const { scrollTop, containerHeight, scrollToCommitIndex } = useCommitGraphViewport({
     logContainerRef,
     layout,
     repoPath,
@@ -129,6 +131,10 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     layout,
     selectedHash,
     onSelectCommit,
+    revealCommit: (hash) => {
+      if (!layout) return;
+      scrollToCommitIndex(layout.nodes.findIndex((node) => node.commit.hash === hash));
+    },
     t,
   });
   const {
@@ -156,6 +162,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   });
   resetForensicStateRef.current = resetForensicState;
   const runGitAction = useCommitGraphGitActions({
+    repoPath,
     onRunGitCommand,
     onOpenConflictResolverForPath,
     refreshCommits,
@@ -197,9 +204,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     void refreshWorkingTreeStatus();
   }, [currentBranch, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
-  const hasWorkingTreeChanges = Boolean(
-    workingTreeStatus && (workingTreeStatus.staged.length > 0 || workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0),
-  );
+  const workingTreeSummary = summarizeWorkingTreeChanges(workingTreeStatus);
+  const hasWorkingTreeChanges = workingTreeSummary.total > 0;
   const workingTreeRowOffset = hasWorkingTreeChanges ? 1 : 0;
   const visibleWindow = useMemo(() => {
     if (!layout) {
@@ -244,6 +250,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const getMenuActions = useCallback(
     (node: GraphNode): MenuAction[] =>
       buildCommitMenuActions({
+        repoPath,
         node,
         branches,
         currentBranch,
@@ -265,6 +272,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       reachableFromHead,
       refreshCommits,
       refreshWorkingTreeStatus,
+      repoPath,
       runGitAction,
       setConfirmDialog,
       setInputDialog,
@@ -310,10 +318,13 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   const bottomSpacerHeight = Math.max(0, (layout.nodes.length - visibleEndIdx) * ROW_HEIGHT);
   const workingTreeLabel = !workingTreeStatus
     ? ''
-    : workingTreeStatus.unstaged.length > 0 || workingTreeStatus.untracked.length > 0
-      ? 'Uncommitted Changes'
-      : 'Staged Changes';
-  const workingTreeCount = !workingTreeStatus ? 0 : workingTreeStatus.staged.length + workingTreeStatus.unstaged.length + workingTreeStatus.untracked.length;
+    : workingTreeSummary.conflicts > 0
+      ? 'Unresolved Conflicts'
+      : workingTreeSummary.unstaged > 0 || workingTreeSummary.untracked > 0
+        ? 'Uncommitted Changes'
+        : 'Staged Changes';
+  const workingTreeCount = workingTreeSummary.total;
+  const localBranchNames = new Set(branches.filter((branch) => branch.scope === 'local').map((branch) => branch.name));
   const isWorkingTreeSelected = hasWorkingTreeChanges && selectedHash === null;
   const hasPassiveHeadFocus = !hasWorkingTreeChanges && !selectedHash && !hasAnyPathHighlight;
 
@@ -400,6 +411,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           isWorkingTreeSelected={isWorkingTreeSelected}
           workingTreeLabel={workingTreeLabel}
           workingTreeCount={workingTreeCount}
+          workingTreeSummary={workingTreeSummary}
           topSpacerHeight={topSpacerHeight}
           bottomSpacerHeight={bottomSpacerHeight}
           visibleNodes={visibleNodes}
@@ -413,6 +425,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           currentPathColor={currentPathColor}
           selectedPathColor={selectedPathColor}
           branchTipByRef={branchTipByRef}
+          localBranchNames={localBranchNames}
           activeHighlightedBranch={activeHighlightedBranch}
           selectedBranchTarget={selectedBranchTarget}
           hasSelectedCommitFocus={hasSelectedCommitFocus}

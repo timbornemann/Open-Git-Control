@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitService } from '../../GitService';
@@ -13,6 +13,7 @@ import {
   deletePlannerProject,
   ensureRepositoryProject,
   getRepositoryProjectKey,
+  onProjectPlannerDataChanged,
   readProjectPlannerData,
   updatePlannerItem,
   updatePlannerProject,
@@ -29,8 +30,33 @@ const failure = (error: unknown) => ({
   error: error instanceof Error ? error.message : String(error || 'Unknown error'),
 });
 
+const plannerSubscribers = new Set<WebContents>();
+let plannerChangeBroadcasterRegistered = false;
+
+const rememberPlannerSubscriber = (event: IpcMainInvokeEvent | undefined): void => {
+  if (event?.sender?.send) plannerSubscribers.add(event.sender);
+};
+
+const ensurePlannerChangeBroadcaster = (): void => {
+  if (plannerChangeBroadcasterRegistered) return;
+  plannerChangeBroadcasterRegistered = true;
+  onProjectPlannerDataChanged(() => {
+    for (const subscriber of plannerSubscribers) {
+      if (subscriber.isDestroyed?.()) {
+        plannerSubscribers.delete(subscriber);
+      } else {
+        subscriber.send(IpcChannel.PlannerDataChanged);
+      }
+    }
+  });
+};
+
 export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPlannerHandlersDeps): void {
-  ipcMain.handle(IpcChannel.PlannerGetData, async () => success(readProjectPlannerData()));
+  ensurePlannerChangeBroadcaster();
+  ipcMain.handle(IpcChannel.PlannerGetData, async (event: IpcMainInvokeEvent) => {
+    rememberPlannerSubscriber(event);
+    return success(readProjectPlannerData());
+  });
 
   ipcMain.handle(IpcChannel.PlannerEnsureRepositoryProject, async (_event: unknown, repoPath: string) => {
     try {

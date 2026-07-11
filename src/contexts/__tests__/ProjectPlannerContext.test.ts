@@ -32,6 +32,7 @@ beforeEach(() => {
   vi.stubGlobal('document', dom.window.document);
   vi.stubGlobal('navigator', dom.window.navigator);
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.spyOn(plannerClient, 'onDataChanged').mockReturnValue(() => undefined);
 });
 
 afterEach(() => {
@@ -40,13 +41,17 @@ afterEach(() => {
 });
 
 describe('ProjectPlannerProvider', () => {
-  const renderProvider = (initialActiveRepo: string | null, initialRefreshSignal = 0) => {
+  const renderProvider = (
+    initialActiveRepo: string | null,
+    initialRefreshSignal = 0,
+    callbacks: { onRepositoryMaterialized?: ReturnType<typeof vi.fn> } = {},
+  ) => {
     let activeRepo = initialActiveRepo;
     let refreshSignal = initialRefreshSignal;
     let current: ReturnType<typeof useProjectPlanner> | undefined;
     const root: Root = createRoot(document.createElement('div'));
     const onRepositorySelected = vi.fn().mockResolvedValue(undefined);
-    const onRepositoryMaterialized = vi.fn().mockResolvedValue(undefined);
+    const onRepositoryMaterialized = callbacks.onRepositoryMaterialized || vi.fn().mockResolvedValue(undefined);
     const onToast = vi.fn();
     const setConfirmDialog = vi.fn();
 
@@ -83,6 +88,8 @@ describe('ProjectPlannerProvider', () => {
         act(render);
       },
       unmount: () => act(() => root.unmount()),
+      onToast,
+      onRepositoryMaterialized,
     };
   };
 
@@ -187,6 +194,65 @@ describe('ProjectPlannerProvider', () => {
       await lateRepoA.promise;
     });
     expect(provider.current.selectedProjectId).toBe(repoB.id);
+    provider.unmount();
+  });
+
+  it('keeps a successful mutation successful when only the follow-up refresh fails', async () => {
+    const project = createProject('created', 'C:\\repos\\created');
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'getData').mockResolvedValueOnce({ success: true, data: EMPTY_DATA }).mockRejectedValueOnce(new Error('refresh offline'));
+    vi.spyOn(plannerClient, 'createProject').mockResolvedValue({ success: true, data: project });
+
+    const provider = renderProvider(null);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    let created: PlannerProject | null = null;
+    await act(async () => {
+      created = await provider.current.createProject({ name: 'Created' });
+    });
+
+    expect(created).toEqual(project);
+    expect(provider.onToast).toHaveBeenCalledWith(expect.stringMatching(/Aenderung gespeichert|Change saved/), true);
+    provider.unmount();
+  });
+
+  it('does not invite duplicate materialization when only repository activation fails', async () => {
+    const planned: PlannerProject = {
+      id: 'planned',
+      name: 'Planned',
+      description: '',
+      kind: 'planned',
+      repoPath: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const materialized = createProject('planned', 'C:\\repos\\planned');
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'getData')
+      .mockResolvedValueOnce({ success: true, data: { version: 1, projects: [planned], items: [] } })
+      .mockResolvedValueOnce({ success: true, data: { version: 1, projects: [materialized], items: [] } });
+    vi.spyOn(plannerClient, 'materializeProject').mockResolvedValue({
+      success: true,
+      data: { project: materialized, repoPath: materialized.repoPath! },
+    });
+    const onRepositoryMaterialized = vi.fn().mockRejectedValue(new Error('workspace switch failed'));
+    const provider = renderProvider(null, 0, { onRepositoryMaterialized });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    let result = false;
+    await act(async () => {
+      result = await provider.current.materializeProject(planned.id, 'C:\\repos', 'planned');
+    });
+
+    expect(result).toBe(true);
+    expect(onRepositoryMaterialized).toHaveBeenCalledWith(materialized.repoPath);
+    expect(provider.onToast).toHaveBeenCalledWith(expect.stringMatching(/created, but could not be activated|erstellt, aber nicht aktiviert/i), true);
     provider.unmount();
   });
 });

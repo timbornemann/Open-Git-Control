@@ -225,6 +225,60 @@ describe('planningApiServer', () => {
     });
   });
 
+  it('does not persist a repository project when todo validation fails', async () => {
+    const response = await fetch(`${server!.url}/api/todos`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [server!.authHeaderName]: server!.authToken,
+      },
+      body: JSON.stringify({ repoPath: path.join(tempDirectory, 'new-repository'), title: '   ' }),
+    });
+
+    expect(response.status).toBe(400);
+    const projects = await requestJson('/api/projects');
+    expect(projects.data.projects).toEqual([]);
+  });
+
+  it('returns an error and preserves an incompatible planner store instead of overwriting it', async () => {
+    const storePath = path.join(tempDirectory, 'project-planner.json');
+    const corruptContents = '{"version":2,"projects":[],"items":[]}';
+    fs.writeFileSync(storePath, corruptContents, 'utf8');
+
+    const response = await fetch(`${server!.url}/api/todos`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [server!.authHeaderName]: server!.authToken,
+      },
+      body: JSON.stringify({ repoPath: path.join(tempDirectory, 'new-repository'), title: 'Must not be written' }),
+    });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: { code: 'INTERNAL_ERROR' },
+    });
+    expect(fs.readFileSync(storePath, 'utf8')).toBe(corruptContents);
+  });
+
+  it('returns a structured 413 response without resetting the client socket', async () => {
+    const response = await fetch(`${server!.url}/api/todos`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [server!.authHeaderName]: server!.authToken,
+      },
+      body: JSON.stringify({ title: 'x'.repeat(1_100_000), projectId: 'irrelevant' }),
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: { code: 'PAYLOAD_TOO_LARGE' },
+    });
+  });
+
   it('exposes planner operations through MCP tools/call JSON-RPC', async () => {
     const createProject = await requestJson('/api/projects', {
       method: 'POST',

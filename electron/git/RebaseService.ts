@@ -63,7 +63,10 @@ export class RebaseService {
   }
 
   async startInteractiveRebase(baseHash: string, todoLines: string[]): Promise<string> {
-    const repoPath = this.getRepoPath();
+    return this.startInteractiveRebaseAtPath(this.getRepoPath(), baseHash, todoLines);
+  }
+
+  async startInteractiveRebaseAtPath(repoPath: string, baseHash: string, todoLines: string[]): Promise<string> {
     const normalizedBase = (baseHash || '').trim();
     if (!COMMIT_HASH_RE.test(normalizedBase)) {
       throw new Error('Invalid base commit hash for interactive rebase.');

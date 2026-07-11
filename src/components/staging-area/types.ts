@@ -35,6 +35,7 @@ export type ConflictEditorState = {
   filePath: string;
   originalContent: string;
   content: string;
+  lineEnding: '\r\n' | '\n' | '\r';
   isSaving: boolean;
 };
 
@@ -43,8 +44,10 @@ export type ConflictBlock = {
   end: number;
   marker: string;
   oursLabel: string;
+  baseLabel?: string;
   theirsLabel: string;
   ours: string;
+  base?: string;
   theirs: string;
   startLine: number;
   endLine: number;

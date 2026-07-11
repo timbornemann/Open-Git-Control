@@ -102,7 +102,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     setLoading(true);
     setError(null);
     try {
-      const result = await gitClient.getStashes();
+      const result = await gitClient.getStashes(repoPath);
       if (!isCurrentRequest()) return;
       if (result.success) {
         setStashes((result as any).data ?? []);
@@ -132,7 +132,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
       }));
       try {
-        const result = await gitClient.runGitCommand('stash', 'show', '-u', '--name-only', stashName);
+        const result = await gitClient.runGitCommandForRepo(capturedRepoPath, 'stash', 'show', '-u', '--name-only', '-z', stashName);
         if (!isCurrentRequest()) return;
         if (!result.success) {
           setStashFiles((current) => ({
@@ -145,14 +145,9 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
           }));
           return;
         }
-        const files = Array.from(
-          new Set(
-            String(result.data || '')
-              .split(/\r?\n/)
-              .map((line) => line.trim())
-              .filter(Boolean),
-          ),
-        ).sort((a, b) => a.localeCompare(b));
+        const rawFiles = String(result.data || '');
+        const fileTokens = rawFiles.includes('\0') ? rawFiles.split('\0') : rawFiles.split('\n').map((line) => line.replace(/\r$/, ''));
+        const files = Array.from(new Set(fileTokens.filter((filePath) => filePath.length > 0))).sort((a, b) => a.localeCompare(b));
         if (!isCurrentRequest()) return;
         setStashFiles((current) => ({
           ...current,
@@ -191,7 +186,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
       } else {
         args = ['stash', 'drop', stashName];
       }
-      const result = await gitClient.runGitCommand('stash', ...args.slice(1));
+      const result = await gitClient.runGitCommandForRepo(capturedRepoPath, 'stash', ...args.slice(1));
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
       if (result.success) {
         if (op === 'pop' || op === 'drop') {
@@ -267,7 +262,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
           const branchName = String(values.branchName || '').trim();
           setError(null);
           try {
-            const result = await gitClient.gitStashBranch(stash.name, branchName);
+            const result = await gitClient.gitStashBranch(stash.name, branchName, capturedRepoPath);
             if (!isCurrentGeneration(generation, capturedRepoPath)) return;
 
             if (result.success) {
@@ -312,9 +307,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     setPendingFileOp({ stashName, path: filePath });
     setError(null);
     try {
-      const trackedResult = await gitClient.runGitCommand('checkout', stashName, '--', filePath);
+      const trackedResult = await gitClient.runGitCommandForRepo(capturedRepoPath, 'checkout', stashName, '--', filePath);
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
-      const finalResult = trackedResult.success ? trackedResult : await gitClient.runGitCommand('checkout', `${stashName}^3`, '--', filePath);
+      const finalResult = trackedResult.success
+        ? trackedResult
+        : await gitClient.runGitCommandForRepo(capturedRepoPath, 'checkout', `${stashName}^3`, '--', filePath);
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
 
       if (finalResult.success) {

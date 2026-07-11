@@ -123,6 +123,7 @@ export const useCommitGraphData = ({
         const scope = showSecondaryHistory ? 'all' : 'head';
         const offset = isAppend ? commitCountRef.current : 0;
         const result = await gitClient.getCommitLogPage({
+          repoPath,
           limit: requestedLimit,
           offset,
           scope,
@@ -355,7 +356,7 @@ export const useCommitGraphData = ({
     async (hashes: string[], priority: 'selected' | 'visible' | 'background' = 'background') => {
       if (!repoPath || hashes.length === 0) return;
       const unique = [...new Set(hashes)].slice(0, 500);
-      const result = await gitClient.requestCommitStats(unique, priority);
+      const result = await gitClient.requestCommitStats(unique, priority, repoPath);
       // Drop a stats response that arrived after the repository changed, so one
       // repository's stats never merge into another repository's graph or cache.
       if (normalizeRepoPathKey(repoPathRef.current || '') !== normalizeRepoPathKey(repoPath)) return;

@@ -7,6 +7,7 @@ import { buildCommitHistoryMenuActions } from './commitGraphHistoryMenuActions';
 import { buildCommitRefMenuActions } from './commitGraphRefMenuActions';
 
 type BuildCommitMenuActionsParams = {
+  repoPath: string | null;
   node: GraphNode;
   branches: BranchInfo[];
   currentBranch: string;
@@ -23,6 +24,7 @@ type BuildCommitMenuActionsParams = {
 };
 
 export const buildCommitMenuActions = ({
+  repoPath,
   node,
   branches,
   currentBranch,
@@ -48,6 +50,7 @@ export const buildCommitMenuActions = ({
     tr,
   }),
   ...buildCommitHistoryMenuActions({
+    repoPath,
     node,
     layout,
     reachableFromHead,

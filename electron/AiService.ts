@@ -5,7 +5,7 @@ import { AiProviderClient, getSelectedAiModel } from './ai/AiProviderClient';
 import { AiAutoCommitRunner } from './ai/AiAutoCommitRunner';
 import { buildFallbackCommitMessage, generateCommitMessageFromUserNotes as generateCommitMessageFromUserNotesCore } from './ai/commitMessageGenerator';
 import { generateReleaseNotes as generateReleaseNotesCore } from './ai/releaseNotesGenerator';
-import type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
+import type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, GeneratedReleaseNotes, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
 
 export type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
 
@@ -82,7 +82,7 @@ export class AiService {
       hints?: string[];
     },
     getOpenAiApiKey: () => string = () => '',
-  ): Promise<string> {
+  ): Promise<GeneratedReleaseNotes> {
     return generateReleaseNotesCore(this.providerClient, settings, getGeminiApiKey, params, getOpenAiApiKey);
   }
 

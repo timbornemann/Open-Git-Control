@@ -8,7 +8,9 @@ export const usePrAndReleaseState = () => {
   const [newPRTitle, setNewPRTitle] = useState('');
   const [newPRBody, setNewPRBody] = useState('');
   const [newPRHead, setNewPRHead] = useState('');
-  const [newPRBase, setNewPRBase] = useState('main');
+  // Keep this empty until repository metadata resolves its real default branch.
+  // The create workflow has its own authoritative fallback lookup.
+  const [newPRBase, setNewPRBase] = useState('');
 
   const [releaseForm, setReleaseFormState] = useState<GitHubCreateReleaseParamsDto>({
     owner: '',

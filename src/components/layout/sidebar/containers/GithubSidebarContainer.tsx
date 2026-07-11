@@ -39,6 +39,7 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
   return (
     <GithubConnectedContent
       githubUser={github.githubUser}
+      authError={github.authError}
       githubRepos={github.githubRepos}
       githubReposHasMore={github.githubReposHasMore}
       isLoadingGithubRepos={github.isLoadingGithubRepos}
@@ -81,6 +82,7 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
       releaseForm={github.releaseForm}
       setReleaseForm={github.setReleaseForm}
       releaseSubmitting={github.releaseSubmitting}
+      releaseNotesGenerating={github.releaseNotesGenerating}
       releaseError={github.releaseError}
       releaseSuccess={github.releaseSuccess}
       onCreateRelease={github.onCreateRelease}

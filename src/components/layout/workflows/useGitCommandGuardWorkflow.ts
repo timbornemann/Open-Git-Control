@@ -16,6 +16,7 @@ import type { GitCommandRunner } from './useGitSyncRecoveryWorkflow';
 type Toast = { msg: string; isError: boolean };
 
 type Params = {
+  activeRepoRef?: MutableRefObject<string | null>;
   runGitCommandRef: MutableRefObject<GitCommandRunner | null>;
   runRemoteAheadQuickFix: (params: { command: string; options?: RunGitCommandOptions }) => Promise<void>;
   settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'language' | 'secretScanBeforePushEnabled'>;
@@ -32,7 +33,14 @@ type GuardParams = {
   options?: RunGitCommandOptions;
 };
 
-export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQuickFix, settings, setConfirmDialog, setGitActionToast }: Params) => {
+export const useGitCommandGuardWorkflow = ({
+  activeRepoRef,
+  runGitCommandRef,
+  runRemoteAheadQuickFix,
+  settings,
+  setConfirmDialog,
+  setGitActionToast,
+}: Params) => {
   const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
   const runWithOptions = useCallback(
@@ -53,6 +61,7 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
       const shouldSecretScan = settings.secretScanBeforePushEnabled && !options?.skipSecretScan && command === 'push';
       const request: GitCommandGuardRequest = { args, command, repoPath, successMsg, actionLabel, options };
       const runtime: GitCommandGuardRuntime = {
+        isRepoCurrent: (expectedRepoPath) => !expectedRepoPath || !activeRepoRef || activeRepoRef.current === expectedRepoPath,
         runRemoteAheadQuickFix,
         runWithOptions,
         setConfirmDialog,
@@ -75,7 +84,17 @@ export const useGitCommandGuardWorkflow = ({ runGitCommandRef, runRemoteAheadQui
         return true;
       return false;
     },
-    [runRemoteAheadQuickFix, runWithOptions, setConfirmDialog, setGitActionToast, settings.confirmDangerousOps, settings.secretScanBeforePushEnabled, t, tr],
+    [
+      activeRepoRef,
+      runRemoteAheadQuickFix,
+      runWithOptions,
+      setConfirmDialog,
+      setGitActionToast,
+      settings.confirmDangerousOps,
+      settings.secretScanBeforePushEnabled,
+      t,
+      tr,
+    ],
   );
 
   return { runGitCommandGuards };

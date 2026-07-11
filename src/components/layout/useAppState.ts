@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
@@ -145,7 +145,6 @@ export const useAppState = () => {
     workspace: {
       activeRepo: workspace.activeRepo,
       addOpenRepo: workspace.addOpenRepo,
-      setActiveRepo: workspace.setActiveRepo,
       setActiveTab: workspace.setActiveTab,
     },
     settings,
@@ -250,6 +249,16 @@ export const useAppState = () => {
     onError: handlePullRequestError,
   });
 
+  useLayoutEffect(() => {
+    setNewPRBase(pullRequestDomain.prDefaultBranch);
+  }, [pullRequestDomain.prDefaultBranch, setNewPRBase]);
+
+  const releaseOwnerRepo = useMemo(() => {
+    const scope = pullRequestDomain.prOwnerRepo;
+    if (!scope) return null;
+    return scope.headOwner ? { owner: scope.headOwner, repo: scope.headRepo || scope.repo } : { owner: scope.owner, repo: scope.repo };
+  }, [pullRequestDomain.prOwnerRepo]);
+
   const handleCreateGithubRepoForCurrent = async () => {
     if (!githubClient.isAvailable() || !workspace.activeRepo) return;
     if (!github.isAuthenticated) {
@@ -272,7 +281,7 @@ export const useAppState = () => {
   } = useReleaseWorkflow({
     activeRepo: workspace.activeRepo,
     isGithubAuthenticated: github.isAuthenticated,
-    ownerRepo: pullRequestDomain.prOwnerRepo,
+    ownerRepo: releaseOwnerRepo,
     currentBranch: repository.currentBranch,
     releaseForm,
     setReleaseFormState,
@@ -285,6 +294,7 @@ export const useAppState = () => {
     setReleaseSubmitting,
     showReleaseCreator,
     setShowReleaseCreator,
+    releaseNotesGenerating,
     setReleaseNotesGenerating,
     releaseNotesLanguage,
     releaseNotesOptions,
@@ -295,6 +305,8 @@ export const useAppState = () => {
     language: settings.language,
   });
   const { handleCheckoutPR, handleCopyPRUrl, handleCreatePR, handleMergePR, handleOpenPR } = usePullRequestWorkflow({
+    activeRepo: workspace.activeRepo,
+    githubHost: settings.githubHost,
     ownerRepo: pullRequestDomain.prOwnerRepo,
     createPullRequest: pullRequestDomain.createPR,
     currentBranch: repository.currentBranch,

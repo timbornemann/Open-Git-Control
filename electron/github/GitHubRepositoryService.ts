@@ -114,6 +114,7 @@ export class GitHubRepositoryService {
       repo: String(data.name || normalizedRepo).trim(),
       fork: Boolean(data.fork),
       parent: parent?.owner && parent?.repo ? parent : null,
+      defaultBranch: String(data.default_branch || 'main').trim() || 'main',
     };
   }
 

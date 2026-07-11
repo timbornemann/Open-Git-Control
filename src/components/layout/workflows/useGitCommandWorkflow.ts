@@ -18,7 +18,6 @@ type Toast = { msg: string; isError: boolean };
 type WorkspaceBridge = {
   activeRepo: string | null;
   addOpenRepo: (repoPath: string) => Promise<void>;
-  setActiveRepo: Dispatch<SetStateAction<string | null>>;
   setActiveTab: (tab: AppTabId) => void;
 };
 
@@ -86,6 +85,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   });
 
   const { runGitCommandGuards } = useGitCommandGuardWorkflow({
+    activeRepoRef,
     runGitCommandRef,
     runRemoteAheadQuickFix,
     settings,
@@ -96,8 +96,10 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
   const runGitCommand = useCallback(
     async (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions, internalContinuation = false): Promise<boolean> => {
       if (!gitClient.isAvailable() || !workspace.activeRepo || args.length === 0) return false;
+      if (options?.expectedRepoPath && workspace.activeRepo !== options.expectedRepoPath) return false;
       if (!internalContinuation && (activeGitWorkflowRunRef.current !== null || isGitActionRunningRef.current)) return false;
-      const repoAtStart = workspace.activeRepo;
+      const repoAtStart = options?.expectedRepoPath || workspace.activeRepo;
+      options = { ...options, expectedRepoPath: repoAtStart };
       const workflowRunId = ++nextGitWorkflowRunIdRef.current;
       activeGitWorkflowRunRef.current = workflowRunId;
       isGitActionRunningRef.current = true;
@@ -155,6 +157,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           if (!options?.confirmedAutoInitialCommit) {
             const confirmationOpened = await requestInitialCommitConfirmationIfNeeded({
               commandLabel: `git ${args.join(' ')}`,
+              repoPath: repoAtStart,
               confirmLabel: t('generated.components.layout.workflows.usegitcommandworkflow.commit_all_changes_and_push_72c5fb04'),
               onConfirm: async () => {
                 await runGitCommand(args, successMsg, actionLabel, {
@@ -169,7 +172,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
           }
 
           if (!isStillActiveRepo()) return false;
-          const prepared = await ensureInitialCommitForPush();
+          const prepared = await ensureInitialCommitForPush({ expectedRepoPath: repoAtStart });
           if (!isStillActiveRepo()) return false;
           if (!prepared) {
             return false;
@@ -221,7 +224,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
         if (!isStillActiveRepo()) return false;
         triggerRefresh();
         try {
-          const statusAfter = await gitClient.getStatusPorcelain();
+          const statusAfter = await gitClient.runGitCommandForRepo(repoAtStart, 'statusPorcelain');
           if (!isStillActiveRepo()) return false;
           const porcelain = statusAfter.success && typeof statusAfter.data === 'string' ? statusAfter.data : null;
           const conflictPath = resolveConflictPathAfterGitFailure(porcelain, errorMessage);
@@ -308,7 +311,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
       setActiveGitActionLabel(actionLabel || tr(`Git ${command} wird ausgeführt...`, `Running git ${command}...`));
 
       try {
-        const r = await gitClient.runGitCommand(command, ...args.slice(1));
+        const r = await gitClient.runGitCommandForRepo(repoAtStart, command, ...args.slice(1));
         if (!isStillActiveRepo()) return false;
         if (r.success) {
           if (forceGithubRepoCreationPrompt && (command === 'push' || command === 'pull' || command === 'fetch')) {

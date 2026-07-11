@@ -40,6 +40,17 @@ const isValidUtf8 = (buffer: Buffer): boolean => {
   }
 };
 
+const looksLikeBinaryBytes = (buffer: Buffer): boolean => {
+  if (buffer.length === 0) return false;
+  let suspicious = 0;
+  for (const byte of buffer) {
+    if ((byte < 0x20 && byte !== 0x09 && byte !== 0x0a && byte !== 0x0d && byte !== 0x0c) || byte === 0x7f) {
+      suspicious += 1;
+    }
+  }
+  return suspicious > 0 && suspicious / buffer.length >= 0.01;
+};
+
 /**
  * Determines how a file's bytes should be interpreted. `binary` means the file
  * must not be treated as editable text.
@@ -54,6 +65,8 @@ export function detectRepositoryFileEncoding(buffer: Buffer): RepositoryFileEnco
   if (buffer.includes(0x00)) return 'binary';
 
   if (isValidUtf8(buffer)) return 'utf8';
+
+  if (looksLikeBinaryBytes(buffer)) return 'binary';
 
   // Not valid UTF-8 and no NUL bytes: fall back to Latin-1, which maps every
   // byte 1:1 to U+00xx and therefore round-trips losslessly.
@@ -108,6 +121,11 @@ export function encodeRepositoryFile(text: string, encoding: RepositoryTextEncod
       return Buffer.concat([Buffer.from(UTF16BE_BOM), body]);
     }
     case 'latin1':
+      for (const character of text) {
+        if ((character.codePointAt(0) || 0) > 0xff) {
+          throw new Error('The edited text contains characters that cannot be represented in the original Latin-1 encoding.');
+        }
+      }
       return Buffer.from(text, 'latin1');
     case 'utf8':
     default:

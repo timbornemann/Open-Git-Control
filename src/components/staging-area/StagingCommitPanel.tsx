@@ -18,6 +18,22 @@ type StagingCommitPanelProps = {
   openAiCommitMessageDialog: () => void;
 };
 
+export const isAiAutoCommitDisabled = ({
+  aiConfigEnabled,
+  isMutating,
+  isCommitting,
+  isAiCommitting,
+  isAiJobRunning,
+  hasStatus,
+}: {
+  aiConfigEnabled: boolean;
+  isMutating: boolean;
+  isCommitting: boolean;
+  isAiCommitting: boolean;
+  isAiJobRunning: boolean;
+  hasStatus: boolean;
+}): boolean => !aiConfigEnabled || isMutating || isCommitting || isAiCommitting || isAiJobRunning || !hasStatus;
+
 export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   status,
   fileOps,
@@ -171,7 +187,14 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
           className="staging-tool-btn"
           type="button"
           onClick={aiCommit.handleAiAutoCommit}
-          disabled={fileOps.isMutating || commitForm.isCommitting || aiCommit.isAiCommitting || aiCommit.isAiJobRunning || !status}
+          disabled={isAiAutoCommitDisabled({
+            aiConfigEnabled,
+            isMutating: fileOps.isMutating,
+            isCommitting: commitForm.isCommitting,
+            isAiCommitting: aiCommit.isAiCommitting,
+            isAiJobRunning: aiCommit.isAiJobRunning,
+            hasStatus: Boolean(status),
+          })}
           title={
             aiConfigEnabled
               ? t('generated.components.staging_area.stagingcommitpanel.ai_decides_staging_commit_messages_automatically_97a774eb')

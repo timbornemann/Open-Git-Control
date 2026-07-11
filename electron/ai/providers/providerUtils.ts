@@ -2,6 +2,9 @@ export const safeString = (value: unknown, fallback = ''): string => (typeof val
 
 export const uniqueSorted = (values: string[]): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));
 
+/** Fast enough for settings UI checks while still tolerating local model startup. */
+export const AI_DISCOVERY_TIMEOUT_MS = 15_000;
+
 export async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number, shouldCancel?: () => boolean): Promise<Response> {
   const controller = new AbortController();
   let abortedByCancel = false;

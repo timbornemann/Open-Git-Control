@@ -1,5 +1,5 @@
 /** Per-line gutter style for merge conflict files (<<<<<<< / ======= / >>>>>>>). */
-export type ConflictGutterKind = 'neutral' | 'ours' | 'theirs' | 'marker-start' | 'marker-separator' | 'marker-end' | 'marker';
+export type ConflictGutterKind = 'neutral' | 'ours' | 'base' | 'theirs' | 'marker-start' | 'marker-base' | 'marker-separator' | 'marker-end' | 'marker';
 
 /**
  * Classify each line of a conflicted file for gutter coloring.
@@ -17,6 +17,7 @@ export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[
       continue;
     }
 
+    let baseIndex = -1;
     let separatorIndex = -1;
     let nestedStartBeforeSeparator = -1;
 
@@ -25,6 +26,10 @@ export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[
       if (candidate.trimEnd().startsWith('<<<<<<<')) {
         nestedStartBeforeSeparator = j;
         break;
+      }
+      if (candidate.trimEnd().startsWith('|||||||')) {
+        baseIndex = j;
+        continue;
       }
       if (candidate.trim() === '=======') {
         separatorIndex = j;
@@ -64,8 +69,15 @@ export function getConflictLineGutterKinds(lines: string[]): ConflictGutterKind[
     }
 
     kinds[i] = 'marker-start';
-    for (let j = i + 1; j < separatorIndex; j += 1) {
+    const oursEndIndex = baseIndex >= 0 ? baseIndex : separatorIndex;
+    for (let j = i + 1; j < oursEndIndex; j += 1) {
       kinds[j] = 'ours';
+    }
+    if (baseIndex >= 0) {
+      kinds[baseIndex] = 'marker-base';
+      for (let j = baseIndex + 1; j < separatorIndex; j += 1) {
+        kinds[j] = 'base';
+      }
     }
     kinds[separatorIndex] = 'marker-separator';
     for (let j = separatorIndex + 1; j < endIndex; j += 1) {

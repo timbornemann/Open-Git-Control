@@ -46,4 +46,14 @@ describe('RepositoryFileEncoding', () => {
     expect(detectRepositoryFileEncoding(buffer)).toBe('binary');
     expect(() => decodeRepositoryFile(buffer)).toThrow(/binary/i);
   });
+
+  it('rejects NUL-free invalid UTF-8 with binary control bytes', () => {
+    const buffer = Buffer.from([0xff, 0xd8, 0xff, 0x01, 0x02, 0x03, 0xfe]);
+    expect(detectRepositoryFileEncoding(buffer)).toBe('binary');
+    expect(() => decodeRepositoryFile(buffer)).toThrow(/binary/i);
+  });
+
+  it('does not silently truncate new characters when saving Latin-1', () => {
+    expect(() => encodeRepositoryFile('café €', 'latin1')).toThrow(/Latin-1/i);
+  });
 });

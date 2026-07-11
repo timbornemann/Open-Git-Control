@@ -1,5 +1,7 @@
 export type StatusEntry = {
   path: string;
+  /** Previous pathname for porcelain rename/copy records. */
+  originalPath?: string;
   x: string;
   y: string;
   code: string;
@@ -8,12 +10,14 @@ export type StatusEntry = {
 export type FileChangeType = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked' | 'other';
 
 export function decodePorcelainPath(rawPath: string): string {
-  const trimmed = rawPath.trim();
-  if (trimmed.length < 2 || !trimmed.startsWith('"') || !trimmed.endsWith('"')) {
-    return trimmed;
+  // Do not trim unquoted paths. Leading and trailing whitespace are legal and
+  // significant in Git filenames. Legacy (newline-delimited) porcelain quotes
+  // such names, while `-z` records never quote them.
+  if (rawPath.length < 2 || !rawPath.startsWith('"') || !rawPath.endsWith('"')) {
+    return rawPath;
   }
 
-  const body = trimmed.slice(1, -1);
+  const body = rawPath.slice(1, -1);
   const bytes: number[] = [];
   const escapeToByte: Record<string, number> = {
     a: 0x07,
@@ -64,20 +68,48 @@ export function decodePorcelainPath(rawPath: string): string {
 }
 
 export function parseStatusPorcelain(statusOutput: string): StatusEntry[] {
-  if (!statusOutput.trim()) return [];
+  if (!statusOutput) return [];
 
+  // Porcelain v1 with `-z` is unambiguous: pathnames are not quoted and rename
+  // and copy records are emitted as `XY target\0source\0`. A literal " -> " or
+  // newline in a filename therefore cannot be mistaken for record syntax.
+  if (statusOutput.includes('\0')) {
+    const records = statusOutput.split('\0');
+    const entries: StatusEntry[] = [];
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index];
+      if (!record || record.length < 3) continue;
+      const x = record[0];
+      const y = record[1];
+      const code = `${x}${y}`;
+      const path = record.slice(3);
+      if (!path) continue;
+
+      const isRenameOrCopy = x === 'R' || x === 'C' || y === 'R' || y === 'C';
+      const originalPath = isRenameOrCopy ? records[index + 1] : undefined;
+      if (isRenameOrCopy && index + 1 < records.length) index += 1;
+      entries.push({ path, ...(originalPath ? { originalPath } : {}), x, y, code });
+    }
+    return entries;
+  }
+
+  // Backwards-compatible parser for tests/older service adapters that still
+  // provide newline-delimited porcelain. Only R/C records may use the arrow
+  // separator; ordinary filenames containing " -> " are left untouched.
   return statusOutput
-    .split('\n')
-    .map((line) => line.trimEnd())
+    .split(/\r?\n/)
     .filter((line) => line.length >= 3)
     .map((line) => {
       const x = line[0];
       const y = line[1];
-      const rawPath = line.slice(3).trim();
-      const renameSeparatorIndex = rawPath.lastIndexOf(' -> ');
+      const code = `${x}${y}`;
+      const rawPath = line.slice(3);
+      const isRenameOrCopy = x === 'R' || x === 'C' || y === 'R' || y === 'C';
+      const renameSeparatorIndex = isRenameOrCopy ? rawPath.lastIndexOf(' -> ') : -1;
+      const originalPath = renameSeparatorIndex >= 0 ? decodePorcelainPath(rawPath.slice(0, renameSeparatorIndex)) : undefined;
       const targetPath = renameSeparatorIndex >= 0 ? rawPath.slice(renameSeparatorIndex + 4) : rawPath;
       const path = decodePorcelainPath(targetPath);
-      return { path, x, y, code: `${x}${y}` };
+      return { path, ...(originalPath ? { originalPath } : {}), x, y, code };
     })
     .filter((entry) => entry.path.length > 0);
 }

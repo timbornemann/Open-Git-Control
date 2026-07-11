@@ -155,12 +155,31 @@ function getStorePath(): string {
   return path.join(app.getPath('userData'), 'project-planner.json');
 }
 
+const plannerDataListeners = new Set<() => void>();
+
+export function onProjectPlannerDataChanged(listener: () => void): () => void {
+  plannerDataListeners.add(listener);
+  return () => plannerDataListeners.delete(listener);
+}
+
 export function readProjectPlannerData(): ProjectPlannerData {
   try {
     const raw = fs.readFileSync(getStorePath(), 'utf8');
-    return normalizeProjectPlannerData(JSON.parse(raw));
-  } catch {
-    return { ...EMPTY_DATA };
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') throw new Error('Planner data is not a JSON object.');
+    const candidate = parsed as Partial<ProjectPlannerData>;
+    if (candidate.version !== 1 || !Array.isArray(candidate.projects) || !Array.isArray(candidate.items)) {
+      throw new Error('Planner data has an unsupported or incomplete schema.');
+    }
+    const normalized = normalizeProjectPlannerData(candidate);
+    if (normalized.projects.length !== candidate.projects.length || normalized.items.length !== candidate.items.length) {
+      throw new Error('Planner data contains invalid or orphaned records.');
+    }
+    return normalized;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return { ...EMPTY_DATA };
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Planner data could not be read safely; the existing file was left untouched. ${message}`);
   }
 }
 
@@ -168,6 +187,14 @@ export function writeProjectPlannerData(data: ProjectPlannerData): ProjectPlanne
   const normalized = normalizeProjectPlannerData(data);
   const storePath = getStorePath();
   writeTextFileAtomically(storePath, JSON.stringify(normalized, null, 2));
+  for (const listener of plannerDataListeners) {
+    try {
+      listener();
+    } catch {
+      // Persistence succeeded; a UI notification failure must not turn the
+      // committed mutation into an apparent write failure.
+    }
+  }
   return normalized;
 }
 
@@ -277,6 +304,13 @@ export function deleteRepositoryPlannerProjectByPath(repoPath: string): { delete
 
 export function createPlannerItem(projectId: string, input: PlannerItemInput): PlannerItem {
   const data = readProjectPlannerData();
+  const item = createPlannerItemInData(data, projectId, input);
+  writeProjectPlannerData(data);
+  return item;
+}
+
+/** Adds a validated item to an in-memory document without persisting it. */
+export function createPlannerItemInData(data: ProjectPlannerData, projectId: string, input: PlannerItemInput): PlannerItem {
   if (!data.projects.some((project) => project.id === projectId)) {
     throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   }
@@ -294,7 +328,7 @@ export function createPlannerItem(projectId: string, input: PlannerItemInput): P
     createdAt: now,
     updatedAt: now,
   };
-  writeProjectPlannerData({ ...data, items: [...data.items, item] });
+  data.items = [...data.items, item];
   return item;
 }
 

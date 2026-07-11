@@ -88,17 +88,20 @@ const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> 
     }
 
     let total = 0;
+    let rejectedForSize = false;
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => {
+      if (rejectedForSize) return;
       total += chunk.length;
       if (total > MAX_BODY_BYTES) {
+        rejectedForSize = true;
         reject(new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body is too large.'));
-        request.destroy();
         return;
       }
       chunks.push(chunk);
     });
     request.on('end', () => {
+      if (rejectedForSize) return;
       const text = Buffer.concat(chunks).toString('utf8').trim();
       if (!text) {
         resolve({});
@@ -121,17 +124,20 @@ const readJsonBody = async (request: http.IncomingMessage): Promise<JsonObject> 
 const readMcpBody = async (request: http.IncomingMessage): Promise<McpBodyReadResult> =>
   new Promise((resolve, reject) => {
     let total = 0;
+    let rejectedForSize = false;
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => {
+      if (rejectedForSize) return;
       total += chunk.length;
       if (total > MAX_BODY_BYTES) {
+        rejectedForSize = true;
         reject(new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Request body is too large.'));
-        request.destroy();
         return;
       }
       chunks.push(chunk);
     });
     request.on('end', () => {
+      if (rejectedForSize) return;
       const text = Buffer.concat(chunks).toString('utf8').trim();
       if (!text) {
         reject(new ApiError(400, 'INVALID_JSON', 'Request body is required.'));

@@ -100,9 +100,9 @@ export const useFileOperations = ({
     }
     try {
       const [statusResult, stagedResult, unstagedResult] = await Promise.all([
-        gitClient.getStatusPorcelain(),
-        gitClient.runGitCommand('diff', '--numstat', '--cached'),
-        gitClient.runGitCommand('diff', '--numstat'),
+        gitClient.runGitCommandForRepo(repoAtStart, 'statusPorcelain'),
+        gitClient.runGitCommandForRepo(repoAtStart, 'diff', '--numstat', '--cached'),
+        gitClient.runGitCommandForRepo(repoAtStart, 'diff', '--numstat'),
       ]);
       if (!isCurrentRepoGeneration(generation, repoAtStart) || externalRefreshRef.current) return;
 
@@ -288,6 +288,72 @@ export const useFileOperations = ({
     [hasCurrentStatusForRepo, isCurrentRepoGeneration, refresh, repoPath, setToast, t],
   );
 
+  const unstagePathsForCurrentRepo = useCallback(
+    async (rawPaths: string[], successMessage: string, preferWholeIndexReset = false) => {
+      const repoAtStart = repoPath;
+      const generation = repoGenerationRef.current;
+      const paths = [...new Set(rawPaths.filter(Boolean))];
+      if (
+        !repoAtStart ||
+        !gitClient.isAvailable() ||
+        paths.length === 0 ||
+        !isCurrentRepoGeneration(generation, repoAtStart) ||
+        !hasCurrentStatusForRepo(repoAtStart)
+      ) {
+        return false;
+      }
+      if (mutationInFlightRef.current) return false;
+      mutationInFlightRef.current = true;
+      setMutationStartedAt(Date.now());
+      try {
+        const statusResult = await gitClient.runGitCommandForRepo(repoAtStart, 'status', '--porcelain=v2', '--branch');
+        if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+        if (!statusResult.success) {
+          setToast({ msg: statusResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+          return false;
+        }
+        const isUnbornBranch = /^# branch\.oid \(initial\)$/m.test(statusResult.data || '');
+        if (preferWholeIndexReset && !isUnbornBranch) {
+          const resetResult = await gitClient.runGitCommandForRepo(repoAtStart, 'reset', 'HEAD');
+          if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+          if (!resetResult.success) {
+            setToast({ msg: resetResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+            return false;
+          }
+          setToast({ msg: successMessage, isError: false });
+          await refresh();
+          return true;
+        }
+        const batchSize = isUnbornBranch ? 100 : 3;
+        for (let offset = 0; offset < paths.length; offset += batchSize) {
+          const result = isUnbornBranch
+            ? await gitClient.runGitCommandForRepo(repoAtStart, 'rm', '--cached', '-f', '--', ...paths.slice(offset, offset + batchSize))
+            : await gitClient.runGitCommandForRepo(repoAtStart, 'reset', '--', ...paths.slice(offset, offset + batchSize));
+          if (!isCurrentRepoGeneration(generation, repoAtStart)) return false;
+          if (!result.success) {
+            setToast({ msg: result.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
+            return false;
+          }
+        }
+        setToast({ msg: successMessage, isError: false });
+        await refresh();
+        return true;
+      } catch (error: unknown) {
+        if (isCurrentRepoGeneration(generation, repoAtStart)) {
+          setToast({
+            msg: error instanceof Error ? error.message : t('generated.components.layout.cloneprogressmodal.error_7d62310f'),
+            isError: true,
+          });
+        }
+        return false;
+      } finally {
+        mutationInFlightRef.current = false;
+        setMutationStartedAt(null);
+      }
+    },
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, refresh, repoPath, setToast, t],
+  );
+
   const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
     event.preventDefault();
     event.stopPropagation();
@@ -300,12 +366,26 @@ export const useFileOperations = ({
     (f: string) => stagePathsForCurrentRepo([f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)),
     [stagePathsForCurrentRepo, tr],
   );
-  const unstageFile = useCallback((f: string) => git(['reset', 'HEAD', '--', f], tr(`${basename(f)} unstaged`, `Unstaged ${basename(f)}`)), [git, tr]);
+  const unstageFile = useCallback(
+    (entry: FileEntry | string) => {
+      const file: Pick<FileEntry, 'path' | 'originalPath'> = typeof entry === 'string' ? { path: entry } : entry;
+      return unstagePathsForCurrentRepo([file.originalPath || '', file.path], tr(`${basename(file.path)} unstaged`, `Unstaged ${basename(file.path)}`));
+    },
+    [tr, unstagePathsForCurrentRepo],
+  );
   const stageAll = useCallback(() => {
     const paths = [...(status?.unstaged || []), ...(status?.untracked || [])].map((entry) => entry.path);
     return stagePathsForCurrentRepo([...new Set(paths)], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702'));
   }, [stagePathsForCurrentRepo, status?.unstaged, status?.untracked, t]);
-  const unstageAll = useCallback(() => git(['reset', 'HEAD'], t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313')), [git, t]);
+  const unstageAll = useCallback(
+    () =>
+      unstagePathsForCurrentRepo(
+        (status?.staged || []).flatMap((entry) => [entry.originalPath || '', entry.path]),
+        t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313'),
+        true,
+      ),
+    [status?.staged, t, unstagePathsForCurrentRepo],
+  );
 
   const stageAllUntracked = useCallback(() => {
     const paths = status?.untracked.map((entry) => entry.path) || [];

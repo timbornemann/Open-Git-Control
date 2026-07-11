@@ -8,6 +8,7 @@ import type { CatalogTranslateFn } from '@/i18n';
 type UseDiffPreviewDataParams = {
   repoPath: string | null;
   request: DiffRequest;
+  refreshTrigger?: number;
   t: CatalogTranslateFn;
 };
 
@@ -21,7 +22,7 @@ const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
   return ['show', '--format=', '--binary', request.commitHash || '', '--', request.path];
 };
 
-export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataParams) => {
+export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: UseDiffPreviewDataParams) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [diffText, setDiffText] = useState('');
@@ -48,10 +49,14 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
       setSourceTruncated(false);
 
       try {
-        const result = await gitClient.getDiffPreview(buildDiffPreviewArgs(request), {
-          maxBytes: MAX_RENDER_CHARS,
-          maxLines: MAX_RENDER_LINES,
-        });
+        const result = await gitClient.getDiffPreview(
+          buildDiffPreviewArgs(request),
+          {
+            maxBytes: MAX_RENDER_CHARS,
+            maxLines: MAX_RENDER_LINES,
+          },
+          repoPath,
+        );
         if (!isCurrentRequest()) return;
 
         if (!result.success) {
@@ -78,7 +83,7 @@ export const useDiffPreviewData = ({ repoPath, request, t }: UseDiffPreviewDataP
         requestGenerationRef.current += 1;
       }
     };
-  }, [repoPath, request, t]);
+  }, [refreshTrigger, repoPath, request, t]);
 
   const looksBinaryByExt = useMemo(() => looksBinaryByExtension(request.path), [request.path]);
 

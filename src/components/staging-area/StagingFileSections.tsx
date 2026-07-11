@@ -72,7 +72,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
               disabled={fileOps.isMutating}
               onClick={(event) => {
                 event.stopPropagation();
-                fileOps.unstageFile(entry.path);
+                fileOps.unstageFile(entry);
               }}
               title={t('generated.components.staging_area.stagingfilesections.unstage_6b603f75')}
             >

@@ -22,7 +22,7 @@ export const useCommitGraphWorkingTreeStatus = ({ repoPath, externalWorkingTreeS
     }
     if (!repoPath || !gitClient.isAvailable()) return;
     try {
-      const { success, data } = await gitClient.runGitCommand('status', '-s');
+      const { success, data } = await gitClient.runGitCommandForRepo(repoPath, 'status', '-s');
       if (success) {
         setInternalWorkingTreeStatus(parseGitStatusDetailed(data || ''));
       }

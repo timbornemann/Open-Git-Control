@@ -60,7 +60,7 @@ describe('AiService release notes', () => {
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
-    const markdown = await service.generateReleaseNotes(baseSettings, () => 'secure-key-123', {
+    const generated = await service.generateReleaseNotes(baseSettings, () => 'secure-key-123', {
       tagName: 'v2.0.0',
       releaseName: 'Release v2.0.0',
       lastReleaseTag: 'v1.4.2',
@@ -91,7 +91,9 @@ describe('AiService release notes', () => {
     expect(userPrompt).toContain('Repository URL: https://github.com/acme/project');
     expect(userPrompt).toContain('url=https://github.com/acme/project/commit/abc123');
     expect(userPrompt).toContain('Never write example.com');
-    expect(markdown).toContain('This major release');
+    expect(generated.markdown).toContain('This major release');
+    expect(generated.source).toBe('ai');
+    expect(generated.warning).toBeUndefined();
   });
 
   it('links only explicit commit urls in the deterministic fallback', async () => {
@@ -101,7 +103,7 @@ describe('AiService release notes', () => {
     vi.stubGlobal('fetch', fetchMock as any);
 
     const service = new AiService(fakeGitService);
-    const markdown = await service.generateReleaseNotes(baseSettings, () => 'secure-key-123', {
+    const generated = await service.generateReleaseNotes(baseSettings, () => 'secure-key-123', {
       tagName: 'v1.3.1',
       releaseName: 'Release v1.3.1',
       lastReleaseTag: 'v1.3.0',
@@ -127,14 +129,16 @@ describe('AiService release notes', () => {
       versionBump: 'patch',
     });
 
-    expect(markdown).toContain('- fix: keep release links real ([abc123](https://github.com/acme/project/commit/abc123))');
-    expect(markdown).toContain('- docs: update changelog (def456)');
-    expect(markdown).not.toContain('example.com');
+    expect(generated.markdown).toContain('- fix: keep release links real ([abc123](https://github.com/acme/project/commit/abc123))');
+    expect(generated.markdown).toContain('- docs: update changelog (def456)');
+    expect(generated.markdown).not.toContain('example.com');
+    expect(generated.source).toBe('fallback');
+    expect(generated.warning).toContain('provider unavailable');
   });
 
   it('names the release type in the deterministic fallback without commits', async () => {
     const service = new AiService(fakeGitService);
-    const markdown = await service.generateReleaseNotes(baseSettings, () => '', {
+    const generated = await service.generateReleaseNotes(baseSettings, () => '', {
       tagName: 'v1.3.0',
       releaseName: 'Release v1.3.0',
       lastReleaseTag: 'v1.2.4',
@@ -143,6 +147,8 @@ describe('AiService release notes', () => {
       versionBump: 'minor',
     });
 
-    expect(markdown).toContain('Dieses Minor Release');
+    expect(generated.markdown).toContain('Dieses Minor Release');
+    expect(generated.source).toBe('fallback');
+    expect(generated.warning).toContain('keine Commits');
   });
 });
