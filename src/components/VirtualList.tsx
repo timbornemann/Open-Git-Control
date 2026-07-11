@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 type VirtualListProps<T> = {
   items: T[];
@@ -8,6 +8,7 @@ type VirtualListProps<T> = {
   getKey: (item: T, index: number) => React.Key;
   renderItem: (item: T, index: number) => React.ReactNode;
   className?: string;
+  fillAvailableHeight?: boolean;
 };
 
 export const calculateVirtualRange = (itemCount: number, scrollTop: number, viewportHeight: number, rowHeight: number, overscan: number) => {
@@ -19,16 +20,50 @@ export const calculateVirtualRange = (itemCount: number, scrollTop: number, view
   };
 };
 
-export function VirtualList<T>({ items, rowHeight, maxHeight = 360, overscan = 8, getKey, renderItem, className }: VirtualListProps<T>) {
+export function VirtualList<T>({
+  items,
+  rowHeight,
+  maxHeight = 360,
+  overscan = 8,
+  getKey,
+  renderItem,
+  className,
+  fillAvailableHeight = false,
+}: VirtualListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
-  const viewportHeight = Math.min(maxHeight, Math.max(rowHeight, items.length * rowHeight));
+  const [availableHeight, setAvailableHeight] = useState(rowHeight);
+  const listRef = useRef<HTMLDivElement>(null);
+  const viewportHeight = fillAvailableHeight ? Math.max(1, availableHeight) : Math.min(maxHeight, Math.max(rowHeight, items.length * rowHeight));
+
+  useLayoutEffect(() => {
+    if (!fillAvailableHeight) return;
+
+    const listElement = listRef.current;
+    if (!listElement) return;
+
+    const updateAvailableHeight = () => {
+      setAvailableHeight((currentHeight) => {
+        const nextHeight = listElement.clientHeight;
+        return currentHeight === nextHeight ? currentHeight : nextHeight;
+      });
+    };
+
+    updateAvailableHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(updateAvailableHeight);
+    observer.observe(listElement);
+    return () => observer.disconnect();
+  }, [fillAvailableHeight]);
+
   const { startIndex, endIndex } = calculateVirtualRange(items.length, scrollTop, viewportHeight, rowHeight, overscan);
   const visibleItems = useMemo(() => items.slice(startIndex, endIndex), [endIndex, items, startIndex]);
 
   return (
     <div
+      ref={listRef}
       className={className}
-      style={{ height: viewportHeight, overflowY: 'auto', position: 'relative' }}
+      style={{ height: fillAvailableHeight ? '100%' : viewportHeight, overflowY: 'auto', position: 'relative' }}
       onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
     >
       <div style={{ height: items.length * rowHeight, position: 'relative' }}>

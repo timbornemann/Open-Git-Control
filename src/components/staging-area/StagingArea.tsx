@@ -140,7 +140,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     setInputDialog,
   });
 
-  const { visibleFiles, visibleTotal, maxListHeight } = useVisibleStagingFiles({
+  const { visibleFiles, visibleTotal } = useVisibleStagingFiles({
     status: fileOps.status,
     searchQuery: fileOps.searchQuery,
   });
@@ -177,6 +177,56 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     onCherryPickContinue: conflicts.cherryPickContinue,
     onCherryPickAbort: conflicts.cherryPickAbort,
   });
+  const getSectionFlex = (itemCount: number) => `${Math.max(1, Math.min(itemCount, 8))} 1 0`;
+  const stagingSections = (
+    <>
+      <ConflictResolverPanel
+        visibleConflicts={visibleConflicts}
+        isConflictOnly={isConflictOnly}
+        onOpenConflictResolver={onOpenConflictResolver}
+        isConflictBlockCountPending={conflicts.isConflictBlockCountPending}
+        totalConflictBlocksInView={totalConflictBlocksInView}
+        conflictEditor={conflicts.conflictEditor}
+        isConflictEditorLoading={conflicts.isConflictEditorLoading}
+        blockCountForPath={conflicts.blockCountForPath}
+        openConflictEditor={conflicts.openConflictEditor}
+        reloadActiveConflictEditor={conflicts.reloadActiveConflictEditor}
+        applyConflictChoiceToAll={conflicts.applyConflictChoiceToAll}
+        markConflictResolvedAndSync={conflicts.markConflictResolvedAndSync}
+        resolveConflictByDeletion={conflicts.resolveConflictByDeletion}
+        hasPreviousConflictTarget={conflicts.hasPreviousConflictTarget}
+        hasNextConflictTarget={conflicts.hasNextConflictTarget}
+        navigateToPreviousConflict={conflicts.navigateToPreviousConflict}
+        navigateToNextConflict={conflicts.navigateToNextConflict}
+        isStructuredConflictViewLocked={conflicts.isStructuredConflictViewLocked}
+        activeConflictFileIndex={conflicts.activeConflictFileIndex}
+        conflictPaths={conflicts.conflictPaths}
+        conflictBlocks={conflicts.conflictBlocks}
+        selectedConflictBlock={conflicts.selectedConflictBlock}
+        safeSelectedConflictBlockIndex={conflicts.safeSelectedConflictBlockIndex}
+        applyConflictChoiceToSelected={conflicts.applyConflictChoiceToSelected}
+        resetConflictEditorDraft={conflicts.resetConflictEditorDraft}
+        saveConflictEditor={conflicts.saveConflictEditor}
+        isConflictEditorDirty={conflicts.isConflictEditorDirty}
+        conflictManualScrollRef={conflicts.conflictManualScrollRef}
+        onConflictEditorContentChange={conflicts.onConflictEditorContentChange}
+        showOperationActions={conflicts.sequencerOperation !== null}
+        isGitActionRunning={fileOps.isMutating}
+        sectionFlex={isConflictOnly ? undefined : getSectionFlex(visibleConflicts.length)}
+        {...sequencerActionProps}
+      />
+
+      {!isConflictOnly && (
+        <StagingFileSections
+          visibleStaged={visibleStaged}
+          visibleUnstaged={visibleUnstaged}
+          visibleUntracked={visibleUntracked}
+          fileOps={fileOps}
+          onSelectFileInspect={onSelectFileInspect}
+        />
+      )}
+    </>
+  );
 
   return (
     <div className={`staging-container${isConflictOnly ? ' staging-container--conflict' : ''}`}>
@@ -207,49 +257,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
               </div>
             ) : null}
 
-            <ConflictResolverPanel
-              visibleConflicts={visibleConflicts}
-              isConflictOnly={isConflictOnly}
-              onOpenConflictResolver={onOpenConflictResolver}
-              isConflictBlockCountPending={conflicts.isConflictBlockCountPending}
-              totalConflictBlocksInView={totalConflictBlocksInView}
-              conflictEditor={conflicts.conflictEditor}
-              isConflictEditorLoading={conflicts.isConflictEditorLoading}
-              blockCountForPath={conflicts.blockCountForPath}
-              openConflictEditor={conflicts.openConflictEditor}
-              reloadActiveConflictEditor={conflicts.reloadActiveConflictEditor}
-              applyConflictChoiceToAll={conflicts.applyConflictChoiceToAll}
-              markConflictResolvedAndSync={conflicts.markConflictResolvedAndSync}
-              resolveConflictByDeletion={conflicts.resolveConflictByDeletion}
-              hasPreviousConflictTarget={conflicts.hasPreviousConflictTarget}
-              hasNextConflictTarget={conflicts.hasNextConflictTarget}
-              navigateToPreviousConflict={conflicts.navigateToPreviousConflict}
-              navigateToNextConflict={conflicts.navigateToNextConflict}
-              isStructuredConflictViewLocked={conflicts.isStructuredConflictViewLocked}
-              activeConflictFileIndex={conflicts.activeConflictFileIndex}
-              conflictPaths={conflicts.conflictPaths}
-              conflictBlocks={conflicts.conflictBlocks}
-              selectedConflictBlock={conflicts.selectedConflictBlock}
-              safeSelectedConflictBlockIndex={conflicts.safeSelectedConflictBlockIndex}
-              applyConflictChoiceToSelected={conflicts.applyConflictChoiceToSelected}
-              resetConflictEditorDraft={conflicts.resetConflictEditorDraft}
-              saveConflictEditor={conflicts.saveConflictEditor}
-              isConflictEditorDirty={conflicts.isConflictEditorDirty}
-              conflictManualScrollRef={conflicts.conflictManualScrollRef}
-              onConflictEditorContentChange={conflicts.onConflictEditorContentChange}
-              showOperationActions={conflicts.sequencerOperation !== null}
-              isGitActionRunning={fileOps.isMutating}
-              {...sequencerActionProps}
-            />
-
-            <StagingFileSections
-              visibleStaged={visibleStaged}
-              visibleUnstaged={visibleUnstaged}
-              visibleUntracked={visibleUntracked}
-              fileOps={fileOps}
-              maxListHeight={maxListHeight}
-              onSelectFileInspect={onSelectFileInspect}
-            />
+            {isConflictOnly ? stagingSections : <div className="staging-file-sections">{stagingSections}</div>}
           </>
         )}
       </div>

@@ -24,20 +24,8 @@ export const useVisibleStagingFiles = ({ status, searchQuery }: UseVisibleStagin
 
   const visibleTotal = visibleFiles.staged.length + visibleFiles.unstaged.length + visibleFiles.untracked.length + visibleFiles.conflicts.length;
 
-  const visibleSectionCount = [visibleFiles.conflicts.length, visibleFiles.staged.length, visibleFiles.unstaged.length, visibleFiles.untracked.length].filter(
-    (count) => count > 0,
-  ).length;
-
-  const maxListHeight = (itemCount: number) => {
-    if (itemCount <= 0) return 0;
-    if (visibleSectionCount <= 1) return 720;
-    if (visibleSectionCount === 2) return 520;
-    return 380;
-  };
-
   return {
     visibleFiles,
     visibleTotal,
-    maxListHeight,
   };
 };

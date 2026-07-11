@@ -43,6 +43,7 @@ type ConflictResolverPanelProps = {
   onRebaseAbort?: () => void;
   onCherryPickContinue?: () => void;
   onCherryPickAbort?: () => void;
+  sectionFlex?: string;
 };
 
 export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
@@ -83,6 +84,7 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   onRebaseAbort,
   onCherryPickContinue,
   onCherryPickAbort,
+  sectionFlex,
 }) => {
   if (visibleConflicts.length === 0 && !showOperationActions) {
     return null;
@@ -92,7 +94,10 @@ export const ConflictResolverPanel: React.FC<ConflictResolverPanelProps> = ({
   const isNavigationBusy = isConflictEditorLoading || conflictEditor?.isSaving === true;
 
   return (
-    <div className={cx('staging-section conflict-section', isConflictOnly && 'conflict-section--resolve', isCompact && 'conflict-section--compact')}>
+    <div
+      className={cx('staging-section conflict-section', isConflictOnly && 'conflict-section--resolve', isCompact && 'conflict-section--compact')}
+      style={sectionFlex ? { flex: sectionFlex } : undefined}
+    >
       <ConflictResolverHeader
         isCompact={isCompact}
         isNavigationBusy={isNavigationBusy}

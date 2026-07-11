@@ -88,6 +88,37 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.staging-file-sections {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.staging-file-sections > .staging-section {
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.staging-file-sections .staging-section-header {
+  position: static;
+  flex-shrink: 0;
+}
+
+.staging-section-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.staging-file-sections > .conflict-section--compact .conflict-summary-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .staging-section-header {
   display: flex;
   align-items: center;

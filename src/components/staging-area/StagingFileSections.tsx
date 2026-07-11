@@ -10,7 +10,6 @@ type StagingFileSectionsProps = {
   visibleUnstaged: FileEntry[];
   visibleUntracked: FileEntry[];
   fileOps: ReturnType<typeof useFileOperations>;
-  maxListHeight: (itemCount: number) => number;
   onSelectFileInspect?: (filePath: string, source: 'staged' | 'unstaged') => void;
 };
 
@@ -36,14 +35,7 @@ const SectionHeader = ({
   </div>
 );
 
-export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
-  visibleStaged,
-  visibleUnstaged,
-  visibleUntracked,
-  fileOps,
-  maxListHeight,
-  onSelectFileInspect,
-}) => {
+export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibleStaged, visibleUnstaged, visibleUntracked, fileOps, onSelectFileInspect }) => {
   const { t } = useI18n();
 
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
@@ -136,10 +128,12 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
     );
   };
 
+  const getSectionFlex = (itemCount: number) => `${Math.min(itemCount, 8)} 1 0`;
+
   return (
     <>
       {visibleStaged.length > 0 && (
-        <div className="staging-section">
+        <div className="staging-section" style={{ flex: getSectionFlex(visibleStaged.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.staged_changes_12b1a849')}
             count={visibleStaged.length}
@@ -157,9 +151,10 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
             }
           />
           <VirtualList
+            className="staging-section-list"
             items={visibleStaged}
             rowHeight={28}
-            maxHeight={maxListHeight(visibleStaged.length)}
+            fillAvailableHeight
             getKey={(file) => `s-${file.path}`}
             renderItem={(file) => <FileRow entry={file} section="staged" />}
           />
@@ -167,7 +162,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       )}
 
       {visibleUnstaged.length > 0 && (
-        <div className="staging-section">
+        <div className="staging-section" style={{ flex: getSectionFlex(visibleUnstaged.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.changes_69ca4922')}
             count={visibleUnstaged.length}
@@ -195,9 +190,10 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
             }
           />
           <VirtualList
+            className="staging-section-list"
             items={visibleUnstaged}
             rowHeight={28}
-            maxHeight={maxListHeight(visibleUnstaged.length)}
+            fillAvailableHeight
             getKey={(file) => `u-${file.path}`}
             renderItem={(file) => <FileRow entry={file} section="unstaged" />}
           />
@@ -205,7 +201,7 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
       )}
 
       {visibleUntracked.length > 0 && (
-        <div className="staging-section">
+        <div className="staging-section" style={{ flex: getSectionFlex(visibleUntracked.length) }}>
           <SectionHeader
             title={t('generated.components.staging_area.stagingfilesections.untracked_d2518623')}
             count={visibleUntracked.length}
@@ -222,9 +218,10 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({
             }
           />
           <VirtualList
+            className="staging-section-list"
             items={visibleUntracked}
             rowHeight={28}
-            maxHeight={maxListHeight(visibleUntracked.length)}
+            fillAvailableHeight
             getKey={(file) => `t-${file.path}`}
             renderItem={(file) => <FileRow entry={file} section="untracked" />}
           />
