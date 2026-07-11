@@ -1,7 +1,9 @@
 import React from 'react';
+import { Copy, Sparkles } from 'lucide-react';
 import { DialogFrame } from '@/components/DialogFrame';
 import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerItemInput, PlannerPriority, PlannerProject, PlannerProjectInput, PlannerStatus } from '@/types/projectPlanner';
+import type { PlannerPromptItem } from '@/utils/plannerAiPrompts';
 
 export const PRIORITY_OPTIONS: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
 export const STATUS_OPTIONS: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
@@ -104,10 +106,23 @@ type ItemDialogProps = {
   busy: boolean;
   onClose: () => void;
   onSubmit: (input: PlannerItemInput) => Promise<void>;
+  onCopyAgentPrompt?: (item: PlannerPromptItem) => void;
+  onGenerateCommitMessage?: (item: PlannerPromptItem) => void;
+  isAiCommitGenerating?: boolean;
 };
 
-export const ItemDialog: React.FC<ItemDialogProps> = ({ open, item, defaultStatus = 'idea', busy, onClose, onSubmit }) => {
-  const { t } = useI18n();
+export const ItemDialog: React.FC<ItemDialogProps> = ({
+  open,
+  item,
+  defaultStatus = 'idea',
+  busy,
+  onClose,
+  onSubmit,
+  onCopyAgentPrompt,
+  onGenerateCommitMessage,
+  isAiCommitGenerating = false,
+}) => {
+  const { t, tr } = useI18n();
   const labels = usePlannerLabels();
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
@@ -137,6 +152,18 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({ open, item, defaultStatu
         .filter(Boolean),
     });
   };
+
+  const promptItem: PlannerPromptItem = {
+    title: title.trim(),
+    description: description.trim(),
+    priority,
+    status,
+    tags: tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  };
+  const canRunAiAction = Boolean(promptItem.title);
 
   return (
     <DialogFrame
@@ -199,6 +226,31 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({ open, item, defaultStatu
           <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Bug, Feature, UI" />
           <small>{t('generated.components.project_planner.plannerdialogs.separate_multiple_tags_with_commas_94bb76c8')}</small>
         </label>
+        {onCopyAgentPrompt && (
+          <div className="planner-item-dialog-ai-actions">
+            <button
+              type="button"
+              className="planner-btn planner-btn-secondary"
+              onClick={() => onCopyAgentPrompt(promptItem)}
+              disabled={!canRunAiAction}
+              title={tr('Fertigen Prompt fuer einen Coding-Agent kopieren', 'Copy a ready-to-use prompt for a coding agent')}
+            >
+              <Copy size={14} /> {tr('Agent-Prompt kopieren', 'Copy agent prompt')}
+            </button>
+            {onGenerateCommitMessage && (
+              <button
+                type="button"
+                className="planner-btn planner-btn-secondary"
+                onClick={() => onGenerateCommitMessage(promptItem)}
+                disabled={!canRunAiAction || isAiCommitGenerating}
+                title={tr('KI-Commit-Nachricht aus diesem Todo erstellen', 'Create an AI commit message from this todo')}
+              >
+                <Sparkles size={14} />{' '}
+                {isAiCommitGenerating ? tr('KI erstellt Nachricht...', 'AI is creating message...') : tr('KI-Commit-Nachricht', 'AI commit message')}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </DialogFrame>
   );

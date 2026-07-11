@@ -6,7 +6,7 @@ import type { SettingsAiUpdaterState } from '../hooks/useSettingsAiUpdater';
 import { actionRowClass, fieldClass, hintClass, inputClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: SettingsSectionProps & { ai: SettingsAiUpdaterState }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const modelListId = variant === 'sidebar' ? 'ai-model-list-sc' : 'ai-model-list-settings';
   const content = (
     <>
@@ -256,7 +256,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
       </label>
 
       <label className={fieldClass(variant)}>
-        {t('generated.components.layout.settingsmaincontent.commit_message_language_5815363d')}
+        {tr('KI-Ausgabesprache', 'AI output language')}
         <select
           className={inputClass(variant)}
           value={settings.aiCommitMessageLanguage}

@@ -25,6 +25,8 @@ type ProjectPlannerContextValue = {
   updateItem: (itemId: string, input: Partial<PlannerItemInput>) => Promise<boolean>;
   deleteItem: (itemId: string) => Promise<boolean>;
   materializeProject: (projectId: string, parentDirectory: string, folderName: string) => Promise<boolean>;
+  activateRepositoryProject: (repoPath: string) => Promise<boolean>;
+  notify: (message: string, isError: boolean) => void;
   refresh: () => Promise<void>;
 };
 
@@ -375,6 +377,29 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     setCreateProjectRequestId((current) => current + 1);
   }, []);
 
+  const activateRepositoryProject = useCallback(
+    async (repoPath: string) => {
+      try {
+        if (!activeRepo || repoKey(activeRepo) !== repoKey(repoPath)) {
+          await onRepositorySelected(repoPath);
+        }
+        return true;
+      } catch (activationError) {
+        const message = activationError instanceof Error ? activationError.message : String(activationError);
+        onToast(message, true);
+        return false;
+      }
+    },
+    [activeRepo, onRepositorySelected, onToast],
+  );
+
+  const notify = useCallback(
+    (message: string, isError: boolean) => {
+      onToast(message, isError);
+    },
+    [onToast],
+  );
+
   const itemsForSelectedProject = useMemo(
     () => (selectedProjectId ? data.items.filter((item) => item.projectId === selectedProjectId) : []),
     [data.items, selectedProjectId],
@@ -401,6 +426,8 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       updateItem,
       deleteItem,
       materializeProject,
+      activateRepositoryProject,
+      notify,
       refresh,
     }),
     [
@@ -409,12 +436,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       createProject,
       createProjectRequestId,
       data,
+      activateRepositoryProject,
       deleteItem,
       deleteProject,
       error,
       itemsForSelectedProject,
       loading,
       materializeProject,
+      notify,
       refresh,
       requestCreateProject,
       requestDeleteItem,

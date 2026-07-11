@@ -9,6 +9,7 @@ import { MainPrimaryPane } from './main/MainPrimaryPane';
 import { MainTopbar } from './main/MainTopbar';
 import { useInspectorPaneVisibility } from './main/useInspectorPaneVisibility';
 import { useMainViewTimeline } from './main/useMainViewTimeline';
+import { APPLICATION_OPEN_STAGING_COMMIT_EVENT } from '@/utils/layoutPreferences';
 
 const MainViewComponent: React.FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
@@ -58,7 +59,7 @@ const MainViewComponent: React.FC = () => {
     onNavigateToCommit,
   });
 
-  const { isInspectorPaneVisible, toggleInspectorPane } = useInspectorPaneVisibility();
+  const { isInspectorPaneVisible, toggleInspectorPane, revealInspectorPane } = useInspectorPaneVisibility();
 
   const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
     activeRepo,
@@ -70,6 +71,16 @@ const MainViewComponent: React.FC = () => {
   React.useEffect(() => {
     if (showReleaseCreator) setShowTimeline(false);
   }, [showReleaseCreator, setShowTimeline]);
+
+  React.useEffect(() => {
+    const handleOpenStagingCommit = () => {
+      handleStageCommitOpen();
+      revealInspectorPane();
+    };
+
+    window.addEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
+    return () => window.removeEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
+  }, [handleStageCommitOpen, revealInspectorPane]);
 
   const isSettingsView = activeTab === 'settings';
   const isPlannerView = activeTab === 'planner';

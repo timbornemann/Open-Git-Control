@@ -1,11 +1,13 @@
 import React from 'react';
-import { AlertTriangle, Bug, CheckCircle2, CircleDot, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Tag, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
+import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
 import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
+import { usePlannerAiActions } from './usePlannerAiActions';
 import '@/styles/project-planner.css';
 
 const statusIcons: Record<PlannerStatus, React.ReactNode> = {
@@ -33,8 +35,12 @@ export const ProjectPlannerView: React.FC = () => {
     requestCreateProject,
     requestDeleteProject,
     requestDeleteItem,
+    activateRepositoryProject,
+    notify,
   } = useProjectPlanner();
   const { t, tr } = useI18n();
+  const settingsState = useSettingsContext();
+  const { setConfirmDialog } = useUIContext();
   const labels = usePlannerLabels();
   const [search, setSearch] = React.useState('');
   const [priorityFilter, setPriorityFilter] = React.useState<PlannerPriority | 'all'>('all');
@@ -51,6 +57,13 @@ export const ProjectPlannerView: React.FC = () => {
   const projectDialogProjectIdRef = React.useRef<string | null>(null);
   const itemDialogProjectIdRef = React.useRef<string | null>(null);
   const materializeProjectIdRef = React.useRef<string | null>(null);
+  const plannerAiActions = usePlannerAiActions({
+    project: selectedProject,
+    settings: settingsState.settings,
+    activateRepositoryProject,
+    notify,
+    setConfirmDialog,
+  });
   selectedProjectIdRef.current = selectedProject?.id || null;
 
   React.useEffect(() => {
@@ -252,6 +265,35 @@ export const ProjectPlannerView: React.FC = () => {
                   <strong>{statusItems.length}</strong>
                   <button
                     className="planner-column-add"
+                    onClick={() => void plannerAiActions.copyStatusPrompt(statusItems)}
+                    disabled={statusItems.length === 0}
+                    title={tr(
+                      `Sichtbare Eintraege aus "${labels.status[status]}" als Agent-Prompt kopieren`,
+                      `Copy visible "${labels.status[status]}" items as an agent prompt`,
+                    )}
+                    aria-label={tr(`Agent-Prompt fuer "${labels.status[status]}" kopieren`, `Copy agent prompt for "${labels.status[status]}"`)}
+                  >
+                    <Copy size={13} />
+                  </button>
+                  {selectedProject.repoPath && (
+                    <button
+                      className="planner-column-add"
+                      onClick={() => plannerAiActions.generateCommitMessageForStatus(statusItems)}
+                      disabled={statusItems.length === 0 || plannerAiActions.isAiCommitGenerating}
+                      title={tr(
+                        `KI-Commit-Nachricht aus sichtbaren Eintraegen in "${labels.status[status]}" erstellen`,
+                        `Create an AI commit message from visible "${labels.status[status]}" items`,
+                      )}
+                      aria-label={tr(
+                        `KI-Commit-Nachricht fuer "${labels.status[status]}" erstellen`,
+                        `Create AI commit message for "${labels.status[status]}"`,
+                      )}
+                    >
+                      <Sparkles size={13} />
+                    </button>
+                  )}
+                  <button
+                    className="planner-column-add"
                     onClick={() => openNewItem(status)}
                     disabled={busy}
                     title={tr(`Eintrag in "${labels.status[status]}" anlegen`, `Create item in "${labels.status[status]}"`)}
@@ -378,6 +420,9 @@ export const ProjectPlannerView: React.FC = () => {
             setItemDialogOpen(false);
           }
         }}
+        onCopyAgentPrompt={(item) => void plannerAiActions.copyItemPrompt(item)}
+        onGenerateCommitMessage={selectedProject.repoPath ? (item) => plannerAiActions.generateCommitMessageForItem(item) : undefined}
+        isAiCommitGenerating={plannerAiActions.isAiCommitGenerating}
       />
 
       <MaterializeDialog

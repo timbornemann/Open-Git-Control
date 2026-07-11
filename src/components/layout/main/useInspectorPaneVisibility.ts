@@ -22,6 +22,12 @@ export const useInspectorPaneVisibility = () => {
     setIsInspectorPaneVisible(false);
   }, []);
 
+  const revealInspectorPane = useCallback(() => {
+    inspectorManuallyCollapsedRef.current = false;
+    window.localStorage.setItem(INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY, 'false');
+    setIsInspectorPaneVisible(window.innerWidth > 900);
+  }, []);
+
   useEffect(() => {
     const handleLayoutReset = () => {
       inspectorManuallyCollapsedRef.current = false;
@@ -47,5 +53,6 @@ export const useInspectorPaneVisibility = () => {
     isInspectorPaneVisible,
     toggleInspectorPane,
     hideInspectorPane,
+    revealInspectorPane,
   };
 };

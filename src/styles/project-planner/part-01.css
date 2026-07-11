@@ -414,6 +414,18 @@
   cursor: wait;
 }
 
+.planner-item-dialog-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.planner-item-dialog-ai-actions .planner-btn {
+  min-height: 30px;
+  padding: 5px 9px;
+}
+
 .planner-column-idea .planner-column-header span {
   color: var(--text-accent);
 }

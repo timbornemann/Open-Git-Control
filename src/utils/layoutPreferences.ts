@@ -5,6 +5,7 @@ export const INSPECTOR_PANE_WIDTH_STORAGE_KEY = 'open-git-control.inspector-pane
 export const INSPECTOR_MANUAL_COLLAPSED_STORAGE_KEY = 'open-git-control.inspector-manually-collapsed';
 
 export const APPLICATION_LAYOUT_RESET_EVENT = 'open-git-control:layout-reset';
+export const APPLICATION_OPEN_STAGING_COMMIT_EVENT = 'open-git-control:open-staging-commit';
 
 const LAYOUT_STORAGE_KEYS = [
   SIDEBAR_WIDTH_STORAGE_KEY,
@@ -20,4 +21,8 @@ export const resetStoredLayoutPreferences = (): void => {
   }
 
   window.dispatchEvent(new window.Event(APPLICATION_LAYOUT_RESET_EVENT));
+};
+
+export const openStagingCommitArea = (): void => {
+  window.dispatchEvent(new window.Event(APPLICATION_OPEN_STAGING_COMMIT_EVENT));
 };
