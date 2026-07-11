@@ -29,6 +29,7 @@ export type RepositoryContextValue = RepositoryStateContract & {
   selectedCommit: string | null;
   setSelectedCommit: (hash: string | null) => void;
   commitNavigationRequest: CommitNavigationRequest | null;
+  onCommitNavigationRequestHandled: (requestId: number) => void;
   onNavigateToCommit: (hash: string) => void;
   refreshTrigger: number;
   triggerRefresh: () => void;

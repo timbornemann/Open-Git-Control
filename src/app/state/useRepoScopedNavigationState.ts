@@ -58,6 +58,10 @@ export const useRepoScopedNavigationState = ({
     setCommitRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  const consumeCommitNavigationRequest = useCallback((requestId: number) => {
+    setCommitNavigationRequest((current) => (current?.requestId === requestId ? null : current));
+  }, []);
+
   const resetRepoScopedUi = useCallback(() => {
     setSelectedCommit(null);
     setCommitNavigationRequest(null);
@@ -130,6 +134,7 @@ export const useRepoScopedNavigationState = ({
     selectedCommit,
     setSelectedCommit,
     commitNavigationRequest,
+    consumeCommitNavigationRequest,
     autoOpenConflictResolverPath,
     setAutoOpenConflictResolverPath,
     clearAutoOpenConflictResolverPath,

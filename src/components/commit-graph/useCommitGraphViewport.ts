@@ -17,6 +17,7 @@ type UseCommitGraphViewportParams = {
   layout: GraphLayout | null;
   repoPath: string | null;
   navigationRequest?: CommitNavigationRequest | null;
+  onNavigationRequestHandled?: (requestId: number) => void;
   workingTreeStatus: GitStatusDetailed | null;
   hasMoreCommits: boolean;
   loadingMore: boolean;
@@ -29,6 +30,7 @@ export const useCommitGraphViewport = ({
   layout,
   repoPath,
   navigationRequest,
+  onNavigationRequestHandled,
   workingTreeStatus,
   hasMoreCommits,
   loadingMore,
@@ -41,11 +43,6 @@ export const useCommitGraphViewport = ({
   const completedNavigationRequestIdRef = useRef<number | null>(null);
   const navigationRetryFrameRef = useRef<number | null>(null);
   const [navigationRetryTick, setNavigationRetryTick] = useState(0);
-  const topResetLockRef = useRef<{
-    repoPath: string | null;
-    activeUntil: number;
-    userReleased: boolean;
-  }>({ repoPath: null, activeUntil: 0, userReleased: false });
 
   const requestNavigationRetry = useCallback(() => {
     if (navigationRetryFrameRef.current !== null) return;
@@ -54,6 +51,15 @@ export const useCommitGraphViewport = ({
       setNavigationRetryTick((current) => current + 1);
     });
   }, []);
+
+  const completeNavigationRequest = useCallback(
+    (requestId: number) => {
+      navigationAttemptRef.current = null;
+      completedNavigationRequestIdRef.current = requestId;
+      onNavigationRequestHandled?.(requestId);
+    },
+    [onNavigationRequestHandled],
+  );
 
   useEffect(
     () => () => {
@@ -73,26 +79,6 @@ export const useCommitGraphViewport = ({
       setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
     }
   }, []);
-
-  const resetCommitListScroll = useCallback(() => {
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
-
-    container.scrollTop = 0;
-    setScrollTop(0);
-    const nextHeight = container.clientHeight;
-    if (nextHeight > 0) {
-      setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
-    }
-  }, [logContainerRef]);
-
-  const maybeKeepCommitListAtTop = useCallback(() => {
-    if (!repoPath || navigationRequest) return;
-    const lock = topResetLockRef.current;
-    if (lock.repoPath !== repoPath || lock.userReleased) return;
-    if (Date.now() > lock.activeUntil) return;
-    resetCommitListScroll();
-  }, [navigationRequest, repoPath, resetCommitListScroll]);
 
   const scrollToCommitIndex = useCallback(
     (nodeIndex: number) => {
@@ -144,71 +130,6 @@ export const useCommitGraphViewport = ({
     };
   }, [layout, logContainerRef, repoPath, syncViewportMetrics]);
 
-  useLayoutEffect(() => {
-    if (navigationRequest) return;
-    topResetLockRef.current = {
-      repoPath,
-      activeUntil: Date.now() + 4000,
-      userReleased: false,
-    };
-    resetCommitListScroll();
-    let secondFrameId: number | null = null;
-    const firstFrameId = window.requestAnimationFrame(() => {
-      resetCommitListScroll();
-      secondFrameId = window.requestAnimationFrame(resetCommitListScroll);
-    });
-    const settleIntervalId = window.setInterval(() => {
-      maybeKeepCommitListAtTop();
-    }, 120);
-    const releaseTimerId = window.setTimeout(() => {
-      if (topResetLockRef.current.repoPath === repoPath) {
-        topResetLockRef.current.activeUntil = 0;
-      }
-    }, 4200);
-
-    return () => {
-      window.cancelAnimationFrame(firstFrameId);
-      window.clearInterval(settleIntervalId);
-      window.clearTimeout(releaseTimerId);
-      if (secondFrameId !== null) {
-        window.cancelAnimationFrame(secondFrameId);
-      }
-    };
-  }, [maybeKeepCommitListAtTop, navigationRequest, repoPath, resetCommitListScroll]);
-
-  useLayoutEffect(() => {
-    maybeKeepCommitListAtTop();
-  }, [layout, loading, workingTreeStatus, maybeKeepCommitListAtTop]);
-
-  useEffect(() => {
-    const container = logContainerRef.current?.parentElement;
-    if (!container) return;
-
-    const releaseTopLock = () => {
-      const lock = topResetLockRef.current;
-      if (lock.repoPath === repoPath) {
-        lock.userReleased = true;
-        lock.activeUntil = 0;
-      }
-    };
-    const releaseTopLockOnKey = (event: KeyboardEvent) => {
-      if (!['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) return;
-      releaseTopLock();
-    };
-
-    container.addEventListener('wheel', releaseTopLock, { passive: true });
-    container.addEventListener('touchstart', releaseTopLock, { passive: true });
-    container.addEventListener('pointerdown', releaseTopLock);
-    window.addEventListener('keydown', releaseTopLockOnKey);
-
-    return () => {
-      container.removeEventListener('wheel', releaseTopLock);
-      container.removeEventListener('touchstart', releaseTopLock);
-      container.removeEventListener('pointerdown', releaseTopLock);
-      window.removeEventListener('keydown', releaseTopLockOnKey);
-    };
-  }, [logContainerRef, repoPath]);
-
   useEffect(() => {
     if (!navigationRequest || !layout) return;
     if (completedNavigationRequestIdRef.current === navigationRequest.requestId) return;
@@ -230,22 +151,19 @@ export const useCommitGraphViewport = ({
       const rowTop = (nodeIndex + workingTreeRowOffset) * ROW_HEIGHT;
       const targetTop = Math.max(0, rowTop - Math.max(0, (container.clientHeight - ROW_HEIGHT) / 2));
       container.scrollTo({ top: targetTop, behavior: 'smooth' });
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      completeNavigationRequest(navigationRequest.requestId);
       return;
     }
 
     if (!hasMoreCommits) {
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      completeNavigationRequest(navigationRequest.requestId);
       return;
     }
     if (loadingMore || loading) return;
 
     const attempts = navigationAttemptRef.current?.attempts ?? 0;
     if (attempts >= NAVIGATION_MAX_LOAD_ATTEMPTS) {
-      navigationAttemptRef.current = null;
-      completedNavigationRequestIdRef.current = navigationRequest.requestId;
+      completeNavigationRequest(navigationRequest.requestId);
       return;
     }
 
@@ -256,6 +174,7 @@ export const useCommitGraphViewport = ({
     void loadMoreCommits();
   }, [
     hasMoreCommits,
+    completeNavigationRequest,
     layout,
     loadMoreCommits,
     loading,

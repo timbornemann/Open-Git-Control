@@ -213,6 +213,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 repoPath={repository.activeRepo}
                 selectedHash={repository.selectedCommit}
                 navigationRequest={repository.commitNavigationRequest}
+                onNavigationRequestHandled={repository.onCommitNavigationRequestHandled}
                 onSelectCommit={handleSelectCommitDirect}
                 refreshTrigger={repository.refreshTrigger}
                 commitRefreshTrigger={repository.commitRefreshTrigger}

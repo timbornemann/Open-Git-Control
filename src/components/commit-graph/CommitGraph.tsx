@@ -35,6 +35,7 @@ interface CommitGraphProps {
   onSelectCommit?: (hash: string | null) => void;
   selectedHash?: string | null;
   navigationRequest?: { hash: string; requestId: number } | null;
+  onNavigationRequestHandled?: (requestId: number) => void;
   refreshTrigger?: number;
   commitRefreshTrigger?: number;
   showSecondaryHistory?: boolean;
@@ -56,6 +57,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   onSelectCommit,
   selectedHash,
   navigationRequest,
+  onNavigationRequestHandled,
   refreshTrigger,
   commitRefreshTrigger,
   showSecondaryHistory = true,
@@ -108,6 +110,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     layout,
     repoPath,
     navigationRequest,
+    onNavigationRequestHandled,
     workingTreeStatus,
     hasMoreCommits,
     loadingMore,

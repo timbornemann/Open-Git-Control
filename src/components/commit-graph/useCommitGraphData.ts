@@ -33,6 +33,7 @@ type Params = {
 };
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error || ''));
+const isGitOperationAborted = (error: unknown): boolean => /git operation was aborted/i.test(errorMessage(error));
 
 export const useCommitGraphData = ({
   repoPath,
@@ -63,6 +64,8 @@ export const useCommitGraphData = ({
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
   const requestGenerationRef = useRef(0);
+  const abortRetryCountRef = useRef(0);
+  const abortRetryTimeoutRef = useRef<number | null>(null);
   const updateLayout = useGraphLayoutEngine(setLayout);
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
@@ -73,6 +76,17 @@ export const useCommitGraphData = ({
   useEffect(() => {
     onRepoClearedRef.current = onRepoCleared;
   }, [onRepoCleared]);
+
+  useEffect(
+    () => () => {
+      requestGenerationRef.current += 1;
+      if (abortRetryTimeoutRef.current !== null) {
+        window.clearTimeout(abortRetryTimeoutRef.current);
+        abortRetryTimeoutRef.current = null;
+      }
+    },
+    [],
+  );
 
   const refreshCommits = useCallback(
     async (mode: RefreshMode = 'reset') => {
@@ -130,6 +144,7 @@ export const useCommitGraphData = ({
         });
         if (requestGeneration !== requestGenerationRef.current) return;
         if (result.success) {
+          abortRetryCountRef.current = 0;
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
           const visibleChunk = applyCachedStats(parsedChunk, data.stats || {});
@@ -160,6 +175,16 @@ export const useCommitGraphData = ({
             updateLayout(normalized);
           }
         } else {
+          if (isGitOperationAborted(result.error) && abortRetryCountRef.current < 2) {
+            abortRetryCountRef.current += 1;
+            abortRetryTimeoutRef.current = window.setTimeout(() => {
+              abortRetryTimeoutRef.current = null;
+              if (requestGeneration === requestGenerationRef.current) {
+                void refreshCommits(mode);
+              }
+            }, 100);
+            return;
+          }
           if (isRepoUnavailableError(String(result.error || ''))) {
             setLayout(null);
             setCommitCount(0);
@@ -171,6 +196,16 @@ export const useCommitGraphData = ({
         }
       } catch (e: unknown) {
         if (requestGeneration !== requestGenerationRef.current) return;
+        if (isGitOperationAborted(e) && abortRetryCountRef.current < 2) {
+          abortRetryCountRef.current += 1;
+          abortRetryTimeoutRef.current = window.setTimeout(() => {
+            abortRetryTimeoutRef.current = null;
+            if (requestGeneration === requestGenerationRef.current) {
+              void refreshCommits(mode);
+            }
+          }, 100);
+          return;
+        }
         if (isRepoUnavailableError(errorMessage(e))) {
           setLayout(null);
           setCommitCount(0);
@@ -208,6 +243,11 @@ export const useCommitGraphData = ({
   useEffect(() => {
     if (!repoPath) {
       requestGenerationRef.current += 1;
+      abortRetryCountRef.current = 0;
+      if (abortRetryTimeoutRef.current !== null) {
+        window.clearTimeout(abortRetryTimeoutRef.current);
+        abortRetryTimeoutRef.current = null;
+      }
       setLayout(null);
       setCommitCount(0);
       setLoading(false);
@@ -234,6 +274,11 @@ export const useCommitGraphData = ({
     lastSecondaryHistoryRef.current = showSecondaryHistory;
     if (repoChanged || historyModeChanged) {
       requestGenerationRef.current += 1;
+      abortRetryCountRef.current = 0;
+      if (abortRetryTimeoutRef.current !== null) {
+        window.clearTimeout(abortRetryTimeoutRef.current);
+        abortRetryTimeoutRef.current = null;
+      }
       // Drop previous-repo state immediately to avoid transient sync refreshes
       // restoring stale scroll positions while the new repo is loading.
       setLayout(null);

@@ -87,6 +87,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   selectedCommit: state.selectedCommit,
   setSelectedCommit: state.setSelectedCommit,
   commitNavigationRequest: state.commitNavigationRequest,
+  onCommitNavigationRequestHandled: state.consumeCommitNavigationRequest,
   onNavigateToCommit: state.onNavigateToCommit,
   refreshTrigger: state.refreshTrigger,
   triggerRefresh: state.triggerRefresh,
