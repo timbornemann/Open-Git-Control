@@ -94,17 +94,25 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
     const sbsGridStyle = showBlame ? { gridTemplateColumns: '180px 52px minmax(0, 1fr)' } : undefined;
 
     if (line.type === 'context') {
+      // A modified line (a deletion paired with an addition) reaches this branch
+      // as a single row whose left and right text are joined by the \x1f
+      // delimiter from sideBySideRows. Genuine unchanged context has no
+      // delimiter. Highlight the two differing sides as deletion/addition so a
+      // modified line is not mistaken for an unchanged one.
+      const isModifiedLine = textStr.includes('\x1f');
       const [leftText = '', rightText = leftText] = textStr.split('\x1f');
+      const leftCellClass = isModifiedLine ? 'diff-sbs-cell del' : 'diff-sbs-cell ctx';
+      const rightCellClass = isModifiedLine ? 'diff-sbs-cell add' : 'diff-sbs-cell ctx';
       return (
         <div key={key} className="diff-sbs-row">
-          <div className="diff-sbs-cell ctx" style={sbsGridStyle}>
+          <div className={leftCellClass} style={sbsGridStyle}>
             {renderBlameCell(line, prevLine, 'left')}
             <span className="diff-lineno">{line.leftNo ?? ''}</span>
             <span className="diff-code" title={leftText}>
               {highlightLine(leftText)}
             </span>
           </div>
-          <div className="diff-sbs-cell ctx" style={sbsGridStyle}>
+          <div className={rightCellClass} style={sbsGridStyle}>
             {renderBlameCell(line, prevLine, 'right')}
             <span className="diff-lineno">{line.rightNo ?? ''}</span>
             <span className="diff-code" title={rightText}>
