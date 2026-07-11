@@ -1,10 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import {
-  createLanguageTranslations,
-  getDefaultI18nContextValue,
-  type AppLanguage,
-  type I18nContextValue,
-} from '@/i18nCore';
+import { createLanguageTranslations, getDefaultI18nContextValue, type AppLanguage, type I18nContextValue } from '@/i18nCore';
 
 export type { AppLanguage, CatalogTranslateFn, I18nContextValue, TranslateFn, TranslationVariables } from '@/i18nCore';
 
