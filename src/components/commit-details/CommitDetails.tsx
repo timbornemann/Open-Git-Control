@@ -59,8 +59,15 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
   };
 
   return (
-    <div className="commit-details-panel" style={{ padding: '12px', height: '100%', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
+    <div
+      className="commit-details-panel"
+      style={
+        selectedFile
+          ? { padding: '12px', height: '100%', boxSizing: 'border-box', overflowY: 'auto' }
+          : { padding: '12px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }
+      }
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', flexShrink: 0 }}>
         <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>
           {t('generated.components.commitdetails.commit_details_7b1df325')}:{' '}
           {normalizedHash ? normalizedHash.substring(0, 8) : t('generated.components.commitdetails.invalid_4296db6c')}
@@ -83,6 +90,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
         <div
           style={{
             marginBottom: '10px',
+            flexShrink: 0,
             border: '1px solid var(--border-color)',
             borderRadius: '6px',
             padding: '9px 10px',
@@ -113,7 +121,7 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
           {filesError}
         </div>
       ) : !selectedFile ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', flex: 1, flexDirection: 'column', gap: '6px', minHeight: 0 }}>
           {filesSourceHint && (
             <div
               style={{
@@ -130,9 +138,10 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
           )}
           {files.length > 0 && (
             <VirtualList
+              className="commit-details-file-list"
               items={files}
               rowHeight={42}
-              maxHeight={630}
+              fillAvailableHeight
               overscan={10}
               getKey={(file, index) => `${file.path}-${index}`}
               renderItem={(file) => (
