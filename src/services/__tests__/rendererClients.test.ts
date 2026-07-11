@@ -141,6 +141,12 @@ describe('renderer service clients', () => {
     await expectDelegation(() => appClient.clearRepoPath(), api.repos.clearRepoPath, []);
   });
 
+  it('delegates repository path opening to the Git Electron domain', async () => {
+    await expectDelegation(() => gitClient.openRepositoryPath({ path: 'src/app.ts', action: 'reveal', repoPath: 'C:/repo' }), api.git.openRepositoryPath, [
+      { path: 'src/app.ts', action: 'reveal', repoPath: 'C:/repo' },
+    ]);
+  });
+
   it('delegates AI operations to the AI Electron domain', async () => {
     await expectDelegation(() => aiClient.testConnection('key'), api.ai.aiTestConnection, ['key']);
     await expectDelegation(() => aiClient.listModels('key'), api.ai.aiListModels, ['key']);

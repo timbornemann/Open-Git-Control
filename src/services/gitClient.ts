@@ -412,6 +412,10 @@ export const gitClient = {
     return result;
   },
 
+  async openRepositoryPath(...args: Parameters<ElectronAPI['openRepositoryPath']>): ReturnType<ElectronAPI['openRepositoryPath']> {
+    return requireElectronGitApi().openRepositoryPath(...args);
+  },
+
   async openSubmodule(...args: Parameters<ElectronAPI['openSubmodule']>): ReturnType<ElectronAPI['openSubmodule']> {
     return requireElectronGitApi().openSubmodule(...args);
   },

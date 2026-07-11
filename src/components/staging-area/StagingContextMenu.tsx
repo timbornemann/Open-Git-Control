@@ -30,6 +30,40 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
           disabled={fileOps.isMutating}
           onClick={() => {
             closeContextMenu();
+            void fileOps.openRepositoryPath(contextEntry.path, 'reveal');
+          }}
+        >
+          <span className="ctx-menu-icon">FM</span>
+          {tr('Im Dateimanager anzeigen', 'Show in file manager')}
+        </button>
+        <button
+          className="ctx-menu-item"
+          disabled={fileOps.isMutating}
+          onClick={() => {
+            closeContextMenu();
+            void fileOps.openRepositoryPath(contextEntry.path, 'open');
+          }}
+        >
+          <span className="ctx-menu-icon">OP</span>
+          {tr('Datei oeffnen', 'Open file')}
+        </button>
+        <button
+          className="ctx-menu-item"
+          disabled={fileOps.isMutating}
+          onClick={() => {
+            closeContextMenu();
+            void fileOps.openRepositoryPath(contextEntry.path, 'openWith');
+          }}
+        >
+          <span className="ctx-menu-icon">OW</span>
+          {tr('Oeffnen mit...', 'Open with...')}
+        </button>
+        <div className="ctx-menu-sep" />
+        <button
+          className="ctx-menu-item"
+          disabled={fileOps.isMutating}
+          onClick={() => {
+            closeContextMenu();
             fileOps.stashFile(contextEntry.path, contextSection);
           }}
         >

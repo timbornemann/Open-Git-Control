@@ -33,6 +33,7 @@ export const enum IpcChannel {
   GitInit = 'git:init',
   GitInteractiveRebase = 'git:interactiveRebase',
   GitMarkdownPreviewFile = 'git:markdownPreviewFile',
+  GitOpenRepositoryPath = 'git:openRepositoryPath',
   GitOpenSubmodule = 'git:openSubmodule',
   GitReadRepoFile = 'git:readRepoFile',
   GitRepoFileDataUrl = 'git:repoFileDataUrl',

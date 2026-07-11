@@ -1,15 +1,19 @@
+import { spawn } from 'child_process';
 import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
+import * as path from 'path';
 import type { GitService, RepositoryFileSource } from '../../../GitService';
 import { resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../../../git/RepositoryPathSafety';
-import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
+import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
+  readStoredRepoPaths?: () => string[];
 };
 
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
+const REPOSITORY_PATH_OPEN_ACTIONS = new Set(['reveal', 'open', 'openWith']);
 
 // Never trim a repository-relative path: leading/trailing whitespace is a
 // significant part of a Git filename. Only reject an entirely empty value.
@@ -23,7 +27,36 @@ const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => 
   return source as RepositoryFileSource;
 };
 
-export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersDeps): void {
+const findExistingParentPath = (targetPath: string): string => {
+  let currentPath = targetPath;
+  while (!fs.existsSync(currentPath)) {
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) {
+      throw new Error('No existing parent directory was found.');
+    }
+    currentPath = parentPath;
+  }
+  return currentPath;
+};
+
+const openWithSystemChooser = async (targetPath: string): Promise<void> => {
+  if (process.platform !== 'win32') {
+    const openError = await shell.openPath(targetPath);
+    if (openError) throw new Error(openError);
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('rundll32.exe', ['shell32.dll,OpenAs_RunDLL', targetPath], { detached: true, stdio: 'ignore', windowsHide: true });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
+};
+
+export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () => [] }: RegisterGitFileHandlersDeps): void {
   ipcMain.handle(IpcChannel.GitReadRepoFile, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {
       const repositoryFilePath = asRepositoryFilePath(filePath);
@@ -98,6 +131,65 @@ export function registerGitFileHandlers({ gitService }: RegisterGitFileHandlersD
       await gitService.files.writeRepoFileAtPath(repoPath, repositoryFilePath, typeof content === 'string' ? content : String(content ?? ''));
       return { success: true };
     } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle(IpcChannel.GitOpenRepositoryPath, async (_event: unknown, params: { path?: unknown; action?: unknown; repoPath?: unknown } = {}) => {
+    try {
+      const action = String(params.action || '');
+      if (!REPOSITORY_PATH_OPEN_ACTIONS.has(action)) {
+        throw new Error('Invalid repository path action.');
+      }
+
+      const relativePath = asRepositoryFilePath(params.path);
+      let repoPath: string;
+      try {
+        repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+      } catch (authorizationError: unknown) {
+        // Opening an already registered repository folder must not switch
+        // the active workspace. Limit that inactive-repository exception to
+        // the repository root; individual files remain active-repository
+        // only and therefore cannot become a general filesystem capability.
+        const requestedRepoPath = String(params.repoPath || '').trim();
+        const storedRepoPath =
+          action === 'open' && relativePath.length === 0 && requestedRepoPath
+            ? readStoredRepoPaths().find((storedPath) => repositoryPathKey(storedPath) === repositoryPathKey(requestedRepoPath))
+            : undefined;
+        if (!storedRepoPath) throw authorizationError;
+        repoPath = storedRepoPath;
+      }
+      const targetPath = relativePath ? resolveExistingRepositoryPath(repoPath, relativePath, 'Repository path') : fs.realpathSync(repoPath);
+
+      if (action === 'reveal') {
+        shell.showItemInFolder(targetPath);
+        return { success: true };
+      }
+
+      if (action === 'openWith') {
+        await openWithSystemChooser(targetPath);
+        return { success: true };
+      }
+
+      const openError = await shell.openPath(targetPath);
+      if (openError) throw new Error(openError);
+      return { success: true };
+    } catch (error: unknown) {
+      // A file from historical commit details can legitimately be absent in
+      // the current checkout. Revealing its nearest existing parent still
+      // gives the user useful filesystem context without ever resolving an
+      // arbitrary renderer path outside the active repository.
+      if (String(params.action || '') === 'reveal' && asRepositoryFilePath(params.path)) {
+        try {
+          const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+          const candidatePath = resolveRepositoryPathForCreate(repoPath, asRepositoryFilePath(params.path), 'Repository path');
+          const openError = await shell.openPath(findExistingParentPath(path.dirname(candidatePath)));
+          if (!openError) return { success: true };
+        } catch {
+          // Return the original error below so traversal or authorization
+          // failures are never masked by the fallback.
+        }
+      }
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });

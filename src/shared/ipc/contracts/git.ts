@@ -105,6 +105,19 @@ export type OpenSubmoduleResultDto = {
   error?: string;
 };
 
+export type RepositoryPathOpenActionDto = 'reveal' | 'open' | 'openWith';
+
+export type OpenRepositoryPathParamsDto = {
+  path?: string;
+  action: RepositoryPathOpenActionDto;
+  repoPath?: string;
+};
+
+export type OpenRepositoryPathResultDto = {
+  success: boolean;
+  error?: string;
+};
+
 export interface ElectronGitAPI {
   setRepoPath: (repoPath: string) => Promise<string>;
   clearRepoPath: () => Promise<boolean>;
@@ -149,6 +162,7 @@ export interface ElectronGitAPI {
   getMarkdownPreviewFile: (params: RepositoryFileRequestDto) => Promise<IpcResult<MarkdownPreviewFileDto>>;
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;
   writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
+  openRepositoryPath: (params: OpenRepositoryPathParamsDto) => Promise<OpenRepositoryPathResultDto>;
   openSubmodule: (submodulePath: string, repoPath?: string) => Promise<OpenSubmoduleResultDto>;
   onCloneProgress: (callback: (line: string) => void) => () => void;
   onJobEvent: (callback: (event: GitJobEventDto) => void) => () => void;

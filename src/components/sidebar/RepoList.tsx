@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, FolderGit2, Loader2, Pin, PinOff, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FolderGit2, FolderOpen, Loader2, Pin, PinOff, Search, X } from 'lucide-react';
 import type { RepoSortByDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 
 type Props = {
   openRepos: string[];
@@ -19,6 +20,17 @@ type Props = {
   onToggleCollapsed: () => void;
 };
 
+type RepositoryContextMenu = {
+  x: number;
+  y: number;
+  repoPath: string;
+  error: string | null;
+};
+
+const CONTEXT_MENU_MARGIN = 8;
+const CONTEXT_MENU_WIDTH = 220;
+const CONTEXT_MENU_HEIGHT = 170;
+
 export const RepoList: React.FC<Props> = ({
   openRepos,
   isRestoringRepos,
@@ -35,6 +47,7 @@ export const RepoList: React.FC<Props> = ({
   onToggleCollapsed,
 }) => {
   const [query, setQuery] = useState('');
+  const [contextMenu, setContextMenu] = useState<RepositoryContextMenu | null>(null);
   const { t, tr, locale } = useI18n();
   const sortOptions: Array<{ value: RepoSortByDto; label: string }> = [
     { value: 'lastOpenedDesc', label: t('generated.components.sidebar.repolist.last_opened_6ece1ffe') },
@@ -52,6 +65,32 @@ export const RepoList: React.FC<Props> = ({
       return name.includes(normalized) || repoPath.toLowerCase().includes(normalized);
     });
   }, [openRepos, query]);
+
+  const openRepositoryFolder = async () => {
+    if (!contextMenu || !gitClient.isAvailable()) return;
+    const menuAtStart = contextMenu;
+    try {
+      const result = await gitClient.openRepositoryPath({ action: 'open', repoPath: menuAtStart.repoPath });
+      if (result.success) {
+        setContextMenu(null);
+        return;
+      }
+      setContextMenu((current) =>
+        current?.repoPath === menuAtStart.repoPath
+          ? { ...current, error: result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.') }
+          : current,
+      );
+    } catch (openError: unknown) {
+      setContextMenu((current) =>
+        current?.repoPath === menuAtStart.repoPath
+          ? {
+              ...current,
+              error: openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'),
+            }
+          : current,
+      );
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -148,6 +187,16 @@ export const RepoList: React.FC<Props> = ({
                   key={repoPath}
                   className="repo-list-item"
                   onClick={() => onSwitchRepo(repoPath)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setContextMenu({
+                      x: Math.max(CONTEXT_MENU_MARGIN, Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN)),
+                      y: Math.max(CONTEXT_MENU_MARGIN, Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_MARGIN)),
+                      repoPath,
+                      error: null,
+                    });
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -263,6 +312,44 @@ export const RepoList: React.FC<Props> = ({
             )}
           </div>
         </>
+      )}
+
+      {contextMenu && (
+        <div className="repo-list-context-backdrop" onClick={() => setContextMenu(null)}>
+          <div className="repo-list-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
+            <div className="repo-list-context-header" title={contextMenu.repoPath}>
+              {contextMenu.repoPath}
+            </div>
+            <button className="repo-list-context-action" onClick={() => void openRepositoryFolder()}>
+              <FolderOpen size={14} />
+              {tr('Ordner oeffnen', 'Open folder')}
+            </button>
+            <div className="repo-list-context-separator" />
+            <button
+              className="repo-list-context-action"
+              onClick={() => {
+                onTogglePin(contextMenu.repoPath);
+                setContextMenu(null);
+              }}
+            >
+              {repoMeta[contextMenu.repoPath]?.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+              {repoMeta[contextMenu.repoPath]?.pinned
+                ? t('generated.components.sidebar.repolist.remove_favorite_baff5f08')
+                : t('generated.components.sidebar.repolist.mark_as_favorite_e3ba96ce')}
+            </button>
+            <button
+              className="repo-list-context-action danger"
+              onClick={() => {
+                onCloseRepo(contextMenu.repoPath);
+                setContextMenu(null);
+              }}
+            >
+              <X size={14} />
+              {t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}
+            </button>
+            {contextMenu.error && <div className="repo-list-context-error">{contextMenu.error}</div>}
+          </div>
+        </div>
       )}
     </div>
   );

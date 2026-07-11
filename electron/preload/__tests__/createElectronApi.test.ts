@@ -123,6 +123,19 @@ describe('createElectronApi', () => {
     );
   });
 
+  it('pins repository path opening to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.openRepositoryPath({ path: 'src/app.ts', action: 'reveal', repoPath: 'C:/captured-repo' });
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitOpenRepositoryPath, {
+      path: 'src/app.ts',
+      action: 'reveal',
+      repoPath: 'C:/captured-repo',
+    });
+  });
+
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

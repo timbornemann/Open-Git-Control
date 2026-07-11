@@ -46,7 +46,7 @@ export function registerGitHandlers({
   });
 
   registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
-  registerGitFileHandlers({ gitService });
+  registerGitFileHandlers({ gitService, readStoredRepoPaths });
   registerGitOperationStateHandler({ gitService });
 
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {

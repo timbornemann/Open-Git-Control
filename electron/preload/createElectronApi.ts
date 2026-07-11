@@ -198,6 +198,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'write', IpcChannel.GitWriteRepoFile, filePath, content, repoPath)
         : invokeGitOperation('write', IpcChannel.GitWriteRepoFile, filePath, content),
+    openRepositoryPath: (params: { path?: string; action: 'reveal' | 'open' | 'openWith'; repoPath?: string }) =>
+      params.repoPath
+        ? invokeGitOperationForRepo(params.repoPath, 'open path', IpcChannel.GitOpenRepositoryPath, params)
+        : invokeGitOperation('open path', IpcChannel.GitOpenRepositoryPath, params),
     openSubmodule: (submodulePath: string, repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'submodule', IpcChannel.GitOpenSubmodule, submodulePath, repoPath)
@@ -353,6 +357,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getMarkdownPreviewFile: flatApi.getMarkdownPreviewFile,
       getRepoFileDataUrl: flatApi.getRepoFileDataUrl,
       writeRepoFile: flatApi.writeRepoFile,
+      openRepositoryPath: flatApi.openRepositoryPath,
       openSubmodule: flatApi.openSubmodule,
       onCloneProgress: flatApi.onCloneProgress,
       onJobEvent: flatApi.onJobEvent,

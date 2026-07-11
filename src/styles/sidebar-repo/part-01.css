@@ -36,6 +36,7 @@
 }
 
 .repo-cockpit-path {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -43,6 +44,33 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.68rem;
   color: var(--text-secondary);
+}
+
+.repo-cockpit-path-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.repo-cockpit-path-open {
+  flex: 0 0 auto;
+  padding: 3px;
+  color: var(--text-secondary);
+}
+
+.repo-cockpit-path-open:hover,
+.repo-cockpit-path-open:focus-visible {
+  color: var(--text-primary);
+}
+
+.repo-cockpit-path-error,
+.repo-list-context-error {
+  padding: 6px 10px;
+  color: var(--status-danger);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .repo-card {

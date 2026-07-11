@@ -6,6 +6,7 @@ import type { DiffRequest } from '@/types/diff';
 import type { ToastMessage } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import type { RepositoryPathOpenActionDto } from '@/shared/ipc/contracts/git';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { EMPTY_DIFF_STATS, basename, parseConflictEntries, parseNumstatStats } from './utils';
 import type { ConfirmDialogState, DiffStats, FileSection, GitStatusWithConflicts, InputDialogState, StagingContextMenuState } from './types';
@@ -360,6 +361,30 @@ export const useFileOperations = ({
     setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
   }, []);
 
+  const openRepositoryPath = useCallback(
+    async (filePath: string, action: RepositoryPathOpenActionDto) => {
+      if (!repoPath || !gitClient.isAvailable()) return;
+      try {
+        const result = await gitClient.openRepositoryPath({ path: filePath, action, repoPath });
+        if (!result.success) {
+          setToast({
+            msg: result.error || tr('Der Pfad konnte nicht im Dateisystem geoeffnet werden.', 'The path could not be opened in the file system.'),
+            isError: true,
+          });
+        }
+      } catch (error: unknown) {
+        setToast({
+          msg:
+            error instanceof Error
+              ? error.message
+              : tr('Der Pfad konnte nicht im Dateisystem geoeffnet werden.', 'The path could not be opened in the file system.'),
+          isError: true,
+        });
+      }
+    },
+    [repoPath, setToast, tr],
+  );
+
   const addIgnoreRule = useIgnoreRule({ repoPath, setToast, tr, t, onRepoChanged, refresh });
 
   const stageFile = useCallback(
@@ -560,6 +585,7 @@ export const useFileOperations = ({
     contextMenu,
     setContextMenu,
     openFileContextMenu,
+    openRepositoryPath,
     addIgnoreRule,
     stageFile,
     unstageFile,

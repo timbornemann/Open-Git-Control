@@ -1,5 +1,5 @@
 import React from 'react';
-import { Github } from 'lucide-react';
+import { FolderOpen, Github } from 'lucide-react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { BranchPanel } from '@/components/sidebar/BranchPanel';
 import { TagPanel } from '@/components/sidebar/TagPanel';
@@ -8,6 +8,7 @@ import { SubmodulePanel } from '@/components/sidebar/SubmodulePanel';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from '@/components/sidebar/RepoCard';
 import { RepoGithubActionsContent } from './RepoGithubActionsContent';
 import { useI18n } from '@/i18n';
+import { gitClient } from '@/services/gitClient';
 
 type RepoSidebarContentProps = Pick<
   AppSidebarProps,
@@ -105,8 +106,26 @@ type RepoSidebarContentProps = Pick<
 };
 
 export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const [repoPathError, setRepoPathError] = React.useState<string | null>(null);
   const shouldShowGithubConnect = props.hasRemoteOrigin === false || props.forceGithubRepoCreationPrompt;
+
+  const openActiveRepositoryFolder = async () => {
+    if (!props.activeRepo || !gitClient.isAvailable()) return;
+    setRepoPathError(null);
+    try {
+      const result = await gitClient.openRepositoryPath({ action: 'open', repoPath: props.activeRepo });
+      if (!result.success) {
+        setRepoPathError(result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'));
+      }
+    } catch (openError: unknown) {
+      setRepoPathError(openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'));
+    }
+  };
+
+  React.useEffect(() => {
+    setRepoPathError(null);
+  }, [props.activeRepo]);
 
   if (!props.activeRepo) {
     return (
@@ -130,9 +149,20 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         <div className="repo-cockpit-title" title={repoName}>
           {repoName}
         </div>
-        <div className="repo-cockpit-path" title={props.activeRepo}>
-          {props.activeRepo}
+        <div className="repo-cockpit-path-row">
+          <div className="repo-cockpit-path" title={props.activeRepo}>
+            {props.activeRepo}
+          </div>
+          <button
+            className="icon-btn repo-cockpit-path-open"
+            onClick={() => void openActiveRepositoryFolder()}
+            title={tr('Projektordner im Dateimanager oeffnen', 'Open project folder in file manager')}
+            aria-label={tr('Projektordner oeffnen', 'Open project folder')}
+          >
+            <FolderOpen size={14} />
+          </button>
         </div>
+        {repoPathError && <div className="repo-cockpit-path-error">{repoPathError}</div>}
       </div>
 
       <RemotePanel

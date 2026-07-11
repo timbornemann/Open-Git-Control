@@ -1,0 +1,63 @@
+.repo-list-context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+}
+
+.repo-list-context-menu {
+  position: fixed;
+  z-index: 2001;
+  min-width: 220px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+.repo-list-context-header {
+  margin-bottom: 2px;
+  padding: 6px 12px 4px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-list-context-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.repo-list-context-action:hover,
+.repo-list-context-action:focus-visible {
+  background: var(--bg-hover);
+}
+
+.repo-list-context-action.danger {
+  color: var(--status-danger);
+}
+
+.repo-list-context-action.danger:hover,
+.repo-list-context-action.danger:focus-visible {
+  background: var(--status-danger-soft);
+}
+
+.repo-list-context-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-color);
+}
