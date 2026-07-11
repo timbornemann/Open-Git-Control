@@ -67,6 +67,12 @@ export class GitErrorFormatter {
         /needed a single revision|unknown revision or path not in the working tree|ambiguous argument .*unknown revision/i.test(errorText)
       );
     }
+    if (primary === 'config' && (args.includes('--get') || args.includes('--get-all'))) {
+      // Git uses exit code 1 without stderr when an optional configuration key
+      // does not exist. Several callers intentionally probe these values before
+      // falling back to Git's defaults.
+      return !gitOutput && /^command failed:\s*git\s+config\s+--get(?:-all)?\s+\S+/i.test(errorText);
+    }
     if (primary === 'submodule' && secondary === 'status') {
       return /no submodule mapping found in \.gitmodules for path/i.test(errorText);
     }
