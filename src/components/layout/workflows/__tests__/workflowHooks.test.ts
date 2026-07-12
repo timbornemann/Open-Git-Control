@@ -256,6 +256,46 @@ describe('workflow hooks', () => {
     hook.unmount();
   });
 
+  it('shows an actionable in-app dialog for a GitHub Push Protection rejection', async () => {
+    const githubPushProtectionError = `remote: error: GH013: Repository rule violations found
+remote: - GITHUB PUSH PROTECTION
+remote:       —— OpenRouter API Key ———————————
+remote:          - commit: e9ca6793dddfbc8cd8b38cf228ef8ef2a24a6604
+remote:            path: tests/secret.test.ts:35
+remote: https://github.com/acme/repo/security/secret-scanning/unblock-secret/token`;
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: false, error: githubPushProtectionError });
+    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
+    const openExternalUrl = vi.spyOn(appClient, 'openExternalUrl').mockResolvedValue(undefined as never);
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const hook = renderHook(() =>
+      useGitCommandWorkflow({
+        workspace: { activeRepo: 'C:/repo', addOpenRepo: vi.fn(), setActiveRepo: vi.fn(), setActiveTab: vi.fn() },
+        settings: { confirmDangerousOps: false, defaultBranch: 'main', language: 'en', secretScanBeforePushEnabled: false, secretScanAllowlist: '' },
+        onUpdateSettings: vi.fn(),
+        triggerRefresh: vi.fn(),
+        setConfirmDialog,
+        setGitActionToast,
+        setConflictResolverPath: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await hook.current.runGitCommand(['push'], 'pushed');
+    });
+
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog).toEqual(expect.objectContaining({ title: 'GitHub blocked this push because of a secret', confirmLabel: 'Open GitHub unblock page' }));
+    expect(dialog.contextItems).toEqual(expect.arrayContaining([expect.objectContaining({ value: 'OpenRouter API Key' })]));
+    expect(setGitActionToast).not.toHaveBeenCalledWith(expect.objectContaining({ msg: githubPushProtectionError }));
+    await act(async () => {
+      await dialog.onConfirm();
+    });
+    expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/acme/repo/security/secret-scanning/unblock-secret/token');
+    hook.unmount();
+  });
+
   it('oeffnet bei pull-blocked-by-local-changes einen Autostash-Dialog', () => {
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();

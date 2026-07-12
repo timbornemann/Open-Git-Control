@@ -3,8 +3,10 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { appClient } from '@/services/appClient';
 import { isMergeInProgressError, isCherryPickInProgressError, resolveConflictPathAfterGitFailure } from '@/utils/gitParsing';
 import { isMissingUpstreamPushError, isNoLocalCommitPushError } from '@/utils/gitPushRecovery';
+import { parseGitHubPushProtectionFailure } from '@/utils/githubPushProtection';
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
@@ -148,6 +150,8 @@ export const useGitCommandWorkflow = ({
         return fallbackSuccess;
       };
 
+      // This central recovery path deliberately routes every known Git failure.
+      // eslint-disable-next-line complexity
       const recoverFromGitCommandFailure = async (failureMessage: unknown, fallbackErrorMessage?: string): Promise<boolean> => {
         const errorMessage =
           typeof failureMessage === 'string' && failureMessage.trim()
@@ -204,6 +208,59 @@ export const useGitCommandWorkflow = ({
             },
             true,
           );
+        }
+
+        if (command === 'push') {
+          const pushProtection = parseGitHubPushProtectionFailure(errorMessage);
+          if (pushProtection) {
+            const violation = pushProtection.violations[0];
+            const unblockUrl = violation?.unblockUrl;
+            const helpUrl = pushProtection.documentationUrl || pushProtection.securitySettingsUrl;
+            const openUrl = async (url: string, fallbackMessage: string) => {
+              try {
+                if (!appClient.isAvailable()) throw new Error();
+                await appClient.openExternalUrl(url);
+              } catch {
+                setGitActionToast({ msg: fallbackMessage, isError: true });
+              }
+            };
+            setConfirmDialog({
+              variant: 'danger',
+              title: tr('GitHub hat den Push wegen eines Secrets blockiert', 'GitHub blocked this push because of a secret'),
+              message: tr(
+                'GitHub Push Protection hat ein moegliches Secret in der Push-Historie erkannt. Entferne ein echtes Secret aus dem Commit und pushe danach erneut. Nutze das Freigeben nur fuer Testdaten oder einen bestaetigten Fehlalarm.',
+                'GitHub Push Protection found a potential secret in the commits being pushed. Remove a real secret from the commit history and push again. Only unblock a confirmed test value or false positive.',
+              ),
+              contextItems: [
+                ...(violation?.secretType ? [{ label: tr('Erkanntes Secret', 'Detected secret'), value: violation.secretType }] : []),
+                ...(violation?.filePath
+                  ? [{ label: tr('Fundstelle', 'Location'), value: `${violation.filePath}${violation.lineNumber ? `:${violation.lineNumber}` : ''}` }]
+                  : []),
+                ...(violation?.commitHash ? [{ label: tr('Commit', 'Commit'), value: violation.commitHash }] : []),
+                ...(pushProtection.violations.length > 1
+                  ? [{ label: tr('Weitere Treffer', 'Additional findings'), value: String(pushProtection.violations.length - 1) }]
+                  : []),
+              ],
+              irreversible: false,
+              consequences: tr(
+                'Der Push wurde nicht ausgefuehrt. Deine lokalen Commits bleiben unveraendert.',
+                'The push was not performed. Your local commits remain unchanged.',
+              ),
+              confirmLabel: unblockUrl ? tr('GitHub-Freigabe oeffnen', 'Open GitHub unblock page') : tr('Schliessen', 'Close'),
+              secondaryActionLabel: helpUrl ? tr('GitHub-Hilfe oeffnen', 'Open GitHub help') : undefined,
+              secondaryActionVariant: 'default',
+              onConfirm: async () => {
+                if (!unblockUrl) return;
+                await openUrl(unblockUrl, tr('Die GitHub-Freigabeseite konnte nicht geoeffnet werden.', 'Could not open the GitHub unblock page.'));
+              },
+              onSecondaryAction: helpUrl
+                ? async () => {
+                    await openUrl(helpUrl, tr('Die GitHub-Hilfe konnte nicht geoeffnet werden.', 'Could not open GitHub help.'));
+                  }
+                : undefined,
+            });
+            return false;
+          }
         }
 
         const missingUpstream = isMissingUpstreamPushError(errorMessage);
@@ -355,6 +412,7 @@ export const useGitCommandWorkflow = ({
       requestInitialCommitConfirmationIfNeeded,
       runGitCommandGuards,
       setConnectError,
+      setConfirmDialog,
       setConflictResolverPath,
       setForceGithubRepoCreationPrompt,
       setGitActionToast,
