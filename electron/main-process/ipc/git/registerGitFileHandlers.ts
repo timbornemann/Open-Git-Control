@@ -85,7 +85,10 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       if (!fs.statSync(directoryPath).isDirectory()) throw new Error('Target path is not a directory.');
       const entries: Array<{ path: string; name: string; kind: 'file' | 'directory'; bytes?: number }> = [];
       for (const item of fs.readdirSync(directoryPath, { withFileTypes: true })) {
-        if (item.name.startsWith('.')) continue;
+        // Project dotfiles (for example .gitignore and .github) are ordinary
+        // working-tree entries. Git metadata remains inaccessible through the
+        // path-safety boundary and is not useful to expose in this browser.
+        if (item.name.toLowerCase() === '.git') continue;
         const childRelativePath = parentPath ? `${parentPath}/${item.name}` : item.name;
         const childAbsolutePath = path.join(directoryPath, item.name);
         if (item.isDirectory()) {

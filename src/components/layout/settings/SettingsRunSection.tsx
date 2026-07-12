@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useRepositoryContext, useWorkflowContext } from '@/contexts/AppStateContext';
@@ -48,35 +48,71 @@ export const SettingsRunSection: React.FC = () => {
   const { tr } = useI18n();
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [config, setConfig] = useState<RepositoryRunConfigDto | null>(null);
+  const [configRepositoryPath, setConfigRepositoryPath] = useState<string | null>(null);
   const [configPath, setConfigPath] = useState('');
   const [templates, setTemplates] = useState<RepositoryRunTemplateDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const repositories = useMemo(() => Array.from(new Set(openRepos)), [openRepos]);
+  const selectedRepoRef = useRef(selectedRepo);
+  const loadRequestIdRef = useRef(0);
+  const saveRequestIdRef = useRef(0);
+  selectedRepoRef.current = selectedRepo;
 
   useEffect(() => {
     if (selectedRepo || !activeRepo) return;
     setSelectedRepo(activeRepo);
   }, [activeRepo, selectedRepo]);
 
-  const load = async (repoPath = selectedRepo) => {
-    if (!repoPath || !repositoryRunClient.isAvailable()) return;
-    setError(null);
-    const result = await repositoryRunClient.getConfig(repoPath);
-    if (!result.success) {
-      setError(result.error);
-      return;
-    }
-    setConfigPath(result.data.configPath);
-    setTemplates(result.data.templates);
-    setConfig(result.data.config);
-    setError(result.data.error || null);
-  };
-
   useEffect(() => {
-    void load();
-    // The chosen repository is the sole source of the editor draft.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const repoPath = selectedRepo;
+    const requestId = ++loadRequestIdRef.current;
+    let cancelled = false;
+
+    // A configuration draft must never be reused for a newly selected
+    // repository while its own configuration is still loading.
+    setConfig(null);
+    setConfigRepositoryPath(null);
+    setConfigPath('');
+    setTemplates([]);
+    setError(null);
+    setSaving(false);
+
+    if (!repoPath || !repositoryRunClient.isAvailable()) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    void (async () => {
+      try {
+        const result = await repositoryRunClient.getConfig(repoPath);
+        if (cancelled || loadRequestIdRef.current !== requestId || selectedRepoRef.current !== repoPath) return;
+
+        setLoading(false);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+
+        setConfigPath(result.data.configPath);
+        setTemplates(result.data.templates);
+        setConfig(result.data.config);
+        setConfigRepositoryPath(repoPath);
+        setError(result.data.error || null);
+      } catch (loadError: unknown) {
+        if (cancelled || loadRequestIdRef.current !== requestId || selectedRepoRef.current !== repoPath) return;
+        setLoading(false);
+        setError(loadError instanceof Error ? loadError.message : String(loadError));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedRepo]);
 
   const updateSteps = (action: RepositoryRunActionId, update: (steps: RepositoryRunStepDto[]) => RepositoryRunStepDto[]) => {
@@ -87,17 +123,29 @@ export const SettingsRunSection: React.FC = () => {
   };
 
   const save = async () => {
-    if (!selectedRepo || !config) return;
+    if (!selectedRepo || !config || configRepositoryPath !== selectedRepo || loading) return;
+    const repoPath = selectedRepo;
+    const configToSave = config;
+    const requestId = ++saveRequestIdRef.current;
     setSaving(true);
-    const result = await repositoryRunClient.saveConfig(selectedRepo, config);
-    setSaving(false);
-    if (!result.success) {
-      setError(result.error);
-      return;
+    try {
+      const result = await repositoryRunClient.saveConfig(repoPath, configToSave);
+      if (saveRequestIdRef.current === requestId && selectedRepoRef.current === repoPath) {
+        setSaving(false);
+        if (!result.success) {
+          setError(result.error);
+          return;
+        }
+        setConfig(result.data);
+        setConfigRepositoryPath(repoPath);
+        setError(null);
+      }
+      if (result.success) await workflow.onRefreshRunConfig();
+    } catch (saveError: unknown) {
+      if (saveRequestIdRef.current !== requestId || selectedRepoRef.current !== repoPath) return;
+      setSaving(false);
+      setError(saveError instanceof Error ? saveError.message : String(saveError));
     }
-    setConfig(result.data);
-    setError(null);
-    await workflow.onRefreshRunConfig();
   };
 
   if (!repositories.length)
@@ -115,7 +163,7 @@ export const SettingsRunSection: React.FC = () => {
           <h3>{tr('Run-Konfiguration', 'Run configuration')}</h3>
           <p className="settings-hint">{tr('Versionierte Befehle in .Open-Git-Control/run.json', 'Versioned commands in .Open-Git-Control/run.json')}</p>
         </div>
-        <button className="staging-tool-btn" onClick={() => void save()} disabled={!config || saving}>
+        <button className="staging-tool-btn" onClick={() => void save()} disabled={!config || configRepositoryPath !== selectedRepo || loading || saving}>
           <Save size={13} /> {saving ? tr('Speichern…', 'Saving…') : tr('Speichern', 'Save')}
         </button>
       </div>
@@ -131,11 +179,12 @@ export const SettingsRunSection: React.FC = () => {
       </label>
       {configPath && <p className="settings-hint repository-run-settings__path">{configPath}</p>}
       {error && <div className="settings-danger repository-run-settings__error">{error}</div>}
-      {!config && (
+      {!config && !loading && (
         <button
           className="staging-tool-btn"
           onClick={() => {
             setConfig(createEmptyRepositoryRunConfig());
+            setConfigRepositoryPath(selectedRepo);
             setError(null);
           }}
         >

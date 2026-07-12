@@ -46,12 +46,22 @@ describe('registerGitFileHandlers repository path opening', () => {
   it('lists only the requested working-directory level', async () => {
     fs.mkdirSync(path.join(repoPath, 'src', 'nested'));
     fs.writeFileSync(path.join(repoPath, 'src', 'nested', 'deep.ts'), 'export {};\n');
-    fs.writeFileSync(path.join(repoPath, '.hidden'), 'ignored\n');
+    fs.writeFileSync(path.join(repoPath, '.hidden'), 'visible\n');
+    fs.mkdirSync(path.join(repoPath, '.github'));
+    fs.mkdirSync(path.join(repoPath, '.git'));
 
     const rootResult = await handlers.get(IpcChannel.GitListWorkingDirectory)!({}, repoPath, '');
     const sourceResult = await handlers.get(IpcChannel.GitListWorkingDirectory)!({}, repoPath, 'src');
 
-    expect(rootResult).toEqual({ success: true, data: [{ path: 'src', name: 'src', kind: 'directory' }] });
+    expect(rootResult).toEqual({
+      success: true,
+      data: expect.arrayContaining([
+        { path: '.github', name: '.github', kind: 'directory' },
+        { path: '.hidden', name: '.hidden', kind: 'file', bytes: expect.any(Number) },
+        { path: 'src', name: 'src', kind: 'directory' },
+      ]),
+    });
+    expect(rootResult.data).not.toContainEqual(expect.objectContaining({ name: '.git' }));
     expect(sourceResult).toEqual({
       success: true,
       data: expect.arrayContaining([

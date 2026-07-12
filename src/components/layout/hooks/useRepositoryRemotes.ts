@@ -42,6 +42,7 @@ const parseRemotes = (rawRemoteOutput: string): { hasOrigin: boolean; remotes: R
 export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, runGitCommand, setConfirmDialog, setInputDialog }: Params) => {
   const [remotes, setRemotes] = useState<RepositoryRemote[]>([]);
   const [hasRemoteOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
+  const [remotesRepositoryPath, setRemotesRepositoryPath] = useState<string | null>(null);
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef(activeRepo);
 
@@ -49,6 +50,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     activeRepoRef.current = activeRepo;
     setHasRemoteOrigin(null);
     setRemotes([]);
+    setRemotesRepositoryPath(null);
   }, [activeRepo]);
 
   const runRemoteMutation = useCallback(
@@ -65,6 +67,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     if (!activeRepo || !gitClient.isAvailable()) {
       setHasRemoteOrigin(null);
       setRemotes([]);
+      setRemotesRepositoryPath(null);
       return;
     }
 
@@ -79,12 +82,14 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
         if (!rawRemoteOutput.trim()) {
           setHasRemoteOrigin(false);
           setRemotes([]);
+          setRemotesRepositoryPath(activeRepo);
           return;
         }
 
         const parsed = parseRemotes(rawRemoteOutput);
         setHasRemoteOrigin(parsed.hasOrigin);
         setRemotes(parsed.remotes);
+        setRemotesRepositoryPath(activeRepo);
       } catch {
         // Keep the last known remote configuration during transient refresh failures.
       }
@@ -168,7 +173,9 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
 
   // Tri-state: null while remotes have not been loaded yet, then whether the
   // repository has any remote at all (regardless of its name).
-  const hasAnyRemote = hasRemoteOrigin === null ? null : remotes.length > 0;
+  // Do not let remote data from a previous repository enable an automatic
+  // fetch while the newly selected repository is still being inspected.
+  const hasAnyRemote = remotesRepositoryPath === activeRepo && hasRemoteOrigin !== null ? remotes.length > 0 : null;
 
   return {
     remotes,

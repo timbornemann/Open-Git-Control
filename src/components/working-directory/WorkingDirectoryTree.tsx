@@ -36,16 +36,17 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
     async (parentPath = ''): Promise<WorkingDirectoryEntryDto[]> => {
       if (!repoPath || !gitClient.isAvailable()) return [];
       const repoAtStart = repoPath;
-      loadedDirectoryPathsRef.current.add(parentPath);
       setLoadingDirectories((current) => new Set(current).add(parentPath));
       try {
         const result = await gitClient.listWorkingDirectory(repoAtStart, parentPath);
         if (activeRepoPathRef.current !== repoAtStart) return [];
         if (!result.success) {
+          loadedDirectoryPathsRef.current.delete(parentPath);
           setToast({ msg: result.error || 'Could not load working directory.', isError: true });
           return [];
         }
         const entries = result.data || [];
+        loadedDirectoryPathsRef.current.add(parentPath);
         setEntriesByParent((current) => ({ ...current, [parentPath]: entries }));
         return entries;
       } finally {
