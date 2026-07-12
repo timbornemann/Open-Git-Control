@@ -64,6 +64,17 @@ const MainViewComponent: React.FC = () => {
 
   const { isInspectorPaneVisible, toggleInspectorPane, revealInspectorPane } = useInspectorPaneVisibility();
 
+  // Owned here rather than inside MainInspectorPane because that pane unmounts
+  // whenever a non-inspector view (planner, settings, release) takes over. Keeping
+  // the directory mode and expanded folders at this always-mounted level lets them
+  // survive those round-trips instead of resetting to defaults on every return.
+  const [directoryMode, setDirectoryMode] = React.useState<'staging' | 'tree'>('staging');
+  const [expandedDirectoryPaths, setExpandedDirectoryPaths] = React.useState<Set<string>>(() => new Set(['']));
+  // Folder expansion is per-repository, so drop the previous repo's paths on switch.
+  React.useEffect(() => {
+    setExpandedDirectoryPaths(new Set(['']));
+  }, [activeRepo]);
+
   const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
     activeRepo,
     setActiveTab,
@@ -144,6 +155,10 @@ const MainViewComponent: React.FC = () => {
             handleSelectCommitFromWorkingTree={handleSelectCommitFromWorkingTree}
             handleCommitBack={handleCommitBack}
             closeInspector={closeInspector}
+            directoryMode={directoryMode}
+            onDirectoryModeChange={setDirectoryMode}
+            expandedDirectoryPaths={expandedDirectoryPaths}
+            onExpandedDirectoryPathsChange={setExpandedDirectoryPaths}
           />
         )}
       </div>

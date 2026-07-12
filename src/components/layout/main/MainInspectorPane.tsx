@@ -29,6 +29,10 @@ type MainInspectorPaneProps = {
   handleCommitBack: () => void;
   closeInspector: () => void;
   onOpenWorkingDirectoryFile: (path: string) => void;
+  directoryMode: 'staging' | 'tree';
+  onDirectoryModeChange: (mode: 'staging' | 'tree') => void;
+  expandedDirectoryPaths: Set<string>;
+  onExpandedDirectoryPathsChange: React.Dispatch<React.SetStateAction<Set<string>>>;
 };
 
 export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
@@ -46,20 +50,15 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   handleCommitBack,
   closeInspector,
   onOpenWorkingDirectoryFile,
+  directoryMode,
+  onDirectoryModeChange,
+  expandedDirectoryPaths,
+  onExpandedDirectoryPathsChange,
 }) => {
   const repository = useRepositoryContext();
   const settingsState = useSettingsContext();
   const { t } = useI18n();
-  const [directoryMode, setDirectoryMode] = React.useState<'staging' | 'tree'>('staging');
-  const [expandedDirectoryPaths, setExpandedDirectoryPaths] = React.useState<Set<string>>(() => new Set(['']));
   const isDirectoryMode = !isCommitInspectorOpen && !workingTreeSelection;
-
-  // Folder expansion is per-repository. The tree can unmount and remount while
-  // this state survives here, so drop the previous repo's expanded paths when
-  // the active repo changes to avoid carrying stale open-folder markers over.
-  React.useEffect(() => {
-    setExpandedDirectoryPaths(new Set(['']));
-  }, [repository.activeRepo]);
 
   return (
     <>
@@ -80,14 +79,14 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
             <div className="directory-mode-switch" role="group" aria-label="Inspector view">
               <button
                 className={`directory-mode-switch__option${directoryMode === 'staging' ? ' is-active' : ''}`}
-                onClick={() => setDirectoryMode('staging')}
+                onClick={() => onDirectoryModeChange('staging')}
                 aria-pressed={directoryMode === 'staging'}
               >
                 Staging Area
               </button>
               <button
                 className={`directory-mode-switch__option${directoryMode === 'tree' ? ' is-active' : ''}`}
-                onClick={() => setDirectoryMode('tree')}
+                onClick={() => onDirectoryModeChange('tree')}
                 aria-pressed={directoryMode === 'tree'}
               >
                 Working Directory
@@ -140,7 +139,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
                   repoPath={repository.activeRepo}
                   refreshTrigger={repository.refreshTrigger}
                   expandedPaths={expandedDirectoryPaths}
-                  onExpandedPathsChange={setExpandedDirectoryPaths}
+                  onExpandedPathsChange={onExpandedDirectoryPathsChange}
                   onOpenFile={onOpenWorkingDirectoryFile}
                   onRepoChanged={repository.triggerRefresh}
                 />

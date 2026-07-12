@@ -118,13 +118,6 @@ const languageDefinitionForPath = (path: string): LanguageDefinition | null => L
 
 export const getLanguageLabelForPath = (path: string): string | null => languageDefinitionForPath(path)?.label || null;
 
-// CodeMirror's default configuration splits on \n, \r\n and \r and rejoins with
-// \n, which silently converts CRLF files (the norm on Windows) to LF. That made
-// the editor's value differ from the file on disk and flagged untouched files as
-// having unsaved changes. Pinning the separator to the file's own convention lets
-// the document round-trip byte-for-byte, so an unedited file stays non-dirty.
-export const detectLineSeparator = (value: string): string => (value.includes('\r\n') ? '\r\n' : value.includes('\r') ? '\r' : '\n');
-
 export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -141,7 +134,6 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
       state: EditorState.create({
         doc: initialValueRef.current,
         extensions: [
-          EditorState.lineSeparator.of(detectLineSeparator(initialValueRef.current)),
           basicSetup,
           editorTheme,
           syntaxHighlighting(editorHighlightStyle),

@@ -4,6 +4,7 @@ import { gitClient } from '@/services/gitClient';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { isHtmlFilePath } from '@/utils/htmlPreview';
 import { isMarkdownFilePath } from '@/utils/markdownPreview';
+import { applyLineEnding, detectLineEnding, normalizeToLf, type LineEnding } from '@/utils/lineEndings';
 import { BlamePanel } from '@/components/file-details/BlamePanel';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '@/components/file-details/blamePagination';
@@ -42,6 +43,9 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const { setConfirmDialog } = useUIContext();
   const requestCloseRef = useRef<() => void>(() => onClose());
   const activeFileKeyRef = useRef('');
+  // The editor normalizes to LF; remember the file's real ending so we can write
+  // it back unchanged instead of rewriting the whole file with LF endings.
+  const lineEndingRef = useRef<LineEnding>('\n');
   const [preview, setPreview] = useState<any>(null);
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
@@ -83,8 +87,10 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       }
       setPreview(result.data);
       if (result.data.kind === 'text') {
-        setText(result.data.text);
-        setSavedText(result.data.text);
+        lineEndingRef.current = detectLineEnding(result.data.text);
+        const normalized = normalizeToLf(result.data.text);
+        setText(normalized);
+        setSavedText(normalized);
       }
       setIsLoading(false);
     });
@@ -118,7 +124,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     const repoAtSave = repoPath;
     const textAtSave = text;
     const fileKeyAtSave = `${repoAtSave}\0${pathAtSave}`;
-    const result = await gitClient.writeRepoFile(pathAtSave, textAtSave, repoAtSave);
+    const result = await gitClient.writeRepoFile(pathAtSave, applyLineEnding(textAtSave, lineEndingRef.current), repoAtSave);
     if (result.success) {
       if (activeFileKeyRef.current === fileKeyAtSave) {
         setSavedText(textAtSave);
