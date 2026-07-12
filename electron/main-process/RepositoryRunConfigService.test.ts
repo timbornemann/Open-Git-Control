@@ -46,6 +46,22 @@ describe('RepositoryRunConfigService', () => {
     expect(JSON.parse(fs.readFileSync(path.join(repoPath, '.Open-Git-Control', 'run.json'), 'utf8'))).toEqual(config);
   });
 
+  it('rejects a symlinked run-configuration directory', () => {
+    const repoPath = createRepository();
+    const externalDirectory = createRepository();
+    const configDirectory = path.join(repoPath, '.Open-Git-Control');
+    try {
+      fs.symlinkSync(externalDirectory, configDirectory, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      // Some locked-down Windows environments disallow creating junctions. The
+      // production path is still covered where the platform permits them.
+      return;
+    }
+
+    expect(() => new RepositoryRunConfigService().write(repoPath, createEmptyRepositoryRunConfig())).toThrow('cannot be a symbolic link');
+    expect(fs.existsSync(path.join(externalDirectory, 'run.json'))).toBe(false);
+  });
+
   it('rejects unsupported shells instead of passing an arbitrary executable to the runner', () => {
     const config = createEmptyRepositoryRunConfig();
     config.actions.run.steps.push({

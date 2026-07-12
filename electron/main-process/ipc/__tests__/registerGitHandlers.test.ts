@@ -252,6 +252,34 @@ describe('registerGitHandlers', () => {
     expect(commitWithMessageAtPath).toHaveBeenCalled();
   });
 
+  it('applies the commit secret guard to the generic commit command', async () => {
+    const scanStagedDiffs = vi.fn().mockResolvedValue({
+      scanned: true,
+      strictness: 'medium',
+      findings: [{ filePath: '.env', lineNumber: 1, contextLine: '[REDACTED_SECRET]' }],
+      notes: [],
+      stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
+    });
+    const runCommandAtPath = vi.fn((_repoPath: string, args: string[]) => (args[0] === 'status' ? '# branch.oid abc\0' : 'H 100644 abc 0\t.env\0'));
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      runCommandAtPath,
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanStagedDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    const result = await handlers.get('git:command')!({ sender: { id: 9, send: vi.fn() } }, 'commit', '-m', 'unsafe');
+
+    expect(result).toEqual({ success: false, error: 'Potential secrets were detected. Confirm the in-app dialog before committing.' });
+    expect(runCommandAtPath).not.toHaveBeenCalledWith('C:/repo', ['commit', '-m', 'unsafe']);
+  });
+
   it('allows opting out of the pre-commit scan without changing the push protection setting', async () => {
     const scanStagedDiffs = vi.fn();
     const commitWithMessageAtPath = vi.fn().mockResolvedValue('commit ok');

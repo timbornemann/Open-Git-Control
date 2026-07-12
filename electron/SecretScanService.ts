@@ -362,6 +362,8 @@ export class SecretScanService {
     pushArgs?: string[];
     /** Restricts the scan to the staged diff, for the fast pre-commit check. */
     includePushHistory?: boolean;
+    /** Internal-only Git environment overrides, used for private AI indexes. */
+    envOverrides?: NodeJS.ProcessEnv;
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -467,6 +469,7 @@ export class SecretScanService {
           if (line.startsWith(' ')) currentNewLineNumber += 1;
         },
         options.signal,
+        { redactOutput: false, envOverrides: options.envOverrides },
       );
     };
 
@@ -626,6 +629,7 @@ export class SecretScanService {
     allowlistText: string;
     signal?: AbortSignal;
     onProgress?: (checkedLines: number) => void;
+    envOverrides?: NodeJS.ProcessEnv;
   }): Promise<SecretScanResult> {
     return this.scanPushDiffs({ ...options, includePushHistory: false });
   }

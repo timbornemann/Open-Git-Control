@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Save } from 'lucide-react';
 import { gitClient } from '@/services/gitClient';
 import { useUIContext } from '@/contexts/AppStateContext';
@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void;
   onRepoChanged: () => void;
   onCloseRequestChange: (request: (() => void) | null) => void;
+  onNavigationGuardChange: (guard: ((nextPath: string, proceed: () => void) => void) | null) => void;
 };
 type Tab = 'content' | 'preview' | 'history' | 'blame';
 type FilePreviewKind = 'html' | 'markdown' | 'none';
@@ -36,10 +37,11 @@ const getFilePreviewKind = (preview: { kind?: string } | null, tab: Tab, isMarkd
 
 const supportsFilePreview = (isMarkdown: boolean, isHtml: boolean): boolean => isMarkdown || isHtml;
 
-export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, onClose, onRepoChanged, onCloseRequestChange }) => {
+export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, onClose, onRepoChanged, onCloseRequestChange, onNavigationGuardChange }) => {
   const { t } = useI18n();
   const { setConfirmDialog } = useUIContext();
   const requestCloseRef = useRef<() => void>(() => onClose());
+  const activeFileKeyRef = useRef('');
   const [preview, setPreview] = useState<any>(null);
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
@@ -47,6 +49,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const [history, setHistory] = useState<GitFileHistoryEntryDto[]>([]);
   const [blame, setBlame] = useState<GitFileBlameLineDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const dirty = text !== savedText;
   const isMarkdown = isMarkdownFilePath(path);
   const isHtml = isHtmlFilePath(path);
@@ -62,13 +65,20 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const htmlPreview = useHtmlPreview({ repoPath, path, html: text, isActive: filePreviewKind === 'html' });
   useEffect(() => {
     let active = true;
+    activeFileKeyRef.current = `${repoPath}\0${path}`;
     setPreview(null);
     setError(null);
     setTab('content');
+    setText('');
+    setSavedText('');
+    setHistory([]);
+    setBlame([]);
+    setIsLoading(true);
     void gitClient.getWorkingDirectoryPreview(path, repoPath).then((result) => {
       if (!active) return;
       if (!result.success) {
         setError(result.error || 'Could not open file.');
+        setIsLoading(false);
         return;
       }
       setPreview(result.data);
@@ -76,6 +86,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         setText(result.data.text);
         setSavedText(result.data.text);
       }
+      setIsLoading(false);
     });
     return () => {
       active = false;
@@ -83,36 +94,51 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   }, [path, repoPath]);
   useEffect(() => {
     if (tab !== 'history') return;
-    void gitClient.getFileHistory(path, undefined, 80, repoPath).then((result) => result.success && setHistory(result.data || []));
+    let active = true;
+    void gitClient.getFileHistory(path, undefined, 80, repoPath).then((result) => {
+      if (active && result.success) setHistory(result.data || []);
+    });
+    return () => {
+      active = false;
+    };
   }, [path, repoPath, tab]);
   useEffect(() => {
     if (tab !== 'blame') return;
-    void gitClient
-      .getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT, repoPath, 'unstaged')
-      .then((result) => result.success && setBlame(splitBlamePage(result.data || []).lines));
+    let active = true;
+    void gitClient.getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT, repoPath, 'unstaged').then((result) => {
+      if (active && result.success) setBlame(splitBlamePage(result.data || []).lines);
+    });
+    return () => {
+      active = false;
+    };
   }, [path, repoPath, tab]);
+  const save = useCallback(async (): Promise<boolean> => {
+    if (isLoading || preview?.kind !== 'text') return false;
+    const pathAtSave = path;
+    const repoAtSave = repoPath;
+    const textAtSave = text;
+    const fileKeyAtSave = `${repoAtSave}\0${pathAtSave}`;
+    const result = await gitClient.writeRepoFile(pathAtSave, textAtSave, repoAtSave);
+    if (result.success) {
+      if (activeFileKeyRef.current === fileKeyAtSave) {
+        setSavedText(textAtSave);
+        onRepoChanged();
+      }
+      return true;
+    }
+    if (activeFileKeyRef.current === fileKeyAtSave) setError(result.error || 'Could not save file.');
+    return false;
+  }, [isLoading, onRepoChanged, path, preview?.kind, repoPath, text]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && dirty) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && dirty && !isLoading) {
         event.preventDefault();
-        void gitClient.writeRepoFile(path, text, repoPath).then((result) => {
-          if (result.success) {
-            setSavedText(text);
-            onRepoChanged();
-          } else setError(result.error || 'Could not save file.');
-        });
+        void save();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dirty, onRepoChanged, path, repoPath, text]);
-  const save = async () => {
-    const result = await gitClient.writeRepoFile(path, text, repoPath);
-    if (result.success) {
-      setSavedText(text);
-      onRepoChanged();
-    } else setError(result.error || 'Could not save file.');
-  };
+  }, [dirty, isLoading, save]);
   const requestClose = () => {
     if (!dirty) {
       onClose();
@@ -130,8 +156,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       secondaryActionVariant: 'default',
       onConfirm: onClose,
       onSecondaryAction: async () => {
-        await save();
-        onClose();
+        if (await save()) onClose();
       },
     });
   };
@@ -142,6 +167,30 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     onCloseRequestChange(() => requestCloseRef.current());
     return () => onCloseRequestChange(null);
   }, [onCloseRequestChange]);
+  useEffect(() => {
+    onNavigationGuardChange((nextPath, proceed) => {
+      if (nextPath === path || !dirty) {
+        proceed();
+        return;
+      }
+      setConfirmDialog({
+        variant: 'danger',
+        title: 'Unsaved changes',
+        message: `Save changes to "${path}" before opening "${nextPath}"?`,
+        contextItems: [{ label: 'Current file', value: path }],
+        irreversible: false,
+        consequences: 'Discarding loses your unsaved editor changes.',
+        confirmLabel: 'Discard changes',
+        secondaryActionLabel: 'Save and open',
+        secondaryActionVariant: 'default',
+        onConfirm: proceed,
+        onSecondaryAction: async () => {
+          if (await save()) proceed();
+        },
+      });
+    });
+    return () => onNavigationGuardChange(null);
+  }, [dirty, onNavigationGuardChange, path, save, setConfirmDialog]);
   return (
     <div className="working-file-viewer">
       <div className="working-file-viewer__toolbar">
@@ -162,7 +211,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
             <button className={`working-file-viewer__button${tab === 'blame' ? ' is-active' : ''}`} onClick={() => setTab('blame')}>
               Blame
             </button>
-            <button className="working-file-viewer__button working-file-viewer__button--save" onClick={() => void save()} disabled={!dirty}>
+            <button className="working-file-viewer__button working-file-viewer__button--save" onClick={() => void save()} disabled={!dirty || isLoading}>
               <Save size={15} /> Save
             </button>
           </div>

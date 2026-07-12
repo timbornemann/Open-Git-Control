@@ -210,13 +210,19 @@ export class GitRunner {
     );
   }
 
-  async streamLines(repoPath: string, args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<void> {
+  async streamLines(
+    repoPath: string,
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
+  ): Promise<void> {
     this.assertRepoPathAvailable(repoPath);
     await this.schedule(
       repoPath,
       'interactive',
       args[0] || 'stream',
-      (schedulerSignal) => this.spawnOperations.streamLines(repoPath, args, onLine, schedulerSignal),
+      (schedulerSignal) => this.spawnOperations.streamLines(repoPath, args, onLine, schedulerSignal, options),
       { signal },
     );
   }

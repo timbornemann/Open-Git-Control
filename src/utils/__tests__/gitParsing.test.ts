@@ -290,6 +290,15 @@ describe('porcelain v2 branch parsing', () => {
     });
     expect(countChangedEntriesFromPorcelainV2(output)).toBe(0);
   });
+
+  it('resolves a slash-containing remote name from configured remotes', () => {
+    const output = ['# branch.oid 9f0f7f0', '# branch.head main', '# branch.upstream team/origin/main'].join('\n');
+
+    expect(parseBranchSyncFromPorcelainV2(output, ['origin', 'team/origin'])).toMatchObject({
+      hasUpstream: true,
+      upstreamRemote: 'team/origin',
+    });
+  });
 });
 
 describe('parseFirstConflictPathFromPorcelain', () => {

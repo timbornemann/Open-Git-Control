@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveRepositoryPathForCreate } from '../git/RepositoryPathSafety';
 import { writeTextFileAtomically } from './atomicFile';
 import {
   REPOSITORY_RUN_ACTION_IDS,
@@ -139,7 +140,12 @@ export const detectRepositoryRunTemplates = (repoPath: string): RepositoryRunTem
 
 export class RepositoryRunConfigService {
   getConfigPath(repoPath: string): string {
-    return path.join(path.resolve(repoPath), CONFIG_DIRECTORY, CONFIG_FILE);
+    const physicalRepoPath = fs.realpathSync(repoPath);
+    const configDirectoryPath = path.join(physicalRepoPath, CONFIG_DIRECTORY);
+    if (fs.existsSync(configDirectoryPath) && fs.lstatSync(configDirectoryPath).isSymbolicLink()) {
+      throw new Error('Run configuration directory cannot be a symbolic link.');
+    }
+    return resolveRepositoryPathForCreate(physicalRepoPath, `${CONFIG_DIRECTORY}/${CONFIG_FILE}`, 'Run configuration path');
   }
 
   read(repoPath: string): RepositoryRunConfigStateDto {

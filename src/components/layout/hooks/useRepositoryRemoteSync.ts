@@ -61,7 +61,7 @@ export const useRepositoryRemoteSync = ({
   // single unreachable remote cannot produce an ambiguous multi-remote failure.
   const resolveFetchRemote = useCallback(
     (branchStatusText: string): string | null => {
-      const upstreamRemote = parseBranchSyncFromPorcelainV2(branchStatusText).upstreamRemote;
+      const upstreamRemote = parseBranchSyncFromPorcelainV2(branchStatusText, remoteNames).upstreamRemote;
       if (upstreamRemote) return upstreamRemote;
       if (remoteNames.includes('origin')) return 'origin';
       if (remoteNames.length === 1) return remoteNames[0];

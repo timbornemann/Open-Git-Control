@@ -24,14 +24,14 @@ const waitForCompletion = async (service: RepositoryRunService) => {
   throw new Error('Run did not finish.');
 };
 
-const createChild = (code: number, output = '') => {
+const createChild = (code: number, output = '', appendNewline = true) => {
   const child = new EventEmitter() as any;
   child.pid = 4321;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.kill = vi.fn();
   queueMicrotask(() => {
-    if (output) child.stdout.emit('data', Buffer.from(`${output}\n`));
+    if (output) child.stdout.emit('data', Buffer.from(appendNewline ? `${output}\n` : output));
     child.emit('close', code);
   });
   return child;
@@ -84,5 +84,20 @@ describe('RepositoryRunService', () => {
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(state.status).toBe('failed');
     expect(state.exitCode).toBe(1);
+  });
+
+  it('flushes an unterminated output line before starting the next step', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0, 0]);
+    spawnMock.mockImplementation(() => createChild(0, spawnMock.mock.calls.length === 1 ? 'first' : 'second', false));
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+
+    await service.start(repoPath, 'test');
+    const state = await waitForCompletion(service);
+    const stdout = state.output.filter((line) => line.stream === 'stdout');
+
+    expect(stdout.map((line) => line.text)).toEqual(['first', 'second']);
+    expect(stdout.map((line) => line.stepIndex)).toEqual([0, 1]);
   });
 });

@@ -28,7 +28,7 @@ describe('registerAiHandlers', () => {
       testConnection: vi.fn(),
       listModels: vi.fn(),
       generateCommitMessageFromUserNotes: vi.fn(),
-      runAutoCommit: vi.fn(async (_repoPath: string, _settings: any, _getKey: any, onProgress: any) => {
+      runAutoCommitWithOptions: vi.fn(async (_repoPath: string, _settings: any, _getKey: any, onProgress: any) => {
         onProgress({
           phase: 'grouping',
           message: 'KI gruppiert Dateien...',
@@ -56,6 +56,7 @@ describe('registerAiHandlers', () => {
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
       getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
       getActiveRepoPath: () => '/tmp/repo',
+      secretScanService: { scanStagedDiffs: vi.fn() } as any,
     });
 
     const autoCommitHandler = handlers.get('git:aiAutoCommit');
@@ -89,19 +90,20 @@ describe('registerAiHandlers', () => {
   });
 
   it('rejects an auto-commit request for a renderer-selected non-active repository', async () => {
-    const aiService = { runAutoCommit: vi.fn() } as any;
+    const aiService = { runAutoCommitWithOptions: vi.fn() } as any;
     registerAiHandlers({
       aiService,
       readSettingsWithMigration: vi.fn(() => ({})) as any,
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
       getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
       getActiveRepoPath: () => '/tmp/active-repo',
+      secretScanService: { scanStagedDiffs: vi.fn() } as any,
     });
 
     const result = await handlers.get('git:aiAutoCommit')!({ sender: { send: vi.fn() } }, { repoPath: '/tmp/private-other-repo' });
 
     expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
-    expect(aiService.runAutoCommit).not.toHaveBeenCalled();
+    expect(aiService.runAutoCommitWithOptions).not.toHaveBeenCalled();
   });
 
   it('preserves explicit release-note fallback metadata for the renderer', async () => {
@@ -117,6 +119,7 @@ describe('registerAiHandlers', () => {
       getGeminiApiKeyFromSecureStore: vi.fn(() => ''),
       getOpenAiApiKeyFromSecureStore: vi.fn(() => ''),
       getActiveRepoPath: () => '/tmp/repo',
+      secretScanService: { scanStagedDiffs: vi.fn() } as any,
     });
 
     const result = await handlers.get('ai:generateReleaseNotes')!(

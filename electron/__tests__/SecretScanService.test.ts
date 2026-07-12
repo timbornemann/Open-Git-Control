@@ -131,10 +131,13 @@ describe('SecretScanService', () => {
   it('scans only the staged patch for the fast pre-commit check', async () => {
     const stagedDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
     const runCommandAtPath = vi.fn();
-    const streamCommandLinesAtPath = vi.fn(async (_repoPath: string, args: string[], onLine: (line: string) => void) => {
-      expect(args).toEqual(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0']);
-      stagedDiff.split(/\r?\n/).forEach(onLine);
-    });
+    const streamCommandLinesAtPath = vi.fn(
+      async (_repoPath: string, args: string[], onLine: (line: string) => void, _signal: AbortSignal | undefined, options: any) => {
+        expect(args).toEqual(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0']);
+        expect(options).toMatchObject({ redactOutput: false });
+        stagedDiff.split(/\r?\n/).forEach(onLine);
+      },
+    );
     const service = new SecretScanService({ runCommandAtPath, streamCommandLinesAtPath } as any);
 
     const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });

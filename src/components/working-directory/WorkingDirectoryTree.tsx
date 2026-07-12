@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useToastQueue } from '@/hooks/useToastQueue';
@@ -61,14 +61,21 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
   );
 
   const refreshLoadedDirectories = useCallback(async () => {
-    await Promise.all([...loadedDirectoryPathsRef.current].map((parentPath) => loadDirectory(parentPath)));
+    const paths = new Set(loadedDirectoryPathsRef.current);
+    // The root has no UI affordance to retry itself. Always include it so a
+    // transient initial failure recovers on the next refresh.
+    paths.add('');
+    await Promise.all([...paths].map((parentPath) => loadDirectory(parentPath)));
   }, [loadDirectory]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (initializedRepoPathRef.current !== repoPath) {
       initializedRepoPathRef.current = repoPath;
       loadedDirectoryPathsRef.current.clear();
       setEntriesByParent({});
+      setLoadingDirectories(new Set());
+      setClipboard(null);
+      setContext(null);
       if (repoPath) void loadDirectory('');
       return;
     }

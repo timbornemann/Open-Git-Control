@@ -45,17 +45,23 @@ export class AiAutoCommitRunSession {
     onProgress?: (update: AiProgressUpdate) => void,
     private readonly shouldCancel?: () => boolean,
     private readonly getOpenAiApiKey: () => string = () => '',
+    beforeCommit?: (privateIndexPath: string) => Promise<void>,
   ) {
     this.state = new AiAutoCommitRunState(onProgress);
     this.groupRecovery = new AiAutoCommitGroupRecovery(this.state);
-    this.indexTransaction = new AiAutoCommitIndexTransaction(this.gitService, this.repoPath);
+    this.indexTransaction = new AiAutoCommitIndexTransaction(this.gitService, this.repoPath, beforeCommit);
   }
   async run(): Promise<AiAutoCommitResult> {
     try {
       this.validateInputs();
       this.state.emitProgress({ phase: 'snapshot', message: 'Snapshot wird erstellt...', progress: 5, details: this.state.buildProgressDetails(0) });
       const snapshotFiles = await this.prepareSnapshotFiles();
-      const snapshotHydrator = new AutoCommitSnapshotHydrator(this.gitService, this.repoPath, () => this.ensureNotCancelled());
+      const snapshotHydrator = new AutoCommitSnapshotHydrator(
+        this.gitService,
+        this.repoPath,
+        () => this.ensureNotCancelled(),
+        this.indexTransaction.supported ? this.indexTransaction.snapshotIndexPathForRead : undefined,
+      );
       const groups = await this.planGroups(snapshotFiles, snapshotHydrator);
       await this.processGroups(groups, snapshotFiles, snapshotHydrator);
       if (this.state.commits.length === 0) {

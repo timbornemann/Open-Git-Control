@@ -111,6 +111,10 @@ export class RepositoryRunService {
         this.appendSystemLine(run, `Starting step ${index + 1}/${steps.length}: ${steps[index].label}`);
         this.emitState();
         const exitCode = await this.executeStep(run, steps[index]);
+        // A process is a step boundary even when it did not finish its last
+        // line. Flush now so output cannot be prepended to the next step and
+        // parsed with that step's parser.
+        this.flushRemainders(run, index);
         if (run.cancelled) break;
         if (exitCode !== 0) {
           run.status = 'failed';
@@ -171,10 +175,10 @@ export class RepositoryRunService {
     for (const line of parts) this.appendLine(run, stream, line, run.activeStepIndex);
   }
 
-  private flushRemainders(run: ActiveRun): void {
+  private flushRemainders(run: ActiveRun, stepIndex = run.activeStepIndex): void {
     for (const stream of ['stdout', 'stderr'] as const) {
       const remainder = run.streamRemainders[stream];
-      if (remainder) this.appendLine(run, stream, remainder, run.activeStepIndex);
+      if (remainder) this.appendLine(run, stream, remainder, stepIndex);
       run.streamRemainders[stream] = '';
     }
   }

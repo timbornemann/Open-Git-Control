@@ -548,9 +548,10 @@ export const useReleaseWorkflow = ({
 
   const openReleaseCreator = useCallback(() => {
     setActiveTab('repo');
+    setReleaseSubmitting(false);
     resetReleaseDraft({ clearContext: true, clearSuccess: true });
     setShowReleaseCreator(true);
-  }, [resetReleaseDraft, setActiveTab, setShowReleaseCreator]);
+  }, [resetReleaseDraft, setActiveTab, setReleaseSubmitting, setShowReleaseCreator]);
 
   const closeReleaseCreator = useCallback(() => {
     generationRef.current += 1;
@@ -559,8 +560,9 @@ export const useReleaseWorkflow = ({
     releaseContextLoadingRef.current = false;
     setReleaseContextLoading(false);
     setReleaseNotesGenerating(false);
+    setReleaseSubmitting(false);
     setShowReleaseCreator(false);
-  }, [setReleaseContextLoading, setReleaseNotesGenerating, setShowReleaseCreator]);
+  }, [setReleaseContextLoading, setReleaseNotesGenerating, setReleaseSubmitting, setShowReleaseCreator]);
 
   useEffect(() => {
     if (!showReleaseCreator) return;

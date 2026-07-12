@@ -12,6 +12,8 @@ export type WorkingDirectoryFileSelection = {
   repoPath: string;
 };
 
+export type WorkingDirectoryNavigationGuard = (nextPath: string, proceed: () => void) => void;
+
 type Params = {
   autoOpenConflictResolverPath?: string | null;
   onAutoOpenConflictResolverConsumed?: () => void;
@@ -50,6 +52,7 @@ export const useMainViewInspector = ({
   const [isCommitInspectorOpen, setIsCommitInspectorOpen] = useState(false);
   const handledNavigationRequestIdRef = useRef<number | null>(null);
   const preserveNextNavigationHistoryRef = useRef(false);
+  const workingDirectoryNavigationGuardRef = useRef<WorkingDirectoryNavigationGuard | null>(null);
 
   useEffect(() => {
     if (!autoOpenConflictResolverPath) return;
@@ -183,16 +186,25 @@ export const useMainViewInspector = ({
   const handleOpenWorkingDirectoryFile = useCallback(
     (path: string) => {
       if (!activeRepo) return;
-      setActiveDiffRequest(null);
-      setActiveConflictPath(null);
-      setShowRecoveryCenter(false);
-      setWorkingTreeSelection(null);
-      setIsCommitInspectorOpen(false);
-      setSelectedCommit(null);
-      setWorkingDirectoryFile({ path, repoPath: activeRepo });
+      const proceed = () => {
+        setActiveDiffRequest(null);
+        setActiveConflictPath(null);
+        setShowRecoveryCenter(false);
+        setWorkingTreeSelection(null);
+        setIsCommitInspectorOpen(false);
+        setSelectedCommit(null);
+        setWorkingDirectoryFile({ path, repoPath: activeRepo });
+      };
+      const guard = workingDirectoryNavigationGuardRef.current;
+      if (guard) guard(path, proceed);
+      else proceed();
     },
     [activeRepo, setSelectedCommit],
   );
+
+  const setWorkingDirectoryNavigationGuard = useCallback((guard: WorkingDirectoryNavigationGuard | null) => {
+    workingDirectoryNavigationGuardRef.current = guard;
+  }, []);
 
   const handleSelectCommitFromWorkingTree = useCallback(
     (hash: string) => {
@@ -257,6 +269,7 @@ export const useMainViewInspector = ({
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
     handleOpenWorkingDirectoryFile,
+    setWorkingDirectoryNavigationGuard,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
     closeInspector,

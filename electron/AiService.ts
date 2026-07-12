@@ -2,7 +2,7 @@ import type { GitService } from './GitService';
 import { gitService } from './GitService';
 import type { AiProvider, AppSettings } from './settings';
 import { AiProviderClient, getSelectedAiModel } from './ai/AiProviderClient';
-import { AiAutoCommitRunner } from './ai/AiAutoCommitRunner';
+import { AiAutoCommitRunner, type AiAutoCommitRunOptions } from './ai/AiAutoCommitRunner';
 import { buildFallbackCommitMessage, generateCommitMessageFromUserNotes as generateCommitMessageFromUserNotesCore } from './ai/commitMessageGenerator';
 import { generateReleaseNotes as generateReleaseNotesCore } from './ai/releaseNotesGenerator';
 import type { AiAutoCommitResult, AiProgressUpdate, CommitMessage, GeneratedReleaseNotes, ReleaseCommitInput, ReleaseVersionBump } from './ai/aiServiceTypes';
@@ -130,6 +130,26 @@ export class AiService {
       getGeminiApiKeyOrOnProgress as ((update: AiProgressUpdate) => void) | undefined,
       onProgressOrShouldCancel as (() => boolean) | undefined,
       (shouldCancelOrGetOpenAiApiKey as (() => string) | undefined) || (() => ''),
+    );
+  }
+
+  async runAutoCommitWithOptions(
+    repoPath: string,
+    settings: AppSettings,
+    getGeminiApiKey: () => string,
+    onProgress: ((update: AiProgressUpdate) => void) | undefined,
+    shouldCancel: (() => boolean) | undefined,
+    getOpenAiApiKey: () => string,
+    options: AiAutoCommitRunOptions,
+  ): Promise<AiAutoCommitResult> {
+    return this.autoCommitRunner.run(
+      this.gitService.resolveRepositoryPath(repoPath),
+      settings,
+      getGeminiApiKey,
+      onProgress,
+      shouldCancel,
+      getOpenAiApiKey,
+      options,
     );
   }
 }

@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto';
 import * as fs from 'fs';
+import * as path from 'path';
 import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath } from './RepositoryPathSafety';
 import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile } from './RepositoryFileEncoding';
 
@@ -25,6 +27,32 @@ const IMAGE_MIME_TYPES = new Map<string, string>([
   ['svg', 'image/svg+xml'],
   ['webp', 'image/webp'],
 ]);
+
+const writeRepositoryFileAtomically = (targetPath: string, contents: Buffer, mode: number): void => {
+  const temporaryPath = path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.ogc-write-${process.pid}-${randomUUID()}.tmp`);
+  let descriptor: number | null = null;
+  try {
+    descriptor = fs.openSync(temporaryPath, 'wx', mode);
+    fs.writeFileSync(descriptor, contents);
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = null;
+    fs.renameSync(temporaryPath, targetPath);
+  } finally {
+    if (descriptor !== null) {
+      try {
+        fs.closeSync(descriptor);
+      } catch {
+        // Preserve the original write error.
+      }
+    }
+    try {
+      fs.rmSync(temporaryPath, { force: true });
+    } catch {
+      // A successful rename has already published the replacement.
+    }
+  }
+};
 
 export class RepositoryFiles {
   constructor(
@@ -112,7 +140,7 @@ export class RepositoryFiles {
     }
 
     const textValue = typeof content === 'string' ? content : String(content ?? '');
-    fs.writeFileSync(resolvedPath, encodeRepositoryFile(textValue, encoding));
+    writeRepositoryFileAtomically(resolvedPath, encodeRepositoryFile(textValue, encoding), stat.mode & 0o777);
   }
 
   async deleteRepoFileAtPath(repoPath: string, relativePath: string): Promise<void> {

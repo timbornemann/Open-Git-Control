@@ -213,6 +213,25 @@ describe('usePullRequests helpers', () => {
     expect(createPullRequest).toHaveBeenCalledWith(expect.objectContaining({ base: 'develop' }));
   });
 
+  it('does not create a PR when the initiating repository became inactive during metadata loading', async () => {
+    const createPullRequest = vi.fn();
+    const getRepository = vi.fn().mockResolvedValue({
+      success: true,
+      data: { owner: 'octo', repo: 'repo', fork: false, parent: null, defaultBranch: 'main' },
+    });
+
+    const result = await submitPullRequest(
+      { owner: 'octo', repo: 'repo' },
+      { title: 'PR', body: '', head: 'feature', base: '', currentBranch: 'feature' },
+      'en',
+      { github: { isAvailable: () => true, createPullRequest, getRepository } as any },
+      () => false,
+    );
+
+    expect(result).toEqual({ success: false, error: 'Requested repository is no longer active.' });
+    expect(createPullRequest).not.toHaveBeenCalled();
+  });
+
   it('treats a failed GitHub check run as CI failure even when workflows passed', () => {
     expect(
       computeCiBadge([{ status: 'completed', conclusion: 'success' } as any], {

@@ -126,7 +126,10 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
       args.push(searchTerm, '0', '0', '200');
     }
 
-    const generation = searchGenerationRef.current;
+    // Searches in the same repository can overlap when Enter is pressed while
+    // the previous request is pending. Give every invocation its own generation
+    // so a slower earlier response cannot overwrite newer results.
+    const generation = ++searchGenerationRef.current;
     const isCurrent = () => searchGenerationRef.current === generation;
 
     setForensicLoading(true);

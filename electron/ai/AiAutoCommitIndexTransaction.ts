@@ -53,6 +53,7 @@ export class AiAutoCommitIndexTransaction {
   constructor(
     gitService: GitService,
     private readonly repoPath: string,
+    private readonly beforeCommit?: (privateIndexPath: string) => Promise<void>,
   ) {
     this.git = gitService as EnvironmentGitService;
     this.tempDir = createPrivateTempDir('ogc-ai-index-');
@@ -61,6 +62,10 @@ export class AiAutoCommitIndexTransaction {
 
   get supported(): boolean {
     return typeof this.git.runCommandAtPathWithEnv === 'function';
+  }
+
+  get snapshotIndexPathForRead(): string {
+    return this.snapshotIndexPath;
   }
 
   async initialize(entries: StatusEntry[]): Promise<void> {
@@ -97,6 +102,7 @@ export class AiAutoCommitIndexTransaction {
     await this.initializePrivateIndex(batchIndexPath, this.expectedHead);
     await this.restorePathsFromTree(batchIndexPath, this.snapshotTree, affectedPaths, pathspecFile);
     const expectedCommitTree = (await this.runWithIndex(batchIndexPath, ['write-tree'])).trim();
+    await this.beforeCommit?.(batchIndexPath);
 
     const currentHead = await this.readHead();
     const currentHeadRef = await this.readHeadRef();

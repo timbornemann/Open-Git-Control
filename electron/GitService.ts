@@ -9,6 +9,7 @@ import { HistoryService, type CommitStats, type FileTimelineCommit } from './git
 import { CherryPickService } from './git/CherryPickService';
 import { MergeConflictService } from './git/MergeConflictService';
 import { RebaseService } from './git/RebaseService';
+import { normalizeRepositoryRelativePath } from './git/RepositoryPathSafety';
 import { RepositoryBareState } from './git/RepositoryBareState';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
 import { StashService } from './git/StashService';
@@ -505,17 +506,38 @@ export class GitService {
     return this.gitRunner.getDiffPreview(repoPath, args, limits);
   }
 
-  async streamCommandLines(args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<void> {
+  async streamCommandLines(
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
+  ): Promise<void> {
     const repoPath = this.ensureRepoPath();
-    await this.gitRunner.streamLines(repoPath, args, onLine, signal);
+    await this.gitRunner.streamLines(repoPath, args, onLine, signal, options);
   }
 
-  async streamCommandLinesAtPath(repoPath: string, args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<void> {
+  async readPrivateIndexFileBufferAtPath(repoPath: string, relativePath: string, privateIndexPath: string, maxBytes: number): Promise<Buffer> {
+    const normalizedPath = normalizeRepositoryRelativePath(relativePath);
+    return this.gitRunner.runBuffer(repoPath, ['show', `:./${normalizedPath}`], {
+      maxBytes,
+      tooLargeMessage: 'File is too large for AI context.',
+      requestedKind: 'interactive',
+      envOverrides: { GIT_INDEX_FILE: privateIndexPath, GIT_OPTIONAL_LOCKS: '0' },
+    });
+  }
+
+  async streamCommandLinesAtPath(
+    repoPath: string,
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
+  ): Promise<void> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
     }
-    await this.gitRunner.streamLines(normalizedPath, args, onLine, signal);
+    await this.gitRunner.streamLines(normalizedPath, args, onLine, signal, options);
   }
 
   async streamCommandOutput(args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<string> {

@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type { AiService, ReleaseCommitInput } from '../../AiService';
+import type { SecretScanService } from '../../SecretScanService';
 import type { AppSettings } from '../../settings';
 import { createJobId } from '../gitCommandPolicy';
 import { RepoJobCancelledError, repoJobRegistry as defaultRepoJobRegistry } from '../repoJobRegistry';
@@ -15,6 +16,7 @@ type RegisterAiHandlersDeps = {
   getGeminiApiKeyFromSecureStore: () => string;
   getOpenAiApiKeyFromSecureStore: () => string;
   getActiveRepoPath: () => string | null;
+  secretScanService: SecretScanService;
   repoJobRegistry?: RepoJobRegistry;
 };
 
@@ -24,6 +26,7 @@ export function registerAiHandlers({
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
   getActiveRepoPath,
+  secretScanService,
   repoJobRegistry = defaultRepoJobRegistry,
 }: RegisterAiHandlersDeps): void {
   let currentAiAutoCommitJob: { id: string; repoPath: string; generation: number; cancelRequested: boolean } | null = null;
@@ -106,7 +109,7 @@ export function registerAiHandlers({
 
     try {
       const settings = readSettingsWithMigration();
-      const result = await aiService.runAutoCommit(
+      const result = await aiService.runAutoCommitWithOptions(
         repoJob.repoPath,
         settings,
         getGeminiApiKeyFromSecureStore,
@@ -126,6 +129,21 @@ export function registerAiHandlers({
         },
         () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
         getOpenAiApiKeyFromSecureStore,
+        {
+          beforeCommit: async (privateIndexPath) => {
+            if (!settings.secretScanBeforeCommitEnabled) return;
+            const scan = await secretScanService.scanStagedDiffs({
+              repoPath: repoJob.repoPath,
+              strictness: settings.secretScanStrictness,
+              allowlistText: settings.secretScanAllowlist,
+              signal: repoJob.signal,
+              envOverrides: { GIT_INDEX_FILE: privateIndexPath, GIT_OPTIONAL_LOCKS: '0' },
+            });
+            if (scan.findings.length > 0) {
+              throw new Error('Potential secrets were detected in the AI commit snapshot. Remove them or configure an explicit allowlist before committing.');
+            }
+          },
+        },
       );
       repoJob.ensureActive();
 

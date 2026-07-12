@@ -29,6 +29,7 @@ export type GitBufferRunOptions = {
   tooLargeMessage: string;
   requestedKind?: GitJobKind;
   commandName?: string;
+  envOverrides?: NodeJS.ProcessEnv;
 };
 
 export type GitInputRunOptions = {

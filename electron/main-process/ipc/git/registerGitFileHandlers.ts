@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -51,6 +52,38 @@ const findExistingParentPath = (targetPath: string): string => {
     currentPath = parentPath;
   }
   return currentPath;
+};
+
+const createSiblingTemporaryPath = (targetPath: string, purpose: string): string =>
+  path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.ogc-${purpose}-${process.pid}-${randomUUID()}`);
+
+const restoreReplacedTarget = (targetPath: string, backupPath: string | null): boolean => {
+  if (!backupPath || !fs.existsSync(backupPath)) return true;
+  try {
+    if (fs.existsSync(targetPath)) fs.rmSync(targetPath, { recursive: true, force: true });
+    fs.renameSync(backupPath, targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const publishReplacement = (preparedPath: string, targetPath: string, overwrite: boolean): void => {
+  let backupPath: string | null = null;
+  let retainBackup = false;
+  if (fs.existsSync(targetPath)) {
+    if (!overwrite) throw new Error('Target already exists.');
+    backupPath = createSiblingTemporaryPath(targetPath, 'backup');
+    fs.renameSync(targetPath, backupPath);
+  }
+  try {
+    fs.renameSync(preparedPath, targetPath);
+  } catch (error) {
+    retainBackup = !restoreReplacedTarget(targetPath, backupPath);
+    throw error;
+  } finally {
+    if (!retainBackup && backupPath && fs.existsSync(backupPath)) fs.rmSync(backupPath, { recursive: true, force: true });
+  }
 };
 
 const openWithSystemChooser = async (targetPath: string): Promise<void> => {
@@ -134,13 +167,33 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
         const sourcePath = workingDirectoryPath(repoPath, params.sourcePath, 'Source path');
         const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Target path', true);
         if (sourcePath === targetPath || targetPath.startsWith(`${sourcePath}${path.sep}`)) throw new Error('A directory cannot be placed inside itself.');
-        if (fs.existsSync(targetPath)) {
-          if (params.overwrite !== true) return { success: false, error: 'Target already exists.' };
-          fs.rmSync(targetPath, { recursive: true, force: true });
-        }
         if (!fs.existsSync(path.dirname(targetPath))) throw new Error('Target folder does not exist.');
-        if (operation === 'move') fs.renameSync(sourcePath, targetPath);
-        else fs.cpSync(sourcePath, targetPath, { recursive: true, errorOnExist: true });
+        const overwrite = params.overwrite === true;
+        if (operation === 'move') {
+          let backupPath: string | null = null;
+          let retainBackup = false;
+          if (fs.existsSync(targetPath)) {
+            if (!overwrite) return { success: false, error: 'Target already exists.' };
+            backupPath = createSiblingTemporaryPath(targetPath, 'backup');
+            fs.renameSync(targetPath, backupPath);
+          }
+          try {
+            fs.renameSync(sourcePath, targetPath);
+          } catch (error) {
+            retainBackup = !restoreReplacedTarget(targetPath, backupPath);
+            throw error;
+          } finally {
+            if (!retainBackup && backupPath && fs.existsSync(backupPath)) fs.rmSync(backupPath, { recursive: true, force: true });
+          }
+        } else {
+          const temporaryTargetPath = createSiblingTemporaryPath(targetPath, 'copy');
+          try {
+            fs.cpSync(sourcePath, temporaryTargetPath, { recursive: true, errorOnExist: true });
+            publishReplacement(temporaryTargetPath, targetPath, overwrite);
+          } finally {
+            if (fs.existsSync(temporaryTargetPath)) fs.rmSync(temporaryTargetPath, { recursive: true, force: true });
+          }
+        }
         return { success: true, targetPath: String(params.targetPath) };
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };

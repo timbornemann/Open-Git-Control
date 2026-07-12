@@ -29,6 +29,9 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+let nextDialogId = 0;
+const openDialogIds: number[] = [];
+
 export const DialogFrame: React.FC<DialogFrameProps> = ({
   open,
   title,
@@ -48,9 +51,11 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const dialogIdRef = useRef<number | null>(null);
   const onCloseRef = useRef(onClose);
   const onEnterRef = useRef(onEnter);
   const { t } = useI18n();
+  if (dialogIdRef.current === null) dialogIdRef.current = ++nextDialogId;
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -59,6 +64,9 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
 
   useEffect(() => {
     if (!open) return;
+    const dialogId = dialogIdRef.current;
+    if (dialogId === null) return;
+    openDialogIds.push(dialogId);
 
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
@@ -74,6 +82,7 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     }, 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (openDialogIds.at(-1) !== dialogId) return;
       if (!dialogRef.current) return;
 
       if (event.key === 'Escape') {
@@ -116,6 +125,8 @@ export const DialogFrame: React.FC<DialogFrameProps> = ({
     return () => {
       window.clearTimeout(focusDialog);
       document.removeEventListener('keydown', handleKeyDown);
+      const index = openDialogIds.lastIndexOf(dialogId);
+      if (index >= 0) openDialogIds.splice(index, 1);
       previousFocusRef.current?.focus();
     };
   }, [open, initialFocusRef]);

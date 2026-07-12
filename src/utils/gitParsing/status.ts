@@ -164,7 +164,7 @@ export interface GitBranchSyncFromPorcelainV2 {
   upstreamRemote: string | null;
 }
 
-export function parseBranchSyncFromPorcelainV2(statusOutput: string): GitBranchSyncFromPorcelainV2 {
+export function parseBranchSyncFromPorcelainV2(statusOutput: string, remoteNames: readonly string[] = []): GitBranchSyncFromPorcelainV2 {
   const result: GitBranchSyncFromPorcelainV2 = {
     ahead: 0,
     behind: 0,
@@ -180,11 +180,19 @@ export function parseBranchSyncFromPorcelainV2(statusOutput: string): GitBranchS
 
     if (line.startsWith('# branch.upstream ')) {
       result.hasUpstream = true;
-      // Upstream is "<remote>/<branch>"; remote names contain no slash, so the
-      // segment before the first slash is the tracked remote.
       const upstreamRef = line.slice('# branch.upstream '.length).trim();
-      const slashIndex = upstreamRef.indexOf('/');
-      result.upstreamRemote = slashIndex > 0 ? upstreamRef.slice(0, slashIndex) : null;
+      // Git permits slashes in remote names. Resolve the longest configured
+      // remote prefix rather than assuming the first slash separates remote and
+      // branch. Keep the legacy fallback for callers that do not have remotes.
+      const configuredRemote = [...remoteNames]
+        .filter((remoteName) => remoteName && upstreamRef.startsWith(`${remoteName}/`))
+        .sort((a, b) => b.length - a.length)[0];
+      if (configuredRemote) {
+        result.upstreamRemote = configuredRemote;
+      } else {
+        const slashIndex = upstreamRef.indexOf('/');
+        result.upstreamRemote = slashIndex > 0 ? upstreamRef.slice(0, slashIndex) : null;
+      }
       continue;
     }
 

@@ -4,6 +4,10 @@ import type { AiProviderClient } from './AiProviderClient';
 import { AiAutoCommitRunSession } from './AiAutoCommitRunSession';
 import type { AiAutoCommitResult, AiProgressUpdate } from './aiServiceTypes';
 
+export type AiAutoCommitRunOptions = {
+  beforeCommit?: (privateIndexPath: string) => Promise<void>;
+};
+
 export class AiAutoCommitRunner {
   constructor(
     private readonly gitService: GitService,
@@ -17,6 +21,7 @@ export class AiAutoCommitRunner {
     onProgress?: (update: AiProgressUpdate) => void,
     shouldCancel?: () => boolean,
     getOpenAiApiKey: () => string = () => '',
+    options: AiAutoCommitRunOptions = {},
   ): Promise<AiAutoCommitResult> {
     return new AiAutoCommitRunSession(
       this.gitService,
@@ -27,6 +32,7 @@ export class AiAutoCommitRunner {
       onProgress,
       shouldCancel,
       getOpenAiApiKey,
+      options.beforeCommit,
     ).run();
   }
 }

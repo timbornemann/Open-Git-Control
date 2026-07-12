@@ -74,6 +74,7 @@ export function setupIPC({
     getGeminiApiKeyFromSecureStore,
     getOpenAiApiKeyFromSecureStore,
     getActiveRepoPath: () => gitService.getRepoPath(),
+    secretScanService,
     repoJobRegistry,
   });
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });

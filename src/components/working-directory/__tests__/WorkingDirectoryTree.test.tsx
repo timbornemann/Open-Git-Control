@@ -71,4 +71,34 @@ describe('WorkingDirectoryTree', () => {
 
     expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === 'folder')).toHaveLength(2);
   });
+
+  it('retries a failed root-directory load on refresh', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    const listWorkingDirectory = vi
+      .spyOn(gitClient, 'listWorkingDirectory')
+      .mockResolvedValueOnce({ success: false, error: 'Temporary root read failure.' })
+      .mockResolvedValueOnce({ success: true, data: [] });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    const props = (refreshTrigger: number) => ({
+      repoPath: 'C:/repos/demo',
+      refreshTrigger,
+      expandedPaths: new Set<string>(),
+      onExpandedPathsChange: vi.fn(),
+      onOpenFile: vi.fn(),
+      onRepoChanged: vi.fn(),
+    });
+
+    act(() => root?.render(createElement(WorkingDirectoryTree, props(0))));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(() => root?.render(createElement(WorkingDirectoryTree, props(1))));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === '')).toHaveLength(2);
+  });
 });

@@ -6,7 +6,11 @@ import { redactGitSensitiveText } from './GitErrorFormatter';
 export class GitSpawnOperations {
   runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions, signal: AbortSignal): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const proc = spawn('git', args, {
+        cwd: repoPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
+      });
       const chunks: Buffer[] = [];
       let capturedBytes = 0;
       let stderr = '';
@@ -144,9 +148,21 @@ export class GitSpawnOperations {
     });
   }
 
-  streamLines(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal): Promise<void> {
+  streamLines(
+    repoPath: string,
+    args: string[],
+    onLine: (line: string) => void,
+    signal: AbortSignal,
+    options: { redactOutput?: boolean; envOverrides?: NodeJS.ProcessEnv } = {},
+  ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const redactOutput = options.redactOutput !== false;
+      const redactLine = (line: string) => (redactOutput ? redactGitSensitiveText(line) : line);
+      const proc = spawn('git', args, {
+        cwd: repoPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
+      });
       let pending = '';
       let stderr = '';
       const abort = () => proc.kill();
@@ -156,7 +172,7 @@ export class GitSpawnOperations {
         pending += chunk.toString('utf8');
         let newlineIndex = pending.indexOf('\n');
         while (newlineIndex >= 0) {
-          onLine(redactGitSensitiveText(pending.slice(0, newlineIndex).replace(/\r$/, '')));
+          onLine(redactLine(pending.slice(0, newlineIndex).replace(/\r$/, '')));
           pending = pending.slice(newlineIndex + 1);
           newlineIndex = pending.indexOf('\n');
         }
@@ -175,7 +191,7 @@ export class GitSpawnOperations {
           reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }
-        if (pending) onLine(redactGitSensitiveText(pending.replace(/\r$/, '')));
+        if (pending) onLine(redactLine(pending.replace(/\r$/, '')));
         resolve();
       });
     });

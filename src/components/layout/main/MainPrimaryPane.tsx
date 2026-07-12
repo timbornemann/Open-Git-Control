@@ -5,6 +5,7 @@ import { StagingArea } from '@/components/staging-area';
 import { useGithubContext, useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
+import type { WorkingDirectoryNavigationGuard } from '@/components/layout/hooks/useMainViewInspector';
 import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
@@ -38,6 +39,7 @@ type MainPrimaryPaneProps = {
   handleOpenDiff: (request: DiffRequest) => void;
   handleToggleRecoveryCenter: () => void;
   handleSelectCommitDirect: (hash: string | null) => void;
+  onWorkingDirectoryNavigationGuardChange: (guard: WorkingDirectoryNavigationGuard | null) => void;
 };
 
 export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
@@ -57,6 +59,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   handleOpenDiff,
   handleToggleRecoveryCenter,
   handleSelectCommitDirect,
+  onWorkingDirectoryNavigationGuardChange,
 }) => {
   const ui = useUIContext();
   const settingsState = useSettingsContext();
@@ -207,6 +210,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             onClose={closeInspector}
             onRepoChanged={repository.triggerRefresh}
             onCloseRequestChange={handleWorkingDirectoryCloseRequestChange}
+            onNavigationGuardChange={onWorkingDirectoryNavigationGuardChange}
           />
         ) : activeConflictPath ? (
           <StagingArea

@@ -39,15 +39,23 @@ export function readSettingsWithMigration(): AppSettings {
   let settings = normalizeSettings(rawSettings);
   const legacyGeminiApiKey = normalizeGeminiApiKey(rawSettings?.geminiApiKey);
   let dirty = false;
+  let retainLegacyGeminiApiKey = false;
 
   if (legacyGeminiApiKey) {
     const savedSecurely = saveGeminiApiKeySecurely(legacyGeminiApiKey);
-    settings = normalizeSettings({
-      ...(rawSettings || {}),
-      hasGeminiApiKey: savedSecurely,
-      hasOpenAiApiKey: settings.hasOpenAiApiKey,
-    });
-    dirty = true;
+    if (savedSecurely) {
+      settings = normalizeSettings({
+        ...(rawSettings || {}),
+        hasGeminiApiKey: true,
+        hasOpenAiApiKey: settings.hasOpenAiApiKey,
+      });
+      dirty = true;
+    } else {
+      // Do not rewrite the settings file until the credential reached secure
+      // storage. Rewriting normalized settings here would silently discard the
+      // only remaining copy of a legacy key on systems without a keyring.
+      retainLegacyGeminiApiKey = true;
+    }
   } else if (rawSettings && Object.prototype.hasOwnProperty.call(rawSettings, 'geminiApiKey')) {
     settings = normalizeSettings({
       ...rawSettings,
@@ -69,7 +77,7 @@ export function readSettingsWithMigration(): AppSettings {
     dirty = true;
   }
 
-  if (dirty) {
+  if (dirty && !retainLegacyGeminiApiKey) {
     writeSettings(settings);
   }
 

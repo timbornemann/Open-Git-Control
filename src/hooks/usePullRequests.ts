@@ -245,6 +245,12 @@ export const usePullRequests = ({ activeRepo, isAuthenticated, refreshTrigger, l
           currentBranch,
         },
         language,
+        undefined,
+        () => {
+          const currentOwnerRepo = prOwnerRepoRef.current;
+          const currentOwnerRepoKey = currentOwnerRepo ? `${currentOwnerRepo.owner}/${currentOwnerRepo.repo}` : '';
+          return activeRepoRef.current === repoAtStart && currentOwnerRepoKey === ownerRepoKeyAtStart;
+        },
       );
       const currentOwnerRepo = prOwnerRepoRef.current;
       const currentOwnerRepoKey = currentOwnerRepo ? `${currentOwnerRepo.owner}/${currentOwnerRepo.repo}` : '';
@@ -495,6 +501,7 @@ export const submitPullRequest = async (
   input: CreatePRInput,
   language: AppLanguage,
   deps?: PullRequestClientDeps,
+  canCreate?: () => boolean,
 ): Promise<{ success: true; number: number } | { success: false; error: string }> => {
   const { t } = createLanguageTranslations(language);
   const { github } = getPullRequestClients(deps);
@@ -529,6 +536,12 @@ export const submitPullRequest = async (
           }
         }
       }
+    }
+
+    // Repository metadata can require one or more awaits. Revalidate the
+    // initiating repository immediately before the irreversible remote write.
+    if (canCreate && !canCreate()) {
+      return { success: false, error: 'Requested repository is no longer active.' };
     }
 
     const result = await github.createPullRequest({

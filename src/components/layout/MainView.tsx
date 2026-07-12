@@ -46,6 +46,7 @@ const MainViewComponent: React.FC = () => {
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
     handleOpenWorkingDirectoryFile,
+    setWorkingDirectoryNavigationGuard,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
     closeInspector,
@@ -124,6 +125,7 @@ const MainViewComponent: React.FC = () => {
           handleOpenDiff={handleOpenDiff}
           handleToggleRecoveryCenter={handleToggleRecoveryCenter}
           handleSelectCommitDirect={handleSelectCommitDirect}
+          onWorkingDirectoryNavigationGuardChange={setWorkingDirectoryNavigationGuard}
         />
 
         {showInspectorPane && (

@@ -41,6 +41,23 @@ export function registerGitHandlers({
   repoJobRegistry = defaultRepoJobRegistry,
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
 }: RegisterGitHandlersDeps): void {
+  const commitProtectionLocks = new Set<string>();
+  const COMMIT_PROTECTION_BUSY_ERROR = 'A secret scan is already protecting a commit. Wait for it to finish before changing repository state.';
+  const commitProtectionKey = (repoPath: string) => repositoryPathKey(repoPath);
+  const beginCommitProtection = (repoPath: string): (() => void) | null => {
+    const key = commitProtectionKey(repoPath);
+    if (commitProtectionLocks.has(key)) return null;
+    commitProtectionLocks.add(key);
+    return () => commitProtectionLocks.delete(key);
+  };
+  const ensureCommitProtectionIsIdle = (repoPath: string): void => {
+    if (commitProtectionLocks.has(commitProtectionKey(repoPath))) throw new Error(COMMIT_PROTECTION_BUSY_ERROR);
+  };
+  const isCommitCommand = (commandName: unknown): boolean =>
+    String(commandName || '')
+      .trim()
+      .toLowerCase() === 'commit';
+
   const secretScanPushGuard = registerSecretScanPushGuard({
     gitService,
     secretScanService,
@@ -112,31 +129,37 @@ export function registerGitHandlers({
 
       try {
         const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
-        const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
-        if (scanBlock) {
+        const releaseCommitProtection = beginCommitProtection(repoPath);
+        if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
+        try {
+          const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
+          if (scanBlock) {
+            emitJobEvent(event.sender, {
+              id: jobId,
+              operation: 'git:commit',
+              status: 'failed',
+              message: scanBlock.error,
+              timestamp: Date.now(),
+            });
+            return scanBlock;
+          }
+          const data = await gitService.commits.commitWithMessageAtPath(repoPath, {
+            title: String(params.title || ''),
+            description: String(params.description || ''),
+            amend: params.amend === true,
+            signoff: params.signoff === true,
+            allowEmpty: params.allowEmpty === true,
+          });
           emitJobEvent(event.sender, {
             id: jobId,
             operation: 'git:commit',
-            status: 'failed',
-            message: scanBlock.error,
+            status: 'done',
             timestamp: Date.now(),
           });
-          return scanBlock;
+          return { success: true, data };
+        } finally {
+          releaseCommitProtection();
         }
-        const data = await gitService.commits.commitWithMessageAtPath(repoPath, {
-          title: String(params.title || ''),
-          description: String(params.description || ''),
-          amend: params.amend === true,
-          signoff: params.signoff === true,
-          allowEmpty: params.allowEmpty === true,
-        });
-        emitJobEvent(event.sender, {
-          id: jobId,
-          operation: 'git:commit',
-          status: 'done',
-          timestamp: Date.now(),
-        });
-        return { success: true, data };
       } catch (error: any) {
         const safeError = redactGitSensitiveText(error?.message || 'Commit failed.');
         emitJobEvent(event.sender, {
@@ -174,6 +197,7 @@ export function registerGitHandlers({
     try {
       const normalizedPaths = Array.isArray(paths) ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000) : [];
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      ensureCommitProtectionIsIdle(repoPath);
       commitStatsService.interruptBackgroundWork();
       const data = await gitService.commits.stagePathsAtPath(repoPath, normalizedPaths);
       emitJobEvent(event.sender, {
@@ -230,7 +254,26 @@ export function registerGitHandlers({
         return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
       }
     }
-    return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    if (!isCommitCommand(commandName)) {
+      try {
+        ensureCommitProtectionIsIdle(repoPath);
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : COMMIT_PROTECTION_BUSY_ERROR };
+      }
+      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    }
+    const releaseCommitProtection = beginCommitProtection(repoPath);
+    if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
+    try {
+      const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
+      if (scanBlock) return scanBlock;
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
+    } finally {
+      releaseCommitProtection();
+    }
   });
 
   ipcMain.handle(IpcChannel.GitCommandForRepo, async (event: any, requestedRepoPath: unknown, commandName: unknown, ...rawArgs: unknown[]) => {
@@ -249,7 +292,26 @@ export function registerGitHandlers({
         return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
       }
     }
-    return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    if (!isCommitCommand(commandName)) {
+      try {
+        ensureCommitProtectionIsIdle(repoPath);
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : COMMIT_PROTECTION_BUSY_ERROR };
+      }
+      return handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    }
+    const releaseCommitProtection = beginCommitProtection(repoPath);
+    if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
+    try {
+      const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
+      if (scanBlock) return scanBlock;
+      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
+    } finally {
+      releaseCommitProtection();
+    }
   });
 
   ipcMain.handle(IpcChannel.GitInteractiveRebase, async (_event: any, baseHash: unknown, todoLines: unknown, requestedRepoPath?: unknown) => {
@@ -262,6 +324,7 @@ export function registerGitHandlers({
       const normalizedTodo = normalizeInteractiveRebaseTodo(todoLines);
 
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      ensureCommitProtectionIsIdle(repoPath);
       const data = await gitService.startInteractiveRebaseAtPath(repoPath, normalizedBase, normalizedTodo);
       return { success: true, data };
     } catch (error: any) {
@@ -282,6 +345,7 @@ export function registerGitHandlers({
         }
 
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        ensureCommitProtectionIsIdle(repoPath);
         const data = await gitService.applyPatchAtPath(repoPath, normalizedPatch, {
           cached: Boolean(options.cached),
           reverse: Boolean(options.reverse),
@@ -304,6 +368,7 @@ export function registerGitHandlers({
 
     try {
       const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+      ensureCommitProtectionIsIdle(repoPath);
       const data = await gitService.createBranchFromStashAtPath(repoPath, String(params.stashName || ''), String(params.branchName || ''));
       emitJobEvent(event.sender, {
         id: jobId,
