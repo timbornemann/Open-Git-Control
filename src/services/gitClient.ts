@@ -285,6 +285,22 @@ export const gitClient = {
     return requireElectronGitApi().approveSecretScanCommit(repoPath);
   },
 
+  async listWorkingDirectory(repoPath: string) {
+    return requireElectronGitApi().listWorkingDirectory(repoPath);
+  },
+  async getWorkingDirectoryPreview(filePath: string, repoPath: string) {
+    return requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
+  },
+  async moveWorkingDirectoryEntry(sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) {
+    return requireElectronGitApi().moveWorkingDirectoryEntry(sourcePath, targetPath, overwrite, repoPath);
+  },
+  async copyWorkingDirectoryEntry(sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) {
+    return requireElectronGitApi().copyWorkingDirectoryEntry(sourcePath, targetPath, overwrite, repoPath);
+  },
+  async deleteWorkingDirectoryEntry(filePath: string, repoPath: string) {
+    return requireElectronGitApi().deleteWorkingDirectoryEntry(filePath, repoPath);
+  },
+
   async scanPushSecrets(params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
   },

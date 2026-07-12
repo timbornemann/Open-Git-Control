@@ -149,6 +149,46 @@
   font-size: 0.9rem;
 }
 
+.pane-header--directory-switch {
+  padding: 7px 8px;
+}
+
+.directory-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-dark);
+}
+
+.directory-mode-switch__option {
+  border: 0;
+  border-radius: 5px;
+  padding: 7px 6px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.directory-mode-switch__option:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.directory-mode-switch__option.is-active {
+  color: var(--on-accent);
+  background: var(--accent-primary);
+}
+
 .pane-header-main {
   min-height: 52px;
   display: flex;

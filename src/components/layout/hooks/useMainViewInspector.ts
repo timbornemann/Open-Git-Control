@@ -37,6 +37,7 @@ export const useMainViewInspector = ({
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
+  const [workingDirectoryFilePath, setWorkingDirectoryFilePath] = useState<string | null>(null);
   const [isCommitInspectorOpen, setIsCommitInspectorOpen] = useState(false);
   const handledNavigationRequestIdRef = useRef<number | null>(null);
   const preserveNextNavigationHistoryRef = useRef(false);
@@ -163,6 +164,19 @@ export const useMainViewInspector = ({
     [setSelectedCommit],
   );
 
+  const handleOpenWorkingDirectoryFile = useCallback(
+    (path: string) => {
+      setActiveDiffRequest(null);
+      setActiveConflictPath(null);
+      setShowRecoveryCenter(false);
+      setWorkingTreeSelection(null);
+      setIsCommitInspectorOpen(false);
+      setSelectedCommit(null);
+      setWorkingDirectoryFilePath(path);
+    },
+    [setSelectedCommit],
+  );
+
   const handleSelectCommitFromWorkingTree = useCallback(
     (hash: string) => {
       const normalized = normalizeCommitHash(hash);
@@ -191,6 +205,7 @@ export const useMainViewInspector = ({
 
   const closeInspector = useCallback(() => {
     setActiveDiffRequest(null);
+    setWorkingDirectoryFilePath(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
     setActiveConflictPath(null);
@@ -203,6 +218,7 @@ export const useMainViewInspector = ({
     setActiveDiffRequest(null);
     setActiveConflictPath(null);
     setShowRecoveryCenter(false);
+    setWorkingDirectoryFilePath(null);
     handleSelectCommitDirect(null);
   }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
 
@@ -215,6 +231,7 @@ export const useMainViewInspector = ({
     setShowRecoveryCenter,
     commitHistoryStack,
     workingTreeSelection,
+    workingDirectoryFilePath,
     isCommitInspectorOpen,
     handleToggleRecoveryCenter,
     handleOpenDiff,
@@ -222,6 +239,7 @@ export const useMainViewInspector = ({
     handleSelectCommitDirect,
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
+    handleOpenWorkingDirectoryFile,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
     closeInspector,

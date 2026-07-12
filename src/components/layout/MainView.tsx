@@ -37,6 +37,7 @@ const MainViewComponent: React.FC = () => {
     setShowRecoveryCenter,
     commitHistoryStack,
     workingTreeSelection,
+    workingDirectoryFilePath,
     isCommitInspectorOpen,
     handleToggleRecoveryCenter,
     handleOpenDiff,
@@ -44,6 +45,7 @@ const MainViewComponent: React.FC = () => {
     handleSelectCommitDirect,
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
+    handleOpenWorkingDirectoryFile,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
     closeInspector,
@@ -113,6 +115,7 @@ const MainViewComponent: React.FC = () => {
           timelineCommits={timelineCommits}
           workingTree={workingTree}
           activeDiffRequest={activeDiffRequest}
+          workingDirectoryFilePath={workingDirectoryFilePath}
           activeConflictPath={activeConflictPath}
           showRecoveryCenter={showRecoveryCenter}
           setActiveConflictPath={setActiveConflictPath}
@@ -130,6 +133,7 @@ const MainViewComponent: React.FC = () => {
             workingTree={workingTree}
             commitHistoryStack={commitHistoryStack}
             workingTreeSelection={workingTreeSelection}
+            onOpenWorkingDirectoryFile={handleOpenWorkingDirectoryFile}
             isCommitInspectorOpen={isCommitInspectorOpen}
             handleOpenDiff={handleOpenDiff}
             handleOpenConflictResolver={handleOpenConflictResolver}

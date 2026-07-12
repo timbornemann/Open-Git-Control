@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { INSPECTOR_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
+import { WorkingDirectoryTree } from '@/components/working-directory/WorkingDirectoryTree';
 
 type WorkingTreeSelection = {
   path: string;
@@ -27,6 +28,7 @@ type MainInspectorPaneProps = {
   handleSelectCommitFromWorkingTree: (hash: string) => void;
   handleCommitBack: () => void;
   closeInspector: () => void;
+  onOpenWorkingDirectoryFile: (path: string) => void;
 };
 
 export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
@@ -43,10 +45,14 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   handleSelectCommitFromWorkingTree,
   handleCommitBack,
   closeInspector,
+  onOpenWorkingDirectoryFile,
 }) => {
   const repository = useRepositoryContext();
   const settingsState = useSettingsContext();
   const { t } = useI18n();
+  const [directoryMode, setDirectoryMode] = React.useState<'staging' | 'tree'>('staging');
+  const [expandedDirectoryPaths, setExpandedDirectoryPaths] = React.useState<Set<string>>(() => new Set(['']));
+  const isDirectoryMode = !isCommitInspectorOpen && !workingTreeSelection;
 
   return (
     <>
@@ -59,28 +65,50 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
       />
 
       <div className="pane inspector-pane" style={{ minWidth: `${INSPECTOR_PANE_MIN_WIDTH}px` }}>
-        <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>
-            {isCommitInspectorOpen && repository.selectedCommit
-              ? t('generated.components.layout.main.maininspectorpane.commit_inspector_3b636d23')
-              : workingTreeSelection
-                ? t('generated.components.layout.main.maininspectorpane.file_inspector_57b931aa')
-                : t('generated.components.layout.main.maininspectorpane.working_directory_d9a68dee')}
-          </span>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {((isCommitInspectorOpen && repository.selectedCommit) || workingTreeSelection) && (
-              <>
-                {isCommitInspectorOpen && repository.selectedCommit && commitHistoryStack.length > 0 && (
-                  <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                    {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
+        <div
+          className={`pane-header${isDirectoryMode ? ' pane-header--directory-switch' : ''}`}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          {isDirectoryMode ? (
+            <div className="directory-mode-switch" role="group" aria-label="Inspector view">
+              <button
+                className={`directory-mode-switch__option${directoryMode === 'staging' ? ' is-active' : ''}`}
+                onClick={() => setDirectoryMode('staging')}
+                aria-pressed={directoryMode === 'staging'}
+              >
+                Staging Area
+              </button>
+              <button
+                className={`directory-mode-switch__option${directoryMode === 'tree' ? ' is-active' : ''}`}
+                onClick={() => setDirectoryMode('tree')}
+                aria-pressed={directoryMode === 'tree'}
+              >
+                Working Directory
+              </button>
+            </div>
+          ) : (
+            <span>
+              {isCommitInspectorOpen && repository.selectedCommit
+                ? t('generated.components.layout.main.maininspectorpane.commit_inspector_3b636d23')
+                : t('generated.components.layout.main.maininspectorpane.file_inspector_57b931aa')}
+            </span>
+          )}
+          {!isDirectoryMode && (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {((isCommitInspectorOpen && repository.selectedCommit) || workingTreeSelection) && (
+                <>
+                  {isCommitInspectorOpen && repository.selectedCommit && commitHistoryStack.length > 0 && (
+                    <button className="icon-btn" onClick={handleCommitBack} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                      {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
+                    </button>
+                  )}
+                  <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
+                    {t('generated.components.actiontoastviewport.close_181764fa')}
                   </button>
-                )}
-                <button className="icon-btn" onClick={closeInspector} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>
-                  {t('generated.components.actiontoastviewport.close_181764fa')}
-                </button>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="pane-content" style={{ overflow: 'hidden' }}>
           {isCommitInspectorOpen && repository.selectedCommit ? (
@@ -99,20 +127,34 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
               onOpenDiff={handleOpenDiff}
             />
           ) : (
-            <StagingArea
-              repoPath={repository.activeRepo}
-              onRepoChanged={repository.triggerRefresh}
-              onCommitsCreated={repository.triggerCommitRefresh}
-              onOpenDiff={handleOpenDiff}
-              onSelectFileInspect={handleSelectWorkingTreeFile}
-              onOpenConflictResolver={handleOpenConflictResolver}
-              settings={settingsState.settings}
-              workingTreeRepoPath={workingTree.dataRepoPath}
-              workingTreeSnapshot={workingTree.snapshot}
-              workingTreeStatus={workingTree.status}
-              workingTreeStats={workingTree.stats}
-              onRefreshWorkingTree={workingTree.refresh}
-            />
+            <>
+              <div style={{ display: directoryMode === 'tree' ? 'block' : 'none', height: '100%' }}>
+                <WorkingDirectoryTree
+                  repoPath={repository.activeRepo}
+                  refreshTrigger={repository.refreshTrigger}
+                  expandedPaths={expandedDirectoryPaths}
+                  onExpandedPathsChange={setExpandedDirectoryPaths}
+                  onOpenFile={onOpenWorkingDirectoryFile}
+                  onRepoChanged={repository.triggerRefresh}
+                />
+              </div>
+              <div style={{ display: directoryMode === 'staging' ? 'block' : 'none', height: '100%' }}>
+                <StagingArea
+                  repoPath={repository.activeRepo}
+                  onRepoChanged={repository.triggerRefresh}
+                  onCommitsCreated={repository.triggerCommitRefresh}
+                  onOpenDiff={handleOpenDiff}
+                  onSelectFileInspect={handleSelectWorkingTreeFile}
+                  onOpenConflictResolver={handleOpenConflictResolver}
+                  settings={settingsState.settings}
+                  workingTreeRepoPath={workingTree.dataRepoPath}
+                  workingTreeSnapshot={workingTree.snapshot}
+                  workingTreeStatus={workingTree.status}
+                  workingTreeStats={workingTree.stats}
+                  onRefreshWorkingTree={workingTree.refresh}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

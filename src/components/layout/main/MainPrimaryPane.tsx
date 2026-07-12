@@ -10,6 +10,7 @@ import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPan
 import { GithubAuthGuide } from './GithubAuthGuide';
 import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
+import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
 
 const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((module) => ({ default: module.CommitGraph })));
 const DiffViewer = React.lazy(() => import('@/components/diff-viewer').then((module) => ({ default: module.DiffViewer })));
@@ -26,6 +27,7 @@ type MainPrimaryPaneProps = {
   timelineCommits: FileTimelineCommitDto[];
   workingTree: WorkingTreeState;
   activeDiffRequest: DiffRequest | null;
+  workingDirectoryFilePath: string | null;
   activeConflictPath: string | null;
   showRecoveryCenter: boolean;
   setActiveConflictPath: (path: string | null) => void;
@@ -44,6 +46,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   timelineCommits,
   workingTree,
   activeDiffRequest,
+  workingDirectoryFilePath,
   activeConflictPath,
   showRecoveryCenter,
   setActiveConflictPath,
@@ -59,10 +62,15 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const github = useGithubContext();
   const workflow = useWorkflowContext();
   const { t } = useI18n();
+  const [workingDirectoryCloseRequest, setWorkingDirectoryCloseRequest] = React.useState<(() => void) | null>(null);
+  const handleWorkingDirectoryCloseRequestChange = React.useCallback((request: (() => void) | null) => {
+    setWorkingDirectoryCloseRequest(() => request);
+  }, []);
 
   const route = getMainPrimaryRoute({
     activeConflictPath,
     activeDiffRequest,
+    workingDirectoryFilePath,
     activeTab: ui.activeTab,
     isAuthenticated: github.isAuthenticated,
     selectedGithubAuthHelpMethod: github.selectedGithubAuthHelpMethod,
@@ -119,6 +127,10 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             </button>
           ) : showRecoveryCenter ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
+              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
+            </button>
+          ) : workingDirectoryFilePath ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={() => workingDirectoryCloseRequest?.() ?? closeInspector()}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : activeConflictPath ? (
@@ -182,6 +194,14 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           <React.Suspense fallback={lazyPaneFallback}>
             <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
           </React.Suspense>
+        ) : workingDirectoryFilePath && repository.activeRepo ? (
+          <WorkingDirectoryFileViewer
+            repoPath={repository.activeRepo}
+            path={workingDirectoryFilePath}
+            onClose={closeInspector}
+            onRepoChanged={repository.triggerRefresh}
+            onCloseRequestChange={handleWorkingDirectoryCloseRequestChange}
+          />
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}

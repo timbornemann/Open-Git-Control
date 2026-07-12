@@ -2,11 +2,12 @@ import type { AppTabId } from '@/app/state/contracts';
 import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 
-export type MainPrimaryRoute = 'planner' | 'settings' | 'release' | 'timeline' | 'githubGuide' | 'recovery' | 'conflict' | 'diff' | 'graph';
+export type MainPrimaryRoute = 'planner' | 'settings' | 'release' | 'timeline' | 'githubGuide' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
 
 type RouteParams = {
   activeConflictPath: string | null;
   activeDiffRequest: DiffRequest | null;
+  workingDirectoryFilePath?: string | null;
   activeTab: AppTabId;
   isAuthenticated: boolean;
   selectedGithubAuthHelpMethod: unknown;
@@ -20,6 +21,7 @@ type Translate = (key: string, variables?: TranslationVariables) => string;
 export const getMainPrimaryRoute = ({
   activeConflictPath,
   activeDiffRequest,
+  workingDirectoryFilePath,
   activeTab,
   isAuthenticated,
   selectedGithubAuthHelpMethod,
@@ -35,6 +37,7 @@ export const getMainPrimaryRoute = ({
   if (showRecoveryCenter) return 'recovery';
   if (activeConflictPath) return 'conflict';
   if (activeDiffRequest) return 'diff';
+  if (workingDirectoryFilePath) return 'file';
   return 'graph';
 };
 
@@ -54,6 +57,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): stri
       return t('generated.components.layout.main.mainprimarypane.conflict_resolver_1f790ac5');
     case 'diff':
       return t('generated.components.layout.main.mainprimarypane.diff_viewer_979e21a6');
+    case 'file':
+      return 'File viewer';
     default:
       return '';
   }

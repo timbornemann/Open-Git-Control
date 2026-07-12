@@ -206,6 +206,15 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'delete', IpcChannel.GitDeleteRepoFile, filePath, repoPath)
         : invokeGitOperation('delete', IpcChannel.GitDeleteRepoFile, filePath),
+    listWorkingDirectory: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'list files', IpcChannel.GitListWorkingDirectory, repoPath),
+    getWorkingDirectoryPreview: (filePath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath),
+    moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'move file', IpcChannel.GitMoveWorkingDirectoryEntry, { sourcePath, targetPath, overwrite }, repoPath),
+    copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'copy file', IpcChannel.GitCopyWorkingDirectoryEntry, { sourcePath, targetPath, overwrite }, repoPath),
+    deleteWorkingDirectoryEntry: (filePath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'delete file', IpcChannel.GitDeleteWorkingDirectoryEntry, filePath, repoPath),
     openRepositoryPath: (params: { path?: string; action: 'reveal' | 'open' | 'openWith'; repoPath?: string }) =>
       params.repoPath
         ? invokeGitOperationForRepo(params.repoPath, 'open path', IpcChannel.GitOpenRepositoryPath, params)
@@ -368,6 +377,11 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getRepoFileDataUrl: flatApi.getRepoFileDataUrl,
       writeRepoFile: flatApi.writeRepoFile,
       deleteRepoFile: flatApi.deleteRepoFile,
+      listWorkingDirectory: flatApi.listWorkingDirectory,
+      getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
+      moveWorkingDirectoryEntry: flatApi.moveWorkingDirectoryEntry,
+      copyWorkingDirectoryEntry: flatApi.copyWorkingDirectoryEntry,
+      deleteWorkingDirectoryEntry: flatApi.deleteWorkingDirectoryEntry,
       openRepositoryPath: flatApi.openRepositoryPath,
       openSubmodule: flatApi.openSubmodule,
       onCloneProgress: flatApi.onCloneProgress,
