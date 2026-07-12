@@ -175,6 +175,16 @@ describe('planningApiServer', () => {
     ]);
   });
 
+  it('returns 404 when deleting a planner project that does not exist', async () => {
+    const response = await fetch(`${server!.url}/api/projects/missing-project`, {
+      method: 'DELETE',
+      headers: { [server!.authHeaderName]: server!.authToken },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ success: false, error: { code: 'PROJECT_NOT_FOUND' } });
+  });
+
   it('rejects invalid todo patches without persisting a simultaneous move', async () => {
     const sourceProject = await requestJson('/api/projects', {
       method: 'POST',
@@ -373,6 +383,14 @@ describe('planningApiServer', () => {
     });
     expect(notification.status).toBe(204);
     await expect(notification.text()).resolves.toBe('');
+
+    const invalidNotification = await fetch(`${server!.url}/mcp`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', params: 'invalid' }),
+    });
+    expect(invalidNotification.status).toBe(204);
+    await expect(invalidNotification.text()).resolves.toBe('');
 
     const mixedBatch = await fetch(`${server!.url}/mcp`, {
       method: 'POST',

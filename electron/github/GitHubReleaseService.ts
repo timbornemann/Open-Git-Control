@@ -147,19 +147,19 @@ export class GitHubReleaseService {
     const assetName = (params.name || path.basename(filePath) || '').trim();
 
     if (!owner || !repo) {
-      throw new Error('Owner und Repository sind erforderlich.');
+      throw new Error('RELEASE_ASSET_OWNER_REPOSITORY_REQUIRED');
     }
     if (!Number.isFinite(releaseId) || releaseId <= 0) {
-      throw new Error('Release-ID ist erforderlich.');
+      throw new Error('RELEASE_ASSET_RELEASE_ID_REQUIRED');
     }
     if (!filePath) {
-      throw new Error('Dateipfad ist erforderlich.');
+      throw new Error('RELEASE_ASSET_FILE_PATH_REQUIRED');
     }
     if (!assetName) {
-      throw new Error('Asset-Name ist erforderlich.');
+      throw new Error('RELEASE_ASSET_NAME_REQUIRED');
     }
     if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-      throw new Error('Asset-Datei wurde nicht gefunden.');
+      throw new Error('RELEASE_ASSET_FILE_NOT_FOUND');
     }
 
     const { data } = await octokit.rest.repos.uploadReleaseAsset({

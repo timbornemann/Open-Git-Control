@@ -169,9 +169,18 @@ export const gitClient = {
   },
 
   buildCheckoutPullRequestBranchArgs(targetBranch: string): GitCommandArgs {
-    // -B intentionally moves this disposable local review branch to the
-    // freshly fetched PR head, including after a force-push.
-    return command('checkout', '-B', targetBranch, 'FETCH_HEAD');
+    return command('checkout', '-b', targetBranch, 'FETCH_HEAD');
+  },
+
+  buildCheckoutExistingPullRequestBranchArgs(targetBranch: string): GitCommandArgs {
+    return command('checkout', targetBranch);
+  },
+
+  buildPullRequestUpstreamConfigArgs(targetBranch: string, remote: string, prNumber: number): [GitCommandArgs, GitCommandArgs] {
+    return [
+      command('config', '--local', `branch.${targetBranch}.remote`, remote),
+      command('config', '--local', `branch.${targetBranch}.merge`, `refs/pull/${prNumber}/head`),
+    ];
   },
 
   buildPullArgs(extraArgs: string[] = []): GitCommandArgs {

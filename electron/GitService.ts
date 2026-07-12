@@ -379,7 +379,10 @@ export class GitService {
       throw new Error('Patch content is empty.');
     }
 
-    const args = ['apply', '--recount', '--whitespace=nowarn'];
+    // A diff view can be one index update behind after a preceding hunk was
+    // staged. Keep three lines of context for safe matching, while allowing
+    // Git to relocate the hunk instead of rejecting its stale line offset.
+    const args = ['apply', '--recount', '-C3', '--whitespace=nowarn'];
     if (options?.cached) {
       args.push('--cached');
     }

@@ -136,6 +136,10 @@ const validateStatusArgs = (args: string[]): void => {
 
 const validateBranchArgs = (args: string[]): void => {
   if (args.length === 1 && ['-a', '-r'].includes(args[0])) return;
+  if (args.length === 2 && args[0] === '--list') {
+    assertSafeValue(args[1], 'branch name');
+    return;
+  }
   if (args.length === 2 && ['-d', '-D'].includes(args[0])) {
     assertSafeValue(args[1], 'branch name');
     return;
@@ -151,6 +155,18 @@ const validateBranchArgs = (args: string[]): void => {
     return;
   }
   throw new Error('Unsupported argument combination for git branch.');
+};
+
+const validateConfigArgs = (args: string[]): void => {
+  if (args.length !== 3 || args[0] !== '--local') throw new Error('Unsupported argument combination for git config.');
+  const [, key, value] = args;
+  const match = key.match(/^branch\.([A-Za-z0-9][A-Za-z0-9._-]*)\.(remote|merge)$/);
+  if (!match) throw new Error('Unsupported Git config key.');
+  if (match[2] === 'remote') {
+    assertSafeRemoteUrl(value);
+    return;
+  }
+  if (!/^refs\/pull\/\d+\/head$/.test(value)) throw new Error('Invalid pull request upstream ref.');
 };
 
 const validateRemoteArgs = (args: string[]): void => {
@@ -391,6 +407,8 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
       return void normalizeRepositoryRelativePath(args[0]);
     case 'branch':
       return validateBranchArgs(args);
+    case 'config':
+      return validateConfigArgs(args);
     case 'remote':
       return validateRemoteArgs(args);
     case 'tag':

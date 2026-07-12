@@ -36,6 +36,12 @@ export type ReadGitFileBufferAtPath = (repoPath: string, revisionSpec: string, m
 
 const STAGED_BLAME_MAX_BYTES = 8 * 1024 * 1024;
 
+const blameAvailableLineCount = (error: unknown): number | null => {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/file has only (\d+) lines?/i);
+  return match ? Number(match[1]) : null;
+};
+
 export class HistoryService {
   constructor(
     private readonly runCommand: RunGitCommand,
@@ -58,6 +64,22 @@ export class HistoryService {
     // returns an empty result, so callers can render an empty blame view.
     const output = await this.execute(['ls-tree', '-r', '--name-only', revision, '--', toLiteralPathspec(filePath)], repoPath);
     return output.trim().length > 0;
+  }
+
+  private async runBlameRange<T>(startLine: number, lineCount: number, executeRange: (endLine: number) => Promise<T>): Promise<T | ''> {
+    const endLine = startLine + lineCount - 1;
+    try {
+      return await executeRange(endLine);
+    } catch (error: unknown) {
+      // Git rejects a range that extends one line beyond EOF. The UI asks for
+      // one look-ahead line, so retry the same page clamped to the line count
+      // reported by Git instead of surfacing a fatal error for 500/1000/...-line
+      // files.
+      const availableLines = blameAvailableLineCount(error);
+      if (availableLines === null || endLine <= availableLines) throw error;
+      if (availableLines < startLine) return '';
+      return executeRange(availableLines);
+    }
   }
 
   async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0, repoPath?: string): Promise<string> {
@@ -171,19 +193,19 @@ export class HistoryService {
     // The renderer asks for one look-ahead line (501 total) to tell a full
     // page from the end of a file with exactly 500/1000/... lines.
     const safeCount = Number.isFinite(lineCount) ? Math.max(1, Math.min(Math.floor(lineCount), 501)) : 500;
-    const endLine = safeStart + safeCount - 1;
-    const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
     const normalizedHash = normalizeOptionalCommitHash(commitHash);
     const revision = normalizedHash || 'HEAD';
     if (!(await this.existsAtRevision(filePath, revision, repoPath))) return '';
-    if (normalizedHash) {
-      args.push(normalizedHash);
-    }
     // blame accepts a pathname after `--`, but does not interpret pathspec
     // magic such as `:(literal)`. Keep the same strict validation without
     // passing the magic prefix through to blame.
-    args.push('--', normalizeRepositoryRelativePath(filePath));
-    return this.execute(args, repoPath);
+    const normalizedPath = normalizeRepositoryRelativePath(filePath);
+    return this.runBlameRange(safeStart, safeCount, (endLine) => {
+      const args = ['blame', '--line-porcelain', `-L${safeStart},${endLine}`];
+      if (normalizedHash) args.push(normalizedHash);
+      args.push('--', normalizedPath);
+      return this.execute(args, repoPath);
+    });
   }
 
   /**
@@ -205,6 +227,7 @@ export class HistoryService {
     if (!this.runCommandAtPathWithInput || !this.readGitFileBufferAtPath) {
       throw new Error('Staged blame is not available.');
     }
+    const runCommandAtPathWithInput = this.runCommandAtPathWithInput;
 
     const normalizedPath = normalizeRepositoryRelativePath(filePath);
     const indexEntry = await this.execute(['ls-files', '--stage', '-z', '--', toLiteralPathspec(normalizedPath)], repoPath);
@@ -224,12 +247,13 @@ export class HistoryService {
       return this.buildUncommittedBlame(stagedContents, startLine, lineCount);
     }
 
-    const args = ['blame', '--line-porcelain'];
-    if (startLine !== undefined && lineCount !== undefined) {
-      args.push(`-L${startLine},${startLine + lineCount - 1}`);
-    }
-    args.push('--contents', '-', 'HEAD', '--', basePath);
-    return this.runCommandAtPathWithInput(repoPath, args, stagedContents);
+    const runBlame = (endLine?: number) => {
+      const args = ['blame', '--line-porcelain'];
+      if (startLine !== undefined && lineCount !== undefined && endLine !== undefined) args.push(`-L${startLine},${endLine}`);
+      args.push('--contents', '-', 'HEAD', '--', basePath);
+      return runCommandAtPathWithInput(repoPath, args, stagedContents);
+    };
+    return startLine !== undefined && lineCount !== undefined ? this.runBlameRange(startLine, lineCount, runBlame) : runBlame();
   }
 
   private async resolveStagedBlameBasePath(filePath: string, repoPath: string): Promise<string> {

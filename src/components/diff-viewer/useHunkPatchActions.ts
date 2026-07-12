@@ -1,19 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { buildHunkPatch, type ParsedHunk } from '@/utils/diffParser';
+import { buildHunkPatch, parseDiff, type ParsedHunk } from '@/utils/diffParser';
 import { gitClient } from '@/services/gitClient';
 import type { CatalogTranslateFn } from '@/i18n';
+import type { DiffRequest } from '@/types/diff';
 
 export type HunkPatchOperation = 'stage' | 'unstage' | 'discard';
 
 type UseHunkPatchActionsParams = {
   repoPath: string | null;
+  request: Pick<DiffRequest, 'path' | 'source'>;
   onRepoChanged?: () => void;
   onApplied?: () => void;
+  onError?: (message: string) => void;
   t: CatalogTranslateFn;
 };
 
-export const useHunkPatchActions = ({ repoPath, onRepoChanged, onApplied, t }: UseHunkPatchActionsParams) => {
-  const [hunkOpError, setHunkOpError] = useState<string | null>(null);
+const buildCurrentDiffArgs = (request: Pick<DiffRequest, 'path' | 'source'>): string[] =>
+  request.source === 'staged' ? ['diff', '--cached', '--', request.path] : ['diff', '--', request.path];
+
+const hasSameRawLines = (left: ParsedHunk, right: ParsedHunk): boolean =>
+  left.rawLines.length === right.rawLines.length && left.rawLines.every((line, index) => line === right.rawLines[index]);
+
+const isOutdatedHunkError = (error: string | undefined): boolean => /patch (failed|does not apply)/i.test(error || '');
+
+const buildCurrentHunkPatch = (diffText: string, displayedHunk: ParsedHunk): string | null => {
+  const currentDiff = parseDiff(diffText);
+  const currentHunk = currentDiff.hunks.find((candidate) => hasSameRawLines(candidate, displayedHunk));
+  return currentHunk ? buildHunkPatch(currentDiff.fileHeader, currentHunk) : null;
+};
+
+export const useHunkPatchActions = ({ repoPath, request, onRepoChanged, onApplied, onError, t }: UseHunkPatchActionsParams) => {
   const [isHunkOperationRunning, setIsHunkOperationRunning] = useState(false);
   const operationRef = useRef<number | null>(null);
   const generationRef = useRef(0);
@@ -23,7 +39,6 @@ export const useHunkPatchActions = ({ repoPath, onRepoChanged, onApplied, t }: U
     generationRef.current += 1;
     operationRef.current = null;
     setIsHunkOperationRunning(false);
-    setHunkOpError(null);
   }, [repoPath]);
 
   const applyHunk = useCallback(
@@ -32,27 +47,47 @@ export const useHunkPatchActions = ({ repoPath, onRepoChanged, onApplied, t }: U
       const generation = generationRef.current;
       const operationId = ++nextOperationIdRef.current;
       operationRef.current = operationId;
-      setHunkOpError(null);
       setIsHunkOperationRunning(true);
       try {
-        const patch = buildHunkPatch(fileHeader, hunk);
-        const result =
+        const applyPatch = async (patch: string) =>
           op === 'stage'
             ? await gitClient.applyPatch(patch, { cached: true }, repoPath)
             : op === 'unstage'
               ? await gitClient.applyPatch(patch, { cached: true, reverse: true }, repoPath)
               : await gitClient.applyPatch(patch, { reverse: true }, repoPath);
+        const result = await applyPatch(buildHunkPatch(fileHeader, hunk));
 
         if (generation !== generationRef.current || operationRef.current !== operationId) return;
         if (result.success) {
           onRepoChanged?.();
           onApplied?.();
         } else {
-          setHunkOpError(result.error || t('diffViewer.errors.hunkOperationFailed'));
+          // A previous hunk can have been staged while this displayed hunk was
+          // still rendered. Its context is unchanged, but its old line offset
+          // is now stale, so reload only the current file and retry that exact
+          // hunk with Git's current line numbers.
+          const latestDiff = isOutdatedHunkError(result.error)
+            ? await gitClient.getDiffPreview(buildCurrentDiffArgs(request), undefined, repoPath).catch(() => null)
+            : null;
+          if (generation !== generationRef.current || operationRef.current !== operationId) return;
+
+          const currentPatch = latestDiff?.success ? buildCurrentHunkPatch(latestDiff.data.text, hunk) : null;
+          if (currentPatch) {
+            const retryResult = await applyPatch(currentPatch);
+
+            if (generation !== generationRef.current || operationRef.current !== operationId) return;
+            if (retryResult.success) {
+              onRepoChanged?.();
+              onApplied?.();
+              return;
+            }
+          }
+
+          onError?.(result.error || t('diffViewer.errors.hunkOperationFailed'));
         }
       } catch (error: unknown) {
         if (generation !== generationRef.current || operationRef.current !== operationId) return;
-        setHunkOpError(error instanceof Error ? error.message : t('diffViewer.errors.hunkOperationFailed'));
+        onError?.(error instanceof Error ? error.message : t('diffViewer.errors.hunkOperationFailed'));
       } finally {
         if (operationRef.current === operationId) {
           operationRef.current = null;
@@ -60,11 +95,10 @@ export const useHunkPatchActions = ({ repoPath, onRepoChanged, onApplied, t }: U
         }
       }
     },
-    [onApplied, onRepoChanged, repoPath, t],
+    [onApplied, onError, onRepoChanged, repoPath, request, t],
   );
 
   return {
-    hunkOpError,
     isHunkOperationRunning,
     applyHunk,
   };

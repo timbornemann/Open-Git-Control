@@ -270,7 +270,9 @@ export function updatePlannerProject(projectId: string, input: { name?: string; 
 
 export function deletePlannerProject(projectId: string): void {
   const data = readProjectPlannerData();
-  if (!data.projects.some((project) => project.id === projectId)) return;
+  if (!data.projects.some((project) => project.id === projectId)) {
+    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
+  }
   writeProjectPlannerData({
     ...data,
     projects: data.projects.filter((project) => project.id !== projectId),

@@ -49,7 +49,6 @@ const renderPane = (diffText: string) => {
         activeHunkIndex: 0,
         setHunkRef: () => {},
         scrollToHunk: () => {},
-        hunkOpError: null,
         isHunkOperationRunning: false,
         applyHunk: () => {},
         showBlame: false,

@@ -396,7 +396,7 @@ describe('registerGithubHandlers fork flow', () => {
     getAuthorizedSelectedFileMock.mockReturnValueOnce(null);
     await expect(handler!(event, { owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/private/secret.txt' })).resolves.toEqual({
       success: false,
-      error: 'Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.',
+      error: 'RELEASE_ASSET_FILE_NOT_AUTHORIZED',
     });
     expect(uploadReleaseAsset).not.toHaveBeenCalled();
 

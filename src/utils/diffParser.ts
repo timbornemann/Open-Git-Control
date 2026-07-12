@@ -152,7 +152,11 @@ export const sideBySideRows = (rows: ParsedLine[]): ParsedLine[] => {
 };
 
 export const buildHunkPatch = (fileHeader: string[], hunk: ParsedHunk): string => {
-  const header = fileHeader.filter((line, index) => line || index < fileHeader.length - 1);
+  // Git's `index <old>..<new>` header describes the complete file diff. Once
+  // one hunk has been staged, that old object ID no longer describes the
+  // current index, so replaying another hunk from the rendered diff fails.
+  // The path and hunk context are sufficient for `git apply` to match it.
+  const header = fileHeader.filter((line, index) => (line || index < fileHeader.length - 1) && !/^index [0-9a-f]+\.\.[0-9a-f]+(?: \d+)?$/i.test(line));
   const rawHunkLines = hunk.rawLines.length
     ? hunk.rawLines
     : hunk.rows.map((row) => {

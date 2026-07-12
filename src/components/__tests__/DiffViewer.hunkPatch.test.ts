@@ -47,6 +47,25 @@ describe('DiffViewer hunk patch reconstruction', () => {
     expect(patch).toContain('rename to new-name.txt');
   });
 
+  it('omits the stale full-file index object IDs while preserving patch paths', () => {
+    const parsed = parseDiff(
+      [
+        'diff --git a/example.ts b/example.ts',
+        'index 1111111..2222222 100644',
+        '--- a/example.ts',
+        '+++ b/example.ts',
+        '@@ -1 +1 @@',
+        '-before',
+        '+after',
+      ].join('\n'),
+    );
+
+    const patch = buildHunkPatch(parsed.fileHeader, parsed.hunks[0]!);
+    expect(patch).not.toContain('index 1111111..2222222 100644');
+    expect(patch).toContain('--- a/example.ts');
+    expect(patch).toContain('+++ b/example.ts');
+  });
+
   it('parses additions, deletions, context rows, and no-newline markers', () => {
     const parsed = parseDiff(
       [

@@ -11,7 +11,7 @@ import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filte
 import { type ReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
-import { getCreateReleaseErrorMessage, getReleaseValidationErrorMessage } from './releaseWorkflowMessages';
+import { getCreateReleaseErrorMessage, getReleaseAssetErrorMessage, getReleaseValidationErrorMessage } from './releaseWorkflowMessages';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -326,7 +326,7 @@ export const useReleaseWorkflow = ({
           });
           if (!isCurrentGeneration(generation, repoPath)) return false;
           if (!uploadResult.success) {
-            setReleaseError(uploadResult.error || t('generated.components.releasecreator.release_asset_could_not_be_uploaded_e97d42d5'));
+            setReleaseError(getReleaseAssetErrorMessage(uploadResult.error || '', tr));
             setReleaseSuccess(releaseData);
             return false;
           }

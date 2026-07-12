@@ -61,6 +61,7 @@ beforeEach(() => {
   vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'https://github.com/acme/project.git' });
+  vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
 });
 
 afterEach(() => {
@@ -69,7 +70,7 @@ afterEach(() => {
 });
 
 describe('usePullRequestWorkflow merge guards', () => {
-  it('fetches a PR into FETCH_HEAD before force-resetting the disposable local review branch', async () => {
+  it('fetches a PR, creates a review branch without force-resetting it, and configures its pull upstream', async () => {
     const rendered = renderWorkflow();
 
     await act(async () => {
@@ -81,9 +82,35 @@ describe('usePullRequestWorkflow merge guards', () => {
     });
     expect(rendered.params.runGitCommand).toHaveBeenNthCalledWith(
       2,
-      ['checkout', '-B', 'pr-42-feature-new-thing', 'FETCH_HEAD'],
+      ['checkout', '-b', 'pr-42-feature-new-thing', 'FETCH_HEAD'],
       'Checked out PR branch pr-42-feature-new-thing.',
     );
+    expect(gitClient.runGitCommandForRepo).toHaveBeenNthCalledWith(1, 'C:/repo', 'branch', '--list', 'pr-42-feature-new-thing');
+    expect(gitClient.runGitCommandForRepo).toHaveBeenNthCalledWith(2, 'C:/repo', 'config', '--local', 'branch.pr-42-feature-new-thing.remote', 'origin');
+    expect(gitClient.runGitCommandForRepo).toHaveBeenNthCalledWith(
+      3,
+      'C:/repo',
+      'config',
+      '--local',
+      'branch.pr-42-feature-new-thing.merge',
+      'refs/pull/42/head',
+    );
+    rendered.unmount();
+  });
+
+  it('reuses an existing review branch without resetting local changes', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repoPath, commandName, ..._args) => {
+      if (commandName === 'branch') return { success: true, data: '* pr-42-feature\n' } as any;
+      return { success: true, data: '' } as any;
+    });
+    const rendered = renderWorkflow();
+
+    await act(async () => {
+      await rendered.hook.handleCheckoutPR(42, 'feature');
+    });
+
+    expect(rendered.params.runGitCommand).toHaveBeenNthCalledWith(2, ['checkout', 'pr-42-feature'], 'Checked out PR branch pr-42-feature.');
+    expect(rendered.params.runGitCommand.mock.calls.flat()).not.toContain('-B');
     rendered.unmount();
   });
 

@@ -303,6 +303,11 @@ export class UpdaterManager {
           UPDATER_STATE_WAIT_TIMEOUT_MS,
         );
       } catch (error: unknown) {
+        // electron-updater can complete its check promise before DNS/network
+        // work emits the terminal state. The short UI wait is not a failed
+        // update check, so keep the live `checking` status and let its event
+        // settle it instead of recording a false permanent error.
+        if (this.updaterStatus.state === 'checking') return { success: true };
         const message = formatUpdaterError(error);
         this.setUpdaterStatus({
           state: 'error',

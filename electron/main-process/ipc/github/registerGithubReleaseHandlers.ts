@@ -108,18 +108,18 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       const name = String(params?.name || '').trim();
 
       if (!owner || !repo) {
-        return { success: false, error: 'Owner und Repository sind erforderlich.' };
+        return { success: false, error: 'RELEASE_ASSET_OWNER_REPOSITORY_REQUIRED' };
       }
       if (!Number.isFinite(releaseId) || releaseId <= 0) {
-        return { success: false, error: 'Release-ID ist erforderlich.' };
+        return { success: false, error: 'RELEASE_ASSET_RELEASE_ID_REQUIRED' };
       }
       if (!filePath) {
-        return { success: false, error: 'Dateipfad ist erforderlich.' };
+        return { success: false, error: 'RELEASE_ASSET_FILE_PATH_REQUIRED' };
       }
 
       const authorizedFilePath = getAuthorizedSelectedFile(event.sender.id, filePath);
       if (!authorizedFilePath) {
-        return { success: false, error: 'Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.' };
+        return { success: false, error: 'RELEASE_ASSET_FILE_NOT_AUTHORIZED' };
       }
 
       try {
@@ -132,7 +132,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         });
         return { success: true, data: asset };
       } catch (error: unknown) {
-        return { success: false, error: toErrorMessage(error, 'Release-Asset konnte nicht hochgeladen werden.') };
+        return { success: false, error: toErrorMessage(error, 'RELEASE_ASSET_UPLOAD_FAILED') };
       }
     },
   );

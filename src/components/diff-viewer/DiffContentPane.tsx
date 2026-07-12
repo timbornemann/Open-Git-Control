@@ -23,7 +23,6 @@ type DiffContentPaneProps = {
   activeHunkIndex: number;
   setHunkRef: (index: number, element: HTMLDivElement | null) => void;
   scrollToHunk: (index: number) => void;
-  hunkOpError: string | null;
   isHunkOperationRunning: boolean;
   applyHunk: (hunk: ParsedHunk, fileHeader: string[], op: HunkPatchOperation) => void;
   onRepoChanged?: () => void;
@@ -48,7 +47,6 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
   activeHunkIndex,
   setHunkRef,
   scrollToHunk,
-  hunkOpError,
   isHunkOperationRunning,
   applyHunk,
   onRepoChanged,
@@ -243,8 +241,6 @@ export const DiffContentPane: React.FC<DiffContentPaneProps> = ({
       {parsed.hunks.length === 0 && (
         <div className="diff-empty-state">{t('generated.components.diff_viewer.diffcontentpane.no_hunk_data_available_3c3c1467')}</div>
       )}
-
-      {hunkOpError && <div className="diff-hunk-op-error">{hunkOpError}</div>}
 
       {parsed.hunks.map((hunk, hunkIndex) => {
         const rows = viewMode === 'side-by-side' ? sideBySideRows(hunk.rows) : hunk.rows;

@@ -59,4 +59,15 @@ describe('UpdaterManager', () => {
     await vi.advanceTimersByTimeAsync(150);
     await expect(update).resolves.toEqual({ success: true, action: 'downloaded' });
   });
+
+  it('keeps a slow update check in checking state after the short UI wait expires', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+    const manager = new UpdaterManager(false);
+
+    const update = manager.runOneClickUpdate();
+    await vi.advanceTimersByTimeAsync(5_100);
+
+    await expect(update).resolves.toEqual({ success: true });
+    expect(manager.getStatus()).toMatchObject({ state: 'checking', error: null });
+  });
 });

@@ -262,7 +262,12 @@ describe('renderer service clients', () => {
     expect(gitClient.buildResetToCommitArgs('--hard', 'abc123')).toEqual(['reset', '--hard', 'abc123']);
     expect(gitClient.getPullRequestBranchName(42, 'feature/new thing')).toBe('pr-42-feature-new-thing');
     expect(gitClient.buildFetchPullRequestBranchArgs(42, 'upstream')).toEqual(['fetch', 'upstream', 'pull/42/head']);
-    expect(gitClient.buildCheckoutPullRequestBranchArgs('pr-42-feature')).toEqual(['checkout', '-B', 'pr-42-feature', 'FETCH_HEAD']);
+    expect(gitClient.buildCheckoutPullRequestBranchArgs('pr-42-feature')).toEqual(['checkout', '-b', 'pr-42-feature', 'FETCH_HEAD']);
+    expect(gitClient.buildCheckoutExistingPullRequestBranchArgs('pr-42-feature')).toEqual(['checkout', 'pr-42-feature']);
+    expect(gitClient.buildPullRequestUpstreamConfigArgs('pr-42-feature', 'origin', 42)).toEqual([
+      ['config', '--local', 'branch.pr-42-feature.remote', 'origin'],
+      ['config', '--local', 'branch.pr-42-feature.merge', 'refs/pull/42/head'],
+    ]);
     expect(gitClient.buildSetUpstreamBranchArgs('main')).toEqual(['branch', '--set-upstream-to', 'origin/main', 'main']);
     expect(gitClient.buildPullArgs(['--ff-only'])).toEqual(['pull', '--ff-only']);
     expect(gitClient.buildPullRebaseArgs()).toEqual(['pull', '--rebase']);

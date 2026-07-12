@@ -8,7 +8,7 @@ describe('gitCommandPolicy', () => {
   });
 
   it('rejects unknown command names', () => {
-    expect(() => assertAllowedGitCommand('config')).toThrow('Git command not allowed.');
+    expect(() => assertAllowedGitCommand('rev-parse')).toThrow('Git command not allowed.');
   });
 
   it('normalizes valid args and rejects control characters', () => {
@@ -65,6 +65,13 @@ describe('gitCommandPolicy', () => {
 
   it('allows NUL-delimited rename-aware file diffs', () => {
     expect(() => validateCommandArgs('diff', ['--name-status', '-M', '-z', 'a'.repeat(40), 'b'.repeat(40)])).not.toThrow();
+  });
+
+  it('allows only the scoped PR upstream configuration required by review branches', () => {
+    expect(() => validateCommandArgs('branch', ['--list', 'pr-42-feature'])).not.toThrow();
+    expect(() => validateCommandArgs('config', ['--local', 'branch.pr-42-feature.remote', 'origin'])).not.toThrow();
+    expect(() => validateCommandArgs('config', ['--local', 'branch.pr-42-feature.merge', 'refs/pull/42/head'])).not.toThrow();
+    expect(() => validateCommandArgs('config', ['--local', 'core.hooksPath', 'unsafe'])).toThrow('Unsupported Git config key.');
   });
 
   it('validates forensic line range queries', () => {

@@ -31,6 +31,22 @@ describe('GitService.getLog pagination', () => {
   });
 });
 
+describe('GitService.applyPatchAtPath', () => {
+  it('allows Git to relocate a hunk with a stale line offset while retaining three lines of context', async () => {
+    const service = new GitService();
+    const runWithInput = vi.spyOn(service.runner, 'runWithInput').mockResolvedValue('');
+
+    await service.applyPatchAtPath('C:/repo', 'diff --git a/file.txt b/file.txt\n', { cached: true });
+
+    expect(runWithInput).toHaveBeenCalledWith(
+      'C:/repo',
+      ['apply', '--recount', '-C3', '--whitespace=nowarn', '--cached'],
+      'diff --git a/file.txt b/file.txt\n',
+      { requestedKind: 'write', commandName: 'apply' },
+    );
+  });
+});
+
 describe('GitService commit statistics', () => {
   it('loads root commit statistics with one first-parent show command', async () => {
     const service = new GitService();
@@ -188,6 +204,20 @@ describe('GitService file blame', () => {
     await expect(service.getFileBlameRange('src/existing.ts', undefined, 1, 501)).resolves.toBe('blame output');
 
     expect(runCommandSpy).toHaveBeenNthCalledWith(2, ['blame', '--line-porcelain', '-L1,501', '--', 'src/existing.ts']);
+  });
+
+  it('clamps an EOF look-ahead request instead of surfacing the Git blame fatal range error', async () => {
+    const service = new GitService();
+    const runCommandSpy = vi
+      .spyOn(service, 'runCommand')
+      .mockResolvedValueOnce('src/existing.ts\n')
+      .mockRejectedValueOnce(new Error('fatal: file has only 500 lines'))
+      .mockResolvedValueOnce('blame output');
+
+    await expect(service.getFileBlameRange('src/existing.ts', undefined, 1, 501)).resolves.toBe('blame output');
+
+    expect(runCommandSpy).toHaveBeenNthCalledWith(2, ['blame', '--line-porcelain', '-L1,501', '--', 'src/existing.ts']);
+    expect(runCommandSpy).toHaveBeenNthCalledWith(3, ['blame', '--line-porcelain', '-L1,500', '--', 'src/existing.ts']);
   });
 });
 

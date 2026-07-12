@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
-import { useUIContext } from '@/contexts/AppStateContext';
+import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
 import type { DiffRequest } from '@/types/diff';
 import { isMarkdownFilePath } from '@/utils/markdownPreview';
 import type { DiffViewMode, ParsedHunk } from '@/utils/diffParser';
@@ -24,6 +24,7 @@ interface DiffViewerProps {
 export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClose, onRepoChanged, onNavigateToCommit }) => {
   const { t, tr } = useI18n();
   const { setConfirmDialog } = useUIContext();
+  const { onToast } = useRepositoryContext();
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
   const [diffRefreshTrigger, setDiffRefreshTrigger] = useState(0);
@@ -37,10 +38,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
 
   const diffData = useDiffPreviewData({ repoPath, request, refreshTrigger: diffRefreshTrigger, t });
   const blame = useDiffBlame({ repoPath, request });
-  const { hunkOpError, isHunkOperationRunning, applyHunk } = useHunkPatchActions({
+  const reportHunkError = useCallback((message: string) => onToast(message, true), [onToast]);
+  const { isHunkOperationRunning, applyHunk } = useHunkPatchActions({
     repoPath,
+    request,
     onRepoChanged,
     onApplied: () => setDiffRefreshTrigger((value) => value + 1),
+    onError: reportHunkError,
     t,
   });
   const { markdownPreview, handleMarkdownPreviewClick } = useMarkdownPreview({
@@ -149,7 +153,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
           activeHunkIndex={activeHunkIndex}
           setHunkRef={setHunkRef}
           scrollToHunk={scrollToHunk}
-          hunkOpError={hunkOpError}
           isHunkOperationRunning={isHunkOperationRunning}
           applyHunk={requestHunkOperation}
           onRepoChanged={onRepoChanged}

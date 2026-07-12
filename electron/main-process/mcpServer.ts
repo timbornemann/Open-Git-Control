@@ -228,17 +228,17 @@ const handleMcpMessage = async (message: unknown, serverVersion: string): Promis
 
   const request = message;
   const hasId = hasOwn(request, 'id');
+  const isNotification = !hasId;
   const id = hasId ? request.id : null;
   const method = typeof request.method === 'string' ? request.method : '';
   const rawParams = request.params === undefined ? {} : request.params;
 
   if (request.jsonrpc !== '2.0' || !method || (hasId && !isValidRequestId(id)) || !isStructuredValue(rawParams)) {
-    return jsonRpcError(null, -32600, 'Invalid Request');
+    return isNotification ? null : jsonRpcError(null, -32600, 'Invalid Request');
   }
 
   // A JSON-RPC notification is a valid request without an id. It is still
   // executed, but it must never receive a result or an error response.
-  const isNotification = !hasId;
   try {
     let response: JsonObject;
     switch (method) {

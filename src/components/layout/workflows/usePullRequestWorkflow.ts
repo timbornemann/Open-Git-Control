@@ -202,10 +202,42 @@ export const usePullRequestWorkflow = ({
         { skipDirtyGuard: true },
       );
       if (!fetched || activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
-      await runGitCommand(
-        gitClient.buildCheckoutPullRequestBranchArgs(targetBranch),
+      const localBranchResult = await gitClient.runGitCommandForRepo(repoAtStart, 'branch', '--list', targetBranch);
+      if (activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+      if (!localBranchResult.success) {
+        setGitActionToast({
+          msg: localBranchResult.error || tr('Lokaler PR-Branch konnte nicht geprueft werden.', 'Could not inspect the local PR branch.'),
+          isError: true,
+        });
+        return;
+      }
+      const localBranchExists = String(localBranchResult.data || '')
+        .split(/\r?\n/)
+        .some((line) => line.trim().replace(/^\*\s+/, '') === targetBranch);
+      const checkedOut = await runGitCommand(
+        localBranchExists ? gitClient.buildCheckoutExistingPullRequestBranchArgs(targetBranch) : gitClient.buildCheckoutPullRequestBranchArgs(targetBranch),
         tr(`PR-Branch ${targetBranch} ausgecheckt.`, `Checked out PR branch ${targetBranch}.`),
       );
+      if (!checkedOut || activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+
+      const [setRemoteArgs, setMergeArgs] = gitClient.buildPullRequestUpstreamConfigArgs(targetBranch, fetchRemote, prNumber);
+      const remoteResult = await gitClient.runGitCommandForRepo(repoAtStart, setRemoteArgs[0], ...setRemoteArgs.slice(1));
+      if (activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+      if (!remoteResult.success) {
+        setGitActionToast({
+          msg: remoteResult.error || tr('PR-Upstream konnte nicht eingerichtet werden.', 'Could not configure the PR upstream.'),
+          isError: true,
+        });
+        return;
+      }
+      const mergeResult = await gitClient.runGitCommandForRepo(repoAtStart, setMergeArgs[0], ...setMergeArgs.slice(1));
+      if (activeRepoRef.current !== repoAtStart || ownerRepoScopeRef.current !== scopeAtStart) return;
+      if (!mergeResult.success) {
+        setGitActionToast({
+          msg: mergeResult.error || tr('PR-Upstream konnte nicht eingerichtet werden.', 'Could not configure the PR upstream.'),
+          isError: true,
+        });
+      }
     },
     [activeRepo, githubHost, ownerRepo, ownerRepoScope, runGitCommand, setGitActionToast, tr],
   );

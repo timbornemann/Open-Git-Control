@@ -27,3 +27,24 @@ export const getCreateReleaseErrorMessage = (errorText: string, t: (key: string)
   }
   return errorText || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0');
 };
+
+export const getReleaseAssetErrorMessage = (errorText: string, tr: (german: string, english: string) => string): string => {
+  switch (errorText) {
+    case 'RELEASE_ASSET_OWNER_REPOSITORY_REQUIRED':
+      return tr('Owner und Repository sind erforderlich.', 'Owner and repository are required.');
+    case 'RELEASE_ASSET_RELEASE_ID_REQUIRED':
+      return tr('Eine gueltige Release-ID ist erforderlich.', 'A valid release ID is required.');
+    case 'RELEASE_ASSET_FILE_PATH_REQUIRED':
+      return tr('Ein Release-Asset muss ausgewaehlt werden.', 'A release asset must be selected.');
+    case 'RELEASE_ASSET_FILE_NOT_AUTHORIZED':
+      return tr('Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.', 'Release assets must first be selected through the file dialog.');
+    case 'RELEASE_ASSET_NAME_REQUIRED':
+      return tr('Der Name des Release-Assets ist erforderlich.', 'A release asset name is required.');
+    case 'RELEASE_ASSET_FILE_NOT_FOUND':
+      return tr('Die Release-Asset-Datei wurde nicht gefunden.', 'The release asset file was not found.');
+    case 'RELEASE_ASSET_UPLOAD_FAILED':
+      return tr('Release-Asset konnte nicht hochgeladen werden.', 'Could not upload the release asset.');
+    default:
+      return errorText || tr('Release-Asset konnte nicht hochgeladen werden.', 'Could not upload the release asset.');
+  }
+};
