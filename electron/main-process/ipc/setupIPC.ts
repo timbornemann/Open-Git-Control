@@ -16,6 +16,10 @@ import { registerProjectPlannerHandlers } from './registerProjectPlannerHandlers
 import { registerUpdaterHandlers } from './registerUpdaterHandlers';
 import { registerExternalLinkHandlers } from '../externalLinks';
 import { repoJobRegistry } from '../repoJobRegistry';
+import { RepositoryRunConfigService } from '../RepositoryRunConfigService';
+import { RepositoryRunService } from '../RepositoryRunService';
+import { registerRepositoryRunHandlers } from './registerRepositoryRunHandlers';
+import { readStoreData } from '../repoStore';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -49,7 +53,9 @@ export function setupIPC({
   getGeminiApiKeyFromSecureStore,
   getOpenAiApiKeyFromSecureStore,
   buildDiagnosticsReport,
-}: SetupIpcDeps): void {
+}: SetupIpcDeps): { repositoryRunService: RepositoryRunService } {
+  const repositoryRunConfigService = new RepositoryRunConfigService();
+  const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerDialogHandlers({ gitService });
   registerGitHandlers({
     gitService,
@@ -73,4 +79,10 @@ export function setupIPC({
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
   registerExternalLinkHandlers();
+  registerRepositoryRunHandlers({
+    configService: repositoryRunConfigService,
+    runService: repositoryRunService,
+    readStoredRepoPaths: () => readStoreData().repos.map((repo) => repo.path),
+  });
+  return { repositoryRunService };
 }

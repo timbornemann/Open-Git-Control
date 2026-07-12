@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- this component is the intentionally central primary-pane route switch. */
 import React from 'react';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
 import { StagingArea } from '@/components/staging-area';
@@ -11,6 +12,7 @@ import { GithubAuthGuide } from './GithubAuthGuide';
 import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
 import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
+import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 
 const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((module) => ({ default: module.CommitGraph })));
 const DiffViewer = React.lazy(() => import('@/components/diff-viewer').then((module) => ({ default: module.DiffViewer })));
@@ -77,12 +79,14 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showRecoveryCenter,
     showReleaseCreator: github.showReleaseCreator,
     showTimeline,
+    showRunConsole: workflow.isRunConsoleOpen && Boolean(workflow.repositoryRun),
   });
   const showGithubGuide = route === 'githubGuide';
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
   const isReleaseView = route === 'release';
   const isTimelineView = route === 'timeline';
+  const isRunConsoleView = route === 'runConsole';
   const primaryPaneTitle = getMainPrimaryTitle(route, t);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
   const lazyPaneFallback = (
@@ -194,6 +198,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           <React.Suspense fallback={lazyPaneFallback}>
             <FileTimelineView onClose={() => setShowTimeline(false)} commits={timelineCommits} />
           </React.Suspense>
+        ) : isRunConsoleView && workflow.repositoryRun ? (
+          <RepositoryRunConsole run={workflow.repositoryRun} onStop={() => void workflow.onStopRepositoryRun()} onBack={workflow.onCloseRunConsole} />
         ) : workingDirectoryFilePath && repository.activeRepo ? (
           <WorkingDirectoryFileViewer
             repoPath={repository.activeRepo}

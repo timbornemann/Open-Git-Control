@@ -4,9 +4,10 @@ import type { ElectronGitAPI } from './git';
 import type { ElectronGithubAPI, ElectronReleaseNotesAPI } from './github';
 import type { ElectronPlannerAPI } from './planner';
 import type { ElectronReposAPI } from './repos';
+import type { ElectronRepositoryRunAPI } from './repositoryRun';
 import type { ElectronSettingsAPI } from './settings';
 
-export type ElectronApiNamespaceKey = 'git' | 'github' | 'planner' | 'settings' | 'app' | 'ai' | 'repos';
+export type ElectronApiNamespaceKey = 'git' | 'github' | 'planner' | 'settings' | 'app' | 'ai' | 'repos' | 'runs';
 
 export interface ElectronFlatAPI
   extends
@@ -17,7 +18,8 @@ export interface ElectronFlatAPI
     ElectronSettingsAPI,
     ElectronAppAPI,
     ElectronAiAPI,
-    ElectronReposAPI {}
+    ElectronReposAPI,
+    ElectronRepositoryRunAPI {}
 
 export interface ElectronAPI extends ElectronFlatAPI {
   git: ElectronGitAPI;
@@ -27,6 +29,7 @@ export interface ElectronAPI extends ElectronFlatAPI {
   app: ElectronAppAPI;
   ai: ElectronAiAPI;
   repos: ElectronReposAPI;
+  runs: ElectronRepositoryRunAPI;
 }
 
 export type { ElectronAiAPI } from './ai';
@@ -35,4 +38,5 @@ export type { ElectronGitAPI } from './git';
 export type { ElectronGithubAPI, ElectronReleaseNotesAPI } from './github';
 export type { ElectronPlannerAPI } from './planner';
 export type { ElectronReposAPI } from './repos';
+export type { ElectronRepositoryRunAPI } from './repositoryRun';
 export type { ElectronSettingsAPI } from './settings';

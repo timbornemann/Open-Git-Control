@@ -15,6 +15,7 @@ import type { GitHubReleaseContextDto } from '@/types/githubDtos';
 import type { GitMergeMode } from '@/types/git';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
+import type { RepositoryRunActionId } from '@/types/repositoryRun';
 
 export type { CommitNavigationRequest } from '@/app/state/contracts';
 
@@ -77,6 +78,7 @@ export type WorkflowContextValue = WorkflowStateContract & {
   onConflictRebaseAbort: () => void;
   onConflictCherryPickContinue: () => void;
   onConflictCherryPickAbort: () => void;
+  onStartRepositoryRun: (action: RepositoryRunActionId) => Promise<boolean>;
 };
 
 export type UIContextValue = BaseUIContextValue & {

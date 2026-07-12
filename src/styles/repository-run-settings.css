@@ -1,0 +1,95 @@
+.repository-run-settings__path {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.repository-run-settings__error {
+  margin: 10px 0;
+  padding: 9px;
+  border: 1px solid var(--status-danger);
+}
+.repository-run-settings__action {
+  margin-top: 10px;
+  border: 1px solid var(--line-subtle);
+  background: var(--bg-panel);
+}
+.repository-run-settings__action-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 0;
+  color: var(--text-primary);
+  background: transparent;
+  text-align: left;
+}
+.repository-run-settings__action-header span {
+  display: grid;
+  gap: 3px;
+}
+.repository-run-settings__action-header small {
+  color: var(--text-muted);
+  font: 0.68rem var(--font-mono);
+}
+.repository-run-settings__action-body {
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+.repository-run-settings__templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 9px 0;
+}
+.repository-run-settings__step {
+  padding: 10px;
+  margin-top: 8px;
+  border: 1px solid var(--line-subtle);
+  background: var(--bg-base);
+}
+.repository-run-settings__step-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.repository-run-settings__select-label {
+  display: grid;
+  gap: 3px;
+  color: var(--text-secondary);
+  font: 0.63rem var(--font-mono);
+}
+.repository-run-settings__select-label select {
+  min-width: 126px;
+}
+.repository-run-settings__step-title input {
+  flex: 1;
+  min-width: 120px;
+}
+.repository-run-settings__platforms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.repository-run-settings__platforms label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px;
+  align-items: center;
+  color: var(--text-secondary);
+  font: 0.72rem var(--font-mono);
+}
+.repository-run-settings__platforms textarea {
+  grid-column: 1 / -1;
+  min-width: 0;
+  resize: vertical;
+}
+@media (max-width: 860px) {
+  .repository-run-settings__platforms {
+    grid-template-columns: 1fr;
+  }
+  .repository-run-settings__step-title {
+    flex-wrap: wrap;
+  }
+}

@@ -39,6 +39,7 @@ if (isPrimaryInstance) {
   const updaterManager = new UpdaterManager(isDev);
   let planningApiServer: PlanningApiServerHandle | null = null;
   let planningApiError: string | null = null;
+  let repositoryRunService: { dispose: () => void } | null = null;
   const preferredPlanningApiPort = (() => {
     const parsed = Number(process.env.OPEN_GIT_CONTROL_API_PORT || '2990');
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2990;
@@ -117,7 +118,7 @@ if (isPrimaryInstance) {
       app.setAppUserModelId(WINDOWS_APP_ID);
     }
 
-    setupIPC({
+    ({ repositoryRunService } = setupIPC({
       gitService,
       githubService,
       aiService,
@@ -129,7 +130,7 @@ if (isPrimaryInstance) {
       getGeminiApiKeyFromSecureStore,
       getOpenAiApiKeyFromSecureStore,
       buildDiagnosticsReport,
-    });
+    }));
 
     installAppSecurity({ isDev, mainProcessDir: __dirname });
     openMainWindowIfReady();
@@ -154,6 +155,7 @@ if (isPrimaryInstance) {
   });
 
   app.on('before-quit', () => {
+    repositoryRunService?.dispose();
     updaterManager.dispose();
     if (planningApiServer) {
       void planningApiServer.close().catch((error) => {

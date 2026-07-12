@@ -2,7 +2,8 @@ import type { AppTabId } from '@/app/state/contracts';
 import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 
-export type MainPrimaryRoute = 'planner' | 'settings' | 'release' | 'timeline' | 'githubGuide' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
+export type MainPrimaryRoute =
+  'planner' | 'settings' | 'release' | 'timeline' | 'runConsole' | 'githubGuide' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
 
 type RouteParams = {
   activeConflictPath: string | null;
@@ -14,6 +15,7 @@ type RouteParams = {
   showRecoveryCenter: boolean;
   showReleaseCreator: boolean;
   showTimeline: boolean;
+  showRunConsole: boolean;
 };
 
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -28,11 +30,13 @@ export const getMainPrimaryRoute = ({
   showRecoveryCenter,
   showReleaseCreator,
   showTimeline,
+  showRunConsole,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
   if (activeTab === 'repo' && showReleaseCreator) return 'release';
   if (activeTab === 'repo' && showTimeline) return 'timeline';
+  if (activeTab === 'repo' && showRunConsole) return 'runConsole';
   if (activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod)) return 'githubGuide';
   if (showRecoveryCenter) return 'recovery';
   if (activeConflictPath) return 'conflict';
@@ -64,4 +68,4 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): stri
   }
 };
 
-export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean => route !== 'planner' && route !== 'graph';
+export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean => route !== 'planner' && route !== 'graph' && route !== 'runConsole';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { GitBranch, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
-import { useGitHubStore, useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
+import { useGitHubStore, useGitStore, useSettingsStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 
 type MainTopbarProps = {
@@ -22,6 +22,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   isTimelineLoading,
 }) => {
   const activeTab = useUIStore((state) => state.activeTab);
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const onSelectSettingsTab = useSettingsStore((state) => state.onSelectSettingsTab);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const branches = useGitStore((state) => state.branches);
   const currentBranch = useGitStore((state) => state.currentBranch);
@@ -39,6 +41,11 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onPushForceWithLease = useWorkflowStore((state) => state.onPushForceWithLease);
   const onPushTags = useWorkflowStore((state) => state.onPushTags);
   const onPushSetUpstream = useWorkflowStore((state) => state.onPushSetUpstream);
+  const repositoryRun = useWorkflowStore((state) => state.repositoryRun);
+  const activeRunConfig = useWorkflowStore((state) => state.activeRunConfig);
+  const onStartRepositoryRun = useWorkflowStore((state) => state.onStartRepositoryRun);
+  const onStopRepositoryRun = useWorkflowStore((state) => state.onStopRepositoryRun);
+  const onOpenRunConsole = useWorkflowStore((state) => state.onOpenRunConsole);
   const onOpenReleaseCreator = useGitHubStore((state) => state.onOpenReleaseCreator);
   const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
@@ -112,6 +119,22 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
             onOpenReleaseCreator={onOpenReleaseCreator}
             onOpenTimeline={onOpenTimeline}
             isTimelineLoading={isTimelineLoading}
+            repositoryRun={repositoryRun}
+            activeRunConfig={activeRunConfig}
+            onStartRepositoryRun={async (action) => {
+              const started = await onStartRepositoryRun(action);
+              if (started) setActiveTab('repo');
+              return started;
+            }}
+            onStopRepositoryRun={onStopRepositoryRun}
+            onOpenRunConsole={() => {
+              setActiveTab('repo');
+              onOpenRunConsole();
+            }}
+            onOpenRunSettings={() => {
+              onSelectSettingsTab('run');
+              setActiveTab('settings');
+            }}
           />
         )}
         {canShowInspectorPane && (

@@ -14,6 +14,7 @@ import type {
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
 import type { RepositoryInitializationOptionsDto } from '../../src/shared/ipc/contracts/git';
+import type { RepositoryRunActionId, RepositoryRunConfigDto, RepositoryRunEventDto } from '../../src/types/repositoryRun';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -236,6 +237,16 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     getStoredRepos: () => ipcRenderer.invoke(IpcChannel.ReposGetStored),
     setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke(IpcChannel.ReposSetStored, data),
+    getRepositoryRunConfig: (repoPath: string) => ipcRenderer.invoke(IpcChannel.RepositoryRunGetConfig, repoPath),
+    saveRepositoryRunConfig: (repoPath: string, config: RepositoryRunConfigDto) => ipcRenderer.invoke(IpcChannel.RepositoryRunSaveConfig, repoPath, config),
+    startRepositoryRun: (repoPath: string, action: RepositoryRunActionId) => ipcRenderer.invoke(IpcChannel.RepositoryRunStart, repoPath, action),
+    stopRepositoryRun: (runId?: string) => ipcRenderer.invoke(IpcChannel.RepositoryRunStop, runId),
+    getRepositoryRunState: () => ipcRenderer.invoke(IpcChannel.RepositoryRunGetState),
+    onRepositoryRunEvent: (callback: (event: RepositoryRunEventDto) => void) => {
+      const handler = (_event: IpcRendererEvent, payload: RepositoryRunEventDto) => callback(payload);
+      ipcRenderer.on(IpcChannel.RepositoryRunEvent, handler);
+      return () => ipcRenderer.removeListener(IpcChannel.RepositoryRunEvent, handler);
+    },
     plannerGetData: () => ipcRenderer.invoke(IpcChannel.PlannerGetData),
     onPlannerDataChanged: (callback: () => void) => {
       const handler = () => callback();
@@ -468,6 +479,14 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       resolveRepoPath: flatApi.resolveRepoPath,
       setRepoPath: flatApi.setRepoPath,
       clearRepoPath: flatApi.clearRepoPath,
+    },
+    runs: {
+      getRepositoryRunConfig: flatApi.getRepositoryRunConfig,
+      saveRepositoryRunConfig: flatApi.saveRepositoryRunConfig,
+      startRepositoryRun: flatApi.startRepositoryRun,
+      stopRepositoryRun: flatApi.stopRepositoryRun,
+      getRepositoryRunState: flatApi.getRepositoryRunState,
+      onRepositoryRunEvent: flatApi.onRepositoryRunEvent,
     },
   };
 

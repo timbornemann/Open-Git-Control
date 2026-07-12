@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
+import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
 import { useI18n } from '@/i18n';
+import { RepositoryRunMenu } from './RepositoryRunMenu';
 
 type Props = {
   activeRepo: string | null;
@@ -25,6 +27,12 @@ type Props = {
   onOpenReleaseCreator: () => void;
   onOpenTimeline?: () => void;
   isTimelineLoading?: boolean;
+  repositoryRun: RepositoryRunStateDto | null;
+  activeRunConfig: RepositoryRunConfigStateDto | null;
+  onStartRepositoryRun: (action: RepositoryRunActionId) => Promise<boolean>;
+  onStopRepositoryRun: () => Promise<boolean>;
+  onOpenRunConsole: () => void;
+  onOpenRunSettings: () => void;
 };
 
 type SplitOption = {
@@ -54,12 +62,18 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenReleaseCreator,
   onOpenTimeline,
   isTimelineLoading = false,
+  repositoryRun,
+  activeRunConfig,
+  onStartRepositoryRun,
+  onStopRepositoryRun,
+  onOpenRunConsole,
+  onOpenRunSettings,
 }) => {
   const { t } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
-  const [openMenu, setOpenMenu] = useState<'pull' | 'push' | 'merge' | 'more' | 'moreMerge' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'pull' | 'push' | 'merge' | 'run' | 'more' | 'moreMerge' | null>(null);
   const [mergeQuery, setMergeQuery] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -146,7 +160,6 @@ export const TopbarActions: React.FC<Props> = ({
     ],
     [onPushForceWithLease, onPushSetUpstream, onPushTags, t],
   );
-
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current) return;
@@ -236,6 +249,17 @@ export const TopbarActions: React.FC<Props> = ({
         <RefreshCw size={16} className={isFetching ? 'spin' : ''} />
         <span className="topbar-action-label">Fetch</span>
       </button>
+      <RepositoryRunMenu
+        activeRepo={activeRepo}
+        activeRunConfig={activeRunConfig}
+        repositoryRun={repositoryRun}
+        open={openMenu === 'run'}
+        setOpen={(open) => setOpenMenu(open ? 'run' : null)}
+        onStart={onStartRepositoryRun}
+        onStop={onStopRepositoryRun}
+        onOpenConsole={onOpenRunConsole}
+        onOpenSettings={onOpenRunSettings}
+      />
       <div className="topbar-split-wrap topbar-action-secondary">
         <button
           className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"

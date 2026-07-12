@@ -9,9 +9,10 @@ import type {
   PullRequestDto,
 } from '@/types/githubDtos';
 import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState, RepoOwnerRef } from '@/types/git';
+import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
-export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
+export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'run' | 'system';
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
@@ -235,4 +236,12 @@ export type WorkflowStateContract = {
   onPushTags: () => void;
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
+  repositoryRun: RepositoryRunStateDto | null;
+  activeRunConfig: RepositoryRunConfigStateDto | null;
+  isRunConsoleOpen: boolean;
+  onStartRepositoryRun: (action: RepositoryRunActionId) => Promise<boolean>;
+  onStopRepositoryRun: () => Promise<boolean>;
+  onOpenRunConsole: () => void;
+  onCloseRunConsole: () => void;
+  onRefreshRunConfig: () => Promise<void>;
 };

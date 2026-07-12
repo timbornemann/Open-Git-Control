@@ -729,6 +729,32 @@ git config --global user.name "Dein Name"
 git config --global user.email "dein@email.de"
 ```
 
+## Repository-Run-Kommandos
+
+Das **Run**-Menue neben Fetch startet repository-spezifische Test-, Format-, Start- und Build-Befehle. Die Konfiguration wird versioniert in `.Open-Git-Control/run.json` abgelegt; Befehle laufen nur nach einem expliziten Klick und immer mit dem Repository-Root als Arbeitsverzeichnis.
+
+```json
+{
+  "version": 1,
+  "actions": {
+    "test": {
+      "steps": [
+        {
+          "id": "unit-tests",
+          "label": "Unit-Tests",
+          "parser": "vitest-jest",
+          "windows": { "shell": "powershell", "command": "npm test" },
+          "macos": { "shell": "zsh", "command": "npm test" },
+          "linux": { "shell": "bash", "command": "npm test" }
+        }
+      ]
+    }
+  }
+}
+```
+
+Unter **Einstellungen → Run** lassen sich die fünf festen Aktionen bearbeiten, erkannte Vorlagen übernehmen und geordnete Workflows konfigurieren. Die In-App-Konsole behält die Roh-Ausgabe und wertet typische Test-, Lint- und Compiler-Diagnosen aus.
+
 ## Entwicklung
 
 Dependencies installieren:

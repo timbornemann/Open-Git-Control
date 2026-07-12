@@ -18,6 +18,7 @@ import { useReleaseWorkflow } from './workflows/useReleaseWorkflow';
 import { useGitJobEvents } from '@/app/state/useGitJobEvents';
 import { useRepoScopedNavigationState } from '@/app/state/useRepoScopedNavigationState';
 import { useSettingsState } from '@/app/state/useSettingsState';
+import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
@@ -125,6 +126,7 @@ export const useAppState = () => {
     onNoActiveRepo: resetRepoScopedUi,
     language: settings.language,
   });
+  const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh });
   const {
     activeGitActionLabel,
     activeGitCommand,
@@ -506,6 +508,7 @@ export const useAppState = () => {
     plannerRefreshSignal,
     jobs,
     clearJobs,
+    ...repositoryRun,
 
     isConnectingGithubRepo,
     connectError,
