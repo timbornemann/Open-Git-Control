@@ -285,8 +285,8 @@ export const gitClient = {
     return requireElectronGitApi().approveSecretScanCommit(repoPath);
   },
 
-  async listWorkingDirectory(repoPath: string) {
-    return requireElectronGitApi().listWorkingDirectory(repoPath);
+  async listWorkingDirectory(repoPath: string, parentPath?: string) {
+    return requireElectronGitApi().listWorkingDirectory(repoPath, parentPath);
   },
   async getWorkingDirectoryPreview(filePath: string, repoPath: string) {
     return requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);

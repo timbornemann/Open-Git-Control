@@ -187,7 +187,7 @@ export interface ElectronGitAPI {
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;
   writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
   deleteRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileDeleteResultDto>;
-  listWorkingDirectory: (repoPath: string) => Promise<IpcResult<WorkingDirectoryEntryDto[]>>;
+  listWorkingDirectory: (repoPath: string, parentPath?: string) => Promise<IpcResult<WorkingDirectoryEntryDto[]>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
   moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

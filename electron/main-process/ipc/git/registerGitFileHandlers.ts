@@ -77,24 +77,23 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
     return allowMissing ? resolveRepositoryPathForCreate(repoPath, relativePath, label) : resolveExistingRepositoryPath(repoPath, relativePath, label);
   };
 
-  ipcMain.handle(IpcChannel.GitListWorkingDirectory, async (_event: unknown, requestedRepoPath?: unknown) => {
+  ipcMain.handle(IpcChannel.GitListWorkingDirectory, async (_event: unknown, requestedRepoPath?: unknown, requestedParentPath?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const parentPath = asRepositoryFilePath(requestedParentPath);
+      const directoryPath = parentPath ? workingDirectoryPath(repoPath, parentPath, 'Directory path') : fs.realpathSync(repoPath);
+      if (!fs.statSync(directoryPath).isDirectory()) throw new Error('Target path is not a directory.');
       const entries: Array<{ path: string; name: string; kind: 'file' | 'directory'; bytes?: number }> = [];
-      const visit = (absolutePath: string, relativePath = '') => {
-        for (const item of fs.readdirSync(absolutePath, { withFileTypes: true })) {
-          if (item.name.startsWith('.')) continue;
-          const childRelativePath = relativePath ? `${relativePath}/${item.name}` : item.name;
-          const childAbsolutePath = path.join(absolutePath, item.name);
-          if (item.isDirectory()) {
-            entries.push({ path: childRelativePath, name: item.name, kind: 'directory' });
-            visit(childAbsolutePath, childRelativePath);
-          } else if (item.isFile()) {
-            entries.push({ path: childRelativePath, name: item.name, kind: 'file', bytes: fs.statSync(childAbsolutePath).size });
-          }
+      for (const item of fs.readdirSync(directoryPath, { withFileTypes: true })) {
+        if (item.name.startsWith('.')) continue;
+        const childRelativePath = parentPath ? `${parentPath}/${item.name}` : item.name;
+        const childAbsolutePath = path.join(directoryPath, item.name);
+        if (item.isDirectory()) {
+          entries.push({ path: childRelativePath, name: item.name, kind: 'directory' });
+        } else if (item.isFile()) {
+          entries.push({ path: childRelativePath, name: item.name, kind: 'file', bytes: fs.statSync(childAbsolutePath).size });
         }
-      };
-      visit(repoPath);
+      }
       return { success: true, data: entries };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

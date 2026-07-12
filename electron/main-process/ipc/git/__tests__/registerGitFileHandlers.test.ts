@@ -43,6 +43,30 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(showItemInFolderMock).toHaveBeenCalledWith(fs.realpathSync(path.join(repoPath, 'src', 'app.ts')));
   });
 
+  it('lists only the requested working-directory level', async () => {
+    fs.mkdirSync(path.join(repoPath, 'src', 'nested'));
+    fs.writeFileSync(path.join(repoPath, 'src', 'nested', 'deep.ts'), 'export {};\n');
+    fs.writeFileSync(path.join(repoPath, '.hidden'), 'ignored\n');
+
+    const rootResult = await handlers.get(IpcChannel.GitListWorkingDirectory)!({}, repoPath, '');
+    const sourceResult = await handlers.get(IpcChannel.GitListWorkingDirectory)!({}, repoPath, 'src');
+
+    expect(rootResult).toEqual({ success: true, data: [{ path: 'src', name: 'src', kind: 'directory' }] });
+    expect(sourceResult).toEqual({
+      success: true,
+      data: expect.arrayContaining([
+        { path: 'src/app.ts', name: 'app.ts', kind: 'file', bytes: expect.any(Number) },
+        { path: 'src/nested', name: 'nested', kind: 'directory' },
+      ]),
+    });
+  });
+
+  it('rejects a working-directory level outside the active repository', async () => {
+    const result = await handlers.get(IpcChannel.GitListWorkingDirectory)!({}, repoPath, '../outside');
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('repository-relative') });
+  });
+
   it('deletes only a file in the active repository', async () => {
     const deleteRepoFileAtPath = vi.fn().mockResolvedValue(undefined);
     registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, files: { deleteRepoFileAtPath } } as any });

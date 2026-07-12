@@ -38,10 +38,19 @@
 
 .working-tree-root__label,
 .working-tree-row__label {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.working-tree-row__loading {
+  flex: 0 0 auto;
+  padding-right: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .working-tree-root__label {

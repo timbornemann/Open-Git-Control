@@ -206,7 +206,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'delete', IpcChannel.GitDeleteRepoFile, filePath, repoPath)
         : invokeGitOperation('delete', IpcChannel.GitDeleteRepoFile, filePath),
-    listWorkingDirectory: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'list files', IpcChannel.GitListWorkingDirectory, repoPath),
+    listWorkingDirectory: (repoPath: string, parentPath = '') =>
+      invokeGitOperationForRepo(repoPath, 'list files', IpcChannel.GitListWorkingDirectory, repoPath, parentPath),
     getWorkingDirectoryPreview: (filePath: string, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath),
     moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>

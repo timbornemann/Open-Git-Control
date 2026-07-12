@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useToastQueue } from '@/hooks/useToastQueue';
@@ -23,34 +23,62 @@ const basename = (value: string) => value.split('/').pop() || value;
 export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger, expandedPaths, onExpandedPathsChange, onOpenFile, onRepoChanged }) => {
   const { setConfirmDialog, setInputDialog } = useUIContext();
   const { toasts, setToast, dismiss } = useToastQueue(3000);
-  const [entries, setEntries] = useState<WorkingDirectoryEntryDto[]>([]);
+  const [entriesByParent, setEntriesByParent] = useState<Record<string, WorkingDirectoryEntryDto[]>>({});
+  const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<{ entry: WorkingDirectoryEntryDto; x: number; y: number } | null>(null);
+  const activeRepoPathRef = useRef(repoPath);
+  const loadedDirectoryPathsRef = useRef(new Set<string>());
+  const initializedRepoPathRef = useRef<string | null>(null);
+  activeRepoPathRef.current = repoPath;
 
-  const load = useCallback(async () => {
-    if (!repoPath || !gitClient.isAvailable()) return;
-    const result = await gitClient.listWorkingDirectory(repoPath);
-    if (result.success) setEntries(result.data || []);
-    else setToast({ msg: result.error || 'Could not load working directory.', isError: true });
-  }, [repoPath, setToast]);
+  const loadDirectory = useCallback(
+    async (parentPath = ''): Promise<WorkingDirectoryEntryDto[]> => {
+      if (!repoPath || !gitClient.isAvailable()) return [];
+      const repoAtStart = repoPath;
+      loadedDirectoryPathsRef.current.add(parentPath);
+      setLoadingDirectories((current) => new Set(current).add(parentPath));
+      try {
+        const result = await gitClient.listWorkingDirectory(repoAtStart, parentPath);
+        if (activeRepoPathRef.current !== repoAtStart) return [];
+        if (!result.success) {
+          setToast({ msg: result.error || 'Could not load working directory.', isError: true });
+          return [];
+        }
+        const entries = result.data || [];
+        setEntriesByParent((current) => ({ ...current, [parentPath]: entries }));
+        return entries;
+      } finally {
+        setLoadingDirectories((current) => {
+          const next = new Set(current);
+          next.delete(parentPath);
+          return next;
+        });
+      }
+    },
+    [repoPath, setToast],
+  );
+
+  const refreshLoadedDirectories = useCallback(async () => {
+    await Promise.all([...loadedDirectoryPathsRef.current].map((parentPath) => loadDirectory(parentPath)));
+  }, [loadDirectory]);
+
   useEffect(() => {
-    void load();
-  }, [load, refreshTrigger]);
+    if (initializedRepoPathRef.current !== repoPath) {
+      initializedRepoPathRef.current = repoPath;
+      loadedDirectoryPathsRef.current.clear();
+      setEntriesByParent({});
+      if (repoPath) void loadDirectory('');
+      return;
+    }
+    if (repoPath) void refreshLoadedDirectories();
+  }, [loadDirectory, refreshLoadedDirectories, refreshTrigger, repoPath]);
+
   useEffect(() => {
     const close = () => setContext(null);
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
-
-  const childrenByParent = useMemo(() => {
-    const map = new Map<string, WorkingDirectoryEntryDto[]>();
-    for (const entry of entries) {
-      const parent = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : '';
-      map.set(parent, [...(map.get(parent) || []), entry]);
-    }
-    for (const values of map.values()) values.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
-    return map;
-  }, [entries]);
 
   const runMutation = async (action: () => Promise<{ success: boolean; error?: string }>) => {
     const result = await action();
@@ -58,11 +86,11 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       setToast({ msg: result.error || 'File operation failed.', isError: true });
       return false;
     }
-    await load();
+    await refreshLoadedDirectories();
     onRepoChanged();
     return true;
   };
-  const pasteInto = (folder: string) => {
+  const pasteInto = async (folder: string) => {
     if (!clipboard || !repoPath) return;
     const targetPath = folder ? `${folder}/${basename(clipboard.path)}` : basename(clipboard.path);
     if (clipboard.cut && clipboard.path === targetPath) {
@@ -75,12 +103,13 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
           ? gitClient.moveWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath)
           : gitClient.copyWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath),
       );
-    const exists = entries.some((entry) => entry.path === targetPath);
+    const destinationEntries = entriesByParent[folder] || (await loadDirectory(folder));
+    const exists = destinationEntries.some((entry) => entry.path === targetPath);
     if (exists) {
       const copyTargetPath = getAvailableWorkingDirectoryCopyPath(
         targetPath,
         clipboard.kind,
-        entries.map((entry) => entry.path),
+        destinationEntries.map((entry) => entry.path),
       );
       setConfirmDialog({
         variant: 'danger',
@@ -122,7 +151,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       onSubmit: async (values) => {
         const parent = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : '';
         const target = parent ? `${parent}/${values.name}` : values.name;
-        const exists = entries.some((item) => item.path === target);
+        const exists = (entriesByParent[parent] || []).some((item) => item.path === target);
         if (exists) {
           setToast({ msg: 'A file or folder with that name already exists.', isError: true });
           return;
@@ -144,49 +173,57 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       },
     });
   const render = (parent: string, ancestorIsLast: boolean[] = []): React.ReactNode =>
-    (childrenByParent.get(parent) || []).map((entry, index, siblings) => {
-      const open = expandedPaths.has(entry.path);
-      const isLast = index === siblings.length - 1;
-      return (
-        <React.Fragment key={entry.path}>
-          <button
-            type="button"
-            className="working-tree-row"
-            onClick={() =>
-              entry.kind === 'directory'
-                ? onExpandedPathsChange((current) => {
-                    const next = new Set(current);
-                    open ? next.delete(entry.path) : next.add(entry.path);
-                    return next;
-                  })
-                : onOpenFile(entry.path)
-            }
-            onContextMenu={(event) => {
-              event.preventDefault();
-              setContext({ entry, x: event.clientX, y: event.clientY });
-            }}
-          >
-            <span className="working-tree-row__guide" aria-hidden>
-              {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
-                <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
-              ))}
-              {isLast ? '└──' : '├──'}
-            </span>
-            {entry.kind === 'directory' ? (
-              open ? (
-                <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+    (entriesByParent[parent] || [])
+      .slice()
+      .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1))
+      .map((entry, index, siblings) => {
+        const open = expandedPaths.has(entry.path);
+        const isLast = index === siblings.length - 1;
+        const loading = loadingDirectories.has(entry.path);
+        return (
+          <React.Fragment key={entry.path}>
+            <button
+              type="button"
+              className="working-tree-row"
+              onClick={() => {
+                if (entry.kind !== 'directory') {
+                  onOpenFile(entry.path);
+                  return;
+                }
+                if (!open && !loadedDirectoryPathsRef.current.has(entry.path)) void loadDirectory(entry.path);
+                onExpandedPathsChange((current) => {
+                  const next = new Set(current);
+                  open ? next.delete(entry.path) : next.add(entry.path);
+                  return next;
+                });
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setContext({ entry, x: event.clientX, y: event.clientY });
+              }}
+            >
+              <span className="working-tree-row__guide" aria-hidden>
+                {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
+                  <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
+                ))}
+                {isLast ? '└──' : '├──'}
+              </span>
+              {entry.kind === 'directory' ? (
+                open ? (
+                  <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+                ) : (
+                  <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+                )
               ) : (
-                <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
-              )
-            ) : (
-              <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
-            )}
-            <span className="working-tree-row__label">{entry.name}</span>
-          </button>
-          {entry.kind === 'directory' && open && render(entry.path, [...ancestorIsLast, isLast])}
-        </React.Fragment>
-      );
-    });
+                <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
+              )}
+              <span className="working-tree-row__label">{entry.name}</span>
+              {loading && <span className="working-tree-row__loading">…</span>}
+            </button>
+            {entry.kind === 'directory' && open && render(entry.path, [...ancestorIsLast, isLast])}
+          </React.Fragment>
+        );
+      });
   const targetFolder =
     context?.entry.kind === 'directory'
       ? context.entry.path
@@ -275,7 +312,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
                 className="working-tree-context-menu__item"
                 onClick={() => {
                   setContext(null);
-                  pasteInto(targetFolder);
+                  void pasteInto(targetFolder);
                 }}
               >
                 <ClipboardPaste size={14} />
