@@ -16,6 +16,8 @@ import { useHtmlPreview } from './useHtmlPreview';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
 
+const WorkingDirectoryCodeEditor = React.lazy(() => import('./WorkingDirectoryCodeEditor').then((module) => ({ default: module.WorkingDirectoryCodeEditor })));
+
 type Props = {
   repoPath: string;
   path: string;
@@ -140,11 +142,6 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     onCloseRequestChange(() => requestCloseRef.current());
     return () => onCloseRequestChange(null);
   }, [onCloseRequestChange]);
-  const editorLines = useMemo(() => text.split(/\r?\n/), [text]);
-  const editorHeightPx = useMemo(() => {
-    // Match the fixed line-height and padding below so textarea rows and gutter rows never drift apart.
-    return Math.max(editorLines.length, 1) * 20 + 24;
-  }, [editorLines.length]);
   return (
     <div className="working-file-viewer">
       <div className="working-file-viewer__toolbar">
@@ -196,27 +193,9 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         </div>
       )}
       {preview?.kind === 'text' && tab === 'content' && (
-        <div className="working-file-viewer__edit-scroll">
-          <div className="working-file-viewer__edit-sync">
-            <div className="working-file-viewer__gutter" aria-hidden>
-              {editorLines.map((_, index) => (
-                <div key={index} className="working-file-viewer__gutter-line">
-                  {index + 1}
-                </div>
-              ))}
-            </div>
-            <div className="working-file-viewer__code-column">
-              <textarea
-                aria-label={`Edit ${path}`}
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                spellCheck={false}
-                className="working-file-viewer__textarea"
-                style={{ height: `${editorHeightPx}px` }}
-              />
-            </div>
-          </div>
-        </div>
+        <React.Suspense fallback={<div className="working-file-viewer__code-editor-loading">Loading editor…</div>}>
+          <WorkingDirectoryCodeEditor path={path} value={text} onChange={setText} onSave={() => void save()} />
+        </React.Suspense>
       )}
       {filePreviewKind === 'markdown' && <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />}
       {filePreviewKind === 'html' && <HtmlPreviewPane preview={htmlPreview} title={path} />}

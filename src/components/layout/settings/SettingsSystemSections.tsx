@@ -135,7 +135,7 @@ export const SettingsJobsSection = ({
       {jobs.length === 0 && <p className={hintClass(variant)}>{t('generated.components.layout.settingsmaincontent.no_jobs_available_87989fb1')}</p>}
       {jobs.map((job) =>
         variant === 'sidebar' ? (
-          <div key={`${job.id}-${job.timestamp}-${job.status}`} className="ssc-job-item">
+          <div key={job.eventId ?? `${job.id}-${job.timestamp}-${job.status}-${job.message ?? ''}`} className="ssc-job-item">
             <div className="ssc-job-header">
               <span className="ssc-job-op">{job.operation}</span>
               <span className={`ssc-job-status${job.status === 'failed' ? ' failed' : ''}`}>{job.status}</span>
@@ -144,7 +144,7 @@ export const SettingsJobsSection = ({
             <div className="ssc-job-time">{new Date(job.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
           </div>
         ) : (
-          <article key={`${job.id}-${job.timestamp}-${job.status}`} className="settings-job-row">
+          <article key={job.eventId ?? `${job.id}-${job.timestamp}-${job.status}-${job.message ?? ''}`} className="settings-job-row">
             <div className="settings-job-top-row">
               <span>{job.operation}</span>
               <span className={job.status === 'failed' ? 'settings-danger' : ''}>{job.status}</span>

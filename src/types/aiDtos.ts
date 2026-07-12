@@ -7,6 +7,8 @@ export type AiCommitMessageLanguageDto = 'auto' | 'de' | 'en';
 export type AiAutoCommitModeDto = 'normal' | 'retry' | 'fallback';
 
 export interface GitJobEventDto {
+  /** Unique ID for one emitted event. `id` identifies the enclosing job. */
+  eventId?: string;
   id: string;
   operation: string;
   status: GitJobStatus;

@@ -11,10 +11,17 @@ export type JobEventPayload = {
   timestamp: number;
 };
 
+let emittedJobEventSequence = 0;
+
 export function emitJobEvent(webContents: Electron.WebContents, event: JobEventPayload): void {
   try {
     if (!webContents || webContents.isDestroyed?.()) return;
-    webContents.send(IpcChannel.JobEvent, event);
+    webContents.send(IpcChannel.JobEvent, {
+      ...event,
+      // A job emits multiple lifecycle and progress events. Timestamps only
+      // have millisecond precision, so they cannot safely identify a list row.
+      eventId: `${event.id}-${event.timestamp}-${++emittedJobEventSequence}`,
+    });
   } catch (error: any) {
     if (/object has been destroyed/i.test(String(error?.message || ''))) return;
     throw error;

@@ -7,6 +7,11 @@ type WorkingTreeSelection = {
   source: 'staged' | 'unstaged';
 };
 
+export type WorkingDirectoryFileSelection = {
+  path: string;
+  repoPath: string;
+};
+
 type Params = {
   autoOpenConflictResolverPath?: string | null;
   onAutoOpenConflictResolverConsumed?: () => void;
@@ -20,6 +25,10 @@ type Params = {
 
 const normalizeCommitHash = (value: string | null | undefined): string | null => {
   return extractGitObjectId(value);
+};
+
+export const getActiveWorkingDirectoryFilePath = (selection: WorkingDirectoryFileSelection | null, activeRepo: string | null): string | null => {
+  return selection?.repoPath === activeRepo ? selection.path : null;
 };
 
 export const useMainViewInspector = ({
@@ -37,7 +46,7 @@ export const useMainViewInspector = ({
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
   const [workingTreeSelection, setWorkingTreeSelection] = useState<WorkingTreeSelection | null>(null);
-  const [workingDirectoryFilePath, setWorkingDirectoryFilePath] = useState<string | null>(null);
+  const [workingDirectoryFile, setWorkingDirectoryFile] = useState<WorkingDirectoryFileSelection | null>(null);
   const [isCommitInspectorOpen, setIsCommitInspectorOpen] = useState(false);
   const handledNavigationRequestIdRef = useRef<number | null>(null);
   const preserveNextNavigationHistoryRef = useRef(false);
@@ -54,14 +63,21 @@ export const useMainViewInspector = ({
     onAutoOpenConflictResolverConsumed?.();
   }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setActiveDiffRequest(null);
     setActiveConflictPath(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
+    setWorkingDirectoryFile(null);
     setIsCommitInspectorOpen(false);
     setShowRecoveryCenter(false);
   }, [activeRepo]);
+
+  // A file path is only meaningful in the repository from which it was
+  // selected. Deriving the exposed value keeps a stale selection from ever
+  // mounting a viewer against a newly active repository, even before the
+  // repository-switch cleanup above has run.
+  const workingDirectoryFilePath = getActiveWorkingDirectoryFilePath(workingDirectoryFile, activeRepo);
 
   useLayoutEffect(() => {
     const request = commitNavigationRequest;
@@ -166,15 +182,16 @@ export const useMainViewInspector = ({
 
   const handleOpenWorkingDirectoryFile = useCallback(
     (path: string) => {
+      if (!activeRepo) return;
       setActiveDiffRequest(null);
       setActiveConflictPath(null);
       setShowRecoveryCenter(false);
       setWorkingTreeSelection(null);
       setIsCommitInspectorOpen(false);
       setSelectedCommit(null);
-      setWorkingDirectoryFilePath(path);
+      setWorkingDirectoryFile({ path, repoPath: activeRepo });
     },
-    [setSelectedCommit],
+    [activeRepo, setSelectedCommit],
   );
 
   const handleSelectCommitFromWorkingTree = useCallback(
@@ -205,7 +222,7 @@ export const useMainViewInspector = ({
 
   const closeInspector = useCallback(() => {
     setActiveDiffRequest(null);
-    setWorkingDirectoryFilePath(null);
+    setWorkingDirectoryFile(null);
     setCommitHistoryStack([]);
     setWorkingTreeSelection(null);
     setActiveConflictPath(null);
@@ -218,7 +235,7 @@ export const useMainViewInspector = ({
     setActiveDiffRequest(null);
     setActiveConflictPath(null);
     setShowRecoveryCenter(false);
-    setWorkingDirectoryFilePath(null);
+    setWorkingDirectoryFile(null);
     handleSelectCommitDirect(null);
   }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
 
