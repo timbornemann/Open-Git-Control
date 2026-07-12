@@ -20,6 +20,8 @@ export interface GitHubRepositoryDetailsDto {
 export interface GitHubUploadReleaseAssetParamsDto {
   owner: string;
   repo: string;
+  /** Local repository that authorized creation of the target release. */
+  repoPath: string;
   releaseId: number;
   filePath: string;
   name?: string;

@@ -225,9 +225,9 @@ describe('renderer service clients', () => {
       { owner: 'octo', repo: 'hello' },
     ]);
     await expectDelegation(
-      () => githubClient.uploadReleaseAsset({ owner: 'octo', repo: 'hello', releaseId: 1, filePath: 'C:/a.zip' }),
+      () => githubClient.uploadReleaseAsset({ owner: 'octo', repo: 'hello', repoPath: 'C:/repo', releaseId: 1, filePath: 'C:/a.zip' }),
       api.github.githubUploadReleaseAsset,
-      [{ owner: 'octo', repo: 'hello', releaseId: 1, filePath: 'C:/a.zip' }],
+      [{ owner: 'octo', repo: 'hello', repoPath: 'C:/repo', releaseId: 1, filePath: 'C:/a.zip' }],
     );
     await expectDelegation(() => githubClient.getRepository('octo', 'hello'), api.github.githubGetRepository, ['octo', 'hello']);
     await expectDelegation(

@@ -83,6 +83,65 @@ export function resolveExistingRepositoryPath(repoPath: string, relativePath: un
 }
 
 /**
+ * Resolves an existing repository path while rejecting every symbolic-link or
+ * junction component. Text editors and previews must operate on the Git path
+ * the user selected, never on a different in-repository target reached through
+ * filesystem indirection.
+ */
+export function resolveExistingRepositoryPathWithoutSymlinks(repoPath: string, relativePath: unknown, label = 'File path'): string {
+  const normalizedPath = normalizeRepositoryRelativePath(relativePath, label);
+  assertOutsideGitMetadata(normalizedPath, label);
+  const physicalRepoPath = fs.realpathSync(repoPath);
+  const candidatePath = path.resolve(physicalRepoPath, normalizedPath);
+
+  if (!isInside(physicalRepoPath, candidatePath)) {
+    throw new Error(`${label} is outside the current repository.`);
+  }
+
+  let currentPath = physicalRepoPath;
+  for (const segment of normalizedPath.split('/')) {
+    if (!segment || segment === '.') continue;
+    currentPath = path.join(currentPath, segment);
+    if (fs.lstatSync(currentPath).isSymbolicLink()) {
+      throw new Error(`${label} cannot be accessed through a symbolic link.`);
+    }
+  }
+
+  const physicalTargetPath = fs.realpathSync(candidatePath);
+  if (!isInside(physicalRepoPath, physicalTargetPath)) {
+    throw new Error(`${label} is outside the current repository.`);
+  }
+  assertOutsideGitMetadata(path.relative(physicalRepoPath, physicalTargetPath), label);
+  return physicalTargetPath;
+}
+
+/** Resolves a create target while rejecting symlink/junction parent aliases. */
+export function resolveRepositoryPathForCreateWithoutSymlinks(repoPath: string, relativePath: unknown, label = 'File path'): string {
+  const normalizedPath = normalizeRepositoryRelativePath(relativePath, label);
+  assertOutsideGitMetadata(normalizedPath, label);
+  const physicalRepoPath = fs.realpathSync(repoPath);
+  const candidatePath = path.resolve(physicalRepoPath, normalizedPath);
+  if (!isInside(physicalRepoPath, candidatePath)) {
+    throw new Error(`${label} is outside the current repository.`);
+  }
+
+  let currentPath = physicalRepoPath;
+  for (const segment of normalizedPath.split('/')) {
+    if (!segment || segment === '.') continue;
+    currentPath = path.join(currentPath, segment);
+    try {
+      if (fs.lstatSync(currentPath).isSymbolicLink()) {
+        throw new Error(`${label} cannot be accessed through a symbolic link.`);
+      }
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+      throw error;
+    }
+  }
+  return resolveRepositoryPathForCreate(physicalRepoPath, normalizedPath, label);
+}
+
+/**
  * Resolves a possibly not-yet-existing path while checking the closest
  * existing parent. This is required for safe creation inside a repository.
  */

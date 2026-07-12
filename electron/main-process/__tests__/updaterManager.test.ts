@@ -70,4 +70,46 @@ describe('UpdaterManager', () => {
     await expect(update).resolves.toEqual({ success: true });
     expect(manager.getStatus()).toMatchObject({ state: 'checking', error: null });
   });
+
+  it('keeps waiting for a non-cancellable update check instead of timing out ahead of it', async () => {
+    let resolveCheck!: () => void;
+    autoUpdaterMock.checkForUpdates.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveCheck = resolve;
+      }),
+    );
+    const manager = new UpdaterManager(false);
+
+    const check = manager.checkForAppUpdates();
+    let settled = false;
+    void check.finally(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(45_100);
+
+    expect(settled).toBe(false);
+    resolveCheck();
+    await expect(check).resolves.toEqual({ success: true });
+    expect(manager.getStatus()).toMatchObject({ state: 'checking', error: null });
+  });
+
+  it('cancels the underlying download when its timeout expires', async () => {
+    let receivedToken: { cancelled: boolean } | null = null;
+    autoUpdaterMock.downloadUpdate.mockImplementation((token: { cancelled: boolean }) => {
+      receivedToken = token;
+      return new Promise(() => {});
+    });
+    const manager = new UpdaterManager(false);
+    setStatus(manager, { state: 'update-available', error: null });
+
+    const download = manager.downloadAvailableUpdate();
+    await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 100);
+
+    await expect(download).resolves.toEqual({
+      success: false,
+      error: 'Der Update-Download hat das Zeitlimit ueberschritten und wurde abgebrochen.',
+    });
+    expect(receivedToken).toMatchObject({ cancelled: true });
+    expect(manager.getStatus()).toMatchObject({ state: 'error', downloaded: false });
+  });
 });

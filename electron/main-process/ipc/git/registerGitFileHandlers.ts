@@ -4,7 +4,12 @@ import { ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitService, RepositoryFileSource } from '../../../GitService';
-import { resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../../../git/RepositoryPathSafety';
+import {
+  resolveExistingRepositoryPath,
+  resolveExistingRepositoryPathWithoutSymlinks,
+  resolveRepositoryPathForCreate,
+  resolveRepositoryPathForCreateWithoutSymlinks,
+} from '../../../git/RepositoryPathSafety';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
@@ -154,7 +159,9 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   const workingDirectoryPath = (repoPath: string, value: unknown, label: string, allowMissing = false) => {
     const relativePath = asRepositoryFilePath(value);
     if (!relativePath) throw new Error(`${label} is required.`);
-    return allowMissing ? resolveRepositoryPathForCreate(repoPath, relativePath, label) : resolveExistingRepositoryPath(repoPath, relativePath, label);
+    return allowMissing
+      ? resolveRepositoryPathForCreateWithoutSymlinks(repoPath, relativePath, label)
+      : resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath, label);
   };
 
   ipcMain.handle(IpcChannel.GitListWorkingDirectory, async (_event: unknown, requestedRepoPath?: unknown, requestedParentPath?: unknown) => {

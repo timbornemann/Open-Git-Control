@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import { useRepositoryContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import {
   REPOSITORY_RUN_ACTION_IDS,
   createEmptyRepositoryRunConfig,
@@ -33,6 +33,43 @@ const PARSERS: Array<{ value: RepositoryRunParser; label: string }> = [
 ];
 type TemplateOption = RepositoryRunTemplateDto | RepositoryRunCommandTemplate;
 
+type StoredRunConfigDraft = {
+  config: RepositoryRunConfigDto;
+  persistedConfig: RepositoryRunConfigDto | null;
+};
+
+const RUN_CONFIG_DRAFT_KEY_PREFIX = 'open-git-control:run-config-draft:';
+const runConfigDraftKey = (repoPath: string): string => `${RUN_CONFIG_DRAFT_KEY_PREFIX}${encodeURIComponent(repoPath)}`;
+
+const readRunConfigDraft = (repoPath: string): StoredRunConfigDraft | null => {
+  try {
+    const raw = window.sessionStorage.getItem(runConfigDraftKey(repoPath));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredRunConfigDraft>;
+    return parsed?.config?.version === 1
+      ? { config: parsed.config, persistedConfig: parsed.persistedConfig?.version === 1 ? parsed.persistedConfig : null }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeRunConfigDraft = (repoPath: string, draft: StoredRunConfigDraft): void => {
+  try {
+    window.sessionStorage.setItem(runConfigDraftKey(repoPath), JSON.stringify(draft));
+  } catch {
+    // A full or unavailable session store must not make the editor unusable.
+  }
+};
+
+const clearRunConfigDraft = (repoPath: string): void => {
+  try {
+    window.sessionStorage.removeItem(runConfigDraftKey(repoPath));
+  } catch {
+    // Ignore unavailable session storage; the in-memory draft remains intact.
+  }
+};
+
 const createStep = (label: string): RepositoryRunStepDto => ({
   id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   label,
@@ -45,9 +82,11 @@ const createStep = (label: string): RepositoryRunStepDto => ({
 export const SettingsRunSection: React.FC = () => {
   const { openRepos, activeRepo } = useRepositoryContext();
   const workflow = useWorkflowContext();
+  const { setConfirmDialog } = useUIContext();
   const { tr } = useI18n();
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [config, setConfig] = useState<RepositoryRunConfigDto | null>(null);
+  const [persistedConfig, setPersistedConfig] = useState<RepositoryRunConfigDto | null>(null);
   const [configRepositoryPath, setConfigRepositoryPath] = useState<string | null>(null);
   const [configPath, setConfigPath] = useState('');
   const [templates, setTemplates] = useState<RepositoryRunTemplateDto[]>([]);
@@ -55,15 +94,23 @@ export const SettingsRunSection: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const repositories = useMemo(() => Array.from(new Set(openRepos)), [openRepos]);
+  const configIsDirty = useMemo(() => config !== null && JSON.stringify(config) !== JSON.stringify(persistedConfig), [config, persistedConfig]);
+  const selectedRepositoryIsOpen = repositories.includes(selectedRepo);
   const selectedRepoRef = useRef(selectedRepo);
   const loadRequestIdRef = useRef(0);
   const saveRequestIdRef = useRef(0);
   selectedRepoRef.current = selectedRepo;
 
   useEffect(() => {
-    if (selectedRepo || !activeRepo) return;
-    setSelectedRepo(activeRepo);
-  }, [activeRepo, selectedRepo]);
+    if (selectedRepo && repositories.includes(selectedRepo)) return;
+    // A repository can be closed outside this view. Preserve its dirty draft,
+    // but never leave the selector pointing at a repository that is no longer
+    // open.
+    if (selectedRepo && configIsDirty && config && configRepositoryPath === selectedRepo) {
+      writeRunConfigDraft(selectedRepo, { config, persistedConfig });
+    }
+    setSelectedRepo(activeRepo && repositories.includes(activeRepo) ? activeRepo : repositories[0] || '');
+  }, [activeRepo, config, configIsDirty, configRepositoryPath, persistedConfig, repositories, selectedRepo]);
 
   useEffect(() => {
     const repoPath = selectedRepo;
@@ -73,6 +120,7 @@ export const SettingsRunSection: React.FC = () => {
     // A configuration draft must never be reused for a newly selected
     // repository while its own configuration is still loading.
     setConfig(null);
+    setPersistedConfig(null);
     setConfigRepositoryPath(null);
     setConfigPath('');
     setTemplates([]);
@@ -98,9 +146,11 @@ export const SettingsRunSection: React.FC = () => {
           return;
         }
 
+        const savedDraft = readRunConfigDraft(repoPath);
         setConfigPath(result.data.configPath);
         setTemplates(result.data.templates);
-        setConfig(result.data.config);
+        setConfig(savedDraft?.config || result.data.config);
+        setPersistedConfig(savedDraft ? savedDraft.persistedConfig : result.data.config);
         setConfigRepositoryPath(repoPath);
         setError(result.data.error || null);
       } catch (loadError: unknown) {
@@ -114,6 +164,15 @@ export const SettingsRunSection: React.FC = () => {
       cancelled = true;
     };
   }, [selectedRepo]);
+
+  useEffect(() => {
+    if (!selectedRepo || configRepositoryPath !== selectedRepo || !config) return;
+    if (configIsDirty) {
+      writeRunConfigDraft(selectedRepo, { config, persistedConfig });
+    } else {
+      clearRunConfigDraft(selectedRepo);
+    }
+  }, [config, configIsDirty, configRepositoryPath, persistedConfig, selectedRepo]);
 
   const updateSteps = (action: RepositoryRunActionId, update: (steps: RepositoryRunStepDto[]) => RepositoryRunStepDto[]) => {
     setConfig((previous) => {
@@ -137,6 +196,8 @@ export const SettingsRunSection: React.FC = () => {
           return;
         }
         setConfig(result.data);
+        setPersistedConfig(result.data);
+        clearRunConfigDraft(repoPath);
         setConfigRepositoryPath(repoPath);
         setError(null);
       }
@@ -146,6 +207,34 @@ export const SettingsRunSection: React.FC = () => {
       setSaving(false);
       setError(saveError instanceof Error ? saveError.message : String(saveError));
     }
+  };
+
+  const selectRepository = (nextRepo: string) => {
+    if (!nextRepo || nextRepo === selectedRepo) return;
+    if (!configIsDirty) {
+      setSelectedRepo(nextRepo);
+      return;
+    }
+
+    setConfirmDialog({
+      variant: 'confirm',
+      title: tr('Ungespeicherte Run-Konfiguration verwerfen?', 'Discard unsaved run configuration?'),
+      message: tr(
+        'Die aktuelle Run-Konfiguration enthaelt ungespeicherte Aenderungen. Beim Repositorywechsel werden diese verworfen.',
+        'The current run configuration contains unsaved changes. Switching repositories will discard them.',
+      ),
+      contextItems: [
+        { label: tr('Aktuelles Repository', 'Current repository'), value: selectedRepo },
+        { label: tr('Neues Repository', 'New repository'), value: nextRepo },
+      ],
+      irreversible: false,
+      consequences: tr('Die ungespeicherten Befehle und Schritte gehen verloren.', 'The unsaved commands and steps will be lost.'),
+      confirmLabel: tr('Aenderungen verwerfen', 'Discard changes'),
+      onConfirm: () => {
+        clearRunConfigDraft(selectedRepo);
+        setSelectedRepo(nextRepo);
+      },
+    });
   };
 
   if (!repositories.length)
@@ -163,13 +252,17 @@ export const SettingsRunSection: React.FC = () => {
           <h3>{tr('Run-Konfiguration', 'Run configuration')}</h3>
           <p className="settings-hint">{tr('Versionierte Befehle in .Open-Git-Control/run.json', 'Versioned commands in .Open-Git-Control/run.json')}</p>
         </div>
-        <button className="staging-tool-btn" onClick={() => void save()} disabled={!config || configRepositoryPath !== selectedRepo || loading || saving}>
+        <button
+          className="staging-tool-btn"
+          onClick={() => void save()}
+          disabled={!config || !selectedRepositoryIsOpen || configRepositoryPath !== selectedRepo || loading || saving}
+        >
           <Save size={13} /> {saving ? tr('Speichern…', 'Saving…') : tr('Speichern', 'Save')}
         </button>
       </div>
       <label className="settings-field">
         <span>{tr('Repository', 'Repository')}</span>
-        <select value={selectedRepo} onChange={(event) => setSelectedRepo(event.target.value)}>
+        <select value={selectedRepo} onChange={(event) => selectRepository(event.target.value)}>
           {repositories.map((repoPath) => (
             <option key={repoPath} value={repoPath}>
               {repoPath}
@@ -177,6 +270,7 @@ export const SettingsRunSection: React.FC = () => {
           ))}
         </select>
       </label>
+      {configIsDirty && <p className="settings-hint repository-run-settings__dirty">{tr('Ungespeicherte Aenderungen', 'Unsaved changes')}</p>}
       {configPath && <p className="settings-hint repository-run-settings__path">{configPath}</p>}
       {error && <div className="settings-danger repository-run-settings__error">{error}</div>}
       {!config && !loading && (
@@ -184,6 +278,7 @@ export const SettingsRunSection: React.FC = () => {
           className="staging-tool-btn"
           onClick={() => {
             setConfig(createEmptyRepositoryRunConfig());
+            setPersistedConfig(null);
             setConfigRepositoryPath(selectedRepo);
             setError(null);
           }}

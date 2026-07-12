@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath, resolveRepositoryPathForCreate } from '../RepositoryPathSafety';
+import {
+  normalizeRepositoryRelativePath,
+  resolveExistingRepositoryPath,
+  resolveExistingRepositoryPathWithoutSymlinks,
+  resolveRepositoryPathForCreate,
+  resolveRepositoryPathForCreateWithoutSymlinks,
+} from '../RepositoryPathSafety';
 
 describe('normalizeRepositoryRelativePath', () => {
   it('preserves leading and trailing whitespace in a filename', () => {
@@ -55,6 +61,23 @@ describe('normalizeRepositoryRelativePath', () => {
       expect(() => resolveRepositoryPathForCreate(repoPath, '.git::$DATA/hooks/pre-commit')).toThrow(/Git metadata/);
       expect(() => resolveExistingRepositoryPath(repoPath, 'vendor/nested/.git/config')).toThrow(/Git metadata/);
       expect(() => resolveRepositoryPathForCreate(repoPath, 'vendor/nested/.git/hooks/pre-commit')).toThrow(/Git metadata/);
+    } finally {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects paths that traverse an in-repository symbolic link or junction', () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-path-symlink-'));
+    const targetDirectory = path.join(repoPath, 'target');
+    const linkedDirectory = path.join(repoPath, 'linked');
+    fs.mkdirSync(targetDirectory);
+    fs.writeFileSync(path.join(targetDirectory, 'note.txt'), 'target\n', 'utf8');
+    fs.symlinkSync(targetDirectory, linkedDirectory, process.platform === 'win32' ? 'junction' : 'dir');
+    try {
+      expect(resolveExistingRepositoryPath(repoPath, 'linked/note.txt')).toBe(fs.realpathSync(path.join(targetDirectory, 'note.txt')));
+      expect(() => resolveExistingRepositoryPathWithoutSymlinks(repoPath, 'linked/note.txt')).toThrow(/symbolic link/);
+      expect(() => resolveRepositoryPathForCreateWithoutSymlinks(repoPath, 'linked/new.txt')).toThrow(/symbolic link/);
+      expect(resolveExistingRepositoryPathWithoutSymlinks(repoPath, 'target/note.txt')).toBe(fs.realpathSync(path.join(targetDirectory, 'note.txt')));
     } finally {
       fs.rmSync(repoPath, { recursive: true, force: true });
     }

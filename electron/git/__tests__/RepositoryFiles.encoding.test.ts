@@ -33,4 +33,18 @@ describe('RepositoryFiles text preview encoding', () => {
     expect(fs.existsSync(path.join(repositoryPath, 'NOTICE'))).toBe(false);
     await expect(files.deleteRepoFileAtPath(repositoryPath, '../NOTICE')).rejects.toThrow('repository-relative');
   });
+
+  it('refuses to preview or overwrite a file reached through a symbolic link', async () => {
+    const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repository-files-symlink-'));
+    repositories.push(repositoryPath);
+    const targetDirectory = path.join(repositoryPath, 'target');
+    fs.mkdirSync(targetDirectory);
+    fs.writeFileSync(path.join(targetDirectory, 'note.txt'), 'original\n', 'utf8');
+    fs.symlinkSync(targetDirectory, path.join(repositoryPath, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+    const files = new RepositoryFiles(() => repositoryPath, vi.fn());
+
+    await expect(files.readRepoFileAtPath(repositoryPath, 'linked/note.txt')).rejects.toThrow(/symbolic link/);
+    await expect(files.writeRepoFileAtPath(repositoryPath, 'linked/note.txt', 'changed\n')).rejects.toThrow(/symbolic link/);
+    expect(fs.readFileSync(path.join(targetDirectory, 'note.txt'), 'utf8')).toBe('original\n');
+  });
 });

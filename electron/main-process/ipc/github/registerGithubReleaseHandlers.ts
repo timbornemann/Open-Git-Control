@@ -16,6 +16,16 @@ type RegisterGithubReleaseHandlersDeps = {
 
 type GithubRemoteTarget = { owner: string; repo: string };
 
+type ReleaseAssetAuthorization = {
+  owner: string;
+  repo: string;
+  repoPath: string;
+  authenticationGeneration: number;
+  expiresAt: number;
+};
+
+const RELEASE_ASSET_AUTHORIZATION_TTL_MS = 30 * 60 * 1000;
+
 function parseGithubRemoteTarget(remoteUrl: unknown, configuredHost: string, githubService: Pick<GitHubService, 'normalizeHost'>): GithubRemoteTarget | null {
   const remote = String(remoteUrl || '').trim();
   if (!remote) return null;
@@ -77,10 +87,53 @@ async function localCommitishExists(gitService: GitService, repoPath: string, co
 }
 
 export function registerGithubReleaseHandlers({ gitService, githubService, readSettingsWithMigration }: RegisterGithubReleaseHandlersDeps): void {
+  const releaseAuthorizationsBySender = new Map<number, Map<number, ReleaseAssetAuthorization>>();
+  const cleanupRegisteredSenders = new Set<number>();
+
+  const rememberReleaseAuthorization = (event: IpcMainInvokeEvent, releaseId: unknown, target: GithubRemoteTarget, repoPath: string): void => {
+    const senderId = event.sender?.id;
+    const normalizedReleaseId = Number(releaseId);
+    if (!Number.isInteger(senderId) || senderId <= 0 || !Number.isInteger(normalizedReleaseId) || normalizedReleaseId <= 0) return;
+
+    const now = Date.now();
+    const authorizations = releaseAuthorizationsBySender.get(senderId) || new Map<number, ReleaseAssetAuthorization>();
+    for (const [id, authorization] of authorizations) {
+      if (authorization.expiresAt <= now) authorizations.delete(id);
+    }
+    authorizations.set(normalizedReleaseId, {
+      owner: target.owner,
+      repo: target.repo,
+      repoPath,
+      authenticationGeneration: githubService.getAuthenticationGeneration?.() ?? 0,
+      expiresAt: now + RELEASE_ASSET_AUTHORIZATION_TTL_MS,
+    });
+    releaseAuthorizationsBySender.set(senderId, authorizations);
+
+    if (!cleanupRegisteredSenders.has(senderId) && typeof event.sender.once === 'function') {
+      cleanupRegisteredSenders.add(senderId);
+      event.sender.once('destroyed', () => {
+        releaseAuthorizationsBySender.delete(senderId);
+        cleanupRegisteredSenders.delete(senderId);
+      });
+    }
+  };
+
+  const getReleaseAuthorization = (senderId: number, releaseId: number): ReleaseAssetAuthorization | null => {
+    const authorizations = releaseAuthorizationsBySender.get(senderId);
+    const authorization = authorizations?.get(releaseId);
+    if (!authorization) return null;
+    if (authorization.expiresAt <= Date.now()) {
+      authorizations?.delete(releaseId);
+      if (authorizations?.size === 0) releaseAuthorizationsBySender.delete(senderId);
+      return null;
+    }
+    return authorization;
+  };
+
   ipcMain.handle(
     IpcChannel.GithubCreateRelease,
     async (
-      _event: IpcMainInvokeEvent,
+      event: IpcMainInvokeEvent,
       params: {
         owner: string;
         repo: string;
@@ -154,6 +207,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
           draft: Boolean(params.draft),
           prerelease: Boolean(params.prerelease),
         });
+        rememberReleaseAuthorization(event, release.id, originTarget, authorizedRepoPath);
         return { success: true, data: release };
       } catch (error: unknown) {
         return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
@@ -168,6 +222,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       params: {
         owner: string;
         repo: string;
+        repoPath?: string;
         releaseId: number;
         filePath: string;
         name?: string;
@@ -190,6 +245,22 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       }
       if (!filePath) {
         return { success: false, error: 'RELEASE_ASSET_FILE_PATH_REQUIRED' };
+      }
+
+      const authorization = getReleaseAuthorization(event.sender.id, releaseId);
+      if (
+        !authorization ||
+        authorization.owner.toLowerCase() !== owner.toLowerCase() ||
+        authorization.repo.toLowerCase() !== repo.toLowerCase() ||
+        authorization.authenticationGeneration !== (githubService.getAuthenticationGeneration?.() ?? 0)
+      ) {
+        return { success: false, error: 'RELEASE_ASSET_TARGET_NOT_AUTHORIZED' };
+      }
+      try {
+        requireActiveRepositoryPath(authorization.repoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(params.repoPath, authorization.repoPath);
+      } catch {
+        return { success: false, error: 'RELEASE_ASSET_REPOSITORY_NOT_ACTIVE' };
       }
 
       const authorizedFilePath = getAuthorizedSelectedFile(event.sender.id, filePath);

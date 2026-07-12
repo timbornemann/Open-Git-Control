@@ -388,6 +388,7 @@ export const useReleaseWorkflow = ({
           const uploadResult = await githubClient.uploadReleaseAsset({
             owner: createParams.owner,
             repo: createParams.repo,
+            repoPath,
             releaseId: releaseData.id,
             filePath,
           });

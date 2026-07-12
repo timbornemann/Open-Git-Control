@@ -15,21 +15,34 @@ type Params = {
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
 };
 
-const parseRemotes = (rawRemoteOutput: string): { hasOrigin: boolean; remotes: RepositoryRemote[] } => {
+export const parseRepositoryRemotes = (rawRemoteOutput: string): { hasOrigin: boolean; remotes: RepositoryRemote[] } => {
   const lines = rawRemoteOutput
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.replace(/\r$/, ''))
     .filter(Boolean);
-  const seen = new Set<string>();
-  const remotes: RepositoryRemote[] = [];
+  const remotesByName = new Map<string, RepositoryRemote & { kind: 'fetch' | 'push' | null }>();
 
   for (const line of lines) {
-    const parts = line.split(/\s+/);
-    if (parts.length >= 2 && !seen.has(parts[0])) {
-      seen.add(parts[0]);
-      remotes.push({ name: parts[0], url: parts[1] });
+    // `git remote -v` separates the remote name from its URL with whitespace,
+    // but the URL itself may be a local path containing spaces. Parse the
+    // trailing `(fetch)` / `(push)` marker from the right instead of splitting
+    // the whole line on whitespace.
+    const verboseMatch = line.match(/^\s*(\S+)\s+(.+?)\s+\((fetch|push)\)\s*$/);
+    const fallbackMatch = verboseMatch ? null : line.match(/^\s*(\S+)\s+(.+?)\s*$/);
+    const name = verboseMatch?.[1] || fallbackMatch?.[1] || '';
+    const url = verboseMatch?.[2] || fallbackMatch?.[2] || '';
+    const kind = (verboseMatch?.[3] as 'fetch' | 'push' | undefined) || null;
+    if (!name || !url) continue;
+
+    const existing = remotesByName.get(name);
+    // The sidebar has one URL slot per remote. Prefer the fetch URL when Git
+    // has a separate push URL, independent of the order emitted by Git.
+    if (!existing || (kind === 'fetch' && existing.kind !== 'fetch')) {
+      remotesByName.set(name, { name, url, kind });
     }
   }
+
+  const remotes = [...remotesByName.values()].map(({ name, url }) => ({ name, url }));
 
   return {
     // Exact match: a remote literally named "origin". `startsWith` would
@@ -86,7 +99,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
           return;
         }
 
-        const parsed = parseRemotes(rawRemoteOutput);
+        const parsed = parseRepositoryRemotes(rawRemoteOutput);
         setHasRemoteOrigin(parsed.hasOrigin);
         setRemotes(parsed.remotes);
         setRemotesRepositoryPath(activeRepo);

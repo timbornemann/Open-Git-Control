@@ -319,7 +319,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       draft?: boolean;
       prerelease?: boolean;
     }) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
-    githubUploadReleaseAsset: (params: { owner: string; repo: string; releaseId: number; filePath: string; name?: string }) =>
+    githubUploadReleaseAsset: (params: { owner: string; repo: string; repoPath: string; releaseId: number; filePath: string; name?: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubUploadReleaseAsset, params),
     githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubGetReleaseContext, params),

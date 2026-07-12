@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import type { GitRunner } from './GitRunner';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath, toLiteralPathspec } from './RepositoryPathSafety';
+import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks, toLiteralPathspec } from './RepositoryPathSafety';
 
 export type ActiveRepoCommand = (args: string[]) => Promise<string>;
 
@@ -75,7 +75,7 @@ export class MergeConflictService {
   }
 
   async markFileResolved(filePath: string): Promise<string> {
-    const resolvedPath = resolveExistingRepositoryPath(this.getRepoPath(), filePath, 'Conflict file path');
+    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(this.getRepoPath(), filePath, 'Conflict file path');
     const normalizedPath = normalizeRepositoryRelativePath(filePath, 'Conflict file path');
     const [contents, markerSizeRaw] = await Promise.all([
       fs.promises.readFile(resolvedPath, 'utf8'),

@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
+import { CancellationToken } from 'builder-util-runtime';
 import { IpcChannel } from '../../src/types/ipcContract';
 
 export type UpdaterState = 'idle' | 'checking' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
@@ -21,7 +22,6 @@ export type UpdaterStatusPayload = {
 };
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
-const UPDATER_CHECK_TIMEOUT_MS = 45 * 1000;
 const UPDATER_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const UPDATER_STATE_WAIT_TIMEOUT_MS = 5 * 1000;
 const UPDATER_STATE_POLL_INTERVAL_MS = 150;
@@ -55,10 +55,16 @@ function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string
   return normalized || null;
 }
 
-function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string, onTimeout?: () => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error(timeoutMessage));
+      try {
+        onTimeout?.();
+      } catch {
+        // Timeout reporting must still settle if updater cancellation throws.
+      } finally {
+        reject(new Error(timeoutMessage));
+      }
     }, timeoutMs);
 
     if (typeof timeout.unref === 'function') {
@@ -83,6 +89,8 @@ export class UpdaterManager {
   private autoUpdatesEnabled = true;
 
   private updaterStatus: UpdaterStatusPayload;
+
+  private activeDownloadCancellationToken: CancellationToken | null = null;
 
   constructor(private readonly isDev: boolean) {
     this.updaterStatus = {
@@ -210,7 +218,10 @@ export class UpdaterManager {
     });
 
     try {
-      await withTimeout(autoUpdater.checkForUpdates(), UPDATER_CHECK_TIMEOUT_MS, 'Die Update-Pruefung hat das Zeitlimit ueberschritten.');
+      // electron-updater does not expose a cancellation token for the network
+      // request performed by checkForUpdates(). Await the real operation
+      // instead of reporting a timeout while it continues in the background.
+      await autoUpdater.checkForUpdates();
       return { success: true };
     } catch (error: unknown) {
       const message = formatUpdaterError(error);
@@ -245,8 +256,17 @@ export class UpdaterManager {
       error: null,
     });
 
+    const cancellationToken = new CancellationToken();
+    this.activeDownloadCancellationToken?.cancel();
+    this.activeDownloadCancellationToken?.dispose();
+    this.activeDownloadCancellationToken = cancellationToken;
     try {
-      await withTimeout(autoUpdater.downloadUpdate(), UPDATER_DOWNLOAD_TIMEOUT_MS, 'Der Update-Download hat das Zeitlimit ueberschritten.');
+      await withTimeout(
+        autoUpdater.downloadUpdate(cancellationToken),
+        UPDATER_DOWNLOAD_TIMEOUT_MS,
+        'Der Update-Download hat das Zeitlimit ueberschritten und wurde abgebrochen.',
+        () => cancellationToken.cancel(),
+      );
       return { success: true };
     } catch (error: unknown) {
       const message = formatUpdaterError(error);
@@ -255,6 +275,11 @@ export class UpdaterManager {
         error: message,
       });
       return { success: false, error: message };
+    } finally {
+      if (this.activeDownloadCancellationToken === cancellationToken) {
+        this.activeDownloadCancellationToken = null;
+      }
+      cancellationToken.dispose();
     }
   }
 
@@ -462,5 +487,8 @@ export class UpdaterManager {
 
   dispose(): void {
     this.clearAutoUpdateInterval();
+    this.activeDownloadCancellationToken?.cancel();
+    this.activeDownloadCancellationToken?.dispose();
+    this.activeDownloadCancellationToken = null;
   }
 }

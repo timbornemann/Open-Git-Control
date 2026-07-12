@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath } from './RepositoryPathSafety';
+import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks } from './RepositoryPathSafety';
 import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile } from './RepositoryFileEncoding';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
@@ -65,7 +65,7 @@ export class RepositoryFiles {
   }
 
   async readRepoFileAtPath(repoPath: string, relativePath: string): Promise<string> {
-    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
+    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
@@ -123,7 +123,7 @@ export class RepositoryFiles {
   }
 
   async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string): Promise<void> {
-    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
+    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
@@ -144,7 +144,7 @@ export class RepositoryFiles {
   }
 
   async deleteRepoFileAtPath(repoPath: string, relativePath: string): Promise<void> {
-    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
+    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
       throw new Error('Target path is not a file.');
@@ -185,7 +185,7 @@ export class RepositoryFiles {
 
   private readWorkingTreeFileBuffer(repoPath: string, relativePath: string, maxBytes: number): Buffer {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
-    const resolvedPath = resolveExistingRepositoryPath(repoPath, normalizedRelativePath);
+    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, normalizedRelativePath);
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {

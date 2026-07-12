@@ -38,6 +38,13 @@ export const getReleaseAssetErrorMessage = (errorText: string, tr: (german: stri
       return tr('Ein Release-Asset muss ausgewaehlt werden.', 'A release asset must be selected.');
     case 'RELEASE_ASSET_FILE_NOT_AUTHORIZED':
       return tr('Release-Assets muessen zuvor ueber den Dateidialog ausgewaehlt werden.', 'Release assets must first be selected through the file dialog.');
+    case 'RELEASE_ASSET_TARGET_NOT_AUTHORIZED':
+      return tr('Das Ziel-Release wurde nicht in dieser Repository-Sitzung erstellt.', 'The target release was not created in this repository session.');
+    case 'RELEASE_ASSET_REPOSITORY_NOT_ACTIVE':
+      return tr(
+        'Das zugehoerige Repository ist nicht mehr aktiv. Der Asset-Upload wurde abgebrochen.',
+        'The associated repository is no longer active. The asset upload was cancelled.',
+      );
     case 'RELEASE_ASSET_NAME_REQUIRED':
       return tr('Der Name des Release-Assets ist erforderlich.', 'A release asset name is required.');
     case 'RELEASE_ASSET_FILE_NOT_FOUND':

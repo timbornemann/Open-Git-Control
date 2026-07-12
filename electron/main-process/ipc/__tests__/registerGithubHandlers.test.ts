@@ -526,10 +526,13 @@ describe('registerGithubHandlers fork flow', () => {
     expect(createRelease).not.toHaveBeenCalled();
   });
 
-  it('only uploads release assets previously selected through the native dialog', async () => {
+  it('only uploads native-dialog files to a release created for the active repository in the same renderer', async () => {
+    let activeRepo = 'C:/repos/project';
+    const createRelease = vi.fn().mockResolvedValue({ id: 4, tagName: 'v1.0.0', name: 'Release' });
     const uploadReleaseAsset = vi.fn().mockResolvedValue({ id: 4, name: 'release.zip' });
     const githubService = {
       isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
       uploadReleaseAsset,
       normalizeHost: vi.fn().mockReturnValue('github.com'),
       isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
@@ -539,7 +542,10 @@ describe('registerGithubHandlers fork flow', () => {
     } as any;
 
     registerGithubHandlers({
-      gitService: {} as any,
+      gitService: {
+        getRepoPath: vi.fn(() => activeRepo),
+        getRepoOriginUrl: vi.fn().mockResolvedValue('https://github.com/acme/project.git'),
+      } as any,
       githubService,
       readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
     });
@@ -548,20 +554,45 @@ describe('registerGithubHandlers fork flow', () => {
     expect(handler).toBeTruthy();
     const event = { sender: { id: 7 } };
 
+    await expect(
+      handlers.get('github:createRelease')!(event, {
+        owner: 'acme',
+        repo: 'project',
+        repoPath: 'C:/repos/project',
+        tagName: 'v1.0.0',
+        releaseName: 'Release',
+      }),
+    ).resolves.toEqual({ success: true, data: { id: 4, tagName: 'v1.0.0', name: 'Release' } });
+
     getAuthorizedSelectedFileMock.mockReturnValueOnce(null);
-    await expect(handler!(event, { owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/private/secret.txt' })).resolves.toEqual({
+    await expect(
+      handler!(event, { owner: 'acme', repo: 'project', repoPath: 'C:/repos/project', releaseId: 4, filePath: 'C:/private/secret.txt' }),
+    ).resolves.toEqual({
       success: false,
       error: 'RELEASE_ASSET_FILE_NOT_AUTHORIZED',
     });
     expect(uploadReleaseAsset).not.toHaveBeenCalled();
 
     getAuthorizedSelectedFileMock.mockReturnValueOnce('C:/selected/release.zip');
-    await expect(handler!(event, { owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/selected/release.zip' })).resolves.toEqual({
+    await expect(
+      handler!(event, { owner: 'acme', repo: 'project', repoPath: 'C:/repos/project', releaseId: 4, filePath: 'C:/selected/release.zip' }),
+    ).resolves.toEqual({
       success: true,
       data: { id: 4, name: 'release.zip' },
     });
     expect(getAuthorizedSelectedFileMock).toHaveBeenLastCalledWith(7, 'C:/selected/release.zip');
     expect(uploadReleaseAsset).toHaveBeenCalledWith({ owner: 'acme', repo: 'project', releaseId: 4, filePath: 'C:/selected/release.zip' });
+
+    getAuthorizedSelectedFileMock.mockClear();
+    await expect(
+      handler!(event, { owner: 'acme', repo: 'project', repoPath: 'C:/repos/project', releaseId: 99, filePath: 'C:/selected/release.zip' }),
+    ).resolves.toEqual({ success: false, error: 'RELEASE_ASSET_TARGET_NOT_AUTHORIZED' });
+    expect(getAuthorizedSelectedFileMock).not.toHaveBeenCalled();
+
+    activeRepo = 'C:/repos/other';
+    await expect(
+      handler!(event, { owner: 'acme', repo: 'project', repoPath: 'C:/repos/project', releaseId: 4, filePath: 'C:/selected/release.zip' }),
+    ).resolves.toEqual({ success: false, error: 'RELEASE_ASSET_REPOSITORY_NOT_ACTIVE' });
   });
 
   it('does not persist a device-flow result after logout invalidated the polling request', async () => {
