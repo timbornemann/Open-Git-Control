@@ -72,6 +72,42 @@ describe('WorkingDirectoryTree', () => {
     expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === 'folder')).toHaveLength(2);
   });
 
+  it('re-hydrates already-expanded directories on mount so their children render', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    const listWorkingDirectory = vi.spyOn(gitClient, 'listWorkingDirectory').mockImplementation(async (_repoPath, parentPath) => {
+      if (!parentPath) return { success: true, data: [{ path: 'folder', name: 'folder', kind: 'directory' }] };
+      if (parentPath === 'folder') return { success: true, data: [{ path: 'folder/child.txt', name: 'child.txt', kind: 'file' }] };
+      return { success: true, data: [] };
+    });
+
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    // The parent owns the expanded-path set and keeps it while the tree unmounts,
+    // so a remount starts with "folder" already marked open but no cached entries.
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(['', 'folder']),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile: vi.fn(),
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(listWorkingDirectory.mock.calls.some(([, parentPath]) => parentPath === 'folder')).toBe(true);
+    const labels = Array.from(container.querySelectorAll('.working-tree-row__label')).map((node) => node.textContent);
+    expect(labels).toContain('child.txt');
+  });
+
   it('retries a failed root-directory load on refresh', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     const listWorkingDirectory = vi

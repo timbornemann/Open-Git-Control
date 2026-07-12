@@ -54,6 +54,13 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   const [expandedDirectoryPaths, setExpandedDirectoryPaths] = React.useState<Set<string>>(() => new Set(['']));
   const isDirectoryMode = !isCommitInspectorOpen && !workingTreeSelection;
 
+  // Folder expansion is per-repository. The tree can unmount and remount while
+  // this state survives here, so drop the previous repo's expanded paths when
+  // the active repo changes to avoid carrying stale open-folder markers over.
+  React.useEffect(() => {
+    setExpandedDirectoryPaths(new Set(['']));
+  }, [repository.activeRepo]);
+
   return (
     <>
       <div

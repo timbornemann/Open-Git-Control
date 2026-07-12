@@ -30,10 +30,12 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
   const activeRepoPathRef = useRef(repoPath);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
   const initializedRepoPathRef = useRef<string | null>(null);
+  const expandedPathsRef = useRef(expandedPaths);
   activeRepoPathRef.current = repoPath;
+  expandedPathsRef.current = expandedPaths;
 
   const loadDirectory = useCallback(
-    async (parentPath = ''): Promise<WorkingDirectoryEntryDto[]> => {
+    async (parentPath = '', options?: { silent?: boolean }): Promise<WorkingDirectoryEntryDto[]> => {
       if (!repoPath || !gitClient.isAvailable()) return [];
       const repoAtStart = repoPath;
       setLoadingDirectories((current) => new Set(current).add(parentPath));
@@ -42,7 +44,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
         if (activeRepoPathRef.current !== repoAtStart) return [];
         if (!result.success) {
           loadedDirectoryPathsRef.current.delete(parentPath);
-          setToast({ msg: result.error || 'Could not load working directory.', isError: true });
+          if (!options?.silent) setToast({ msg: result.error || 'Could not load working directory.', isError: true });
           return [];
         }
         const entries = result.data || [];
@@ -70,13 +72,27 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
 
   useLayoutEffect(() => {
     if (initializedRepoPathRef.current !== repoPath) {
+      // A null ref means a fresh mount rather than a repo switch. The tree can be
+      // unmounted (e.g. when a commit or file inspector takes over) while the
+      // expanded-path set lives on in the parent, so on remount our local entry
+      // cache is empty yet folders are still marked open. Re-hydrate every
+      // expanded directory so open folders show their children immediately
+      // instead of appearing open-but-empty until the user clicks them twice.
+      const isFreshMount = initializedRepoPathRef.current === null;
       initializedRepoPathRef.current = repoPath;
       loadedDirectoryPathsRef.current.clear();
       setEntriesByParent({});
       setLoadingDirectories(new Set());
       setClipboard(null);
       setContext(null);
-      if (repoPath) void loadDirectory('');
+      if (repoPath) {
+        void loadDirectory('');
+        if (isFreshMount) {
+          for (const expandedPath of expandedPathsRef.current) {
+            if (expandedPath) void loadDirectory(expandedPath, { silent: true });
+          }
+        }
+      }
       return;
     }
     if (repoPath) void refreshLoadedDirectories();
