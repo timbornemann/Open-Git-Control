@@ -15,6 +15,7 @@ import {
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import { plannerClient } from '@/services/plannerClient';
+import { repositoryRunClient } from '@/services/repositoryRunClient';
 
 type ApiBucket = Record<string, ReturnType<typeof vi.fn>>;
 
@@ -25,6 +26,7 @@ type TestElectronApi = {
   github: ApiBucket;
   planner: ApiBucket;
   repos: ApiBucket;
+  runs: ApiBucket;
   settings: ApiBucket;
 };
 
@@ -48,6 +50,7 @@ const createElectronApi = (): TestElectronApi => ({
   github: createBucket(),
   planner: createBucket(),
   repos: createBucket(),
+  runs: createBucket(),
   settings: createBucket(),
 });
 
@@ -102,6 +105,7 @@ describe('renderer service clients', () => {
     expect(gitClient.isAvailable()).toBe(true);
     expect(githubClient.isAvailable()).toBe(true);
     expect(plannerClient.isAvailable()).toBe(true);
+    expect(repositoryRunClient.isAvailable()).toBe(true);
 
     vi.unstubAllGlobals();
     expect(aiClient.isAvailable()).toBe(false);
@@ -109,6 +113,19 @@ describe('renderer service clients', () => {
     expect(gitClient.isAvailable()).toBe(false);
     expect(githubClient.isAvailable()).toBe(false);
     expect(plannerClient.isAvailable()).toBe(false);
+    expect(repositoryRunClient.isAvailable()).toBe(false);
+  });
+
+  it('delegates repository run operations to the Electron run domain', async () => {
+    const listener = vi.fn();
+    const config = { version: 1, actions: {} } as any;
+
+    await expectDelegation(() => repositoryRunClient.getConfig('C:/repo'), api.runs.getRepositoryRunConfig, ['C:/repo']);
+    await expectDelegation(() => repositoryRunClient.saveConfig('C:/repo', config), api.runs.saveRepositoryRunConfig, ['C:/repo', config]);
+    await expectDelegation(() => repositoryRunClient.start('C:/repo', 'test'), api.runs.startRepositoryRun, ['C:/repo', 'test']);
+    await expectDelegation(() => repositoryRunClient.stop('run-1'), api.runs.stopRepositoryRun, ['run-1']);
+    await expectDelegation(() => repositoryRunClient.getState(), api.runs.getRepositoryRunState, []);
+    await expectDelegation(() => repositoryRunClient.onEvent(listener), api.runs.onRepositoryRunEvent, [listener]);
   });
 
   it('delegates app, settings and repo operations to their Electron domains', async () => {
@@ -336,6 +353,24 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.onCommitStats(vi.fn()), api.git.onCommitStats, [expect.any(Function)]);
     await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);
     await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, []);
+    await expectDelegation(() => gitClient.listWorkingDirectory('C:/repo', 'src'), api.git.listWorkingDirectory, ['C:/repo', 'src']);
+    await expectDelegation(() => gitClient.getWorkingDirectoryPreview('src/app.ts', 'C:/repo'), api.git.getWorkingDirectoryPreview, ['src/app.ts', 'C:/repo']);
+    await expectDelegation(() => gitClient.moveWorkingDirectoryEntry('src/old.ts', 'src/new.ts', true, 'C:/repo'), api.git.moveWorkingDirectoryEntry, [
+      'src/old.ts',
+      'src/new.ts',
+      true,
+      'C:/repo',
+    ]);
+    await expectDelegation(() => gitClient.copyWorkingDirectoryEntry('src/source.ts', 'src/copy.ts', false, 'C:/repo'), api.git.copyWorkingDirectoryEntry, [
+      'src/source.ts',
+      'src/copy.ts',
+      false,
+      'C:/repo',
+    ]);
+    await expectDelegation(() => gitClient.deleteWorkingDirectoryEntry('src/old.ts', 'C:/repo'), api.git.deleteWorkingDirectoryEntry, [
+      'src/old.ts',
+      'C:/repo',
+    ]);
     await expectDelegation(() => gitClient.getSequencerState('C:/repo'), api.git.getSequencerState, ['C:/repo']);
     await expectDelegation(() => gitClient.stagePaths(['a.ts'], 'C:/repo'), api.git.stagePaths, [['a.ts'], 'C:/repo']);
     await expectDelegation(() => gitClient.getDiffPreview({ path: 'a.ts' } as any), api.git.getDiffPreview, [{ path: 'a.ts' }]);
