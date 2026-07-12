@@ -79,7 +79,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showRecoveryCenter,
     showReleaseCreator: github.showReleaseCreator,
     showTimeline,
-    showRunConsole: workflow.isRunConsoleOpen && Boolean(workflow.repositoryRun),
+    showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
   });
   const showGithubGuide = route === 'githubGuide';
   const isSettingsView = route === 'settings';

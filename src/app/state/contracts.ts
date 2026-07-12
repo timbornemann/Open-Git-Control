@@ -239,6 +239,7 @@ export type WorkflowStateContract = {
   repositoryRun: RepositoryRunStateDto | null;
   activeRunConfig: RepositoryRunConfigStateDto | null;
   isRunConsoleOpen: boolean;
+  hasUnreadRepositoryRunResult: boolean;
   onStartRepositoryRun: (action: RepositoryRunActionId) => Promise<boolean>;
   onStopRepositoryRun: () => Promise<boolean>;
   onOpenRunConsole: () => void;

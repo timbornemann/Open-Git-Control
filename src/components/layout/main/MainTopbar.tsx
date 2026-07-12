@@ -43,12 +43,14 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onPushSetUpstream = useWorkflowStore((state) => state.onPushSetUpstream);
   const repositoryRun = useWorkflowStore((state) => state.repositoryRun);
   const activeRunConfig = useWorkflowStore((state) => state.activeRunConfig);
+  const hasUnreadRepositoryRunResult = useWorkflowStore((state) => state.hasUnreadRepositoryRunResult);
   const onStartRepositoryRun = useWorkflowStore((state) => state.onStartRepositoryRun);
   const onStopRepositoryRun = useWorkflowStore((state) => state.onStopRepositoryRun);
   const onOpenRunConsole = useWorkflowStore((state) => state.onOpenRunConsole);
   const onOpenReleaseCreator = useGitHubStore((state) => state.onOpenReleaseCreator);
   const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
+  const repositoryRunForActiveRepo = repositoryRun?.repoPath === activeRepo ? repositoryRun : null;
 
   return (
     <div className="topbar">
@@ -119,8 +121,9 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
             onOpenReleaseCreator={onOpenReleaseCreator}
             onOpenTimeline={onOpenTimeline}
             isTimelineLoading={isTimelineLoading}
-            repositoryRun={repositoryRun}
+            repositoryRun={repositoryRunForActiveRepo}
             activeRunConfig={activeRunConfig}
+            hasUnreadRepositoryRunResult={hasUnreadRepositoryRunResult}
             onStartRepositoryRun={async (action) => {
               const started = await onStartRepositoryRun(action);
               if (started) setActiveTab('repo');

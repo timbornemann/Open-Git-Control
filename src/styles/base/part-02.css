@@ -90,6 +90,30 @@
   color: var(--on-accent);
 }
 
+.topbar-run-result--succeeded {
+  color: var(--status-success);
+  background-color: var(--status-success-soft);
+  border-color: var(--status-success-border);
+}
+
+.topbar-run-result--succeeded:hover:not(:disabled) {
+  color: var(--status-success);
+  background-color: var(--status-success-soft);
+  border-color: var(--status-success);
+}
+
+.topbar-run-result--failed {
+  color: var(--status-danger);
+  background-color: var(--status-danger-soft);
+  border-color: var(--status-danger-border);
+}
+
+.topbar-run-result--failed:hover:not(:disabled) {
+  color: var(--status-danger);
+  background-color: var(--status-danger-soft);
+  border-color: var(--status-danger);
+}
+
 .content-area {
   flex: 1;
   min-width: 0;

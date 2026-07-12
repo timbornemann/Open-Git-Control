@@ -29,6 +29,7 @@ type Props = {
   isTimelineLoading?: boolean;
   repositoryRun: RepositoryRunStateDto | null;
   activeRunConfig: RepositoryRunConfigStateDto | null;
+  hasUnreadRepositoryRunResult: boolean;
   onStartRepositoryRun: (action: RepositoryRunActionId) => Promise<boolean>;
   onStopRepositoryRun: () => Promise<boolean>;
   onOpenRunConsole: () => void;
@@ -64,6 +65,7 @@ export const TopbarActions: React.FC<Props> = ({
   isTimelineLoading = false,
   repositoryRun,
   activeRunConfig,
+  hasUnreadRepositoryRunResult,
   onStartRepositoryRun,
   onStopRepositoryRun,
   onOpenRunConsole,
@@ -356,6 +358,7 @@ export const TopbarActions: React.FC<Props> = ({
         activeRepo={activeRepo}
         activeRunConfig={activeRunConfig}
         repositoryRun={repositoryRun}
+        hasUnreadResult={hasUnreadRepositoryRunResult}
         open={openMenu === 'run'}
         setOpen={(open) => setOpenMenu(open ? 'run' : null)}
         onStart={onStartRepositoryRun}

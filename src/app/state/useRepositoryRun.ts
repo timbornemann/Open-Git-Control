@@ -8,7 +8,16 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   const [runState, setRunState] = useState<RepositoryRunStateDto | null>(null);
   const [activeConfig, setActiveConfig] = useState<RepositoryRunConfigStateDto | null>(null);
   const [isConsoleOpen, setConsoleOpen] = useState(false);
+  const [lastViewedRunId, setLastViewedRunId] = useState<string | null>(null);
   const refreshedRunIds = useRef(new Set<string>());
+  const activeRepoRef = useRef(activeRepo);
+  const isConsoleOpenRef = useRef(isConsoleOpen);
+
+  useEffect(() => {
+    activeRepoRef.current = activeRepo;
+    isConsoleOpenRef.current = false;
+    setConsoleOpen(false);
+  }, [activeRepo]);
 
   const refreshConfig = useCallback(
     async (repoPath = activeRepo) => {
@@ -37,6 +46,7 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
       if (event.type === 'state') {
         setRunState(event.state);
         if (event.state && event.state.status !== 'running' && !refreshedRunIds.current.has(event.state.runId)) {
+          if (isConsoleOpenRef.current && event.state.repoPath === activeRepoRef.current) setLastViewedRunId(event.state.runId);
           refreshedRunIds.current.add(event.state.runId);
           triggerRefresh();
           void refreshConfig(event.state.repoPath);
@@ -56,6 +66,7 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
       const result = await repositoryRunClient.start(activeRepo, action);
       if (!result.success) return false;
       setRunState(result.data);
+      isConsoleOpenRef.current = true;
       setConsoleOpen(true);
       return true;
     },
@@ -67,14 +78,29 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
     return result.success && result.data;
   }, [runState?.runId]);
 
+  const openRunConsole = useCallback(() => {
+    if (!runState || runState.repoPath !== activeRepo) return;
+    if (runState.status !== 'running') setLastViewedRunId(runState.runId);
+    isConsoleOpenRef.current = true;
+    setConsoleOpen(true);
+  }, [activeRepo, runState]);
+
+  const closeRunConsole = useCallback(() => {
+    isConsoleOpenRef.current = false;
+    setConsoleOpen(false);
+  }, []);
+
+  const hasUnreadResult = Boolean(runState && runState.status !== 'running' && runState.repoPath === activeRepo && runState.runId !== lastViewedRunId);
+
   return {
     runState,
     activeRunConfig: activeConfig,
     isRunConsoleOpen: isConsoleOpen,
+    hasUnreadRepositoryRunResult: hasUnreadResult,
     startRun,
     stopRun,
-    openRunConsole: () => setConsoleOpen(true),
-    closeRunConsole: () => setConsoleOpen(false),
+    openRunConsole,
+    closeRunConsole,
     refreshRunConfig: refreshConfig,
   };
 };

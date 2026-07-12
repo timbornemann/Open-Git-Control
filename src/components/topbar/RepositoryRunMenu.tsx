@@ -7,6 +7,7 @@ type Props = {
   activeRepo: string | null;
   activeRunConfig: RepositoryRunConfigStateDto | null;
   repositoryRun: RepositoryRunStateDto | null;
+  hasUnreadResult: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
   onStart: (action: RepositoryRunActionId) => Promise<boolean>;
@@ -21,6 +22,7 @@ export const RepositoryRunMenu: React.FC<Props> = ({
   activeRepo,
   activeRunConfig,
   repositoryRun,
+  hasUnreadResult,
   open,
   setOpen,
   onStart,
@@ -30,6 +32,8 @@ export const RepositoryRunMenu: React.FC<Props> = ({
 }) => {
   const { tr } = useI18n();
   const isRunning = repositoryRun?.status === 'running';
+  const hasCompletedRun = Boolean(repositoryRun && !isRunning);
+  const resultStatus = hasUnreadResult ? repositoryRun?.status : null;
   const runAction = (action: RepositoryRunActionId) => {
     setOpen(false);
     void onStart(action);
@@ -38,10 +42,16 @@ export const RepositoryRunMenu: React.FC<Props> = ({
   return (
     <div className="topbar-split-wrap topbar-action-secondary">
       <button
-        className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"
-        onClick={() => (isRunning ? onOpenConsole() : runAction('run'))}
-        disabled={!activeRepo || (!isRunning && !activeRunConfig?.availableActions.run)}
-        title={isRunning ? tr('Laufende Konsole öffnen', 'Open running console') : tr('Standardbefehl ausführen', 'Run default command')}
+        className={`icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main${resultStatus ? ` topbar-run-result--${resultStatus}` : ''}`}
+        onClick={() => (isRunning || hasUnreadResult ? onOpenConsole() : runAction('run'))}
+        disabled={!activeRepo || (!isRunning && !hasUnreadResult && !activeRunConfig?.availableActions.run)}
+        title={
+          isRunning
+            ? tr('Laufende Konsole öffnen', 'Open running console')
+            : hasUnreadResult
+              ? tr('Letztes Ergebnis öffnen', 'Open latest result')
+              : tr('Standardbefehl ausführen', 'Run default command')
+        }
       >
         <Play size={16} className={isRunning ? 'spin' : ''} />
         <span className="topbar-action-label">Run</span>
@@ -84,6 +94,22 @@ export const RepositoryRunMenu: React.FC<Props> = ({
           ) : (
             <>
               <div className="topbar-dropdown-header">{tr('Repository-Befehle', 'Repository commands')}</div>
+              {hasCompletedRun && (
+                <button
+                  className="topbar-dropdown-item"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenConsole();
+                  }}
+                >
+                  <span className="topbar-dropdown-item-label">{tr('Letzten Lauf öffnen', 'Open latest run')}</span>
+                  <span className="topbar-dropdown-item-hint">
+                    {repositoryRun?.action.toUpperCase()} •{' '}
+                    {repositoryRun?.status === 'succeeded' ? tr('Erfolgreich', 'Succeeded') : tr('Fehlgeschlagen', 'Failed')}
+                  </span>
+                </button>
+              )}
+              {hasCompletedRun && <div className="topbar-dropdown-sep" />}
               {REPOSITORY_RUN_ACTION_IDS.map((action) => {
                 const configured = Boolean(activeRunConfig?.availableActions[action]);
                 return (
