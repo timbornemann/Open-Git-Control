@@ -251,7 +251,7 @@ export const useFileOperations = ({
   );
 
   const stagePathsForCurrentRepo = useCallback(
-    async (paths: string[], successMessage: string) => {
+    async (paths: string[]) => {
       const repoAtStart = repoPath;
       const generation = repoGenerationRef.current;
       if (
@@ -273,7 +273,6 @@ export const useFileOperations = ({
           setToast({ msg: result.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
           return false;
         }
-        setToast({ msg: successMessage, isError: false });
         await refresh();
         return true;
       } catch (e: any) {
@@ -290,7 +289,7 @@ export const useFileOperations = ({
   );
 
   const unstagePathsForCurrentRepo = useCallback(
-    async (rawPaths: string[], successMessage: string, preferWholeIndexReset = false) => {
+    async (rawPaths: string[], preferWholeIndexReset = false) => {
       const repoAtStart = repoPath;
       const generation = repoGenerationRef.current;
       const paths = [...new Set(rawPaths.filter(Boolean))];
@@ -321,7 +320,6 @@ export const useFileOperations = ({
             setToast({ msg: resetResult.error || t('generated.components.layout.cloneprogressmodal.error_7d62310f'), isError: true });
             return false;
           }
-          setToast({ msg: successMessage, isError: false });
           await refresh();
           return true;
         }
@@ -336,7 +334,6 @@ export const useFileOperations = ({
             return false;
           }
         }
-        setToast({ msg: successMessage, isError: false });
         await refresh();
         return true;
       } catch (error: unknown) {
@@ -387,39 +384,31 @@ export const useFileOperations = ({
 
   const addIgnoreRule = useIgnoreRule({ repoPath, setToast, tr, t, onRepoChanged, refresh });
 
-  const stageFile = useCallback(
-    (f: string) => stagePathsForCurrentRepo([f], tr(`${basename(f)} gestaged`, `Staged ${basename(f)}`)),
-    [stagePathsForCurrentRepo, tr],
-  );
+  const stageFile = useCallback((f: string) => stagePathsForCurrentRepo([f]), [stagePathsForCurrentRepo]);
   const unstageFile = useCallback(
     (entry: FileEntry | string) => {
       const file: Pick<FileEntry, 'path' | 'originalPath'> = typeof entry === 'string' ? { path: entry } : entry;
-      return unstagePathsForCurrentRepo([file.originalPath || '', file.path], tr(`${basename(file.path)} unstaged`, `Unstaged ${basename(file.path)}`));
+      return unstagePathsForCurrentRepo([file.originalPath || '', file.path]);
     },
-    [tr, unstagePathsForCurrentRepo],
+    [unstagePathsForCurrentRepo],
   );
   const stageAll = useCallback(() => {
     const paths = [...(status?.unstaged || []), ...(status?.untracked || [])].map((entry) => entry.path);
-    return stagePathsForCurrentRepo([...new Set(paths)], t('generated.components.staging_area.usefileoperations.staged_all_files_b29a5702'));
-  }, [stagePathsForCurrentRepo, status?.unstaged, status?.untracked, t]);
+    return stagePathsForCurrentRepo([...new Set(paths)]);
+  }, [stagePathsForCurrentRepo, status?.unstaged, status?.untracked]);
   const unstageAll = useCallback(
     () =>
       unstagePathsForCurrentRepo(
         (status?.staged || []).flatMap((entry) => [entry.originalPath || '', entry.path]),
-        t('generated.components.staging_area.usefileoperations.unstaged_all_files_444bd313'),
         true,
       ),
-    [status?.staged, t, unstagePathsForCurrentRepo],
+    [status?.staged, unstagePathsForCurrentRepo],
   );
 
   const stageAllUntracked = useCallback(() => {
     const paths = status?.untracked.map((entry) => entry.path) || [];
-    const count = paths.length;
-    return stagePathsForCurrentRepo(
-      paths,
-      tr(`${count} untracked Datei${count !== 1 ? 'en' : ''} gestaged`, `Staged ${count} untracked file${count !== 1 ? 's' : ''}`),
-    );
-  }, [stagePathsForCurrentRepo, status?.untracked, tr]);
+    return stagePathsForCurrentRepo(paths);
+  }, [stagePathsForCurrentRepo, status?.untracked]);
 
   const discardFile = useCallback(
     (f: string) => {

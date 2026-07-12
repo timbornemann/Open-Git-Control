@@ -143,7 +143,6 @@ export const useCommitForm = ({
         setCommitMsgState(nextDraft.commitMsg);
         setCommitDescriptionState(nextDraft.commitDescription);
         setAmendCommit(false);
-        setToast({ msg: t('generated.components.staging_area.usecommitform.commit_successful_155eebd2'), isError: false });
         if (onCommitsCreated) onCommitsCreated();
         else if (onRepoChanged) onRepoChanged();
         await refresh();

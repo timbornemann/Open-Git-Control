@@ -399,7 +399,6 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
           return null;
         }
 
-        setToast({ msg: t('generated.components.staging_area.useaicommit.ai_commit_message_inserted_bead6485'), isError: false });
         return result.data;
       } catch (error: unknown) {
         if (generation !== runGenerationRef.current) return null;

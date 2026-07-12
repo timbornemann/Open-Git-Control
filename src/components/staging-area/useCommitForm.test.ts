@@ -98,13 +98,14 @@ describe('useCommitForm repository isolation', () => {
 
   it('turns amend off after a successful commit', async () => {
     vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    const setToast = vi.fn();
     let current: ReturnType<typeof useCommitForm> | null = null;
     const root: Root = createRoot(document.getElementById('root')!);
     const Harness = () => {
       current = useCommitForm({
         repoPath: repoA,
         status,
-        setToast: vi.fn(),
+        setToast,
         refresh: vi.fn().mockResolvedValue(undefined),
         settings: DEFAULT_SETTINGS,
         setConfirmDialog: vi.fn(),
@@ -121,6 +122,7 @@ describe('useCommitForm repository isolation', () => {
       await current!.handleCommit();
     });
     expect(current!.amendCommit).toBe(false);
+    expect(setToast).not.toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
     act(() => root.unmount());
   });
 
