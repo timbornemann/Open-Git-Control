@@ -11,7 +11,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: {
-      ignored: ['**/.git/**', '**/node_modules/**', '**/dist/**', '**/dist-electron/**', '**/.cursor/**', '**/release/**'],
+      ignored: ['**/.git/**', '**/node_modules/**', '**/coverage/**', '**/dist/**', '**/dist-electron/**', '**/.cursor/**', '**/release/**'],
     },
   },
   build: {

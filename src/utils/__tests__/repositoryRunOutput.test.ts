@@ -17,4 +17,17 @@ describe('parseRepositoryRunOutput', () => {
   it('keeps raw-only steps out of the problem view', () => {
     expect(parseRepositoryRunOutput([{ sequence: 1, stream: 'stderr', text: 'error: expected', timestamp: 1, stepIndex: 0 }], () => 'none')).toEqual([]);
   });
+
+  it('parses real Vitest failures without treating successful test names as errors', () => {
+    const result = parseRepositoryRunOutput(
+      [
+        { sequence: 1, stream: 'stdout', text: '✓ continues processing after a failed command', timestamp: 1, stepIndex: 0 },
+        { sequence: 2, stream: 'stderr', text: 'FAIL  src/example.test.ts > rejects invalid input', timestamp: 2, stepIndex: 0 },
+        { sequence: 3, stream: 'stderr', text: 'AssertionError: expected true to be false', timestamp: 3, stepIndex: 0 },
+      ],
+      () => 'vitest-jest',
+    );
+
+    expect(result).toEqual([expect.objectContaining({ sequence: 2, severity: 'error' }), expect.objectContaining({ sequence: 3, severity: 'error' })]);
+  });
 });

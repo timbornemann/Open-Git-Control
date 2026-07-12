@@ -12,6 +12,9 @@ export type RepositoryRunProblem = {
 // eslint-disable-next-line no-control-regex -- ANSI SGR/control sequences are removed before diagnostic parsing.
 const stripAnsi = (value: string): string => value.replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '');
 const diagnosticPattern = /(?:^|\s)([^\s()]+\.[A-Za-z0-9]+)[:(](\d+)(?::|,)(\d+)\)?\s*[-:]?\s*(.*)$/;
+const vitestJestFailurePattern = /^(?:FAIL\b|[×✗]\s|AssertionError(?::|\b)|Error:|.*\bFailed Tests\b)/;
+const prettierFailurePattern = /(?:^\[error\]|\bCode style issues found\b)/i;
+const diagnosticFailurePattern = /^(?:error|warning|fatal)\b/i;
 
 export const parseRepositoryRunOutput = (
   lines: RepositoryRunOutputLineDto[],
@@ -24,8 +27,6 @@ export const parseRepositoryRunOutput = (
     const parser = parserForStep(line.stepIndex);
     if (parser === 'none') continue;
     const match = text.match(diagnosticPattern);
-    const looksLikeFailure = /\b(error|failed|failure|fail|warning)\b/i.test(text);
-    if (!match && !looksLikeFailure) continue;
     const severity: RepositoryRunProblem['severity'] = /\bwarning\b/i.test(text) && !/\b(error|failed|failure|fail)\b/i.test(text) ? 'warning' : 'error';
     if (match) {
       problems.push({
@@ -36,7 +37,14 @@ export const parseRepositoryRunOutput = (
         column: Number(match[3]),
         message: match[4] || text,
       });
-    } else if (parser !== 'prettier' || looksLikeFailure) {
+      continue;
+    }
+
+    const isFrameworkFailure =
+      (parser === 'vitest-jest' && vitestJestFailurePattern.test(text)) ||
+      (parser === 'prettier' && prettierFailurePattern.test(text)) ||
+      (parser === 'diagnostic' && diagnosticFailurePattern.test(text));
+    if (isFrameworkFailure) {
       problems.push({ sequence: line.sequence, severity, message: text });
     }
   }

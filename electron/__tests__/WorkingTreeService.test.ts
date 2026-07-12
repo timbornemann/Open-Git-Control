@@ -134,6 +134,7 @@ describe('WorkingTreeService', () => {
 
     try {
       git('init', '-q');
+      git('config', 'core.autocrlf', 'false');
       fs.writeFileSync(path.join(repoPath, 'a.txt'), 'base\n', 'utf8');
       git('add', '--', 'a.txt');
       git('-c', 'user.name=Snapshot Test', '-c', 'user.email=snapshot@example.invalid', 'commit', '-q', '-m', 'initial');
