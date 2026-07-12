@@ -12,7 +12,24 @@
     "installDownloadedUpdate": "Install downloaded update"
   },
   "updates": {
-    "installFailed": "Could not install update."
+    "installFailed": "Could not install update.",
+    "downloadFailed": "Could not download update.",
+    "settingsFailed": "Could not change the automatic update setting.",
+    "noLongerAvailable": "This update is no longer available.",
+    "availableIconLabel": "A new app version is available",
+    "readyIconLabel": "Update is ready to install",
+    "dialogTitle": "A new Open Git Control version is available",
+    "dialogMessage": "Version {version} is ready for you. Review the changes and install it now.",
+    "unknownVersion": "new version",
+    "preparingInstall": "Preparing update...",
+    "downloadAndInstall": "Download and install",
+    "installAfterDownload": "Install after download",
+    "installAndRestart": "Install and restart",
+    "skipAndDisable": "Skip & disable automatic updates",
+    "later": "Later",
+    "downloadProgress": "Update download progress",
+    "releaseNotes": "What's new",
+    "noReleaseNotes": "No release notes were provided for this version."
   },
   "generated": {
     "components": {
@@ -437,7 +454,7 @@
           "last_checked_bd036721": "Last checked",
           "download_d9eb7f3e": "Download",
           "auto_updates_are_only_available_in_installed_production_abb1a98e": "Auto updates are only available in installed production builds.",
-          "automatically_check_and_download_updates_in_the_backgrou_dbe47c67": "Automatically check and download updates in the background",
+          "automatically_check_and_download_updates_in_the_backgrou_dbe47c67": "Automatically download updates and show update popups",
           "release_notes_0b482d7f": "Release notes",
           "job_center_a5f9bea9": "Job center",
           "clear_156e0575": "Clear",
@@ -598,7 +615,7 @@
             "available_d7ca5b14": "Available",
             "checked_16535227": "Checked",
             "only_available_in_installed_builds_eacd8bec": "Only available in installed builds.",
-            "automatically_check_and_download_updates_6ffcd411": "Automatically check and download updates",
+            "automatically_check_and_download_updates_6ffcd411": "Automatically download updates and show update popups",
             "diagnostics_b0b2e360": "Diagnostics",
             "copying_097f00a2": "Copying...",
             "copy_diagnostics_report_428a213f": "Copy diagnostics report"

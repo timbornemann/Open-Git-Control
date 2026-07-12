@@ -244,19 +244,60 @@ pre {
 }
 
 .activity-update-btn {
-  color: var(--status-success);
-  background: var(--status-success-soft);
-  border: 1px solid var(--status-success-border);
+  position: relative;
+  color: var(--status-warning);
+  background: var(--status-warning-soft);
+  border: 1px solid var(--status-warning-border);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-warning) 45%, transparent);
+  animation: update-attention-pulse 1.8s ease-out infinite;
 }
 
 .activity-update-btn:hover:not(:disabled) {
   color: var(--text-primary);
-  background: var(--status-success-soft);
-  border-color: var(--status-success);
+  background: color-mix(in srgb, var(--status-warning) 24%, var(--bg-darker));
+  border-color: var(--status-warning);
+  transform: translateY(-1px) scale(1.06);
 }
 
 .activity-update-btn:disabled {
   opacity: 0.55;
+}
+
+.activity-update-btn--downloaded {
+  color: var(--status-success);
+  background: var(--status-success-soft);
+  border-color: var(--status-success-border);
+}
+
+.activity-update-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--bg-darker);
+  border-radius: 50%;
+  background: var(--status-warning);
+}
+
+.activity-update-btn--downloaded .activity-update-badge {
+  background: var(--status-success);
+}
+
+@keyframes update-attention-pulse {
+  0%,
+  55% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-warning) 42%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-update-btn {
+    animation: none;
+  }
 }
 
 .spin {

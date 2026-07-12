@@ -12,7 +12,24 @@
     "installDownloadedUpdate": "Heruntergeladenes Update installieren"
   },
   "updates": {
-    "installFailed": "Update konnte nicht installiert werden."
+    "installFailed": "Update konnte nicht installiert werden.",
+    "downloadFailed": "Update konnte nicht heruntergeladen werden.",
+    "settingsFailed": "Die Einstellung für automatische Updates konnte nicht geändert werden.",
+    "noLongerAvailable": "Dieses Update ist nicht mehr verfügbar.",
+    "availableIconLabel": "Eine neue App-Version ist verfügbar",
+    "readyIconLabel": "Update kann installiert werden",
+    "dialogTitle": "Eine neue Open-Git-Control-Version ist verfügbar",
+    "dialogMessage": "Version {version} ist verfügbar. Sieh dir die Änderungen an und installiere sie direkt.",
+    "unknownVersion": "Neue Version",
+    "preparingInstall": "Update wird vorbereitet...",
+    "downloadAndInstall": "Herunterladen und installieren",
+    "installAfterDownload": "Nach Download installieren",
+    "installAndRestart": "Installieren und neu starten",
+    "skipAndDisable": "Überspringen & automatische Updates deaktivieren",
+    "later": "Später",
+    "downloadProgress": "Fortschritt des Update-Downloads",
+    "releaseNotes": "Das ist neu",
+    "noReleaseNotes": "Für diese Version wurden keine Release Notes bereitgestellt."
   },
   "generated": {
     "components": {
@@ -437,7 +454,7 @@
           "last_checked_bd036721": "Zuletzt geprueft",
           "download_d9eb7f3e": "Download",
           "auto_updates_are_only_available_in_installed_production_abb1a98e": "Auto-Updates sind nur in der installierten Produktions-App verfuegbar.",
-          "automatically_check_and_download_updates_in_the_backgrou_dbe47c67": "Updates im Hintergrund automatisch suchen und herunterladen",
+          "automatically_check_and_download_updates_in_the_backgrou_dbe47c67": "Updates automatisch herunterladen und Update-Popups anzeigen",
           "release_notes_0b482d7f": "Release Notes",
           "job_center_a5f9bea9": "Job Center",
           "clear_156e0575": "Leeren",
@@ -598,7 +615,7 @@
             "available_d7ca5b14": "Verfügbar",
             "checked_16535227": "Geprüft",
             "only_available_in_installed_builds_eacd8bec": "Nur in installierten Builds verfügbar.",
-            "automatically_check_and_download_updates_6ffcd411": "Updates automatisch suchen und herunterladen",
+            "automatically_check_and_download_updates_6ffcd411": "Updates automatisch herunterladen und Update-Popups anzeigen",
             "diagnostics_b0b2e360": "Diagnose",
             "copying_097f00a2": "Kopiere...",
             "copy_diagnostics_report_428a213f": "Diagnose-Report kopieren"

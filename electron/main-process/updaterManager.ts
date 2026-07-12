@@ -86,7 +86,7 @@ function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage
 export class UpdaterManager {
   private autoUpdateInterval: NodeJS.Timeout | null = null;
 
-  private autoUpdatesEnabled = true;
+  private automaticDownloadsEnabled = true;
 
   private updaterStatus: UpdaterStatusPayload;
 
@@ -137,8 +137,16 @@ export class UpdaterManager {
     }
   }
 
+  private ensureUpdateCheckInterval(): void {
+    if (this.autoUpdateInterval) return;
+    this.autoUpdateInterval = setInterval(() => {
+      void this.checkForAppUpdates();
+    }, AUTO_UPDATE_CHECK_INTERVAL_MS);
+    this.autoUpdateInterval.unref();
+  }
+
   private maybeDownloadAvailableUpdate(): void {
-    if (!this.autoUpdatesEnabled || !this.updaterStatus.isSupported) return;
+    if (!this.automaticDownloadsEnabled || !this.updaterStatus.isSupported) return;
     if (this.updaterStatus.state !== 'update-available') return;
 
     void this.downloadAvailableUpdate();
@@ -368,25 +376,18 @@ export class UpdaterManager {
   }
 
   setAutoUpdatesEnabled(enabled: boolean): void {
-    this.autoUpdatesEnabled = enabled;
+    this.automaticDownloadsEnabled = enabled;
 
     if (!this.updaterStatus.isSupported) {
       return;
     }
 
-    if (!enabled) {
-      this.clearAutoUpdateInterval();
-      return;
-    }
+    // Availability checks remain active even when automatic downloads are
+    // disabled, so the renderer can still advertise a new version. The user
+    // setting controls only background download and automatic promotion.
+    this.ensureUpdateCheckInterval();
 
-    if (!this.autoUpdateInterval) {
-      this.autoUpdateInterval = setInterval(() => {
-        void this.checkForAppUpdates();
-      }, AUTO_UPDATE_CHECK_INTERVAL_MS);
-      this.autoUpdateInterval.unref();
-    }
-
-    if (this.updaterStatus.state === 'update-available') {
+    if (enabled && this.updaterStatus.state === 'update-available') {
       this.maybeDownloadAvailableUpdate();
       return;
     }
@@ -397,7 +398,7 @@ export class UpdaterManager {
   }
 
   configureAutoUpdates(autoUpdatesEnabled = true): void {
-    this.autoUpdatesEnabled = autoUpdatesEnabled;
+    this.automaticDownloadsEnabled = autoUpdatesEnabled;
 
     if (this.isDev) {
       this.setUpdaterStatus({

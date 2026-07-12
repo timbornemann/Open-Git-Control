@@ -38,6 +38,7 @@ describe('UpdaterManager', () => {
     getAllWindowsMock.mockReturnValue([]);
     autoUpdaterMock.checkForUpdates.mockReset();
     autoUpdaterMock.downloadUpdate.mockReset();
+    autoUpdaterMock.on.mockReset();
   });
 
   afterEach(() => {
@@ -111,5 +112,35 @@ describe('UpdaterManager', () => {
     });
     expect(receivedToken).toMatchObject({ cancelled: true });
     expect(manager.getStatus()).toMatchObject({ state: 'error', downloaded: false });
+  });
+
+  it('keeps checking for available versions without downloading when automatic updates are disabled', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+    const manager = new UpdaterManager(false);
+
+    manager.configureAutoUpdates(false);
+    await Promise.resolve();
+
+    expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1);
+    const updateAvailable = autoUpdaterMock.on.mock.calls.find(([eventName]) => eventName === 'update-available')?.[1];
+    expect(updateAvailable).toBeTypeOf('function');
+    updateAvailable?.({ version: '2.0.0', releaseNotes: 'New release' });
+
+    expect(manager.getStatus()).toMatchObject({ state: 'update-available', availableVersion: '2.0.0', releaseNotes: 'New release' });
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+  });
+
+  it('continues to download an advertised version in the background when automatic updates are enabled', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined);
+    autoUpdaterMock.downloadUpdate.mockResolvedValue([]);
+    const manager = new UpdaterManager(false);
+
+    manager.configureAutoUpdates(true);
+    const updateAvailable = autoUpdaterMock.on.mock.calls.find(([eventName]) => eventName === 'update-available')?.[1];
+    updateAvailable?.({ version: '2.0.0', releaseNotes: 'New release' });
+    await Promise.resolve();
+
+    expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(manager.getStatus()).toMatchObject({ state: 'downloading', availableVersion: '2.0.0' });
   });
 });
