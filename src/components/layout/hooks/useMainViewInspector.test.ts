@@ -8,28 +8,41 @@ type Inspector = ReturnType<typeof useMainViewInspector>;
 
 const renderInspector = (initialRepo: string | null) => {
   let current: Inspector | null = null;
+  let currentRepo = initialRepo;
+  let autoOpenConflictResolverPath: string | null = null;
   const root: Root = createRoot(document.createElement('div'));
   const setSelectedCommit = vi.fn();
-  const Harness = ({ activeRepo }: { activeRepo: string | null }) => {
+  const onAutoOpenConflictResolverConsumed = vi.fn();
+  const Harness = () => {
     current = useMainViewInspector({
-      activeRepo,
+      activeRepo: currentRepo,
+      autoOpenConflictResolverPath,
+      onAutoOpenConflictResolverConsumed,
       setSelectedCommit,
       onOpenRepoWorkspace: vi.fn(),
       onCloseReleaseCreator: vi.fn(),
     });
     return null;
   };
-  const render = (activeRepo: string | null) => {
-    act(() => root.render(createElement(Harness, { activeRepo })));
+  const render = () => {
+    act(() => root.render(createElement(Harness)));
   };
 
-  render(initialRepo);
+  render();
   return {
     get current() {
       if (!current) throw new Error('Inspector hook did not render.');
       return current;
     },
-    rerender: render,
+    rerender: (activeRepo: string | null) => {
+      currentRepo = activeRepo;
+      render();
+    },
+    autoOpenConflict: (path: string) => {
+      autoOpenConflictResolverPath = path;
+      render();
+    },
+    onAutoOpenConflictResolverConsumed,
     unmount: () => act(() => root.unmount()),
   };
 };
@@ -59,6 +72,65 @@ describe('useMainViewInspector working-directory viewer binding', () => {
     expect(hook.current.workingDirectoryFilePath).toBe('src/index.ts');
 
     hook.rerender('C:/repositories/b');
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    hook.unmount();
+  });
+
+  it('keeps the working file open until guarded staging navigation proceeds', () => {
+    const hook = renderInspector('C:/repositories/a');
+    let proceed: (() => void) | undefined;
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.setWorkingDirectoryNavigationGuard((_target, next) => (proceed = next)));
+
+    act(() => hook.current.handleStageCommitOpen());
+    expect(hook.current.workingDirectoryFilePath).toBe('src/index.ts');
+    act(() => proceed?.());
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    hook.unmount();
+  });
+
+  it('defers diff routes that would replace the working-file editor', () => {
+    const hook = renderInspector('C:/repositories/a');
+    let proceed: (() => void) | undefined;
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.setWorkingDirectoryNavigationGuard((_target, next) => (proceed = next)));
+
+    act(() => hook.current.handleOpenDiff({ source: 'unstaged', path: 'src/index.ts' }));
+    expect(hook.current.activeDiffRequest).toBeNull();
+    act(() => proceed?.());
+    expect(hook.current.activeDiffRequest).toEqual({ source: 'unstaged', path: 'src/index.ts' });
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    hook.unmount();
+  });
+
+  it('closes the working-file editor when guarded automatic conflict navigation proceeds', () => {
+    const hook = renderInspector('C:/repositories/a');
+    let proceed: (() => void) | undefined;
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.setWorkingDirectoryNavigationGuard((_target, next) => (proceed = next)));
+
+    hook.autoOpenConflict('src/conflicted.ts');
+    expect(hook.current.activeConflictPath).toBeNull();
+    expect(hook.current.workingDirectoryFilePath).toBe('src/index.ts');
+
+    act(() => proceed?.());
+    expect(hook.current.activeConflictPath).toBe('src/conflicted.ts');
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    expect(hook.onAutoOpenConflictResolverConsumed).toHaveBeenCalledTimes(1);
+    hook.unmount();
+  });
+
+  it('closes the working-file editor for recovery and manual conflict destinations', () => {
+    const hook = renderInspector('C:/repositories/a');
+
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.handleToggleRecoveryCenter());
+    expect(hook.current.showRecoveryCenter).toBe(true);
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.handleOpenConflictResolver('src/conflicted.ts'));
+    expect(hook.current.activeConflictPath).toBe('src/conflicted.ts');
     expect(hook.current.workingDirectoryFilePath).toBeNull();
     hook.unmount();
   });

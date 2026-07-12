@@ -139,4 +139,64 @@ describe('GitScheduler', () => {
     blockers.slice(1).forEach((blocker) => blocker.resolve());
     await Promise.all(backgrounds);
   });
+
+  it('serializes ref-mutating network work with writes while allowing local reads', async () => {
+    const scheduler = new GitScheduler();
+    const networkGate = deferred<void>();
+    const started: string[] = [];
+    const fetch = scheduler.schedule('C:/repo', 'network', 'fetch', async () => {
+      started.push('fetch');
+      await networkGate.promise;
+    });
+
+    const commit = scheduler.schedule('C:/repo', 'write', 'commit', async () => {
+      started.push('commit');
+    });
+    const log = scheduler.schedule('C:/repo', 'interactive', 'log', async () => {
+      started.push('log');
+    });
+
+    await expect(log).resolves.toBeUndefined();
+    expect(started).toEqual(['fetch', 'log']);
+    networkGate.resolve();
+    await Promise.all([fetch, commit]);
+    expect(started).toEqual(['fetch', 'log', 'commit']);
+  });
+
+  it('does not start fetch or push while a local write is active', async () => {
+    const scheduler = new GitScheduler();
+    const writeGate = deferred<void>();
+    const started: string[] = [];
+    const write = scheduler.schedule('C:/repo', 'write', 'checkout', async () => {
+      started.push('write');
+      await writeGate.promise;
+    });
+    const push = scheduler.schedule('C:/repo', 'network', 'push', async () => {
+      started.push('push');
+    });
+
+    await Promise.resolve();
+    expect(started).toEqual(['write']);
+    writeGate.resolve();
+    await Promise.all([write, push]);
+    expect(started).toEqual(['write', 'push']);
+  });
+
+  it('lets a pure remote read overlap a local write', async () => {
+    const scheduler = new GitScheduler();
+    const writeGate = deferred<void>();
+    const started: string[] = [];
+    const write = scheduler.schedule('C:/repo', 'write', 'commit', async () => {
+      started.push('write');
+      await writeGate.promise;
+    });
+    const remoteRead = scheduler.schedule('C:/repo', 'network-read', 'ls-remote', async () => {
+      started.push('ls-remote');
+    });
+
+    await expect(remoteRead).resolves.toBeUndefined();
+    expect(started).toEqual(['write', 'ls-remote']);
+    writeGate.resolve();
+    await write;
+  });
 });

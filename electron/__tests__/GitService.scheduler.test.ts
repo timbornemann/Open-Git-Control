@@ -86,7 +86,7 @@ describe('GitService command queue', () => {
     }
   });
 
-  it('runs network jobs (fetch/push) in a lane that never blocks local reads or writes', async () => {
+  it('keeps local reads responsive during fetch but serializes local writes behind it', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-4-'));
     let releaseFetch!: () => void;
     const fetchGate = new Promise<void>((resolve) => {
@@ -107,14 +107,18 @@ describe('GitService command queue', () => {
     (service as any).repoPath = repoDir;
 
     try {
-      // Start a fetch that will hang, then confirm a local read and a local
-      // write both complete without waiting for it.
+      // Reads remain useful while a remote is slow, but a local write must not
+      // race ref/FETCH_HEAD updates performed by fetch.
       const fetchPromise = service.runCommand(['fetch', 'origin', '--prune']);
       await expect(service.runCommand(['log', '-1'])).resolves.toContain('log-ok');
-      await expect(service.runCommand(['commit', '-m', 'local'])).resolves.toContain('commit-ok');
+      const commitPromise = service.runCommand(['commit', '-m', 'local']);
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      expect(fakeExec.mock.calls.some(([, args]) => args[0] === 'commit')).toBe(false);
 
       releaseFetch();
-      await fetchPromise;
+      await expect(Promise.all([fetchPromise, commitPromise])).resolves.toEqual(['', 'commit-ok']);
 
       const kinds = service.getSchedulerDiagnostics().map((entry) => `${entry.command}:${entry.kind}`);
       expect(kinds).toContain('fetch:network');
@@ -134,6 +138,18 @@ describe('GitService command queue', () => {
     try {
       await service.runCommand(['push', 'origin', 'main']);
       expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual(['network']);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+  });
+
+  it('classifies ls-remote as a side-effect-free network read', async () => {
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-queue-test-repo-6-'));
+    const service = new GitService((async () => ({ stdout: '', stderr: '' })) as any);
+
+    try {
+      await service.runCommandAtPath(repoDir, ['ls-remote', 'origin']);
+      expect(service.getSchedulerDiagnostics().map((entry) => entry.kind)).toEqual(['network-read']);
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }

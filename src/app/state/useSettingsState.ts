@@ -3,6 +3,7 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18nCore';
 import { appClient } from '@/services/appClient';
 import { DEFAULT_SETTINGS } from './defaultSettings';
+import type { SettingsUpdateResult } from './contracts';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -22,19 +23,33 @@ export const useSettingsState = ({ setGitActionToast }: UseSettingsStateParams) 
 
   const t = useCallback((key: string, variables?: TranslationVariables) => translateFromCatalog(settings.language, key, variables), [settings.language]);
 
-  const handleUpdateSettings = useCallback(
-    async (partial: Partial<AppSettingsDto>) => {
-      if (!appClient.isAvailable()) return;
+  const updateSettingsWithResult = useCallback(
+    async (partial: Partial<AppSettingsDto>): Promise<SettingsUpdateResult> => {
+      if (!appClient.isAvailable()) {
+        const error = t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b');
+        setGitActionToast({ msg: error, isError: true });
+        return { success: false, error };
+      }
 
       try {
         const next = await appClient.setSettings(partial);
         setSettings(next);
         setGitActionToast({ msg: t('generated.components.layout.useappstate.settings_saved_d81d1258'), isError: false });
+        return { success: true, settings: next };
       } catch (e: any) {
-        setGitActionToast({ msg: e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b'), isError: true });
+        const error = e?.message || t('generated.components.layout.useappstate.could_not_save_settings_bc762a3b');
+        setGitActionToast({ msg: error, isError: true });
+        return { success: false, error };
       }
     },
     [setGitActionToast, t],
+  );
+
+  const handleUpdateSettings = useCallback(
+    async (partial: Partial<AppSettingsDto>): Promise<void> => {
+      await updateSettingsWithResult(partial);
+    },
+    [updateSettingsWithResult],
   );
 
   useEffect(() => {
@@ -58,6 +73,7 @@ export const useSettingsState = ({ setGitActionToast }: UseSettingsStateParams) 
   return {
     settings,
     handleUpdateSettings,
+    updateSettingsWithResult,
     t,
     tr,
   };

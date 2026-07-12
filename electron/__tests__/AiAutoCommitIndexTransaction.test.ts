@@ -103,6 +103,47 @@ describe('AI auto-commit isolated index transaction', () => {
     expect(await git.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD'])).toBe('1');
   });
 
+  it('reports an exclusively dirty submodule without retrying an empty parent commit', async () => {
+    const { git, repoPath } = await createRepository();
+    const submodulePath = path.join(repoPath, 'nested-module');
+    fs.mkdirSync(submodulePath);
+    const nestedGit = new GitService();
+    await nestedGit.runCommandAtPath(submodulePath, ['init']);
+    await nestedGit.runCommandAtPath(submodulePath, ['config', 'user.name', 'Nested Test']);
+    await nestedGit.runCommandAtPath(submodulePath, ['config', 'user.email', 'nested@example.test']);
+    fs.writeFileSync(path.join(submodulePath, 'nested.txt'), 'base\n', 'utf8');
+    await nestedGit.runCommandAtPath(submodulePath, ['add', '--', 'nested.txt']);
+    await nestedGit.runCommandAtPath(submodulePath, ['commit', '-m', 'nested initial']);
+    const nestedHead = (await nestedGit.runCommandAtPath(submodulePath, ['rev-parse', 'HEAD'])).trim();
+    await git.runCommandAtPath(repoPath, ['update-index', '--add', '--cacheinfo', '160000', nestedHead, 'nested-module']);
+    await git.runCommandAtPath(repoPath, ['commit', '-m', 'add nested module']);
+    const parentHead = await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD']);
+    fs.writeFileSync(path.join(submodulePath, 'nested.txt'), 'dirty internal change\n', 'utf8');
+    expect(await git.getStatusPorcelainZAtPath(repoPath)).toContain('nested-module');
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new AiService(git);
+
+    await expect(service.runAutoCommit(repoPath, baseSettings, () => 'test-key')).rejects.toThrow(/Submodul|Submodulen/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await git.runCommandAtPath(repoPath, ['rev-parse', 'HEAD'])).toBe(parentHead);
+    expect(await git.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD'])).toBe('2');
+
+    // In a mixed snapshot the dirty submodule is skipped while an actual
+    // parent-repository blob remains eligible for a commit.
+    fs.writeFileSync(path.join(repoPath, 'example.txt'), 'parent change\n', 'utf8');
+    const mixedEntries = parseStatusPorcelain(await git.getStatusPorcelainZAtPath(repoPath));
+    const transaction = new AiAutoCommitIndexTransaction(git, repoPath);
+    try {
+      await transaction.initialize(mixedEntries);
+      expect(transaction.isStatusEntryCommittable(mixedEntries.find((entry) => entry.path === 'nested-module')!)).toBe(false);
+      expect(transaction.isStatusEntryCommittable(mixedEntries.find((entry) => entry.path === 'example.txt')!)).toBe(true);
+    } finally {
+      transaction.dispose();
+    }
+  }, 20_000);
+
   it('commits immutable snapshot blobs and leaves later working-tree edits unstaged', async () => {
     const { git, repoPath, filePath } = await createRepository();
     await createPartiallyStagedChange(git, repoPath, filePath);

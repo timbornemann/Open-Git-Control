@@ -68,7 +68,7 @@ describe('registerGithubHandlers fork flow', () => {
     } as any;
 
     registerGithubHandlers({
-      gitService: {} as any,
+      gitService: { getRepoPath: vi.fn().mockReturnValue('C:/repos/project') } as any,
       githubService,
       readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
     });
@@ -101,7 +101,7 @@ describe('registerGithubHandlers fork flow', () => {
     } as any;
 
     registerGithubHandlers({
-      gitService: {} as any,
+      gitService: { getRepoPath: vi.fn().mockReturnValue('C:/repos/project') } as any,
       githubService,
       readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
     });
@@ -324,7 +324,10 @@ describe('registerGithubHandlers fork flow', () => {
     } as any;
 
     registerGithubHandlers({
-      gitService: {} as any,
+      gitService: {
+        getRepoPath: vi.fn().mockReturnValue('C:/repos/project'),
+        getRepoOriginUrl: vi.fn().mockResolvedValue('https://github.com/acme/project.git'),
+      } as any,
       githubService,
       readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
     });
@@ -341,6 +344,7 @@ describe('registerGithubHandlers fork flow', () => {
       {
         owner: 'acme',
         repo: 'project',
+        repoPath: 'C:/repos/project',
         tagName: ' v1.3.0 ',
         targetCommitish: 'main',
         releaseName: ' Release 1.3.0 ',
@@ -369,6 +373,157 @@ describe('registerGithubHandlers fork flow', () => {
       draft: true,
       prerelease: false,
     });
+  });
+
+  it('accepts the fork origin itself as the release target', async () => {
+    const createRelease = vi.fn().mockResolvedValue({ id: 43, tagName: 'v2.0.0' });
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn((value: string) => String(value || 'github.com').toLowerCase()),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService: {
+        getRepoPath: vi.fn().mockReturnValue('C:/repos/fork'),
+        getRepoOriginUrl: vi.fn().mockResolvedValue('ssh://git@github.com/scm/fork-owner/project-fork.git'),
+      } as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'fork-owner',
+          repo: 'project-fork',
+          repoPath: 'C:/repos/fork',
+          tagName: 'v2.0.0',
+          releaseName: 'Fork release',
+        },
+      ),
+    ).resolves.toMatchObject({ success: true });
+    expect(createRelease).toHaveBeenCalledWith(expect.objectContaining({ owner: 'fork-owner', repo: 'project-fork' }));
+  });
+
+  it.each([
+    ['a missing origin', null, 'The active repository has no matching GitHub origin.'],
+    ['a changed origin', 'https://github.com/other/other-repo.git', 'Release target does not match the active repository origin.'],
+  ])('rejects release creation for %s', async (_label, originUrl, expectedError) => {
+    const createRelease = vi.fn();
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn((value: string) => String(value || 'github.com').toLowerCase()),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService: {
+        getRepoPath: vi.fn().mockReturnValue('C:/repos/project'),
+        getRepoOriginUrl: vi.fn().mockResolvedValue(originUrl),
+      } as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const result = await handlers.get('github:createRelease')!(
+      {},
+      {
+        owner: 'acme',
+        repo: 'project',
+        repoPath: 'C:/repos/project',
+        tagName: 'v1.0.0',
+        releaseName: 'Release',
+      },
+    );
+
+    expect(result).toEqual({ success: false, error: expectedError });
+    expect(createRelease).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the active repository after the asynchronous origin lookup', async () => {
+    let activeRepo = 'C:/repos/project';
+    let resolveOrigin: ((value: string) => void) | undefined;
+    const createRelease = vi.fn();
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn((value: string) => String(value || 'github.com').toLowerCase()),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService: {
+        getRepoPath: vi.fn(() => activeRepo),
+        getRepoOriginUrl: vi.fn(
+          () =>
+            new Promise<string>((resolve) => {
+              resolveOrigin = resolve;
+            }),
+        ),
+      } as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    const resultPromise = handlers.get('github:createRelease')!(
+      {},
+      {
+        owner: 'acme',
+        repo: 'project',
+        repoPath: 'C:/repos/project',
+        tagName: 'v1.0.0',
+        releaseName: 'Release',
+      },
+    );
+    await vi.waitFor(() => expect(resolveOrigin).toBeTypeOf('function'));
+    activeRepo = 'C:/repos/other';
+    resolveOrigin?.('https://github.com/acme/project.git');
+
+    await expect(resultPromise).resolves.toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(createRelease).not.toHaveBeenCalled();
+  });
+
+  it('rejects release creation when the captured local repository is no longer active', async () => {
+    const createRelease = vi.fn();
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: { getRepoPath: vi.fn().mockReturnValue('C:/repos/repo-b') } as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'acme',
+          repo: 'project',
+          tagName: 'v1.0.0',
+          releaseName: 'Release v1.0.0',
+        },
+      ),
+    ).resolves.toEqual({ success: false, error: 'Repository path is required.' });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'acme',
+          repo: 'project',
+          repoPath: 'C:/repos/repo-a',
+          tagName: 'v1.0.0',
+          releaseName: 'Release v1.0.0',
+        },
+      ),
+    ).resolves.toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(createRelease).not.toHaveBeenCalled();
   });
 
   it('only uploads release assets previously selected through the native dialog', async () => {
@@ -441,6 +596,32 @@ describe('registerGithubHandlers fork flow', () => {
 
     await expect(pollPromise).resolves.toEqual({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
     expect(saveGithubTokenSecurelyMock).not.toHaveBeenCalled();
+    expect(githubService.logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports persistence failure after clearing the live session when the saved token cannot be deleted', async () => {
+    clearSavedGithubTokenSecurelyMock.mockImplementationOnce(() => {
+      throw new Error('credential file is locked');
+    });
+    const githubService = {
+      getAuthenticationGeneration: vi.fn().mockReturnValue(0),
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+      logout: vi.fn(),
+    } as any;
+
+    registerGithubHandlers({
+      gitService: {} as any,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(handlers.get('github:logout')!({})).resolves.toEqual({
+      success: false,
+      error: 'credential file is locked',
+      sessionCleared: true,
+    });
     expect(githubService.logout).toHaveBeenCalledTimes(1);
   });
 

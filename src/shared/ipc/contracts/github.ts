@@ -96,7 +96,7 @@ export interface ElectronGithubAPI {
     error?: string;
   }>;
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
-  githubLogout: () => Promise<{ success: true } | { success: false; error: string }>;
+  githubLogout: () => Promise<{ success: true } | { success: false; error: string; sessionCleared: boolean }>;
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubGetRepository: (owner: string, repo: string) => Promise<IpcResult<GitHubRepositoryDetailsDto>>;

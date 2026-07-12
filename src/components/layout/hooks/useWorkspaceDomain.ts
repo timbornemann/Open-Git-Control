@@ -8,6 +8,7 @@ import type { AppTabId, InputDialogState } from '@/app/state/contracts';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { getLicenseTemplateRequirements, LICENSE_TEMPLATE_OPTIONS, isLicenseTemplateId } from '@/shared/licenseTemplates';
 import type { Dispatch, SetStateAction } from 'react';
+import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type Params = {
   triggerRefresh: () => void;
@@ -111,7 +112,7 @@ export const useWorkspaceDomain = ({
   onNoActiveRepo,
   language,
 }: Params) => {
-  const [activeTab, setActiveTab] = useState<AppTabId>('localRepos');
+  const [activeTab, setActiveTabState] = useState<AppTabId>('localRepos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
@@ -124,6 +125,7 @@ export const useWorkspaceDomain = ({
   const activeRepoRef = useRef(activeRepo);
   const repoMetaRef = useRef(repoMeta);
   const repoSortByRef = useRef(repoSortBy);
+  const activeTabRef = useRef(activeTab);
 
   // Dialog callbacks can outlive the render in which they were created. Keep
   // repository mutations anchored to the latest committed workspace state
@@ -133,7 +135,16 @@ export const useWorkspaceDomain = ({
     activeRepoRef.current = activeRepo;
     repoMetaRef.current = repoMeta;
     repoSortByRef.current = repoSortBy;
-  }, [activeRepo, openRepos, repoMeta, repoSortBy]);
+    activeTabRef.current = activeTab;
+  }, [activeRepo, activeTab, openRepos, repoMeta, repoSortBy]);
+
+  const setActiveTab = useCallback((tab: AppTabId) => {
+    if (activeTabRef.current === tab) return;
+    requestWorkingDirectoryNavigation({ kind: 'view', label: tab }, () => {
+      activeTabRef.current = tab;
+      setActiveTabState(tab);
+    });
+  }, []);
 
   const { t, tr } = useLanguageTranslations(language);
 
@@ -271,10 +282,11 @@ export const useWorkspaceDomain = ({
             const remainingPaths = provisionalPaths.filter((repoPath) => normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(active));
             let nextPathIndex = 0;
             const resolveNextPath = async () => {
-              while (nextPathIndex < remainingPaths.length) {
+              while (nextPathIndex < remainingPaths.length && repoOperationSequenceRef.current === operationId) {
                 const repoPath = remainingPaths[nextPathIndex++];
                 try {
                   const canonicalPath = String((await appClient.resolveRepoPath(repoPath)) || '').trim() || repoPath;
+                  if (repoOperationSequenceRef.current !== operationId) return;
                   migrateRepoPathToCanonical(repoPath, canonicalPath);
                 } catch {
                   // Keep unavailable entries visible so their existing recovery
@@ -282,7 +294,7 @@ export const useWorkspaceDomain = ({
                 }
               }
             };
-            await Promise.all(Array.from({ length: Math.min(BACKGROUND_REPO_RESOLUTION_CONCURRENCY, remainingPaths.length) }, resolveNextPath));
+            void Promise.all(Array.from({ length: Math.min(BACKGROUND_REPO_RESOLUTION_CONCURRENCY, remainingPaths.length) }, resolveNextPath));
           }
         } else {
           await appClient.clearRepoPath();
@@ -293,12 +305,14 @@ export const useWorkspaceDomain = ({
         }
       } catch (e) {
         console.error(e);
-      }
-      if (repoOperationSequenceRef.current === operationId) {
-        setReposLoaded(true);
-      }
-      if (repoRestoreSequenceRef.current === restoreId) {
-        setIsRestoringRepos(false);
+      } finally {
+        // A user operation may supersede restoration while getStoredRepos (or
+        // active-repository validation) is pending. Restoration still owns this
+        // lifecycle flag and must always release persistence for the winner.
+        if (repoRestoreSequenceRef.current === restoreId) {
+          setReposLoaded(true);
+          setIsRestoringRepos(false);
+        }
       }
     };
     loadStored();
@@ -324,10 +338,13 @@ export const useWorkspaceDomain = ({
 
   const handleSwitchRepo = async (repoPath: string) => {
     if (!appClient.isAvailable() || normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(activeRepoRef.current || '')) return;
+    // Close any repository-scoped action dialog before an asynchronous guard
+    // decision or main-process repository switch can begin.
+    setConfirmDialog(null);
+    if (!(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: repoPath }))) return;
     const operationId = ++repoOperationSequenceRef.current;
     // Prevent a confirmation opened for repo A from being accepted while the
     // main process has already switched to repo B but React has not rerendered.
-    setConfirmDialog(null);
     const canonicalRepoPath = await appClient.setRepoPath(repoPath);
     if (repoOperationSequenceRef.current !== operationId) return;
     migrateRepoPathToCanonical(repoPath, canonicalRepoPath);
@@ -343,6 +360,8 @@ export const useWorkspaceDomain = ({
     const repoKey = normalizeRepoPathKey(repoPath);
     const currentOpenRepos = openReposRef.current;
     if (!currentOpenRepos.some((candidate) => normalizeRepoPathKey(candidate) === repoKey)) return;
+    const closesActiveRepo = Boolean(activeRepoRef.current && normalizeRepoPathKey(activeRepoRef.current) === repoKey);
+    if (closesActiveRepo && !(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'repository list' }))) return;
 
     const next = currentOpenRepos.filter((candidate) => normalizeRepoPathKey(candidate) !== repoKey);
     const nextMeta = Object.fromEntries(Object.entries(repoMetaRef.current).filter(([candidate]) => normalizeRepoPathKey(candidate) !== repoKey)) as Record<
@@ -360,7 +379,7 @@ export const useWorkspaceDomain = ({
     // operation sequence, otherwise it would invalidate an in-flight switch to a
     // different repository and leave the UI showing one repo while the main
     // process operates on another.
-    if (!activeRepoRef.current || normalizeRepoPathKey(activeRepoRef.current) !== repoKey) {
+    if (!closesActiveRepo) {
       setReposLoaded(true);
       return;
     }
@@ -431,6 +450,7 @@ export const useWorkspaceDomain = ({
     try {
       const result = await appClient.openDirectory();
       if (result && result.isRepo) {
+        if (!(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: result.path }))) return;
         const operationId = ++repoOperationSequenceRef.current;
         setConfirmDialog(null);
         const canonicalRepoPath = await appClient.setRepoPath(result.path);
@@ -513,6 +533,7 @@ export const useWorkspaceDomain = ({
           ),
           confirmLabel: t('generated.components.layout.hooks.useworkspacedomain.initialize_repository_540255ad'),
           onSubmit: async (values) => {
+            if (!(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: result.path }))) return;
             const license = isLicenseTemplateId(values.license) ? values.license : 'none';
             const initResult = await gitClient.gitInit(result.path, {
               createReadme: values.createReadme === 'true',
@@ -557,6 +578,11 @@ export const useWorkspaceDomain = ({
 
   const addOpenRepo = async (repoPath: string) => {
     if (!appClient.isAvailable()) return;
+    if (
+      normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(activeRepoRef.current || '') &&
+      !(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: repoPath }))
+    )
+      return;
     const operationId = ++repoOperationSequenceRef.current;
     setConfirmDialog(null);
     const canonicalRepoPath = await appClient.setRepoPath(repoPath);

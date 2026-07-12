@@ -1,8 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
+import { confirmWorkingDirectoryNavigation, requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
-const trimOutput = (state: RepositoryRunStateDto): RepositoryRunStateDto => ({ ...state, output: state.output.slice(-4_000) });
+const MAX_RUN_OUTPUT_LINES = 4_000;
+const MAX_RUN_OUTPUT_BYTES = 2 * 1024 * 1024;
+
+const utf8Encoder = new TextEncoder();
+const utf8Decoder = new TextDecoder();
+
+const truncateUtf8End = (text: string, maxBytes: number): string => {
+  const bytes = utf8Encoder.encode(text);
+  if (bytes.length <= maxBytes) return text;
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  return utf8Decoder.decode(bytes.subarray(start));
+};
+
+export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): RepositoryRunStateDto => {
+  const retained = [] as RepositoryRunStateDto['output'];
+  let retainedBytes = 0;
+  for (let index = state.output.length - 1; index >= 0 && retained.length < MAX_RUN_OUTPUT_LINES; index -= 1) {
+    const line = state.output[index];
+    const availableBytes = MAX_RUN_OUTPUT_BYTES - retainedBytes;
+    if (availableBytes <= 0) break;
+    const text = truncateUtf8End(line.text, availableBytes);
+    const textBytes = utf8Encoder.encode(text).length;
+    retained.push(text === line.text ? line : { ...line, text });
+    retainedBytes += textBytes;
+  }
+  retained.reverse();
+  return { ...state, output: retained };
+};
 
 export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: string | null; triggerRefresh: () => void }) => {
   const [runState, setRunState] = useState<RepositoryRunStateDto | null>(null);
@@ -51,12 +80,12 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
     if (!repositoryRunClient.isAvailable()) return;
     let active = true;
     void repositoryRunClient.getState().then((result) => {
-      if (active && result.success) setRunState(result.data);
+      if (active && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
     });
     return repositoryRunClient.onEvent((event) => {
       if (!active) return;
       if (event.type === 'state') {
-        setRunState(event.state);
+        setRunState(event.state ? trimRepositoryRunOutput(event.state) : null);
         if (event.state && event.state.status !== 'running' && !refreshedRunIds.current.has(event.state.runId)) {
           if (isConsoleOpenRef.current && event.state.repoPath === activeRepoRef.current) setLastViewedRunId(event.state.runId);
           refreshedRunIds.current.add(event.state.runId);
@@ -67,7 +96,7 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
       }
       setRunState((previous) => {
         if (!previous || previous.runId !== event.runId) return previous;
-        return trimOutput({ ...previous, output: [...previous.output, event.line] });
+        return trimRepositoryRunOutput({ ...previous, output: [...previous.output, event.line] });
       });
     });
   }, [refreshConfig, triggerRefresh]);
@@ -75,9 +104,10 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   const startRun = useCallback(
     async (action: RepositoryRunActionId): Promise<boolean> => {
       if (!activeRepo || !repositoryRunClient.isAvailable()) return false;
+      if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'run console' }))) return false;
       const result = await repositoryRunClient.start(activeRepo, action);
       if (!result.success) return false;
-      setRunState(result.data);
+      setRunState(trimRepositoryRunOutput(result.data));
       isConsoleOpenRef.current = true;
       setConsoleOpen(true);
       return true;
@@ -92,9 +122,11 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
 
   const openRunConsole = useCallback(() => {
     if (!runState || runState.repoPath !== activeRepo) return;
-    if (runState.status !== 'running') setLastViewedRunId(runState.runId);
-    isConsoleOpenRef.current = true;
-    setConsoleOpen(true);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'run console' }, () => {
+      if (runState.status !== 'running') setLastViewedRunId(runState.runId);
+      isConsoleOpenRef.current = true;
+      setConsoleOpen(true);
+    });
   }, [activeRepo, runState]);
 
   const closeRunConsole = useCallback(() => {

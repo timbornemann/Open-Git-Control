@@ -185,6 +185,16 @@ describe('planningApiServer', () => {
     await expect(response.json()).resolves.toMatchObject({ success: false, error: { code: 'PROJECT_NOT_FOUND' } });
   });
 
+  it('returns TODO_NOT_FOUND when deleting a todo that does not exist', async () => {
+    const response = await fetch(`${server!.url}/api/todos/missing-todo`, {
+      method: 'DELETE',
+      headers: { [server!.authHeaderName]: server!.authToken },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ success: false, error: { code: 'TODO_NOT_FOUND' } });
+  });
+
   it('rejects invalid todo patches without persisting a simultaneous move', async () => {
     const sourceProject = await requestJson('/api/projects', {
       method: 'POST',
@@ -335,6 +345,21 @@ describe('planningApiServer', () => {
         projectName: 'MCP Project',
       }),
     ]);
+
+    const deleteMissing = await requestJson('/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'delete_todo', arguments: { itemId: 'missing-todo' } },
+      }),
+    });
+    expect(deleteMissing.result).toMatchObject({
+      isError: true,
+      structuredContent: { error: { code: 'TODO_NOT_FOUND', message: 'Todo not found.' } },
+    });
+    expect(deleteMissing.result.content[0].text).toContain('TODO_NOT_FOUND');
   });
 
   it('does not expose Git routes or MCP Git tools', async () => {

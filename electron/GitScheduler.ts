@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network';
+export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network' | 'network-read';
 
 export type GitSchedulerDiagnostic = {
   repoPath: string;
@@ -40,6 +40,7 @@ const PRIORITY: Record<GitJobKind, number> = {
   // Network jobs run in their own lane and are picked by kind, so this value
   // only affects tie-break ordering among queued jobs.
   network: 4,
+  'network-read': 4,
 };
 
 const MAX_CONCURRENT_READS = 4;
@@ -188,13 +189,14 @@ export class GitScheduler {
       return false;
     });
 
-    // Network jobs (fetch/push) neither read the working tree nor touch the
-    // index, so they run in an independent single-slot lane. A slow or offline
-    // remote therefore can never block local reads (log, file tree, diff) or
-    // local writes (checkout, commit, ...). This runs before the activeWrite
-    // gate so a network job may start even while a local write is in flight.
+    // Pure remote reads (`ls-remote`) remain fully independent. Fetch and push
+    // use the same lane, but are ref/config mutators and therefore must not
+    // overlap a local write. Local reads may still run while a remote is slow.
     if (!state.activeNetwork) {
-      const networkIndex = state.queue.findIndex((entry) => entry.kind === 'network');
+      const pureNetworkReadIndex = state.queue.findIndex((entry) => entry.kind === 'network-read');
+      const hasQueuedWrite = state.queue.some((entry) => entry.kind === 'write');
+      const mutatingNetworkIndex = state.activeWrite || hasQueuedWrite ? -1 : state.queue.findIndex((entry) => entry.kind === 'network');
+      const networkIndex = pureNetworkReadIndex >= 0 ? pureNetworkReadIndex : mutatingNetworkIndex;
       if (networkIndex >= 0) {
         const [entry] = state.queue.splice(networkIndex, 1);
         state.activeNetwork = entry;
@@ -206,18 +208,21 @@ export class GitScheduler {
 
     const nextWriteIndex = state.queue.findIndex((entry) => entry.kind === 'write');
     if (nextWriteIndex >= 0) {
-      if (state.activeReads.size > 0) return;
-      const [entry] = state.queue.splice(nextWriteIndex, 1);
-      state.activeWrite = entry;
-      void this.execute(repoPath, state, entry, 'write');
-      return;
+      const mutatingNetworkActive = state.activeNetwork?.kind === 'network';
+      if (!mutatingNetworkActive) {
+        if (state.activeReads.size > 0) return;
+        const [entry] = state.queue.splice(nextWriteIndex, 1);
+        state.activeWrite = entry;
+        void this.execute(repoPath, state, entry, 'write');
+        return;
+      }
     }
 
     while (state.activeReads.size < MAX_CONCURRENT_READS) {
       const activeBackgroundCount = [...state.activeReads].filter((entry) => entry.kind === 'background').length;
       const hasActiveInteractiveRead = [...state.activeReads].some((entry) => entry.kind === 'interactive');
       const nextIndex = state.queue.findIndex((entry) => {
-        if (entry.kind === 'write' || entry.kind === 'network') return false;
+        if (entry.kind === 'write' || entry.kind === 'network' || entry.kind === 'network-read') return false;
         if (entry.kind === 'background') {
           return !hasActiveInteractiveRead && activeBackgroundCount < MAX_BACKGROUND_READS;
         }

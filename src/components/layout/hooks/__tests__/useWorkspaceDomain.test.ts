@@ -4,6 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceDomain } from '@/components/layout/hooks/useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
+import {
+  resetWorkingDirectoryNavigationGuardForTests,
+  setActiveWorkingDirectoryNavigationGuard,
+} from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type Workspace = ReturnType<typeof useWorkspaceDomain>;
 
@@ -60,11 +64,46 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetWorkingDirectoryNavigationGuardForTests();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe('useWorkspaceDomain repository canonicalization', () => {
+  it('defers tab and repository switches until the working-file guard proceeds', async () => {
+    vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
+      repos: [
+        { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
+        { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 },
+      ],
+      activeRepo: 'C:/repo-a',
+      sortBy: 'lastOpenedDesc',
+    });
+    vi.spyOn(appClient, 'setRepoPath').mockResolvedValueOnce('C:/repo-a').mockResolvedValueOnce('C:/repo-b');
+    const pending: Array<() => void> = [];
+    setActiveWorkingDirectoryNavigationGuard((_target, proceed) => pending.push(proceed));
+    const hook = renderWorkspace();
+    await flushEffects();
+    await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
+
+    act(() => hook.current.setActiveTab('settings'));
+    expect(hook.current.activeTab).toBe('localRepos');
+    act(() => pending.shift()?.());
+    expect(hook.current.activeTab).toBe('settings');
+
+    let switchPromise!: Promise<void>;
+    act(() => {
+      switchPromise = hook.current.handleSwitchRepo('C:/repo-b');
+    });
+    expect(hook.current.activeRepo).toBe('C:/repo-a');
+    await act(async () => {
+      pending.shift()?.();
+      await switchPromise;
+    });
+    expect(hook.current.activeRepo).toBe('C:/repo-b');
+    hook.unmount();
+  });
+
   it('offers README and license scaffolding before initializing a selected folder', async () => {
     vi.spyOn(appClient, 'openDirectory').mockResolvedValue({ path: 'C:/new-repository', isRepo: false });
     const hook = renderWorkspace();
@@ -220,7 +259,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     hook.unmount();
   });
 
-  it('shows stored repositories before a background path canonicalization completes', async () => {
+  it('releases restore mode while background path canonicalization continues', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [
         { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
@@ -243,14 +282,13 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
 
     expect(hook.current.openRepos).toEqual(['C:/repo-a', 'C:/repo-b/packages/app']);
-    expect(hook.current.isRestoringRepos).toBe(true);
+    await vi.waitFor(() => expect(hook.current.isRestoringRepos).toBe(false));
 
     await act(async () => {
       resolveBackgroundPath('C:/repo-b');
       await Promise.resolve();
     });
-    await vi.waitFor(() => expect(hook.current.isRestoringRepos).toBe(false));
-    expect(hook.current.openRepos).toEqual(['C:/repo-a', 'C:/repo-b']);
+    await vi.waitFor(() => expect(hook.current.openRepos).toEqual(['C:/repo-a', 'C:/repo-b']));
     hook.unmount();
   });
 
@@ -288,6 +326,36 @@ describe('useWorkspaceDomain repository canonicalization', () => {
         expect.objectContaining({
           repos: expect.arrayContaining([expect.objectContaining({ path: 'C:/repo-a' }), expect.objectContaining({ path: 'C:/repo-b' })]),
         }),
+      ),
+    );
+    hook.unmount();
+  });
+
+  it('releases restore mode when a newer repository add wins while stored repositories are still loading', async () => {
+    let resolveStored!: (value: { repos: []; activeRepo: null; sortBy: 'lastOpenedDesc' }) => void;
+    vi.spyOn(appClient, 'getStoredRepos').mockReturnValue(
+      new Promise((resolve) => {
+        resolveStored = resolve;
+      }),
+    );
+    vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-b');
+    const hook = renderWorkspace();
+    await flushEffects();
+
+    await act(async () => {
+      await hook.current.addOpenRepo('C:/repo-b');
+    });
+    expect(hook.current.activeRepo).toBe('C:/repo-b');
+
+    await act(async () => {
+      resolveStored({ repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' });
+      await Promise.resolve();
+    });
+
+    expect(hook.current.isRestoringRepos).toBe(false);
+    await vi.waitFor(() =>
+      expect(appClient.setStoredRepos).toHaveBeenCalledWith(
+        expect.objectContaining({ activeRepo: 'C:/repo-b', repos: [expect.objectContaining({ path: 'C:/repo-b' })] }),
       ),
     );
     hook.unmount();

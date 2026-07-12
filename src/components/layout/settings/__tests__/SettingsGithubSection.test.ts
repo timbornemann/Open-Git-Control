@@ -61,5 +61,6 @@ describe('SettingsGithubSection', () => {
 
     expect(onUpdateSettings).toHaveBeenCalledTimes(1);
     expect(onUpdateSettings).toHaveBeenCalledWith({ githubHost: 'github.enterprise.local' });
+    expect(hostInput.value).toBe('github.com');
   });
 });

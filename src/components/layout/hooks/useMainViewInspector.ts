@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { extractGitObjectId } from '@/utils/gitObjectId';
+import {
+  requestWorkingDirectoryNavigation,
+  setActiveWorkingDirectoryNavigationGuard,
+  type WorkingDirectoryNavigationGuard,
+} from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type WorkingTreeSelection = {
   path: string;
@@ -12,7 +17,7 @@ export type WorkingDirectoryFileSelection = {
   repoPath: string;
 };
 
-export type WorkingDirectoryNavigationGuard = (nextPath: string, proceed: () => void) => void;
+export type { WorkingDirectoryNavigationGuard } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type Params = {
   autoOpenConflictResolverPath?: string | null;
@@ -56,14 +61,17 @@ export const useMainViewInspector = ({
 
   useEffect(() => {
     if (!autoOpenConflictResolverPath) return;
-    setActiveConflictPath(autoOpenConflictResolverPath);
-    setActiveDiffRequest(null);
-    setShowRecoveryCenter(false);
-    setWorkingTreeSelection(null);
-    setIsCommitInspectorOpen(false);
-    setCommitHistoryStack([]);
-    setSelectedCommit(null);
-    onAutoOpenConflictResolverConsumed?.();
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'conflict resolver' }, () => {
+      setActiveConflictPath(autoOpenConflictResolverPath);
+      setActiveDiffRequest(null);
+      setShowRecoveryCenter(false);
+      setWorkingTreeSelection(null);
+      setWorkingDirectoryFile(null);
+      setIsCommitInspectorOpen(false);
+      setCommitHistoryStack([]);
+      setSelectedCommit(null);
+      onAutoOpenConflictResolverConsumed?.();
+    });
   }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit]);
 
   useLayoutEffect(() => {
@@ -104,29 +112,38 @@ export const useMainViewInspector = ({
   }, [commitNavigationRequest, onCloseReleaseCreator, onOpenRepoWorkspace, setSelectedCommit]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
-    setActiveDiffRequest(null);
-    setActiveConflictPath(null);
-    setShowRecoveryCenter((prev) => !prev);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'recovery center' }, () => {
+      setActiveDiffRequest(null);
+      setActiveConflictPath(null);
+      setWorkingDirectoryFile(null);
+      setShowRecoveryCenter((prev) => !prev);
+    });
   }, []);
 
   const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
-    setActiveConflictPath(null);
-    setActiveDiffRequest((previous) => {
-      if (previous && previous.source === diffRequest.source && previous.path === diffRequest.path && previous.commitHash === diffRequest.commitHash) {
-        return previous;
-      }
-      return diffRequest;
+    requestWorkingDirectoryNavigation({ kind: 'view', label: `diff for "${diffRequest.path}"` }, () => {
+      setActiveConflictPath(null);
+      setWorkingDirectoryFile(null);
+      setActiveDiffRequest((previous) => {
+        if (previous && previous.source === diffRequest.source && previous.path === diffRequest.path && previous.commitHash === diffRequest.commitHash) {
+          return previous;
+        }
+        return diffRequest;
+      });
     });
   }, []);
 
   const handleOpenConflictResolver = useCallback(
     (filePath: string) => {
-      setActiveDiffRequest(null);
-      setShowRecoveryCenter(false);
-      setActiveConflictPath(filePath);
-      setWorkingTreeSelection(null);
-      setCommitHistoryStack([]);
-      setSelectedCommit(null);
+      requestWorkingDirectoryNavigation({ kind: 'view', label: `conflict resolver for "${filePath}"` }, () => {
+        setActiveDiffRequest(null);
+        setShowRecoveryCenter(false);
+        setActiveConflictPath(filePath);
+        setWorkingTreeSelection(null);
+        setWorkingDirectoryFile(null);
+        setCommitHistoryStack([]);
+        setSelectedCommit(null);
+      });
     },
     [setSelectedCommit],
   );
@@ -196,7 +213,7 @@ export const useMainViewInspector = ({
         setWorkingDirectoryFile({ path, repoPath: activeRepo });
       };
       const guard = workingDirectoryNavigationGuardRef.current;
-      if (guard) guard(path, proceed);
+      if (guard) guard({ kind: 'file', path }, proceed);
       else proceed();
     },
     [activeRepo, setSelectedCommit],
@@ -204,7 +221,15 @@ export const useMainViewInspector = ({
 
   const setWorkingDirectoryNavigationGuard = useCallback((guard: WorkingDirectoryNavigationGuard | null) => {
     workingDirectoryNavigationGuardRef.current = guard;
+    setActiveWorkingDirectoryNavigationGuard(guard);
   }, []);
+
+  useEffect(
+    () => () => {
+      setActiveWorkingDirectoryNavigationGuard(null);
+    },
+    [],
+  );
 
   const handleSelectCommitFromWorkingTree = useCallback(
     (hash: string) => {
@@ -242,13 +267,15 @@ export const useMainViewInspector = ({
   }, []);
 
   const handleStageCommitOpen = useCallback(() => {
-    onOpenRepoWorkspace();
-    onCloseReleaseCreator();
-    setActiveDiffRequest(null);
-    setActiveConflictPath(null);
-    setShowRecoveryCenter(false);
-    setWorkingDirectoryFile(null);
-    handleSelectCommitDirect(null);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'staging and commit' }, () => {
+      onOpenRepoWorkspace();
+      onCloseReleaseCreator();
+      setActiveDiffRequest(null);
+      setActiveConflictPath(null);
+      setShowRecoveryCenter(false);
+      setWorkingDirectoryFile(null);
+      handleSelectCommitDirect(null);
+    });
   }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
 
   return {

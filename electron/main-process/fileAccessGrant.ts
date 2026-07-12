@@ -8,6 +8,7 @@ type FileAccessGrant = {
 };
 
 const grantsByWebContents = new Map<number, Map<string, FileAccessGrant>>();
+const projectParentGrantsByWebContents = new Map<number, Map<string, FileAccessGrant>>();
 
 function canonicalizeSelectedFile(filePath: unknown): string | null {
   if (typeof filePath !== 'string' || !filePath.trim()) return null;
@@ -15,6 +16,18 @@ function canonicalizeSelectedFile(filePath: unknown): string | null {
   try {
     const absolutePath = path.resolve(filePath);
     if (!fs.statSync(absolutePath).isFile()) return null;
+    return fs.realpathSync.native(absolutePath);
+  } catch {
+    return null;
+  }
+}
+
+function canonicalizeSelectedDirectory(directoryPath: unknown): string | null {
+  if (typeof directoryPath !== 'string' || !directoryPath.trim()) return null;
+
+  try {
+    const absolutePath = path.resolve(directoryPath);
+    if (!fs.statSync(absolutePath).isDirectory()) return null;
     return fs.realpathSync.native(absolutePath);
   } catch {
     return null;
@@ -75,6 +88,36 @@ export function getAuthorizedSelectedFile(webContentsId: number, filePath: unkno
   return grants.has(canonicalPath) ? canonicalPath : null;
 }
 
+/** Records a native-dialog-selected parent directory for project materialization. */
+export function grantSelectedProjectParentDirectory(webContentsId: number, directoryPath: unknown): void {
+  if (!Number.isInteger(webContentsId) || webContentsId <= 0) return;
+  const canonicalPath = canonicalizeSelectedDirectory(directoryPath);
+  if (!canonicalPath) return;
+
+  const now = Date.now();
+  const grants = projectParentGrantsByWebContents.get(webContentsId) || new Map<string, FileAccessGrant>();
+  pruneExpiredGrants(grants, now);
+  grants.set(canonicalPath, { expiresAt: now + FILE_ACCESS_GRANT_TTL_MS });
+  projectParentGrantsByWebContents.set(webContentsId, grants);
+}
+
+/** Resolves an exact project parent path selected by the requesting renderer. */
+export function getAuthorizedProjectParentDirectory(webContentsId: number, directoryPath: unknown): string | null {
+  if (!Number.isInteger(webContentsId) || webContentsId <= 0) return null;
+  const canonicalPath = canonicalizeSelectedDirectory(directoryPath);
+  if (!canonicalPath) return null;
+
+  const grants = projectParentGrantsByWebContents.get(webContentsId);
+  if (!grants) return null;
+  pruneExpiredGrants(grants, Date.now());
+  if (grants.size === 0) {
+    projectParentGrantsByWebContents.delete(webContentsId);
+    return null;
+  }
+  return grants.has(canonicalPath) ? canonicalPath : null;
+}
+
 export function clearSelectedFileGrants(webContentsId: number): void {
   grantsByWebContents.delete(webContentsId);
+  projectParentGrantsByWebContents.delete(webContentsId);
 }

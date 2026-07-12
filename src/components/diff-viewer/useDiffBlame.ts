@@ -6,9 +6,10 @@ import { gitClient } from '@/services/gitClient';
 type UseDiffBlameParams = {
   repoPath: string | null;
   request: DiffRequest;
+  refreshTrigger?: number;
 };
 
-export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
+export const useDiffBlame = ({ repoPath, request, refreshTrigger }: UseDiffBlameParams) => {
   const [showBlame, setShowBlame] = useState(false);
   const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);
   const [isBlameLoading, setIsBlameLoading] = useState(false);
@@ -32,6 +33,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
 
     const fetchBlame = async () => {
       setIsBlameLoading(true);
+      setBlameData([]);
       try {
         const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
 
@@ -41,10 +43,12 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
         if (result.success) {
           setBlameData(result.data);
         } else {
+          setBlameData([]);
           console.error('Failed to fetch blame data:', result.error);
         }
       } catch (err) {
         if (!isCurrentRequest()) return;
+        setBlameData([]);
         console.error('Error fetching blame data:', err);
       } finally {
         if (isCurrentRequest()) {
@@ -59,7 +63,7 @@ export const useDiffBlame = ({ repoPath, request }: UseDiffBlameParams) => {
         requestGenerationRef.current += 1;
       }
     };
-  }, [showBlame, repoPath, request]);
+  }, [showBlame, repoPath, request, refreshTrigger]);
 
   const blameMap = useMemo(() => {
     const map = new Map<number, GitFileBlameLineDto>();

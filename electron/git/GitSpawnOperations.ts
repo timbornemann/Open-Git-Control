@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import { StringDecoder } from 'string_decoder';
 import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult } from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
@@ -295,34 +296,43 @@ export class GitSpawnOperations {
   cloneWithProgress(cloneUrl: string, repoPath: string, onProgress: (line: string) => void): Promise<GitCloneProgressResult> {
     return new Promise((resolve) => {
       const progressTail: string[] = [];
-      const collectProgress = (data: Buffer) => {
-        const lines = data.toString().split(/\r?\n|\r/);
-        for (const line of lines) {
-          const trimmed = redactGitSensitiveText(line.trim());
-          if (!trimmed) continue;
-          progressTail.push(trimmed);
-          if (progressTail.length > 24) {
-            progressTail.splice(0, progressTail.length - 24);
-          }
-          // Progress is delivered from a stream 'data' handler. A throwing
-          // consumer (e.g. sending to a destroyed window) must not surface as an
-          // uncaught exception outside the clone promise.
-          try {
-            onProgress(trimmed);
-          } catch {
-            // Ignore progress delivery failures; the clone itself continues.
-          }
+      let settled = false;
+      const emitProgress = (line: string) => {
+        const trimmed = redactGitSensitiveText(line.trim());
+        if (!trimmed) return;
+        progressTail.push(trimmed);
+        if (progressTail.length > 24) {
+          progressTail.splice(0, progressTail.length - 24);
+        }
+        // Progress is delivered from a stream 'data' handler. A throwing
+        // consumer (e.g. sending to a destroyed window) must not surface as an
+        // uncaught exception outside the clone promise.
+        try {
+          onProgress(trimmed);
+        } catch {
+          // Ignore progress delivery failures; the clone itself continues.
         }
       };
-
       const proc = spawn('git', ['clone', '--progress', '--', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
+      const failForOversizedProgress = () => {
+        if (settled) return;
+        settled = true;
+        proc.kill();
+        resolve({ success: false, error: `Git clone progress line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.` });
+      };
+      const stdoutProgress = createProgressCollector(emitProgress, MAX_STREAM_LINE_BYTES, failForOversizedProgress);
+      const stderrProgress = createProgressCollector(emitProgress, MAX_STREAM_LINE_BYTES, failForOversizedProgress);
 
-      proc.stderr.on('data', collectProgress);
-      proc.stdout.on('data', collectProgress);
+      proc.stderr.on('data', (data: Buffer) => stderrProgress.write(data));
+      proc.stdout.on('data', (data: Buffer) => stdoutProgress.write(data));
 
       proc.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        stderrProgress.end();
+        stdoutProgress.end();
         if (code === 0) {
           resolve({ success: true });
           return;
@@ -336,6 +346,10 @@ export class GitSpawnOperations {
       });
 
       proc.on('error', (err) => {
+        if (settled) return;
+        settled = true;
+        stderrProgress.end();
+        stdoutProgress.end();
         resolve({ success: false, error: redactGitSensitiveText(err.message) });
       });
     });
@@ -360,4 +374,49 @@ const emitLines = (
     if (line) onLine(redactGitSensitiveText(line));
   }
   return true;
+};
+
+const createProgressCollector = (onLine: (line: string) => void, maxPendingBytes: number, onLimitExceeded: () => void) => {
+  const decoder = new StringDecoder('utf8');
+  let pending = '';
+  let ended = false;
+
+  const drain = (final: boolean) => {
+    let lineStart = 0;
+    for (let index = 0; index < pending.length; index += 1) {
+      const character = pending[index];
+      if (character !== '\n' && character !== '\r') continue;
+      // A CR at the end of a chunk may be the first half of CRLF. Keep it
+      // until the next chunk so CRLF never produces a spurious empty update.
+      if (character === '\r' && index === pending.length - 1 && !final) break;
+      onLine(pending.slice(lineStart, index));
+      if (character === '\r' && pending[index + 1] === '\n') index += 1;
+      lineStart = index + 1;
+    }
+    pending = pending.slice(lineStart);
+    if (final && pending) {
+      onLine(pending);
+      pending = '';
+    }
+  };
+
+  return {
+    write(chunk: Buffer) {
+      if (ended) return;
+      pending += decoder.write(chunk);
+      drain(false);
+      if (Buffer.byteLength(pending) > maxPendingBytes) {
+        pending = '';
+        ended = true;
+        decoder.end();
+        onLimitExceeded();
+      }
+    },
+    end() {
+      if (ended) return;
+      ended = true;
+      pending += decoder.end();
+      drain(true);
+    },
+  };
 };

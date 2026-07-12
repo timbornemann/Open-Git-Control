@@ -2,7 +2,7 @@ import type { GitService } from '../../GitService';
 import { assertAllowedGitCommand, createJobId, normalizeCommandArgs, type GitCommandName } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../../git/RepositoryPathSafety';
-import { hasUnresolvedConflictMarkers } from '../../git/MergeConflictService';
+import { hasUnresolvedConflictMarkers, parseConflictMarkerSize } from '../../git/MergeConflictService';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -118,11 +118,15 @@ const executeCommitDetails: GitCommandExecutor = async (context) => {
 
 const executeConflictMarkResolved: GitCommandExecutor = async (context) => {
   const repoPath = context.repoPath || context.gitService.requireActiveRepoPath();
-  const contents = await context.gitService.files.readRepoFileAtPath(repoPath, context.args[0]);
-  if (hasUnresolvedConflictMarkers(contents)) {
+  const filePath = normalizeRepositoryRelativePath(context.args[0], 'Conflict file path');
+  const [contents, markerSizeRaw] = await Promise.all([
+    context.gitService.files.readRepoFileAtPath(repoPath, filePath),
+    context.gitService.runCommandAtPath(repoPath, ['check-attr', '-z', 'conflict-marker-size', '--', filePath]),
+  ]);
+  if (hasUnresolvedConflictMarkers(contents, parseConflictMarkerSize(markerSizeRaw))) {
     throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
   }
-  return context.gitService.runCommandAtPath(repoPath, ['add', '--', toLiteralPathspec(context.args[0])]);
+  return context.gitService.runCommandAtPath(repoPath, ['add', '--', toLiteralPathspec(filePath)]);
 };
 
 const executeSequencerCommand = (context: GitCommandExecutionContext, args: string[], envOverrides: NodeJS.ProcessEnv = {}): Promise<string> =>

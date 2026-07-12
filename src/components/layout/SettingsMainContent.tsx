@@ -2,6 +2,7 @@ import React from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitJobEventDto } from '@/types/aiDtos';
 import type { SettingsTabId } from '@/app/state/contracts';
+import type { SettingsUpdateHandler } from './settings/SettingsSectionPrimitives';
 import { ApiMcpSettingsPanel } from './ApiMcpSettingsPanel';
 import {
   SettingsAiSection,
@@ -17,7 +18,7 @@ import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
 
 type SettingsMainContentProps = {
   settings: AppSettingsDto;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  onUpdateSettings: SettingsUpdateHandler;
   jobs: GitJobEventDto[];
   onClearJobs: () => void;
   activeTab: SettingsTabId;

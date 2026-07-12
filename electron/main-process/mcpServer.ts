@@ -289,8 +289,10 @@ const handleMcpMessage = async (message: unknown, serverVersion: string): Promis
     }
     return isNotification ? null : response;
   } catch (error) {
+    const apiError = error instanceof ApiError ? error : null;
     const response = jsonRpcResult(id, {
-      content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+      content: [{ type: 'text', text: apiError ? `${apiError.code}: ${apiError.message}` : error instanceof Error ? error.message : String(error) }],
+      ...(apiError ? { structuredContent: { error: { code: apiError.code, message: apiError.message } } } : {}),
       isError: true,
     });
     return isNotification ? null : response;

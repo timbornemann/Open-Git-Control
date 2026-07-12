@@ -4,6 +4,7 @@ import type { GitHubService } from '../GitHubService';
 import type { AppSettings } from '../settings';
 import { sanitizeRemoteUrl } from './parsing';
 import type { UpdaterStatusPayload } from './updaterManager';
+import { repositoryPathKey } from './activeRepositoryAuthorization';
 
 type BuildDiagnosticsReportDependencies = {
   gitService: GitService;
@@ -66,13 +67,19 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`downloaded=${updaterStatus.downloaded}`);
     lines.push(`lastError=${updaterStatus.error || ''}`);
 
-    const gitDiagnostics = gitService.getSchedulerDiagnostics().slice(-20);
+    const activeRepoKey = activeRepo ? repositoryPathKey(activeRepo) : null;
+    const gitDiagnostics = activeRepoKey
+      ? gitService
+          .getSchedulerDiagnostics()
+          .filter((entry) => repositoryPathKey(entry.repoPath) === activeRepoKey)
+          .slice(-20)
+      : [];
     lines.push('');
     lines.push('[Git Scheduler]');
     lines.push(`entries=${gitDiagnostics.length}`);
     for (const entry of gitDiagnostics) {
       lines.push(
-        `${new Date(entry.timestamp).toISOString()} kind=${entry.kind} command=${entry.command} durationMs=${entry.durationMs} resultBytes=${entry.resultBytes} aborted=${entry.aborted}`,
+        `${new Date(entry.timestamp).toISOString()} repoPath=${JSON.stringify(entry.repoPath)} kind=${entry.kind} command=${entry.command} durationMs=${entry.durationMs} resultBytes=${entry.resultBytes} aborted=${entry.aborted}`,
       );
     }
 
@@ -87,7 +94,7 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
       lines.push('');
       lines.push('[Git]');
       try {
-        const status = await gitService.runCommand(['status', '-sb']);
+        const status = await gitService.runCommandAtPath(activeRepo, ['status', '-sb']);
         lines.push('status -sb:');
         lines.push(status || '(empty)');
       } catch (error: any) {
@@ -95,7 +102,7 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
       }
 
       try {
-        const remotes = await gitService.runCommand(['remote', '-v']);
+        const remotes = await gitService.runCommandAtPath(activeRepo, ['remote', '-v']);
         lines.push('');
         lines.push('remote -v:');
         lines.push(

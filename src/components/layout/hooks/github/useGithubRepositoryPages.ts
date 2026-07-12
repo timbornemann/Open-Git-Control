@@ -110,7 +110,7 @@ export const useGithubRepositoryPages = ({ isAuthenticated, t }: Params) => {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      resetRepositoryPages();
+      resetRepositoryPages({ clearRepos: true });
       return;
     }
 

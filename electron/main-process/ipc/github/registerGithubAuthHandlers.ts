@@ -237,9 +237,17 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   ipcMain.handle(IpcChannel.GithubLogout, async () => {
     authGeneration += 1;
     abortGithubCliLogin();
+    let persistenceError: string | null = null;
+    try {
+      clearSavedGithubTokenSecurely();
+    } catch (error: unknown) {
+      persistenceError = toErrorMessage(error, 'Saved GitHub token could not be deleted.');
+    }
     githubService.logout();
-    clearSavedGithubTokenSecurely();
-    return { success: true };
+    if (persistenceError) {
+      return { success: false, error: persistenceError, sessionCleared: true } as const;
+    }
+    return { success: true } as const;
   });
 
   ipcMain.handle(IpcChannel.GithubCheckAuthStatus, async () => {

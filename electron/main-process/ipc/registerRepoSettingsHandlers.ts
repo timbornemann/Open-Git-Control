@@ -30,6 +30,17 @@ function getEndpointOrigin(value: string): string {
   }
 }
 
+function getValidOpenAiEndpointOrigin(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const parsed = new URL(value.trim());
+    if (parsed.protocol.toLowerCase() !== 'https:' || parsed.username || parsed.password) return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function registerRepoSettingsHandlers({ updaterManager, githubService }: RegisterRepoSettingsHandlersDeps): void {
   ipcMain.handle(IpcChannel.ReposGetStored, async () => {
     return readStoreData();
@@ -57,6 +68,14 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     delete partialWithoutSecrets.openAiApiKey;
     delete partialWithoutSecrets.hasOpenAiApiKey;
 
+    const hasOpenAiBaseUrlUpdate = Object.prototype.hasOwnProperty.call(partialWithoutSecrets, 'openAiBaseUrl');
+    const requestedOpenAiOrigin = getValidOpenAiEndpointOrigin(partialWithoutSecrets.openAiBaseUrl);
+    // Invalid/incomplete endpoint text is not a request to reset to the
+    // default. Retain both the configured endpoint and its bound credential.
+    if (hasOpenAiBaseUrlUpdate && requestedOpenAiOrigin === null) {
+      delete partialWithoutSecrets.openAiBaseUrl;
+    }
+
     let next = normalizeSettings({
       ...current,
       ...partialWithoutSecrets,
@@ -67,15 +86,20 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     // A saved key belongs to the endpoint the user explicitly configured it
     // for. Do not carry it over to another host (or back to the default) where
     // it could otherwise be sent without a fresh user action.
-    if (getEndpointOrigin(next.openAiBaseUrl) !== getEndpointOrigin(current.openAiBaseUrl)) {
+    const githubHostChanged = next.githubHost !== current.githubHost;
+    if (githubHostChanged) {
+      // Deleting the host-bound credential is the commit precondition. If it
+      // fails, leave both persisted settings and the live session untouched.
+      clearSavedGithubTokenSecurely();
+    }
+    if (requestedOpenAiOrigin !== null && requestedOpenAiOrigin !== getEndpointOrigin(current.openAiBaseUrl)) {
       clearSavedOpenAiApiKeySecurely();
       next = normalizeSettings({ ...next, hasOpenAiApiKey: false });
     }
 
     writeSettings(next);
-    if (next.githubHost !== current.githubHost) {
+    if (githubHostChanged) {
       githubService.logout();
-      clearSavedGithubTokenSecurely();
     }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
       updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);

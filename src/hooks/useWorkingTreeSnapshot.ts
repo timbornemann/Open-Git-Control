@@ -21,6 +21,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const [dataRepoPath, setDataRepoPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const inFlightRef = useRef<{ generation: number; promise: Promise<void> } | null>(null);
+  const queuedRefreshGenerationRef = useRef<number | null>(null);
   const generationRef = useRef(0);
   const snapshotRef = useRef<WorkingTreeSnapshotDto | null>(null);
   const statsRef = useRef<WorkingTreeStatsDto | null>(null);
@@ -28,57 +29,69 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const refresh = useCallback(async () => {
     if (!repoPath || !gitClient.isAvailable()) return;
     const generation = generationRef.current;
-    if (inFlightRef.current?.generation === generation) return inFlightRef.current.promise;
-    const quickStatusRequest = snapshotRef.current ? null : gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain').catch(() => null);
-    if (quickStatusRequest) {
-      void quickStatusRequest
-        .then((quickStatus) => {
-          if (generation !== generationRef.current || snapshotRef.current || !quickStatus?.success) return;
-          statsRef.current = null;
-          setSnapshot(null);
-          setDataRepoPath(repoPath);
-          setStatus(parseGitStatusDetailed(quickStatus.data || ''));
-          setStats(null);
-        })
-        .catch(() => undefined);
+    if (inFlightRef.current?.generation === generation) {
+      queuedRefreshGenerationRef.current = generation;
+      return inFlightRef.current.promise;
     }
+
+    const performRefresh = async () => {
+      const quickStatusRequest = snapshotRef.current ? null : gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain').catch(() => null);
+      if (quickStatusRequest) {
+        void quickStatusRequest
+          .then((quickStatus) => {
+            if (generation !== generationRef.current || snapshotRef.current || !quickStatus?.success) return;
+            statsRef.current = null;
+            setSnapshot(null);
+            setDataRepoPath(repoPath);
+            setStatus(parseGitStatusDetailed(quickStatus.data || ''));
+            setStats(null);
+          })
+          .catch(() => undefined);
+      }
+
+      const result = await gitClient.getWorkingTreeSnapshot(repoPath);
+      if (generation !== generationRef.current) return;
+      if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
+        const nextSnapshot = result.data;
+        snapshotRef.current = nextSnapshot;
+        setSnapshot(nextSnapshot);
+        setDataRepoPath(nextSnapshot.repoPath);
+        setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
+        if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
+          statsRef.current = null;
+          setStats(null);
+          const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId, repoPath);
+          if (generation !== generationRef.current || !statsResult.success || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId) return;
+          statsRef.current = statsResult.data;
+          setStats(statsResult.data);
+        }
+        return;
+      }
+
+      const quickStatus = quickStatusRequest ? await quickStatusRequest : null;
+      const fallback = quickStatus?.success ? quickStatus : await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
+      if (generation !== generationRef.current || !fallback.success) return;
+      snapshotRef.current = null;
+      statsRef.current = null;
+      setSnapshot(null);
+      setDataRepoPath(repoPath);
+      setStatus(parseGitStatusDetailed(fallback.data || ''));
+      setStats(null);
+    };
+
     let request!: Promise<void>;
     request = (async () => {
       setLoading((current) => current || !snapshotRef.current);
-      try {
-        const result = await gitClient.getWorkingTreeSnapshot(repoPath);
-        if (generation !== generationRef.current) return;
-        if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
-          const nextSnapshot = result.data;
-          snapshotRef.current = nextSnapshot;
-          setSnapshot(nextSnapshot);
-          setDataRepoPath(nextSnapshot.repoPath);
-          setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
-          if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
-            statsRef.current = null;
-            setStats(null);
-            const statsResult = await gitClient.getWorkingTreeStats(nextSnapshot.snapshotId, repoPath);
-            if (generation !== generationRef.current || !statsResult.success || snapshotRef.current?.snapshotId !== statsResult.data.snapshotId) return;
-            statsRef.current = statsResult.data;
-            setStats(statsResult.data);
+      do {
+        queuedRefreshGenerationRef.current = null;
+        try {
+          await performRefresh();
+        } catch (error) {
+          if (generation === generationRef.current) {
+            console.error('Failed to refresh working tree status:', error);
           }
-          return;
         }
-
-        const quickStatus = quickStatusRequest ? await quickStatusRequest : null;
-        const fallback = quickStatus?.success ? quickStatus : await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
-        if (generation !== generationRef.current || !fallback.success) return;
-        snapshotRef.current = null;
-        statsRef.current = null;
-        setSnapshot(null);
-        setDataRepoPath(repoPath);
-        setStatus(parseGitStatusDetailed(fallback.data || ''));
-        setStats(null);
-      } catch (error) {
-        if (generation === generationRef.current) {
-          console.error('Failed to refresh working tree status:', error);
-        }
-      }
+      } while (generation === generationRef.current && queuedRefreshGenerationRef.current === generation);
     })().finally(() => {
       if (generation === generationRef.current) setLoading(false);
       if (inFlightRef.current?.promise === request) {
@@ -91,6 +104,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
 
   useLayoutEffect(() => {
     generationRef.current += 1;
+    queuedRefreshGenerationRef.current = null;
     snapshotRef.current = null;
     statsRef.current = null;
     inFlightRef.current = null;
@@ -98,6 +112,7 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     setStatus(null);
     setStats(null);
     setDataRepoPath(null);
+    setLoading(false);
   }, [repoPath]);
 
   useEffect(() => {

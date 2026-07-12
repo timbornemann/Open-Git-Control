@@ -232,4 +232,55 @@ describe('useCommitForm repository isolation', () => {
     expect(setToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
     act(() => root.unmount());
   });
+
+  it('lets the new repository scan immediately and suppresses a late error from the previous repository', async () => {
+    const oldScan = deferred<any>();
+    vi.spyOn(gitClient, 'scanCommitSecrets')
+      .mockReturnValueOnce(oldScan.promise)
+      .mockResolvedValueOnce({
+        success: true,
+        data: { scanned: true, strictness: 'medium', findings: [], notes: [], stats: { checkedLines: 0, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
+      });
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    const setToast = vi.fn();
+    let repoPath = repoA;
+    let current: ReturnType<typeof useCommitForm> | null = null;
+    const root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath,
+        status,
+        setToast,
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: DEFAULT_SETTINGS,
+        setConfirmDialog: vi.fn(),
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
+      });
+      return null;
+    };
+    const render = () => root.render(createElement(Harness));
+    act(render);
+    act(() => current!.setCommitMsg('Commit in A'));
+    let oldCommit!: Promise<void>;
+    act(() => {
+      oldCommit = current!.handleCommit();
+    });
+
+    repoPath = repoB;
+    act(render);
+    act(() => current!.setCommitMsg('Commit in B'));
+    await act(async () => {
+      await current!.handleCommit();
+    });
+
+    expect(gitClient.scanCommitSecrets).toHaveBeenNthCalledWith(2, { repoPath: repoB });
+    expect(createCommit).toHaveBeenCalledWith(expect.objectContaining({ repoPath: repoB, title: 'Commit in B' }));
+
+    await act(async () => {
+      oldScan.resolve({ success: false, error: 'old repository scan failed' });
+      await oldCommit;
+    });
+    expect(setToast).not.toHaveBeenCalledWith(expect.objectContaining({ msg: 'old repository scan failed' }));
+    act(() => root.unmount());
+  });
 });

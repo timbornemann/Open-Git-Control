@@ -96,7 +96,23 @@ export class AiAutoCommitRunSession {
     // The live index is not touched while messages are being generated.
     await this.indexTransaction.initialize(statusEntries);
 
-    const snapshotFiles = statusEntries.map((entry): SnapshotFile => this.toSnapshotFile(entry));
+    const committableEntries = statusEntries.filter((entry) => this.indexTransaction.isStatusEntryCommittable(entry));
+    const skippedEntries = statusEntries.filter((entry) => !this.indexTransaction.isStatusEntryCommittable(entry));
+    if (committableEntries.length === 0) {
+      const dirtySubmodules = this.indexTransaction.getNonCommittableSubmodulePaths();
+      if (dirtySubmodules.length > 0) {
+        throw new Error(
+          `Nur interne Aenderungen in Submodulen erkannt (${dirtySubmodules.join(', ')}). ` +
+            'Diese koennen im uebergeordneten Repository nicht committet werden; committe sie zuerst im jeweiligen Submodul.',
+        );
+      }
+      throw new Error('Die erkannten Working-Tree-Aenderungen erzeugen im Repository keinen commitbaren Snapshot.');
+    }
+    if (skippedEntries.length > 0) {
+      this.state.diagnostics.push(`Nicht commitbare Working-Tree-Eintraege wurden uebersprungen: ${skippedEntries.map((entry) => entry.path).join(', ')}`);
+    }
+
+    const snapshotFiles = committableEntries.map((entry): SnapshotFile => this.toSnapshotFile(entry));
     if (snapshotFiles.length >= LARGE_BATCH_THRESHOLD) {
       this.state.enableLargeHybridBudget();
     }

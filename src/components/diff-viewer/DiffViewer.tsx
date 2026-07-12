@@ -37,7 +37,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoPath, request, onClo
   const isMarkdownPreviewMode = viewMode === 'preview' && isMarkdownFile;
 
   const diffData = useDiffPreviewData({ repoPath, request, refreshTrigger: diffRefreshTrigger, t });
-  const blame = useDiffBlame({ repoPath, request });
+  const blame = useDiffBlame({ repoPath, request, refreshTrigger: diffRefreshTrigger });
   const reportHunkError = useCallback((message: string) => onToast(message, true), [onToast]);
   const { isHunkOperationRunning, applyHunk } = useHunkPatchActions({
     repoPath,

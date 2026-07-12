@@ -48,6 +48,8 @@ export class AiAutoCommitIndexTransaction {
   private expectedRealIndexTree: string | null = null;
   private expectedRealIndexFingerprint: string | null = null;
   private realIndexPath: string | null = null;
+  private committablePaths: Set<string> | null = null;
+  private nonCommittableSubmodulePaths = new Set<string>();
   private initialized = false;
 
   constructor(
@@ -86,7 +88,18 @@ export class AiAutoCommitIndexTransaction {
     await this.runWithIndex(this.snapshotIndexPath, ['add', '-A', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul']);
     this.snapshotTree = (await this.runWithIndex(this.snapshotIndexPath, ['write-tree'])).trim();
     if (!this.snapshotTree) throw new Error('AI working-tree snapshot could not be created.');
+    this.committablePaths = await this.readSnapshotChangedPaths();
+    this.nonCommittableSubmodulePaths = await this.readNonCommittableSubmodulePaths(entries);
     this.initialized = true;
+  }
+
+  isStatusEntryCommittable(entry: StatusEntry): boolean {
+    if (!this.supported || !this.committablePaths) return true;
+    return this.committablePaths.has(entry.path) || Boolean(entry.originalPath && this.committablePaths.has(entry.originalPath));
+  }
+
+  getNonCommittableSubmodulePaths(): string[] {
+    return [...this.nonCommittableSubmodulePaths];
   }
 
   async commit(batchFiles: SnapshotFile[], message: CommitMessage): Promise<string> {
@@ -100,8 +113,12 @@ export class AiAutoCommitIndexTransaction {
     const batchIndexPath = path.join(this.tempDir, `batch-${Date.now()}-${Math.random().toString(16).slice(2)}.index`);
     const pathspecFile = this.writePathspecFile(`batch-${Date.now()}-${Math.random().toString(16).slice(2)}.paths`, affectedPaths);
     await this.initializePrivateIndex(batchIndexPath, this.expectedHead);
+    const baseTree = (await this.runWithIndex(batchIndexPath, ['write-tree'])).trim();
     await this.restorePathsFromTree(batchIndexPath, this.snapshotTree, affectedPaths, pathspecFile);
     const expectedCommitTree = (await this.runWithIndex(batchIndexPath, ['write-tree'])).trim();
+    if (expectedCommitTree === baseTree) {
+      throw new Error('AI commit batch contains no changes that can be committed in the parent repository.');
+    }
     await this.beforeCommit?.(batchIndexPath);
 
     const currentHead = await this.readHead();
@@ -224,6 +241,27 @@ export class AiAutoCommitIndexTransaction {
     return [
       ...new Set(files.flatMap((file) => [file.path, file.originalPath].filter((value): value is string => typeof value === 'string' && value.length > 0))),
     ];
+  }
+
+  private async readSnapshotChangedPaths(): Promise<Set<string>> {
+    const raw = this.expectedHead
+      ? await this.runWithIndex(this.snapshotIndexPath, ['diff', '--cached', '--name-only', '--no-renames', '-z', this.expectedHead, '--'])
+      : await this.runWithIndex(this.snapshotIndexPath, ['ls-files', '-z']);
+    return new Set(raw.split('\0').filter(Boolean));
+  }
+
+  private async readNonCommittableSubmodulePaths(entries: StatusEntry[]): Promise<Set<string>> {
+    if (!this.committablePaths) return new Set();
+    const nonCommittable = entries.filter((entry) => !this.isStatusEntryCommittable(entry));
+    if (nonCommittable.length === 0) return new Set();
+    const paths = [...new Set(nonCommittable.map((entry) => entry.path))];
+    const raw = await this.runWithIndex(this.snapshotIndexPath, ['ls-files', '--stage', '-z', '--', ...paths.map((filePath) => toLiteralPathspec(filePath))]);
+    const submodules = new Set<string>();
+    for (const record of raw.split('\0')) {
+      const match = record.match(/^160000 [0-9a-f]+ \d+\t([\s\S]+)$/i);
+      if (match) submodules.add(match[1]);
+    }
+    return submodules;
   }
 
   private writePathspecFile(fileName: string, paths: string[]): string {

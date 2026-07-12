@@ -36,8 +36,8 @@ export function normalizeOpenAiApiKey(value: unknown): string {
   return value.trim().slice(0, MAX_OPENAI_KEY_LENGTH);
 }
 
-function overwriteAndDeleteFile(filePath: string): void {
-  if (!fs.existsSync(filePath)) return;
+function overwriteAndDeleteFile(filePath: string): boolean {
+  if (!fs.existsSync(filePath)) return true;
 
   try {
     const stat = fs.statSync(filePath);
@@ -52,9 +52,14 @@ function overwriteAndDeleteFile(filePath: string): void {
 
   try {
     fs.rmSync(filePath, { force: true });
-  } catch {
-    // ignore
+  } catch (error) {
+    throw new Error(`Secure credential file could not be deleted: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  if (fs.existsSync(filePath)) {
+    throw new Error('Secure credential file still exists after deletion.');
+  }
+  return true;
 }
 
 function getGithubTokenStorePath(): string {
@@ -160,8 +165,8 @@ export function readSavedGithubToken(): string | null {
   return readSavedGithubTokenWithHost()?.token || null;
 }
 
-export function clearSavedGithubTokenSecurely(): void {
-  overwriteAndDeleteFile(getGithubTokenStorePath());
+export function clearSavedGithubTokenSecurely(): boolean {
+  return overwriteAndDeleteFile(getGithubTokenStorePath());
 }
 
 export function saveGeminiApiKeySecurely(apiKey: string): boolean {
@@ -194,8 +199,8 @@ export function readSavedGeminiApiKey(): string | null {
   }
 }
 
-export function clearSavedGeminiApiKeySecurely(): void {
-  overwriteAndDeleteFile(getGeminiApiKeyStorePath());
+export function clearSavedGeminiApiKeySecurely(): boolean {
+  return overwriteAndDeleteFile(getGeminiApiKeyStorePath());
 }
 
 export function saveOpenAiApiKeySecurely(apiKey: string): boolean {
@@ -228,8 +233,8 @@ export function readSavedOpenAiApiKey(): string | null {
   }
 }
 
-export function clearSavedOpenAiApiKeySecurely(): void {
-  overwriteAndDeleteFile(getOpenAiApiKeyStorePath());
+export function clearSavedOpenAiApiKeySecurely(): boolean {
+  return overwriteAndDeleteFile(getOpenAiApiKeyStorePath());
 }
 
 function normalizeEpochMillis(value: unknown): number | null {
@@ -316,6 +321,6 @@ export function readSavedPlanningApiToken(): SavedPlanningApiToken | null {
   }
 }
 
-export function clearSavedPlanningApiTokenSecurely(): void {
-  overwriteAndDeleteFile(getPlanningApiTokenStorePath());
+export function clearSavedPlanningApiTokenSecurely(): boolean {
+  return overwriteAndDeleteFile(getPlanningApiTokenStorePath());
 }

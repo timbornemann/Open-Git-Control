@@ -48,6 +48,8 @@ export interface GitHubRepositoryPageDto {
 export interface GitHubCreateReleaseParamsDto {
   owner: string;
   repo: string;
+  /** Local repository captured when the release submission was authorized. */
+  repoPath?: string;
   tagName: string;
   targetCommitish?: string;
   releaseName: string;

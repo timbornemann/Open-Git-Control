@@ -1,10 +1,57 @@
 import * as fs from 'fs';
 import type { GitRunner } from './GitRunner';
-import { resolveExistingRepositoryPath, toLiteralPathspec } from './RepositoryPathSafety';
+import { normalizeRepositoryRelativePath, resolveExistingRepositoryPath, toLiteralPathspec } from './RepositoryPathSafety';
 
 export type ActiveRepoCommand = (args: string[]) => Promise<string>;
 
-export const hasUnresolvedConflictMarkers = (contents: string): boolean => /^<{7,}(?: .*)?\r?$/m.test(contents) && /^>{7,}(?: .*)?\r?$/m.test(contents);
+const DEFAULT_CONFLICT_MARKER_SIZE = 7;
+const MIN_CONFLICT_MARKER_SIZE = 1;
+
+const isMarkerLine = (line: string, character: '<' | '=' | '>', size: number, allowsLabel: boolean): boolean => {
+  const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line;
+  if (normalizedLine.length < size) return false;
+  for (let index = 0; index < size; index += 1) {
+    if (normalizedLine[index] !== character) return false;
+  }
+  if (normalizedLine.length === size) return true;
+  return allowsLabel && normalizedLine[size] === ' ';
+};
+
+/**
+ * Matches one complete Git conflict block for the configured marker width.
+ * Requiring an opener, separator and closer in order avoids treating an
+ * isolated Markdown rule or an example label as an unresolved conflict.
+ */
+export const hasUnresolvedConflictMarkers = (contents: string, markerSize = DEFAULT_CONFLICT_MARKER_SIZE): boolean => {
+  const normalizedSize = Number.isSafeInteger(markerSize) && markerSize >= MIN_CONFLICT_MARKER_SIZE ? markerSize : DEFAULT_CONFLICT_MARKER_SIZE;
+  let insideConflict = false;
+  let foundSeparator = false;
+
+  for (const line of contents.split('\n')) {
+    if (!insideConflict) {
+      if (isMarkerLine(line, '<', normalizedSize, true)) {
+        insideConflict = true;
+        foundSeparator = false;
+      }
+      continue;
+    }
+    if (!foundSeparator && isMarkerLine(line, '=', normalizedSize, false)) {
+      foundSeparator = true;
+      continue;
+    }
+    if (foundSeparator && isMarkerLine(line, '>', normalizedSize, true)) return true;
+  }
+  return false;
+};
+
+export const parseConflictMarkerSize = (raw: unknown): number => {
+  // `git check-attr -z` returns path, attribute name and value as a triplet.
+  const text = typeof raw === 'string' ? raw : '';
+  const records = text.split('\0');
+  const value = records.length >= 3 ? records[2] : text.trim().split(/\s+/).pop() || '';
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= MIN_CONFLICT_MARKER_SIZE ? parsed : DEFAULT_CONFLICT_MARKER_SIZE;
+};
 
 export class MergeConflictService {
   constructor(
@@ -29,12 +76,12 @@ export class MergeConflictService {
 
   async markFileResolved(filePath: string): Promise<string> {
     const resolvedPath = resolveExistingRepositoryPath(this.getRepoPath(), filePath, 'Conflict file path');
-    const contents = await fs.promises.readFile(resolvedPath, 'utf8');
-    // A real unresolved conflict has BOTH an opening (`<<<<<<<`) and a closing
-    // (`>>>>>>>`) marker. Requiring both avoids false-positives on a legitimate
-    // lone `=======` line (e.g. a Markdown setext heading rule), which must not
-    // block marking the file as resolved.
-    if (hasUnresolvedConflictMarkers(contents)) {
+    const normalizedPath = normalizeRepositoryRelativePath(filePath, 'Conflict file path');
+    const [contents, markerSizeRaw] = await Promise.all([
+      fs.promises.readFile(resolvedPath, 'utf8'),
+      this.runCommand(['check-attr', '-z', 'conflict-marker-size', '--', normalizedPath]),
+    ]);
+    if (hasUnresolvedConflictMarkers(contents, parseConflictMarkerSize(markerSizeRaw))) {
       throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
     }
     return this.runCommand(['add', '--', toLiteralPathspec(filePath)]);

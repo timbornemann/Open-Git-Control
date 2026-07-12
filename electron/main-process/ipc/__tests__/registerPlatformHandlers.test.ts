@@ -176,10 +176,37 @@ describe('platform IPC handlers', () => {
     expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ language: 'en', hasGeminiApiKey: true }));
     expect(writeSettingsMock.mock.calls[0][0]).not.toHaveProperty('geminiApiKey');
     expect(clearSavedGithubTokenSecurelyMock).toHaveBeenCalled();
+    expect(clearSavedGithubTokenSecurelyMock.mock.invocationCallOrder[0]).toBeLessThan(writeSettingsMock.mock.invocationCallOrder[0]);
     expect(githubService.logout).toHaveBeenCalledOnce();
     expect(updaterManager.setAutoUpdatesEnabled).toHaveBeenCalledWith(true);
 
     await expect(handlers.get(IpcChannel.AppGetVersion)?.({})).resolves.toBe('9.8.7');
+  });
+
+  it('keeps the old GitHub host settings and session when token deletion fails', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    const updaterManager = { setAutoUpdatesEnabled: vi.fn() };
+    const githubService = { logout: vi.fn() };
+    readSettingsWithMigrationMock.mockReturnValue({
+      language: 'en',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: false,
+      hasOpenAiApiKey: false,
+    });
+    clearSavedGithubTokenSecurelyMock.mockImplementationOnce(() => {
+      throw new Error('GitHub token file is locked.');
+    });
+    registerRepoSettingsHandlers({ updaterManager, githubService } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsSet)?.({}, { language: 'de', githubHost: 'github.enterprise.test', autoUpdateEnabled: true })).rejects.toThrow(
+      'GitHub token file is locked.',
+    );
+
+    expect(writeSettingsMock).not.toHaveBeenCalled();
+    expect(githubService.logout).not.toHaveBeenCalled();
+    expect(updaterManager.setAutoUpdatesEnabled).not.toHaveBeenCalled();
   });
 
   it('updates and clears Gemini API key state through secure storage', async () => {
@@ -202,6 +229,50 @@ describe('platform IPC handlers', () => {
     await expect(handlers.get(IpcChannel.SettingsClearGeminiApiKey)?.({})).resolves.toEqual(expect.objectContaining({ hasGeminiApiKey: false }));
     expect(clearSavedGeminiApiKeySecurelyMock).toHaveBeenCalled();
     expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ hasGeminiApiKey: false }));
+  });
+
+  it('does not claim API-key persistence when OS-backed encryption is unavailable', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    readSettingsWithMigrationMock.mockReturnValue({
+      language: 'en',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: false,
+      hasOpenAiApiKey: false,
+    });
+    saveGeminiApiKeySecurelyMock.mockReturnValue(false);
+    saveOpenAiApiKeySecurelyMock.mockReturnValue(false);
+
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() } } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsSetGeminiApiKey)?.({}, 'gemini-key')).rejects.toThrow('Gemini API key was not saved');
+    await expect(handlers.get(IpcChannel.SettingsSetOpenAiApiKey)?.({}, 'openai-key')).rejects.toThrow('OpenAI API key was not saved');
+    expect(writeSettingsMock).not.toHaveBeenCalled();
+  });
+
+  it('does not clear API-key settings when secure file deletion fails', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    readSettingsWithMigrationMock.mockReturnValue({
+      language: 'de',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: true,
+      hasOpenAiApiKey: true,
+    });
+    clearSavedGeminiApiKeySecurelyMock.mockImplementationOnce(() => {
+      throw new Error('Gemini key is locked');
+    });
+    clearSavedOpenAiApiKeySecurelyMock.mockImplementationOnce(() => {
+      throw new Error('OpenAI key is locked');
+    });
+
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() } } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsClearGeminiApiKey)?.({})).rejects.toThrow('Gemini key is locked');
+    await expect(handlers.get(IpcChannel.SettingsClearOpenAiApiKey)?.({})).rejects.toThrow('OpenAI key is locked');
+    expect(writeSettingsMock).not.toHaveBeenCalled();
   });
 
   it('reads settings, manages the OpenAI key, and skips side effects when host/auto-update are unchanged', async () => {
@@ -256,5 +327,25 @@ describe('platform IPC handlers', () => {
 
     expect(clearSavedOpenAiApiKeySecurelyMock).toHaveBeenCalledTimes(1);
     expect(writeSettingsMock).toHaveBeenCalledWith(expect.objectContaining({ hasOpenAiApiKey: false }));
+  });
+
+  it('does not clear a saved OpenAI key for an invalid intermediate endpoint value', async () => {
+    const { registerRepoSettingsHandlers } = await import('../registerRepoSettingsHandlers');
+    const handlers = getRegisteredHandlers();
+    readSettingsWithMigrationMock.mockReturnValue({
+      language: 'en',
+      githubHost: 'github.com',
+      autoUpdateEnabled: false,
+      hasGeminiApiKey: false,
+      hasOpenAiApiKey: true,
+      openAiBaseUrl: 'https://gateway.example.test/v1',
+    });
+
+    registerRepoSettingsHandlers({ updaterManager: { setAutoUpdatesEnabled: vi.fn() }, githubService: { logout: vi.fn() } } as any);
+
+    await expect(handlers.get(IpcChannel.SettingsSet)?.({}, { openAiBaseUrl: 'https:' })).resolves.toEqual(
+      expect.objectContaining({ openAiBaseUrl: 'https://gateway.example.test/v1', hasOpenAiApiKey: true }),
+    );
+    expect(clearSavedOpenAiApiKeySecurelyMock).not.toHaveBeenCalled();
   });
 });

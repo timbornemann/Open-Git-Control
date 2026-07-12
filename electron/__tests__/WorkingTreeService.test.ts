@@ -195,6 +195,32 @@ describe('WorkingTreeService', () => {
     expect(parseStatusPath('R  "old -> name.txt" -> "new -> name.txt"')).toBe('new -> name.txt');
   });
 
+  it('uses NUL-delimited rename records for snapshot identity and literal target paths', async () => {
+    const statusZ = 'R  new -> target.txt\0old -> source.txt\0';
+    const getStatusPorcelainZAtPath = vi.fn(async () => statusZ);
+    const getStatusPorcelainAtPath = vi.fn(async () => {
+      throw new Error('legacy porcelain must not be used when -z is available');
+    });
+    const runPollingCommandAtPath = vi.fn(async () => '');
+    const service = new WorkingTreeService({
+      getRepoPath: () => 'C:/repo',
+      getStatusPorcelainZAtPath,
+      getStatusPorcelainAtPath,
+      runPollingCommandAtPath,
+    } as any);
+
+    const snapshot = await service.getSnapshot();
+
+    expect(snapshot.changeCount).toBe(1);
+    expect(snapshot.statusRaw).toBe('R  "old -> source.txt" -> "new -> target.txt"');
+    expect(getStatusPorcelainAtPath).not.toHaveBeenCalled();
+    expect(runPollingCommandAtPath).toHaveBeenCalledWith(
+      'C:/repo',
+      ['ls-files', '--stage', '-z', '--', ':(literal)new -> target.txt'],
+      expect.stringContaining('working-tree-snapshot:index:'),
+    );
+  });
+
   it('does not promote a completed snapshot from a previously selected repository', async () => {
     let repoPath = 'C:/old';
     const oldStatus = deferred<string>();

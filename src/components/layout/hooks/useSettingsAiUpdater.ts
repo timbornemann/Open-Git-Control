@@ -3,13 +3,14 @@ import type { AppSettingsDto, UpdaterStatusDto } from '@/types/appDtos';
 import type { TranslationVariables } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import { appClient } from '@/services/appClient';
+import type { SettingsUpdateHandler } from '../settings/SettingsSectionPrimitives';
 
 type TranslateFn = (deText: string, enText: string) => string;
 type CatalogTranslateFn = (key: string, variables?: TranslationVariables) => string;
 
 type Params = {
   settings: AppSettingsDto;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  onUpdateSettings: SettingsUpdateHandler;
   t: CatalogTranslateFn;
   tr: TranslateFn;
 };

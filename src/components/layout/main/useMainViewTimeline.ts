@@ -3,6 +3,7 @@ import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { CatalogTranslateFn } from '@/i18n';
 import type { AppTabId } from '@/app/state/contracts';
 import { gitClient } from '@/services/gitClient';
+import { confirmWorkingDirectoryNavigation, runWorkingDirectoryNavigationAction } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type UseMainViewTimelineParams = {
   activeRepo: string | null;
@@ -32,10 +33,14 @@ export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCr
       const result = await gitClient.getFileTimelineData(1500, repoAtStart);
       if (requestGenerationRef.current !== generation || activeRepoRef.current !== repoAtStart) return;
       if (result.success) {
-        setTimelineCommits([...result.data].reverse());
-        onCloseReleaseCreator();
-        setActiveTab('repo');
-        setShowTimeline(true);
+        if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'timeline' }))) return;
+        if (requestGenerationRef.current !== generation || activeRepoRef.current !== repoAtStart) return;
+        runWorkingDirectoryNavigationAction(() => {
+          setTimelineCommits([...result.data].reverse());
+          onCloseReleaseCreator();
+          setActiveTab('repo');
+          setShowTimeline(true);
+        });
       } else {
         alert(result.error || t('timeline.errors.loadDataFailed'));
       }

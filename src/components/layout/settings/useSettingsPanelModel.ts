@@ -3,10 +3,11 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitJobEventDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { useSettingsAiUpdater } from '../hooks/useSettingsAiUpdater';
+import type { SettingsUpdateHandler } from './SettingsSectionPrimitives';
 
 type Params = {
   settings: AppSettingsDto;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  onUpdateSettings: SettingsUpdateHandler;
   jobs: GitJobEventDto[];
 };
 

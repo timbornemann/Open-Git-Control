@@ -388,6 +388,9 @@ export function movePlannerItem(itemId: string, input: { projectId?: string; sta
 
 export function deletePlannerItem(itemId: string): void {
   const data = readProjectPlannerData();
+  if (!data.items.some((item) => item.id === itemId)) {
+    throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
+  }
   writeProjectPlannerData({ ...data, items: data.items.filter((item) => item.id !== itemId) });
 }
 

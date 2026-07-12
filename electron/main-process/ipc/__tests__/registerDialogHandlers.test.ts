@@ -5,8 +5,10 @@ const { handleMock, showOpenDialogMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   showOpenDialogMock: vi.fn(),
 }));
-const { grantSelectedFilesMock } = vi.hoisted(() => ({
+const { clearSelectedFileGrantsMock, grantSelectedFilesMock, grantSelectedProjectParentDirectoryMock } = vi.hoisted(() => ({
+  clearSelectedFileGrantsMock: vi.fn(),
   grantSelectedFilesMock: vi.fn(),
+  grantSelectedProjectParentDirectoryMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
@@ -19,7 +21,9 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('../../fileAccessGrant', () => ({
+  clearSelectedFileGrants: clearSelectedFileGrantsMock,
   grantSelectedFiles: grantSelectedFilesMock,
+  grantSelectedProjectParentDirectory: grantSelectedProjectParentDirectoryMock,
 }));
 
 describe('registerDialogHandlers', () => {
@@ -29,7 +33,9 @@ describe('registerDialogHandlers', () => {
     handlers.clear();
     handleMock.mockReset();
     showOpenDialogMock.mockReset();
+    clearSelectedFileGrantsMock.mockReset();
     grantSelectedFilesMock.mockReset();
+    grantSelectedProjectParentDirectoryMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -100,8 +106,14 @@ describe('registerDialogHandlers', () => {
     });
 
     showOpenDialogMock.mockResolvedValueOnce({ canceled: false, filePaths: ['D:/tmp/projects'] });
-    const projectParentResult = await selectProjectParentDirectoryHandler!();
+    let onDestroyed: (() => void) | undefined;
+    const projectSender = { id: 17, once: vi.fn((_event: string, callback: () => void) => (onDestroyed = callback)) };
+    const projectParentResult = await selectProjectParentDirectoryHandler!({ sender: projectSender });
     expect(projectParentResult).toBe('D:/tmp/projects');
+    expect(grantSelectedProjectParentDirectoryMock).toHaveBeenCalledWith(17, 'D:/tmp/projects');
+    expect(projectSender.once).toHaveBeenCalledWith('destroyed', expect.any(Function));
+    onDestroyed?.();
+    expect(clearSelectedFileGrantsMock).toHaveBeenCalledWith(17);
     expect(showOpenDialogMock).toHaveBeenLastCalledWith({
       properties: ['openDirectory', 'createDirectory'],
       title: 'Speicherort fuer neues Projekt auswaehlen',
@@ -116,7 +128,7 @@ describe('registerDialogHandlers', () => {
 
     expect(await handlers.get('dialog:openDirectory')!()).toBeNull();
     expect(await handlers.get('dialog:selectDirectory')!()).toBeNull();
-    expect(await handlers.get('dialog:selectProjectParentDirectory')!()).toBeNull();
+    expect(await handlers.get('dialog:selectProjectParentDirectory')!({ sender: { id: 17 } })).toBeNull();
     expect(await handlers.get('dialog:selectFiles')!()).toBeNull();
     expect(gitService.runCommandAtPath).not.toHaveBeenCalled();
   });
@@ -129,7 +141,7 @@ describe('registerDialogHandlers', () => {
     const selectFilesHandler = handlers.get('dialog:selectFiles');
     expect(selectFilesHandler).toBeTruthy();
 
-    const files = await selectFilesHandler!({ sender: { id: 42 } });
+    const files = await selectFilesHandler!({ sender: { id: 42, once: vi.fn() } });
     expect(files).toEqual(['D:/a.txt', 'D:/b.txt']);
     expect(grantSelectedFilesMock).toHaveBeenCalledWith(42, ['D:/a.txt', 'D:/b.txt']);
     expect(showOpenDialogMock).toHaveBeenLastCalledWith({

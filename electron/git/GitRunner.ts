@@ -296,12 +296,13 @@ export class GitRunner {
     }
     if (primary === 'hash-object' && commandArgs.includes('-w')) return 'write';
     if (primary === 'submodule' && secondary === 'status') return 'polling';
-    // Pure network operations do not read the working tree or touch the index.
-    // Running them in the scheduler's independent network lane keeps an offline
-    // or slow remote (auto-fetch, push) from blocking local reads and writes.
-    // `pull` is deliberately excluded: it merges into the working tree and must
-    // stay serialized as a write.
-    if (primary === 'fetch' || primary === 'push' || primary === 'ls-remote') return 'network';
+    // `ls-remote` has no local side effects and may overlap every local job.
+    // Fetch mutates remote refs/FETCH_HEAD, while push can update config and
+    // remote-tracking refs; they share a network lane but are serialized with
+    // local writes. `pull` remains a normal write because it also changes the
+    // index and working tree.
+    if (primary === 'ls-remote') return 'network-read';
+    if (primary === 'fetch' || primary === 'push') return 'network';
     if (this.shouldSerializeCommand(commandArgs)) return 'write';
     if (primary === 'status') return 'polling';
     if (['rev-parse', 'for-each-ref', 'symbolic-ref'].includes(primary)) return 'polling';

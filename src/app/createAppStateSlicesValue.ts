@@ -31,7 +31,7 @@ type CreateAppStateSlicesValueParams = {
 
 const createSettingsSlice = (state: AppState, settingsTab: SettingsTabId, setSettingsTab: Dispatch<SetStateAction<SettingsTabId>>): SettingsContextValue => ({
   settings: state.settings,
-  onUpdateSettings: state.handleUpdateSettings,
+  onUpdateSettings: state.updateSettingsWithResult,
   settingsTab,
   onSelectSettingsTab: setSettingsTab,
 });

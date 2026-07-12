@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { fieldClass, hintClass, inputClass, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 export const SettingsGithubSection = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
   const { t, tr } = useI18n();
   const [githubHostDraft, setGithubHostDraft] = useState(settings.githubHost);
+  const persistedGithubHostRef = useRef(settings.githubHost);
+  persistedGithubHostRef.current = settings.githubHost;
   const githubHostHintId = variant === 'sidebar' ? 'github-host-hint-sidebar' : 'github-host-hint-settings';
 
   useEffect(() => {
-    setGithubHostDraft(settings.githubHost);
+    setGithubHostDraft(persistedGithubHostRef.current);
   }, [settings.githubHost]);
 
   const saveGithubHost = useCallback(async () => {
@@ -18,7 +20,11 @@ export const SettingsGithubSection = ({ settings, onUpdateSettings, variant }: S
       return;
     }
 
-    await onUpdateSettings({ githubHost: nextHost });
+    const result = await onUpdateSettings({ githubHost: nextHost });
+    // The settings owner reports failures via its toast and deliberately keeps
+    // the previous settings object. Reset this local draft; on success the
+    // ensuing settings prop update immediately supplies the persisted host.
+    setGithubHostDraft(result?.success ? result.settings.githubHost : persistedGithubHostRef.current);
   }, [githubHostDraft, onUpdateSettings, settings.githubHost]);
 
   const content = (

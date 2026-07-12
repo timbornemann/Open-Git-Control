@@ -10,10 +10,39 @@ import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
 import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes } from '@/utils/releaseNotes';
 import { type ReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import type { AppTabId } from '@/app/state/contracts';
+import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { getCreateReleaseErrorMessage, getReleaseAssetErrorMessage, getReleaseValidationErrorMessage } from './releaseWorkflowMessages';
 
 type Toast = { msg: string; isError: boolean };
+
+type ReleaseSubmissionSnapshot = {
+  generation: number;
+  repoPath: string;
+  createParams: GitHubCreateReleaseParamsDto;
+  pendingAssets: string[];
+  fingerprint: string;
+};
+
+const buildReleaseCreateParams = (
+  form: GitHubCreateReleaseParamsDto,
+  ownerRepo: RepoOwnerRef,
+  currentBranch: string,
+  repoPath: string,
+): GitHubCreateReleaseParamsDto => ({
+  owner: ownerRepo.owner,
+  repo: ownerRepo.repo,
+  repoPath,
+  tagName: (form.tagName || '').trim(),
+  targetCommitish: (form.targetCommitish || '').trim() || currentBranch,
+  releaseName: (form.releaseName || '').trim(),
+  body: (form.body || '').trim(),
+  draft: Boolean(form.draft),
+  prerelease: Boolean(form.prerelease),
+});
+
+const getReleaseSubmissionFingerprint = (params: GitHubCreateReleaseParamsDto, pendingAssets: readonly string[]): string =>
+  JSON.stringify({ params, pendingAssets });
 
 type Params = {
   activeRepo: string | null;
@@ -71,6 +100,10 @@ export const useReleaseWorkflow = ({
   const { t, tr } = useLanguageTranslations(language);
   const generationRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
+  const ownerRepoRef = useRef<RepoOwnerRef | null>(ownerRepo);
+  const currentBranchRef = useRef(currentBranch);
+  const releaseFormRef = useRef(releaseForm);
+  const releasePendingAssetsRef = useRef<string[]>([]);
   // Distinguishes successive refreshReleaseContext calls (e.g. while typing
   // targetCommitish) within one repo/branch generation, so a slower earlier
   // request cannot overwrite the context produced by a newer one.
@@ -84,6 +117,13 @@ export const useReleaseWorkflow = ({
   }, [releaseNotesGenerating]);
 
   useLayoutEffect(() => {
+    ownerRepoRef.current = ownerRepo;
+    currentBranchRef.current = currentBranch;
+    releaseFormRef.current = releaseForm;
+    releasePendingAssetsRef.current = releasePendingAssets;
+  }, [currentBranch, ownerRepo, releaseForm, releasePendingAssets]);
+
+  useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
     generationRef.current += 1;
     refreshContextRequestRef.current += 1;
@@ -93,7 +133,17 @@ export const useReleaseWorkflow = ({
     setReleaseNotesGenerating(false);
     setReleaseSubmitting(false);
     setReleasePendingAssets([]);
-  }, [activeRepo, currentBranch, ownerRepo?.owner, ownerRepo?.repo, setReleaseContextLoading, setReleaseNotesGenerating, setReleaseSubmitting]);
+    setConfirmDialog(null);
+  }, [
+    activeRepo,
+    currentBranch,
+    ownerRepo?.owner,
+    ownerRepo?.repo,
+    setConfirmDialog,
+    setReleaseContextLoading,
+    setReleaseNotesGenerating,
+    setReleaseSubmitting,
+  ]);
 
   const isCurrentGeneration = useCallback((generation: number, repoPath: string | null) => {
     return generation === generationRef.current && activeRepoRef.current === repoPath;
@@ -232,7 +282,21 @@ export const useReleaseWorkflow = ({
   );
 
   const handleCreateRelease = useCallback(
-    async (confirmedEmptyReleaseNotes = false) => {
+    async (confirmedEmptyReleaseNotes = false, confirmedSnapshot?: ReleaseSubmissionSnapshot) => {
+      if (confirmedSnapshot) {
+        const currentOwnerRepo = ownerRepoRef.current;
+        const currentRepoPath = activeRepoRef.current;
+        const currentParams =
+          currentOwnerRepo && currentRepoPath
+            ? buildReleaseCreateParams(releaseFormRef.current, currentOwnerRepo, currentBranchRef.current, currentRepoPath)
+            : null;
+        const currentFingerprint = currentParams ? getReleaseSubmissionFingerprint(currentParams, releasePendingAssetsRef.current) : null;
+        if (!isCurrentGeneration(confirmedSnapshot.generation, confirmedSnapshot.repoPath) || currentFingerprint !== confirmedSnapshot.fingerprint) {
+          setConfirmDialog(null);
+          return;
+        }
+      }
+
       if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
         setReleaseError(t('generated.components.layout.workflows.usereleaseworkflow.github_connection_or_repository_mapping_is_missing_58d8b5a1'));
         return;
@@ -243,11 +307,17 @@ export const useReleaseWorkflow = ({
         return;
       }
 
+      const repoPath = confirmedSnapshot?.repoPath || activeRepoRef.current;
+      if (!repoPath) {
+        setReleaseError(tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'));
+        return;
+      }
+      const createParams = confirmedSnapshot?.createParams || buildReleaseCreateParams(releaseForm, ownerRepo, currentBranch, repoPath);
       const validation = validateGithubReleaseInput({
-        tagName: releaseForm.tagName,
-        releaseName: releaseForm.releaseName,
+        tagName: createParams.tagName,
+        releaseName: createParams.releaseName,
       });
-      const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
+      const normalizedTag = (createParams.tagName || '').trim().toLowerCase();
       const existingTags = new Set((releaseContext?.existingTags || []).map((tag) => tag.toLowerCase()));
       const validationError = getReleaseValidationErrorMessage(validation, t);
 
@@ -261,63 +331,60 @@ export const useReleaseWorkflow = ({
         return;
       }
 
-      const showEmptyReleaseNotesConfirm = () => {
-        const releaseMode = releaseForm.draft
+      const showEmptyReleaseNotesConfirm = (snapshot: ReleaseSubmissionSnapshot) => {
+        const releaseMode = createParams.draft
           ? t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')
           : t('generated.components.layout.workflows.usereleaseworkflow.published_adbe9c8a');
 
         setConfirmDialog({
           variant: 'confirm',
-          title: releaseForm.draft
+          title: createParams.draft
             ? t('generated.components.layout.workflows.usereleaseworkflow.create_draft_release_without_notes_248f5d5f')
             : t('generated.components.layout.workflows.usereleaseworkflow.publish_release_without_notes_280a3a1c'),
-          message: releaseForm.draft
+          message: createParams.draft
             ? t('generated.components.layout.workflows.usereleaseworkflow.this_draft_release_has_no_release_notes_do_you_still_wan_6a9f65c2')
             : t('generated.components.layout.workflows.usereleaseworkflow.this_release_has_no_release_notes_do_you_really_want_to_43efa5f1'),
           contextItems: [
-            { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${ownerRepo.owner}/${ownerRepo.repo}` },
-            { label: t('generated.components.layout.hooks.userepositorydomain.tag_d509084a'), value: releaseForm.tagName.trim() },
-            { label: t('generated.components.layout.workflows.usereleaseworkflow.name_605563c5'), value: releaseForm.releaseName.trim() },
+            { label: t('generated.components.layout.cloneprogressmodal.repository_3c2e75cb'), value: `${createParams.owner}/${createParams.repo}` },
+            { label: t('generated.components.layout.hooks.userepositorydomain.tag_d509084a'), value: createParams.tagName.trim() },
+            { label: t('generated.components.layout.workflows.usereleaseworkflow.name_605563c5'), value: createParams.releaseName.trim() },
             { label: t('generated.components.layout.apimcpsettingspanel.status_b853ab43'), value: releaseMode },
           ],
           irreversible: false,
           consequences: t('generated.components.layout.workflows.usereleaseworkflow.the_github_release_will_be_created_without_a_description_0c5b5547'),
-          confirmLabel: releaseForm.draft
+          confirmLabel: createParams.draft
             ? t('generated.components.layout.workflows.usereleaseworkflow.create_without_notes_b0c349a2')
             : t('generated.components.layout.workflows.usereleaseworkflow.publish_without_notes_7e45885a'),
           onConfirm: async () => {
-            await handleCreateRelease(true);
+            await handleCreateRelease(true, snapshot);
           },
         });
       };
 
-      const releaseNotes = (releaseForm.body || '').trim();
+      const releaseNotes = (createParams.body || '').trim();
       if (!releaseNotes && !confirmedEmptyReleaseNotes) {
-        showEmptyReleaseNotesConfirm();
+        const snapshot: ReleaseSubmissionSnapshot = {
+          generation: generationRef.current,
+          repoPath,
+          createParams,
+          pendingAssets: [...releasePendingAssets],
+          fingerprint: getReleaseSubmissionFingerprint(createParams, releasePendingAssets),
+        };
+        showEmptyReleaseNotesConfirm(snapshot);
         return;
       }
 
       setReleaseSubmitting(true);
       setReleaseError(null);
       setReleaseSuccess(null);
-      const generation = generationRef.current;
-      const repoPath = activeRepoRef.current;
-      const createParams = {
-        owner: ownerRepo.owner,
-        repo: ownerRepo.repo,
-        tagName: releaseForm.tagName.trim(),
-        targetCommitish: (releaseForm.targetCommitish || '').trim() || currentBranch,
-        releaseName: releaseForm.releaseName.trim(),
-        body: (releaseForm.body || '').trim(),
-        draft: Boolean(releaseForm.draft),
-        prerelease: Boolean(releaseForm.prerelease),
-      };
+      const generation = confirmedSnapshot?.generation ?? generationRef.current;
+      const pendingAssets = confirmedSnapshot?.pendingAssets || [...releasePendingAssets];
 
       // Uploads every pending asset to the created release. Returns false when
       // the repository switched mid-upload or an upload failed (both cases stop
       // the success path without overwriting the error already surfaced here).
       const uploadPendingAssets = async (releaseData: GitHubReleaseDto): Promise<boolean> => {
-        for (const filePath of [...releasePendingAssets]) {
+        for (const filePath of pendingAssets) {
           const uploadResult = await githubClient.uploadReleaseAsset({
             owner: createParams.owner,
             repo: createParams.repo,
@@ -386,12 +453,7 @@ export const useReleaseWorkflow = ({
       ownerRepo,
       refreshReleaseContext,
       releaseContext?.existingTags,
-      releaseForm.body,
-      releaseForm.draft,
-      releaseForm.prerelease,
-      releaseForm.releaseName,
-      releaseForm.tagName,
-      releaseForm.targetCommitish,
+      releaseForm,
       releasePendingAssets,
       resetReleaseDraft,
       setConfirmDialog,
@@ -547,10 +609,12 @@ export const useReleaseWorkflow = ({
   }, []);
 
   const openReleaseCreator = useCallback(() => {
-    setActiveTab('repo');
-    setReleaseSubmitting(false);
-    resetReleaseDraft({ clearContext: true, clearSuccess: true });
-    setShowReleaseCreator(true);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'release' }, () => {
+      setActiveTab('repo');
+      setReleaseSubmitting(false);
+      resetReleaseDraft({ clearContext: true, clearSuccess: true });
+      setShowReleaseCreator(true);
+    });
   }, [resetReleaseDraft, setActiveTab, setReleaseSubmitting, setShowReleaseCreator]);
 
   const closeReleaseCreator = useCallback(() => {

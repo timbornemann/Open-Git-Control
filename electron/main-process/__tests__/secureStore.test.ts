@@ -1,17 +1,39 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isSecureStorageAvailable, parseSavedGithubTokenPayload } from '../secureStore';
+import {
+  clearSavedGeminiApiKeySecurely,
+  clearSavedGithubTokenSecurely,
+  clearSavedOpenAiApiKeySecurely,
+  clearSavedPlanningApiTokenSecurely,
+  isSecureStorageAvailable,
+  parseSavedGithubTokenPayload,
+} from '../secureStore';
 
-const { getSelectedStorageBackendMock, isEncryptionAvailableMock } = vi.hoisted(() => ({
-  getSelectedStorageBackendMock: vi.fn(),
-  isEncryptionAvailableMock: vi.fn(),
-}));
+const { existsSyncMock, getPathMock, getSelectedStorageBackendMock, isEncryptionAvailableMock, rmSyncMock, statSyncMock, writeFileSyncMock } = vi.hoisted(
+  () => ({
+    existsSyncMock: vi.fn(),
+    getPathMock: vi.fn(),
+    getSelectedStorageBackendMock: vi.fn(),
+    isEncryptionAvailableMock: vi.fn(),
+    rmSyncMock: vi.fn(),
+    statSyncMock: vi.fn(),
+    writeFileSyncMock: vi.fn(),
+  }),
+);
 
 vi.mock('electron', () => ({
-  app: { getPath: vi.fn() },
+  app: { getPath: getPathMock },
   safeStorage: {
     getSelectedStorageBackend: getSelectedStorageBackendMock,
     isEncryptionAvailable: isEncryptionAvailableMock,
   },
+}));
+
+vi.mock('fs', () => ({
+  existsSync: existsSyncMock,
+  readFileSync: vi.fn(),
+  rmSync: rmSyncMock,
+  statSync: statSyncMock,
+  writeFileSync: writeFileSyncMock,
 }));
 
 const originalPlatform = process.platform;
@@ -47,6 +69,44 @@ describe('isSecureStorageAvailable', () => {
     isEncryptionAvailableMock.mockReturnValue(false);
     expect(isSecureStorageAvailable()).toBe(false);
     expect(getSelectedStorageBackendMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('secure credential deletion', () => {
+  beforeEach(() => {
+    existsSyncMock.mockReset();
+    getPathMock.mockReset();
+    rmSyncMock.mockReset();
+    statSyncMock.mockReset();
+    writeFileSyncMock.mockReset();
+    getPathMock.mockReturnValue('C:/secure-store');
+    existsSyncMock.mockReturnValue(true);
+    statSyncMock.mockReturnValue({ size: 32 });
+  });
+
+  it.each([
+    ['GitHub token', clearSavedGithubTokenSecurely],
+    ['Gemini key', clearSavedGeminiApiKeySecurely],
+    ['OpenAI key', clearSavedOpenAiApiKeySecurely],
+    ['Planning API token', clearSavedPlanningApiTokenSecurely],
+  ])('propagates a filesystem removal failure for the %s', (_label, clearCredential) => {
+    rmSyncMock.mockImplementation(() => {
+      throw new Error('access denied');
+    });
+
+    expect(() => clearCredential()).toThrow('Secure credential file could not be deleted: access denied');
+  });
+
+  it('does not report success when the credential file remains after rmSync', () => {
+    existsSyncMock.mockReturnValue(true);
+
+    expect(() => clearSavedGithubTokenSecurely()).toThrow('Secure credential file still exists after deletion.');
+  });
+
+  it('returns success only after the credential file is gone', () => {
+    existsSyncMock.mockReturnValueOnce(true).mockReturnValueOnce(false);
+
+    expect(clearSavedGithubTokenSecurely()).toBe(true);
   });
 });
 

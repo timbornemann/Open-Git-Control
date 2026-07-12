@@ -1,0 +1,42 @@
+# Fehlerbehebung nach Voll-Audit
+
+Statuslegende: `[ ]` offen, `[x]` behoben und durch einen gezielten Regressionstest abgesichert.
+
+## Hohe Priorität
+
+- [x] 01 Release-Erstellung: Eine Bestätigung aus Repository A darf nach einem Wechsel zu Repository B niemals ein Release oder Assets in A oder B mit gemischtem Kontext veröffentlichen.
+- [x] 02 Working-Directory-Editor: Ungespeicherte Änderungen müssen bei Repository-, Tab-, Timeline-, Release- und Run-Navigation sowie bei globalen Tastenkürzeln geschützt werden.
+- [x] 03 Credential-Revocation: GitHub-, Gemini-, OpenAI- und Planning-API-Credentials dürfen nur als gelöscht gemeldet werden, wenn die verschlüsselte Datei tatsächlich entfernt wurde.
+- [x] 04 AI-Base-URLs: Ollama-/OpenAI-URLs dürfen beim Tippen nicht pro Zeichen normalisiert werden; ein gespeicherter OpenAI-Key darf nur bei einem bestätigten echten Originwechsel entfernt werden.
+
+## Mittlere Priorität
+
+- [x] 05 Konfliktauflösung: Benutzerdefinierte kurze Git-Konfliktmarker (`conflict-marker-size`) dürfen nicht versehentlich als gelöst gestaged werden.
+- [x] 06 Git-Scheduler: Ref-verändernde Fetch-/Push-Operationen dürfen nicht mit lokalen Git-Schreiboperationen konkurrieren.
+- [x] 07 AI Auto-Commit: Ausschließlich intern veränderte Submodule müssen korrekt erkannt und ohne wiederholte `nothing to commit`-Versuche behandelt werden.
+- [x] 08 Repository Run Output: Output ohne Zeilenumbruch muss strikt speicherbegrenzt verarbeitet werden.
+- [x] 09 Repository Run Stop: Nicht reagierende Prozesse müssen nach einer Grace-Period hart beendet werden; der Run muss immer einen terminalen Status erreichen.
+- [x] 10 Planner-Materialisierung: Nur ein explizit im nativen Dialog gewährter, nicht leerer Elternpfad darf verwendet werden.
+- [x] 11 GitHub-Hostwechsel: Repository-Daten des vorherigen Hosts müssen sofort und dauerhaft aus der UI entfernt werden.
+- [x] 12 Working-Directory History/Blame: Loading, Fehler und Pagination über 500 Zeilen müssen korrekt funktionieren.
+- [x] 13 Diff-Blame: Nach Unstage/Discard eines Hunks müssen Blame-Daten passend zum aktualisierten Diff neu geladen werden.
+
+## Niedrige bis mittlere Priorität
+
+- [x] 14 Repository-Restore: Ein überholter `getStoredRepos`-Aufruf muss den Restore-State zuverlässig beenden und Persistenz wieder freigeben.
+- [x] 15 Working-Tree-Refresh: Refresh-Anforderungen während eines laufenden Snapshots müssen anschließend erneut ausgeführt werden.
+- [x] 16 Secret-Scan: Ein Scan aus Repository A darf Commits in B nicht blockieren und keine veralteten Toasts oder Dialoge in B erzeugen.
+- [x] 17 Working-Tree-Renames: Legale POSIX-Dateinamen mit ` -> ` müssen eindeutig und snapshot-stabil geparst werden.
+- [x] 18 Clone-Fortschritt: Stream-Chunk-Grenzen und geteilte UTF-8-Zeichen müssen korrekt gepuffert werden.
+- [x] 19 Planner Delete: Das Löschen einer unbekannten Todo-ID muss konsistent `TODO_NOT_FOUND` liefern.
+- [x] 20 Diagnosebericht: Repository-Pfad, Status und Remotes müssen während der gesamten Erzeugung an dasselbe Repository gebunden bleiben.
+
+## Abschlusskriterien
+
+- [x] Für jeden der 20 Punkte existiert ein gezielter Regressionstest oder eine gleichwertige reproduzierbare Verifikation.
+- [x] Vollständige Unit-Test-Suite ist grün.
+- [x] Coverage-Grenzen sind grün.
+- [x] ESLint und Architekturprüfung sind grün.
+- [x] Prettier-Prüfung ist grün.
+- [x] TypeScript-/Vite-/Electron-Produktionsbuild ist grün.
+- [x] Abschließender 20-Punkte-Code-Audit bestätigt, dass kein Punkt nur teilweise behoben wurde.

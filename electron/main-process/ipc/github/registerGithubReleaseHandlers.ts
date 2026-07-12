@@ -14,6 +14,44 @@ type RegisterGithubReleaseHandlersDeps = {
   readSettingsWithMigration: () => AppSettings;
 };
 
+type GithubRemoteTarget = { owner: string; repo: string };
+
+function parseGithubRemoteTarget(remoteUrl: unknown, configuredHost: string, githubService: Pick<GitHubService, 'normalizeHost'>): GithubRemoteTarget | null {
+  const remote = String(remoteUrl || '').trim();
+  if (!remote) return null;
+
+  let remoteHost = '';
+  let remotePath = '';
+  try {
+    const parsed = new URL(remote);
+    remoteHost = parsed.host;
+    remotePath = parsed.pathname;
+  } catch {
+    const scpMatch = remote.match(/^(?:[^@\s]+@)?([^:\s]+):(.+)$/);
+    if (!scpMatch) return null;
+    remoteHost = scpMatch[1];
+    remotePath = scpMatch[2];
+  }
+
+  if (!remoteHost || /[^a-z0-9.\-:]/i.test(remoteHost)) return null;
+  if (githubService.normalizeHost(remoteHost) !== githubService.normalizeHost(configuredHost)) return null;
+  const segments = remotePath
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\.git$/i, '')
+    .split('/');
+  if (segments.length < 2 || segments.some((segment) => !segment)) return null;
+  try {
+    const owner = decodeURIComponent(segments[segments.length - 2]);
+    const repo = decodeURIComponent(segments[segments.length - 1]);
+    const invalidName = (value: string) =>
+      value.includes('/') || value.includes('\\') || /\s/.test(value) || [...value].some((character) => (character.codePointAt(0) ?? 0) < 0x20);
+    if ([owner, repo].some(invalidName)) return null;
+    return { owner, repo };
+  } catch {
+    return null;
+  }
+}
+
 function buildGithubRepositoryUrl(host: string, owner: string, repo: string): string {
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 }
@@ -46,6 +84,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       params: {
         owner: string;
         repo: string;
+        repoPath?: string;
         tagName: string;
         targetCommitish?: string;
         releaseName: string;
@@ -68,10 +107,46 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         return { success: false, error: 'Release-Name ist erforderlich.' };
       }
 
+      const requestedRepoPath = String(params?.repoPath || '').trim();
+      if (!requestedRepoPath) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+      let authorizedRepoPath: string;
       try {
+        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
+      }
+
+      try {
+        const originUrl = await gitService.getRepoOriginUrl(authorizedRepoPath);
+        // Origin resolution is asynchronous. Re-authorize immediately before
+        // the irreversible GitHub write so a repository switch during that
+        // read cannot validate a stale release request.
+        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath());
+        const settings = readSettingsWithMigration();
+        const originTarget = parseGithubRemoteTarget(originUrl, settings.githubHost, githubService);
+        if (!originTarget) {
+          return { success: false, error: 'The active repository has no matching GitHub origin.' };
+        }
+        if (
+          originTarget.owner.toLowerCase() !==
+            String(params.owner || '')
+              .trim()
+              .toLowerCase() ||
+          originTarget.repo.toLowerCase() !==
+            String(params.repo || '')
+              .trim()
+              .toLowerCase()
+        ) {
+          return { success: false, error: 'Release target does not match the active repository origin.' };
+        }
+        const currentAuthError = assertGithubAuthenticated(githubService);
+        if (currentAuthError) return currentAuthError;
+
         const release = await githubService.createRelease({
-          owner: params.owner,
-          repo: params.repo,
+          owner: originTarget.owner,
+          repo: originTarget.repo,
           tagName,
           targetCommitish: params.targetCommitish,
           releaseName,

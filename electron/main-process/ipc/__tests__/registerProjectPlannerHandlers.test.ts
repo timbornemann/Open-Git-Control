@@ -7,10 +7,17 @@ const { handleMock, getPathMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   getPathMock: vi.fn(),
 }));
+const { getAuthorizedProjectParentDirectoryMock } = vi.hoisted(() => ({
+  getAuthorizedProjectParentDirectoryMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock },
   app: { getPath: getPathMock },
+}));
+
+vi.mock('../../fileAccessGrant', () => ({
+  getAuthorizedProjectParentDirectory: getAuthorizedProjectParentDirectoryMock,
 }));
 
 import { registerProjectPlannerHandlers } from '../registerProjectPlannerHandlers';
@@ -24,6 +31,8 @@ describe('registerProjectPlannerHandlers', () => {
   beforeEach(() => {
     handlers.clear();
     handleMock.mockReset();
+    getAuthorizedProjectParentDirectoryMock.mockReset();
+    getAuthorizedProjectParentDirectoryMock.mockImplementation((_webContentsId: number, parentDirectory: string) => parentDirectory);
     tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-planner-'));
     getPathMock.mockReturnValue(tempDirectory);
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
@@ -108,6 +117,17 @@ describe('registerProjectPlannerHandlers', () => {
     });
   });
 
+  it('returns TODO_NOT_FOUND when deleting an unknown planner item through IPC', async () => {
+    const gitService = { runCommandAtPath: vi.fn() } as any;
+    registerProjectPlannerHandlers({ gitService });
+
+    await expect(handlers.get('planner:deleteItem')!({}, 'missing-todo')).resolves.toEqual({
+      success: false,
+      error: 'Todo not found.',
+      code: 'TODO_NOT_FOUND',
+    });
+  });
+
   it('deletes a repository planning project and its items by repository path through IPC', async () => {
     const repoPath = path.join(tempDirectory, 'deleted-repo');
     const project = ensureRepositoryProject(repoPath);
@@ -167,10 +187,11 @@ describe('registerProjectPlannerHandlers', () => {
     const parentDirectory = path.join(tempDirectory, 'projects');
     fs.mkdirSync(parentDirectory);
     const handler = handlers.get('planner:materializeProject');
-    const result = await handler!({}, project.id, parentDirectory, 'future-app');
+    const result = await handler!({ sender: { id: 41 } }, project.id, parentDirectory, 'future-app');
     const expectedRepoPath = path.join(parentDirectory, 'future-app');
 
     expect(result.success).toBe(true);
+    expect(getAuthorizedProjectParentDirectoryMock).toHaveBeenCalledWith(41, parentDirectory);
     expect(result.data.repoPath).toBe(expectedRepoPath);
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith(expectedRepoPath, ['init']);
     expect(fs.existsSync(expectedRepoPath)).toBe(true);
@@ -201,7 +222,7 @@ describe('registerProjectPlannerHandlers', () => {
     const parentDirectory = path.join(tempDirectory, 'projects');
     fs.mkdirSync(parentDirectory);
     const handler = handlers.get('planner:materializeProject');
-    const result = await handler!({}, project.id, parentDirectory, 'broken-start');
+    const result = await handler!({ sender: { id: 41 } }, project.id, parentDirectory, 'broken-start');
     const expectedRepoPath = path.join(parentDirectory, 'broken-start');
 
     expect(result).toEqual({ success: false, error: 'git is unavailable' });
@@ -212,5 +233,26 @@ describe('registerProjectPlannerHandlers', () => {
       repoPath: null,
     });
     expect(readStoreData().repos).toEqual([]);
+  });
+
+  it('rejects empty or renderer-supplied project parent paths without a matching native grant', async () => {
+    const project = createPlannedProject({ name: 'Protected project' });
+    const gitService = { runCommandAtPath: vi.fn() } as any;
+    registerProjectPlannerHandlers({ gitService });
+    const handler = handlers.get('planner:materializeProject');
+
+    await expect(handler!({ sender: { id: 41 } }, project.id, '', 'protected-project')).resolves.toEqual({
+      success: false,
+      error: 'Selected parent directory is required.',
+    });
+
+    const unauthorizedParent = path.join(tempDirectory, 'unauthorized');
+    fs.mkdirSync(unauthorizedParent);
+    getAuthorizedProjectParentDirectoryMock.mockReturnValueOnce(null);
+    await expect(handler!({ sender: { id: 42 } }, project.id, unauthorizedParent, 'protected-project')).resolves.toEqual({
+      success: false,
+      error: 'Selected parent directory is not authorized. Please choose it again.',
+    });
+    expect(gitService.runCommandAtPath).not.toHaveBeenCalled();
   });
 });

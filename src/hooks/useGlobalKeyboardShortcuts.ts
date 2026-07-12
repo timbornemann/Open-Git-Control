@@ -22,6 +22,10 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
       const ctrl = e.ctrlKey || e.metaKey;
       if (!ctrl) return;
 
+      // Never steal tab shortcuts from text/code editors. Navigation initiated
+      // outside an editor is still protected by the working-file dirty guard.
+      if (isEditableFocused()) return;
+
       // Keep the established Ctrl+1..4 mapping; the planner is available on Ctrl+5.
       if (!e.shiftKey && !e.altKey) {
         const tabs: AppTabId[] = ['localRepos', 'repo', 'github', 'settings', 'planner'];
@@ -32,9 +36,6 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
           return;
         }
       }
-
-      // Shortcuts that should not fire when typing
-      if (isEditableFocused()) return;
 
       // Ctrl+Shift+F → Fetch
       if (e.shiftKey && e.key === 'F') {

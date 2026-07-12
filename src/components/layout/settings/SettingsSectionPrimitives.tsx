@@ -1,7 +1,8 @@
 import type { AppSettingsDto } from '@/types/appDtos';
+import type { SettingsUpdateResult } from '@/app/state/contracts';
 
 export type SettingsLayoutVariant = 'main' | 'sidebar';
-export type SettingsUpdateHandler = (partial: Partial<AppSettingsDto>) => Promise<void>;
+export type SettingsUpdateHandler = (partial: Partial<AppSettingsDto>) => Promise<SettingsUpdateResult | void>;
 
 export type SettingsSectionProps = {
   settings: AppSettingsDto;

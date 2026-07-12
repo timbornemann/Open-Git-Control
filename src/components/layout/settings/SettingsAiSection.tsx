@@ -1,9 +1,105 @@
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { formatCommitMessageStyleExample, getCommitMessageLanguageOptions, getCommitMessageStyleOptions } from '@/utils/commitMessagePreferences';
 import type { SettingsAiUpdaterState } from '../hooks/useSettingsAiUpdater';
+import type { SettingsUpdateResult } from '@/app/state/contracts';
 import { actionRowClass, fieldClass, hintClass, inputClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
+
+type BaseUrlInputProps = {
+  label: string;
+  value: string;
+  placeholder: string;
+  className?: string;
+  fieldClassName?: string;
+  onCommit: (value: string) => Promise<SettingsUpdateResult | void>;
+  validate: (value: string) => string | null;
+};
+
+const BaseUrlInput = ({ label, value, placeholder, className, fieldClassName, onCommit, validate }: BaseUrlInputProps) => {
+  const [draft, setDraft] = useState(value);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const inFlightValueRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setDraft(value);
+    setValidationError(null);
+    inFlightValueRef.current = null;
+  }, [value]);
+
+  const commit = useCallback(async () => {
+    const nextValue = draft.trim();
+    if (nextValue === value) {
+      setDraft(value);
+      setValidationError(null);
+      return;
+    }
+    const nextError = validate(nextValue);
+    if (nextError) {
+      setValidationError(nextError);
+      return;
+    }
+    if (inFlightValueRef.current === nextValue) return;
+    inFlightValueRef.current = nextValue;
+    setValidationError(null);
+    try {
+      const result = await onCommit(nextValue);
+      if (result && !result.success) {
+        setDraft(value);
+        setValidationError(result.error);
+      }
+    } catch (error: unknown) {
+      setDraft(value);
+      setValidationError(error instanceof Error ? error.message : 'Could not save the URL.');
+    } finally {
+      if (inFlightValueRef.current === nextValue) inFlightValueRef.current = null;
+    }
+  }, [draft, onCommit, validate, value]);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    void commit();
+    event.currentTarget.blur();
+  };
+
+  return (
+    <>
+      <label className={fieldClassName}>
+        {label}
+        <input
+          className={className}
+          type="text"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setValidationError(null);
+          }}
+          onBlur={() => void commit()}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          aria-invalid={Boolean(validationError)}
+        />
+      </label>
+      {validationError && <p style={{ color: 'var(--status-danger)', margin: 0, fontSize: '0.78rem' }}>{validationError}</p>}
+    </>
+  );
+};
+
+const validateBaseUrl = (value: string, requireHttps: boolean): string | null => {
+  if (!value) return 'Enter a complete URL.';
+  try {
+    const parsed = new URL(value);
+    if (parsed.username || parsed.password) return 'Credentials are not allowed in the URL.';
+    if (requireHttps ? parsed.protocol !== 'https:' : parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return requireHttps ? 'The OpenAI URL must use HTTPS.' : 'The URL must use HTTP or HTTPS.';
+    }
+    return null;
+  } catch {
+    return 'Enter a complete, valid URL.';
+  }
+};
 
 export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: SettingsSectionProps & { ai: SettingsAiUpdaterState }) => {
   const { t, tr } = useI18n();
@@ -30,16 +126,15 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
       </label>
 
       {settings.aiProvider === 'ollama' && (
-        <label className={fieldClass(variant)}>
-          Ollama URL
-          <input
-            className={inputClass(variant)}
-            type="text"
-            value={settings.ollamaBaseUrl}
-            onChange={(event) => void onUpdateSettings({ ollamaBaseUrl: event.target.value })}
-            placeholder="http://127.0.0.1:11434"
-          />
-        </label>
+        <BaseUrlInput
+          label="Ollama URL"
+          value={settings.ollamaBaseUrl || 'http://127.0.0.1:11434'}
+          placeholder="http://127.0.0.1:11434"
+          className={inputClass(variant)}
+          fieldClassName={fieldClass(variant)}
+          onCommit={(ollamaBaseUrl) => onUpdateSettings({ ollamaBaseUrl })}
+          validate={(value) => validateBaseUrl(value, false)}
+        />
       )}
 
       {settings.aiProvider === 'gemini' && (
@@ -84,9 +179,13 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
-                await appClient.clearGeminiApiKey();
-                ai.setGeminiApiKeyInput('');
-                await onUpdateSettings({});
+                try {
+                  await appClient.clearGeminiApiKey();
+                  ai.setGeminiApiKeyInput('');
+                  await onUpdateSettings({});
+                } catch (error: unknown) {
+                  ai.setAiStatus(error instanceof Error ? error.message : 'The Gemini API key could not be removed.');
+                }
               }}
               disabled={!settings.hasGeminiApiKey}
             >
@@ -106,16 +205,15 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
 
       {settings.aiProvider === 'openai' && (
         <>
-          <label className={fieldClass(variant)}>
-            OpenAI Base URL
-            <input
-              className={inputClass(variant)}
-              type="text"
-              value={settings.openAiBaseUrl}
-              onChange={(event) => void onUpdateSettings({ openAiBaseUrl: event.target.value })}
-              placeholder="https://api.openai.com/v1"
-            />
-          </label>
+          <BaseUrlInput
+            label="OpenAI Base URL"
+            value={settings.openAiBaseUrl || 'https://api.openai.com/v1'}
+            placeholder="https://api.openai.com/v1"
+            className={inputClass(variant)}
+            fieldClassName={fieldClass(variant)}
+            onCommit={(openAiBaseUrl) => onUpdateSettings({ openAiBaseUrl })}
+            validate={(value) => validateBaseUrl(value, true)}
+          />
           <label className={fieldClass(variant)}>
             OpenAI API Key
             <input
@@ -156,9 +254,13 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
-                await appClient.clearOpenAiApiKey();
-                ai.setOpenAiApiKeyInput('');
-                await onUpdateSettings({});
+                try {
+                  await appClient.clearOpenAiApiKey();
+                  ai.setOpenAiApiKeyInput('');
+                  await onUpdateSettings({});
+                } catch (error: unknown) {
+                  ai.setAiStatus(error instanceof Error ? error.message : 'The OpenAI API key could not be removed.');
+                }
               }}
               disabled={!settings.hasOpenAiApiKey}
             >

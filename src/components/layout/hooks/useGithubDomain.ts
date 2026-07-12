@@ -5,6 +5,7 @@ import { appClient } from '@/services/appClient';
 import { githubClient } from '@/services/githubClient';
 import { useGithubCloneWorkflow } from './github/useGithubCloneWorkflow';
 import { useGithubRepositoryPages } from './github/useGithubRepositoryPages';
+import { confirmWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type Params = {
   onRepoCloned: (repoPath: string) => Promise<void>;
@@ -74,6 +75,25 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     const normalizedHost = (githubHost || '').trim().toLowerCase() || 'github.com';
     if (initializedHostRef.current === normalizedHost) return;
     initializedHostRef.current = normalizedHost;
+
+    // Authentication and repository data are host-scoped. Clear the previous
+    // host synchronously, before its saved-token bootstrap can race the new one.
+    nextAuthRunIdRef.current += 1;
+    activeAuthRunRef.current = null;
+    if (pollingRef.current !== null) {
+      window.clearTimeout(pollingRef.current);
+      pollingRef.current = null;
+    }
+    setIsAuthenticated(false);
+    setGithubUser(null);
+    setAuthError(null);
+    setIsAuthenticating(false);
+    setIsDeviceFlowRunning(false);
+    setDeviceFlow(null);
+    setDeviceFlowError(null);
+    setIsWebFlowRunning(false);
+    setWebFlowError(null);
+    resetRepositoryPages({ clearRepos: true });
 
     const loginWithSavedToken = async () => {
       if (!githubClient.isAvailable()) return;
@@ -371,6 +391,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   };
 
   const handleLogout = async () => {
+    if (!(await confirmWorkingDirectoryNavigation({ kind: 'view', label: 'GitHub login' }))) return;
     invalidateAuthRuns();
     const run = beginAuthRun('logout');
     if (!run) return;
@@ -383,16 +404,29 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
 
     try {
       if (githubClient.isAvailable()) {
-        await githubClient.logout();
+        const result = await githubClient.logout();
+        if (!isCurrentAuthRun(run)) return;
+        if (!result.success) {
+          if (result.sessionCleared) {
+            setIsAuthenticated(false);
+            setGithubUser(null);
+            setTokenInput('');
+            resetRepositoryPages({ clearRepos: true });
+          }
+          setAuthError(result.error);
+          return;
+        }
       }
+      if (!isCurrentAuthRun(run)) return;
+      setIsAuthenticated(false);
+      setGithubUser(null);
+      setTokenInput('');
+      resetRepositoryPages({ clearRepos: true });
     } catch (e) {
       console.error('GitHub logout failed:', e);
+      if (isCurrentAuthRun(run)) setAuthError(e instanceof Error ? e.message : 'GitHub logout failed.');
     } finally {
       if (isCurrentAuthRun(run)) {
-        setIsAuthenticated(false);
-        setGithubUser(null);
-        setTokenInput('');
-        resetRepositoryPages({ clearRepos: true });
         setIsAuthenticating(false);
         finishAuthRun(run);
       }

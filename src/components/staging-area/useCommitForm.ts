@@ -8,6 +8,7 @@ import { addFindingPathsToSecretScanAllowlistText } from '@/shared/secretScanAll
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { GitStatusWithConflicts } from './types';
 import { getCommitFormDraft, resetCommitFormDraft, updateCommitFormDraft } from './commitFormDraft';
+import type { SettingsUpdateHandler } from '@/components/layout/settings/SettingsSectionPrimitives';
 
 type Params = {
   repoPath: string | null;
@@ -18,7 +19,7 @@ type Params = {
   onCommitsCreated?: () => void;
   settings: AppSettingsDto;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  onUpdateSettings: SettingsUpdateHandler;
 };
 
 export const useCommitForm = ({
@@ -43,10 +44,14 @@ export const useCommitForm = ({
   const nextCommitOperationIdRef = useRef(0);
   const activeCommitOperationIdRef = useRef<number | null>(null);
   const isSecretScanInProgressRef = useRef(false);
+  const nextSecretScanOperationIdRef = useRef(0);
+  const activeSecretScanOperationIdRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     repoGenerationRef.current += 1;
     activeCommitOperationIdRef.current = null;
+    activeSecretScanOperationIdRef.current = null;
+    isSecretScanInProgressRef.current = false;
     isCommittingRef.current = false;
     setIsCommitting(false);
     setAmendCommit(false);
@@ -176,13 +181,15 @@ export const useCommitForm = ({
   ]);
 
   const addFindingsToAllowlist = useCallback(
-    async (findings: { filePath: string }[]) => {
+    async (findings: { filePath: string }[], isCurrent: () => boolean = () => true) => {
       const update = addFindingPathsToSecretScanAllowlistText(settings.secretScanAllowlist, findings);
       if (update.addedPaths.length === 0) return true;
       try {
         if (!appClient.isAvailable()) throw new Error(tr('Die Einstellungen sind nicht verfuegbar.', 'Settings are unavailable.'));
         await onUpdateSettings({ secretScanAllowlist: update.allowlistText });
+        if (!isCurrent()) return false;
         const persisted = await appClient.getSettings();
+        if (!isCurrent()) return false;
         const remaining = addFindingPathsToSecretScanAllowlistText(
           persisted.secretScanAllowlist,
           update.addedPaths.map((filePath) => ({ filePath })),
@@ -192,6 +199,7 @@ export const useCommitForm = ({
         }
         return true;
       } catch (error: unknown) {
+        if (!isCurrent()) return false;
         setToast({
           msg:
             error instanceof Error
@@ -224,10 +232,16 @@ export const useCommitForm = ({
     }
 
     const repoAtStart = repoPath;
+    const repoGeneration = repoGenerationRef.current;
+    const scanOperationId = ++nextSecretScanOperationIdRef.current;
+    const isCurrentRepo = () => repoGenerationRef.current === repoGeneration;
+    const isCurrentScan = () => isCurrentRepo() && activeSecretScanOperationIdRef.current === scanOperationId;
+    activeSecretScanOperationIdRef.current = scanOperationId;
     isSecretScanInProgressRef.current = true;
     setIsCommitting(true);
     try {
       const scan = await gitClient.scanCommitSecrets({ repoPath: repoAtStart });
+      if (!isCurrentScan()) return;
       if (!scan.success) {
         setToast({
           msg: scan.error || tr('Der Secret-Scan vor dem Commit ist fehlgeschlagen.', 'The secret scan before the commit failed.'),
@@ -243,7 +257,9 @@ export const useCommitForm = ({
       }
 
       const continueCommit = async () => {
+        if (!isCurrentRepo()) return;
         const approval = await gitClient.approveSecretScanCommit(repoAtStart);
+        if (!isCurrentRepo()) return;
         if (!approval.success) {
           setToast({
             msg: tr(
@@ -277,19 +293,23 @@ export const useCommitForm = ({
         secondaryActionLabel: tr('Dateien allowlisten und committen', 'Allowlist files and commit'),
         secondaryActionVariant: 'default',
         onSecondaryAction: async () => {
-          if (!(await addFindingsToAllowlist(findings))) return;
+          if (!isCurrentRepo() || !(await addFindingsToAllowlist(findings, isCurrentRepo)) || !isCurrentRepo()) return;
           await continueCommit();
         },
         onConfirm: continueCommit,
       });
     } catch (error: unknown) {
+      if (!isCurrentScan()) return;
       setToast({
         msg: error instanceof Error ? error.message : tr('Der Secret-Scan vor dem Commit ist fehlgeschlagen.', 'The secret scan before the commit failed.'),
         isError: true,
       });
     } finally {
-      isSecretScanInProgressRef.current = false;
-      if (!isCommittingRef.current) setIsCommitting(false);
+      if (activeSecretScanOperationIdRef.current === scanOperationId) {
+        activeSecretScanOperationIdRef.current = null;
+        isSecretScanInProgressRef.current = false;
+        if (repoGenerationRef.current === repoGeneration && !isCommittingRef.current) setIsCommitting(false);
+      }
     }
   }, [
     addFindingsToAllowlist,

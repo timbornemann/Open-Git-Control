@@ -124,17 +124,31 @@ export const useGitHubAuth = ({ onAuthChanged }: Params = {}) => {
     setIsAuthenticating(true);
     try {
       if (githubClient.isAvailable()) {
-        await githubClient.logout();
+        const result = await githubClient.logout();
+        if (!isCurrentOperation()) return;
+        if (!result.success) {
+          if (result.sessionCleared) {
+            setIsAuthenticated(false);
+            onAuthChanged?.(false);
+            setGithubUser(null);
+            setGithubRepos([]);
+            setTokenInput('');
+          }
+          setAuthError(result.error);
+          return;
+        }
       }
+      if (!isCurrentOperation()) return;
+      setIsAuthenticated(false);
+      onAuthChanged?.(false);
+      setGithubUser(null);
+      setGithubRepos([]);
+      setTokenInput('');
     } catch (error) {
       console.error('GitHub logout failed:', error);
+      if (isCurrentOperation()) setAuthError(error instanceof Error ? error.message : 'GitHub logout failed.');
     } finally {
       if (isCurrentOperation()) {
-        setIsAuthenticated(false);
-        onAuthChanged?.(false);
-        setGithubUser(null);
-        setGithubRepos([]);
-        setTokenInput('');
         activeAuthOperationRef.current = null;
         setIsAuthenticating(false);
       }

@@ -13,6 +13,7 @@ import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunS
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
 export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'run' | 'system';
+export type SettingsUpdateResult = { success: true; settings: AppSettingsDto } | { success: false; error: string };
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 
 export type RepoMetaMap = Record<string, { lastOpened: number; pinned: boolean; createdAt: number }>;
@@ -108,7 +109,7 @@ export type SidebarCoreState = {
 
 export type SettingsStateContract = {
   settings: AppSettingsDto;
-  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
+  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<SettingsUpdateResult>;
   settingsTab: SettingsTabId;
   onSelectSettingsTab: (tab: SettingsTabId) => void;
 };

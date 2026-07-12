@@ -80,7 +80,7 @@ export const useAppState = () => {
     executeInputDialog,
   } = useDialogControllers();
 
-  const { settings, handleUpdateSettings, t, tr } = useSettingsState({ setGitActionToast });
+  const { settings, handleUpdateSettings, updateSettingsWithResult, t, tr } = useSettingsState({ setGitActionToast });
 
   const {
     selectedCommit,
@@ -505,6 +505,7 @@ export const useAppState = () => {
 
     settings,
     handleUpdateSettings,
+    updateSettingsWithResult,
     plannerRefreshSignal,
     jobs,
     clearJobs,

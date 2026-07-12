@@ -13,6 +13,10 @@ import { RepositoryRunService } from './RepositoryRunService';
 import { createEmptyRepositoryRunConfig } from '../../src/types/repositoryRun';
 
 const directories: string[] = [];
+const originalPlatform = process.platform;
+const setPlatform = (platform: NodeJS.Platform): void => {
+  Object.defineProperty(process, 'platform', { configurable: true, value: platform });
+};
 const waitForCompletion = async (service: RepositoryRunService) => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const state = service.getState();
@@ -37,6 +41,15 @@ const createChild = (code: number, output = '', appendNewline = true) => {
   return child;
 };
 
+const createHangingChild = () => {
+  const child = new EventEmitter() as any;
+  child.pid = 4321;
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = vi.fn();
+  return child;
+};
+
 const prepareConfig = (repoPath: string, exitCodes: number[]) => {
   const config = createEmptyRepositoryRunConfig();
   config.actions.test.steps = exitCodes.map((_, index) => ({
@@ -51,6 +64,8 @@ const prepareConfig = (repoPath: string, exitCodes: number[]) => {
 };
 
 afterEach(() => {
+  setPlatform(originalPlatform);
+  vi.restoreAllMocks();
   spawnMock.mockReset();
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
@@ -99,5 +114,76 @@ describe('RepositoryRunService', () => {
 
     expect(stdout.map((line) => line.text)).toEqual(['first', 'second']);
     expect(stdout.map((line) => line.stepIndex)).toEqual([0, 1]);
+  });
+
+  it('strictly bounds continuous output without newline characters', async () => {
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    spawnMock.mockImplementation(() => createChild(0, 'x'.repeat(3 * 1024 * 1024), false));
+    const service = new RepositoryRunService(new RepositoryRunConfigService());
+
+    await service.start(repoPath, 'test');
+    const state = await waitForCompletion(service);
+    const retainedBytes = state.output.reduce((total, line) => total + Buffer.byteLength(line.text, 'utf8'), 0);
+
+    expect(state.status).toBe('succeeded');
+    expect(retainedBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
+    expect(state.output.every((line) => Buffer.byteLength(line.text, 'utf8') <= 64 * 1024)).toBe(true);
+  });
+
+  it('escalates from SIGTERM to SIGKILL and reaches a terminal cancelled state', async () => {
+    setPlatform('linux');
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const target = createHangingChild();
+    spawnMock.mockReturnValue(target);
+    const service = new RepositoryRunService(new RepositoryRunConfigService(), 5, 5);
+
+    const started = await service.start(repoPath, 'test');
+    expect(service.stop(started.runId)).toBe(true);
+    const state = await waitForCompletion(service);
+
+    expect(killSpy).toHaveBeenCalledWith(-4321, 'SIGTERM');
+    expect(killSpy).toHaveBeenCalledWith(-4321, 'SIGKILL');
+    expect(state.status).toBe('cancelled');
+    expect(state.finishedAt).toEqual(expect.any(Number));
+    const outputLengthAfterCancellation = state.output.length;
+    target.stdout.emit('data', Buffer.from('late orphan output\n'));
+    expect(service.getState()?.output).toHaveLength(outputLengthAfterCancellation);
+
+    await expect(service.start(repoPath, 'test')).rejects.toThrow('previous repository command may still be running');
+    target.emit('close', null);
+    spawnMock.mockImplementation(() => createChild(0));
+    await expect(service.start(repoPath, 'test')).resolves.toEqual(expect.objectContaining({ status: 'running' }));
+    await waitForCompletion(service);
+  });
+
+  it('handles taskkill failures and still reaches a terminal cancelled state on Windows', async () => {
+    setPlatform('win32');
+    const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-run-service-'));
+    directories.push(repoPath);
+    prepareConfig(repoPath, [0]);
+    const target = createHangingChild();
+    spawnMock
+      .mockImplementationOnce(() => target)
+      .mockImplementation(() => {
+        const killer = new EventEmitter() as any;
+        queueMicrotask(() => killer.emit('close', 1));
+        return killer;
+      });
+    const service = new RepositoryRunService(new RepositoryRunConfigService(), 50, 5);
+
+    const started = await service.start(repoPath, 'test');
+    expect(service.stop(started.runId)).toBe(true);
+    const state = await waitForCompletion(service);
+
+    const taskkillCalls = spawnMock.mock.calls.filter(([command]) => command === 'taskkill.exe');
+    expect(taskkillCalls).toHaveLength(2);
+    expect(taskkillCalls[0][1]).toEqual(['/pid', '4321', '/t']);
+    expect(taskkillCalls[1][1]).toEqual(['/pid', '4321', '/t', '/f']);
+    expect(state.status).toBe('cancelled');
   });
 });
