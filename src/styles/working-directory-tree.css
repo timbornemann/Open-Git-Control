@@ -106,3 +106,83 @@
   color: var(--accent-primary);
   opacity: 1;
 }
+
+.working-tree-context-menu {
+  min-width: 210px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  background: var(--bg-panel);
+  box-shadow: 8px 8px 0 color-mix(in srgb, var(--bg-main) 76%, transparent);
+  color: var(--text-primary);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.working-tree-context-menu__header {
+  overflow: hidden;
+  padding: 5px 7px 6px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.working-tree-context-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 27px;
+  gap: 8px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: 0.73rem/1.2 var(--font-mono, 'JetBrains Mono', monospace);
+  text-align: left;
+}
+
+.working-tree-context-menu__item svg {
+  flex: 0 0 auto;
+  color: var(--status-info);
+}
+
+.working-tree-context-menu__item:hover,
+.working-tree-context-menu__item:focus-visible {
+  border-color: var(--accent-primary-border);
+  outline: 0;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.working-tree-context-menu__item:hover svg,
+.working-tree-context-menu__item:focus-visible svg {
+  color: var(--accent-primary);
+}
+
+.working-tree-context-menu__separator {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border-color);
+}
+
+.working-tree-context-menu__item--danger {
+  color: var(--status-danger);
+}
+
+.working-tree-context-menu__item--danger svg,
+.working-tree-context-menu__item--danger:hover svg,
+.working-tree-context-menu__item--danger:focus-visible svg {
+  color: var(--status-danger);
+}
+
+.working-tree-context-menu__item--danger:hover,
+.working-tree-context-menu__item--danger:focus-visible {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-soft);
+}

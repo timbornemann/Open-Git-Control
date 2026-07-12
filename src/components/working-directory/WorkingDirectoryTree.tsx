@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, File, Folder, FolderOpen, Scissors, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
+import { getAvailableWorkingDirectoryCopyPath } from '@/utils/workingDirectoryCopyName';
 import '@/styles/working-directory-tree.css';
 
-type ClipboardEntry = { path: string; cut: boolean } | null;
+type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
 type Props = {
   repoPath: string | null;
   refreshTrigger: number;
@@ -64,28 +65,48 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
   const pasteInto = (folder: string) => {
     if (!clipboard || !repoPath) return;
     const targetPath = folder ? `${folder}/${basename(clipboard.path)}` : basename(clipboard.path);
-    const execute = async (overwrite: boolean) =>
+    if (clipboard.cut && clipboard.path === targetPath) {
+      setClipboard(null);
+      return;
+    }
+    const execute = async (destinationPath: string, overwrite: boolean) =>
       runMutation(() =>
         clipboard.cut
-          ? gitClient.moveWorkingDirectoryEntry(clipboard.path, targetPath, overwrite, repoPath)
-          : gitClient.copyWorkingDirectoryEntry(clipboard.path, targetPath, overwrite, repoPath),
+          ? gitClient.moveWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath)
+          : gitClient.copyWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath),
       );
     const exists = entries.some((entry) => entry.path === targetPath);
-    if (exists)
+    if (exists) {
+      const copyTargetPath = getAvailableWorkingDirectoryCopyPath(
+        targetPath,
+        clipboard.kind,
+        entries.map((entry) => entry.path),
+      );
       setConfirmDialog({
         variant: 'danger',
         title: 'Replace existing entry?',
         message: `"${targetPath}" already exists.`,
         contextItems: [{ label: 'Target', value: targetPath }],
         irreversible: true,
-        consequences: 'The existing file or folder will be replaced.',
+        consequences: clipboard.cut
+          ? 'The existing file or folder will be replaced.'
+          : 'Replace the existing entry, or create a separately named copy instead.',
         confirmLabel: 'Replace',
         onConfirm: async () => {
-          if ((await execute(true)) && clipboard.cut) setClipboard(null);
+          if ((await execute(targetPath, true)) && clipboard.cut) setClipboard(null);
         },
+        ...(clipboard.cut
+          ? {}
+          : {
+              secondaryActionLabel: 'Keep both',
+              secondaryActionVariant: 'default' as const,
+              onSecondaryAction: async () => {
+                await execute(copyTargetPath, false);
+              },
+            }),
       });
-    else
-      void execute(false).then((ok) => {
+    } else
+      void execute(targetPath, false).then((ok) => {
         if (ok && clipboard.cut) setClipboard(null);
       });
   };
@@ -187,43 +208,136 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       {render('')}
       {context && (
         <div
-          className="staging-context-menu"
+          className="working-tree-context-menu"
           style={{ position: 'fixed', left: context.x, top: context.y, zIndex: 50 }}
           onClick={(event) => event.stopPropagation()}
+          role="menu"
+          aria-label="File actions"
         >
-          {context.entry.path && context.entry.kind === 'file' && <button onClick={() => onOpenFile(context.entry.path)}>Open</button>}
-          {context.entry.path && <button onClick={() => rename(context.entry)}>Rename</button>}
+          <div className="working-tree-context-menu__header">{context.entry.path || (repoPath ? basename(repoPath) : 'Repository')}</div>
+          {context.entry.path && context.entry.kind === 'file' && (
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setContext(null);
+                onOpenFile(context.entry.path);
+              }}
+            >
+              <File size={14} />
+              <span>Open</span>
+            </button>
+          )}
           {context.entry.path && (
-            <button onClick={() => setClipboard({ path: context.entry.path, cut: false })}>
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setContext(null);
+                rename(context.entry);
+              }}
+            >
+              <Pencil size={14} />
+              <span>Rename</span>
+            </button>
+          )}
+          {context.entry.path && (
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: false });
+                setContext(null);
+              }}
+            >
               <Copy size={14} />
-              Copy
+              <span>Copy</span>
             </button>
           )}
           {context.entry.path && (
-            <button onClick={() => setClipboard({ path: context.entry.path, cut: true })}>
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: true });
+                setContext(null);
+              }}
+            >
               <Scissors size={14} />
-              Cut
+              <span>Cut</span>
             </button>
           )}
-          {clipboard && <button onClick={() => pasteInto(targetFolder)}>Paste</button>}
+          {clipboard && (
+            <>
+              <div className="working-tree-context-menu__separator" />
+              <button
+                type="button"
+                className="working-tree-context-menu__item"
+                onClick={() => {
+                  setContext(null);
+                  pasteInto(targetFolder);
+                }}
+              >
+                <ClipboardPaste size={14} />
+                <span>Paste</span>
+              </button>
+            </>
+          )}
+          {context.entry.path && <div className="working-tree-context-menu__separator" />}
           {context.entry.path && (
-            <button onClick={() => void gitClient.openRepositoryPath({ path: context.entry.path, action: 'reveal', repoPath: repoPath! })}>
-              Show in file system
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setContext(null);
+                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'reveal', repoPath: repoPath! });
+              }}
+            >
+              <FolderOpen size={14} />
+              <span>Show in file system</span>
             </button>
           )}
           {context.entry.path && (
-            <button onClick={() => void gitClient.openRepositoryPath({ path: context.entry.path, action: 'open', repoPath: repoPath! })}>
-              Open externally
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setContext(null);
+                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'open', repoPath: repoPath! });
+              }}
+            >
+              <ExternalLink size={14} />
+              <span>Open externally</span>
             </button>
           )}
           {context.entry.path && (
-            <button onClick={() => void gitClient.openRepositoryPath({ path: context.entry.path, action: 'openWith', repoPath: repoPath! })}>Open with</button>
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setContext(null);
+                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'openWith', repoPath: repoPath! });
+              }}
+            >
+              <ExternalLink size={14} />
+              <span>Open with</span>
+            </button>
           )}
           {context.entry.path && (
-            <button onClick={() => remove(context.entry)}>
-              <Trash2 size={14} />
-              Delete
-            </button>
+            <>
+              <div className="working-tree-context-menu__separator" />
+              <button
+                type="button"
+                className="working-tree-context-menu__item working-tree-context-menu__item--danger"
+                onClick={() => {
+                  setContext(null);
+                  remove(context.entry);
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Delete</span>
+              </button>
+            </>
           )}
         </div>
       )}

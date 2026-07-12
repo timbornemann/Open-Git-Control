@@ -120,6 +120,28 @@
   overflow: auto;
   padding: 20px;
 }
+.working-file-viewer__html-preview,
+.working-file-viewer__html-loading {
+  flex: 1;
+  min-height: 0;
+}
+.working-file-viewer__html-preview {
+  overflow: hidden;
+  background: #fff;
+}
+.working-file-viewer__html-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+.working-file-viewer__html-loading {
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
 .working-file-viewer__image {
   display: grid;
   place-items: center;

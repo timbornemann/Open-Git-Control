@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Save } from 'lucide-react';
 import { gitClient } from '@/services/gitClient';
 import { useUIContext } from '@/contexts/AppStateContext';
+import { isHtmlFilePath } from '@/utils/htmlPreview';
 import { isMarkdownFilePath } from '@/utils/markdownPreview';
 import { BlamePanel } from '@/components/file-details/BlamePanel';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
@@ -10,6 +11,8 @@ import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { MarkdownPreviewPane } from '@/components/diff-viewer/MarkdownPreviewPane';
 import { useMarkdownPreview } from '@/components/diff-viewer/useMarkdownPreview';
+import { HtmlPreviewPane } from './HtmlPreviewPane';
+import { useHtmlPreview } from './useHtmlPreview';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
 
@@ -21,6 +24,15 @@ type Props = {
   onCloseRequestChange: (request: (() => void) | null) => void;
 };
 type Tab = 'content' | 'preview' | 'history' | 'blame';
+type FilePreviewKind = 'html' | 'markdown' | 'none';
+
+const getFilePreviewKind = (preview: { kind?: string } | null, tab: Tab, isMarkdown: boolean, isHtml: boolean): FilePreviewKind => {
+  if (preview?.kind !== 'text' || tab !== 'preview') return 'none';
+  if (isMarkdown) return 'markdown';
+  return isHtml ? 'html' : 'none';
+};
+
+const supportsFilePreview = (isMarkdown: boolean, isHtml: boolean): boolean => isMarkdown || isHtml;
 
 export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, onClose, onRepoChanged, onCloseRequestChange }) => {
   const { t } = useI18n();
@@ -35,13 +47,17 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const [error, setError] = useState<string | null>(null);
   const dirty = text !== savedText;
   const isMarkdown = isMarkdownFilePath(path);
+  const isHtml = isHtmlFilePath(path);
+  const filePreviewKind = getFilePreviewKind(preview, tab, isMarkdown, isHtml);
+  const supportsPreview = supportsFilePreview(isMarkdown, isHtml);
   const markdownRequest = useMemo(() => ({ source: 'unstaged' as const, path, title: path }), [path]);
   const { markdownPreview, handleMarkdownPreviewClick } = useMarkdownPreview({
     repoPath,
     request: markdownRequest,
-    isActive: preview?.kind === 'text' && tab === 'preview',
+    isActive: filePreviewKind === 'markdown',
     t,
   });
+  const htmlPreview = useHtmlPreview({ repoPath, path, html: text, isActive: filePreviewKind === 'html' });
   useEffect(() => {
     let active = true;
     setPreview(null);
@@ -138,7 +154,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
             <button className={`working-file-viewer__button${tab === 'content' ? ' is-active' : ''}`} onClick={() => setTab('content')}>
               Text
             </button>
-            {isMarkdown && (
+            {supportsPreview && (
               <button className={`working-file-viewer__button${tab === 'preview' ? ' is-active' : ''}`} onClick={() => setTab('preview')}>
                 Preview
               </button>
@@ -202,7 +218,8 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
           </div>
         </div>
       )}
-      {preview?.kind === 'text' && tab === 'preview' && <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />}
+      {filePreviewKind === 'markdown' && <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />}
+      {filePreviewKind === 'html' && <HtmlPreviewPane preview={htmlPreview} title={path} />}
       {preview?.kind === 'text' && tab === 'history' && <FileHistoryPanel entries={history} loading={false} error={null} formatDate={(value) => value} />}
       {preview?.kind === 'text' && tab === 'blame' && <BlamePanel lines={blame} loading={false} error={null} hasMore={false} onLoadMore={() => {}} />}
     </div>
