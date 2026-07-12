@@ -2,7 +2,7 @@ import { useI18n } from '@/i18n';
 import { fieldClass, inputClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 export const SettingsSecuritySection = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const checks = (
     <>
       <SettingsSwitch
@@ -14,6 +14,12 @@ export const SettingsSecuritySection = ({ settings, onUpdateSettings, variant }:
             : t('generated.components.layout.settingsmaincontent.confirm_dangerous_git_operations_29652f4d')
         }
         onChange={(checked) => void onUpdateSettings({ confirmDangerousOps: checked })}
+      />
+      <SettingsSwitch
+        variant={variant}
+        checked={settings.secretScanBeforeCommitEnabled}
+        label={tr('Secret-Scan vor Commit', 'Secret scan before commit')}
+        onChange={(checked) => void onUpdateSettings({ secretScanBeforeCommitEnabled: checked })}
       />
       <SettingsSwitch
         variant={variant}

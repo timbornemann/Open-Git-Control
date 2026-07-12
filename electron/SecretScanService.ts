@@ -265,6 +265,8 @@ export class SecretScanService {
     revisions?: string[];
     excludeRemote?: string;
     pushArgs?: string[];
+    /** Restricts the scan to the staged diff, for the fast pre-commit check. */
+    includePushHistory?: boolean;
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -496,8 +498,10 @@ export class SecretScanService {
     };
 
     await streamDiff(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0'], 'staged');
-    await scanPushSourceCommits();
-    await scanTagCommits();
+    if (options.includePushHistory !== false) {
+      await scanPushSourceCommits();
+      await scanTagCommits();
+    }
 
     options.onProgress?.(stagedLines + toPushLines + tagLines);
 
@@ -513,6 +517,20 @@ export class SecretScanService {
         tagLines,
       },
     };
+  }
+
+  /**
+   * Fast, local pre-commit scan. It deliberately inspects only the staged
+   * patch, so creating a commit never waits for remote or history traversal.
+   */
+  async scanStagedDiffs(options: {
+    repoPath: string;
+    strictness: SecretScanStrictness;
+    allowlistText: string;
+    signal?: AbortSignal;
+    onProgress?: (checkedLines: number) => void;
+  }): Promise<SecretScanResult> {
+    return this.scanPushDiffs({ ...options, includePushHistory: false });
   }
 
   private async resolvePushPlan(repoPath: string, rawArgs: string[]): Promise<{ revisions: string[]; excludeRemote?: string; includeTags: boolean }> {

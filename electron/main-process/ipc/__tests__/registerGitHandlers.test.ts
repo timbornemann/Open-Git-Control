@@ -193,6 +193,88 @@ describe('registerGitHandlers', () => {
     expect(new Set(jobEvents.map((event) => event.id)).size).toBe(1);
   });
 
+  it('scans staged changes before committing and proceeds when the scan is clean', async () => {
+    const send = vi.fn();
+    const scanStagedDiffs = vi.fn().mockResolvedValue({ findings: [] });
+    const commitWithMessageAtPath = vi.fn().mockResolvedValue('commit ok');
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      commits: { commitWithMessageAtPath },
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanStagedDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    const result = await handlers.get('git:createCommit')!({ sender: { send } }, { title: 'feat: safe change', description: 'Details' });
+
+    expect(result).toEqual({ success: true, data: 'commit ok' });
+    expect(scanStagedDiffs).toHaveBeenCalledWith(
+      expect.objectContaining({ repoPath: 'C:/repo', strictness: 'medium', allowlistText: '', signal: expect.any(AbortSignal) }),
+    );
+    expect(commitWithMessageAtPath).toHaveBeenCalledWith('C:/repo', {
+      title: 'feat: safe change',
+      description: 'Details',
+      amend: false,
+      signoff: false,
+      allowEmpty: false,
+    });
+    expect(send.mock.calls.filter((call) => call[0] === 'job:event').map((call) => call[1].status)).toEqual(['start', 'progress', 'done']);
+  });
+
+  it('blocks a commit when the staged pre-commit scan finds a potential secret', async () => {
+    const scanStagedDiffs = vi.fn().mockResolvedValue({ findings: [{ filePath: '.env' }, { filePath: '.env' }] });
+    const commitWithMessageAtPath = vi.fn();
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      commits: { commitWithMessageAtPath },
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanStagedDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+    });
+
+    const result = await handlers.get('git:createCommit')!({ sender: { send: vi.fn() } }, { title: 'feat: unsafe change' });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'Commit blocked: 2 potential secret hit(s) found in 1 staged file(s). Review the staged changes, or add a deliberate allowlist rule in Settings.',
+    });
+    expect(commitWithMessageAtPath).not.toHaveBeenCalled();
+  });
+
+  it('allows opting out of the pre-commit scan without changing the push protection setting', async () => {
+    const scanStagedDiffs = vi.fn();
+    const commitWithMessageAtPath = vi.fn().mockResolvedValue('commit ok');
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/repo'),
+      commits: { commitWithMessageAtPath },
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanStagedDiffs } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: false, secretScanBeforePushEnabled: true })) as any,
+    });
+
+    await expect(handlers.get('git:createCommit')!({ sender: { send: vi.fn() } }, { title: 'chore: local change' })).resolves.toEqual({
+      success: true,
+      data: 'commit ok',
+    });
+    expect(scanStagedDiffs).not.toHaveBeenCalled();
+    expect(commitWithMessageAtPath).toHaveBeenCalled();
+  });
+
   it('runs the secret scan in the main process before a push and only proceeds when it is clean', async () => {
     const send = vi.fn();
     const scanPushDiffs = vi.fn().mockResolvedValue({

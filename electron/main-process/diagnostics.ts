@@ -48,6 +48,7 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`autoFetchIntervalMs=${settings.autoFetchIntervalMs}`);
     lines.push(`confirmDangerousOps=${settings.confirmDangerousOps}`);
     lines.push(`showSecondaryHistory=${settings.showSecondaryHistory}`);
+    lines.push(`secretScanBeforeCommitEnabled=${settings.secretScanBeforeCommitEnabled}`);
     lines.push(`secretScanBeforePushEnabled=${settings.secretScanBeforePushEnabled}`);
     lines.push(`secretScanStrictness=${settings.secretScanStrictness}`);
     lines.push(

@@ -100,11 +100,13 @@ describe('normalizeSettings', () => {
   it('normalizes secret scan settings', () => {
     const oversizedAllowlist = 'a'.repeat(9_500);
     const normalized = normalizeSettings({
+      secretScanBeforeCommitEnabled: false,
       secretScanBeforePushEnabled: false,
       secretScanStrictness: 'high',
       secretScanAllowlist: oversizedAllowlist,
     });
 
+    expect(normalized.secretScanBeforeCommitEnabled).toBe(false);
     expect(normalized.secretScanBeforePushEnabled).toBe(false);
     expect(normalized.secretScanStrictness).toBe('high');
     expect(normalized.secretScanAllowlist.length).toBe(8_000);

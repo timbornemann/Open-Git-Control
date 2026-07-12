@@ -11,6 +11,7 @@ export const baseSettings: AppSettings = {
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
   autoUpdateEnabled: true,
+  secretScanBeforeCommitEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',
   secretScanAllowlist: '',

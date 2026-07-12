@@ -4,6 +4,7 @@ import type { GitService } from '../../GitService';
 import type { SecretScanService } from '../../SecretScanService';
 import type { WorkingTreeService } from '../../WorkingTreeService';
 import type { AppSettings } from '../../settings';
+import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { createJobId } from '../gitCommandPolicy';
 import { normalizeDiffPreviewArgs } from '../diffPreviewPolicy';
@@ -102,6 +103,45 @@ export function registerGitHandlers({
 
       try {
         const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+        const settings = readSettingsWithMigration();
+        if (settings.secretScanBeforeCommitEnabled) {
+          const repoJob = repoJobRegistry.begin(repoPath);
+          try {
+            emitJobEvent(event.sender, {
+              id: jobId,
+              operation: 'git:commit',
+              status: 'progress',
+              message: 'Scanning staged changes for potential secrets.',
+              timestamp: Date.now(),
+            });
+            const scanResult = await secretScanService.scanStagedDiffs({
+              repoPath: repoJob.repoPath,
+              strictness: settings.secretScanStrictness,
+              allowlistText: settings.secretScanAllowlist,
+              signal: repoJob.signal,
+              onProgress: (checkedLines) => {
+                emitJobEvent(event.sender, {
+                  id: jobId,
+                  operation: 'git:commit',
+                  status: 'progress',
+                  message: `Secret scan checked ${checkedLines} added line(s).`,
+                  details: { checkedLines },
+                  timestamp: Date.now(),
+                });
+              },
+            });
+            repoJob.ensureActive();
+            if (scanResult.findings.length > 0) {
+              const fileCount = new Set(scanResult.findings.map((finding) => finding.filePath)).size;
+              throw new Error(
+                `Commit blocked: ${scanResult.findings.length} potential secret hit(s) found in ${fileCount} staged file(s). Review the staged changes, or add a deliberate allowlist rule in Settings.`,
+              );
+            }
+          } finally {
+            repoJob.complete();
+          }
+          requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+        }
         const data = await gitService.commits.commitWithMessageAtPath(repoPath, {
           title: String(params.title || ''),
           description: String(params.description || ''),
@@ -117,14 +157,15 @@ export function registerGitHandlers({
         });
         return { success: true, data };
       } catch (error: any) {
+        const safeError = redactGitSensitiveText(error?.message || 'Commit failed.');
         emitJobEvent(event.sender, {
           id: jobId,
           operation: 'git:commit',
           status: 'failed',
-          message: error.message,
+          message: safeError,
           timestamp: Date.now(),
         });
-        return { success: false, error: error.message };
+        return { success: false, error: safeError };
       }
     },
   );

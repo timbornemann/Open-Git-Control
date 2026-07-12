@@ -25,6 +25,24 @@ function createGitServiceMock(outputs: Record<string, string | Error>) {
 }
 
 describe('SecretScanService', () => {
+  it('scans only the staged patch for the fast pre-commit check', async () => {
+    const stagedDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
+    const runCommandAtPath = vi.fn();
+    const streamCommandLinesAtPath = vi.fn(async (_repoPath: string, args: string[], onLine: (line: string) => void) => {
+      expect(args).toEqual(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0']);
+      stagedDiff.split(/\r?\n/).forEach(onLine);
+    });
+    const service = new SecretScanService({ runCommandAtPath, streamCommandLinesAtPath } as any);
+
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ source: 'staged', filePath: '.env' });
+    expect(result.stats).toMatchObject({ checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 });
+    expect(streamCommandLinesAtPath).toHaveBeenCalledTimes(1);
+    expect(runCommandAtPath).not.toHaveBeenCalled();
+  });
+
   it('detects staged and outgoing secrets', async () => {
     const outgoingCommit = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const stagedDiff = [
