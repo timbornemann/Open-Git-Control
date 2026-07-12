@@ -1,6 +1,7 @@
 export { SettingsAiSection } from './SettingsAiSection';
 export { SettingsGeneralSection } from './SettingsGeneralSection';
 export { SettingsGithubSection } from './SettingsGithubSection';
+export { SettingsFeedbackSection } from './SettingsFeedbackSection';
 export { SettingsJobsSection, SettingsReleaseNotesCard, SettingsUpdatesSection } from './SettingsSystemSections';
 export { SettingsSecuritySection } from './SettingsSecuritySection';
 export { SettingsRunSection } from './SettingsRunSection';

@@ -134,6 +134,20 @@ describe('renderer service clients', () => {
     await expectDelegation(() => appClient.selectFiles(), api.app.selectFiles, []);
     await expectDelegation(() => appClient.selectProjectParentDirectory('C:/projects'), api.app.selectProjectParentDirectory, ['C:/projects']);
     await expectDelegation(() => appClient.openExternalUrl('https://example.test'), api.app.openExternalUrl, ['https://example.test']);
+    await expectDelegation(() => appClient.getFeedbackReportCapability(), api.app.getFeedbackReportCapability, []);
+    await expectDelegation(
+      () =>
+        appClient.submitFeedbackReport({
+          category: 'bug',
+          submissionMode: 'automatic',
+          source: 'error-toast',
+          title: 'Failure',
+          area: 'Settings',
+          errorMessage: 'x',
+        }),
+      api.app.submitFeedbackReport,
+      [{ category: 'bug', submissionMode: 'automatic', source: 'error-toast', title: 'Failure', area: 'Settings', errorMessage: 'x' }],
+    );
     await expectDelegation(() => appClient.getPlanningApiInfo(), api.app.getPlanningApiInfo, []);
     await expectDelegation(() => appClient.generatePlanningApiToken(), api.app.generatePlanningApiToken, []);
     await expectDelegation(() => appClient.clearPlanningApiToken(), api.app.clearPlanningApiToken, []);

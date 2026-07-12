@@ -8,6 +8,7 @@ import {
   SettingsAiSection,
   SettingsGeneralSection,
   SettingsGithubSection,
+  SettingsFeedbackSection,
   SettingsJobsSection,
   SettingsReleaseNotesCard,
   SettingsSecuritySection,
@@ -55,6 +56,7 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({ settin
         {activeTab === 'system' && (
           <div className="settings-grid">
             <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" ai={aiUpdater} locale={locale} />
+            <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />
             <SettingsReleaseNotesCard releaseNotes={aiUpdater.updaterStatus?.releaseNotes} />
             <SettingsJobsSection jobs={sortedJobs} onClearJobs={onClearJobs} variant="main" locale={locale} />
           </div>

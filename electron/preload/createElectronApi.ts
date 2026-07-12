@@ -15,6 +15,7 @@ import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/proj
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
 import type { RepositoryInitializationOptionsDto } from '../../src/shared/ipc/contracts/git';
 import type { RepositoryRunActionId, RepositoryRunConfigDto, RepositoryRunEventDto } from '../../src/types/repositoryRun';
+import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -84,6 +85,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       return result;
     },
     openExternalUrl: (url: string) => ipcRenderer.invoke(IpcChannel.ExternalOpen, url),
+    getFeedbackReportCapability: () => ipcRenderer.invoke(IpcChannel.FeedbackGetCapability),
+    submitFeedbackReport: (input: FeedbackReportInputDto) => ipcRenderer.invoke(IpcChannel.FeedbackSubmit, input),
     runGitCommand: (commandName: GitCommandNameDto, ...args: string[]) => invokeGitCommand(commandName, ...args),
     runGitCommandForRepo: (repoPath: string, commandName: GitCommandNameDto, ...args: string[]) =>
       invokeGitOperationForRepo(repoPath, commandName, IpcChannel.GitCommandForRepo, repoPath, commandName, ...args),
@@ -449,6 +452,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       selectFiles: flatApi.selectFiles,
       selectProjectParentDirectory: flatApi.selectProjectParentDirectory,
       openExternalUrl: flatApi.openExternalUrl,
+      getFeedbackReportCapability: flatApi.getFeedbackReportCapability,
+      submitFeedbackReport: flatApi.submitFeedbackReport,
       getPlanningApiInfo: flatApi.getPlanningApiInfo,
       generatePlanningApiToken: flatApi.generatePlanningApiToken,
       clearPlanningApiToken: flatApi.clearPlanningApiToken,

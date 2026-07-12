@@ -3,6 +3,7 @@ import { GitHubPullRequestService } from './github/GitHubPullRequestService';
 import { GitHubReleaseService } from './github/GitHubReleaseService';
 import { GitHubRepositoryService } from './github/GitHubRepositoryService';
 import { GitHubWorkflowService } from './github/GitHubWorkflowService';
+import { GitHubIssueService } from './github/GitHubIssueService';
 import {
   DEFAULT_HOST,
   type CreateReleaseParams,
@@ -30,6 +31,7 @@ export class GitHubService {
   private readonly repositories = new GitHubRepositoryService(() => this.requireOctokit());
   private readonly pullRequests = new GitHubPullRequestService(() => this.requireOctokit());
   private readonly workflows = new GitHubWorkflowService(() => this.requireOctokit());
+  private readonly issues = new GitHubIssueService(() => this.requireOctokit());
   private readonly releases = new GitHubReleaseService(
     () => this.requireOctokit(),
     () => this.host,
@@ -165,6 +167,10 @@ export class GitHubService {
 
   getStatusChecks(owner: string, repo: string, ref: string) {
     return this.workflows.getStatusChecks(owner, repo, ref);
+  }
+
+  createFeedbackIssue(title: string, body: string, label: string) {
+    return this.issues.createFeedbackIssue(title, body, label);
   }
 
   listRepositoryTags(owner: string, repo: string, perPage: number = 200): Promise<string[]> {

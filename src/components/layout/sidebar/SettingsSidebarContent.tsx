@@ -5,6 +5,7 @@ import {
   SettingsAiSection,
   SettingsGeneralSection,
   SettingsGithubSection,
+  SettingsFeedbackSection,
   SettingsJobsSection,
   SettingsSecuritySection,
   SettingsUpdatesSection,
@@ -23,6 +24,7 @@ export const SettingsSidebarContent: React.FC<SettingsSidebarContentProps> = ({ 
       <SettingsGithubSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsAiSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" ai={aiUpdater} />
       <SettingsUpdatesSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" ai={aiUpdater} locale={locale} />
+      <SettingsFeedbackSection settings={settings} onUpdateSettings={onUpdateSettings} variant="sidebar" />
       <SettingsDiagnosticsSection />
       <SettingsJobsSection jobs={sortedJobs} onClearJobs={onClearJobs} variant="sidebar" locale={locale} />
     </div>

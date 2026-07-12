@@ -252,6 +252,10 @@ pre {
   animation: update-attention-pulse 1.8s ease-out infinite;
 }
 
+.feedback-settings-actions {
+  flex-wrap: wrap;
+}
+
 .activity-update-btn:hover:not(:disabled) {
   color: var(--text-primary);
   background: color-mix(in srgb, var(--status-warning) 24%, var(--bg-darker));

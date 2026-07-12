@@ -31,6 +31,13 @@
     "releaseNotes": "Das ist neu",
     "noReleaseNotes": "Für diese Version wurden keine Release Notes bereitgestellt."
   },
+  "feedback": {
+    "quickReport": "Schnell melden",
+    "reporting": "Wird gemeldet...",
+    "openIssue": "Issue öffnen",
+    "openIssueNumber": "Issue #{number} öffnen",
+    "reportManually": "Manuell melden"
+  },
   "generated": {
     "components": {
       "actiontoastviewport": {

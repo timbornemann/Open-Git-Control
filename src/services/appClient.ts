@@ -28,6 +28,14 @@ export const appClient = {
     return requireElectronAppApi().openExternalUrl(...args);
   },
 
+  async getFeedbackReportCapability(...args: Parameters<ElectronAPI['getFeedbackReportCapability']>): ReturnType<ElectronAPI['getFeedbackReportCapability']> {
+    return requireElectronAppApi().getFeedbackReportCapability(...args);
+  },
+
+  async submitFeedbackReport(...args: Parameters<ElectronAPI['submitFeedbackReport']>): ReturnType<ElectronAPI['submitFeedbackReport']> {
+    return requireElectronAppApi().submitFeedbackReport(...args);
+  },
+
   async getSettings(...args: Parameters<ElectronAPI['getSettings']>): ReturnType<ElectronAPI['getSettings']> {
     return requireElectronSettingsApi().getSettings(...args);
   },

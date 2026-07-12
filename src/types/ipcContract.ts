@@ -11,6 +11,8 @@ export const enum IpcChannel {
   DialogSelectFiles = 'dialog:selectFiles',
   DialogSelectProjectParentDirectory = 'dialog:selectProjectParentDirectory',
   ExternalOpen = 'external:open',
+  FeedbackGetCapability = 'feedback:getCapability',
+  FeedbackSubmit = 'feedback:submit',
   GitAddIgnoreRule = 'git:addIgnoreRule',
   GitAiAutoCommit = 'git:aiAutoCommit',
   GitApplyPatch = 'git:applyPatch',

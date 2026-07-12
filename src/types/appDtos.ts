@@ -66,6 +66,8 @@ export interface AppSettingsDto {
   showSecondaryHistory: boolean;
   commitSignoffByDefault: boolean;
   autoUpdateEnabled: boolean;
+  errorReportConsentShown: boolean;
+  automaticErrorReportsEnabled: boolean;
   secretScanBeforeCommitEnabled: boolean;
   secretScanBeforePushEnabled: boolean;
   secretScanStrictness: SecretScanStrictnessDto;

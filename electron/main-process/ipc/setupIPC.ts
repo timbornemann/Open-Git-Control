@@ -20,6 +20,7 @@ import { RepositoryRunConfigService } from '../RepositoryRunConfigService';
 import { RepositoryRunService } from '../RepositoryRunService';
 import { registerRepositoryRunHandlers } from './registerRepositoryRunHandlers';
 import { readStoreData } from '../repoStore';
+import { registerFeedbackHandlers } from './registerFeedbackHandlers';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -79,6 +80,7 @@ export function setupIPC({
   });
   registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
+  registerFeedbackHandlers({ githubService });
   registerExternalLinkHandlers();
   registerRepositoryRunHandlers({
     configService: repositoryRunConfigService,

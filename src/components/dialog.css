@@ -259,3 +259,38 @@
   font-size: 0.78rem;
   line-height: 1.4;
 }
+
+.feedback-report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedback-report-diagnostics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.feedback-report-diagnostics-toggle input {
+  accent-color: var(--accent-primary);
+}
+
+.feedback-report-privacy-warning {
+  padding: 8px 10px;
+  border: 1px solid var(--status-warning-border);
+  border-radius: 6px;
+  color: var(--status-warning);
+  background: var(--status-warning-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.feedback-report-error {
+  color: var(--status-danger);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

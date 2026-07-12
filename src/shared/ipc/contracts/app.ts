@@ -1,5 +1,6 @@
 import type { DiagnosticsReportDto, PlanningApiInfoDto, PlanningApiTokenLifetimeDto, UpdaterOneClickResultDto, UpdaterStatusDto } from '../../../types/appDtos';
 import type { IpcResult } from '../../../types/ipc';
+import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../types/feedbackDtos';
 
 export type DirectoryOpenResultDto = {
   path: string;
@@ -17,6 +18,8 @@ export interface ElectronAppAPI {
   selectFiles: () => Promise<string[] | null>;
   selectProjectParentDirectory: () => Promise<string | null>;
   openExternalUrl: (url: string) => Promise<BasicActionResultDto>;
+  getFeedbackReportCapability: () => Promise<FeedbackReportCapabilityDto>;
+  submitFeedbackReport: (input: FeedbackReportInputDto) => Promise<FeedbackReportSubmissionResultDto>;
   getPlanningApiInfo: () => Promise<PlanningApiInfoDto>;
   generatePlanningApiToken: (lifetime: PlanningApiTokenLifetimeDto) => Promise<PlanningApiInfoDto>;
   clearPlanningApiToken: () => Promise<PlanningApiInfoDto>;

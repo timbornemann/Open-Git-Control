@@ -13,6 +13,7 @@ import { AppStateSlicesProvider } from './contexts/AppStateContext';
 import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
+import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -105,88 +106,90 @@ const App: React.FC = () => {
   return (
     <I18nProvider language={state.settings.language}>
       <AppStateSlicesProvider value={appStateSlices}>
-        <ProjectPlannerProvider
-          activeRepo={state.activeRepo}
-          refreshSignal={state.plannerRefreshSignal}
-          onRepositorySelected={state.addOpenRepo}
-          onRepositoryMaterialized={async (repoPath) => {
-            await state.addOpenRepo(repoPath);
-            state.setActiveTab('planner');
-            state.setGitActionToast({
-              msg: t('generated.app.created_project_folder_and_initialized_git_repository_1d314004'),
-              isError: false,
-            });
-          }}
-          onToast={(message, isError) => state.setGitActionToast({ msg: message, isError })}
-          setConfirmDialog={state.setConfirmDialog}
-        >
-          <div
-            className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
-            style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+        <FeedbackReportProvider>
+          <ProjectPlannerProvider
+            activeRepo={state.activeRepo}
+            refreshSignal={state.plannerRefreshSignal}
+            onRepositorySelected={state.addOpenRepo}
+            onRepositoryMaterialized={async (repoPath) => {
+              await state.addOpenRepo(repoPath);
+              state.setActiveTab('planner');
+              state.setGitActionToast({
+                msg: t('generated.app.created_project_folder_and_initialized_git_repository_1d314004'),
+                isError: false,
+              });
+            }}
+            onToast={(message, isError) => state.setGitActionToast({ msg: message, isError })}
+            setConfirmDialog={state.setConfirmDialog}
           >
-            <AppSidebar />
+            <div
+              className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+              style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+            >
+              <AppSidebar />
 
-            {!isSidebarCollapsed && (
-              <div
-                className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label={t('generated.app.resize_sidebar_width_d9368c0f')}
-                onPointerDown={handleSidebarResizeStart}
+              {!isSidebarCollapsed && (
+                <div
+                  className={`pane-resizer app-sidebar-resizer ${isSidebarResizing ? 'dragging' : ''}`}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={t('generated.app.resize_sidebar_width_d9368c0f')}
+                  onPointerDown={handleSidebarResizeStart}
+                />
+              )}
+
+              <MainView />
+
+              <OverlayManager
+                repoSwitcher={{
+                  selectedIndex: repoSwitcherIndex,
+                  listRef: repoSwitcherListRef,
+                  openRepos: state.openRepos,
+                  activeRepo: state.activeRepo,
+                }}
+                toasts={{
+                  items: state.gitActionToasts,
+                  onDismiss: state.dismissToast,
+                }}
+                branchMenu={{
+                  menu: state.branchContextMenu,
+                  setMenu: state.setBranchContextMenu,
+                  onCheckout: handleBranchMenuCheckout,
+                  onMerge: state.handleMergeBranch,
+                  onRename: state.handleRenameBranch,
+                  onDelete: state.handleDeleteBranch,
+                }}
+                dialogs={{
+                  confirmDialog: state.confirmDialog,
+                  inputDialog: state.inputDialog,
+                  onConfirm: state.executeConfirmDialog,
+                  onSecondaryConfirm: state.executeConfirmDialogSecondary,
+                  onCancelConfirm: state.closeConfirmDialog,
+                  onSubmitInput: state.executeInputDialog,
+                  onCancelInput: state.closeInputDialog,
+                }}
+                gitTransfer={{
+                  open: showGitTransferProgress,
+                  title: state.activeGitActionLabel,
+                  events: activeTransferEvents,
+                }}
+                cloneProgress={{
+                  isCloning: state.isCloning,
+                  cloneRepoName: state.cloneRepoName,
+                  cloneFinished: state.cloneFinished,
+                  cloneError: state.cloneError,
+                  cloneLog: state.cloneLog,
+                  onClose: handleCloneProgressClose,
+                }}
+                commandPalette={{
+                  open: isPaletteOpen,
+                  commands: paletteCommands,
+                  onClose: () => setIsPaletteOpen(false),
+                }}
               />
-            )}
-
-            <MainView />
-
-            <OverlayManager
-              repoSwitcher={{
-                selectedIndex: repoSwitcherIndex,
-                listRef: repoSwitcherListRef,
-                openRepos: state.openRepos,
-                activeRepo: state.activeRepo,
-              }}
-              toasts={{
-                items: state.gitActionToasts,
-                onDismiss: state.dismissToast,
-              }}
-              branchMenu={{
-                menu: state.branchContextMenu,
-                setMenu: state.setBranchContextMenu,
-                onCheckout: handleBranchMenuCheckout,
-                onMerge: state.handleMergeBranch,
-                onRename: state.handleRenameBranch,
-                onDelete: state.handleDeleteBranch,
-              }}
-              dialogs={{
-                confirmDialog: state.confirmDialog,
-                inputDialog: state.inputDialog,
-                onConfirm: state.executeConfirmDialog,
-                onSecondaryConfirm: state.executeConfirmDialogSecondary,
-                onCancelConfirm: state.closeConfirmDialog,
-                onSubmitInput: state.executeInputDialog,
-                onCancelInput: state.closeInputDialog,
-              }}
-              gitTransfer={{
-                open: showGitTransferProgress,
-                title: state.activeGitActionLabel,
-                events: activeTransferEvents,
-              }}
-              cloneProgress={{
-                isCloning: state.isCloning,
-                cloneRepoName: state.cloneRepoName,
-                cloneFinished: state.cloneFinished,
-                cloneError: state.cloneError,
-                cloneLog: state.cloneLog,
-                onClose: handleCloneProgressClose,
-              }}
-              commandPalette={{
-                open: isPaletteOpen,
-                commands: paletteCommands,
-                onClose: () => setIsPaletteOpen(false),
-              }}
-            />
-          </div>
-        </ProjectPlannerProvider>
+            </div>
+          </ProjectPlannerProvider>
+        </FeedbackReportProvider>
       </AppStateSlicesProvider>
     </I18nProvider>
   );
