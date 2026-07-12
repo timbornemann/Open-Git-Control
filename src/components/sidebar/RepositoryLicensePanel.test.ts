@@ -203,4 +203,36 @@ describe('RepositoryLicensePanel', () => {
     await flush();
     expect(host.querySelector('select')).not.toBeNull();
   });
+
+  it('does not apply a late license lookup from the previously selected repository', async () => {
+    let resolveOldLookup: ((result: any) => void) | undefined;
+    vi.mocked(gitClient.readRepoFile).mockImplementation((filePath, repoPath) =>
+      repoPath === 'C:/Repos/Old' && filePath === 'LICENSE'
+        ? new Promise((resolve) => {
+            resolveOldLookup = resolve;
+          })
+        : Promise.resolve({ success: false }),
+    );
+    await act(async () => {
+      root.render(createElement(RepositoryLicensePanel, { repoPath: 'C:/Repos/Old' }));
+    });
+    await act(async () => {
+      root.render(createElement(RepositoryLicensePanel, { repoPath: 'C:/Repos/New' }));
+    });
+    await act(async () => resolveOldLookup?.({ success: true, data: 'old license' }));
+    await flush();
+
+    expect(host.textContent).toContain('Keine Lizenzdatei');
+    expect(host.querySelector('select')).not.toBeNull();
+  });
+
+  it('reports a repository read error instead of treating it as a missing license', async () => {
+    vi.mocked(gitClient.readRepoFile).mockResolvedValue({ success: false, error: 'Permission denied' });
+    await act(async () => {
+      root.render(createElement(RepositoryLicensePanel, { repoPath: 'C:/Repos/Example' }));
+    });
+    await flush();
+
+    expect(onToast).toHaveBeenCalledWith('Permission denied', true);
+  });
 });

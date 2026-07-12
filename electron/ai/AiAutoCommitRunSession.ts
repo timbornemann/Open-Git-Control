@@ -344,8 +344,11 @@ export class AiAutoCommitRunSession {
     } catch (error: unknown) {
       this.ensureNotCancelled();
       const message = error instanceof Error ? error.message : 'Commit fehlgeschlagen.';
-      this.state.diagnostics.push(message);
-      throw new Error(`KI Auto-Commit konnte den Commit nicht erstellen: ${message}`);
+      this.state.diagnostics.push(`KI Auto-Commit konnte den Commit nicht erstellen: ${message}`);
+      // A failed batch is recoverable: retry it with the recovery strategy and
+      // eventually fall back to smaller deterministic batches. Throwing here
+      // made that recovery state machine unreachable on the first failure.
+      return this.groupRecovery.handleCommitFailure(groupState, groupIndex, queue.length, snapshotFiles);
     }
   }
 

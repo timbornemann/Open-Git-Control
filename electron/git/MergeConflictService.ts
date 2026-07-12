@@ -4,6 +4,8 @@ import { resolveExistingRepositoryPath, toLiteralPathspec } from './RepositoryPa
 
 export type ActiveRepoCommand = (args: string[]) => Promise<string>;
 
+export const hasUnresolvedConflictMarkers = (contents: string): boolean => /^<{7,}(?: .*)?\r?$/m.test(contents) && /^>{7,}(?: .*)?\r?$/m.test(contents);
+
 export class MergeConflictService {
   constructor(
     private readonly getRepoPath: () => string,
@@ -32,9 +34,7 @@ export class MergeConflictService {
     // (`>>>>>>>`) marker. Requiring both avoids false-positives on a legitimate
     // lone `=======` line (e.g. a Markdown setext heading rule), which must not
     // block marking the file as resolved.
-    const hasStartMarker = /^<{7,}(?: .*)?\r?$/m.test(contents);
-    const hasEndMarker = /^>{7,}(?: .*)?\r?$/m.test(contents);
-    if (hasStartMarker && hasEndMarker) {
+    if (hasUnresolvedConflictMarkers(contents)) {
       throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
     }
     return this.runCommand(['add', '--', toLiteralPathspec(filePath)]);

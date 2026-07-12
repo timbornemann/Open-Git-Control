@@ -65,6 +65,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     request: markdownRequest,
     isActive: filePreviewKind === 'markdown',
     t,
+    markdownText: preview?.kind === 'text' ? text : undefined,
   });
   const htmlPreview = useHtmlPreview({ repoPath, path, html: text, isActive: filePreviewKind === 'html' });
   useEffect(() => {

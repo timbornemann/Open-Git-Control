@@ -22,6 +22,8 @@ type UseMarkdownPreviewParams = {
   request: DiffRequest;
   isActive: boolean;
   t: CatalogTranslateFn;
+  /** Current editor text, when a preview must include unsaved working-tree edits. */
+  markdownText?: string;
 };
 
 const EMPTY_MARKDOWN_PREVIEW: MarkdownPreviewState = {
@@ -30,13 +32,13 @@ const EMPTY_MARKDOWN_PREVIEW: MarkdownPreviewState = {
   html: '',
 };
 
-export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdownPreviewParams) => {
+export const useMarkdownPreview = ({ repoPath, request, isActive, t, markdownText }: UseMarkdownPreviewParams) => {
   const [markdownPreview, setMarkdownPreview] = useState<MarkdownPreviewState>(EMPTY_MARKDOWN_PREVIEW);
   const requestGenerationRef = useRef(0);
 
   useLayoutEffect(() => {
     setMarkdownPreview(EMPTY_MARKDOWN_PREVIEW);
-  }, [repoPath, request]);
+  }, [markdownText, repoPath, request]);
 
   useEffect(() => {
     const requestGeneration = requestGenerationRef.current + 1;
@@ -53,25 +55,29 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
       setMarkdownPreview({ loading: true, error: null, html: '' });
 
       try {
-        const markdownResult = await gitClient.getMarkdownPreviewFile({
-          source: request.source,
-          path: request.path,
-          commitHash: request.commitHash,
-          repoPath: repoAtStart,
-        });
+        let sourceText = markdownText;
+        if (sourceText === undefined) {
+          const markdownResult = await gitClient.getMarkdownPreviewFile({
+            source: request.source,
+            path: request.path,
+            commitHash: request.commitHash,
+            repoPath: repoAtStart,
+          });
 
-        if (!markdownResult.success) {
-          if (isCurrentRequest()) {
-            setMarkdownPreview({
-              loading: false,
-              error: markdownResult.error || t('diffViewer.errors.markdownPreviewLoadFailed'),
-              html: '',
-            });
+          if (!markdownResult.success) {
+            if (isCurrentRequest()) {
+              setMarkdownPreview({
+                loading: false,
+                error: markdownResult.error || t('diffViewer.errors.markdownPreviewLoadFailed'),
+                html: '',
+              });
+            }
+            return;
           }
-          return;
+          sourceText = markdownResult.data.text;
         }
 
-        const initialHtml = renderMarkdownToSanitizedHtml(markdownResult.data.text);
+        const initialHtml = renderMarkdownToSanitizedHtml(sourceText);
         const imageSources = collectMarkdownPreviewImageSources(initialHtml);
         const dataUrlsBySource: Record<string, string> = {};
 
@@ -117,7 +123,7 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t }: UseMarkdo
     return () => {
       if (requestGenerationRef.current === requestGeneration) requestGenerationRef.current += 1;
     };
-  }, [isActive, repoPath, request, t]);
+  }, [isActive, markdownText, repoPath, request, t]);
 
   const handleMarkdownPreviewClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;

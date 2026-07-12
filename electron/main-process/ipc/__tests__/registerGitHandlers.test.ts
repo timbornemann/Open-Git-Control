@@ -120,6 +120,28 @@ describe('registerGitHandlers', () => {
     expect(gitService.getStatus).not.toHaveBeenCalled();
   });
 
+  it('returns an empty status for an explicit bare repository without invoking Git', async () => {
+    const gitService = {
+      getRepoPath: vi.fn(() => 'C:/bare-repo'),
+      isBareRepositoryAtPath: vi.fn(() => true),
+      runCommandAtPath: vi.fn(),
+      getStatus: vi.fn(),
+    } as any;
+
+    registerGitHandlers({
+      gitService,
+      secretScanService: { scanPushDiffs: vi.fn() } as any,
+      commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
+      workingTreeService: {} as any,
+      readSettingsWithMigration: vi.fn() as any,
+    });
+
+    const result = await handlers.get('git:command')!({ sender: { send: vi.fn() } }, 'status', '--porcelain=v2');
+
+    expect(result).toEqual({ success: true, data: '' });
+    expect(gitService.runCommandAtPath).not.toHaveBeenCalled();
+  });
+
   it('streams pull progress through job events', async () => {
     const send = vi.fn();
     const gitService = {

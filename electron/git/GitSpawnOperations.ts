@@ -3,6 +3,9 @@ import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult } f
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 
+const MAX_STREAM_LINE_BYTES = 1024 * 1024;
+const MAX_STREAM_OUTPUT_BYTES = 8 * 1024 * 1024;
+
 export class GitSpawnOperations {
   runBuffer(repoPath: string, args: string[], options: GitBufferRunOptions, signal: AbortSignal): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
@@ -165,24 +168,50 @@ export class GitSpawnOperations {
       });
       let pending = '';
       let stderr = '';
+      let settled = false;
       const abort = () => proc.kill();
       signal.addEventListener('abort', abort, { once: true });
 
+      const cleanup = () => signal.removeEventListener('abort', abort);
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        proc.kill();
+        reject(error);
+      };
+
       proc.stdout.on('data', (chunk: Buffer) => {
-        pending += chunk.toString('utf8');
-        let newlineIndex = pending.indexOf('\n');
+        if (settled) return;
+        const text = chunk.toString('utf8');
+        let start = 0;
+        let newlineIndex = text.indexOf('\n');
         while (newlineIndex >= 0) {
-          onLine(redactLine(pending.slice(0, newlineIndex).replace(/\r$/, '')));
-          pending = pending.slice(newlineIndex + 1);
-          newlineIndex = pending.indexOf('\n');
+          const linePart = text.slice(start, newlineIndex);
+          if (Buffer.byteLength(pending) + Buffer.byteLength(linePart) > MAX_STREAM_LINE_BYTES) {
+            fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
+            return;
+          }
+          onLine(redactLine(`${pending}${linePart}`.replace(/\r$/, '')));
+          pending = '';
+          start = newlineIndex + 1;
+          newlineIndex = text.indexOf('\n', start);
         }
+        const remaining = text.slice(start);
+        if (Buffer.byteLength(pending) + Buffer.byteLength(remaining) > MAX_STREAM_LINE_BYTES) {
+          fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
+          return;
+        }
+        pending += remaining;
       });
       proc.stderr.on('data', (chunk: Buffer) => {
         if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
       });
-      proc.on('error', reject);
+      proc.on('error', (error) => fail(error));
       proc.on('close', (code, closeSignal) => {
-        signal.removeEventListener('abort', abort);
+        if (settled) return;
+        settled = true;
+        cleanup();
         if (signal.aborted || closeSignal) {
           reject(createAbortError('Git stream was aborted.'));
           return;
@@ -204,22 +233,46 @@ export class GitSpawnOperations {
       const stderrPending = { value: '' };
       let stdout = '';
       let stderr = '';
+      let outputBytes = 0;
+      let settled = false;
       const abort = () => proc.kill();
       signal.addEventListener('abort', abort, { once: true });
 
+      const cleanup = () => signal.removeEventListener('abort', abort);
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        proc.kill();
+        reject(error);
+      };
+      const consume = (chunk: Buffer, pending: { value: string }, capture: (text: string) => void) => {
+        if (settled) return;
+        outputBytes += chunk.length;
+        if (outputBytes > MAX_STREAM_OUTPUT_BYTES) {
+          fail(new Error(`Git stream output exceeded the ${MAX_STREAM_OUTPUT_BYTES / 1024 / 1024} MB limit.`));
+          return;
+        }
+        if (!emitLines(chunk, pending, onLine, capture, MAX_STREAM_LINE_BYTES)) {
+          fail(new Error(`Git stream line exceeded the ${MAX_STREAM_LINE_BYTES / 1024 / 1024} MB limit.`));
+        }
+      };
+
       proc.stdout.on('data', (chunk: Buffer) => {
-        emitLines(chunk, stdoutPending, onLine, (text) => {
+        consume(chunk, stdoutPending, (text) => {
           stdout += text;
         });
       });
       proc.stderr.on('data', (chunk: Buffer) => {
-        emitLines(chunk, stderrPending, onLine, (text) => {
+        consume(chunk, stderrPending, (text) => {
           if (stderr.length < 256 * 1024) stderr += text;
         });
       });
-      proc.on('error', reject);
+      proc.on('error', (error) => fail(error));
       proc.on('close', (code, closeSignal) => {
-        signal.removeEventListener('abort', abort);
+        if (settled) return;
+        settled = true;
+        cleanup();
         if (signal.aborted || closeSignal) {
           reject(createAbortError('Git stream was aborted.'));
           return;
@@ -289,14 +342,22 @@ export class GitSpawnOperations {
   }
 }
 
-const emitLines = (chunk: Buffer, pendingRef: { value: string }, onLine: (line: string) => void, capture: (text: string) => void) => {
+const emitLines = (
+  chunk: Buffer,
+  pendingRef: { value: string },
+  onLine: (line: string) => void,
+  capture: (text: string) => void,
+  maxPendingBytes: number,
+): boolean => {
   const text = chunk.toString('utf8');
   capture(text);
 
   const parts = `${pendingRef.value}${text}`.split(/\r\n|\n|\r/);
   pendingRef.value = parts.pop() ?? '';
+  if (Buffer.byteLength(pendingRef.value) > maxPendingBytes) return false;
   for (const part of parts) {
     const line = part.trim();
     if (line) onLine(redactGitSensitiveText(line));
   }
+  return true;
 };

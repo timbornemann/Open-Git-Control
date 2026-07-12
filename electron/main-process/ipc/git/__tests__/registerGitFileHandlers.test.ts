@@ -144,4 +144,50 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(result).toEqual({ success: true });
     expect(openPathMock).toHaveBeenCalledWith(fs.realpathSync(path.join(repoPath, 'src')));
   });
+
+  it('adds an ignore rule by replacing a regular .gitignore atomically', async () => {
+    registerGitFileHandlers({
+      gitService: { getRepoPath: () => repoPath, runCommandAtPath: vi.fn().mockResolvedValue(repoPath) } as any,
+    });
+
+    const result = await handlers.get(IpcChannel.GitAddIgnoreRule)!({}, 'dist/', repoPath);
+
+    expect(result).toEqual({ success: true, added: true, pattern: 'dist/' });
+    expect(fs.readFileSync(path.join(repoPath, '.gitignore'), 'utf8')).toBe('dist/\n');
+  });
+
+  it('rejects a hard-linked .gitignore without changing its linked target', async () => {
+    const metadataPath = path.join(repoPath, '.git', 'config');
+    fs.mkdirSync(path.dirname(metadataPath));
+    fs.writeFileSync(metadataPath, '[core]\nrepositoryformatversion = 0\n');
+    fs.linkSync(metadataPath, path.join(repoPath, '.gitignore'));
+    registerGitFileHandlers({
+      gitService: { getRepoPath: () => repoPath, runCommandAtPath: vi.fn().mockResolvedValue(repoPath) } as any,
+    });
+
+    const result = await handlers.get(IpcChannel.GitAddIgnoreRule)!({}, 'dist/', repoPath);
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('hard links') });
+    expect(fs.readFileSync(metadataPath, 'utf8')).toBe('[core]\nrepositoryformatversion = 0\n');
+  });
+
+  it('re-authorizes the active repository after resolving the Git top level', async () => {
+    let activeRepository = repoPath;
+    const otherRepository = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-other-repository-'));
+    registerGitFileHandlers({
+      gitService: {
+        getRepoPath: () => activeRepository,
+        runCommandAtPath: vi.fn(async () => {
+          activeRepository = otherRepository;
+          return repoPath;
+        }),
+      } as any,
+    });
+
+    const result = await handlers.get(IpcChannel.GitAddIgnoreRule)!({}, 'dist/', repoPath);
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('active repository') });
+    expect(fs.existsSync(path.join(repoPath, '.gitignore'))).toBe(false);
+    fs.rmSync(otherRepository, { recursive: true, force: true });
+  });
 });

@@ -374,7 +374,7 @@ describe('SecretScanService', () => {
     const service = new SecretScanService(
       createGitServiceMock({
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
-        'rev-list --reverse --topo-order release-candidate --not --remotes=backup': commitHash,
+        'rev-list --reverse --topo-order release-candidate': commitHash,
         [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: branchDiff,
       }),
     );
@@ -417,7 +417,7 @@ describe('SecretScanService', () => {
     expect(result.findings[0]).toMatchObject({ filePath: '.env', lineNumber: 2, source: 'to-push' });
   });
 
-  it('honors remote push refspecs for a no-refspec push', async () => {
+  it('scans the full configured push source without trusting potentially stale remote-tracking refs', async () => {
     const commitHash = 'f'.repeat(40);
     const diff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
     const service = new SecretScanService(
@@ -426,7 +426,7 @@ describe('SecretScanService', () => {
         'symbolic-ref --quiet --short HEAD': 'main',
         remote: 'origin',
         'config --get-all remote.origin.push': 'refs/heads/release:refs/heads/release',
-        'rev-list --reverse --topo-order refs/heads/release --not --remotes=origin': commitHash,
+        'rev-list --reverse --topo-order refs/heads/release': commitHash,
         [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: diff,
       }),
     );
@@ -448,8 +448,8 @@ describe('SecretScanService', () => {
         'config --get push.default': 'matching',
         'for-each-ref --format=%(refname) refs/heads': 'refs/heads/main\nrefs/heads/feature',
         'for-each-ref --format=%(refname) refs/remotes/origin/': 'refs/remotes/origin/main\nrefs/remotes/origin/feature',
-        'rev-list --reverse --topo-order refs/heads/main --not --remotes=origin': '',
-        'rev-list --reverse --topo-order refs/heads/feature --not --remotes=origin': commitHash,
+        'rev-list --reverse --topo-order refs/heads/main': '',
+        'rev-list --reverse --topo-order refs/heads/feature': commitHash,
         [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: diff,
       }),
     );

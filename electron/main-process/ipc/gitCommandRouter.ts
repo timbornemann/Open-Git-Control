@@ -2,6 +2,7 @@ import type { GitService } from '../../GitService';
 import { assertAllowedGitCommand, createJobId, normalizeCommandArgs, type GitCommandName } from '../gitCommandPolicy';
 import { emitJobEvent } from './jobEvents';
 import { normalizeRepositoryRelativePath, toLiteralPathspec } from '../../git/RepositoryPathSafety';
+import { hasUnresolvedConflictMarkers } from '../../git/MergeConflictService';
 
 type GitCommandRouterEvent = {
   sender: any;
@@ -118,7 +119,7 @@ const executeCommitDetails: GitCommandExecutor = async (context) => {
 const executeConflictMarkResolved: GitCommandExecutor = async (context) => {
   const repoPath = context.repoPath || context.gitService.requireActiveRepoPath();
   const contents = await context.gitService.files.readRepoFileAtPath(repoPath, context.args[0]);
-  if (/^(?:<{7,}(?: .*)?|\|{7,}(?: .*)?|={7,}|>{7,}(?: .*)?)\r?$/m.test(contents)) {
+  if (hasUnresolvedConflictMarkers(contents)) {
     throw new Error('Conflict markers remain in the file. Resolve them before marking the file as resolved.');
   }
   return context.gitService.runCommandAtPath(repoPath, ['add', '--', toLiteralPathspec(context.args[0])]);
@@ -131,11 +132,13 @@ const executeSequencerCommand = (context: GitCommandExecutionContext, args: stri
 
 const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   status: async ({ gitService, args, repoPath }) =>
-    repoPath
-      ? gitService.runCommandAtPath(repoPath, ['status', ...(args.length > 0 ? args : ['--short'])])
-      : args.length > 0
-        ? gitService.runCommand(['status', ...args])
-        : gitService.getStatus(),
+    repoPath && gitService.isBareRepositoryAtPath?.(repoPath)
+      ? ''
+      : repoPath
+        ? gitService.runCommandAtPath(repoPath, ['status', ...(args.length > 0 ? args : ['--short'])])
+        : args.length > 0
+          ? gitService.runCommand(['status', ...args])
+          : gitService.getStatus(),
   statusPorcelain: async ({ gitService, repoPath }) => (repoPath ? gitService.getStatusPorcelainAtPath(repoPath) : gitService.getStatusPorcelain()),
   log: executeLog,
   branches: async (context) => runInContext(context, ['branch', '-a']),

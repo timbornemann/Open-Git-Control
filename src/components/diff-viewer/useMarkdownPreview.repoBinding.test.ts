@@ -52,4 +52,22 @@ describe('useMarkdownPreview repository binding', () => {
     expect(getAsset).toHaveBeenNthCalledWith(2, expect.objectContaining({ source: 'unstaged', repoPath: 'C:/repo-a' }));
     act(() => root.unmount());
   });
+
+  it('renders supplied working-directory text without reloading the saved file', async () => {
+    const getMarkdown = vi.spyOn(gitClient, 'getMarkdownPreviewFile');
+    const request = { source: 'unstaged' as const, path: 'docs/readme.md', title: 'README' };
+    const t = ((key: string) => key) as any;
+    let state: ReturnType<typeof useMarkdownPreview> | null = null;
+    const Harness = () => {
+      state = useMarkdownPreview({ repoPath: 'C:/repo-a', request, isActive: true, t, markdownText: '# Unsaved heading' });
+      return null;
+    };
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => root.render(createElement(Harness)));
+    await vi.waitFor(() => expect(state?.markdownPreview.loading).toBe(false));
+
+    expect(state?.markdownPreview.html).toContain('Unsaved heading');
+    expect(getMarkdown).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  });
 });

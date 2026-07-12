@@ -512,7 +512,13 @@ export class SecretScanService {
       );
 
     const excludedRemote = normalizeSecretScanRemote(pushPlan?.excludeRemote ?? options.excludeRemote);
-    const remoteExclusionArgs = excludedRemote ? ['--not', `--remotes=${excludedRemote}`] : pushPlan ? [] : ['--not', '--remotes'];
+    // A push guard must not trust remote-tracking refs to establish that a
+    // commit is already published. They can be stale after a force-push (or
+    // simply before the next fetch), which would otherwise exclude a commit
+    // that the pending push can publish again. For an explicit source, scan
+    // its full reachable history instead. The upstream fallback below remains
+    // precise because Git calculates that range from the selected upstream.
+    const remoteExclusionArgs = pushPlan || options.revisions?.length ? [] : excludedRemote ? ['--not', `--remotes=${excludedRemote}`] : ['--not', '--remotes'];
 
     const scanRequestedRevisions = async (revisions: string[]) => {
       for (const revision of revisions) {

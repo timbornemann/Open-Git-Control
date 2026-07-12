@@ -33,66 +33,84 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
   const [loading, setLoading] = React.useState(true);
   const [applying, setApplying] = React.useState(false);
   const licenseCheckGenerationRef = React.useRef(0);
+  const currentRepoPathRef = React.useRef(repoPath);
   const autoCollapsedRepositoryRef = React.useRef<string | null>(null);
+  // Update during render so a response from the previous repository can never
+  // win the render-to-effect gap while the selected repository is changing.
+  currentRepoPathRef.current = repoPath;
 
   React.useEffect(() => {
+    licenseCheckGenerationRef.current += 1;
     setProgramName(getRepositoryName(repoPath));
     setProgramDescription('');
     setCollapsed(false);
+    setExistingLicenseFile(null);
+    setExistingNoticeFile(null);
+    setLoading(true);
     autoCollapsedRepositoryRef.current = null;
   }, [repoPath]);
 
-  const refreshLicensePresence = React.useCallback(async () => {
-    const generation = licenseCheckGenerationRef.current + 1;
-    licenseCheckGenerationRef.current = generation;
-    if (!gitClient.isAvailable()) {
-      setLoading(false);
-      return;
-    }
-    const isCurrent = () => licenseCheckGenerationRef.current === generation;
-    const findExistingFile = async (candidates: string[]): Promise<string | null> => {
-      for (const filePath of candidates) {
-        const result = await gitClient.readRepoFile(filePath, repoPath);
-        if (!isCurrent()) return null;
-        if (result.success) return filePath;
+  const refreshLicensePresence = React.useCallback(
+    async (requestedRepoPath = repoPath) => {
+      if (requestedRepoPath !== currentRepoPathRef.current) return;
+      const generation = licenseCheckGenerationRef.current + 1;
+      licenseCheckGenerationRef.current = generation;
+      if (!gitClient.isAvailable()) {
+        if (currentRepoPathRef.current === requestedRepoPath) setLoading(false);
+        return;
       }
-      return null;
-    };
+      const isCurrent = () => licenseCheckGenerationRef.current === generation && currentRepoPathRef.current === requestedRepoPath;
+      const findExistingFile = async (candidates: string[]): Promise<string | null> => {
+        for (const filePath of candidates) {
+          const result = await gitClient.readRepoFile(filePath, requestedRepoPath);
+          if (!isCurrent()) return null;
+          if (result.success) return filePath;
+          // A missing candidate is expected; permission, authorization, and
+          // filesystem errors are not evidence that no license exists.
+          if (result.error && !/(?:\bENOENT\b|no such file|not found)/i.test(result.error)) throw new Error(result.error);
+        }
+        return null;
+      };
 
-    setLoading(true);
-    try {
-      const licenseFile = await findExistingFile(LICENSE_FILE_CANDIDATES);
-      if (!isCurrent()) return;
-      const noticeFile = await findExistingFile(NOTICE_FILE_CANDIDATES);
-      if (!isCurrent()) return;
-      setExistingLicenseFile(licenseFile);
-      setExistingNoticeFile(noticeFile);
-      if (licenseFile && autoCollapsedRepositoryRef.current !== repoPath) {
-        setCollapsed(true);
-        autoCollapsedRepositoryRef.current = repoPath;
+      setLoading(true);
+      try {
+        const licenseFile = await findExistingFile(LICENSE_FILE_CANDIDATES);
+        if (!isCurrent()) return;
+        const noticeFile = await findExistingFile(NOTICE_FILE_CANDIDATES);
+        if (!isCurrent()) return;
+        setExistingLicenseFile(licenseFile);
+        setExistingNoticeFile(noticeFile);
+        if (licenseFile && autoCollapsedRepositoryRef.current !== requestedRepoPath) {
+          setCollapsed(true);
+          autoCollapsedRepositoryRef.current = requestedRepoPath;
+        }
+      } catch (loadError: unknown) {
+        if (!isCurrent()) return;
+        setExistingLicenseFile(null);
+        setExistingNoticeFile(null);
+        onToast(loadError instanceof Error ? loadError.message : tr('Lizenz konnte nicht geprueft werden.', 'Could not check the license.'), true);
+      } finally {
+        if (isCurrent()) setLoading(false);
       }
-    } catch (loadError: unknown) {
-      if (!isCurrent()) return;
-      setExistingLicenseFile(null);
-      setExistingNoticeFile(null);
-      onToast(loadError instanceof Error ? loadError.message : tr('Lizenz konnte nicht geprueft werden.', 'Could not check the license.'), true);
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [onToast, repoPath, tr]);
+    },
+    [onToast, repoPath, tr],
+  );
 
   React.useEffect(() => {
-    void refreshLicensePresence();
+    void refreshLicensePresence(repoPath);
     return () => {
       licenseCheckGenerationRef.current += 1;
     };
-  }, [refreshLicensePresence]);
+  }, [refreshLicensePresence, repoPath]);
 
   const requirements = getLicenseTemplateRequirements(license);
   const requiresApplicationNotice = requirements.createsApplicationNotice;
 
   const writeLicense = async () => {
-    if (!gitClient.isAvailable() || applying) return;
+    const repoAtWrite = repoPath;
+    if (!gitClient.isAvailable() || applying || currentRepoPathRef.current !== repoAtWrite) return;
+    const existingLicenseAtWrite = existingLicenseFile;
+    const existingNoticeAtWrite = existingNoticeFile;
     let documents: ReturnType<typeof buildLicenseDocuments>;
     try {
       documents = buildLicenseDocuments(license, { copyrightHolder, programName, programDescription });
@@ -111,8 +129,8 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
     setApplying(true);
     let licenseWritten = false;
     try {
-      const targetPath = existingLicenseFile || 'LICENSE';
-      const licenseResult = await gitClient.writeRepoFile(targetPath, licenseDocument.content, repoPath);
+      const targetPath = existingLicenseAtWrite || 'LICENSE';
+      const licenseResult = await gitClient.writeRepoFile(targetPath, licenseDocument.content, repoAtWrite);
       if (!licenseResult.success) {
         onToast(licenseResult.error || tr('Lizenz konnte nicht gespeichert werden.', 'Could not save the license.'), true);
         return;
@@ -121,10 +139,10 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
 
       let noticeAction: 'created' | 'updated' | 'removed' | null = null;
       if (noticeDocument) {
-        const noticeResult = await gitClient.writeRepoFile(existingNoticeFile || 'NOTICE', noticeDocument.content, repoPath);
+        const noticeResult = await gitClient.writeRepoFile(existingNoticeAtWrite || 'NOTICE', noticeDocument.content, repoAtWrite);
         if (!noticeResult.success) {
           triggerRefresh();
-          void refreshLicensePresence();
+          void refreshLicensePresence(repoAtWrite);
           onToast(
             noticeResult.error ||
               tr('LICENSE wurde gespeichert, aber NOTICE konnte nicht aktualisiert werden.', 'LICENSE was saved, but NOTICE could not be updated.'),
@@ -132,12 +150,12 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
           );
           return;
         }
-        noticeAction = existingNoticeFile ? 'updated' : 'created';
-      } else if (existingNoticeFile) {
-        const noticeDeleteResult = await gitClient.deleteRepoFile(existingNoticeFile, repoPath);
+        noticeAction = existingNoticeAtWrite ? 'updated' : 'created';
+      } else if (existingNoticeAtWrite) {
+        const noticeDeleteResult = await gitClient.deleteRepoFile(existingNoticeAtWrite, repoAtWrite);
         if (!noticeDeleteResult.success) {
           triggerRefresh();
-          void refreshLicensePresence();
+          void refreshLicensePresence(repoAtWrite);
           onToast(
             noticeDeleteResult.error ||
               tr(
@@ -152,7 +170,7 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
       }
 
       triggerRefresh();
-      void refreshLicensePresence();
+      void refreshLicensePresence(repoAtWrite);
       onToast(
         noticeAction === 'created'
           ? tr('LICENSE und NOTICE wurden gespeichert.', 'LICENSE and NOTICE were saved.')
@@ -160,15 +178,15 @@ export const RepositoryLicensePanel: React.FC<RepositoryLicensePanelProps> = ({ 
             ? tr('LICENSE und NOTICE wurden aktualisiert.', 'LICENSE and NOTICE were updated.')
             : noticeAction === 'removed'
               ? tr('LICENSE wurde aktualisiert und NOTICE entfernt.', 'LICENSE was updated and NOTICE removed.')
-              : existingLicenseFile
-                ? tr(`${existingLicenseFile} wurde ersetzt.`, `${existingLicenseFile} was replaced.`)
+              : existingLicenseAtWrite
+                ? tr(`${existingLicenseAtWrite} wurde ersetzt.`, `${existingLicenseAtWrite} was replaced.`)
                 : tr('LICENSE wurde hinzugefuegt.', 'LICENSE was added.'),
         false,
       );
     } catch (writeError: unknown) {
       if (licenseWritten) {
         triggerRefresh();
-        void refreshLicensePresence();
+        void refreshLicensePresence(repoAtWrite);
       }
       onToast(writeError instanceof Error ? writeError.message : tr('Lizenz konnte nicht gespeichert werden.', 'Could not save the license.'), true);
     } finally {

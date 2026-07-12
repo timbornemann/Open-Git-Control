@@ -57,6 +57,53 @@ const findExistingParentPath = (targetPath: string): string => {
 const createSiblingTemporaryPath = (targetPath: string, purpose: string): string =>
   path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.ogc-${purpose}-${process.pid}-${randomUUID()}`);
 
+const lstatIfExists = (targetPath: string): fs.Stats | null => {
+  try {
+    return fs.lstatSync(targetPath);
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+};
+
+const readIgnoreFileSafely = (repoRoot: string): { targetPath: string; content: string; mode: number } => {
+  const targetPath = resolveRepositoryPathForCreate(repoRoot, '.gitignore', 'Ignore file');
+  const targetStats = lstatIfExists(targetPath);
+  if (!targetStats) {
+    return { targetPath, content: '', mode: 0o644 };
+  }
+  // Do not follow either kind of filesystem indirection. In particular,
+  // appendFile follows dangling links and mutates the target of hard links.
+  if (targetStats.isSymbolicLink()) throw new Error('Ignore file must not be a symbolic link.');
+  if (!targetStats.isFile()) throw new Error('Ignore file must be a regular file.');
+  if (targetStats.nlink > 1) throw new Error('Ignore file must not have hard links.');
+
+  const physicalTargetPath = resolveExistingRepositoryPath(repoRoot, '.gitignore', 'Ignore file');
+  const physicalStats = fs.lstatSync(physicalTargetPath);
+  if (!physicalStats.isFile() || physicalStats.isSymbolicLink() || physicalStats.nlink > 1) {
+    throw new Error('Ignore file must be an unlinked regular file.');
+  }
+  return { targetPath, content: fs.readFileSync(physicalTargetPath, 'utf-8'), mode: targetStats.mode & 0o777 };
+};
+
+const replaceIgnoreFileAtomically = (targetPath: string, content: string, mode: number): void => {
+  const temporaryPath = createSiblingTemporaryPath(targetPath, 'ignore');
+  let descriptor: number | null = null;
+  try {
+    descriptor = fs.openSync(temporaryPath, 'wx', mode);
+    fs.writeFileSync(descriptor, content, 'utf-8');
+    fs.fsyncSync(descriptor);
+    fs.closeSync(descriptor);
+    descriptor = null;
+    // Renaming replaces a link itself rather than following it, so even a
+    // concurrent path swap cannot redirect this write outside the repository.
+    fs.renameSync(temporaryPath, targetPath);
+  } finally {
+    if (descriptor !== null) fs.closeSync(descriptor);
+    if (lstatIfExists(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+  }
+};
+
 const restoreReplacedTarget = (targetPath: string, backupPath: string | null): boolean => {
   if (!backupPath || !fs.existsSync(backupPath)) return true;
   try {
@@ -403,8 +450,11 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       const selectedRepo = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
 
       const repoRoot = await gitService.runCommandAtPath(selectedRepo, ['rev-parse', '--show-toplevel']);
-      const gitignorePath = resolveRepositoryPathForCreate(repoRoot, '.gitignore');
-      const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf-8') : '';
+      // The Git command crossed an asynchronous boundary. Authorize again
+      // before any filesystem read or write so a repository switch cannot
+      // apply this operation to a repository the user has left.
+      requireActiveRepositoryPath(selectedRepo, gitService.getRepoPath());
+      const { targetPath: gitignorePath, content: existing, mode } = readIgnoreFileSafely(repoRoot);
       const existingRules = new Set(existing.split(/\r?\n/).filter((line) => line.length > 0));
 
       if (existingRules.has(normalizedPattern)) {
@@ -412,8 +462,8 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       }
 
       const needsLeadingNewline = existing.length > 0 && !existing.endsWith('\n') && !existing.endsWith('\r\n');
-      const nextContent = `${needsLeadingNewline ? '\n' : ''}${normalizedPattern}\n`;
-      fs.appendFileSync(gitignorePath, nextContent, 'utf-8');
+      const nextContent = `${existing}${needsLeadingNewline ? '\n' : ''}${normalizedPattern}\n`;
+      replaceIgnoreFileAtomically(gitignorePath, nextContent, mode);
       return { success: true, added: true, pattern: normalizedPattern };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

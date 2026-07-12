@@ -12,28 +12,40 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   const refreshedRunIds = useRef(new Set<string>());
   const activeRepoRef = useRef(activeRepo);
   const isConsoleOpenRef = useRef(isConsoleOpen);
+  const configRequestGenerationRef = useRef(0);
+  // A run event can arrive between committing a repository switch and its
+  // effect. Keep this identity current during render so that event cannot
+  // publish configuration from the repository that was just left.
+  activeRepoRef.current = activeRepo;
 
   useEffect(() => {
-    activeRepoRef.current = activeRepo;
+    configRequestGenerationRef.current += 1;
     isConsoleOpenRef.current = false;
     setConsoleOpen(false);
+    setActiveConfig(null);
   }, [activeRepo]);
 
-  const refreshConfig = useCallback(
-    async (repoPath = activeRepo) => {
-      if (!repoPath || !repositoryRunClient.isAvailable()) {
-        setActiveConfig(null);
-        return;
-      }
-      const result = await repositoryRunClient.getConfig(repoPath);
-      if (result.success && repoPath === activeRepo) setActiveConfig(result.data);
-    },
-    [activeRepo],
-  );
+  const refreshConfig = useCallback(async (requestedRepoPath?: string) => {
+    const repoPath = requestedRepoPath ?? activeRepoRef.current;
+    if (!repoPath || !repositoryRunClient.isAvailable()) {
+      if (repoPath === activeRepoRef.current) setActiveConfig(null);
+      return;
+    }
+    // Run-completion events can arrive after the user selected another
+    // repository. Those events must not start (or invalidate) a config read
+    // for the repository currently shown in the sidebar.
+    if (repoPath !== activeRepoRef.current) return;
+
+    const requestGeneration = configRequestGenerationRef.current + 1;
+    configRequestGenerationRef.current = requestGeneration;
+    const result = await repositoryRunClient.getConfig(repoPath);
+    if (requestGeneration !== configRequestGenerationRef.current || repoPath !== activeRepoRef.current) return;
+    setActiveConfig(result.success ? result.data : null);
+  }, []);
 
   useEffect(() => {
-    void refreshConfig();
-  }, [refreshConfig]);
+    void refreshConfig(activeRepo ?? undefined);
+  }, [activeRepo, refreshConfig]);
 
   useEffect(() => {
     if (!repositoryRunClient.isAvailable()) return;

@@ -470,6 +470,6 @@ describe('AiService context extraction and prompts', () => {
     await expect(run).rejects.toThrow(/Commit nicht erstellen.*pre-commit hook failed/i);
 
     const commitAttempts = runCommand.mock.calls.map((call) => (Array.isArray(call[0]) ? call[0][0] : '')).filter((command) => command === 'commit').length;
-    expect(commitAttempts).toBe(1);
+    expect(commitAttempts).toBe(8);
   });
 });
