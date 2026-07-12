@@ -53,6 +53,7 @@ beforeEach(() => {
   vi.stubGlobal('navigator', dom.window.navigator);
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
+  vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({ repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' });
   vi.spyOn(appClient, 'setStoredRepos').mockResolvedValue(true);
   vi.spyOn(appClient, 'clearRepoPath').mockResolvedValue(true);
   vi.spyOn(appClient, 'resolveRepoPath').mockImplementation(async (repoPath) => repoPath);
