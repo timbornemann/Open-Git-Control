@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type VirtualListProps<T> = {
   items: T[];
@@ -35,25 +35,36 @@ export function VirtualList<T>({
   const listRef = useRef<HTMLDivElement>(null);
   const viewportHeight = fillAvailableHeight ? Math.max(1, availableHeight) : Math.min(maxHeight, Math.max(rowHeight, items.length * rowHeight));
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!fillAvailableHeight) return;
 
     const listElement = listRef.current;
     if (!listElement) return;
 
-    const updateAvailableHeight = () => {
+    const updateAvailableHeight = (nextHeight: number) => {
+      if (nextHeight <= 0) return;
       setAvailableHeight((currentHeight) => {
-        const nextHeight = listElement.clientHeight;
         return currentHeight === nextHeight ? currentHeight : nextHeight;
       });
     };
 
-    updateAvailableHeight();
-    if (typeof ResizeObserver === 'undefined') return;
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries.find((candidate) => candidate.target === listElement);
+        if (entry) updateAvailableHeight(entry.contentRect.height);
+      });
+      observer.observe(listElement);
+      return () => observer.disconnect();
+    }
 
-    const observer = new ResizeObserver(updateAvailableHeight);
-    observer.observe(listElement);
-    return () => observer.disconnect();
+    // Legacy fallback: defer the layout read until after the commit rather than
+    // forcing style/layout synchronously from a layout effect.
+    if (typeof window.requestAnimationFrame === 'function') {
+      const frameId = window.requestAnimationFrame(() => updateAvailableHeight(listElement.clientHeight));
+      return () => window.cancelAnimationFrame(frameId);
+    }
+    const timeoutId = window.setTimeout(() => updateAvailableHeight(listElement.clientHeight), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [fillAvailableHeight]);
 
   const { startIndex, endIndex } = calculateVirtualRange(items.length, scrollTop, viewportHeight, rowHeight, overscan);

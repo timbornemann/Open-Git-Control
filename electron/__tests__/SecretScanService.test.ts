@@ -206,10 +206,7 @@ describe('SecretScanService', () => {
         'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
         'rev-parse --abbrev-ref --symbolic-full-name @{upstream}': 'origin/main',
         'rev-list --reverse --topo-order origin/main..HEAD': `${secretCommit}\n${removalCommit}`,
-        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${secretCommit}`]:
-          secretDiff,
-        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${removalCommit}`]:
-          removalDiff,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${secretCommit} ${removalCommit}`]: `${secretDiff}\n${removalDiff}`,
       }),
     );
 

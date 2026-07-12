@@ -171,7 +171,7 @@ describe('secret scan renderer approval', () => {
       runtime,
       false,
     );
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(120_000);
     await expect(guardResult).resolves.toBe(true);
 
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
@@ -185,5 +185,58 @@ describe('secret scan renderer approval', () => {
       undefined,
       expect.objectContaining({ expectedRepoPath: 'C:/repo', skipSecretScan: false }),
     );
+  });
+
+  it('allows a progressing scan to exceed the former fifteen-second deadline', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+    });
+    vi.spyOn(gitClient, 'scanPushSecrets').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                success: true,
+                data: {
+                  scanned: true,
+                  strictness: 'medium',
+                  findings: [],
+                  notes: ['Scanned a large history.'],
+                  stats: { checkedLines: 500, stagedLines: 0, toPushLines: 500, tagLines: 0 },
+                },
+              }),
+            20_000,
+          );
+        }),
+    );
+    const cancel = vi.spyOn(gitClient, 'cancelSecretScan');
+    const runtime = {
+      isRepoCurrent: vi.fn(() => true),
+      runRemoteAheadQuickFix: vi.fn(),
+      runWithOptions: vi.fn(),
+      setConfirmDialog: vi.fn(),
+      setGitActionToast: vi.fn(),
+      t: (key: string) => key,
+      tr: (_de: string, en: string) => en,
+    } as any;
+
+    const guardResult = runSecretScanGuard(
+      {
+        args: ['push', 'origin', 'main'],
+        command: 'push',
+        successMsg: 'pushed',
+        repoPath: 'C:/repo',
+      },
+      runtime,
+      false,
+    );
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    await expect(guardResult).resolves.toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(runtime.setConfirmDialog).not.toHaveBeenCalled();
   });
 });

@@ -243,7 +243,10 @@ const scanPushSecretsWithTimeout = async (
   repoPath: string,
   pushArgs?: string[],
 ): Promise<Awaited<ReturnType<typeof gitClient.scanPushSecrets>>> => {
-  const scanTimeoutMs = 15000;
+  // This is a last-resort hung-process deadline, not a performance budget.
+  // Large repositories can legitimately need more than the former 15 seconds
+  // even though the scan continues making progress locally.
+  const scanTimeoutMs = 120_000;
   let scanTimeoutId: number | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
     scanTimeoutId = window.setTimeout(() => reject(new Error('__timeout__')), scanTimeoutMs);

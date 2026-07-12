@@ -2,6 +2,10 @@ import type { GitService } from './GitService';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
+
+// Keep batched `git show` invocations well below Windows' command-line limit,
+// including SHA-256 object IDs and all fixed diff flags.
+const MAX_COMMITS_PER_DIFF_PROCESS = 96;
 type SecretSeverity = 'medium' | 'high' | 'critical';
 
 type PatternDefinition = {
@@ -474,14 +478,20 @@ export class SecretScanService {
     };
 
     const scanCommits = async (commits: string[], source: SecretScanSource) => {
+      const commitsToScan: string[] = [];
       for (const commitHash of commits) {
         if (scannedCommits.has(commitHash)) continue;
         scannedCommits.add(commitHash);
+        commitsToScan.push(commitHash);
+      }
+
+      for (let offset = 0; offset < commitsToScan.length; offset += MAX_COMMITS_PER_DIFF_PROCESS) {
         if (options.signal?.aborted) {
           const aborted = new Error('Secret scan was aborted.');
           aborted.name = 'AbortError';
           throw aborted;
         }
+        const batch = commitsToScan.slice(offset, offset + MAX_COMMITS_PER_DIFF_PROCESS);
         await streamDiff(
           [
             'show',
@@ -493,7 +503,7 @@ export class SecretScanService {
             '--unified=0',
             '--find-renames',
             '--find-copies',
-            commitHash,
+            ...batch,
           ],
           source,
         );

@@ -1,4 +1,4 @@
-import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { GraphLayout } from '@/utils/graphLayout';
 import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -34,6 +34,12 @@ type Params = {
 
 const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error || ''));
 const isGitOperationAborted = (error: unknown): boolean => /git operation was aborted/i.test(errorMessage(error));
+const requestDeferredFrame = (callback: FrameRequestCallback): number =>
+  typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(callback) : window.setTimeout(() => callback(performance.now()), 0);
+const cancelDeferredFrame = (id: number): void => {
+  if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(id);
+  else window.clearTimeout(id);
+};
 
 export const useCommitGraphData = ({
   repoPath,
@@ -66,6 +72,7 @@ export const useCommitGraphData = ({
   const requestGenerationRef = useRef(0);
   const abortRetryCountRef = useRef(0);
   const abortRetryTimeoutRef = useRef<number | null>(null);
+  const scrollRestoreFrameRef = useRef<number | null>(null);
   const updateLayout = useGraphLayoutEngine(setLayout);
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
@@ -83,6 +90,10 @@ export const useCommitGraphData = ({
       if (abortRetryTimeoutRef.current !== null) {
         window.clearTimeout(abortRetryTimeoutRef.current);
         abortRetryTimeoutRef.current = null;
+      }
+      if (scrollRestoreFrameRef.current !== null) {
+        cancelDeferredFrame(scrollRestoreFrameRef.current);
+        scrollRestoreFrameRef.current = null;
       }
     },
     [],
@@ -320,38 +331,49 @@ export const useCommitGraphData = ({
     commitCountRef.current = commitCount;
   }, [commitCount]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (pendingScrollTopRef.current === null) return;
-    const scrollContainer = logContainerRef.current?.parentElement;
-    if (!scrollContainer) {
+    scrollRestoreFrameRef.current = requestDeferredFrame(() => {
+      scrollRestoreFrameRef.current = null;
+      const scrollContainer = logContainerRef.current?.parentElement;
+      if (!scrollContainer) {
+        pendingScrollTopRef.current = null;
+        pendingScrollHeightRef.current = null;
+        pendingScrollModeRef.current = null;
+        onRepoClearedRef.current?.();
+        return;
+      }
+
+      const previousTop = pendingScrollTopRef.current;
+      const previousHeight = pendingScrollHeightRef.current;
+      const restoreMode = pendingScrollModeRef.current;
+      if (previousTop === null) return;
+
+      if (restoreMode === 'sync' && typeof previousHeight === 'number') {
+        const deltaHeight = scrollContainer.scrollHeight - previousHeight;
+        scrollContainer.scrollTop = Math.max(0, previousTop + deltaHeight);
+      } else {
+        scrollContainer.scrollTop = previousTop;
+      }
+
+      // A repository change can trigger several refreshes before any resulting
+      // layout commits. Keep every one of those refreshes pinned to the top; only
+      // release the marker after the first new layout was actually rendered.
+      if (restoreMode === 'reset') {
+        forceScrollToTopOnNextResetRef.current = false;
+      }
+
       pendingScrollTopRef.current = null;
       pendingScrollHeightRef.current = null;
       pendingScrollModeRef.current = null;
-      onRepoClearedRef.current?.();
-      return;
-    }
+    });
 
-    const previousTop = pendingScrollTopRef.current;
-    const previousHeight = pendingScrollHeightRef.current;
-    const restoreMode = pendingScrollModeRef.current;
-
-    if (restoreMode === 'sync' && typeof previousHeight === 'number') {
-      const deltaHeight = scrollContainer.scrollHeight - previousHeight;
-      scrollContainer.scrollTop = Math.max(0, previousTop + deltaHeight);
-    } else {
-      scrollContainer.scrollTop = previousTop;
-    }
-
-    // A repository change can trigger several refreshes before any resulting
-    // layout commits. Keep every one of those refreshes pinned to the top; only
-    // release the marker after the first new layout was actually rendered.
-    if (restoreMode === 'reset') {
-      forceScrollToTopOnNextResetRef.current = false;
-    }
-
-    pendingScrollTopRef.current = null;
-    pendingScrollHeightRef.current = null;
-    pendingScrollModeRef.current = null;
+    return () => {
+      if (scrollRestoreFrameRef.current !== null) {
+        cancelDeferredFrame(scrollRestoreFrameRef.current);
+        scrollRestoreFrameRef.current = null;
+      }
+    };
   }, [layout, logContainerRef]);
 
   useCommitGraphAutoLoad({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
 import type { GraphLayout } from '@/utils/graphLayout';
@@ -71,9 +71,9 @@ export const useCommitGraphViewport = ({
     [],
   );
 
-  const syncViewportMetrics = useCallback((container: HTMLElement) => {
+  const syncViewportMetrics = useCallback((container: HTMLElement, measuredHeight?: number) => {
     const nextTop = container.scrollTop;
-    const nextHeight = container.clientHeight;
+    const nextHeight = measuredHeight ?? container.clientHeight;
     setScrollTop((previous) => (previous === nextTop ? previous : nextTop));
     if (nextHeight > 0) {
       setContainerHeight((previous) => (previous === nextHeight ? previous : nextHeight));
@@ -94,7 +94,7 @@ export const useCommitGraphViewport = ({
     [logContainerRef, workingTreeStatus],
   );
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!layout) return;
     const container = logContainerRef.current?.parentElement;
     if (!container) return;
@@ -102,30 +102,29 @@ export const useCommitGraphViewport = ({
     const onScroll = () => {
       syncViewportMetrics(container);
     };
-    const onWindowResize = () => {
-      syncViewportMetrics(container);
-    };
-
-    syncViewportMetrics(container);
-    const rafId = window.requestAnimationFrame(() => {
-      syncViewportMetrics(container);
-    });
-
     let resizeObserver: ResizeObserver | null = null;
+    let initialFrameId: number | null = null;
+    let initialTimeoutId: number | null = null;
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => {
-        syncViewportMetrics(container);
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries.find((candidate) => candidate.target === container);
+        if (entry) syncViewportMetrics(container, entry.contentRect.height);
       });
       resizeObserver.observe(container);
+    } else {
+      if (typeof window.requestAnimationFrame === 'function') {
+        initialFrameId = window.requestAnimationFrame(() => syncViewportMetrics(container));
+      } else {
+        initialTimeoutId = window.setTimeout(() => syncViewportMetrics(container), 0);
+      }
     }
 
     container.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onWindowResize);
 
     return () => {
-      window.cancelAnimationFrame(rafId);
+      if (initialFrameId !== null) window.cancelAnimationFrame(initialFrameId);
+      if (initialTimeoutId !== null) window.clearTimeout(initialTimeoutId);
       container.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onWindowResize);
       resizeObserver?.disconnect();
     };
   }, [layout, logContainerRef, repoPath, syncViewportMetrics]);

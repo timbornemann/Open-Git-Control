@@ -138,4 +138,37 @@ describe('layout preferences', () => {
     expect(window.localStorage.getItem('open-git-control.inspector-pane-width')).toBe('392');
     hook.unmount();
   });
+
+  it('clamps the initial pane split from ResizeObserver without forcing a bounding-box read', () => {
+    let resizeCallback: ResizeObserverCallback | undefined;
+    let observedElement: Element | undefined;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallback = callback;
+        }
+        observe(target: Element) {
+          observedElement = target;
+        }
+        disconnect() {}
+      },
+    );
+    window.localStorage.setItem('open-git-control.inspector-pane-width', '400');
+    const boundingRect = vi.spyOn(window.HTMLElement.prototype, 'getBoundingClientRect');
+    let panes: ReturnType<typeof useMainViewPaneResizer> | null = null;
+    const root = createRoot(document.createElement('div'));
+    const Harness = () => {
+      panes = useMainViewPaneResizer();
+      return createElement('div', { ref: panes.contentAreaRef });
+    };
+
+    act(() => root.render(createElement(Harness)));
+    expect(boundingRect).not.toHaveBeenCalled();
+    act(() => {
+      resizeCallback?.([{ target: observedElement!, contentRect: { width: 1000 } } as ResizeObserverEntry], {} as ResizeObserver);
+    });
+    expect(panes!.primaryPaneBasis).toBe('59.20%');
+    act(() => root.unmount());
+  });
 });

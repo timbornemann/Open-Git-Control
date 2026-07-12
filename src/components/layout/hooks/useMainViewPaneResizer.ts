@@ -30,12 +30,15 @@ export const useMainViewPaneResizer = () => {
   const [isContentResizing, setIsContentResizing] = useState(false);
   const contentAreaRef = useRef<HTMLDivElement | null>(null);
   const contentResizeActiveRef = useRef(false);
+  const contentResizeRectRef = useRef<{ left: number; width: number } | null>(null);
   const preferredInspectorWidthRef = useRef<number | null>(preferredInspectorWidth);
 
   const primaryPaneBasis = `${(primaryPaneRatio * 100).toFixed(2)}%`;
 
   const handleContentResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const rect = contentAreaRef.current?.getBoundingClientRect();
+    contentResizeRectRef.current = rect && rect.width > 0 ? { left: rect.left, width: rect.width } : null;
     contentResizeActiveRef.current = true;
     setIsContentResizing(true);
     document.body.style.cursor = 'col-resize';
@@ -59,8 +62,9 @@ export const useMainViewPaneResizer = () => {
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
-      if (!contentResizeActiveRef.current || !contentAreaRef.current) return;
-      const rect = contentAreaRef.current.getBoundingClientRect();
+      if (!contentResizeActiveRef.current) return;
+      const rect = contentResizeRectRef.current;
+      if (!rect) return;
       if (rect.width <= 0) return;
 
       const minPrimaryPx = PRIMARY_PANE_MIN_WIDTH;
@@ -78,6 +82,7 @@ export const useMainViewPaneResizer = () => {
     const stopResize = () => {
       if (!contentResizeActiveRef.current) return;
       contentResizeActiveRef.current = false;
+      contentResizeRectRef.current = null;
       const nextPreferredInspectorWidth = preferredInspectorWidthRef.current;
       if (nextPreferredInspectorWidth !== null) {
         setPreferredInspectorWidth((previous) => (previous === nextPreferredInspectorWidth ? previous : nextPreferredInspectorWidth));
@@ -110,26 +115,37 @@ export const useMainViewPaneResizer = () => {
   }, [preferredInspectorWidth]);
 
   useEffect(() => {
-    const clampToCurrentWidth = () => {
-      if (!contentAreaRef.current) return;
-      const rect = contentAreaRef.current.getBoundingClientRect();
-      if (rect.width <= 0) return;
-
+    const clampToCurrentWidth = (containerWidth: number) => {
+      if (containerWidth <= 0) return;
       setPrimaryPaneRatio((previous) => {
         if (Number.isFinite(preferredInspectorWidth ?? NaN) && preferredInspectorWidth !== null) {
-          const desiredPrimaryPx = rect.width - preferredInspectorWidth - CONTENT_RESIZER_WIDTH;
-          const desiredRatio = desiredPrimaryPx / rect.width;
-          const clamped = clampPrimaryPaneRatio(desiredRatio, rect.width);
+          const desiredPrimaryPx = containerWidth - preferredInspectorWidth - CONTENT_RESIZER_WIDTH;
+          const desiredRatio = desiredPrimaryPx / containerWidth;
+          const clamped = clampPrimaryPaneRatio(desiredRatio, containerWidth);
           return Math.abs(previous - clamped) < 0.000_001 ? previous : clamped;
         }
-        const clamped = clampPrimaryPaneRatio(previous, rect.width);
+        const clamped = clampPrimaryPaneRatio(previous, containerWidth);
         return Math.abs(previous - clamped) < 0.000_001 ? previous : clamped;
       });
     };
 
-    clampToCurrentWidth();
-    window.addEventListener('resize', clampToCurrentWidth);
-    return () => window.removeEventListener('resize', clampToCurrentWidth);
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries.find((candidate) => candidate.target === contentArea);
+        if (entry) clampToCurrentWidth(entry.contentRect.width);
+      });
+      observer.observe(contentArea);
+      return () => observer.disconnect();
+    }
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      const frameId = window.requestAnimationFrame(() => clampToCurrentWidth(contentArea.getBoundingClientRect().width));
+      return () => window.cancelAnimationFrame(frameId);
+    }
+    const timeoutId = window.setTimeout(() => clampToCurrentWidth(contentArea.getBoundingClientRect().width), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [preferredInspectorWidth]);
 
   return {
