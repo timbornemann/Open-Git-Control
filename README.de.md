@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, Diff-Ansicht, Konfliktloesung, GitHub Pull Requests, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge und optionale KI-Unterstuetzung in einer lokalen Anwendung.
+Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, einen Working-Directory-Dateibaum mit Editor, Diff-Ansicht, Konfliktloesung, GitHub Pull Requests, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge, Repository-Run-Workflows und optionale KI-Unterstuetzung in einer lokalen Anwendung.
 
 Sprache: **Deutsch** | English version: [README.md](README.md)
 
@@ -20,7 +20,9 @@ Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client
 - Staging, Stash, Hunk-Diffs, Datei-Historie, Blame und Konfliktloesung in einem Workflow
 - GitHub-Login, Repository-Klonen/Forken, Pull Requests, CI-Status, Workflows und Release-Publishing
 - Projektplanung mit lokaler REST- und MCP-aehnlicher API fuer agentengestuetzte Arbeit
-- Optionale KI-Unterstuetzung ueber Ollama oder Google Gemini fuer Commit Messages, Auto-Commits und Release Notes
+- Working-Directory-Dateibaum mit sicheren In-App-Dateivorschauen und Bearbeitung sowie System-Dateiaktionen bei Bedarf
+- Repository-spezifische Run-Workflows fuer Tests, Formatieren, Starten und Bauen mit Live-Konsole
+- Optionale KI-Unterstuetzung durch Ollama, Google Gemini oder OpenAI fuer Commit-Nachrichten, Auto-Commits, Release Notes und Planner-Uebergaben
 - Secret-Scanning vor Commits und Pushes, Allowlist, Sicherheitsabfragen fuer gefaehrliche Aktionen und lokale verschluesselte Token-Speicherung, wenn vom OS unterstuetzt
 
 ## Downloads
@@ -47,7 +49,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 - Git muss installiert und im `PATH` verfuegbar sein.
 - GitHub CLI (`gh`) ist optional und nur fuer die One-click-GitHub-Login-Methode erforderlich.
-- Ollama oder ein Gemini API Key ist optional und nur fuer KI-Funktionen erforderlich.
+- Ollama, ein Gemini API Key oder ein OpenAI API Key ist optional und nur fuer KI-Funktionen erforderlich.
 - Entwicklung aus dem Quellcode benoetigt Node.js und npm. CI nutzt aktuell Node.js 20.
 
 ## Screenshots
@@ -90,6 +92,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - [Typische Workflows](#typische-workflows)
 - [Lokale Planning API und MCP](#lokale-planning-api-und-mcp)
 - [Git installieren](#git-installieren)
+- [Repository-Run-Kommandos](#repository-run-kommandos)
 - [Entwicklung](#entwicklung)
 - [Release Builds](#release-builds)
 - [Datenhaltung und Sicherheit](#datenhaltung-und-sicherheit)
@@ -102,11 +105,14 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 ### Repository- und Workspace-Management
 
 - Lokale Repositories oeffnen und als aktive Working Session setzen.
-- Ordner, die noch kein Git-Repository sind, mit `git init` initialisieren.
+- Ordner, die noch kein Git-Repository sind, mit `git init` initialisieren und dabei optional ein Start-README sowie eine Lizenz anlegen.
 - Persistenter Repository-Workspace mit zuletzt genutzten Repositories, Favoriten, aktivem Repo und Sortierung.
+- Gespeicherte Repositories ohne leeren Zwischenzustand wiederherstellen: das aktive Repository wird zuerst vorbereitet, waehrend die restlichen Eintraege im Hintergrund validiert werden.
 - Lokale Repositories suchen und nach zuletzt geoeffnet, Name, Erstellzeit, aufsteigend oder absteigend sortieren.
 - Repositories anpinnen, schliessen und schnell zwischen bekannten Repositories wechseln.
 - Nicht verfuegbare Repositories erkennen und fehlende Pfade sauber behandeln.
+- Repository-Ordner direkt aus Local Repositories oder dem Header des aktiven Repositories im Dateisystem anzeigen.
+- Vorhandene `LICENSE`-/`LICENCE`-Datei erkennen sowie Lizenzen aus gebuendelten, nachvollziehbaren SPDX-/Choose-a-License-Vorlagen anlegen oder ersetzen. Benoetigte Copyright-, Programmname-, Programmbeschreibung- und Apache/GNU-Notice-Felder werden vor dem Schreiben abgefragt.
 - Gespeicherte Layout-Groessen in den Settings zuruecksetzen.
 - Haupt-Sidebar und Graph/Inspector-Split vergroessern oder verkleinern.
 - Eingeklappte Sidebar-Panels pro Repository fuer Remotes, Branches, Tags und Submodule merken.
@@ -156,6 +162,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Upstream setzen (`-u`)
   - Force-with-lease
   - Tags pushen
+- Repository-spezifische Run-, Test-, Format-, Start- und Build-Workflows starten.
 - Codebase Timeline oeffnen.
 - Release Creator oeffnen.
 - Staging/Commit-Panel oeffnen.
@@ -243,6 +250,19 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Commit-Signoff standardmaessig in den Settings aktivieren.
 - Konfigurierbares Commit Template.
 - Commit mit `Ctrl+Enter` in Commit-Feldern ausfuehren.
+
+### Working Directory und Datei-Viewer
+
+- Rechten Inspector zwischen Staging Area und repositorygebundenem Working-Directory-Dateibaum umschalten.
+- Sichtbare Dateien und Ordner ohne `.git` oder weitere Dot-Entries durchsuchen; aufgeklappte Ordner bleiben beim Umschalten erhalten und werden lazy geladen.
+- Kontextaktionen fuer Dateien und Ordner: oeffnen, umbenennen, ausschneiden, kopieren, einfuegen, loeschen, im Dateisystem zeigen, extern oeffnen oder Anwendung waehlen. Copy/Cut/Paste bleibt im aktiven Repository, destruktive Aktionen verlangen eine Bestaetigung.
+- Dateien im Hauptbereich statt des Graphen oeffnen:
+  - editierbarer, syntaxhervorgehobener Text mit explizitem Speichern und `Ctrl/Cmd+S`
+  - Markdown-Editor und Vorschau
+  - sichere Bild- und SVG-Vorschau
+  - abgeschirmte HTML-/HTM-Vorschau
+  - History- und Blame-Tabs
+  - sichere Informationsansicht fuer Binaer- oder zu grosse Dateien mit System-Oeffnen-Aktionen
 
 ### Diff Viewer und Datei-Inspector
 
@@ -386,6 +406,9 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Projekte bearbeiten oder loeschen.
 - Zukuenftiges Projekt materialisieren: Parent-Verzeichnis waehlen, Projektordner erstellen, `git init` ausfuehren und Planning-Projekt verknuepft halten.
 - Beim Entfernen eines Repositories koennen verknuepfte Planungseintraege nach Bestaetigung mit entfernt werden.
+- Kontextmenues auf Planungseintraegen bieten schnelle Status-/Prioritaetsaenderungen, Loeschen, Agent-Prompt kopieren und (fuer Repository-Projekte) KI-Commit-Message-Erstellung.
+- Agentenfertigen Umsetzungs-Prompt fuer einen Eintrag oder alle aktuell sichtbaren Eintraege einer Status-Spalte kopieren. Spalten-Prompts behalten die sichtbare, nach Prioritaet sortierte Reihenfolge.
+- KI-Commit-Message aus einem Eintrag oder einer sichtbaren Status-Spalte generieren. Das Ergebnis wird als Commit-Entwurf des Repositories gespeichert und oeffnet die Staging-Ansicht.
 
 ### Lokale Planning API und MCP
 
@@ -460,6 +483,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Provider:
   - Ollama
   - Google Gemini
+  - OpenAI
 - Ollama Base URL konfigurieren.
 - Gemini API Key sicher speichern, ersetzen und entfernen, wenn OS-Verschluesselung verfuegbar ist.
 - Provider-Verbindung testen.
@@ -469,11 +493,12 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Conventional Commits
   - Plain
   - Detailed
-- Commit-Message-Sprache konfigurieren:
+- KI-Ausgabesprache fuer Commit-Nachrichten und Planner-Prompts konfigurieren:
   - Auto
   - Deutsch
   - Englisch
-- KI-Commit-Message aus Nutzerhinweisen generieren.
+- KI-Commit-Message aus Nutzerhinweisen oder repositorygebundenen Planner-Eintraegen generieren.
+- Statusbewusste KI-Agent-Prompts fuer Umsetzung, Bugfix, Fortsetzung, Entblockung oder Abschlusspruefung kopieren.
 - KI Auto-Commit:
   - analysiert den Working Tree
   - gruppiert geaenderte Dateien logisch
@@ -491,13 +516,12 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - External-Link-Policy oeffnet erlaubte URLs ueber den Main Process.
 - Diff-Preview-Policy normalisiert sichere Diff-Befehle.
 - Secret-Scan vor Commit und Push:
-  - scannt staged Diffs lokal vor einem Commit
-  - scannt staged Diffs
-  - scannt to-push Diffs
+  - scannt staged Diffs lokal vor einem Commit und den Push-Bereich erneut vor dem Push
   - kann Tags einbeziehen
   - unterstuetzt Abbruch
   - meldet Treffer mit Rule, Severity, Datei, Zeile und bereinigtem Kontext
-  - bietet Dialogaktionen zum Abbrechen, Fortfahren und Allowlisten betroffener Dateien
+  - nutzt app-eigene Dialoge zum Abbrechen, Fortfahren oder Hinzufuegen betroffener Dateien zur Allowlist
+  - formatiert GitHub-Push-Protection-Ablehnungen als handlungsorientierten Dialog mit relevanten Links und Hinweisen
 - Secret-Scan-Strengegrad:
   - low
   - medium
@@ -539,6 +563,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - AI Message Style/Language
   - Ollama URL
   - Gemini API Key
+  - OpenAI API Key und HTTPS-Base-URL
   - GitHub OAuth Client ID
 - API & MCP Settings:
   - Runtime API Status
@@ -561,6 +586,10 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - One-click Update
   - Release Notes
   - Job Center
+- Run Settings:
+  - repository-spezifische `.Open-Git-Control/run.json`-Konfiguration
+  - plattformspezifische Shell-Befehle und geordnete Workflow-Schritte
+  - erkannte Befehlsvorlagen und Output-Parser-Auswahl
 - Job Center verfolgt aktuelle Operationen wie:
   - clone
   - fetch
@@ -731,7 +760,7 @@ git config --global user.email "dein@email.de"
 
 ## Repository-Run-Kommandos
 
-Das **Run**-Menue neben Fetch startet repository-spezifische Test-, Format-, Start- und Build-Befehle. Die Konfiguration wird versioniert in `.Open-Git-Control/run.json` abgelegt; Befehle laufen nur nach einem expliziten Klick und immer mit dem Repository-Root als Arbeitsverzeichnis.
+Das **Run**-Menue in der Topbar startet repository-spezifische **Run**-, **Test**-, **Format**-, **Start**- und **Build**-Befehle. Die Konfiguration wird versioniert in `.Open-Git-Control/run.json` abgelegt; Befehle laufen nur nach einem expliziten Klick und immer mit dem Repository-Root als Arbeitsverzeichnis.
 
 ```json
 {
@@ -753,7 +782,9 @@ Das **Run**-Menue neben Fetch startet repository-spezifische Test-, Format-, Sta
 }
 ```
 
-Unter **Einstellungen → Run** lassen sich die fünf festen Aktionen bearbeiten, erkannte Vorlagen übernehmen und geordnete Workflows konfigurieren. Die In-App-Konsole behält die Roh-Ausgabe und wertet typische Test-, Lint- und Compiler-Diagnosen aus.
+Unter **Einstellungen -> Run** lassen sich die fuenf festen Aktionen bearbeiten, erkannte Vorlagen uebernehmen und geordnete Workflows konfigurieren. Vorlagen decken npm, pnpm, Yarn, Bun, Python, Rust, Go, .NET, Maven, Gradle, Flutter und CMake ab. Jeder Schritt kann PowerShell oder CMD unter Windows, zsh unter macOS und bash unter Linux verwenden.
+
+Es laeuft immer nur ein Workflow gleichzeitig. Er kann im Hintergrund weiterlaufen, ueber das Run-Menue erneut geoeffnet und in der App gestoppt werden. Die Konsole behaelt einen begrenzten Roh-Ausgabepuffer, einen ausgewerteten Probleme-Tab, eine Zusammenfassung sowie Kopieraktionen fuer Ausgabe und Probleme. Ein ungelesenes erfolgreiches Ergebnis faerbt den Run-Button gruen; ein ungelesenes fehlgeschlagenes Ergebnis rot, bis es geoeffnet wird.
 
 ## Entwicklung
 

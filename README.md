@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, diff inspection, conflict resolution, GitHub pull requests, releases, project planning, secret scanning, recovery tools, and optional AI assistance in one local-first application.
+Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, a working-directory file browser and editor, diff inspection, conflict resolution, GitHub pull requests, releases, project planning, secret scanning, recovery tools, repository run workflows, and optional AI assistance in one local-first application.
 
 Language: **English** | Deutsche Version: [README.de.md](README.de.md)
 
@@ -20,7 +20,9 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 - Staging, stash, hunk-based diffs, file history, blame, and conflict resolution in one workflow
 - GitHub authentication, repository cloning/forking, pull requests, CI status, workflows, and release publishing
 - Project planning board with local REST and MCP-style API for agent-assisted work
-- Optional AI support through Ollama or Google Gemini for commit messages, auto-commits, and release notes
+- Working-directory tree with safe in-app file previews and editing, plus native file-system actions when needed
+- Per-repository Run workflows for test, format, start, and build commands with a live console
+- Optional AI support through Ollama, Google Gemini, or OpenAI for commit messages, auto-commits, release notes, and planner hand-offs
 - Secret scanning before commits and pushes, allowlists, safe prompts for dangerous operations, and local encrypted token storage when available
 
 ## Downloads
@@ -47,7 +49,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 - Git must be installed and available in your `PATH`.
 - GitHub CLI (`gh`) is optional and only required for the one-click GitHub login method.
-- Ollama or a Gemini API key is optional and only required for AI features.
+- Ollama, a Gemini API key, or an OpenAI API key is optional and only required for AI features.
 - Development from source requires Node.js and npm. CI currently uses Node.js 20.
 
 ## Screenshots
@@ -90,6 +92,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - [Typical Workflows](#typical-workflows)
 - [Local Planning API and MCP](#local-planning-api-and-mcp)
 - [Install Git](#install-git)
+- [Repository Run Commands](#repository-run-commands)
 - [Development](#development)
 - [Release Builds](#release-builds)
 - [Data Storage and Security](#data-storage-and-security)
@@ -102,11 +105,14 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 ### Repository and Workspace Management
 
 - Open local repositories and set the active working session.
-- Initialize folders that are not yet Git repositories with `git init`.
+- Initialize folders that are not yet Git repositories with `git init`, optionally including a starter README and license.
 - Keep a persistent repository workspace with recent repositories, favorites, active repository, and sorting.
+- Restore stored repositories without an empty-state flash: the active repository is prepared first while the remaining entries are validated in the background.
 - Search and sort local repositories by last opened date, name, creation date, ascending, or descending order.
 - Pin repositories, close repositories, and switch between known repositories quickly.
 - Detect unavailable repositories and handle missing repository paths gracefully.
+- Reveal a repository folder directly from Local Repositories or the active repository header.
+- Detect an existing `LICENSE`/`LICENCE` file and add or replace a license from bundled, auditable SPDX/Choose a License templates. Required copyright, program-name, program-description, and Apache/GNU notice fields are collected before writing.
 - Reset stored layout dimensions from settings.
 - Resize the main sidebar and the graph/inspector split.
 - Persist collapsed sidebar panels per repository for remotes, branches, tags, and submodules.
@@ -156,6 +162,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - set upstream (`-u`)
   - force-with-lease
   - push tags
+- Run repository-specific Run, Test, Format, Start, and Build workflows.
 - Open the codebase timeline.
 - Open the release creator.
 - Open the staging/commit panel.
@@ -243,6 +250,19 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Enable commit signoff by default in settings.
 - Use a configurable commit template.
 - Commit with `Ctrl+Enter` in commit fields.
+
+### Working Directory and File Viewer
+
+- Switch the right inspector between the Staging Area and a repository-bound Working Directory tree.
+- Browse visible files and folders without exposing `.git` or other dot entries; expanded folders stay open while switching views and load lazily.
+- File and folder context actions: open, rename, cut, copy, paste, delete, reveal in the system file manager, open externally, or choose an application. Copy/cut/paste stays inside the active repository and destructive actions require confirmation.
+- Open files in the main pane instead of the graph:
+  - editable syntax-highlighted text with explicit save and `Ctrl/Cmd+S`
+  - Markdown editor and preview
+  - safe image and SVG previews
+  - sandboxed HTML/HTM preview
+  - file History and Blame tabs
+  - safe information view for binary or oversized files, with system-open actions
 
 ### Diff Viewer and File Inspector
 
@@ -386,6 +406,9 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Edit or delete projects.
 - Materialize a future project by selecting a parent directory, creating a project folder, running `git init`, and keeping the planning project linked.
 - Repository removal can also remove linked planning items after confirmation.
+- Context menus on planning items offer quick status/priority changes, delete, agent-prompt copy, and (for repository projects) AI commit-message generation.
+- Copy an agent-ready implementation prompt for one item or every currently visible item in a status column. Column prompts keep the visible order sorted by priority.
+- Generate an AI commit message from one item or a visible status column. The result is saved as the repository commit draft and opens the staging view.
 
 ### Local Planning API and MCP
 
@@ -460,6 +483,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Providers:
   - Ollama
   - Google Gemini
+  - OpenAI
 - Configure Ollama base URL.
 - Store, replace, and remove Gemini API key securely when OS encryption is available.
 - Test provider connection.
@@ -469,11 +493,12 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - Conventional Commits
   - plain
   - detailed
-- Configure commit-message language:
+- Configure AI output language for commit messages and planner prompts:
   - auto
   - German
   - English
-- Generate an AI commit message from user notes.
+- Generate an AI commit message from user notes or repository-backed planner items.
+- Copy status-aware AI agent prompts for planner implementation, bug fixing, continuation, unblocking, or completion review.
 - AI auto-commit:
   - analyzes the working tree
   - groups changed files logically
@@ -491,13 +516,12 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - External link policy opens allowed URLs through the main process.
 - Diff preview policy normalizes safe diff commands.
 - Secret scan before commit and push:
-  - scans staged diffs locally before a commit
-  - scans staged diffs
-  - scans to-push diffs
+  - scans staged diffs locally before a commit and scans the push range again before push
   - can include tags
   - supports cancellation
   - reports findings with rule, severity, file, line, and sanitized context
-  - offers dialog actions to cancel, continue, or allowlist affected files
+  - uses app-native dialogs to cancel, continue, or add affected files to the allowlist
+  - formats GitHub Push Protection rejections into an actionable dialog with the relevant links and remediation guidance
 - Secret scan strictness:
   - low
   - medium
@@ -539,6 +563,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - AI message style/language
   - Ollama URL
   - Gemini API key
+  - OpenAI API key and HTTPS base URL
   - GitHub OAuth Client ID
 - API & MCP settings:
   - runtime API status
@@ -561,6 +586,10 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - one-click update
   - release notes
   - job center
+- Run settings:
+  - per-repository `.Open-Git-Control/run.json` configuration
+  - platform-specific shell commands and ordered workflow steps
+  - recognised command templates and output parser selection
 - Job Center tracks recent operations such as:
   - clone
   - fetch
@@ -731,7 +760,7 @@ git config --global user.email "your@email.com"
 
 ## Repository run commands
 
-The **Run** menu next to Fetch can run repository-specific Test, Format, Start and Build commands. Configuration is versioned in `.Open-Git-Control/run.json`; commands execute only after an explicit click and always use the repository root as their working directory.
+The **Run** menu in the top bar can run repository-specific **Run**, **Test**, **Format**, **Start**, and **Build** commands. Configuration is versioned in `.Open-Git-Control/run.json`; commands execute only after an explicit click and always use the repository root as their working directory.
 
 ```json
 {
@@ -753,7 +782,9 @@ The **Run** menu next to Fetch can run repository-specific Test, Format, Start a
 }
 ```
 
-Use **Settings → Run** to edit the five fixed actions, select recognised templates and configure ordered workflows. The in-app console preserves raw output and provides parsers for common test, lint and compiler diagnostics.
+Use **Settings -> Run** to edit the five fixed actions, select recognised templates, and configure ordered workflows. Templates cover npm, pnpm, Yarn, Bun, Python, Rust, Go, .NET, Maven, Gradle, Flutter, and CMake projects. Each step can use PowerShell or CMD on Windows, zsh on macOS, and bash on Linux.
+
+Only one workflow runs at a time. It can continue in the background, be reopened from the Run menu, and be stopped from the app. The console keeps a bounded raw-output buffer, a parsed Problems tab, a Summary tab, and copy actions for both output and problems. An unread successful result turns the Run button green; an unread failed result turns it red until opened.
 
 ## Development
 
