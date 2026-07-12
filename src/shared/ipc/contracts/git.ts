@@ -18,6 +18,7 @@ import type {
 import type { GitCommandName } from '../gitCommands';
 import type { GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
+import type { LicenseTemplateId } from '../../licenseTemplates';
 
 export type RepoUnavailablePayloadDto = {
   repoPath: string;
@@ -86,7 +87,16 @@ export type GitCloneResultDto = {
 export type GitInitResultDto = {
   success: boolean;
   data?: string;
+  createdFiles?: string[];
   error?: string;
+};
+
+export type RepositoryInitializationOptionsDto = {
+  createReadme?: boolean;
+  license?: LicenseTemplateId;
+  copyrightHolder?: string;
+  programName?: string;
+  programDescription?: string;
 };
 
 export type RepoFileReadResultDto = {
@@ -96,6 +106,11 @@ export type RepoFileReadResultDto = {
 };
 
 export type RepoFileWriteResultDto = {
+  success: boolean;
+  error?: string;
+};
+
+export type RepoFileDeleteResultDto = {
   success: boolean;
   error?: string;
 };
@@ -154,7 +169,7 @@ export interface ElectronGitAPI {
   approveSecretScanPush: (pushArgs: string[] | undefined, repoPath: string) => Promise<{ success: boolean }>;
   cancelSecretScan: (repoPath: string) => Promise<{ success: boolean; cancelled: boolean; error?: string }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;
-  gitInit: (repoPath: string) => Promise<GitInitResultDto>;
+  gitInit: (repoPath: string, options?: RepositoryInitializationOptionsDto) => Promise<GitInitResultDto>;
   getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) => Promise<IpcResult<GitFileHistoryEntryDto[]>>;
   getFileBlame: (filePath: string, commitHash?: string, repoPath?: string, source?: FileBlameSourceDto) => Promise<IpcResult<GitFileBlameLineDto[]>>;
   getFileTimelineData: (limit?: number, repoPath?: string) => Promise<IpcResult<FileTimelineCommitDto[]>>;
@@ -162,6 +177,7 @@ export interface ElectronGitAPI {
   getMarkdownPreviewFile: (params: RepositoryFileRequestDto) => Promise<IpcResult<MarkdownPreviewFileDto>>;
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;
   writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
+  deleteRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileDeleteResultDto>;
   openRepositoryPath: (params: OpenRepositoryPathParamsDto) => Promise<OpenRepositoryPathResultDto>;
   openSubmodule: (submodulePath: string, repoPath?: string) => Promise<OpenSubmoduleResultDto>;
   onCloneProgress: (callback: (line: string) => void) => () => void;

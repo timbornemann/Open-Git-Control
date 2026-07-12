@@ -5,6 +5,7 @@ import { BranchPanel } from '@/components/sidebar/BranchPanel';
 import { TagPanel } from '@/components/sidebar/TagPanel';
 import { RemotePanel } from '@/components/sidebar/RemotePanel';
 import { SubmodulePanel } from '@/components/sidebar/SubmodulePanel';
+import { RepositoryLicensePanel } from '@/components/sidebar/RepositoryLicensePanel';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from '@/components/sidebar/RepoCard';
 import { RepoGithubActionsContent } from './RepoGithubActionsContent';
 import { useI18n } from '@/i18n';
@@ -178,6 +179,8 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
         collapsed={props.isRemotePanelCollapsed}
         onToggleCollapsed={props.onToggleRemotePanelCollapsed}
       />
+
+      <RepositoryLicensePanel repoPath={props.activeRepo} />
 
       <BranchPanel
         branches={props.branches}

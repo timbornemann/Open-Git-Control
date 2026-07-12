@@ -13,6 +13,7 @@ import type {
 } from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
+import type { RepositoryInitializationOptionsDto } from '../../src/shared/ipc/contracts/git';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -169,7 +170,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     // Clone is not an operation on the selected repository; a target-path
     // failure must never evict whichever repository is currently open.
     gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => ipcRenderer.invoke(IpcChannel.GitClone, cloneUrl, targetDir, targetName),
-    gitInit: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'init', IpcChannel.GitInit, repoPath),
+    gitInit: (repoPath: string, options?: RepositoryInitializationOptionsDto) =>
+      invokeGitOperationForRepo(repoPath, 'init', IpcChannel.GitInit, repoPath, options),
     getFileHistory: (filePath: string, commitHash?: string, limit?: number, repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'log', IpcChannel.GitFileHistory, filePath, commitHash, limit, repoPath)
@@ -198,6 +200,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'write', IpcChannel.GitWriteRepoFile, filePath, content, repoPath)
         : invokeGitOperation('write', IpcChannel.GitWriteRepoFile, filePath, content),
+    deleteRepoFile: (filePath: string, repoPath?: string) =>
+      repoPath
+        ? invokeGitOperationForRepo(repoPath, 'delete', IpcChannel.GitDeleteRepoFile, filePath, repoPath)
+        : invokeGitOperation('delete', IpcChannel.GitDeleteRepoFile, filePath),
     openRepositoryPath: (params: { path?: string; action: 'reveal' | 'open' | 'openWith'; repoPath?: string }) =>
       params.repoPath
         ? invokeGitOperationForRepo(params.repoPath, 'open path', IpcChannel.GitOpenRepositoryPath, params)
@@ -357,6 +363,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getMarkdownPreviewFile: flatApi.getMarkdownPreviewFile,
       getRepoFileDataUrl: flatApi.getRepoFileDataUrl,
       writeRepoFile: flatApi.writeRepoFile,
+      deleteRepoFile: flatApi.deleteRepoFile,
       openRepositoryPath: flatApi.openRepositoryPath,
       openSubmodule: flatApi.openSubmodule,
       onCloneProgress: flatApi.onCloneProgress,

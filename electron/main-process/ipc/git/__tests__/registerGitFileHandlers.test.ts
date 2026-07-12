@@ -43,6 +43,26 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(showItemInFolderMock).toHaveBeenCalledWith(fs.realpathSync(path.join(repoPath, 'src', 'app.ts')));
   });
 
+  it('deletes only a file in the active repository', async () => {
+    const deleteRepoFileAtPath = vi.fn().mockResolvedValue(undefined);
+    registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, files: { deleteRepoFileAtPath } } as any });
+
+    const result = await handlers.get(IpcChannel.GitDeleteRepoFile)!({}, 'NOTICE', repoPath);
+
+    expect(result).toEqual({ success: true });
+    expect(deleteRepoFileAtPath).toHaveBeenCalledWith(repoPath, 'NOTICE');
+  });
+
+  it('rejects deletion paths that leave the repository', async () => {
+    const deleteRepoFileAtPath = vi.fn().mockRejectedValue(new Error('File path must be repository-relative.'));
+    registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, files: { deleteRepoFileAtPath } } as any });
+
+    const result = await handlers.get(IpcChannel.GitDeleteRepoFile)!({}, '../NOTICE', repoPath);
+
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('repository-relative') });
+    expect(deleteRepoFileAtPath).toHaveBeenCalledWith(repoPath, '../NOTICE');
+  });
+
   it('opens the repository root when no relative path is supplied', async () => {
     const result = await handlers.get(IpcChannel.GitOpenRepositoryPath)!({}, { action: 'open', repoPath });
 

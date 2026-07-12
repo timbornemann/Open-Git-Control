@@ -136,6 +136,25 @@ describe('createElectronApi', () => {
     });
   });
 
+  it('forwards repository initialization scaffolding options', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const options = { createReadme: true, license: 'MIT' as const, copyrightHolder: 'Example Organization' };
+
+    await api.git.gitInit('C:/new-repository', options);
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitInit, 'C:/new-repository', options);
+  });
+
+  it('pins repository-file deletion to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.deleteRepoFile('NOTICE', 'C:/captured-repo');
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitDeleteRepoFile, 'NOTICE', 'C:/captured-repo');
+  });
+
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

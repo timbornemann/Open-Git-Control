@@ -61,3 +61,47 @@
   margin: 4px 0;
   background: var(--border-color);
 }
+
+.repo-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.repo-license-content {
+  gap: 5px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.repo-license-summary,
+.repo-license-help {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.repo-license-help {
+  padding: 5px 6px;
+  border-left: 2px solid var(--accent-primary-border);
+  background: color-mix(in srgb, var(--accent-primary-soft) 56%, transparent);
+}
+
+.repo-license-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--status-warning);
+}
+
+.repo-license-indicator.is-present {
+  background: var(--status-success);
+}
+
+.repo-license-submit {
+  min-height: 28px;
+  padding: 5px 8px;
+  font-size: 0.74rem;
+}

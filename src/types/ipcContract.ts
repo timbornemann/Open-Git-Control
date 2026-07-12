@@ -48,6 +48,7 @@ export const enum IpcChannel {
   GitStashBranch = 'git:stashBranch',
   GitWorkingTreeSnapshot = 'git:workingTreeSnapshot',
   GitWorkingTreeStats = 'git:workingTreeStats',
+  GitDeleteRepoFile = 'git:deleteRepoFile',
   GitWriteRepoFile = 'git:writeRepoFile',
   GithubAuth = 'github:auth',
   GithubCancelAuth = 'github:cancelAuth',

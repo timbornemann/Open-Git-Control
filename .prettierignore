@@ -9,3 +9,4 @@ build/
 
 *.ico
 *.png
+src/shared/generated/

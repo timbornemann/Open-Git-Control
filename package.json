@@ -25,6 +25,7 @@
     "format:check": "prettier --check .",
     "legal:prepare": "node scripts/prepare-distribution-legal-files.js",
     "legal:check": "node scripts/prepare-distribution-legal-files.js --check",
+    "licenses:update": "node scripts/update-spdx-license-texts.js",
     "dist": "npm run legal:prepare && npm run build && electron-builder --publish never",
     "dist:win": "npm run legal:prepare && npm run build && electron-builder --win nsis --x64 --publish never",
     "dist:linux": "npm run legal:prepare && npm run build && electron-builder --linux AppImage deb --x64 --publish never",

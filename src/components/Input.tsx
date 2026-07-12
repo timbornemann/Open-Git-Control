@@ -33,7 +33,7 @@ export const Input: React.FC<InputProps> = ({
   onCancel,
 }) => {
   const [values, setValues] = useState<Record<string, string>>({});
-  const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
   const { t, tr } = useI18n();
 
   const initialValues = useMemo(() => {
@@ -51,6 +51,7 @@ export const Input: React.FC<InputProps> = ({
 
   const validationError = useMemo(() => {
     for (const field of fields) {
+      if (field.visible && !field.visible(values)) continue;
       const value = values[field.id] ?? '';
       if (field.required && !value.trim()) {
         return tr(`Bitte "${field.label}" ausfüllen.`, `Please fill "${field.label}".`);
@@ -92,29 +93,60 @@ export const Input: React.FC<InputProps> = ({
         </dl>
       )}
       <div className="dialog-inputs">
-        {fields.map((field, index) => (
-          <label key={field.id} className="dialog-field">
-            <span>{field.label}</span>
-            {field.multiline ? (
-              <textarea
-                ref={index === 0 ? (firstInputRef as React.RefObject<HTMLTextAreaElement>) : undefined}
-                placeholder={field.placeholder}
-                value={values[field.id] ?? ''}
-                onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
-                rows={field.rows ?? 3}
-              />
-            ) : (
-              <input
-                ref={index === 0 ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
-                type={field.type ?? 'text'}
-                placeholder={field.placeholder}
-                value={values[field.id] ?? ''}
-                onChange={(event) => setValues((prev) => ({ ...prev, [field.id]: event.target.value }))}
-              />
-            )}
-            {field.helperText && <small>{field.helperText}</small>}
-          </label>
-        ))}
+        {fields.map((field, index) => {
+          if (field.visible && !field.visible(values)) return null;
+          const setValue = (value: string) => setValues((prev) => ({ ...prev, [field.id]: value }));
+          if (field.type === 'checkbox') {
+            return (
+              <label key={field.id} className="dialog-field dialog-checkbox-field">
+                <input
+                  ref={index === 0 ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                  type="checkbox"
+                  checked={(values[field.id] ?? '') === 'true'}
+                  onChange={(event) => setValue(event.target.checked ? 'true' : 'false')}
+                />
+                <span>{field.label}</span>
+                {field.helperText && <small>{field.helperText}</small>}
+              </label>
+            );
+          }
+
+          return (
+            <label key={field.id} className="dialog-field">
+              <span>{field.label}</span>
+              {field.multiline ? (
+                <textarea
+                  ref={index === 0 ? (firstInputRef as React.RefObject<HTMLTextAreaElement>) : undefined}
+                  placeholder={field.placeholder}
+                  value={values[field.id] ?? ''}
+                  onChange={(event) => setValue(event.target.value)}
+                  rows={field.rows ?? 3}
+                />
+              ) : field.type === 'select' ? (
+                <select
+                  ref={index === 0 ? (firstInputRef as React.RefObject<HTMLSelectElement>) : undefined}
+                  value={values[field.id] ?? ''}
+                  onChange={(event) => setValue(event.target.value)}
+                >
+                  {(field.options || []).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  ref={index === 0 ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                  type={field.type ?? 'text'}
+                  placeholder={field.placeholder}
+                  value={values[field.id] ?? ''}
+                  onChange={(event) => setValue(event.target.value)}
+                />
+              )}
+              {field.helperText && <small>{field.helperText}</small>}
+            </label>
+          );
+        })}
       </div>
       {validationError && <div className="dialog-validation">{validationError}</div>}
       <div className="dialog-impact">

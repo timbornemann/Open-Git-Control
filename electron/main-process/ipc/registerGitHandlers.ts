@@ -18,6 +18,7 @@ import { emitJobEvent, sendToWebContents } from './jobEvents';
 import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { readStoreData } from '../repoStore';
+import { normalizeRepositoryInitializationOptions, scaffoldInitializedRepository } from '../../git/RepositoryScaffolding';
 
 type RegisterGitHandlersDeps = {
   gitService: GitService;
@@ -355,18 +356,20 @@ export function registerGitHandlers({
     return result;
   });
 
-  ipcMain.handle(IpcChannel.GitInit, async (_event: any, repoPath: string) => {
+  ipcMain.handle(IpcChannel.GitInit, async (_event: any, repoPath: string, options?: unknown) => {
     try {
       const normalizedPath = String(repoPath || '').trim();
       if (!normalizedPath) {
         return { success: false, error: 'Repository path is required.' };
       }
+      const initializationOptions = options === undefined ? null : normalizeRepositoryInitializationOptions(options);
       const out = await gitService.runCommandAtPath(normalizedPath, ['init']);
+      const createdFiles = initializationOptions ? scaffoldInitializedRepository(normalizedPath, initializationOptions) : undefined;
       // Initializing an explicit target is not a repository-selection action.
       // The renderer performs a sequenced GitSetRepo only after this succeeds;
       // switching here could overwrite a newer user-selected repository while
       // `git init` was still running.
-      return { success: true, data: out };
+      return createdFiles ? { success: true, data: out, createdFiles } : { success: true, data: out };
     } catch (error: any) {
       return { success: false, error: error.message };
     }

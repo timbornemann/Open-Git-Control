@@ -94,6 +94,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   triggerRefresh: state.triggerRefresh,
   commitRefreshTrigger: state.commitRefreshTrigger,
   triggerCommitRefresh: state.triggerCommitRefresh,
+  onToast: (message, isError) => state.setGitActionToast({ msg: message, isError }),
   showSecondaryHistory: state.settings.showSecondaryHistory,
   onMergeBranch: state.handleMergeBranch,
   onOpenRepoWorkspace: () => state.setActiveTab('repo'),

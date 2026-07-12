@@ -119,6 +119,7 @@ export const useAppState = () => {
   const workspace = useWorkspaceDomain({
     triggerRefresh,
     setConfirmDialog,
+    setInputDialog,
     setGitActionToast,
     onRepoActivated: resetRepoScopedUi,
     onNoActiveRepo: resetRepoScopedUi,

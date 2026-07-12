@@ -412,6 +412,10 @@ export const gitClient = {
     return result;
   },
 
+  async deleteRepoFile(...args: Parameters<ElectronAPI['deleteRepoFile']>): ReturnType<ElectronAPI['deleteRepoFile']> {
+    return requireElectronGitApi().deleteRepoFile(...args);
+  },
+
   async openRepositoryPath(...args: Parameters<ElectronAPI['openRepositoryPath']>): ReturnType<ElectronAPI['openRepositoryPath']> {
     return requireElectronGitApi().openRepositoryPath(...args);
   },

@@ -349,6 +349,11 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.gitPush(), api.git.gitPush, []);
     await expectDelegation(() => gitClient.gitClone({ url: 'x' } as any), api.git.gitClone, [{ url: 'x' }]);
     await expectDelegation(() => gitClient.gitInit('C:/repo' as any), api.git.gitInit, ['C:/repo']);
+    await expectDelegation(
+      () => gitClient.gitInit('C:/repo', { createReadme: true, license: 'MIT', copyrightHolder: 'Example Organization' }),
+      api.git.gitInit,
+      ['C:/repo', { createReadme: true, license: 'MIT', copyrightHolder: 'Example Organization' }],
+    );
     await expectDelegation(() => gitClient.getFileHistory('a.ts' as any), api.git.getFileHistory, ['a.ts']);
     await expectDelegation(() => gitClient.getFileBlame('a.ts' as any), api.git.getFileBlame, ['a.ts']);
     await expectDelegation(() => gitClient.getFileTimelineData('a.ts' as any), api.git.getFileTimelineData, ['a.ts']);
@@ -356,6 +361,7 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.getMarkdownPreviewFile('README.md' as any), api.git.getMarkdownPreviewFile, ['README.md']);
     await expectDelegation(() => gitClient.getRepoFileDataUrl('logo.png' as any), api.git.getRepoFileDataUrl, ['logo.png']);
     await expectDelegation(() => gitClient.writeRepoFile({ path: 'a.ts' } as any), api.git.writeRepoFile, [{ path: 'a.ts' }]);
+    await expectDelegation(() => gitClient.deleteRepoFile('NOTICE', 'C:/repo'), api.git.deleteRepoFile, ['NOTICE', 'C:/repo']);
     await expectDelegation(() => gitClient.openSubmodule('libs/a' as any), api.git.openSubmodule, ['libs/a']);
     await expectDelegation(() => gitClient.onCloneProgress(vi.fn()), api.git.onCloneProgress, [expect.any(Function)]);
   });

@@ -35,6 +35,7 @@ export type RepositoryContextValue = RepositoryStateContract & {
   triggerRefresh: () => void;
   commitRefreshTrigger: number;
   triggerCommitRefresh: () => void;
+  onToast: (message: string, isError: boolean) => void;
   showSecondaryHistory: boolean;
   onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   onOpenRepoWorkspace: () => void;

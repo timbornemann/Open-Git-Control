@@ -4,12 +4,15 @@ import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
-import type { AppTabId } from '@/app/state/contracts';
+import type { AppTabId, InputDialogState } from '@/app/state/contracts';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { getLicenseTemplateRequirements, LICENSE_TEMPLATE_OPTIONS, isLicenseTemplateId } from '@/shared/licenseTemplates';
+import type { Dispatch, SetStateAction } from 'react';
 
 type Params = {
   triggerRefresh: () => void;
   setConfirmDialog: (state: ConfirmDialogState | null) => void;
+  setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
   setGitActionToast: (toast: { msg: string; isError: boolean }) => void;
   onRepoActivated: () => void;
   onNoActiveRepo: () => void;
@@ -92,7 +95,22 @@ const sortRepoPaths = (repoPaths: string[], metaMap: Record<string, RepoMetaEntr
   return withMeta.map((entry) => entry.path);
 };
 
-export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitActionToast, onRepoActivated, onNoActiveRepo, language }: Params) => {
+const getRepositoryNameFromPath = (repositoryPath: string): string =>
+  repositoryPath
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .filter(Boolean)
+    .pop() || 'My Program';
+
+export const useWorkspaceDomain = ({
+  triggerRefresh,
+  setConfirmDialog,
+  setInputDialog,
+  setGitActionToast,
+  onRepoActivated,
+  onNoActiveRepo,
+  language,
+}: Params) => {
   const [activeTab, setActiveTab] = useState<AppTabId>('localRepos');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
@@ -117,7 +135,7 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
     repoSortByRef.current = repoSortBy;
   }, [activeRepo, openRepos, repoMeta, repoSortBy]);
 
-  const { t } = useLanguageTranslations(language);
+  const { t, tr } = useLanguageTranslations(language);
 
   const sortedOpenRepos = useMemo(() => {
     return sortRepoPaths(openRepos, repoMeta, repoSortBy);
@@ -425,22 +443,87 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
         onRepoActivated();
         triggerRefresh();
       } else if (result && !result.isRepo) {
-        setConfirmDialog({
-          variant: 'confirm',
+        const repositoryName = getRepositoryNameFromPath(result.path);
+        setInputDialog({
           title: t('generated.components.layout.hooks.useworkspacedomain.initialize_git_repository_0ba2d2a1'),
-          message: t('generated.components.layout.hooks.useworkspacedomain.the_selected_directory_is_not_a_git_repository_yet_4d2a99bd'),
+          message: tr(
+            'Der ausgewaehlte Ordner ist noch kein Git-Repository. Waehle optional eine README-Vorlage und eine Lizenz, bevor Git initialisiert wird.',
+            'The selected folder is not a Git repository yet. Optionally choose a README template and a license before Git is initialized.',
+          ),
+          fields: [
+            {
+              id: 'createReadme',
+              label: tr('README.md mit Open-Git-Control-Vorlage erstellen', 'Create README.md with an Open Git Control template'),
+              type: 'checkbox',
+              defaultValue: 'false',
+              helperText: tr('Vorhandene README-Dateien werden nie ueberschrieben.', 'Existing README files are never overwritten.'),
+            },
+            {
+              id: 'license',
+              label: tr('Lizenzvorlage', 'License template'),
+              type: 'select',
+              defaultValue: 'none',
+              options: LICENSE_TEMPLATE_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.value === 'none' ? tr('Keine Lizenz', 'No license') : option.label,
+              })),
+            },
+            {
+              id: 'copyrightHolder',
+              label: tr('Urheberrechtsinhaber', 'Copyright holder'),
+              placeholder: tr('Name oder Organisation', 'Name or organization'),
+              helperText: tr('Wird fuer diese Lizenz und ihren Anwendungsnachweis verwendet.', 'Used for this license and its application notice.'),
+              required: true,
+              visible: (values) => {
+                const license = isLicenseTemplateId(values.license) ? values.license : 'none';
+                return getLicenseTemplateRequirements(license).requiresCopyrightHolder;
+              },
+            },
+            {
+              id: 'programName',
+              label: tr('Programmname', 'Program name'),
+              defaultValue: repositoryName,
+              helperText: tr('Wird fuer den GNU-Lizenzhinweis verwendet.', 'Used for the GNU license notice.'),
+              required: true,
+              visible: (values) => {
+                const license = isLicenseTemplateId(values.license) ? values.license : 'none';
+                return getLicenseTemplateRequirements(license).requiresProgramName;
+              },
+            },
+            {
+              id: 'programDescription',
+              label: tr('Kurze Programmbeschreibung', 'Short program description'),
+              placeholder: tr('Was macht dieses Programm?', 'What does this program do?'),
+              helperText: tr('Wird fuer den GNU-Lizenzhinweis verwendet.', 'Used for the GNU license notice.'),
+              required: true,
+              visible: (values) => {
+                const license = isLicenseTemplateId(values.license) ? values.license : 'none';
+                return getLicenseTemplateRequirements(license).requiresProgramDescription;
+              },
+            },
+          ],
           contextItems: [
             { label: t('generated.components.layout.hooks.useworkspacedomain.path_f9011584'), value: result.path },
             { label: t('generated.components.staging_area.useconflictresolver.action_ba062410'), value: 'git init' },
           ],
           irreversible: false,
-          consequences: t('generated.components.layout.hooks.useworkspacedomain.a_git_directory_will_be_created_and_the_folder_prepared_8a4dacda'),
+          consequences: tr(
+            'Eine .git-Struktur wird angelegt. Gewaehlte Dateien werden nur erstellt, wenn sie noch nicht vorhanden sind.',
+            'A .git directory will be created. Selected files are created only when they do not already exist.',
+          ),
           confirmLabel: t('generated.components.layout.hooks.useworkspacedomain.initialize_repository_540255ad'),
-          onConfirm: async () => {
-            const initResult = await gitClient.gitInit(result.path);
+          onSubmit: async (values) => {
+            const license = isLicenseTemplateId(values.license) ? values.license : 'none';
+            const initResult = await gitClient.gitInit(result.path, {
+              createReadme: values.createReadme === 'true',
+              license,
+              copyrightHolder: values.copyrightHolder || '',
+              programName: values.programName || '',
+              programDescription: values.programDescription || '',
+            });
             if (initResult.success) {
               const operationId = ++repoOperationSequenceRef.current;
-              setConfirmDialog(null);
+              setInputDialog(null);
               const canonicalRepoPath = await appClient.setRepoPath(result.path);
               if (repoOperationSequenceRef.current !== operationId) return;
               migrateRepoPathToCanonical(result.path, canonicalRepoPath);
@@ -449,7 +532,14 @@ export const useWorkspaceDomain = ({ triggerRefresh, setConfirmDialog, setGitAct
               setActiveRepo(canonicalRepoPath);
               setReposLoaded(true);
               onRepoActivated();
-              setGitActionToast({ msg: t('generated.components.layout.hooks.useworkspacedomain.initialized_new_git_repository_058c91a4'), isError: false });
+              const createdFiles = initResult.createdFiles || [];
+              setGitActionToast({
+                msg:
+                  createdFiles.length > 0
+                    ? tr(`Repository initialisiert. Erstellt: ${createdFiles.join(', ')}.`, `Repository initialized. Created: ${createdFiles.join(', ')}.`)
+                    : t('generated.components.layout.hooks.useworkspacedomain.initialized_new_git_repository_058c91a4'),
+                isError: false,
+              });
               triggerRefresh();
             } else {
               setGitActionToast({

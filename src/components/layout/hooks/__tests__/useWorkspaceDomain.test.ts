@@ -20,12 +20,14 @@ const renderWorkspace = (setConfirmDialog = vi.fn()) => {
   const root: Root = createRoot(document.createElement('div'));
   const triggerRefresh = vi.fn();
   const setGitActionToast = vi.fn();
+  const setInputDialog = vi.fn();
   const onRepoActivated = vi.fn();
   const onNoActiveRepo = vi.fn();
   const Harness = () => {
     current = useWorkspaceDomain({
       triggerRefresh,
       setConfirmDialog,
+      setInputDialog,
       setGitActionToast,
       onRepoActivated,
       onNoActiveRepo,
@@ -40,6 +42,7 @@ const renderWorkspace = (setConfirmDialog = vi.fn()) => {
       return current;
     },
     unmount: () => act(() => root.unmount()),
+    setInputDialog,
   };
 };
 
@@ -61,6 +64,32 @@ afterEach(() => {
 });
 
 describe('useWorkspaceDomain repository canonicalization', () => {
+  it('offers README and license scaffolding before initializing a selected folder', async () => {
+    vi.spyOn(appClient, 'openDirectory').mockResolvedValue({ path: 'C:/new-repository', isRepo: false });
+    const hook = renderWorkspace();
+
+    await act(async () => {
+      await hook.current.handleOpenFolder();
+    });
+
+    const dialog = hook.setInputDialog.mock.calls[0]?.[0];
+    expect(dialog).toEqual(
+      expect.objectContaining({
+        title: expect.any(String),
+        onSubmit: expect.any(Function),
+      }),
+    );
+    expect(dialog.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'createReadme', type: 'checkbox' }),
+        expect.objectContaining({ id: 'license', type: 'select' }),
+        expect.objectContaining({ id: 'programName', visible: expect.any(Function) }),
+        expect.objectContaining({ id: 'programDescription', visible: expect.any(Function) }),
+      ]),
+    );
+    hook.unmount();
+  });
+
   it('migrates a stored subdirectory to the canonical root and deduplicates an existing root alias', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [

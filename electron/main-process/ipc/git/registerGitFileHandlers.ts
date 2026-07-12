@@ -135,6 +135,21 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
     }
   });
 
+  ipcMain.handle(IpcChannel.GitDeleteRepoFile, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
+    try {
+      const repositoryFilePath = asRepositoryFilePath(filePath);
+      if (repositoryFilePath.length === 0) {
+        return { success: false, error: 'File path is required' };
+      }
+
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      await gitService.files.deleteRepoFileAtPath(repoPath, repositoryFilePath);
+      return { success: true };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   ipcMain.handle(IpcChannel.GitOpenRepositoryPath, async (_event: unknown, params: { path?: unknown; action?: unknown; repoPath?: unknown } = {}) => {
     try {
       const action = String(params.action || '');

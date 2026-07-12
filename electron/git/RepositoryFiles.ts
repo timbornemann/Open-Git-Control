@@ -115,6 +115,15 @@ export class RepositoryFiles {
     fs.writeFileSync(resolvedPath, encodeRepositoryFile(textValue, encoding));
   }
 
+  async deleteRepoFileAtPath(repoPath: string, relativePath: string): Promise<void> {
+    const resolvedPath = resolveExistingRepositoryPath(repoPath, relativePath);
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile()) {
+      throw new Error('Target path is not a file.');
+    }
+    fs.unlinkSync(resolvedPath);
+  }
+
   private normalizeRepoRelativePath(relativePath: string): string {
     return normalizeRepositoryRelativePath(relativePath);
   }

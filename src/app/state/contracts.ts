@@ -40,7 +40,9 @@ export interface InputDialogField {
   helperText?: string;
   multiline?: boolean;
   rows?: number;
-  type?: 'text' | 'url';
+  type?: 'text' | 'url' | 'checkbox' | 'select';
+  options?: Array<{ value: string; label: string }>;
+  visible?: (values: Record<string, string>) => boolean;
   validate?: (value: string, values: Record<string, string>) => string | null;
 }
 

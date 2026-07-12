@@ -94,7 +94,8 @@
 }
 
 .dialog-field input,
-.dialog-field textarea {
+.dialog-field textarea,
+.dialog-field select {
   border: 1px solid var(--border-color);
   background: var(--bg-dark);
   color: var(--text-primary);
@@ -113,7 +114,8 @@
 }
 
 .dialog-field input:focus,
-.dialog-field textarea:focus {
+.dialog-field textarea:focus,
+.dialog-field select:focus {
   outline: none;
   border-color: var(--accent-primary);
 }
@@ -121,6 +123,23 @@
 .dialog-field small {
   font-size: 0.72rem;
   color: var(--text-secondary);
+}
+
+.dialog-checkbox-field {
+  flex-flow: row wrap;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.dialog-checkbox-field input {
+  width: auto;
+  padding: 0;
+  accent-color: var(--accent-primary);
+}
+
+.dialog-checkbox-field small {
+  flex-basis: 100%;
+  margin-left: 24px;
 }
 
 .dialog-validation {
