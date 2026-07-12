@@ -9,7 +9,6 @@ const { handleMock } = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock },
   shell: { openPath: vi.fn() },
-  dialog: { showMessageBox: vi.fn() },
 }));
 
 describe('registerGitHistoryHandlers through registerGitHandlers', () => {

@@ -162,6 +162,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     gitFetch: () => invokeGitCommand('fetch', '--all', '--prune', '--tags', '--quiet'),
     gitPull: () => invokeGitCommand('pull'),
     gitPush: () => invokeGitCommand('push'),
+    scanCommitSecrets: (params: { repoPath: string }) => invokeGitOperationForRepo(params.repoPath, 'commit', IpcChannel.GitScanCommitSecrets, params),
+    approveSecretScanCommit: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'commit', IpcChannel.GitApproveSecretScanCommit, repoPath),
     scanPushSecrets: (params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }) =>
       invokeGitOperationForRepo(params.repoPath, 'push', IpcChannel.GitScanPushSecrets, params),
     approveSecretScanPush: (pushArgs: string[] | undefined, repoPath: string) =>
@@ -351,6 +353,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       gitFetch: flatApi.gitFetch,
       gitPull: flatApi.gitPull,
       gitPush: flatApi.gitPush,
+      scanCommitSecrets: flatApi.scanCommitSecrets,
+      approveSecretScanCommit: flatApi.approveSecretScanCommit,
       scanPushSecrets: flatApi.scanPushSecrets,
       approveSecretScanPush: flatApi.approveSecretScanPush,
       cancelSecretScan: flatApi.cancelSecretScan,

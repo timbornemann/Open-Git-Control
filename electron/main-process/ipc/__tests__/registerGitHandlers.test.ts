@@ -4,19 +4,12 @@ import { registerGitHandlers } from '../registerGitHandlers';
 const { handleMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
 }));
-const { showMessageBoxMock } = vi.hoisted(() => ({
-  showMessageBoxMock: vi.fn(),
-}));
-
 vi.mock('electron', () => ({
   ipcMain: {
     handle: handleMock,
   },
   shell: {
     openPath: vi.fn(),
-  },
-  dialog: {
-    showMessageBox: showMessageBoxMock,
   },
 }));
 
@@ -26,7 +19,6 @@ describe('registerGitHandlers', () => {
   beforeEach(() => {
     handlers.clear();
     handleMock.mockReset();
-    showMessageBoxMock.mockReset();
     handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
       handlers.set(channel, callback);
     });
@@ -193,9 +185,7 @@ describe('registerGitHandlers', () => {
     expect(new Set(jobEvents.map((event) => event.id)).size).toBe(1);
   });
 
-  it('scans staged changes before committing and proceeds when the scan is clean', async () => {
-    const send = vi.fn();
-    const scanStagedDiffs = vi.fn().mockResolvedValue({ findings: [] });
+  it('commits directly when the pre-commit secret scan is disabled', async () => {
     const commitWithMessageAtPath = vi.fn().mockResolvedValue('commit ok');
     const gitService = {
       getRepoPath: vi.fn(() => 'C:/repo'),
@@ -204,18 +194,15 @@ describe('registerGitHandlers', () => {
 
     registerGitHandlers({
       gitService,
-      secretScanService: { scanStagedDiffs } as any,
+      secretScanService: {} as any,
       commitStatsService: { onUpdate: vi.fn(() => vi.fn()), interruptBackgroundWork: vi.fn() } as any,
       workingTreeService: {} as any,
-      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
+      readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: false })) as any,
     });
 
-    const result = await handlers.get('git:createCommit')!({ sender: { send } }, { title: 'feat: safe change', description: 'Details' });
+    const result = await handlers.get('git:createCommit')!({ sender: { send: vi.fn() } }, { title: 'feat: safe change', description: 'Details' });
 
     expect(result).toEqual({ success: true, data: 'commit ok' });
-    expect(scanStagedDiffs).toHaveBeenCalledWith(
-      expect.objectContaining({ repoPath: 'C:/repo', strictness: 'medium', allowlistText: '', signal: expect.any(AbortSignal) }),
-    );
     expect(commitWithMessageAtPath).toHaveBeenCalledWith('C:/repo', {
       title: 'feat: safe change',
       description: 'Details',
@@ -223,14 +210,20 @@ describe('registerGitHandlers', () => {
       signoff: false,
       allowEmpty: false,
     });
-    expect(send.mock.calls.filter((call) => call[0] === 'job:event').map((call) => call[1].status)).toEqual(['start', 'progress', 'done']);
   });
 
-  it('blocks a commit when the staged pre-commit scan finds a potential secret', async () => {
-    const scanStagedDiffs = vi.fn().mockResolvedValue({ findings: [{ filePath: '.env' }, { filePath: '.env' }] });
-    const commitWithMessageAtPath = vi.fn();
+  it('requires an in-app approval before committing secret scan findings', async () => {
+    const scanStagedDiffs = vi.fn().mockResolvedValue({
+      scanned: true,
+      strictness: 'medium',
+      findings: [{ filePath: '.env', lineNumber: 1, contextLine: '[REDACTED_SECRET]' }],
+      notes: [],
+      stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
+    });
+    const commitWithMessageAtPath = vi.fn().mockResolvedValue('commit ok');
     const gitService = {
       getRepoPath: vi.fn(() => 'C:/repo'),
+      runCommandAtPath: vi.fn((_repoPath: string, args: string[]) => (args[0] === 'status' ? '# branch.oid abc\0' : 'H 100644 abc 0\t.env\0')),
       commits: { commitWithMessageAtPath },
     } as any;
 
@@ -242,13 +235,21 @@ describe('registerGitHandlers', () => {
       readSettingsWithMigration: vi.fn(() => ({ secretScanBeforeCommitEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' })) as any,
     });
 
-    const result = await handlers.get('git:createCommit')!({ sender: { send: vi.fn() } }, { title: 'feat: unsafe change' });
+    const event = { sender: { id: 9, send: vi.fn() } };
+    const result = await handlers.get('git:createCommit')!(event, { title: 'feat: unsafe change' });
 
     expect(result).toEqual({
       success: false,
-      error: 'Commit blocked: 2 potential secret hit(s) found in 1 staged file(s). Review the staged changes, or add a deliberate allowlist rule in Settings.',
+      error: 'Potential secrets were detected. Confirm the in-app dialog before committing.',
     });
     expect(commitWithMessageAtPath).not.toHaveBeenCalled();
+    await expect(handlers.get('git:scanCommitSecrets')!(event, { repoPath: 'C:/repo' })).resolves.toEqual(expect.objectContaining({ success: true }));
+    await expect(handlers.get('git:approveSecretScanCommit')!(event, 'C:/repo')).resolves.toEqual({ success: true });
+    await expect(handlers.get('git:createCommit')!(event, { title: 'feat: reviewed change' })).resolves.toEqual({
+      success: true,
+      data: 'commit ok',
+    });
+    expect(commitWithMessageAtPath).toHaveBeenCalled();
   });
 
   it('allows opting out of the pre-commit scan without changing the push protection setting', async () => {
@@ -322,10 +323,9 @@ describe('registerGitHandlers', () => {
     expect(result).toEqual({ success: true, data: 'push ok' });
     expect(scanPushDiffs).toHaveBeenCalledWith(expect.objectContaining({ repoPath: 'C:/repo', includeTags: true, strictness: 'medium' }));
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push', '--tags']);
-    expect(showMessageBoxMock).not.toHaveBeenCalled();
   });
 
-  it('requires a native confirmation for push findings instead of trusting a renderer flag', async () => {
+  it('requires an in-app confirmation for push findings instead of trusting a renderer flag', async () => {
     const scanPushDiffs = vi.fn().mockResolvedValue({
       scanned: true,
       strictness: 'medium',
@@ -333,7 +333,6 @@ describe('registerGitHandlers', () => {
       notes: [],
       stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
     });
-    showMessageBoxMock.mockResolvedValue({ response: 0 });
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
@@ -369,12 +368,11 @@ describe('registerGitHandlers', () => {
     const commandHandler = handlers.get('git:command');
     const result = await commandHandler!({ sender: { send: vi.fn() } }, 'push');
 
-    expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
-    expect(showMessageBoxMock).toHaveBeenCalledWith(expect.objectContaining({ buttons: ['Cancel', 'Push anyway'] }));
+    expect(result).toEqual({ success: false, error: 'Potential secrets were detected. Confirm the in-app dialog before pushing.' });
     expect(gitService.runCommandAtPath.mock.calls.some((call: any[]) => call[1]?.[0] === 'push')).toBe(false);
   });
 
-  it('skips the native secret-scan dialog after an in-app approval', async () => {
+  it('continues after an in-app approval', async () => {
     const scanPushDiffs = vi.fn().mockResolvedValue({
       scanned: true,
       strictness: 'medium',
@@ -422,7 +420,6 @@ describe('registerGitHandlers', () => {
     const result = await handlers.get('git:command')!({ sender: { id: 42, send: vi.fn() } }, 'push');
 
     expect(result).toEqual({ success: true, data: 'push ok' });
-    expect(showMessageBoxMock).not.toHaveBeenCalled();
     expect(scanPushDiffs).toHaveBeenCalledTimes(1);
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['push']);
   });
@@ -435,7 +432,6 @@ describe('registerGitHandlers', () => {
       notes: [],
       stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 },
     });
-    showMessageBoxMock.mockResolvedValue({ response: 0 });
     const gitService = {
       runCommandAtPath: vi.fn().mockResolvedValue('should not push'),
       getRepoPath: vi.fn(() => 'C:/repo'),
@@ -475,9 +471,8 @@ describe('registerGitHandlers', () => {
     expect(approval).toEqual({ success: true });
     const result = await handlers.get('git:command')!({ sender: { id: 7, send: vi.fn() } }, 'push');
 
-    expect(result).toEqual({ success: false, error: 'Push cancelled after secret scan findings.' });
+    expect(result).toEqual({ success: false, error: 'Potential secrets were detected. Confirm the in-app dialog before pushing.' });
     expect(scanPushDiffs).toHaveBeenCalled();
-    expect(showMessageBoxMock).toHaveBeenCalled();
     expect(gitService.runCommandAtPath.mock.calls.some((call: any[]) => call[1]?.[0] === 'push')).toBe(false);
   });
 

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { useI18n } from '@/i18n';
-import { useUIContext } from '@/contexts/AppStateContext';
+import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { getCommitMessageStyleLabel } from '@/utils/commitMessagePreferences';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
@@ -70,6 +70,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
 }) => {
   const { t } = useI18n();
   const { setConfirmDialog, setInputDialog } = useUIContext();
+  const { onUpdateSettings } = useSettingsContext();
   const { toasts, setToast, dismiss } = useToastQueue(3000);
   const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
 
@@ -106,6 +107,8 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
     onRepoChanged,
     onCommitsCreated,
     settings,
+    setConfirmDialog,
+    onUpdateSettings,
   });
 
   const aiCommit = useAiCommit({

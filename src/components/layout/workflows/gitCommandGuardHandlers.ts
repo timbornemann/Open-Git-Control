@@ -23,6 +23,7 @@ export type GitCommandGuardRuntime = {
   runWithOptions: (args: string[], successMsg: string, actionLabel: string | undefined, options: RunGitCommandOptions | undefined) => Promise<void>;
   setConfirmDialog: SetConfirmDialog;
   setGitActionToast: (toast: Toast) => void;
+  addSecretScanFindingsToAllowlist: (findings: { filePath: string }[]) => Promise<boolean>;
   t: Translate;
   tr: TranslatePair;
 };
@@ -183,6 +184,24 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
       value: `${finding.filePath}:${finding.lineNumber}  ${finding.contextLine}`,
     }));
 
+    const continuePush = async () => {
+      // Bind the approval to this exact push (args after the `push` command).
+      const approval = await gitClient.approveSecretScanPush(args.slice(1), repoPath);
+      if (!approval.success || !runtime.isRepoCurrent(request.repoPath)) {
+        if (runtime.isRepoCurrent(request.repoPath)) {
+          setGitActionToast({
+            msg: tr(
+              'Der Repository-Zustand hat sich geaendert. Bitte fuehre den Secret-Scan erneut aus.',
+              'The repository state changed. Run the secret scan again before pushing.',
+            ),
+            isError: true,
+          });
+        }
+        return;
+      }
+      await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipSecretScan: true }));
+    };
+
     setConfirmDialog({
       variant: 'danger',
       title: t('generated.components.layout.workflows.usegitcommandguardworkflow.potential_secrets_detected_before_push_deeb3751'),
@@ -194,23 +213,13 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
       irreversible: true,
       consequences: t('generated.components.layout.workflows.usegitcommandguardworkflow.please_review_these_findings_pushing_can_irreversibly_pu_fb7def03'),
       confirmLabel: t('generated.components.layout.workflows.usegitcommandguardworkflow.push_anyway_46f5aba1'),
-      onConfirm: async () => {
-        // Bind the approval to this exact push (args after the `push` command).
-        const approval = await gitClient.approveSecretScanPush(args.slice(1), repoPath);
-        if (!approval.success || !runtime.isRepoCurrent(request.repoPath)) {
-          if (runtime.isRepoCurrent(request.repoPath)) {
-            setGitActionToast({
-              msg: tr(
-                'Der Repository-Zustand hat sich geaendert. Bitte fuehre den Secret-Scan erneut aus.',
-                'The repository state changed. Run the secret scan again before pushing.',
-              ),
-              isError: true,
-            });
-          }
-          return;
-        }
-        await runWithOptions(args, successMsg, actionLabel, boundOptions(request, { skipSecretScan: true }));
+      secondaryActionLabel: tr('Dateien allowlisten und pushen', 'Allowlist files and push'),
+      secondaryActionVariant: 'default',
+      onSecondaryAction: async () => {
+        if (!(await runtime.addSecretScanFindingsToAllowlist(findings))) return;
+        await continuePush();
       },
+      onConfirm: continuePush,
     });
     return true;
   } catch (error: any) {

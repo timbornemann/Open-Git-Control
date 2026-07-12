@@ -23,14 +23,23 @@ type WorkspaceBridge = {
 
 type Params = {
   workspace: WorkspaceBridge;
-  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'defaultBranch' | 'language' | 'secretScanBeforePushEnabled'>;
+  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'defaultBranch' | 'language' | 'secretScanBeforePushEnabled' | 'secretScanAllowlist'>;
+  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   triggerRefresh: () => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setGitActionToast: (toast: Toast) => void;
   setConflictResolverPath: (path: string) => void;
 };
 
-export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, setConfirmDialog, setGitActionToast, setConflictResolverPath }: Params) => {
+export const useGitCommandWorkflow = ({
+  workspace,
+  settings,
+  onUpdateSettings,
+  triggerRefresh,
+  setConfirmDialog,
+  setGitActionToast,
+  setConflictResolverPath,
+}: Params) => {
   const [isGitActionRunning, setIsGitActionRunning] = useState(false);
   const [activeGitActionLabel, setActiveGitActionLabel] = useState<string | null>(null);
   const [activeGitCommand, setActiveGitCommand] = useState<string | null>(null);
@@ -89,6 +98,7 @@ export const useGitCommandWorkflow = ({ workspace, settings, triggerRefresh, set
     runGitCommandRef,
     runRemoteAheadQuickFix,
     settings,
+    onUpdateSettings,
     setConfirmDialog,
     setGitActionToast,
   });

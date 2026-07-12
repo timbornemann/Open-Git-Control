@@ -320,6 +320,8 @@ describe('renderer service clients', () => {
   });
 
   it('delegates rich git APIs and repo-unavailable guarded methods', async () => {
+    await expectDelegation(() => gitClient.scanCommitSecrets({ repoPath: 'C:/repo' }), api.git.scanCommitSecrets, [{ repoPath: 'C:/repo' }]);
+    await expectDelegation(() => gitClient.approveSecretScanCommit('C:/repo'), api.git.approveSecretScanCommit, ['C:/repo']);
     await expectDelegation(() => gitClient.scanPushSecrets({ repoPath: 'C:/repo', includeTags: true }), api.git.scanPushSecrets, [
       { repoPath: 'C:/repo', includeTags: true },
     ]);

@@ -1,6 +1,8 @@
 import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
+import { addFindingPathsToSecretScanAllowlistText } from '@/shared/secretScanAllowlist';
+import { appClient } from '@/services/appClient';
 import { GUARDED_COMMANDS, isForcePushCommand, type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import {
@@ -19,7 +21,8 @@ type Params = {
   activeRepoRef?: MutableRefObject<string | null>;
   runGitCommandRef: MutableRefObject<GitCommandRunner | null>;
   runRemoteAheadQuickFix: (params: { command: string; options?: RunGitCommandOptions }) => Promise<void>;
-  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'language' | 'secretScanBeforePushEnabled'>;
+  settings: Pick<AppSettingsDto, 'confirmDangerousOps' | 'language' | 'secretScanBeforePushEnabled' | 'secretScanAllowlist'>;
+  onUpdateSettings: (partial: Partial<AppSettingsDto>) => Promise<void>;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setGitActionToast: (toast: Toast) => void;
 };
@@ -38,6 +41,7 @@ export const useGitCommandGuardWorkflow = ({
   runGitCommandRef,
   runRemoteAheadQuickFix,
   settings,
+  onUpdateSettings,
   setConfirmDialog,
   setGitActionToast,
 }: Params) => {
@@ -50,6 +54,34 @@ export const useGitCommandGuardWorkflow = ({
       await runner(args, successMsg, actionLabel, options);
     },
     [runGitCommandRef],
+  );
+
+  const addSecretScanFindingsToAllowlist = useCallback(
+    async (findings: { filePath: string }[]) => {
+      const update = addFindingPathsToSecretScanAllowlistText(settings.secretScanAllowlist, findings);
+      if (update.addedPaths.length === 0) return true;
+      try {
+        if (!appClient.isAvailable()) throw new Error(tr('Die Einstellungen sind nicht verfuegbar.', 'Settings are unavailable.'));
+        await onUpdateSettings({ secretScanAllowlist: update.allowlistText });
+        const persisted = await appClient.getSettings();
+        const remaining = addFindingPathsToSecretScanAllowlistText(
+          persisted.secretScanAllowlist,
+          update.addedPaths.map((filePath) => ({ filePath })),
+        );
+        if (remaining.addedPaths.length > 0) {
+          throw new Error(tr('Die Secret-Scan-Allowlist wurde nicht gespeichert.', 'The secret scan allowlist was not saved.'));
+        }
+        return true;
+      } catch (error: unknown) {
+        setGitActionToast({
+          msg:
+            error instanceof Error ? error.message : tr('Secret-Scan-Allowlist konnte nicht gespeichert werden.', 'Could not save the secret scan allowlist.'),
+          isError: true,
+        });
+        return false;
+      }
+    },
+    [onUpdateSettings, setGitActionToast, settings.secretScanAllowlist, tr],
   );
 
   const runGitCommandGuards = useCallback(
@@ -66,6 +98,7 @@ export const useGitCommandGuardWorkflow = ({
         runWithOptions,
         setConfirmDialog,
         setGitActionToast,
+        addSecretScanFindingsToAllowlist,
         t,
         tr,
       };
@@ -90,6 +123,7 @@ export const useGitCommandGuardWorkflow = ({
       runWithOptions,
       setConfirmDialog,
       setGitActionToast,
+      addSecretScanFindingsToAllowlist,
       settings.confirmDangerousOps,
       settings.secretScanBeforePushEnabled,
       t,

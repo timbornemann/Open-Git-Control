@@ -21,7 +21,7 @@ Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client
 - GitHub-Login, Repository-Klonen/Forken, Pull Requests, CI-Status, Workflows und Release-Publishing
 - Projektplanung mit lokaler REST- und MCP-aehnlicher API fuer agentengestuetzte Arbeit
 - Optionale KI-Unterstuetzung ueber Ollama oder Google Gemini fuer Commit Messages, Auto-Commits und Release Notes
-- Secret-Scanning vor Pushes, Allowlist, Sicherheitsabfragen fuer gefaehrliche Aktionen und lokale verschluesselte Token-Speicherung, wenn vom OS unterstuetzt
+- Secret-Scanning vor Commits und Pushes, Allowlist, Sicherheitsabfragen fuer gefaehrliche Aktionen und lokale verschluesselte Token-Speicherung, wenn vom OS unterstuetzt
 
 ## Downloads
 
@@ -490,12 +490,14 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Git Command Policy begrenzt, welche Befehle der Renderer beim Main Process anfordern kann.
 - External-Link-Policy oeffnet erlaubte URLs ueber den Main Process.
 - Diff-Preview-Policy normalisiert sichere Diff-Befehle.
-- Secret-Scan vor Push:
+- Secret-Scan vor Commit und Push:
+  - scannt staged Diffs lokal vor einem Commit
   - scannt staged Diffs
   - scannt to-push Diffs
   - kann Tags einbeziehen
   - unterstuetzt Abbruch
   - meldet Treffer mit Rule, Severity, Datei, Zeile und bereinigtem Kontext
+  - bietet Dialogaktionen zum Abbrechen, Fortfahren und Allowlisten betroffener Dateien
 - Secret-Scan-Strengegrad:
   - low
   - medium
@@ -546,6 +548,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Beispiel-MCP-Server-Config
 - Security Settings:
   - Bestaetigungen fuer gefaehrliche Operationen
+  - Secret-Scan vor Commit
   - Secret-Scan vor Push
   - Strictness
   - Allowlist
@@ -847,10 +850,11 @@ Erwartete Release Assets:
 - Im GitHub-Tab anmelden.
 - Repository und PR-Panel aktualisieren.
 
-### Push wird vom Secret-Scan blockiert
+### Commit oder Push wird vom Secret-Scan blockiert
 
 - Gemeldete Datei und Zeile pruefen.
 - Secret entfernen oder rotieren, falls es versehentlich committed wurde.
+- Die Allowlist-Aktion im Dialog nur fuer beabsichtigte Test- oder Beispielwerte verwenden; sie erlaubt den betroffenen Dateipfad bei künftigen Scans.
 - Allowlist nur eng fuer absichtliche Dummy-/Beispielwerte setzen.
 
 ### Auto-Update nicht verfuegbar

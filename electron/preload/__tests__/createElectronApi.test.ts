@@ -159,14 +159,20 @@ describe('createElectronApi', () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
 
+    await api.git.scanCommitSecrets({ repoPath: 'C:/captured-repo' });
+    await api.git.approveSecretScanCommit('C:/captured-repo');
     await api.git.scanPushSecrets({ repoPath: 'C:/captured-repo', includeTags: true, pushArgs: ['origin', 'main'] });
     await api.git.approveSecretScanPush(['origin', 'main'], 'C:/captured-repo');
 
-    expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitScanPushSecrets, {
+    expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitScanCommitSecrets, {
+      repoPath: 'C:/captured-repo',
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitApproveSecretScanCommit, 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(3, IpcChannel.GitScanPushSecrets, {
       repoPath: 'C:/captured-repo',
       includeTags: true,
       pushArgs: ['origin', 'main'],
     });
-    expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitApproveSecretScanPush, ['origin', 'main'], 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(4, IpcChannel.GitApproveSecretScanPush, ['origin', 'main'], 'C:/captured-repo');
   });
 });

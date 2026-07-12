@@ -277,6 +277,14 @@ export const gitClient = {
     return this.runGitCommand('commit', '--allow-empty', '-m', message);
   },
 
+  async scanCommitSecrets(params: { repoPath: string }): Promise<IpcResult<SecretScanResultDto>> {
+    return requireElectronGitApi().scanCommitSecrets(params);
+  },
+
+  async approveSecretScanCommit(repoPath: string): Promise<{ success: boolean }> {
+    return requireElectronGitApi().approveSecretScanCommit(repoPath);
+  },
+
   async scanPushSecrets(params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
   },

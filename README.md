@@ -21,7 +21,7 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 - GitHub authentication, repository cloning/forking, pull requests, CI status, workflows, and release publishing
 - Project planning board with local REST and MCP-style API for agent-assisted work
 - Optional AI support through Ollama or Google Gemini for commit messages, auto-commits, and release notes
-- Secret scanning before pushes, allowlists, safe prompts for dangerous operations, and local encrypted token storage when available
+- Secret scanning before commits and pushes, allowlists, safe prompts for dangerous operations, and local encrypted token storage when available
 
 ## Downloads
 
@@ -490,12 +490,14 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Git command policy limits what the renderer can ask the main process to run.
 - External link policy opens allowed URLs through the main process.
 - Diff preview policy normalizes safe diff commands.
-- Secret scan before push:
+- Secret scan before commit and push:
+  - scans staged diffs locally before a commit
   - scans staged diffs
   - scans to-push diffs
   - can include tags
   - supports cancellation
   - reports findings with rule, severity, file, line, and sanitized context
+  - offers dialog actions to cancel, continue, or allowlist affected files
 - Secret scan strictness:
   - low
   - medium
@@ -546,6 +548,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - example MCP server config
 - Security settings:
   - dangerous operation confirmations
+  - secret scan before commit
   - secret scan before push
   - strictness
   - allowlist
@@ -847,10 +850,11 @@ Expected release assets:
 - Sign in to GitHub in the GitHub tab.
 - Refresh the repository and PR panel.
 
-### Push is blocked by secret scan
+### Commit or push is blocked by secret scan
 
 - Inspect the reported file and line.
 - Remove the secret or rotate it if it was committed accidentally.
+- Use the dialog's allowlist action only for intentional test or example values; it allowlists the affected file path for future scans.
 - Add a narrow allowlist rule only for intentional dummy/example values.
 
 ### Auto-update is unavailable

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { dialog, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import type { GitService } from '../../../GitService';
 import type { SecretScanService } from '../../../SecretScanService';
 import { redactGitSensitiveText } from '../../../git/GitErrorFormatter';
@@ -277,36 +277,7 @@ export function registerSecretScanPushGuard({
       return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
     }
 
-    const findings = scanResult.data.findings;
-    const fileCount = new Set(findings.map((finding) => finding.filePath)).size;
-    const preview = findings
-      .slice(0, 8)
-      .map((finding) => `${finding.filePath}:${finding.lineNumber}`)
-      .join('\n');
-    const confirmation = await dialog.showMessageBox({
-      type: 'warning',
-      title: 'Potential secrets detected before push',
-      message: `${findings.length} potential secret hit(s) were found in ${fileCount} file(s).`,
-      detail: `${preview}${findings.length > 8 ? '\n...' : ''}\n\nReview the changes before publishing.`,
-      buttons: ['Cancel', 'Push anyway'],
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true,
-    });
-    if (confirmation.response === 1) {
-      try {
-        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath());
-        const currentFingerprint = await readPushStateFingerprint(gitService, expectedRepoPath);
-        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath());
-        if (currentFingerprint !== scanResult.stateFingerprint) {
-          return { success: false, error: PUSH_STATE_CHANGED_ERROR };
-        }
-        return null;
-      } catch {
-        return { success: false, error: PUSH_STATE_VERIFICATION_ERROR };
-      }
-    }
-    return { success: false, error: 'Push cancelled after secret scan findings.' };
+    return { success: false, error: 'Potential secrets were detected. Confirm the in-app dialog before pushing.' };
   };
 
   ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown; pushArgs?: unknown } = {}) => {

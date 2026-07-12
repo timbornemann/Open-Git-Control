@@ -150,6 +150,7 @@ export const useAppState = () => {
       setActiveTab: workspace.setActiveTab,
     },
     settings,
+    onUpdateSettings: handleUpdateSettings,
     triggerRefresh,
     setConfirmDialog,
     setGitActionToast,

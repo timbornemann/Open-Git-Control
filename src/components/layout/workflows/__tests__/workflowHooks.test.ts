@@ -13,6 +13,7 @@ import { useRemoteRecoveryWorkflow } from '@/components/layout/workflows/useRemo
 import { gitClient } from '@/services/gitClient';
 import { githubClient } from '@/services/githubClient';
 import { plannerClient } from '@/services/plannerClient';
+import { appClient } from '@/services/appClient';
 
 type HookRender<T> = {
   readonly current: T;
@@ -227,7 +228,9 @@ describe('workflow hooks', () => {
           defaultBranch: 'main',
           language: 'en',
           secretScanBeforePushEnabled: false,
+          secretScanAllowlist: '',
         },
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
         triggerRefresh: vi.fn(),
         setConfirmDialog: vi.fn(),
         setGitActionToast,
@@ -297,7 +300,9 @@ describe('workflow hooks', () => {
           confirmDangerousOps: true,
           language: 'de',
           secretScanBeforePushEnabled: false,
+          secretScanAllowlist: '',
         },
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
         setConfirmDialog,
         setGitActionToast: vi.fn(),
       }),
@@ -325,6 +330,72 @@ describe('workflow hooks', () => {
 
     expect(runGitCommand).toHaveBeenCalledWith(['push', '--force'], 'pushed', undefined, expect.objectContaining({ skipDirtyGuard: true }));
 
+    hook.unmount();
+  });
+
+  it('continues no push when the allowlist update is not persisted', async () => {
+    vi.spyOn(gitClient, 'scanPushSecrets').mockResolvedValue({
+      success: true,
+      data: {
+        scanned: true,
+        strictness: 'medium',
+        findings: [
+          {
+            id: 'finding-1',
+            ruleId: 'secret',
+            severity: 'high',
+            source: 'to-push',
+            filePath: '.env',
+            lineNumber: 1,
+            contextLine: '[REDACTED_SECRET]',
+          },
+        ],
+        notes: [],
+        stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 },
+      },
+    });
+    const approve = vi.spyOn(gitClient, 'approveSecretScanPush').mockResolvedValue({ success: true });
+    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ secretScanAllowlist: '' } as any);
+    const runGitCommand = vi.fn<GitCommandRunner>().mockResolvedValue(true);
+    const setConfirmDialog = vi.fn();
+    const setGitActionToast = vi.fn();
+    const onUpdateSettings = vi.fn().mockResolvedValue(undefined);
+    const hook = renderHook(() =>
+      useGitCommandGuardWorkflow({
+        runGitCommandRef: { current: runGitCommand },
+        runRemoteAheadQuickFix: vi.fn(),
+        settings: {
+          confirmDangerousOps: false,
+          language: 'en',
+          secretScanBeforePushEnabled: true,
+          secretScanAllowlist: '',
+        },
+        onUpdateSettings,
+        setConfirmDialog,
+        setGitActionToast,
+      }),
+    );
+
+    await act(async () => {
+      await hook.current.runGitCommandGuards({
+        args: ['push', 'origin', 'main'],
+        command: 'push',
+        repoPath: 'C:/repo',
+        successMsg: 'pushed',
+        options: { skipRemoteAheadDirtyGuard: true },
+      });
+    });
+
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    await act(async () => {
+      await dialog.onSecondaryAction?.();
+    });
+
+    expect(onUpdateSettings).toHaveBeenCalledWith({ secretScanAllowlist: 'path:.env' });
+    expect(approve).not.toHaveBeenCalled();
+    expect(runGitCommand).not.toHaveBeenCalled();
+    expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
     hook.unmount();
   });
 

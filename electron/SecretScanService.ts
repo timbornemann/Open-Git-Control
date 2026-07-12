@@ -9,6 +9,8 @@ type PatternDefinition = {
   minStrictness: SecretScanStrictness;
   severity: SecretSeverity;
   regex: RegExp;
+  configFileOnly?: boolean;
+  validateMatch?: (match: RegExpMatchArray) => boolean;
 };
 
 type ParsedAllowlistRule = { kind: 'path'; value: string } | { kind: 'text'; value: string } | { kind: 'regex'; pattern: RegExp };
@@ -50,6 +52,78 @@ const STRICTNESS_RANK: Record<SecretScanStrictness, number> = {
 };
 
 const SECRET_PATTERNS: PatternDefinition[] = [
+  {
+    id: 'openai-project-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bsk-proj-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'openai-service-account-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bsk-svcacct-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'anthropic-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bsk-ant-api\d{2,}-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'google-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bAIza[A-Za-z0-9_-]{30,}\b/,
+  },
+  {
+    id: 'groq-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bgsk_[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'openrouter-api-key',
+    minStrictness: 'low',
+    severity: 'critical',
+    regex: /\bsk-or-v1-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'hugging-face-access-token',
+    minStrictness: 'low',
+    severity: 'high',
+    regex: /\bhf_[A-Za-z0-9]{20,}\b/,
+  },
+  {
+    id: 'replicate-api-token',
+    minStrictness: 'low',
+    severity: 'high',
+    regex: /\br8_[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'xai-api-key',
+    minStrictness: 'medium',
+    severity: 'high',
+    regex: /\bxai-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'perplexity-api-key',
+    minStrictness: 'medium',
+    severity: 'high',
+    regex: /\bpplx-[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'together-ai-api-key',
+    minStrictness: 'medium',
+    severity: 'high',
+    regex: /\btgp_v1_[A-Za-z0-9_-]{20,}\b/,
+  },
+  {
+    id: 'fireworks-ai-api-key',
+    minStrictness: 'medium',
+    severity: 'high',
+    regex: /\bfw_[A-Za-z0-9_-]{20,}\b/,
+  },
   {
     id: 'aws-access-key-id',
     minStrictness: 'low',
@@ -107,10 +181,31 @@ const SECRET_PATTERNS: PatternDefinition[] = [
     severity: 'medium',
     regex: /\b(?:api[_-]?key|secret|token|password|passwd)\b\s*[:=]\s*["'][A-Za-z0-9+/_=-]{20,}["']/i,
   },
+  {
+    id: 'configuration-secret-assignment',
+    minStrictness: 'medium',
+    severity: 'high',
+    configFileOnly: true,
+    regex:
+      /\b(?:[A-Za-z0-9]+[_-])*(?:api[_-]?(?:key|token)|access[_-]?(?:key|token)|auth(?:entication|orization)?[_-]?(?:key|token)|bearer[_-]?token|client[_-]?(?:secret|key)|consumer[_-]?(?:secret|key)|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret(?:[_-]?key)?|token|password|passwd|credential(?:s)?|key)\b\s*[:=]\s*["']?([A-Za-z0-9+/_=.-]{20,})["']?(?=\s*(?:[#;].*)?$)/i,
+    validateMatch: (match) => isLikelyHighEntropySecret(match[1] || ''),
+  },
 ];
 
 function normalizePathForMatch(filePath: string): string {
   return (filePath || '').replace(/\\/g, '/').toLowerCase();
+}
+
+function isConfigurationFile(filePath: string): boolean {
+  const fileName = normalizePathForMatch(filePath).split('/').pop() || '';
+  return /^\.env(?:\..+)?$/.test(fileName) || /\.(?:env|ini|conf|cfg|config|properties)$/.test(fileName);
+}
+
+function isLikelyHighEntropySecret(value: string): boolean {
+  if (value.length < 20 || value.length > 512) return false;
+
+  const characterClasses = [/[a-z]/.test(value), /[A-Z]/.test(value), /\d/.test(value), /[+/_=.-]/.test(value)].filter(Boolean).length;
+  return characterClasses >= 3 && new Set(value).size >= 10;
 }
 
 function parseAllowlist(rawAllowlist: string): ParsedAllowlistRule[] {
@@ -288,7 +383,9 @@ export class SecretScanService {
       if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
       for (const pattern of SECRET_PATTERNS) {
         if (!patternEnabledForStrictness(pattern, strictness)) continue;
-        if (!pattern.regex.test(candidate.line)) continue;
+        if (pattern.configFileOnly && !isConfigurationFile(candidate.filePath)) continue;
+        const match = candidate.line.match(pattern.regex);
+        if (!match || (pattern.validateMatch && !pattern.validateMatch(match))) continue;
         if (isAllowlisted({ filePath: candidate.filePath, line: candidate.line, ruleId: pattern.id }, allowlistRules)) continue;
         if (findings.length >= 1000) {
           if (!findingLimitNoted) {

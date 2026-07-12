@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
+import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import type { GitStatusWithConflicts } from './types';
 import { clearCommitFormDraftsForTests } from './commitFormDraft';
@@ -34,6 +35,10 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: 'Previous title' });
+  vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
+    success: true,
+    data: { scanned: true, strictness: 'medium', findings: [], notes: [], stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 } },
+  });
 });
 
 afterEach(() => {
@@ -55,7 +60,9 @@ describe('useCommitForm repository isolation', () => {
         status,
         setToast,
         refresh: vi.fn().mockResolvedValue(undefined),
-        settings: DEFAULT_SETTINGS,
+        settings: { ...DEFAULT_SETTINGS, secretScanBeforeCommitEnabled: false },
+        setConfirmDialog: vi.fn(),
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
       });
       return null;
     };
@@ -100,6 +107,8 @@ describe('useCommitForm repository isolation', () => {
         setToast: vi.fn(),
         refresh: vi.fn().mockResolvedValue(undefined),
         settings: DEFAULT_SETTINGS,
+        setConfirmDialog: vi.fn(),
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
       });
       return null;
     };
@@ -112,6 +121,113 @@ describe('useCommitForm repository isolation', () => {
       await current!.handleCommit();
     });
     expect(current!.amendCommit).toBe(false);
+    act(() => root.unmount());
+  });
+
+  it('opens the app dialog and persists an allowlist entry before committing findings', async () => {
+    const findings = [
+      {
+        id: 'finding-1',
+        ruleId: 'secret',
+        severity: 'high' as const,
+        source: 'staged' as const,
+        filePath: 'data.ini',
+        lineNumber: 1,
+        contextLine: '[REDACTED_SECRET]',
+      },
+    ];
+    vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
+      success: true,
+      data: { scanned: true, strictness: 'medium', findings, notes: [], stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
+    });
+    const approve = vi.spyOn(gitClient, 'approveSecretScanCommit').mockResolvedValue({ success: true });
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, secretScanAllowlist: 'path:data.ini' });
+    const setConfirmDialog = vi.fn();
+    const onUpdateSettings = vi.fn().mockResolvedValue(undefined);
+    let current: ReturnType<typeof useCommitForm> | null = null;
+    const root: Root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath: repoA,
+        status,
+        setToast: vi.fn(),
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: DEFAULT_SETTINGS,
+        setConfirmDialog,
+        onUpdateSettings,
+      });
+      return null;
+    };
+    act(() => root.render(createElement(Harness)));
+    act(() => current!.setCommitMsg('feat: protect config'));
+
+    await act(async () => {
+      await current!.handleCommit();
+    });
+
+    const dialog = setConfirmDialog.mock.calls[0]?.[0];
+    expect(dialog).toEqual(expect.objectContaining({ secondaryActionLabel: 'Dateien allowlisten und committen' }));
+    await act(async () => {
+      await dialog.onSecondaryAction();
+    });
+
+    expect(onUpdateSettings).toHaveBeenCalledWith({ secretScanAllowlist: 'path:data.ini' });
+    expect(approve).toHaveBeenCalledWith(repoA);
+    expect(createCommit).toHaveBeenCalledWith(expect.objectContaining({ repoPath: repoA }));
+    act(() => root.unmount());
+  });
+
+  it('does not commit when the allowlist update cannot be verified', async () => {
+    const findings = [
+      {
+        id: 'finding-1',
+        ruleId: 'secret',
+        severity: 'high' as const,
+        source: 'staged' as const,
+        filePath: 'data.ini',
+        lineNumber: 1,
+        contextLine: '[REDACTED_SECRET]',
+      },
+    ];
+    vi.spyOn(gitClient, 'scanCommitSecrets').mockResolvedValue({
+      success: true,
+      data: { scanned: true, strictness: 'medium', findings, notes: [], stats: { checkedLines: 1, stagedLines: 1, toPushLines: 0, tagLines: 0 } },
+    });
+    const approve = vi.spyOn(gitClient, 'approveSecretScanCommit').mockResolvedValue({ success: true });
+    const createCommit = vi.spyOn(gitClient, 'createCommit').mockResolvedValue({ success: true });
+    vi.spyOn(appClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(appClient, 'getSettings').mockResolvedValue({ ...DEFAULT_SETTINGS, secretScanAllowlist: '' });
+    const setConfirmDialog = vi.fn();
+    const setToast = vi.fn();
+    let current: ReturnType<typeof useCommitForm> | null = null;
+    const root: Root = createRoot(document.getElementById('root')!);
+    const Harness = () => {
+      current = useCommitForm({
+        repoPath: repoA,
+        status,
+        setToast,
+        refresh: vi.fn().mockResolvedValue(undefined),
+        settings: DEFAULT_SETTINGS,
+        setConfirmDialog,
+        onUpdateSettings: vi.fn().mockResolvedValue(undefined),
+      });
+      return null;
+    };
+    act(() => root.render(createElement(Harness)));
+    act(() => current!.setCommitMsg('feat: protect config'));
+    await act(async () => {
+      await current!.handleCommit();
+    });
+    const dialog = setConfirmDialog.mock.calls[0]?.[0];
+    await act(async () => {
+      await dialog.onSecondaryAction();
+    });
+
+    expect(approve).not.toHaveBeenCalled();
+    expect(createCommit).not.toHaveBeenCalled();
+    expect(setToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
     act(() => root.unmount());
   });
 });

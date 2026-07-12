@@ -70,6 +70,72 @@ describe('secret scan renderer approval', () => {
     expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true }));
   });
 
+  it('adds finding paths to the allowlist before continuing the approved push', async () => {
+    vi.stubGlobal('window', {
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+    });
+    const findings = [
+      {
+        id: 'finding-1',
+        ruleId: 'token',
+        severity: 'high' as const,
+        source: 'to-push' as const,
+        filePath: '.env',
+        lineNumber: 1,
+        contextLine: '[REDACTED_SECRET]',
+      },
+    ];
+    vi.spyOn(gitClient, 'scanPushSecrets').mockResolvedValue({
+      success: true,
+      data: {
+        scanned: true,
+        strictness: 'medium',
+        findings,
+        notes: [],
+        stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 },
+      },
+    });
+    const approve = vi.spyOn(gitClient, 'approveSecretScanPush').mockResolvedValue({ success: true });
+    const addSecretScanFindingsToAllowlist = vi.fn().mockResolvedValue(true);
+    const runWithOptions = vi.fn();
+    const setConfirmDialog = vi.fn();
+    const runtime = {
+      isRepoCurrent: vi.fn(() => true),
+      runRemoteAheadQuickFix: vi.fn(),
+      runWithOptions,
+      setConfirmDialog,
+      setGitActionToast: vi.fn(),
+      addSecretScanFindingsToAllowlist,
+      t: (key: string) => key,
+      tr: (_de: string, en: string) => en,
+    } as any;
+
+    await runSecretScanGuard(
+      {
+        args: ['push', 'origin', 'main'],
+        command: 'push',
+        successMsg: 'pushed',
+        repoPath: 'C:/repo',
+      },
+      runtime,
+      false,
+    );
+
+    const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
+    expect(dialog.secondaryActionLabel).toBe('Allowlist files and push');
+    await dialog.onSecondaryAction?.();
+
+    expect(addSecretScanFindingsToAllowlist).toHaveBeenCalledWith(findings);
+    expect(approve).toHaveBeenCalledWith(['origin', 'main'], 'C:/repo');
+    expect(runWithOptions).toHaveBeenCalledWith(
+      ['push', 'origin', 'main'],
+      'pushed',
+      undefined,
+      expect.objectContaining({ expectedRepoPath: 'C:/repo', skipSecretScan: true }),
+    );
+  });
+
   it('retries a timed-out scan instead of offering an unscanned bypass', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('window', {

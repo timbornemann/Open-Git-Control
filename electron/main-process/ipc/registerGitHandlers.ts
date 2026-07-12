@@ -15,6 +15,7 @@ import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { registerGitOperationStateHandler } from './git/registerGitOperationStateHandler';
 import { registerSecretScanPushGuard } from './git/secretScanPushGuard';
+import { registerSecretScanCommitGuard } from './git/secretScanCommitGuard';
 import { emitJobEvent, sendToWebContents } from './jobEvents';
 import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
@@ -46,6 +47,12 @@ export function registerGitHandlers({
     readSettingsWithMigration,
     repoJobRegistry,
   });
+  const secretScanCommitGuard = registerSecretScanCommitGuard({
+    gitService,
+    secretScanService,
+    readSettingsWithMigration,
+    repoJobRegistry,
+  });
 
   registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
   registerGitFileHandlers({ gitService, readStoredRepoPaths });
@@ -66,6 +73,7 @@ export function registerGitHandlers({
     const activeRepoPath = gitService.getRepoPath() || requestedRepoPath;
     repoJobRegistry.cancelForRepoChange(activeRepoPath);
     secretScanPushGuard.abortActiveScan();
+    secretScanCommitGuard.clearApprovals();
     commitStatsService.setActiveRepo(activeRepoPath);
     return activeRepoPath;
   });
@@ -75,6 +83,7 @@ export function registerGitHandlers({
     workingTreeService.setActiveRepo();
     repoJobRegistry.cancelForRepoChange(null);
     secretScanPushGuard.abortActiveScan();
+    secretScanCommitGuard.clearApprovals();
     gitService.clearRepoPath();
     commitStatsService.setActiveRepo('');
     return true;
@@ -103,44 +112,16 @@ export function registerGitHandlers({
 
       try {
         const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
-        const settings = readSettingsWithMigration();
-        if (settings.secretScanBeforeCommitEnabled) {
-          const repoJob = repoJobRegistry.begin(repoPath);
-          try {
-            emitJobEvent(event.sender, {
-              id: jobId,
-              operation: 'git:commit',
-              status: 'progress',
-              message: 'Scanning staged changes for potential secrets.',
-              timestamp: Date.now(),
-            });
-            const scanResult = await secretScanService.scanStagedDiffs({
-              repoPath: repoJob.repoPath,
-              strictness: settings.secretScanStrictness,
-              allowlistText: settings.secretScanAllowlist,
-              signal: repoJob.signal,
-              onProgress: (checkedLines) => {
-                emitJobEvent(event.sender, {
-                  id: jobId,
-                  operation: 'git:commit',
-                  status: 'progress',
-                  message: `Secret scan checked ${checkedLines} added line(s).`,
-                  details: { checkedLines },
-                  timestamp: Date.now(),
-                });
-              },
-            });
-            repoJob.ensureActive();
-            if (scanResult.findings.length > 0) {
-              const fileCount = new Set(scanResult.findings.map((finding) => finding.filePath)).size;
-              throw new Error(
-                `Commit blocked: ${scanResult.findings.length} potential secret hit(s) found in ${fileCount} staged file(s). Review the staged changes, or add a deliberate allowlist rule in Settings.`,
-              );
-            }
-          } finally {
-            repoJob.complete();
-          }
-          requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+        const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
+        if (scanBlock) {
+          emitJobEvent(event.sender, {
+            id: jobId,
+            operation: 'git:commit',
+            status: 'failed',
+            message: scanBlock.error,
+            timestamp: Date.now(),
+          });
+          return scanBlock;
         }
         const data = await gitService.commits.commitWithMessageAtPath(repoPath, {
           title: String(params.title || ''),
@@ -169,6 +150,18 @@ export function registerGitHandlers({
       }
     },
   );
+
+  ipcMain.handle(IpcChannel.GitScanCommitSecrets, async (event: any, params: { repoPath?: unknown } = {}) => {
+    if (typeof params.repoPath !== 'string' || !params.repoPath.trim()) {
+      return { success: false, error: 'Repository path is required.' };
+    }
+    return secretScanCommitGuard.scanCommitSecrets(event, { repoPath: params.repoPath, recordRendererScan: true });
+  });
+
+  ipcMain.handle(IpcChannel.GitApproveSecretScanCommit, async (event: any, requestedRepoPath?: unknown) => {
+    if (typeof requestedRepoPath !== 'string' || !requestedRepoPath.trim()) return { success: false };
+    return secretScanCommitGuard.approveSecretScanCommit(event, requestedRepoPath);
+  });
 
   ipcMain.handle(IpcChannel.GitStagePaths, async (event: any, paths: unknown, requestedRepoPath?: unknown) => {
     const jobId = createJobId('git-stage-paths');

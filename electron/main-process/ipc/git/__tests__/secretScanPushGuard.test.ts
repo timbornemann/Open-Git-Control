@@ -2,17 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepoJobRegistry } from '../../../repoJobRegistry';
 import { registerSecretScanPushGuard } from '../secretScanPushGuard';
 
-const { handlers, showMessageBoxMock } = vi.hoisted(() => ({
+const { handlers } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => Promise<any>>(),
-  showMessageBoxMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, callback: (...args: any[]) => Promise<any>) => handlers.set(channel, callback)),
-  },
-  dialog: {
-    showMessageBox: showMessageBoxMock,
   },
 }));
 
@@ -68,10 +64,11 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
     getRepoPath: vi.fn(() => 'C:/repo'),
     runCommandAtPath,
   } as any;
+  const settings = { secretScanBeforePushEnabled: true, secretScanStrictness: 'medium' as const, secretScanAllowlist: '' };
   const guard = registerSecretScanPushGuard({
     gitService,
     secretScanService: { scanPushDiffs } as any,
-    readSettingsWithMigration: vi.fn(() => ({ secretScanBeforePushEnabled: true, secretScanStrictness: 'medium', secretScanAllowlist: '' }) as any),
+    readSettingsWithMigration: vi.fn(() => settings as any),
     repoJobRegistry: new RepoJobRegistry(),
   });
   const event = { sender: { id: 7, send: vi.fn() } };
@@ -82,7 +79,6 @@ const createHarness = (scanPushDiffs: ReturnType<typeof vi.fn>) => {
 describe('secret scan push state binding', () => {
   beforeEach(() => {
     handlers.clear();
-    showMessageBoxMock.mockReset();
   });
 
   it('requires an explicit repository for renderer scans and approvals', async () => {
@@ -112,7 +108,6 @@ describe('secret scan push state binding', () => {
       success: false,
       error: 'Repository state changed after the secret scan. Run the secret scan again before pushing.',
     });
-    expect(showMessageBoxMock).not.toHaveBeenCalled();
   });
 
   it('rejects approval when exact staged index entries changed after the scan', async () => {
@@ -139,20 +134,15 @@ describe('secret scan push state binding', () => {
     });
   });
 
-  it('blocks a native Push-anyway response when refs change while the dialog is open', async () => {
+  it('blocks a direct push with findings until the renderer confirms the in-app dialog', async () => {
     const harness = createHarness(vi.fn().mockResolvedValue(findingsResult));
-    showMessageBoxMock.mockImplementation(async () => {
-      harness.state.remoteRef = '3333333333333333333333333333333333333333';
-      return { response: 1 };
-    });
 
     const result = await harness.guard.requirePushSecretScanApproval(harness.event, [], 'C:/repo');
 
     expect(result).toEqual({
       success: false,
-      error: 'Repository state changed after the secret scan. Run the secret scan again before pushing.',
+      error: 'Potential secrets were detected. Confirm the in-app dialog before pushing.',
     });
-    expect(showMessageBoxMock).toHaveBeenCalledOnce();
   });
 
   it('redacts fingerprint command errors instead of returning embedded credentials', async () => {

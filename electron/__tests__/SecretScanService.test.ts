@@ -25,6 +25,109 @@ function createGitServiceMock(outputs: Record<string, string | Error>) {
 }
 
 describe('SecretScanService', () => {
+  it('detects high-confidence AI provider keys at low strictness', async () => {
+    const keys = [
+      ['openai-project-api-key', 'sk-proj-K7xP2mQ9vR4tN8cW3yL6dF1hJ5sA0bE2'],
+      ['openai-service-account-api-key', 'sk-svcacct-R9pL3xW7nK2mV8qF4cJ6tA1yD5hB0sE3'],
+      ['anthropic-api-key', 'sk-ant-api03-X7mQ2pV9kR4nW8cL3yF6tJ1hD5sA0bE2-G4uN9zC7xP3'],
+      ['google-api-key', 'AIzaSyD7mQ2pV9kR4nW8cL3yF6tJ1hD5sA0bE2X'],
+      ['groq-api-key', 'gsk_K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+      ['openrouter-api-key', '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'],
+      ['hugging-face-access-token', 'hf_K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+      ['replicate-api-token', 'r8_K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+    ] as const;
+    const stagedDiff = keys.flatMap(([, key], index) => [
+      `diff --git a/src/key-${index}.ts b/src/key-${index}.ts`,
+      `+++ b/src/key-${index}.ts`,
+      '@@ -0,0 +1 @@',
+      `+// ${key}`,
+    ]);
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff.join('\n'),
+      }),
+    );
+
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' });
+
+    expect(result.findings.map((finding) => finding.ruleId).sort()).toEqual(keys.map(([ruleId]) => ruleId).sort());
+  });
+
+  it('detects less distinctive AI provider prefixes at medium strictness', async () => {
+    const keys = [
+      ['xai-api-key', 'xai-K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+      ['perplexity-api-key', 'pplx-K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+      ['together-ai-api-key', 'tgp_v1_K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+      ['fireworks-ai-api-key', 'fw_K7mP2xR9vQ4nW8cL3yF6tJ1hD5sA0bE2'],
+    ] as const;
+    const stagedDiff = keys.flatMap(([, key], index) => [
+      `diff --git a/src/key-${index}.ts b/src/key-${index}.ts`,
+      `+++ b/src/key-${index}.ts`,
+      '@@ -0,0 +1 @@',
+      `+// ${key}`,
+    ]);
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff.join('\n'),
+      }),
+    );
+
+    await expect(service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '' })).resolves.toMatchObject({ findings: [] });
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'medium', allowlistText: '' });
+
+    expect(result.findings.map((finding) => finding.ruleId).sort()).toEqual(keys.map(([ruleId]) => ruleId).sort());
+  });
+
+  it('detects contextual AI keys in staged configuration files without matching the same code assignment', async () => {
+    const testValue = '2Qm5B1vwzeCYkFp3XflS5h6Z4y7cQQbd';
+    const stagedDiff = [
+      'diff --git a/data.ini b/data.ini',
+      '+++ b/data.ini',
+      '@@ -0,0 +1 @@',
+      `+key=${testValue}`,
+      'diff --git a/.env b/.env',
+      '+++ b/.env',
+      '@@ -0,0 +1 @@',
+      '+DASHSCOPE_API_KEY=sk-91f3a7c2e8b64d05a4f1c9e7b2d83a60',
+      'diff --git a/config.conf b/config.conf',
+      '+++ b/config.conf',
+      '@@ -0,0 +1 @@',
+      '+MISTRAL_API_KEY=mQ7pV2xR9kL4nW8cF3yJ6tD1hS5aB0eE',
+      'diff --git a/.env.gemini b/.env.gemini',
+      '+++ b/.env.gemini',
+      '@@ -0,0 +1 @@',
+      '+GEMINI_API_KEY=AQ.AbC7mQ2pV9kR4nW8cL3yF6tJ1hD5sA0bE2xZ',
+      'diff --git a/src/example.ts b/src/example.ts',
+      '+++ b/src/example.ts',
+      '@@ -0,0 +1 @@',
+      `+const key = '${testValue}';`,
+    ].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+      }),
+    );
+
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'medium', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(4);
+    expect(result.findings.map((finding) => finding.filePath).sort()).toEqual(['.env', '.env.gemini', 'config.conf', 'data.ini']);
+    expect(result.findings.every((finding) => finding.ruleId === 'configuration-secret-assignment')).toBe(true);
+  });
+
+  it('does not flag a low-entropy configuration value with a generic key name', async () => {
+    const stagedDiff = ['diff --git a/data.ini b/data.ini', '+++ b/data.ini', '@@ -0,0 +1 @@', '+key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'].join('\n');
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': stagedDiff,
+      }),
+    );
+
+    const result = await service.scanStagedDiffs({ repoPath: '/tmp/repo', strictness: 'medium', allowlistText: '' });
+
+    expect(result.findings).toHaveLength(0);
+  });
+
   it('scans only the staged patch for the fast pre-commit check', async () => {
     const stagedDiff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');
     const runCommandAtPath = vi.fn();
