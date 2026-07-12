@@ -72,15 +72,20 @@ const MainViewComponent: React.FC = () => {
     if (showReleaseCreator) setShowTimeline(false);
   }, [showReleaseCreator, setShowTimeline]);
 
+  const handleRepositoryStagingOpen = React.useCallback(() => {
+    setShowTimeline(false);
+    handleStageCommitOpen();
+  }, [handleStageCommitOpen, setShowTimeline]);
+
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
-      handleStageCommitOpen();
+      handleRepositoryStagingOpen();
       revealInspectorPane();
     };
 
     window.addEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
     return () => window.removeEventListener(APPLICATION_OPEN_STAGING_COMMIT_EVENT, handleOpenStagingCommit);
-  }, [handleStageCommitOpen, revealInspectorPane]);
+  }, [handleRepositoryStagingOpen, revealInspectorPane]);
 
   const isSettingsView = activeTab === 'settings';
   const isPlannerView = activeTab === 'planner';
@@ -94,7 +99,7 @@ const MainViewComponent: React.FC = () => {
         canShowInspectorPane={canShowInspectorPane}
         showInspectorPane={showInspectorPane}
         onToggleInspectorPane={toggleInspectorPane}
-        onStageCommit={handleStageCommitOpen}
+        onStageCommit={handleRepositoryStagingOpen}
         onOpenTimeline={openTimeline}
         isTimelineLoading={isTimelineLoading}
       />
