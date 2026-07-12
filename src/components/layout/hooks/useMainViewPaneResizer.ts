@@ -30,6 +30,7 @@ export const useMainViewPaneResizer = () => {
   const [isContentResizing, setIsContentResizing] = useState(false);
   const contentAreaRef = useRef<HTMLDivElement | null>(null);
   const contentResizeActiveRef = useRef(false);
+  const preferredInspectorWidthRef = useRef<number | null>(preferredInspectorWidth);
 
   const primaryPaneBasis = `${(primaryPaneRatio * 100).toFixed(2)}%`;
 
@@ -44,6 +45,7 @@ export const useMainViewPaneResizer = () => {
   useEffect(() => {
     const handleLayoutReset = () => {
       contentResizeActiveRef.current = false;
+      preferredInspectorWidthRef.current = null;
       setIsContentResizing(false);
       setPrimaryPaneRatio(PRIMARY_PANE_DEFAULT_RATIO);
       setPreferredInspectorWidth(null);
@@ -68,13 +70,18 @@ export const useMainViewPaneResizer = () => {
       const nextRatio = clampedPrimaryPx / rect.width;
       const nextInspectorWidth = Math.max(INSPECTOR_PANE_MIN_WIDTH, Math.round(rect.width - clampedPrimaryPx - CONTENT_RESIZER_WIDTH));
 
-      setPrimaryPaneRatio(clampPrimaryPaneRatio(nextRatio, rect.width));
-      setPreferredInspectorWidth(nextInspectorWidth);
+      preferredInspectorWidthRef.current = nextInspectorWidth;
+      const clampedRatio = clampPrimaryPaneRatio(nextRatio, rect.width);
+      setPrimaryPaneRatio((previous) => (Math.abs(previous - clampedRatio) < 0.000_001 ? previous : clampedRatio));
     };
 
     const stopResize = () => {
       if (!contentResizeActiveRef.current) return;
       contentResizeActiveRef.current = false;
+      const nextPreferredInspectorWidth = preferredInspectorWidthRef.current;
+      if (nextPreferredInspectorWidth !== null) {
+        setPreferredInspectorWidth((previous) => (previous === nextPreferredInspectorWidth ? previous : nextPreferredInspectorWidth));
+      }
       setIsContentResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -112,9 +119,11 @@ export const useMainViewPaneResizer = () => {
         if (Number.isFinite(preferredInspectorWidth ?? NaN) && preferredInspectorWidth !== null) {
           const desiredPrimaryPx = rect.width - preferredInspectorWidth - CONTENT_RESIZER_WIDTH;
           const desiredRatio = desiredPrimaryPx / rect.width;
-          return clampPrimaryPaneRatio(desiredRatio, rect.width);
+          const clamped = clampPrimaryPaneRatio(desiredRatio, rect.width);
+          return Math.abs(previous - clamped) < 0.000_001 ? previous : clamped;
         }
-        return clampPrimaryPaneRatio(previous, rect.width);
+        const clamped = clampPrimaryPaneRatio(previous, rect.width);
+        return Math.abs(previous - clamped) < 0.000_001 ? previous : clamped;
       });
     };
 

@@ -114,4 +114,28 @@ describe('layout preferences', () => {
 
     hook.unmount();
   });
+
+  it('keeps resizing live without persisting the inspector width until the pointer is released', () => {
+    const hook = renderLayoutHooks();
+    const contentArea = document.createElement('div');
+    Object.defineProperty(contentArea, 'getBoundingClientRect', {
+      value: () => ({ left: 0, width: 1000 }),
+    });
+    hook.current.panes.contentAreaRef.current = contentArea;
+
+    act(() => {
+      hook.current.panes.handleContentResizeStart({ preventDefault: vi.fn() } as any);
+      const move = new window.Event('pointermove');
+      Object.defineProperty(move, 'clientX', { value: 600 });
+      window.dispatchEvent(move);
+    });
+
+    expect(hook.current.panes.primaryPaneBasis).toBe('60.00%');
+    expect(window.localStorage.getItem('open-git-control.inspector-pane-width')).toBeNull();
+
+    act(() => window.dispatchEvent(new window.Event('pointerup')));
+
+    expect(window.localStorage.getItem('open-git-control.inspector-pane-width')).toBe('392');
+    hook.unmount();
+  });
 });
