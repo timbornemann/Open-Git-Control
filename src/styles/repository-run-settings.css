@@ -1,5 +1,29 @@
+.settings-card.repository-run-settings {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 0 8px;
+  border-top: 0;
+}
+.settings-card.repository-run-settings > * {
+  grid-column: auto;
+}
+.repository-run-settings .settings-card-header-row {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.repository-run-settings .settings-field {
+  max-width: none;
+}
+.repository-run-settings .settings-field select {
+  max-width: none;
+}
 .repository-run-settings__path {
+  margin: -5px 0 2px;
   font-family: var(--font-mono);
+  font-size: 0.68rem;
   overflow-wrap: anywhere;
 }
 .repository-run-settings__error {
@@ -8,9 +32,12 @@
   border: 1px solid var(--status-danger);
 }
 .repository-run-settings__action {
-  margin-top: 10px;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 2px;
   border: 1px solid var(--line-subtle);
-  background: var(--bg-panel);
+  background: var(--bg-dark);
 }
 .repository-run-settings__action-header {
   width: 100%;
@@ -18,7 +45,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px;
+  padding: 11px 12px;
   border: 0;
   color: var(--text-primary);
   background: transparent;
@@ -33,7 +60,7 @@
   font: 0.68rem var(--font-mono);
 }
 .repository-run-settings__action-body {
-  padding: 0 10px 10px;
+  padding: 0 12px 12px;
   border-top: 1px solid var(--line-subtle);
 }
 .repository-run-settings__templates {
@@ -43,10 +70,10 @@
   padding: 9px 0;
 }
 .repository-run-settings__step {
-  padding: 10px;
+  padding: 12px;
   margin-top: 8px;
   border: 1px solid var(--line-subtle);
-  background: var(--bg-base);
+  background: var(--bg-panel);
 }
 .repository-run-settings__step-title {
   display: flex;

@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { AlertCircle, FileWarning, Square, Terminal } from 'lucide-react';
+import { AlertCircle, Copy, FileWarning, Square, Terminal } from 'lucide-react';
 import type { RepositoryRunStateDto } from '@/types/repositoryRun';
 import { parseRepositoryRunOutput } from '@/utils/repositoryRunOutput';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { useI18n } from '@/i18n';
+import { useRepositoryContext } from '@/contexts/AppStateContext';
 import '@/styles/repository-run.css';
 
 type Props = {
@@ -15,6 +17,7 @@ type ConsoleTab = 'output' | 'problems' | 'summary';
 
 export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) => {
   const { tr } = useI18n();
+  const { onToast } = useRepositoryContext();
   const [tab, setTab] = useState<ConsoleTab>('output');
   const problems = useMemo(() => parseRepositoryRunOutput(run.output, (index) => run.steps[index]?.parser || 'none'), [run.output, run.steps]);
   const isRunning = run.status === 'running';
@@ -26,6 +29,32 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
         : run.status === 'cancelled'
           ? tr('Gestoppt', 'Stopped')
           : tr('Fehlgeschlagen', 'Failed');
+  const outputText = useMemo(() => run.output.map((line) => line.text).join('\n'), [run.output]);
+  const problemsText = useMemo(
+    () =>
+      problems
+        .map((problem) => `${problem.file ? `${problem.file}:${problem.line}:${problem.column}` : problem.severity.toUpperCase()} ${problem.message}`)
+        .join('\n'),
+    [problems],
+  );
+  const copy = async (text: string, copiedMessage: string) => {
+    const copied = await copyTextToClipboard(text);
+    onToast(copied ? copiedMessage : tr('Kopieren in die Zwischenablage fehlgeschlagen.', 'Could not copy to the clipboard.'), !copied);
+  };
+  const copyAction =
+    tab === 'output'
+      ? {
+          text: outputText,
+          label: tr('Ausgabe kopieren', 'Copy output'),
+          message: tr('Konsolenausgabe kopiert.', 'Console output copied.'),
+        }
+      : tab === 'problems'
+        ? {
+            text: problemsText,
+            label: tr('Probleme kopieren', 'Copy problems'),
+            message: tr('Probleme kopiert.', 'Problems copied.'),
+          }
+        : null;
 
   return (
     <section className="repository-run-console">
@@ -40,6 +69,11 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
         </div>
         <div className="repository-run-console__actions">
           <span className={`repository-run-console__status repository-run-console__status--${run.status}`}>{statusLabel}</span>
+          {copyAction && (
+            <button className="staging-tool-btn" onClick={() => void copy(copyAction.text, copyAction.message)} disabled={!copyAction.text}>
+              <Copy size={13} /> {copyAction.label}
+            </button>
+          )}
           {isRunning && (
             <button className="staging-tool-btn danger" onClick={onStop}>
               <Square size={13} /> {tr('Stoppen', 'Stop')}
@@ -69,30 +103,34 @@ export const RepositoryRunConsole: React.FC<Props> = ({ run, onStop, onBack }) =
         </button>
       </div>
       {tab === 'output' && (
-        <pre className="repository-run-console__output">
-          {run.output.map((line) => (
-            <code key={line.sequence} className={`repository-run-console__line repository-run-console__line--${line.stream}`}>
-              {line.text || ' '}
-              {'\n'}
-            </code>
-          ))}
-        </pre>
+        <div className="repository-run-console__pane">
+          <pre className="repository-run-console__output">
+            {run.output.map((line) => (
+              <code key={line.sequence} className={`repository-run-console__line repository-run-console__line--${line.stream}`}>
+                {line.text || ' '}
+                {'\n'}
+              </code>
+            ))}
+          </pre>
+        </div>
       )}
       {tab === 'problems' && (
-        <div className="repository-run-console__problems">
-          {problems.length === 0 ? (
-            <p>{tr('Keine auswertbaren Probleme gefunden.', 'No parseable problems found.')}</p>
-          ) : (
-            problems.map((problem) => (
-              <article key={problem.sequence} className={`repository-run-console__problem ${problem.severity}`}>
-                <AlertCircle size={15} />
-                <div>
-                  <strong>{problem.file ? `${problem.file}:${problem.line}:${problem.column}` : problem.severity}</strong>
-                  <div>{problem.message}</div>
-                </div>
-              </article>
-            ))
-          )}
+        <div className="repository-run-console__pane">
+          <div className="repository-run-console__problems">
+            {problems.length === 0 ? (
+              <p>{tr('Keine auswertbaren Probleme gefunden.', 'No parseable problems found.')}</p>
+            ) : (
+              problems.map((problem) => (
+                <article key={problem.sequence} className={`repository-run-console__problem ${problem.severity}`}>
+                  <AlertCircle size={15} />
+                  <div>
+                    <strong>{problem.file ? `${problem.file}:${problem.line}:${problem.column}` : problem.severity}</strong>
+                    <div>{problem.message}</div>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
         </div>
       )}
       {tab === 'summary' && (

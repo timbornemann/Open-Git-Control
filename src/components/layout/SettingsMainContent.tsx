@@ -45,7 +45,11 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({ settin
 
         {activeTab === 'security' && <SettingsSecuritySection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />}
 
-        {activeTab === 'run' && <SettingsRunSection />}
+        {activeTab === 'run' && (
+          <div className="settings-grid">
+            <SettingsRunSection />
+          </div>
+        )}
 
         {activeTab === 'system' && (
           <div className="settings-grid">

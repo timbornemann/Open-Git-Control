@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "actions": {
+    "run": {
+      "steps": [
+        {
+          "id": "quality",
+          "label": "Full CI check",
+          "parser": "vitest-jest",
+          "windows": { "shell": "powershell", "command": "npm run test:ci" },
+          "macos": { "shell": "zsh", "command": "npm run test:ci" },
+          "linux": { "shell": "bash", "command": "npm run test:ci" }
+        }
+      ]
+    },
+    "test": {
+      "steps": [
+        {
+          "id": "unit-tests",
+          "label": "Unit tests",
+          "parser": "vitest-jest",
+          "windows": { "shell": "powershell", "command": "npm run test" },
+          "macos": { "shell": "zsh", "command": "npm run test" },
+          "linux": { "shell": "bash", "command": "npm run test" }
+        }
+      ]
+    },
+    "format": {
+      "steps": [
+        {
+          "id": "format-write",
+          "label": "Format files",
+          "parser": "prettier",
+          "windows": { "shell": "powershell", "command": "npx prettier --write ." },
+          "macos": { "shell": "zsh", "command": "npx prettier --write ." },
+          "linux": { "shell": "bash", "command": "npx prettier --write ." }
+        }
+      ]
+    },
+    "start": {
+      "steps": [
+        {
+          "id": "development",
+          "label": "Start development app",
+          "parser": "none",
+          "windows": { "shell": "powershell", "command": "npm run dev" },
+          "macos": { "shell": "zsh", "command": "npm run dev" },
+          "linux": { "shell": "bash", "command": "npm run dev" }
+        }
+      ]
+    },
+    "build": {
+      "steps": [
+        {
+          "id": "production-build",
+          "label": "Build application",
+          "parser": "typescript",
+          "windows": { "shell": "powershell", "command": "npm run build" },
+          "macos": { "shell": "zsh", "command": "npm run build" },
+          "linux": { "shell": "bash", "command": "npm run build" }
+        }
+      ]
+    }
+  }
+}

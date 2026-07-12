@@ -249,17 +249,6 @@ export const TopbarActions: React.FC<Props> = ({
         <RefreshCw size={16} className={isFetching ? 'spin' : ''} />
         <span className="topbar-action-label">Fetch</span>
       </button>
-      <RepositoryRunMenu
-        activeRepo={activeRepo}
-        activeRunConfig={activeRunConfig}
-        repositoryRun={repositoryRun}
-        open={openMenu === 'run'}
-        setOpen={(open) => setOpenMenu(open ? 'run' : null)}
-        onStart={onStartRepositoryRun}
-        onStop={onStopRepositoryRun}
-        onOpenConsole={onOpenRunConsole}
-        onOpenSettings={onOpenRunSettings}
-      />
       <div className="topbar-split-wrap topbar-action-secondary">
         <button
           className="icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main"
@@ -363,6 +352,17 @@ export const TopbarActions: React.FC<Props> = ({
           </div>
         )}
       </div>
+      <RepositoryRunMenu
+        activeRepo={activeRepo}
+        activeRunConfig={activeRunConfig}
+        repositoryRun={repositoryRun}
+        open={openMenu === 'run'}
+        setOpen={(open) => setOpenMenu(open ? 'run' : null)}
+        onStart={onStartRepositoryRun}
+        onStop={onStopRepositoryRun}
+        onOpenConsole={onOpenRunConsole}
+        onOpenSettings={onOpenRunSettings}
+      />
       <button className="icon-btn topbar-action-btn topbar-action-secondary" onClick={onOpenTimeline} disabled={!activeRepo || isTimelineLoading}>
         <History size={16} className={isTimelineLoading ? 'spin' : ''} />
         <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>

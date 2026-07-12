@@ -88,6 +88,13 @@
   background: var(--bg-base);
   color: var(--text-accent);
 }
+.repository-run-console__pane {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--bg-base);
+}
 .repository-run-console__output {
   margin: 0;
   padding: 14px 16px;
