@@ -57,11 +57,10 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if RELEASE_STATE="$(gh release view "$RELEASE_TAG" --json isDraft,assets --jq '[.isDraft, (.assets | length)] | @tsv' 2>/dev/null)"; then
-            read -r IS_DRAFT ASSET_COUNT <<< "$RELEASE_STATE"
+          if IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
             if [[ "$IS_DRAFT" != "true" ]]; then
-              if [[ "$RELEASE_EVENT" == "push" && "$ASSET_COUNT" == "0" ]]; then
-                echo "Converting the newly published, assetless release for $RELEASE_TAG back to a draft."
+              if [[ "$RELEASE_EVENT" == "push" ]]; then
+                echo "Converting the release that created tag $RELEASE_TAG back to a draft while its assets are built and verified."
                 gh release edit "$RELEASE_TAG" --draft
               else
                 echo "A published GitHub Release already exists for $RELEASE_TAG. Refusing to mutate it."

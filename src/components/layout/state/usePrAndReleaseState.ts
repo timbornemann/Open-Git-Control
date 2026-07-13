@@ -19,7 +19,7 @@ export const usePrAndReleaseState = () => {
     targetCommitish: '',
     releaseName: '',
     body: '',
-    draft: true,
+    draft: false,
     prerelease: false,
   });
   const [releaseSubmitting, setReleaseSubmitting] = useState(false);

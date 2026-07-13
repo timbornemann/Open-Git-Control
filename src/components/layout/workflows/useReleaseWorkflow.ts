@@ -175,7 +175,7 @@ export const useReleaseWorkflow = ({
         targetCommitish: currentBranch || '',
         releaseName: '',
         body: '',
-        draft: true,
+        draft: false,
         prerelease: false,
       });
       setReleaseError(null);

@@ -84,7 +84,7 @@ export const useRepoScopedNavigationState = ({
       targetCommitish: '',
       releaseName: '',
       body: '',
-      draft: true,
+      draft: false,
       prerelease: false,
     });
     setReleaseSubmitting(false);
