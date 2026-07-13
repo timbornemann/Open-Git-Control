@@ -1,8 +1,9 @@
 {
   "name": "open-git-control",
   "productName": "Open-Git-Control",
+  "desktopName": "Open-Git-Control",
   "private": true,
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "Desktop app for organizing and controlling Git repositories.",
   "license": "GPL-3.0-only",
   "copyright": "Copyright © 2026 Tim Bornemann",
@@ -154,7 +155,8 @@
         }
       ],
       "icon": "logo.png",
-      "category": "Development"
+      "category": "Development",
+      "syncDesktopName": true
     },
     "mac": {
       "target": [
@@ -171,6 +173,7 @@
           ]
         }
       ],
+      "icon": "logo.png",
       "category": "public.app-category.developer-tools",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",

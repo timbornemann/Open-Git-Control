@@ -250,7 +250,10 @@ export class HistoryService {
     const runBlame = (endLine?: number) => {
       const args = ['blame', '--line-porcelain'];
       if (startLine !== undefined && lineCount !== undefined && endLine !== undefined) args.push(`-L${startLine},${endLine}`);
-      args.push('--contents', '-', 'HEAD', '--', basePath);
+      // Omitting the optional final commit keeps this compatible with Git
+      // versions that reject combining `--contents` with an explicit HEAD.
+      // Git still uses HEAD as the implicit parent for the supplied contents.
+      args.push('--contents', '-', '--', basePath);
       return runCommandAtPathWithInput(repoPath, args, stagedContents);
     };
     return startLine !== undefined && lineCount !== undefined ? this.runBlameRange(startLine, lineCount, runBlame) : runBlame();

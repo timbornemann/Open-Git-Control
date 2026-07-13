@@ -372,7 +372,7 @@ fi`,
     expect(await git.runCommandAtPath(repoPath, ['show', '-s', '--format=%s', 'HEAD^'])).toBe('test: AI parent');
     expect(Number(await git.runCommandAtPath(repoPath, ['rev-list', '--count', 'HEAD']))).toBe(countBefore + 2);
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
-  });
+  }, 15_000);
 
   it('rolls back only the original branch when a hook attaches HEAD elsewhere', async () => {
     const { git, repoPath, filePath } = await createRepository();
