@@ -276,8 +276,8 @@ describe('GitService Markdown preview reads', () => {
         fs.symlinkSync(outsideFile, linkedFile, 'file');
       } catch (error: any) {
         // Windows installations without Developer Mode or symlink permission
-        // cannot create the fixture. The production containment check is still
-        // covered on every platform where symlinks are available.
+        // cannot create the fixture. The no-symlink policy is still covered by
+        // the lower-level junction tests on Windows.
         if (error?.code === 'EPERM' || error?.code === 'EACCES') return;
         throw error;
       }
@@ -285,8 +285,8 @@ describe('GitService Markdown preview reads', () => {
       const service = new GitService();
       service.setRepoPath(repoDir);
 
-      await expect(service.readRepoFile('linked-secret.txt')).rejects.toThrow('outside the current repository');
-      await expect(service.writeRepoFile('linked-secret.txt', 'overwrite')).rejects.toThrow('outside the current repository');
+      await expect(service.readRepoFile('linked-secret.txt')).rejects.toThrow('cannot be accessed through a symbolic link');
+      await expect(service.writeRepoFile('linked-secret.txt', 'overwrite')).rejects.toThrow('cannot be accessed through a symbolic link');
       expect(fs.readFileSync(outsideFile, 'utf8')).toBe('do not expose');
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
