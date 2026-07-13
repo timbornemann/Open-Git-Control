@@ -816,26 +816,26 @@ npm run test:ci
 
 Verfuegbare Skripte:
 
-| Skript                   | Zweck                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `npm run dev`            | Vite und Electron zusammen starten                                            |
-| `npm run electron:dev`   | Electron-Prozess bauen und Electron gegen Vite starten                        |
-| `npm run build`          | TypeScript, Vite Build und Electron-Prozess bauen                             |
-| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren                                     |
-| `npm run legal:prepare`  | Installer-Lizenz und Drittanbieterhinweise erzeugen                           |
-| `npm run legal:check`    | Erzeugte rechtliche Dateien pruefen                                           |
-| `npm run dist`           | Paketierte App fuer aktuelle Plattform bauen                                  |
-| `npm run dist:win`       | Windows NSIS x64 Paket bauen                                                  |
-| `npm run dist:linux`     | Linux AppImage und deb Pakete bauen                                           |
-| `npm run dist:mac`       | macOS dmg und zip Pakete bauen                                                |
-| `npm run release:win`    | Signiertes Windows-Release-Paket bauen (Signierungs-Env erforderlich)         |
-| `npm run release:linux`  | Linux-Release-Artefakte ohne Publishing bauen                                 |
-| `npm run release:mac`    | Signiertes und notarisiertes macOS-Paket bauen (Signierungs-Env erforderlich) |
-| `npm run preview`        | Vite Build previewen                                                          |
-| `npm run electron:start` | Electron nach gebautem Electron-Prozess starten                               |
-| `npm run test`           | Unit Tests ausfuehren                                                         |
-| `npm run test:coverage`  | Tests mit Coverage ausfuehren                                                 |
-| `npm run test:ci`        | Kompilieren, Tests mit Coverage und Build ausfuehren                          |
+| Skript                   | Zweck                                                       |
+| ------------------------ | ----------------------------------------------------------- |
+| `npm run dev`            | Vite und Electron zusammen starten                          |
+| `npm run electron:dev`   | Electron-Prozess bauen und Electron gegen Vite starten      |
+| `npm run build`          | TypeScript, Vite Build und Electron-Prozess bauen           |
+| `npm run build:electron` | Electron Main/Preload-Prozess kompilieren                   |
+| `npm run legal:prepare`  | Installer-Lizenz und Drittanbieterhinweise erzeugen         |
+| `npm run legal:check`    | Erzeugte rechtliche Dateien pruefen                         |
+| `npm run dist`           | Paketierte App fuer aktuelle Plattform bauen                |
+| `npm run dist:win`       | Windows NSIS x64 Paket bauen                                |
+| `npm run dist:linux`     | Linux AppImage und deb Pakete bauen                         |
+| `npm run dist:mac`       | macOS dmg und zip Pakete bauen                              |
+| `npm run release:win`    | Unsignierte Windows-Release-Artefakte ohne Publishing bauen |
+| `npm run release:linux`  | Linux-Release-Artefakte ohne Publishing bauen               |
+| `npm run release:mac`    | Unsignierte macOS-Release-Artefakte ohne Publishing bauen   |
+| `npm run preview`        | Vite Build previewen                                        |
+| `npm run electron:start` | Electron nach gebautem Electron-Prozess starten             |
+| `npm run test`           | Unit Tests ausfuehren                                       |
+| `npm run test:coverage`  | Tests mit Coverage ausfuehren                               |
+| `npm run test:ci`        | Kompilieren, Tests mit Coverage und Build ausfuehren        |
 
 ## Release Builds
 
@@ -848,16 +848,11 @@ npm run dist:linux
 npm run dist:mac
 ```
 
-GitHub Publishing laeuft ueber [.github/workflows/release.yml](.github/workflows/release.yml). Das Pushen eines geschuetzten Tags wie `vX.Y.Z` startet Qualitaetspruefungen und Plattform-Builds fuer Windows, Linux und macOS. Der Workflow leitet Paket- und Lockfile-Version aus dem Tag ab, erzeugt rechtliche Hinweise, verlangt Windows-/macOS-Signierungsmaterial, prueft den signierten Installer und die paketierte Anwendung, validiert Updater-Metadaten und erzeugt `SHA256SUMS.txt`. Danach laedt er alle Assets in ein Draft-Release, prueft dieses remote und veroeffentlicht es erst anschliessend. Der Auto-Updater kann das Release daher nicht sehen, bevor alle erforderlichen Assets vorhanden sind.
+GitHub Publishing laeuft ueber [.github/workflows/release.yml](.github/workflows/release.yml). Das Veroeffentlichen eines Releases mit einem Tag wie `vX.Y.Z` in Open Git Control oder auf GitHub startet Qualitaetspruefungen und Plattform-Builds fuer Windows, Linux und macOS. Der Workflow leitet Paket- und Lockfile-Version aus dem Release-Tag ab, erzeugt rechtliche Hinweise, validiert die paketierten Anwendungen und Updater-Metadaten und erzeugt `SHA256SUMS.txt`. Danach haengt er alle Assets an den bereits sichtbaren Release an und prueft sie remote. Fuer einen fehlgeschlagenen Build kann der Workflow mit einem vorhandenen Release-Tag auch manuell erneut gestartet werden.
 
 Lokale `dist:*`-Builds verwenden die in `package.json` eingecheckte Version. Offizielle Release-Builds fuehren `prepare-release-version.js` aus, damit `package.json`, `package-lock.json`, paketierte App-Version und MCP-Server-Metadaten auf dieselbe Release-Tag-Version aufgeloest werden.
 
-Erforderliche Repository-Secrets fuer signierte Releases:
-
-- Windows: `WINDOWS_CSC_LINK`, `WINDOWS_CSC_KEY_PASSWORD`
-- macOS: `MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
-
-Die Windows-Repository-Secrets werden auf electron-builders Variablen `WIN_CSC_LINK` und `WIN_CSC_KEY_PASSWORD` abgebildet. macOS verwendet `CSC_LINK`, `CSC_KEY_PASSWORD` und die Apple-Notarisierungsvariablen. Signierungs-Secrets werden nur in Release-Jobs uebergeben und duerfen nie committet werden. Lokale `dist:*`-Builds bleiben unsigniert; `release:win` erwartet `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`, waehrend `release:mac` die dokumentierte macOS-Signierungsumgebung erwartet.
+Es sind keine eigenen Repository-Secrets oder Signierungszertifikate erforderlich. GitHub stellt dem Workflow das `GITHUB_TOKEN` automatisch bereit. Die Windows- und macOS-Pakete sind bewusst unsigniert und der macOS-Build wird nicht notarisiert. Deshalb koennen die Betriebssysteme SmartScreen- oder Gatekeeper-Warnungen anzeigen. Code-Signierung und Notarisierung lassen sich spaeter ergaenzen, ohne den Release-Trigger zu aendern.
 
 Erwartete Release Assets:
 

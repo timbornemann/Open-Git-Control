@@ -816,26 +816,26 @@ npm run test:ci
 
 Available scripts:
 
-| Script                   | Purpose                                                           |
-| ------------------------ | ----------------------------------------------------------------- |
-| `npm run dev`            | Run Vite and Electron together                                    |
-| `npm run electron:dev`   | Build Electron process and start Electron against Vite            |
-| `npm run build`          | TypeScript, Vite build, and Electron process build                |
-| `npm run build:electron` | Compile Electron main/preload process                             |
-| `npm run legal:prepare`  | Generate installer license and third-party notices                |
-| `npm run legal:check`    | Verify generated legal files are current                          |
-| `npm run dist`           | Build packaged app for the current platform                       |
-| `npm run dist:win`       | Build Windows NSIS x64 package                                    |
-| `npm run dist:linux`     | Build Linux AppImage and deb packages                             |
-| `npm run dist:mac`       | Build macOS dmg and zip packages                                  |
-| `npm run release:win`    | Build a signed Windows release package (signing env required)     |
-| `npm run release:linux`  | Build Linux release assets without publishing                     |
-| `npm run release:mac`    | Build a signed and notarized macOS package (signing env required) |
-| `npm run preview`        | Preview Vite build                                                |
-| `npm run electron:start` | Start Electron after the Electron process has been built          |
-| `npm run test`           | Run unit tests                                                    |
-| `npm run test:coverage`  | Run tests with coverage                                           |
-| `npm run test:ci`        | Compile, test with coverage, and build                            |
+| Script                   | Purpose                                                  |
+| ------------------------ | -------------------------------------------------------- |
+| `npm run dev`            | Run Vite and Electron together                           |
+| `npm run electron:dev`   | Build Electron process and start Electron against Vite   |
+| `npm run build`          | TypeScript, Vite build, and Electron process build       |
+| `npm run build:electron` | Compile Electron main/preload process                    |
+| `npm run legal:prepare`  | Generate installer license and third-party notices       |
+| `npm run legal:check`    | Verify generated legal files are current                 |
+| `npm run dist`           | Build packaged app for the current platform              |
+| `npm run dist:win`       | Build Windows NSIS x64 package                           |
+| `npm run dist:linux`     | Build Linux AppImage and deb packages                    |
+| `npm run dist:mac`       | Build macOS dmg and zip packages                         |
+| `npm run release:win`    | Build unsigned Windows release assets without publishing |
+| `npm run release:linux`  | Build Linux release assets without publishing            |
+| `npm run release:mac`    | Build unsigned macOS release assets without publishing   |
+| `npm run preview`        | Preview Vite build                                       |
+| `npm run electron:start` | Start Electron after the Electron process has been built |
+| `npm run test`           | Run unit tests                                           |
+| `npm run test:coverage`  | Run tests with coverage                                  |
+| `npm run test:ci`        | Compile, test with coverage, and build                   |
 
 ## Release Builds
 
@@ -848,16 +848,11 @@ npm run dist:linux
 npm run dist:mac
 ```
 
-GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Pushing a protected tag such as `vX.Y.Z` triggers quality gates and platform builds for Windows, Linux, and macOS. The workflow derives the package and lockfile version from the tag, generates legal notices, requires Windows/macOS signing material, verifies the signed installer and packaged application, validates updater metadata, and generates `SHA256SUMS.txt`. It then uploads all assets to a draft release, verifies the draft remotely, and only then publishes it. The auto-updater therefore cannot see the release before all required assets exist.
+GitHub publishing is handled by [.github/workflows/release.yml](.github/workflows/release.yml). Publishing a release with a tag such as `vX.Y.Z` in Open Git Control or on GitHub triggers quality gates and platform builds for Windows, Linux, and macOS. The workflow derives the package and lockfile version from the release tag, generates legal notices, validates the packaged applications and updater metadata, and generates `SHA256SUMS.txt`. It then attaches all assets to the already published release and verifies them remotely. The workflow can also be started manually for an existing release tag to retry failed builds.
 
 Local `dist:*` builds use the version committed in `package.json`. Official release builds run `prepare-release-version.js` so `package.json`, `package-lock.json`, the packaged app version, and MCP server metadata all resolve to the release tag version.
 
-Repository secrets required for signed releases:
-
-- Windows: `WINDOWS_CSC_LINK`, `WINDOWS_CSC_KEY_PASSWORD`
-- macOS: `MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
-
-The Windows repository secrets are mapped to electron-builder's `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` variables. macOS uses `CSC_LINK`, `CSC_KEY_PASSWORD`, and the Apple notarization variables. Signing secrets are passed only during release jobs and must never be committed. Local `dist:*` builds remain unsigned; `release:win` expects `WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`, while `release:mac` expects the documented macOS signing environment.
+No custom repository secrets or signing certificates are required. GitHub supplies the workflow's `GITHUB_TOKEN` automatically. Windows and macOS packages are intentionally unsigned and the macOS build is not notarized, so operating systems can show SmartScreen or Gatekeeper warnings. Code signing and notarization can be added later without changing the release trigger.
 
 Expected release assets:
 

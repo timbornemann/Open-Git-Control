@@ -1,13 +1,13 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to build and publish (for example v1.2.3)
+        description: Existing release tag whose assets should be rebuilt (for example v1.2.3)
         required: true
         type: string
 
@@ -29,13 +29,13 @@ jobs:
       - name: Checkout release tag
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
 
       - id: release
         name: Derive release version from tag
         shell: bash
         run: |
-          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}"
           if ! git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
             echo "Release tag does not exist: $TAG"
             exit 1
@@ -49,32 +49,27 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure release is new or an unpublished retry
+      - name: Validate published release and version
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_EVENT: ${{ github.event_name }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
-            if [[ "$IS_DRAFT" != "true" ]]; then
-              if [[ "$RELEASE_EVENT" == "push" ]]; then
-                echo "Converting the release that created tag $RELEASE_TAG back to a draft while its assets are built and verified."
-                gh release edit "$RELEASE_TAG" --draft
-              else
-                echo "A published GitHub Release already exists for $RELEASE_TAG. Refusing to mutate it."
-                exit 1
-              fi
-            else
-              echo "Reusing existing draft release for $RELEASE_TAG."
-            fi
-          else
-            echo "No existing release found for $RELEASE_TAG."
+          if ! IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            echo "No GitHub Release exists for $RELEASE_TAG. Create the release before running this workflow."
+            exit 1
           fi
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "The release must be published before its assets can be built."
+            exit 1
+          fi
+          echo "Reusing existing release for $RELEASE_TAG."
 
           LATEST_TAG="$(gh release view --json tagName --jq '.tagName' 2>/dev/null || true)"
-          if [[ "$LATEST_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          if [[ "$LATEST_TAG" == "$RELEASE_TAG" ]]; then
+            echo "The requested tag is already the latest published release. Reusing it."
+          elif [[ "$LATEST_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             LATEST_VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
             IFS='.' read -r NEW_MAJOR NEW_MINOR NEW_PATCH <<< "$RELEASE_VERSION"
             IFS='.' read -r OLD_MAJOR OLD_MINOR OLD_PATCH <<< "$LATEST_VERSION"
@@ -128,52 +123,15 @@ jobs:
       - name: Run release quality gate
         run: npm run test:ci
 
-      - name: Validate required Windows signing secrets
-        if: matrix.platform == 'windows'
-        run: node scripts/validate-release-signing.js windows
-        env:
-          WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-
-      - name: Validate required macOS signing and notarization secrets
-        if: matrix.platform == 'macos'
-        run: node scripts/validate-release-signing.js macos
-        env:
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
       - name: Build release assets
         run: npm run ${{ matrix.script }}
         env:
-          WIN_CSC_LINK: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_LINK || '' }}
-          WIN_CSC_KEY_PASSWORD: ${{ matrix.platform == 'windows' && secrets.WINDOWS_CSC_KEY_PASSWORD || '' }}
-          CSC_LINK: ${{ matrix.platform == 'macos' && secrets.MACOS_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MACOS_CSC_KEY_PASSWORD || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Validate release artifacts
         run: node scripts/validate-release-assets.js "${{ needs.prepare.outputs.version }}" "${{ matrix.platform }}"
 
-      - name: Verify Windows Authenticode signature
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          $targets = @(
-            "release/Open-Git-Control-${{ needs.prepare.outputs.version }}-win-x64.exe",
-            "release/win-unpacked/Open-Git-Control.exe"
-          )
-          foreach ($target in $targets) {
-            if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "Signed Windows executable was not created: $target" }
-            $signature = Get-AuthenticodeSignature -LiteralPath $target
-            if ($signature.Status -ne 'Valid') { throw "Windows signature is not valid for ${target}: $($signature.Status)" }
-          }
-
-      - name: Verify signed and notarized macOS app
+      - name: Verify macOS application bundle
         if: matrix.platform == 'macos'
         shell: bash
         run: |
@@ -183,8 +141,9 @@ jobs:
           ditto -x -k "$ZIP_FILE" signed-app-check
           APP_PATH="$(find signed-app-check -maxdepth 2 -name '*.app' -print -quit)"
           test -n "$APP_PATH"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          spctl --assess --type execute --verbose=4 "$APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          test -d "$APP_PATH/Contents/MacOS"
+          test -n "$(find "$APP_PATH/Contents/MacOS" -maxdepth 1 -type f -perm -111 -print -quit)"
 
       - name: Upload verified release artifacts
         uses: actions/upload-artifact@v6
@@ -194,7 +153,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish verified release
+    name: Attach verified release assets
     needs:
       - prepare
       - build
@@ -232,13 +191,11 @@ jobs:
       - name: Generate SHA-256 checksums
         run: node scripts/generate-release-checksums.js release
 
-      - name: Create draft GitHub Release and upload verified assets
+      - name: Upload verified assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
-          name: Open-Git-Control ${{ needs.prepare.outputs.tag }}
-          generate_release_notes: true
-          draft: true
+          draft: false
           files: |
             release/latest.yml
             release/latest-linux.yml
@@ -254,16 +211,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify draft assets before publishing
+      - name: Verify uploaded release assets
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')"
-          test "$IS_DRAFT" = "true"
-
           EXPECTED_ASSETS=(
             "latest.yml"
             "latest-linux.yml"
@@ -280,17 +234,10 @@ jobs:
           UPLOADED_ASSETS="$(gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name')"
           for asset in "${EXPECTED_ASSETS[@]}"; do
             if ! grep -Fqx "$asset" <<<"$UPLOADED_ASSETS"; then
-              echo "Draft release is missing required asset: $asset"
+              echo "Release is missing required asset: $asset"
               exit 1
             fi
           done
-
-      - name: Publish verified draft release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-        run: gh release edit "$RELEASE_TAG" --draft=false --latest
 
   sync-readme-release-links:
     name: Sync README release links

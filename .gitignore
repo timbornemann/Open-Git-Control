@@ -32,5 +32,3 @@ coverage
 NVIDIA Corporation/
 release/
 /build/*
-!/build/entitlements.mac.plist
-!/build/entitlements.mac.inherit.plist

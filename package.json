@@ -31,9 +31,9 @@
     "dist:win": "npm run legal:prepare && npm run build && electron-builder --win nsis --x64 --publish never",
     "dist:linux": "npm run legal:prepare && npm run build && electron-builder --linux AppImage deb --x64 --publish never",
     "dist:mac": "npm run legal:prepare && npm run build && electron-builder --mac dmg zip --x64 --publish never",
-    "release:win": "npm run legal:prepare && node scripts/validate-release-signing.js windows && npm run build && electron-builder --win nsis --x64 --publish never",
+    "release:win": "npm run dist:win",
     "release:linux": "npm run dist:linux",
-    "release:mac": "npm run legal:prepare && node scripts/validate-release-signing.js macos && npm run build && electron-builder --mac dmg zip --x64 --publish never",
+    "release:mac": "npm run dist:mac",
     "preview": "vite preview",
     "electron:start": "cross-env NODE_ENV=development node scripts/start-electron.js",
     "test": "npm run test:unit",
@@ -175,10 +175,9 @@
       ],
       "icon": "logo.png",
       "category": "public.app-category.developer-tools",
-      "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
-      "notarize": true
+      "identity": null,
+      "hardenedRuntime": false,
+      "notarize": false
     },
     "dmg": {
       "license": "build/LICENSE.txt"

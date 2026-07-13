@@ -6,7 +6,6 @@ import * as path from 'path';
 
 const projectRoot = path.resolve(__dirname, '../../..');
 const prepareVersionScript = path.join(projectRoot, 'scripts', 'prepare-release-version.js');
-const validateSigningScript = path.join(projectRoot, 'scripts', 'validate-release-signing.js');
 const generateChecksumsScript = path.join(projectRoot, 'scripts', 'generate-release-checksums.js');
 const tempDirectories: string[] = [];
 
@@ -50,23 +49,6 @@ describe('release scripts', () => {
 
     expect(result.status).toBe(1);
     expect(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')).toBe(manifest);
-  });
-
-  it('requires the platform-specific electron-builder signing variables', () => {
-    const cleanEnv = { ...process.env };
-    for (const name of ['WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD', 'CSC_LINK', 'CSC_KEY_PASSWORD', 'APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID']) {
-      delete cleanEnv[name];
-    }
-
-    const missingWindows = spawnSync(process.execPath, [validateSigningScript, 'windows'], { encoding: 'utf8', env: cleanEnv });
-    expect(missingWindows.status).toBe(1);
-    expect(missingWindows.stderr).toContain('WIN_CSC_LINK');
-
-    const validWindows = spawnSync(process.execPath, [validateSigningScript, 'windows'], {
-      encoding: 'utf8',
-      env: { ...cleanEnv, WIN_CSC_LINK: 'certificate', WIN_CSC_KEY_PASSWORD: 'password' },
-    });
-    expect(validWindows.status, validWindows.stderr).toBe(0);
   });
 
   it('generates checksums only for release installers and archives', () => {
