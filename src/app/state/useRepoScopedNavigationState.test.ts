@@ -71,7 +71,7 @@ describe('useRepoScopedNavigationState', () => {
       targetCommitish: '',
       releaseName: '',
       body: '',
-      draft: false,
+      draft: true,
       prerelease: false,
     });
     expect(setters.setReleaseSubmitting).toHaveBeenCalledWith(false);

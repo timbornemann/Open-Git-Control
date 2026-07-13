@@ -53,15 +53,23 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_EVENT: ${{ github.event_name }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          if IS_DRAFT="$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+          if RELEASE_STATE="$(gh release view "$RELEASE_TAG" --json isDraft,assets --jq '[.isDraft, (.assets | length)] | @tsv' 2>/dev/null)"; then
+            read -r IS_DRAFT ASSET_COUNT <<< "$RELEASE_STATE"
             if [[ "$IS_DRAFT" != "true" ]]; then
-              echo "A published GitHub Release already exists for $RELEASE_TAG. Refusing to mutate it."
-              exit 1
+              if [[ "$RELEASE_EVENT" == "push" && "$ASSET_COUNT" == "0" ]]; then
+                echo "Converting the newly published, assetless release for $RELEASE_TAG back to a draft."
+                gh release edit "$RELEASE_TAG" --draft
+              else
+                echo "A published GitHub Release already exists for $RELEASE_TAG. Refusing to mutate it."
+                exit 1
+              fi
+            else
+              echo "Reusing existing draft release for $RELEASE_TAG."
             fi
-            echo "Reusing existing draft release for $RELEASE_TAG."
           else
             echo "No existing release found for $RELEASE_TAG."
           fi
