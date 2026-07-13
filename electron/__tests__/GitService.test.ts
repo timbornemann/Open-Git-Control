@@ -5,6 +5,11 @@ import * as path from 'path';
 import { execFileSync } from 'child_process';
 import { GitService } from '../GitService';
 
+const canonicalExistingPath = (value: string): string => {
+  const canonicalPath = fs.realpathSync.native(value);
+  return process.platform === 'win32' ? canonicalPath.toLowerCase() : canonicalPath;
+};
+
 describe('GitService.getLog pagination', () => {
   it('adds --skip for incremental loading and supports head scope', async () => {
     const service = new GitService();
@@ -227,13 +232,14 @@ describe('GitService repo path normalization', () => {
     const nestedDir = path.join(rootDir, 'src', 'nested');
     fs.mkdirSync(nestedDir, { recursive: true });
     execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
-    const service = new GitService();
 
-    service.setRepoPath(nestedDir);
-
-    expect(path.resolve(service.getRepoPath() || '')).toBe(path.resolve(rootDir));
-
-    fs.rmSync(rootDir, { recursive: true, force: true });
+    try {
+      const service = new GitService();
+      service.setRepoPath(nestedDir);
+      expect(canonicalExistingPath(service.getRepoPath() || '')).toBe(canonicalExistingPath(rootDir));
+    } finally {
+      fs.rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 
   it('resolves a nested repository path asynchronously', async () => {
@@ -245,7 +251,7 @@ describe('GitService repo path normalization', () => {
     try {
       const service = new GitService();
       const resolvedPath = await service.resolveRepositoryPathAsync(nestedDir);
-      expect(path.normalize(resolvedPath)).toBe(path.resolve(rootDir));
+      expect(canonicalExistingPath(resolvedPath)).toBe(canonicalExistingPath(rootDir));
     } finally {
       fs.rmSync(rootDir, { recursive: true, force: true });
     }
