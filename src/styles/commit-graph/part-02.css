@@ -1,3 +1,207 @@
+.commit-search-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-width: 0;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-darker);
+  container-type: inline-size;
+}
+
+.commit-search-toolbar__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.commit-search-toolbar__control {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.commit-search-toolbar__select,
+.commit-search-toolbar__more-control select {
+  min-width: 0;
+  max-width: 160px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+.commit-search-toolbar__select {
+  padding: 5px 8px;
+}
+
+.commit-search-input {
+  flex: 1 1 220px;
+  min-width: 150px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.commit-search-toolbar__recovery,
+.commit-search-nav,
+.commit-search-toolbar__more-toggle,
+.commit-search-toolbar__more-action {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-panel);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.commit-search-toolbar__recovery {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.commit-search-meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.commit-search-nav {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+.commit-search-nav:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.commit-search-toolbar__compact-icon,
+.commit-search-toolbar__compact-menu {
+  display: none;
+}
+
+.commit-search-toolbar__compact-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.commit-search-toolbar__more-toggle {
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.commit-search-toolbar__more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 4;
+  display: grid;
+  gap: 8px;
+  width: min(240px, calc(100cqw - 16px));
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-dark);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+
+.commit-search-toolbar__more-control {
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.commit-search-toolbar__more-control select {
+  max-width: none;
+  width: 100%;
+  padding: 5px 8px;
+}
+
+.commit-search-toolbar__more-action {
+  padding: 6px 8px;
+  font-size: 0.76rem;
+  text-align: left;
+}
+
+.commit-search-toolbar__recovery:hover,
+.commit-search-nav:hover:not(:disabled),
+.commit-search-toolbar__more-toggle:hover,
+.commit-search-toolbar__more-action:hover {
+  border-color: var(--accent-primary-border);
+  background-color: var(--bg-hover);
+}
+
+@container (max-width: 900px) {
+  .commit-search-toolbar__control-label,
+  .commit-search-meta__count,
+  .commit-search-toolbar__recovery-label,
+  .commit-search-nav__label {
+    display: none;
+  }
+
+  .commit-search-toolbar__select {
+    max-width: 124px;
+  }
+
+  .commit-search-input {
+    flex-basis: 160px;
+    min-width: 0;
+  }
+
+  .commit-search-toolbar__recovery,
+  .commit-search-nav {
+    display: inline-grid;
+    width: 34px;
+    height: 32px;
+    place-items: center;
+    padding: 0;
+  }
+
+  .commit-search-toolbar__compact-icon {
+    display: inline;
+  }
+}
+
+@container (max-width: 620px) {
+  .commit-search-toolbar__mode,
+  .commit-search-toolbar__recovery {
+    display: none;
+  }
+
+  .commit-search-toolbar__compact-menu {
+    display: block;
+  }
+}
+
+@container (max-width: 480px) {
+  .commit-search-toolbar__scope {
+    display: none;
+  }
+}
+
 .ctx-menu-item.danger {
   color: var(--status-danger);
 }
