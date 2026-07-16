@@ -558,14 +558,14 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - Mono Dark Green
   - Mono Light Green
 - Integrations settings:
+  - GitHub OAuth Client ID
+- AI & MCP settings:
   - AI provider
   - AI model
   - AI message style/language
   - Ollama URL
   - Gemini API key
   - OpenAI API key and HTTPS base URL
-  - GitHub OAuth Client ID
-- API & MCP settings:
   - runtime API status
   - copyable URLs and token values
   - token generation and deletion
@@ -666,7 +666,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 ### Agent planning workflow
 
 1. Start Open-Git-Control.
-2. Open Settings -> API & MCP and copy the MCP URL plus token.
+2. Open Settings -> AI & MCP and copy the MCP URL plus token.
 3. Configure an external agent with the MCP URL or REST endpoints.
 4. Ask the agent for `get_next_todos` or `GET /api/agent/next`.
 5. Let the agent create or move planning items.
@@ -918,7 +918,7 @@ Expected release assets:
 ### Planning API is not on port `2990`
 
 - Another local process may already use the port.
-- Check Settings -> API & MCP for the actual port.
+- Check Settings -> AI & MCP for the actual port.
 - Set `OPEN_GIT_CONTROL_API_PORT=<PORT>` before starting the app if you want a different preferred port.
 
 ### AI features do not respond

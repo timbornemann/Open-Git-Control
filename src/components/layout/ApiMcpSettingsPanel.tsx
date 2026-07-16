@@ -15,6 +15,10 @@ type CopyButtonProps = {
   label?: string;
 };
 
+type ApiMcpSettingsPanelProps = {
+  aiSettings?: React.ReactNode;
+};
+
 const DEFAULT_BASE_URL = 'http://127.0.0.1:2990';
 
 const formatDateTime = (value: number | null): string | null => {
@@ -75,7 +79,7 @@ const buildAgentConfig = (mcpUrl: string, authHeaderName: string, authToken: str
     2,
   );
 
-export const ApiMcpSettingsPanel: React.FC = () => {
+export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSettings }) => {
   const { t } = useI18n();
   const [apiInfo, setApiInfo] = useState<PlanningApiInfoDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -224,6 +228,8 @@ export const ApiMcpSettingsPanel: React.FC = () => {
 
   return (
     <div className="settings-grid">
+      {aiSettings}
+
       <section className="settings-card">
         <div className="settings-card-header-row">
           <h3>{t('generated.components.layout.apimcpsettingspanel.local_api_940afb5b')}</h3>

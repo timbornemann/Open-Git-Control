@@ -38,12 +38,13 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({ settin
 
         {activeTab === 'integrations' && (
           <div className="settings-grid">
-            <SettingsAiSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" ai={aiUpdater} />
             <SettingsGithubSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />
           </div>
         )}
 
-        {activeTab === 'api' && <ApiMcpSettingsPanel />}
+        {activeTab === 'api' && (
+          <ApiMcpSettingsPanel aiSettings={<SettingsAiSection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" ai={aiUpdater} />} />
+        )}
 
         {activeTab === 'security' && <SettingsSecuritySection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />}
 
