@@ -14,6 +14,7 @@ import { ProjectPlannerProvider } from './contexts/ProjectPlannerContext';
 import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
 import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
+import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRepositoryTodoDialog';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [quickTodoRequestId, setQuickTodoRequestId] = useState(0);
   const { sidebarWidth, isSidebarCollapsed, isSidebarResizing, resetLayout, handleToggleSidebar, handleSidebarResizeStart } = useResizableSidebar();
   const { repoSwitcherIndex, repoSwitcherListRef } = useRepoSwitcherKeyboard({
     openRepos: state.openRepos,
@@ -39,6 +41,11 @@ const App: React.FC = () => {
     setActiveTab: state.setActiveTab,
     onFetch: () => state.refreshRemoteState(true),
     onOpenCommandPalette: () => setIsPaletteOpen(true),
+    onOpenQuickTodo: () => {
+      if (state.activeTab === 'repo' && state.activeRepo) {
+        setQuickTodoRequestId((current) => current + 1);
+      }
+    },
   });
 
   const activeTransferCommand = state.activeGitCommand === 'pull' || state.activeGitCommand === 'fetch' ? state.activeGitCommand : null;
@@ -123,6 +130,7 @@ const App: React.FC = () => {
             onToast={(message, isError) => state.setGitActionToast({ msg: message, isError })}
             setConfirmDialog={state.setConfirmDialog}
           >
+            <QuickRepositoryTodoDialog requestId={quickTodoRequestId} activeRepo={state.activeRepo} />
             <div
               className={`app-container${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}
               style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}

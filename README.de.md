@@ -606,6 +606,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - `Ctrl+1..4`: Haupt-Sidebar-Tabs wechseln
 - `Ctrl+Shift+F`: Fetch
 - `Ctrl+Shift+P`: Command Palette
+- `Ctrl+Shift+T`: Todo fuer das aktive Repository erstellen
 - `Ctrl+Enter`: Commit aus Commit-Feldern ausfuehren
 - Command Palette mit Tastaturnavigation, Suche, `Enter` zum Ausfuehren und `Esc` zum Schliessen
 - Copy-Buttons fuer Hashes, URLs, Tokens, API-Beispiele und PR-Links

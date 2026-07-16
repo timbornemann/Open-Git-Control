@@ -15,8 +15,9 @@ describe('useGlobalKeyboardShortcuts editor focus', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div><textarea id="editor"></textarea>';
     const setActiveTab = vi.fn();
+    const onOpenQuickTodo = vi.fn();
     const Harness = () => {
-      useGlobalKeyboardShortcuts({ setActiveTab, onFetch: vi.fn(), onOpenCommandPalette: vi.fn() });
+      useGlobalKeyboardShortcuts({ setActiveTab, onFetch: vi.fn(), onOpenCommandPalette: vi.fn(), onOpenQuickTodo });
       return null;
     };
     const root = createRoot(document.getElementById('root')!);
@@ -30,6 +31,27 @@ describe('useGlobalKeyboardShortcuts editor focus', () => {
     editor.blur();
     act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: '4', ctrlKey: true, bubbles: true })));
     expect(setActiveTab).toHaveBeenCalledWith('settings');
+    act(() => root.unmount());
+  });
+
+  it('opens the quick todo modal with Ctrl+Shift+T outside editable fields', () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    document.body.innerHTML = '<div id="root"></div><input id="editor" />';
+    const onOpenQuickTodo = vi.fn();
+    const Harness = () => {
+      useGlobalKeyboardShortcuts({ setActiveTab: vi.fn(), onFetch: vi.fn(), onOpenCommandPalette: vi.fn(), onOpenQuickTodo });
+      return null;
+    };
+    const root = createRoot(document.getElementById('root')!);
+    act(() => root.render(createElement(Harness)));
+
+    act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 't', ctrlKey: true, shiftKey: true, bubbles: true })));
+    expect(onOpenQuickTodo).toHaveBeenCalledOnce();
+
+    const editor = document.getElementById('editor') as HTMLInputElement;
+    editor.focus();
+    act(() => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 't', ctrlKey: true, shiftKey: true, bubbles: true })));
+    expect(onOpenQuickTodo).toHaveBeenCalledOnce();
     act(() => root.unmount());
   });
 });

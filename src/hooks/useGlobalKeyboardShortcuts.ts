@@ -6,6 +6,7 @@ type ShortcutHandlers = {
   setActiveTab: (tab: AppTabId) => void;
   onFetch: () => void;
   onOpenCommandPalette: () => void;
+  onOpenQuickTodo: () => void;
 };
 
 const FOCUSABLE_TEXT_SELECTOR = 'input, textarea, [contenteditable="true"], select';
@@ -16,7 +17,7 @@ const isEditableFocused = (): boolean => {
   return el.matches(FOCUSABLE_TEXT_SELECTOR);
 };
 
-export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenCommandPalette }: ShortcutHandlers) => {
+export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo }: ShortcutHandlers) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -50,9 +51,15 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
         onOpenCommandPalette();
         return;
       }
+
+      // Ctrl+Shift+T → Create a todo for the active repository
+      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        e.preventDefault();
+        onOpenQuickTodo();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setActiveTab, onFetch, onOpenCommandPalette]);
+  }, [setActiveTab, onFetch, onOpenCommandPalette, onOpenQuickTodo]);
 };

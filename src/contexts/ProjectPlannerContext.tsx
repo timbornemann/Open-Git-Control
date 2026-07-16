@@ -29,6 +29,7 @@ type ProjectPlannerContextValue = {
   requestDeleteItem: (itemId: string) => void;
   selectProject: (projectId: string) => void;
   createProject: (input: PlannerProjectInput) => Promise<PlannerProject | null>;
+  createRepositoryProject: (repoPath: string) => Promise<PlannerProject | null>;
   updateProject: (projectId: string, input: Partial<PlannerProjectInput>) => Promise<boolean>;
   deleteProject: (projectId: string) => Promise<boolean>;
   createItem: (projectId: string, input: PlannerItemInput) => Promise<boolean>;
@@ -53,7 +54,6 @@ type ProjectPlannerProviderProps = {
 
 const EMPTY_DATA: ProjectPlannerData = { version: 1, projects: [], items: [] };
 const ProjectPlannerContext = createContext<ProjectPlannerContextValue | null>(null);
-
 const repoKey = normalizeRepoPathKey;
 
 export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
@@ -80,7 +80,6 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const plannerActiveRef = useRef(plannerActive);
   activeRepoRef.current = activeRepo;
   plannerActiveRef.current = plannerActive;
-
   useEffect(() => {
     refreshRequestGenerationRef.current += 1;
     setSelectedProjectId(null);
@@ -112,7 +111,6 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const refresh = useCallback(async (): Promise<void> => {
     await refreshData();
   }, [refreshData]);
-
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -204,24 +202,30 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     [onToast, refresh, tr],
   );
 
-  const confirmRepositoryProject = useCallback(
-    async (repoPath: string) => {
+  const createRepositoryProject = useCallback(
+    async (repoPath: string): Promise<PlannerProject | null> => {
       if (!plannerClient.isAvailable()) {
         const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
         setError(message);
         onToast(message, true);
-        return false;
+        return null;
       }
+      return runMutation(() => plannerClient.ensureRepositoryProject(repoPath));
+    },
+    [onToast, runMutation],
+  );
+  const confirmRepositoryProject = useCallback(
+    async (repoPath: string) => {
       if (!plannerActiveRef.current || !activeRepoRef.current || repoKey(activeRepoRef.current) !== repoKey(repoPath)) return false;
 
-      const project = await runMutation(() => plannerClient.ensureRepositoryProject(repoPath));
+      const project = await createRepositoryProject(repoPath);
       if (!project) return false;
       if (plannerActiveRef.current && activeRepoRef.current && repoKey(activeRepoRef.current) === repoKey(repoPath)) {
         setSelectedProjectId(project.id);
       }
       return true;
     },
-    [onToast, runMutation],
+    [createRepositoryProject],
   );
 
   useRepositoryProjectPrompt({
@@ -234,7 +238,6 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     tr,
     onConfirmRepositoryProject: confirmRepositoryProject,
   });
-
   const createProject = useCallback(
     async (input: PlannerProjectInput) => {
       if (!plannerClient.isAvailable()) {
@@ -445,6 +448,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       requestDeleteItem,
       selectProject,
       createProject,
+      createRepositoryProject,
       updateProject,
       deleteProject,
       createItem,
@@ -459,6 +463,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       busy,
       createItem,
       createProject,
+      createRepositoryProject,
       createProjectRequestId,
       data,
       activateRepositoryProject,

@@ -606,6 +606,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - `Ctrl+1..4`: switch main sidebar tabs
 - `Ctrl+Shift+F`: fetch
 - `Ctrl+Shift+P`: command palette
+- `Ctrl+Shift+T`: create a todo for the active repository
 - `Ctrl+Enter`: commit from commit fields
 - Command palette with keyboard navigation, search, `Enter` to run, and `Esc` to close
 - Copy buttons for hashes, URLs, tokens, API examples, and PR links
