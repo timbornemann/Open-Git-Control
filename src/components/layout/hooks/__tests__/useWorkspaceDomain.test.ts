@@ -70,6 +70,13 @@ afterEach(() => {
 });
 
 describe('useWorkspaceDomain repository canonicalization', () => {
+  it('starts on the current repository tab', () => {
+    const hook = renderWorkspace();
+
+    expect(hook.current.activeTab).toBe('repo');
+    hook.unmount();
+  });
+
   it('defers tab and repository switches until the working-file guard proceeds', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [
@@ -87,7 +94,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
 
     act(() => hook.current.setActiveTab('settings'));
-    expect(hook.current.activeTab).toBe('localRepos');
+    expect(hook.current.activeTab).toBe('repo');
     act(() => pending.shift()?.());
     expect(hook.current.activeTab).toBe('settings');
 

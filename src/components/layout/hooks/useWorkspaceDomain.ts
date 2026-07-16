@@ -112,7 +112,7 @@ export const useWorkspaceDomain = ({
   onNoActiveRepo,
   language,
 }: Params) => {
-  const [activeTab, setActiveTabState] = useState<AppTabId>('localRepos');
+  const [activeTab, setActiveTabState] = useState<AppTabId>('repo');
   const [openRepos, setOpenRepos] = useState<string[]>([]);
   const [activeRepo, setActiveRepo] = useState<string | null>(null);
   const [repoMeta, setRepoMeta] = useState<Record<string, RepoMetaEntry>>({});
