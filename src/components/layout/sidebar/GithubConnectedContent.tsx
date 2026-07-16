@@ -113,20 +113,13 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '8px',
-          backgroundColor: 'var(--bg-panel)',
-          borderRadius: '6px',
-          border: '1px solid var(--border-color)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div className="github-account-summary">
+        <div className="github-account-summary__identity">
           <Github size={16} style={{ color: 'var(--accent-primary)' }} />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+          <span
+            className="github-account-summary__name"
+            title={githubUser || t('generated.components.layout.sidebar.githubconnectedcontent.connected_64357a97')}
+          >
             {githubUser || t('generated.components.layout.sidebar.githubconnectedcontent.connected_64357a97')}
           </span>
         </div>
@@ -140,17 +133,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
         </button>
       </div>
       {authError && (
-        <div
-          role="status"
-          style={{
-            padding: '8px',
-            borderRadius: '6px',
-            border: '1px solid var(--status-warning-border)',
-            background: 'var(--status-warning-soft)',
-            color: 'var(--status-warning)',
-            fontSize: '0.78rem',
-          }}
-        >
+        <div role="status" className="github-account-summary__error">
           {authError}
         </div>
       )}

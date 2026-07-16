@@ -127,6 +127,7 @@ export const RepoList: React.FC<Props> = ({
                 onChange={(e) => onSortChange(e.target.value as RepoSortByDto)}
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   maxWidth: '190px',
                   padding: '5px 8px',
                   borderRadius: '4px',

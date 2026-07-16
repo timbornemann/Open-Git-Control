@@ -31,10 +31,14 @@ export const RepoCardHeader: React.FC<RepoCardHeaderProps> = ({ title, collapsed
       {typeof collapsed === 'boolean' && onToggleCollapsed ? (
         <button className="repo-card-toggle" onClick={onToggleCollapsed} title={toggleTitle}>
           {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          <span className="repo-card-title">{title}</span>
+          <span className="repo-card-title" title={typeof title === 'string' ? title : undefined}>
+            {title}
+          </span>
         </button>
       ) : (
-        <span className="repo-card-title">{title}</span>
+        <span className="repo-card-title" title={typeof title === 'string' ? title : undefined}>
+          {title}
+        </span>
       )}
     </div>
     {actions ? <div className="repo-card-actions">{actions}</div> : null}

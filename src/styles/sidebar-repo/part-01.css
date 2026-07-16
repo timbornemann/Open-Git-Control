@@ -96,6 +96,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
   padding: 9px 10px;
   border-bottom: 1px solid var(--line-subtle);
   background: var(--bg-panel);
@@ -127,6 +129,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  width: 100%;
+  min-width: 0;
   background: transparent;
   border: 0;
   color: var(--text-primary);
@@ -134,11 +138,18 @@
   padding: 0;
 }
 
+.repo-card-toggle > svg {
+  flex: 0 0 auto;
+}
+
 .repo-card-toggle:hover .repo-card-title {
   color: var(--text-accent);
 }
 
 .repo-card-title {
+  display: block;
+  flex: 1;
+  min-width: 0;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -198,7 +209,8 @@
 
 .repo-card-scroll {
   max-height: 260px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-right: 2px;
   scrollbar-gutter: stable;
 }

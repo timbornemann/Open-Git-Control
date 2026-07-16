@@ -142,7 +142,9 @@ export const RemotePanel: React.FC<Props> = ({
                     >
                       <Globe size={13} className="remote-row-icon" />
                       <span className="remote-row-copy">
-                        <span className="remote-row-name">{remote.name}</span>
+                        <span className="remote-row-name" title={remote.name}>
+                          {remote.name}
+                        </span>
                         <span className="remote-row-url">{compactUrl}</span>
                       </span>
                       <span className="remote-row-actions">

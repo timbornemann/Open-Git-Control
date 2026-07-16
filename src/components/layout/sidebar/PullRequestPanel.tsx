@@ -98,14 +98,15 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
     { value: 'closed', label: t('generated.components.layout.sidebar.githubconnectedcontent.closed_ec5c60af') },
     { value: 'all', label: t('generated.components.layout.sidebar.githubconnectedcontent.all_2ba206ff') },
   ];
+  const pullRequestsTitle = `${t('generated.components.layout.sidebar.githubconnectedcontent.pull_requests_b5324949')} (${ownerRepo.owner}/${ownerRepo.repo})`;
 
   return (
     <>
       {showDivider && <div className="github-panel-divider" />}
       {showHeader && (
         <div className="github-panel-section-header">
-          <span className="github-panel-section-title">
-            {t('generated.components.layout.sidebar.githubconnectedcontent.pull_requests_b5324949')} ({ownerRepo.owner}/{ownerRepo.repo})
+          <span className="github-panel-section-title" title={pullRequestsTitle}>
+            {pullRequestsTitle}
           </span>
           {isRefreshing && (
             <span title={t('generated.components.layout.sidebar.repogithubactionscontent.refreshing_pull_requests_49129472')}>

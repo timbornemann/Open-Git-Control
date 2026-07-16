@@ -74,6 +74,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         padding: '8px',
         textAlign: 'center',
         marginTop: '16px',
+        minWidth: 0,
       }}
     >
       <Github size={48} style={{ margin: '0 auto', color: 'var(--text-secondary)' }} />
@@ -211,6 +212,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
               borderRadius: '4px',
               padding: '8px',
               backgroundColor: 'var(--bg-dark)',
+              minWidth: 0,
             }}
           >
             <div className="sidebar-panel-row">
@@ -226,7 +228,7 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
                 <Copy size={12} />
               </button>
             </div>
-            <div style={{ marginTop: '4px', color: 'var(--text-secondary)' }}>
+            <div style={{ marginTop: '4px', color: 'var(--text-secondary)', overflowWrap: 'anywhere' }}>
               {t('generated.components.layout.sidebar.githubauthcontent.go_to_9aa3247d')}: {deviceFlow.verificationUri}
             </div>
           </div>

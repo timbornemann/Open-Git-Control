@@ -109,7 +109,13 @@
   display: flex;
   align-items: flex-start;
   gap: 7px;
+  min-width: 0;
   border-left: 3px solid var(--border-color);
+}
+
+.release-alert > :not(svg) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .release-alert strong {

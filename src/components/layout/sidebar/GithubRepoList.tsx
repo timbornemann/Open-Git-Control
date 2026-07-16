@@ -61,7 +61,7 @@ export const GithubRepoList: React.FC<GithubRepoListProps> = ({
   return (
     <>
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
           <input
             type="text"

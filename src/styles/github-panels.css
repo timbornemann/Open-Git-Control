@@ -9,6 +9,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
   padding: 4px 0 6px;
 }
 
@@ -22,6 +23,56 @@
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.github-panel-section-title {
+  flex: 1;
+}
+
+.github-account-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-panel);
+}
+
+.github-account-summary__identity {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.github-account-summary__identity > svg {
+  flex: 0 0 auto;
+}
+
+.github-account-summary__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-account-summary__error {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--status-warning-border);
+  border-radius: 6px;
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .pr-panel__filter {
@@ -41,10 +92,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .pr-panel__branch-row .ui-field {
   flex: 1;
+  min-width: 0;
 }
 
 .pr-panel__branch-arrow {
@@ -167,6 +220,10 @@
   font-size: 0.72rem;
 }
 
+.pr-card__workflow-row > div {
+  min-width: 0;
+}
+
 .pr-card__workflow-name {
   overflow: hidden;
   font-weight: 700;
@@ -177,7 +234,10 @@
 .pr-card__workflow-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pr-card__empty-detail {
@@ -223,6 +283,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
   color: var(--text-secondary);
   font-size: 0.78rem;
 }
@@ -231,11 +292,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .release-mini-form__message {
   font-size: 0.74rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .release-mini-form__message--warning {
@@ -257,6 +321,7 @@
 .release-mini-form__link {
   color: inherit;
   text-decoration: underline;
+  overflow-wrap: anywhere;
 }
 
 .github-auth-guide {
