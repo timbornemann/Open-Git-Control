@@ -5,6 +5,7 @@ import { IpcChannel } from '../../../../src/types/ipcContract';
 import { runGithubCliOneClickLogin } from '../../githubCliAuth';
 import { clearSavedGithubTokenSecurely, readSavedGithubTokenWithHost, saveGithubTokenSecurely } from '../../secureStore';
 import { toErrorMessage } from './githubHandlerUtils';
+import { getGithubUserFacingErrorMessage } from '../../../github/githubErrorUtils';
 
 type RegisterGithubAuthHandlersDeps = {
   githubService: GitHubService;
@@ -31,7 +32,10 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
   const isCurrentAuthAttempt = (generation: number): boolean => generation === authGeneration;
   const serviceGeneration = (): number => githubService.getAuthenticationGeneration();
   const staleAuthError = () => ({ success: false, error: 'GitHub-Anmeldung wurde abgebrochen.' });
-  const lastAuthenticationError = (): string | undefined => githubService.getLastAuthenticationFailure?.()?.message;
+  const lastAuthenticationError = (): string | undefined => {
+    const message = githubService.getLastAuthenticationFailure?.()?.message;
+    return message ? getGithubUserFacingErrorMessage(message, 'GitHub authentication failed.') : undefined;
+  };
   const abortGithubCliLogin = (): void => {
     activeGithubCliLogin?.abort();
     activeGithubCliLogin = null;
@@ -139,7 +143,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       if (!isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) return staleAuthError();
       return { success: true, data: flow };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Device Flow konnte nicht gestartet werden.';
+      const message = toErrorMessage(error, 'Device Flow konnte nicht gestartet werden.');
       return { success: false, error: message };
     }
   });
@@ -225,7 +229,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       if (abortController.signal.aborted || !isCurrentAuthAttempt(generation) || serviceGeneration() !== startingServiceGeneration) {
         return staleAuthError();
       }
-      const message = error instanceof Error ? error.message : 'GitHub 1-Klick Login fehlgeschlagen.';
+      const message = toErrorMessage(error, 'GitHub 1-Klick Login fehlgeschlagen.');
       return { success: false, error: message };
     } finally {
       if (activeGithubCliLogin === abortController) {

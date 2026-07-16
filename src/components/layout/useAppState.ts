@@ -214,6 +214,7 @@ export const useAppState = () => {
     language: settings.language,
     githubOauthClientId: settings.githubOauthClientId,
     githubHost: settings.githubHost,
+    onError: (message) => setGitActionToast({ msg: message, isError: true }),
   });
 
   const { handleCloneByUrl, handleForkByUrl } = useRepositoryCreationWorkflow({

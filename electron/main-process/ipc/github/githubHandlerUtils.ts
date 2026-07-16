@@ -1,4 +1,5 @@
 import type { GitHubService } from '../../../GitHubService';
+import { getGithubErrorStatus, getGithubRawErrorMessage, getGithubUserFacingErrorMessage } from '../../../github/githubErrorUtils';
 
 export type GithubPrState = 'open' | 'closed' | 'all';
 
@@ -13,15 +14,15 @@ type GithubApiErrorLike = {
 };
 
 export function toErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return error instanceof Error ? getGithubUserFacingErrorMessage(error, fallback) : fallback;
 }
 
 export function getGithubApiErrorDetails(error: unknown): { status: number; apiMessage: string; message: string } {
   const candidate = error as GithubApiErrorLike;
   return {
-    status: Number(candidate?.status),
+    status: getGithubErrorStatus(error) ?? Number.NaN,
     apiMessage: typeof candidate?.response?.data?.message === 'string' ? candidate.response.data.message : '',
-    message: typeof candidate?.message === 'string' ? candidate.message : '',
+    message: getGithubRawErrorMessage(error),
   };
 }
 

@@ -174,6 +174,39 @@ describe('useGithubDomain StrictMode bootstrap', () => {
     hook.unmount();
   });
 
+  it('reports a one-click login failure through the app-wide error channel', async () => {
+    const onError = vi.fn();
+    vi.spyOn(githubClient, 'getSavedAuthStatus').mockResolvedValue({
+      hasSavedToken: false,
+      authenticated: false,
+      username: null,
+      oauthConfigured: true,
+    });
+    vi.spyOn(githubClient, 'webLogin').mockResolvedValue({ success: false, error: 'GitHub is temporarily unavailable (HTTP 503).' });
+
+    let current: GithubDomain | null = null;
+    const root: Root = createRoot(document.createElement('div'));
+    const HookHarness = () => {
+      current = useGithubDomain({
+        onRepoCloned: vi.fn().mockResolvedValue(undefined),
+        setActiveTab: vi.fn(),
+        language: 'en',
+        githubOauthClientId: 'client-id',
+        githubHost: 'github.com',
+        onError,
+      });
+      return null;
+    };
+    act(() => root.render(createElement(HookHarness)));
+    await flush();
+
+    await act(async () => current!.handleStartWebFlowLogin());
+
+    expect(onError).toHaveBeenCalledWith('GitHub is temporarily unavailable (HTTP 503).');
+    expect(current!.webFlowError).toBe('GitHub is temporarily unavailable (HTTP 503).');
+    act(() => root.unmount());
+  });
+
   it('marks a device flow as running before its start request resolves', async () => {
     vi.spyOn(githubClient, 'getSavedAuthStatus').mockResolvedValue({
       hasSavedToken: false,

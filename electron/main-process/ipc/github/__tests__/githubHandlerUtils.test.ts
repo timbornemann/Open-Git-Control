@@ -7,6 +7,15 @@ describe('githubHandlerUtils', () => {
     expect(toErrorMessage('plain failure', 'fallback')).toBe('fallback');
   });
 
+  it('replaces GitHub HTML service pages with a concise retryable error', () => {
+    expect(
+      toErrorMessage(
+        Object.assign(new Error('<!DOCTYPE html><html><head><title>Unicorn! &middot; GitHub</title></head></html>'), { status: 503 }),
+        'Workflow runs could not be loaded.',
+      ),
+    ).toBe('GitHub is temporarily unavailable (HTTP 503). Please try again shortly.');
+  });
+
   it('extracts API status, API message and generic message defensively', () => {
     expect(
       getGithubApiErrorDetails({

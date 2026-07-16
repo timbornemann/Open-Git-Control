@@ -13,12 +13,13 @@ type Params = {
   language: AppLanguage;
   githubOauthClientId: string;
   githubHost: string;
+  onError?: (message: string) => void;
 };
 
 type AuthRunKind = 'bootstrap' | 'token' | 'device' | 'web' | 'logout';
 type AuthRun = { id: number; kind: AuthRunKind };
 
-export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOauthClientId, githubHost }: Params) => {
+export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOauthClientId, githubHost, onError }: Params) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubUser, setGithubUser] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
@@ -350,7 +351,9 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       const loginResult = await githubClient.webLogin();
       if (!isCurrentAuthRun(run)) return;
       if (!loginResult.success) {
-        setWebFlowError(loginResult.error || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));
+        const message = loginResult.error || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360');
+        setWebFlowError(message);
+        if (message !== 'GitHub-Anmeldung wurde abgebrochen.') onError?.(message);
         return;
       }
 
@@ -365,7 +368,9 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       }
     } catch (error: any) {
       if (!isCurrentAuthRun(run)) return;
-      setWebFlowError(error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360'));
+      const message = error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360');
+      setWebFlowError(message);
+      onError?.(message);
     } finally {
       if (isCurrentAuthRun(run)) setIsWebFlowRunning(false);
       finishAuthRun(run);

@@ -10,6 +10,7 @@ import {
   type WebFlowExchangeResult,
   oauthEndpointForHost,
 } from './types';
+import { getGithubErrorStatus, getGithubRawErrorMessage, getGithubUserFacingErrorMessage } from './githubErrorUtils';
 
 type OctokitConstructor = new (options: { auth: string; baseUrl: string }) => GitHubOctokit;
 
@@ -20,21 +21,9 @@ export type GitHubAuthenticationFailure = {
   invalidCredentials: boolean;
 };
 
-const getErrorStatus = (error: unknown): number | null => {
-  if (!error || typeof error !== 'object') return null;
-  const candidate = error as { status?: unknown; response?: { status?: unknown } };
-  const status = Number(candidate.status ?? candidate.response?.status);
-  return Number.isInteger(status) ? status : null;
-};
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return fallback;
-};
-
 const isInvalidCredentialError = (error: unknown): boolean => {
-  const status = getErrorStatus(error);
-  return status === 401 || /bad credentials|invalid (access )?token/i.test(getErrorMessage(error, ''));
+  const status = getGithubErrorStatus(error);
+  return status === 401 || /bad credentials|invalid (access )?token/i.test(getGithubRawErrorMessage(error));
 };
 
 export class GitHubAuthService {
@@ -128,7 +117,7 @@ export class GitHubAuthService {
 
   private authenticationFailed(error: unknown): null {
     this.lastAuthenticationFailure = {
-      message: getErrorMessage(error, 'GitHub authentication failed.'),
+      message: getGithubUserFacingErrorMessage(error, 'GitHub authentication failed.'),
       invalidCredentials: isInvalidCredentialError(error),
     };
     return null;
@@ -160,7 +149,7 @@ export class GitHubAuthService {
         username = data?.login || null;
         console.log('GitHub Authenticated as:', username, 'on host:', host);
       } catch (error) {
-        if (getErrorStatus(error) !== 403) return this.authenticationFailed(error);
+        if (getGithubErrorStatus(error) !== 403) return this.authenticationFailed(error);
         console.log('GitHub Authenticated (user lookup is not permitted for this token). Host:', host);
       }
 
