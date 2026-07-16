@@ -98,8 +98,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
     const zoomFactor = event.deltaY < 0 ? 1.15 : 0.85;
-    const nextScale = Math.max(0.15, Math.min(viewport.scale * zoomFactor, 3));
-    const nextViewport = zoomAt(mouseX, mouseY, nextScale);
+    const nextViewport = zoomAt(mouseX, mouseY, viewport.scale * zoomFactor);
     checkHover(mouseX, mouseY, nextViewport, flatNodes);
   };
 
@@ -137,7 +136,7 @@ export const FileTimelineCanvas: React.FC<FileTimelineCanvasProps> = ({ fileTree
 
       {hoveredNode && tooltipPos && <FileTimelineTooltip activeCommit={activeCommit} hoveredNode={hoveredNode} x={tooltipPos.x} y={tooltipPos.y} />}
 
-      <FileTimelineCanvasControls onCenter={centerView} onZoomIn={() => zoomFromCenter(1.25, 0.15, 3)} onZoomOut={() => zoomFromCenter(0.8, 0.15, 3)} />
+      <FileTimelineCanvasControls onCenter={centerView} onZoomIn={() => zoomFromCenter(1.25)} onZoomOut={() => zoomFromCenter(0.8)} />
     </div>
   );
 };

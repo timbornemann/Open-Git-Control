@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCenteredTimelineViewport } from './fileTimelineLayout';
 import type { FileTimelineDimensions, FileTimelineLayoutNode, FileTimelineViewport } from './types';
 
@@ -8,9 +8,16 @@ const initialViewport: FileTimelineViewport = {
   translateY: 0,
 };
 
+const DEFAULT_MIN_SCALE = 0.15;
+const MAX_SCALE = 3;
+
 export const useFileTimelineViewport = (flatNodes: FileTimelineLayoutNode[], dimensions: FileTimelineDimensions, resetKey: string) => {
   const hasCenteredRef = useRef(false);
   const [viewport, setViewport] = useState<FileTimelineViewport>(initialViewport);
+  const minScale = useMemo(() => {
+    const fitViewport = getCenteredTimelineViewport(flatNodes, dimensions);
+    return Math.min(DEFAULT_MIN_SCALE, fitViewport?.scale ?? DEFAULT_MIN_SCALE);
+  }, [dimensions, flatNodes]);
 
   useEffect(() => {
     hasCenteredRef.current = false;
@@ -29,7 +36,8 @@ export const useFileTimelineViewport = (flatNodes: FileTimelineLayoutNode[], dim
   }, [centerView, dimensions.height, dimensions.width, flatNodes.length]);
 
   const zoomAt = useCallback(
-    (screenX: number, screenY: number, nextScale: number) => {
+    (screenX: number, screenY: number, requestedScale: number) => {
+      const nextScale = Math.max(minScale, Math.min(requestedScale, MAX_SCALE));
       const worldX = (screenX - viewport.translateX) / viewport.scale;
       const worldY = (screenY - viewport.translateY) / viewport.scale;
       const nextViewport = {
@@ -41,14 +49,14 @@ export const useFileTimelineViewport = (flatNodes: FileTimelineLayoutNode[], dim
       setViewport(nextViewport);
       return nextViewport;
     },
-    [viewport],
+    [minScale, viewport],
   );
 
   const zoomFromCenter = useCallback(
-    (factor: number, min: number, max: number) => {
+    (factor: number) => {
       const centerX = dimensions.width / 2;
       const centerY = dimensions.height / 2;
-      zoomAt(centerX, centerY, Math.max(min, Math.min(viewport.scale * factor, max)));
+      zoomAt(centerX, centerY, viewport.scale * factor);
     },
     [dimensions.height, dimensions.width, viewport.scale, zoomAt],
   );
