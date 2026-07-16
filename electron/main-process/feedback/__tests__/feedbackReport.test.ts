@@ -28,7 +28,7 @@ describe('feedbackReport', () => {
     expect(report.fallbackUrl!.length).toBeLessThanOrEqual(4_000);
   });
 
-  it('redacts secrets and paths from automatic reports and creates a stable signature', () => {
+  it('rejects automatic reports', () => {
     const input = {
       category: 'bug' as const,
       submissionMode: 'automatic' as const,
@@ -37,15 +37,8 @@ describe('feedbackReport', () => {
       area: 'Repository workspace' as const,
       errorMessage: 'token=github_pat_abcdefghijklmnopqrstuvwxyz123456 at C:\\Users\\Tim\\private\\repo',
     };
-    const first = prepareFeedbackReport(input, environment);
-    const second = prepareFeedbackReport(input, environment);
 
-    expect(first.title).toContain('[REDACTED_PATH]');
-    expect(first.body).toContain('[REDACTED_SECRET]');
-    expect(first.body).toContain('[REDACTED_PATH]');
-    expect(first.body).not.toContain('github_pat_');
-    expect(first.fallbackUrl).toBeNull();
-    expect(first.signature).toBe(second.signature);
+    expect(() => prepareFeedbackReport(input as never, environment)).toThrow('Only manual feedback reports are supported.');
   });
 
   it('maps feature and question reports to the existing forms and validates required fields', () => {

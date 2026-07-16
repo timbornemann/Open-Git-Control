@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { FEEDBACK_REPORT_AREAS, type FeedbackReportAreaDto, type FeedbackReportInputDto } from '../../../src/types/feedbackDtos';
 import { redactGitSensitiveText } from '../../git/GitErrorFormatter';
 import { FEEDBACK_REPOSITORY_NAME, FEEDBACK_REPOSITORY_OWNER } from '../../github/GitHubIssueService';
@@ -14,7 +13,6 @@ export type PreparedFeedbackReport = {
   body: string;
   label: string;
   fallbackUrl: string | null;
-  signature: string | null;
 };
 
 const TITLE_MAX = 180;
@@ -78,7 +76,6 @@ const formArea = (category: FeedbackReportInputDto['category'], area: FeedbackRe
 };
 
 const fallbackUrl = (input: FeedbackReportInputDto, title: string, environment: FeedbackEnvironment, fields: Record<string, string>): string | null => {
-  if (input.submissionMode === 'automatic') return null;
   const config = categoryConfig[input.category];
   const params = new URLSearchParams({ template: config.template, title });
   for (const [key, value] of Object.entries(fields)) {
@@ -101,30 +98,13 @@ const fallbackUrl = (input: FeedbackReportInputDto, title: string, environment: 
 
 export function prepareFeedbackReport(input: FeedbackReportInputDto, environment: FeedbackEnvironment): PreparedFeedbackReport {
   if (!input || !categoryConfig[input.category]) throw new Error('Invalid feedback category.');
+  if (input.submissionMode !== 'manual') throw new Error('Only manual feedback reports are supported.');
   const config = categoryConfig[input.category];
-  const rawTitle = requiredText(input.title, 'Title', TITLE_MAX, input.submissionMode === 'automatic').replace(/^\[(?:Bug|Feature|Question)\]:\s*/i, '');
+  const rawTitle = requiredText(input.title, 'Title', TITLE_MAX).replace(/^\[(?:Bug|Feature|Question)\]:\s*/i, '');
   const title = `${config.prefix} ${rawTitle}`.slice(0, TITLE_MAX + config.prefix.length + 1);
   const area = normalizedArea(input.area);
   const source = input.source === 'error-toast' ? 'Error toast' : 'Settings';
   const environmentBlock = environmentMarkdown(environment, area, source);
-
-  if (input.submissionMode === 'automatic') {
-    const errorMessage = requiredText(input.errorMessage, 'Error message', FIELD_MAX, true);
-    const signature = createHash('sha256').update(`${environment.appVersion}\0${area}\0${errorMessage}`).digest('hex');
-    const body = [
-      '## Actual behavior',
-      errorMessage,
-      '',
-      '## Context',
-      'Automatically captured after explicit user consent. No diagnostics or repository details were attached.',
-      '',
-      '## Environment',
-      environmentBlock,
-      '',
-      `<!-- open-git-control-error-signature:${signature} -->`,
-    ].join('\n');
-    return { title, body, label: config.label, fallbackUrl: null, signature };
-  }
 
   if (input.category === 'bug') {
     const steps = requiredText(input.steps, 'Steps');
@@ -149,7 +129,6 @@ export function prepareFeedbackReport(input: FeedbackReportInputDto, environment
       title,
       body,
       label: config.label,
-      signature: null,
       fallbackUrl: fallbackUrl(input, title, environment, { steps, expected, actual, 'affected-area': formArea(input.category, area) }),
     };
   }
@@ -179,7 +158,6 @@ export function prepareFeedbackReport(input: FeedbackReportInputDto, environment
       title,
       body,
       label: config.label,
-      signature: null,
       fallbackUrl: fallbackUrl(input, title, environment, {
         problem,
         workflow: desiredWorkflow,
@@ -208,7 +186,6 @@ export function prepareFeedbackReport(input: FeedbackReportInputDto, environment
     title,
     body,
     label: config.label,
-    signature: null,
     fallbackUrl: fallbackUrl(input, title, environment, { question, context, tried, area: formArea(input.category, area) }),
   };
 }

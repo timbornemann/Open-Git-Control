@@ -10,8 +10,6 @@ export const DEFAULT_SETTINGS: AppSettingsDto = {
   showSecondaryHistory: true,
   commitSignoffByDefault: false,
   autoUpdateEnabled: true,
-  errorReportConsentShown: false,
-  automaticErrorReportsEnabled: false,
   secretScanBeforeCommitEnabled: true,
   secretScanBeforePushEnabled: true,
   secretScanStrictness: 'medium',

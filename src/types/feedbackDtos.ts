@@ -1,6 +1,6 @@
 export type FeedbackReportCategoryDto = 'bug' | 'feature' | 'question';
 export type FeedbackReportSourceDto = 'settings' | 'error-toast';
-export type FeedbackReportSubmissionModeDto = 'manual' | 'automatic';
+export type FeedbackReportSubmissionModeDto = 'manual';
 export const FEEDBACK_REPORT_AREAS = [
   'Repository workspace',
   'Commit graph',
@@ -48,23 +48,14 @@ export type ManualQuestionFeedbackReportDto = FeedbackReportBaseDto & {
   tried?: string;
 };
 
-export type AutomaticFeedbackReportDto = {
-  category: 'bug';
-  submissionMode: 'automatic';
-  source: 'error-toast';
-  title: string;
-  area: FeedbackReportAreaDto;
-  errorMessage: string;
-};
-
-export type FeedbackReportInputDto = ManualBugFeedbackReportDto | ManualFeatureFeedbackReportDto | ManualQuestionFeedbackReportDto | AutomaticFeedbackReportDto;
+export type FeedbackReportInputDto = ManualBugFeedbackReportDto | ManualFeatureFeedbackReportDto | ManualQuestionFeedbackReportDto;
 
 export type FeedbackReportCapabilityDto = {
   directSubmissionAvailable: boolean;
   reason: 'not-authenticated' | 'wrong-host' | null;
 };
 
-export type FeedbackReportErrorCodeDto = 'DIRECT_UNAVAILABLE' | 'RATE_LIMITED' | 'VALIDATION_FAILED' | 'GITHUB_FAILED';
+export type FeedbackReportErrorCodeDto = 'DIRECT_UNAVAILABLE' | 'VALIDATION_FAILED' | 'GITHUB_FAILED';
 
 export type FeedbackReportSubmissionResultDto =
   | {

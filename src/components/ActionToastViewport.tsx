@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { useI18n } from '@/i18n';
 import { useOptionalFeedbackReport } from '@/contexts/FeedbackReportContext';
 
@@ -49,13 +49,6 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
     void copyMessage(message);
   }, []);
 
-  useEffect(() => {
-    if (!feedback) return;
-    for (const toast of toasts) {
-      if (toast.isError) feedback.observeErrorToast(toast);
-    }
-  }, [feedback, toasts]);
-
   if (toasts.length === 0) return null;
 
   return (
@@ -82,15 +75,10 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
                     type="button"
                     className="toast-action-btn toast-action-btn-report"
                     onClick={() => feedback.handleToastAction(toast)}
-                    disabled={feedback.getToastStatus(toast.id).state === 'submitting'}
                   >
-                    {feedback.getToastStatus(toast.id).state === 'submitting'
-                      ? feedbackLabel('submitting', t)
-                      : feedback.getToastStatus(toast.id).state === 'reported'
+                    {feedback.getToastStatus(toast.id).state === 'reported'
                         ? feedbackLabel('reported', t, feedback.getToastStatus(toast.id).issueNumber)
-                        : feedback.getToastStatus(toast.id).state === 'suppressed'
-                          ? feedbackLabel('suppressed', t)
-                          : feedbackLabel('idle', t)}
+                        : feedbackLabel('idle', t)}
                   </button>
                 )}
               </>
@@ -112,9 +100,7 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
   );
 };
 
-const feedbackLabel = (state: 'idle' | 'submitting' | 'reported' | 'suppressed', t: ReturnType<typeof useI18n>['t'], issueNumber?: number): string => {
-  if (state === 'submitting') return t('feedback.reporting');
+const feedbackLabel = (state: 'idle' | 'reported', t: ReturnType<typeof useI18n>['t'], issueNumber?: number): string => {
   if (state === 'reported') return issueNumber ? t('feedback.openIssueNumber', { number: issueNumber }) : t('feedback.openIssue');
-  if (state === 'suppressed') return t('feedback.reportManually');
   return t('feedback.quickReport');
 };

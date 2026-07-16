@@ -37,7 +37,6 @@ describe('registerFeedbackHandlers', () => {
         normalizeHost: vi.fn((value) => value),
         getHost: vi.fn(() => 'github.com'),
       } as any,
-      historyStore: {} as any,
     });
 
     await expect(handlers.get('feedback:getCapability')!({})).resolves.toEqual({ directSubmissionAvailable: false, reason: 'not-authenticated' });
@@ -47,38 +46,8 @@ describe('registerFeedbackHandlers', () => {
     expect(result.fallbackUrl).toContain('template=bug_report.yml');
   });
 
-  it('never returns a browser fallback for automatic submissions on the wrong host', async () => {
-    registerFeedbackHandlers({
-      githubService: {
-        isAuthenticated: vi.fn(() => true),
-        normalizeHost: vi.fn((value) => value),
-        getHost: vi.fn(() => 'github.enterprise.test'),
-      } as any,
-      historyStore: {} as any,
-    });
-
-    const result = await handlers.get('feedback:submit')!(
-      {},
-      {
-        category: 'bug',
-        submissionMode: 'automatic',
-        source: 'error-toast',
-        title: 'Failure',
-        area: 'Settings',
-        errorMessage: 'Something failed',
-      },
-    );
-    expect(result).toEqual({ success: false, code: 'DIRECT_UNAVAILABLE', error: 'Direct reports require a GitHub.com session.' });
-  });
-
-  it('creates direct manual issues and maps automatic deduplication results', async () => {
-    const createFeedbackIssue = vi.fn().mockResolvedValue({ number: 12, htmlUrl: 'https://github.com/timbornemann/Open-Git-Control/issues/12' });
-    const historyStore = {
-      submit: vi.fn(async (_signature: string, create: () => Promise<{ number: number; htmlUrl: string }>) => {
-        const issue = await create();
-        return { kind: 'duplicate', issueNumber: issue.number, htmlUrl: issue.htmlUrl };
-      }),
-    };
+  it('rejects automatic submissions before an issue can be created', async () => {
+    const createFeedbackIssue = vi.fn();
     registerFeedbackHandlers({
       githubService: {
         isAuthenticated: vi.fn(() => true),
@@ -86,26 +55,29 @@ describe('registerFeedbackHandlers', () => {
         getHost: vi.fn(() => 'github.com'),
         createFeedbackIssue,
       } as any,
-      historyStore: historyStore as any,
+    });
+
+    await expect(
+      handlers.get('feedback:submit')!({}, { ...bugReport, submissionMode: 'automatic', source: 'error-toast', errorMessage: 'Something failed' }),
+    ).resolves.toMatchObject({ success: false, code: 'VALIDATION_FAILED', error: 'Only manual feedback reports are supported.' });
+    expect(createFeedbackIssue).not.toHaveBeenCalled();
+  });
+
+  it('creates direct manual issues', async () => {
+    const createFeedbackIssue = vi.fn().mockResolvedValue({ number: 12, htmlUrl: 'https://github.com/timbornemann/Open-Git-Control/issues/12' });
+    registerFeedbackHandlers({
+      githubService: {
+        isAuthenticated: vi.fn(() => true),
+        normalizeHost: vi.fn((value) => value),
+        getHost: vi.fn(() => 'github.com'),
+        createFeedbackIssue,
+      } as any,
     });
 
     await expect(handlers.get('feedback:submit')!({}, bugReport)).resolves.toMatchObject({
       success: true,
       data: { issueNumber: 12, deduplicated: false },
     });
-    await expect(
-      handlers.get('feedback:submit')!(
-        {},
-        {
-          category: 'bug',
-          submissionMode: 'automatic',
-          source: 'error-toast',
-          title: 'Failure',
-          area: 'Settings',
-          errorMessage: 'Something failed',
-        },
-      ),
-    ).resolves.toMatchObject({ success: true, data: { issueNumber: 12, deduplicated: true } });
     expect(createFeedbackIssue).toHaveBeenCalledWith(expect.stringMatching(/^\[Bug\]:/), expect.stringContaining('## Actual behavior'), 'bug');
   });
 });

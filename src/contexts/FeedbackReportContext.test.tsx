@@ -7,20 +7,17 @@ import { I18nProvider } from '@/i18n';
 import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { FeedbackReportProvider } from './FeedbackReportContext';
 
-const { appClientMock, settingsState, uiState, githubState, onUpdateSettingsMock } = vi.hoisted(() => ({
+const { appClientMock, settingsState, uiState, githubState } = vi.hoisted(() => ({
   appClientMock: {
     isAvailable: vi.fn(() => true),
     getFeedbackReportCapability: vi.fn(),
     submitFeedbackReport: vi.fn(),
     openExternalUrl: vi.fn(),
+    getDiagnosticsReport: vi.fn(),
   },
-  settingsState: {
-    settings: { errorReportConsentShown: false, automaticErrorReportsEnabled: false, githubHost: 'github.com' },
-    onUpdateSettings: vi.fn(),
-  },
+  settingsState: { settings: { githubHost: 'github.com' } },
   uiState: { activeTab: 'repo', confirmDialog: null, inputDialog: null },
   githubState: { isAuthenticated: true },
-  onUpdateSettingsMock: vi.fn(),
 }));
 
 vi.mock('@/services/appClient', () => ({ appClient: appClientMock }));
@@ -36,16 +33,10 @@ describe('FeedbackReportProvider', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div>';
-    settingsState.settings.errorReportConsentShown = false;
-    settingsState.settings.automaticErrorReportsEnabled = false;
-    settingsState.onUpdateSettings = onUpdateSettingsMock;
-    onUpdateSettingsMock.mockReset().mockResolvedValue({ success: true, settings: settingsState.settings });
     appClientMock.getFeedbackReportCapability.mockReset().mockResolvedValue({ directSubmissionAvailable: true, reason: null });
-    appClientMock.submitFeedbackReport.mockReset().mockResolvedValue({
-      success: true,
-      data: { issueNumber: 8, htmlUrl: 'https://github.com/timbornemann/Open-Git-Control/issues/8', deduplicated: false },
-    });
+    appClientMock.submitFeedbackReport.mockReset();
     appClientMock.openExternalUrl.mockReset().mockResolvedValue({ success: true });
+    appClientMock.getDiagnosticsReport.mockReset().mockResolvedValue({ success: true, data: { report: 'diagnostics' } });
   });
 
   afterEach(() => {
@@ -70,30 +61,18 @@ describe('FeedbackReportProvider', () => {
     });
   };
 
-  it('shows the one-time public GitHub consent with automatic reporting selected', async () => {
+  it('never submits an error toast automatically and opens the manual report from its button', async () => {
     await renderError();
 
-    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('public GitHub issue');
-    const checkbox = document.querySelector<HTMLInputElement>('.feedback-report-diagnostics-toggle input');
-    expect(checkbox?.checked).toBe(true);
-    const confirm = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Report this error');
-    await act(async () => confirm?.click());
-
-    expect(onUpdateSettingsMock).toHaveBeenCalledWith({ errorReportConsentShown: true, automaticErrorReportsEnabled: true });
-    expect(appClientMock.submitFeedbackReport).toHaveBeenCalledWith(
-      expect.objectContaining({ submissionMode: 'automatic', errorMessage: 'Repository failed', area: 'Repository workspace' }),
-    );
-    expect(document.body.textContent).toContain('Open issue #8');
-  });
-
-  it('persists opt-out without submitting when the first consent is declined', async () => {
-    await renderError();
-    const decline = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Do not report');
-    await act(async () => decline?.click());
-
-    expect(onUpdateSettingsMock).toHaveBeenCalledWith({ errorReportConsentShown: true, automaticErrorReportsEnabled: false });
-    expect(appClientMock.submitFeedbackReport).not.toHaveBeenCalled();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.body.textContent).toContain('Quick report');
+    expect(appClientMock.submitFeedbackReport).not.toHaveBeenCalled();
+
+    const report = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Quick report');
+    await act(async () => report?.click());
+
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Feedback & issue report');
+    expect(document.querySelector<HTMLTextAreaElement>('textarea')?.value).toBe('');
+    expect(Array.from(document.querySelectorAll('textarea'))[2]?.value).toBe('Repository failed');
+    expect(appClientMock.submitFeedbackReport).not.toHaveBeenCalled();
   });
 });

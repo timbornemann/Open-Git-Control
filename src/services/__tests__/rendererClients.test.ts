@@ -139,14 +139,27 @@ describe('renderer service clients', () => {
       () =>
         appClient.submitFeedbackReport({
           category: 'bug',
-          submissionMode: 'automatic',
-          source: 'error-toast',
+          submissionMode: 'manual',
+          source: 'settings',
           title: 'Failure',
           area: 'Settings',
-          errorMessage: 'x',
+          steps: 'Open settings',
+          expected: 'The report opens.',
+          actual: 'The report fails.',
         }),
       api.app.submitFeedbackReport,
-      [{ category: 'bug', submissionMode: 'automatic', source: 'error-toast', title: 'Failure', area: 'Settings', errorMessage: 'x' }],
+      [
+        {
+          category: 'bug',
+          submissionMode: 'manual',
+          source: 'settings',
+          title: 'Failure',
+          area: 'Settings',
+          steps: 'Open settings',
+          expected: 'The report opens.',
+          actual: 'The report fails.',
+        },
+      ],
     );
     await expectDelegation(() => appClient.getPlanningApiInfo(), api.app.getPlanningApiInfo, []);
     await expectDelegation(() => appClient.generatePlanningApiToken(), api.app.generatePlanningApiToken, []);

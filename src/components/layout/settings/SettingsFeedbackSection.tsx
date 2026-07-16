@@ -1,9 +1,9 @@
 import { Bug, HelpCircle, Lightbulb } from 'lucide-react';
 import { useFeedbackReport } from '@/contexts/FeedbackReportContext';
 import { useI18n } from '@/i18n';
-import { actionRowClass, hintClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
+import { actionRowClass, hintClass, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
-export const SettingsFeedbackSection = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
+export const SettingsFeedbackSection = ({ variant }: SettingsSectionProps) => {
   const { tr } = useI18n();
   const feedback = useFeedbackReport();
   const content = (
@@ -25,22 +25,12 @@ export const SettingsFeedbackSection = ({ settings, onUpdateSettings, variant }:
           <HelpCircle size={13} /> {tr('Frage stellen', 'Ask question')}
         </button>
       </div>
-      <SettingsSwitch
-        variant={variant}
-        compact={variant === 'sidebar'}
-        checked={settings.automaticErrorReportsEnabled}
-        label={tr('Fehler-Toasts nach Einwilligung automatisch melden', 'Automatically report error toasts after consent')}
-        onChange={(checked) => void onUpdateSettings({ automaticErrorReportsEnabled: checked, errorReportConsentShown: true })}
-      />
       <p className={hintClass(variant)}>
         {feedback.capability?.directSubmissionAvailable
-          ? tr(
-              'Direkte Meldungen sind über die aktive GitHub.com-Sitzung verfügbar. Automatische Meldungen enthalten nur redigierte Minimaldaten.',
-              'Direct reports are available through the active GitHub.com session. Automatic reports contain only redacted minimal data.',
-            )
+          ? tr('Direkte Meldungen sind über die aktive GitHub.com-Sitzung verfügbar.', 'Direct reports are available through the active GitHub.com session.')
           : tr(
-              'Ohne aktive GitHub.com-Sitzung werden manuelle Meldungen als vorausgefülltes Browserformular geöffnet; automatische Meldungen pausieren.',
-              'Without an active GitHub.com session, manual reports open as a prefilled browser form and automatic reports pause.',
+              'Ohne aktive GitHub.com-Sitzung werden Meldungen als vorausgefülltes Browserformular geöffnet.',
+              'Without an active GitHub.com session, reports open as a prefilled browser form.',
             )}
       </p>
     </>
