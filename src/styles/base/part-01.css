@@ -415,6 +415,10 @@ pre {
 }
 
 .topbar-chip-branch {
+  min-width: 0;
+  max-width: min(260px, 20vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: color-mix(in srgb, var(--status-success) 18%, var(--bg-panel));
   color: color-mix(in srgb, var(--status-success) 78%, var(--text-primary));
   border-color: color-mix(in srgb, var(--status-success) 50%, var(--border-color));
@@ -423,6 +427,7 @@ pre {
 }
 
 .topbar-chip-remote {
+  min-width: 0;
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;

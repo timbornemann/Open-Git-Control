@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitCommitHorizontal, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
 import { useI18n } from '@/i18n';
 import { RepositoryRunMenu } from './RepositoryRunMenu';
+import { TopbarMoreMenu, type TopbarMoreMenuView } from './TopbarMoreMenu';
 
 type Props = {
   activeRepo: string | null;
@@ -75,7 +76,7 @@ export const TopbarActions: React.FC<Props> = ({
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
   const isPushRunning = isGitActionRunning && normalizedAction.includes('push');
-  const [openMenu, setOpenMenu] = useState<'pull' | 'push' | 'merge' | 'run' | 'more' | 'moreMerge' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'pull' | 'push' | 'merge' | 'run' | 'more' | 'moreMerge' | 'moreRun' | null>(null);
   const [mergeQuery, setMergeQuery] = useState('');
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -240,6 +241,8 @@ export const TopbarActions: React.FC<Props> = ({
     </>
   );
 
+  const moreMenuView: TopbarMoreMenuView | null = openMenu === 'more' || openMenu === 'moreMerge' || openMenu === 'moreRun' ? openMenu : null;
+
   return (
     <div className="topbar-actions" ref={rootRef}>
       <button
@@ -375,112 +378,41 @@ export const TopbarActions: React.FC<Props> = ({
         <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.release_f55496ba')}</span>
       </button>
       <button className="icon-btn topbar-action-btn topbar-action-btn-primary topbar-action-secondary" onClick={onStageCommit} disabled={!activeRepo}>
-        {t('generated.components.topbar.topbaractions.stage_commit_77275475')}
+        <GitCommitHorizontal size={16} />
+        <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.stage_commit_77275475')}</span>
       </button>
       <div className="topbar-split-wrap topbar-more-wrap">
         <button
           className="icon-btn topbar-action-btn topbar-more-toggle"
-          onClick={() => setOpenMenu((previous) => (previous === 'more' || previous === 'moreMerge' ? null : 'more'))}
+          onClick={() => setOpenMenu((previous) => (previous === 'more' || previous === 'moreMerge' || previous === 'moreRun' ? null : 'more'))}
           aria-label={t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}
           title={t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}
         >
           <MoreHorizontal size={18} />
           <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.more_d62e1799')}</span>
         </button>
-        {(openMenu === 'more' || openMenu === 'moreMerge') && (
-          <div className="topbar-dropdown topbar-more-dropdown">
-            {openMenu === 'moreMerge' ? (
-              <>
-                <button
-                  type="button"
-                  className="topbar-dropdown-item topbar-more-back"
-                  onClick={() => {
-                    setMergeQuery('');
-                    setOpenMenu('more');
-                  }}
-                >
-                  <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.back_to_actions_db752816')}</span>
-                </button>
-                <div className="topbar-dropdown-sep" />
-                {renderMergePicker()}
-              </>
-            ) : (
-              <>
-                <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.more_actions_a53b5e21')}</div>
-                <button
-                  className="topbar-dropdown-item"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    onStageCommit();
-                  }}
-                  disabled={!activeRepo}
-                >
-                  <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.stage_commit_77275475')}</span>
-                  <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.open_working_directory_48559e72')}</span>
-                </button>
-                <button
-                  className="topbar-dropdown-item"
-                  onClick={() => setOpenMenu('moreMerge')}
-                  disabled={!activeRepo || isGitActionRunning || branches.length === 0}
-                >
-                  <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.merge_branch_8c3efbb0')}</span>
-                  <span className="topbar-dropdown-item-hint">{t('generated.components.topbar.topbaractions.choose_branch_and_merge_mode_9fea8d11')}</span>
-                </button>
-                <button
-                  className="topbar-dropdown-item"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    onOpenTimeline?.();
-                  }}
-                  disabled={!activeRepo || isTimelineLoading}
-                >
-                  <span className="topbar-dropdown-item-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>
-                </button>
-                <button
-                  className="topbar-dropdown-item"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    onOpenReleaseCreator();
-                  }}
-                  disabled={!activeRepo}
-                >
-                  <span className="topbar-dropdown-item-label">{t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}</span>
-                </button>
-                <div className="topbar-dropdown-sep" />
-                <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.pull_options_021c5024')}</div>
-                {pullOptions.map((option) => (
-                  <button
-                    key={`more-${option.label}`}
-                    className="topbar-dropdown-item"
-                    onClick={() => {
-                      setOpenMenu(null);
-                      option.action();
-                    }}
-                    disabled={!activeRepo || isGitActionRunning}
-                  >
-                    <span className="topbar-dropdown-item-label">{option.label}</span>
-                    <span className="topbar-dropdown-item-hint">{option.hint}</span>
-                  </button>
-                ))}
-                <div className="topbar-dropdown-sep" />
-                <div className="topbar-dropdown-header">{t('generated.components.topbar.topbaractions.push_options_f825b016')}</div>
-                {pushOptions.map((option) => (
-                  <button
-                    key={`more-${option.label}`}
-                    className="topbar-dropdown-item"
-                    onClick={() => {
-                      setOpenMenu(null);
-                      option.action();
-                    }}
-                    disabled={!activeRepo || isGitActionRunning}
-                  >
-                    <span className="topbar-dropdown-item-label">{option.label}</span>
-                    <span className="topbar-dropdown-item-hint">{option.hint}</span>
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
+        {moreMenuView && (
+          <TopbarMoreMenu
+            view={moreMenuView}
+            setView={(view) => setOpenMenu(view)}
+            activeRepo={activeRepo}
+            isGitActionRunning={isGitActionRunning}
+            branchCount={branches.length}
+            isTimelineLoading={isTimelineLoading}
+            pullOptions={pullOptions}
+            pushOptions={pushOptions}
+            renderMergePicker={renderMergePicker}
+            onClearMergeQuery={() => setMergeQuery('')}
+            onStageCommit={onStageCommit}
+            onOpenTimeline={onOpenTimeline}
+            onOpenReleaseCreator={onOpenReleaseCreator}
+            activeRunConfig={activeRunConfig}
+            repositoryRun={repositoryRun}
+            onStartRepositoryRun={onStartRepositoryRun}
+            onStopRepositoryRun={onStopRepositoryRun}
+            onOpenRunConsole={onOpenRunConsole}
+            onOpenRunSettings={onOpenRunSettings}
+          />
         )}
       </div>
     </div>
