@@ -2,11 +2,14 @@ import React from 'react';
 import { FolderGit2, Lightbulb, Plus, Trash2 } from 'lucide-react';
 import { useProjectPlanner } from '@/contexts/ProjectPlannerContext';
 import { useI18n } from '@/i18n';
+import { PlannerProjectContextMenu, type PlannerProjectContextMenuState } from './PlannerProjectContextMenu';
 import '@/styles/project-planner.css';
 
 export const ProjectPlannerSidebarContent: React.FC = () => {
-  const { data, selectedProjectId, selectProject, loading, busy, requestCreateProject, requestDeleteProject } = useProjectPlanner();
+  const { data, selectedProjectId, selectProject, loading, busy, requestCreateProject, requestCreateItem, requestEditProject, requestDeleteProject } =
+    useProjectPlanner();
   const { t, tr } = useI18n();
+  const [projectContextMenu, setProjectContextMenu] = React.useState<PlannerProjectContextMenuState | null>(null);
 
   const itemCountByProject = React.useMemo(() => {
     const counts = new Map<string, number>();
@@ -20,7 +23,14 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
   const repositoryProjects = data.projects.filter((project) => project.kind === 'repository');
 
   const renderProject = (project: (typeof data.projects)[number]) => (
-    <div key={project.id} className={`planner-sidebar-project-row ${selectedProjectId === project.id ? 'active' : ''}`}>
+    <div
+      key={project.id}
+      className={`planner-sidebar-project-row ${selectedProjectId === project.id ? 'active' : ''}`}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setProjectContextMenu({ x: event.clientX, y: event.clientY, project });
+      }}
+    >
       <button className="planner-sidebar-project" onClick={() => selectProject(project.id)} title={project.repoPath || project.name}>
         <span className="planner-sidebar-project-icon">{project.kind === 'planned' ? <Lightbulb size={14} /> : <FolderGit2 size={14} />}</span>
         <span className="planner-sidebar-project-copy">
@@ -82,6 +92,15 @@ export const ProjectPlannerSidebarContent: React.FC = () => {
           <div className="planner-sidebar-empty">{t('generated.components.project_planner.projectplannersidebarcontent.no_repository_assigned_0fef515d')}</div>
         )}
       </section>
+
+      <PlannerProjectContextMenu
+        contextMenu={projectContextMenu}
+        busy={busy}
+        onClose={() => setProjectContextMenu(null)}
+        onCreateItem={requestCreateItem}
+        onEdit={requestEditProject}
+        onDelete={requestDeleteProject}
+      />
     </div>
   );
 };

@@ -40,13 +40,15 @@
   transform: translateY(-1px);
 }
 
-.planner-item-context-backdrop {
+.planner-item-context-backdrop,
+.planner-project-context-backdrop {
   position: fixed;
   inset: 0;
   z-index: 2000;
 }
 
 .planner-item-context-menu,
+.planner-project-context-menu,
 .planner-item-context-submenu {
   position: fixed;
   z-index: 2001;
@@ -58,7 +60,8 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
 
-.planner-item-context-header {
+.planner-item-context-header,
+.planner-project-context-header {
   padding: 6px 11px;
   overflow: hidden;
   border-bottom: 1px solid var(--border-color);
@@ -70,6 +73,7 @@
 }
 
 .planner-item-context-action,
+.planner-project-context-action,
 .planner-item-context-option {
   display: flex;
   align-items: center;
@@ -87,6 +91,8 @@
 
 .planner-item-context-action:hover:not(:disabled),
 .planner-item-context-action:focus-visible:not(:disabled),
+.planner-project-context-action:hover:not(:disabled),
+.planner-project-context-action:focus-visible:not(:disabled),
 .planner-item-context-option:hover:not(:disabled),
 .planner-item-context-option:focus-visible:not(:disabled),
 .planner-item-context-option.active {
@@ -94,17 +100,21 @@
 }
 
 .planner-item-context-action:disabled,
+.planner-project-context-action:disabled,
 .planner-item-context-option:disabled {
   opacity: 0.5;
   cursor: wait;
 }
 
-.planner-item-context-action.danger {
+.planner-item-context-action.danger,
+.planner-project-context-action.danger {
   color: var(--status-danger);
 }
 
 .planner-item-context-action.danger:hover:not(:disabled),
-.planner-item-context-action.danger:focus-visible:not(:disabled) {
+.planner-item-context-action.danger:focus-visible:not(:disabled),
+.planner-project-context-action.danger:hover:not(:disabled),
+.planner-project-context-action.danger:focus-visible:not(:disabled) {
   background: var(--status-danger-soft);
 }
 
@@ -113,7 +123,8 @@
   color: var(--text-secondary);
 }
 
-.planner-item-context-separator {
+.planner-item-context-separator,
+.planner-project-context-separator {
   height: 1px;
   margin: 4px 0;
   background: var(--border-color);

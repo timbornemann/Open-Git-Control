@@ -4,6 +4,13 @@ import type { ConfirmDialogState } from '@/app/state/contracts';
 import { useI18n } from '@/i18n';
 import { plannerClient } from '@/services/plannerClient';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { useRepositoryProjectPrompt } from './useRepositoryProjectPrompt';
+
+type PlannerProjectActionRequest = {
+  requestId: number;
+  projectId: string;
+  action: 'create-item' | 'edit-project';
+};
 
 type ProjectPlannerContextValue = {
   data: ProjectPlannerData;
@@ -11,10 +18,13 @@ type ProjectPlannerContextValue = {
   selectedProjectId: string | null;
   itemsForSelectedProject: PlannerItem[];
   createProjectRequestId: number;
+  projectActionRequest: PlannerProjectActionRequest | null;
   loading: boolean;
   busy: boolean;
   error: string | null;
   requestCreateProject: () => void;
+  requestCreateItem: (projectId: string) => void;
+  requestEditProject: (projectId: string) => void;
   requestDeleteProject: (projectId: string) => void;
   requestDeleteItem: (itemId: string) => void;
   selectProject: (projectId: string) => void;
@@ -32,6 +42,7 @@ type ProjectPlannerContextValue = {
 
 type ProjectPlannerProviderProps = {
   activeRepo: string | null;
+  plannerActive: boolean;
   refreshSignal?: number;
   onRepositorySelected: (repoPath: string) => Promise<void>;
   onRepositoryMaterialized: (repoPath: string) => Promise<void>;
@@ -47,6 +58,7 @@ const repoKey = normalizeRepoPathKey;
 
 export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   activeRepo,
+  plannerActive,
   refreshSignal = 0,
   onRepositorySelected,
   onRepositoryMaterialized,
@@ -61,14 +73,15 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createProjectRequestId, setCreateProjectRequestId] = useState(0);
-  const ensuredRepoRef = useRef<string | null>(null);
-  const activeRepoGenerationRef = useRef(0);
-  const ensureRequestGenerationRef = useRef(0);
+  const [projectActionRequest, setProjectActionRequest] = useState<PlannerProjectActionRequest | null>(null);
   const refreshRequestGenerationRef = useRef(0);
+  const projectActionRequestIdRef = useRef(0);
+  const activeRepoRef = useRef(activeRepo);
+  const plannerActiveRef = useRef(plannerActive);
+  activeRepoRef.current = activeRepo;
+  plannerActiveRef.current = plannerActive;
 
   useEffect(() => {
-    activeRepoGenerationRef.current += 1;
-    ensureRequestGenerationRef.current += 1;
     refreshRequestGenerationRef.current += 1;
     setSelectedProjectId(null);
   }, [activeRepo]);
@@ -147,41 +160,6 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   }, [refresh, refreshSignal]);
 
   useEffect(() => {
-    if (!activeRepo || !plannerClient.isAvailable()) return;
-    const key = repoKey(activeRepo);
-    if (ensuredRepoRef.current === key) return;
-    const repoGeneration = activeRepoGenerationRef.current;
-    const ensureGeneration = ensureRequestGenerationRef.current + 1;
-    ensureRequestGenerationRef.current = ensureGeneration;
-    const isCurrentEnsure = () => repoGeneration === activeRepoGenerationRef.current && ensureGeneration === ensureRequestGenerationRef.current;
-
-    const ensure = async () => {
-      try {
-        const result = await plannerClient.ensureRepositoryProject(activeRepo);
-        if (!isCurrentEnsure()) return;
-        if (!result.success) {
-          setError(result.error);
-          return;
-        }
-        ensuredRepoRef.current = key;
-        const refreshed = await refreshData();
-        if (!isCurrentEnsure() || !refreshed) return;
-        setSelectedProjectId(result.data.id);
-      } catch (ensureError) {
-        if (!isCurrentEnsure()) return;
-        setError(ensureError instanceof Error ? ensureError.message : String(ensureError));
-      }
-    };
-    void ensure();
-
-    return () => {
-      if (ensureRequestGenerationRef.current === ensureGeneration) {
-        ensureRequestGenerationRef.current += 1;
-      }
-    };
-  }, [activeRepo, refreshData, refreshSignal]);
-
-  useEffect(() => {
     if (loading || selectedProjectId) return;
     const activeProject = activeRepo ? data.projects.find((project) => project.repoPath && repoKey(project.repoPath) === repoKey(activeRepo)) : null;
     setSelectedProjectId(activeProject?.id || data.projects[0]?.id || null);
@@ -225,6 +203,37 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     },
     [onToast, refresh, tr],
   );
+
+  const confirmRepositoryProject = useCallback(
+    async (repoPath: string) => {
+      if (!plannerClient.isAvailable()) {
+        const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
+        setError(message);
+        onToast(message, true);
+        return false;
+      }
+      if (!plannerActiveRef.current || !activeRepoRef.current || repoKey(activeRepoRef.current) !== repoKey(repoPath)) return false;
+
+      const project = await runMutation(() => plannerClient.ensureRepositoryProject(repoPath));
+      if (!project) return false;
+      if (plannerActiveRef.current && activeRepoRef.current && repoKey(activeRepoRef.current) === repoKey(repoPath)) {
+        setSelectedProjectId(project.id);
+      }
+      return true;
+    },
+    [onToast, runMutation],
+  );
+
+  useRepositoryProjectPrompt({
+    activeRepo,
+    plannerActive,
+    projects: data.projects,
+    loading,
+    error,
+    setConfirmDialog,
+    tr,
+    onConfirmRepositoryProject: confirmRepositoryProject,
+  });
 
   const createProject = useCallback(
     async (input: PlannerProjectInput) => {
@@ -373,9 +382,22 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     [activeRepo, data.projects, onRepositorySelected],
   );
 
+  const requestProjectAction = useCallback(
+    (projectId: string, action: PlannerProjectActionRequest['action']) => {
+      if (!data.projects.some((project) => project.id === projectId)) return;
+      setSelectedProjectId(projectId);
+      setProjectActionRequest({ requestId: ++projectActionRequestIdRef.current, projectId, action });
+    },
+    [data.projects],
+  );
+
   const requestCreateProject = useCallback(() => {
     setCreateProjectRequestId((current) => current + 1);
   }, []);
+
+  const requestCreateItem = useCallback((projectId: string) => requestProjectAction(projectId, 'create-item'), [requestProjectAction]);
+
+  const requestEditProject = useCallback((projectId: string) => requestProjectAction(projectId, 'edit-project'), [requestProjectAction]);
 
   const activateRepositoryProject = useCallback(
     async (repoPath: string) => {
@@ -412,10 +434,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       selectedProjectId,
       itemsForSelectedProject,
       createProjectRequestId,
+      projectActionRequest,
       loading,
       busy,
       error,
       requestCreateProject,
+      requestCreateItem,
+      requestEditProject,
       requestDeleteProject,
       requestDeleteItem,
       selectProject,
@@ -444,10 +469,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       loading,
       materializeProject,
       notify,
+      projectActionRequest,
       refresh,
       requestCreateProject,
+      requestCreateItem,
       requestDeleteItem,
       requestDeleteProject,
+      requestEditProject,
       selectedProject,
       selectedProjectId,
       selectProject,

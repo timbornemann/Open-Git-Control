@@ -25,6 +25,7 @@ export const ProjectPlannerView: React.FC = () => {
     selectedProject,
     itemsForSelectedProject,
     createProjectRequestId,
+    projectActionRequest,
     loading,
     busy,
     error,
@@ -55,6 +56,7 @@ export const ProjectPlannerView: React.FC = () => {
   const [itemContextMenu, setItemContextMenu] = React.useState<PlannerItemContextMenuState | null>(null);
   const [materializeParent, setMaterializeParent] = React.useState<string | null>(null);
   const handledCreateProjectRequestRef = React.useRef(createProjectRequestId);
+  const handledProjectActionRequestRef = React.useRef(projectActionRequest?.requestId || 0);
   const selectedProjectIdRef = React.useRef(selectedProject?.id || null);
   const projectDialogProjectIdRef = React.useRef<string | null>(null);
   const itemDialogProjectIdRef = React.useRef<string | null>(null);
@@ -77,6 +79,22 @@ export const ProjectPlannerView: React.FC = () => {
     setEditingProject(false);
     setProjectDialogOpen(true);
   }, [createProjectRequestId]);
+
+  React.useEffect(() => {
+    if (!projectActionRequest || projectActionRequest.requestId === handledProjectActionRequestRef.current) return;
+    handledProjectActionRequestRef.current = projectActionRequest.requestId;
+    if (projectActionRequest.action === 'create-item') {
+      itemDialogProjectIdRef.current = projectActionRequest.projectId;
+      setEditingItem(null);
+      setNewItemStatus('idea');
+      setItemDialogOpen(true);
+      return;
+    }
+
+    projectDialogProjectIdRef.current = projectActionRequest.projectId;
+    setEditingProject(true);
+    setProjectDialogOpen(true);
+  }, [projectActionRequest]);
 
   React.useLayoutEffect(() => {
     setSearch('');

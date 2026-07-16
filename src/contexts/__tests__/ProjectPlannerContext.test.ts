@@ -45,9 +45,11 @@ describe('ProjectPlannerProvider', () => {
     initialActiveRepo: string | null,
     initialRefreshSignal = 0,
     callbacks: { onRepositoryMaterialized?: ReturnType<typeof vi.fn> } = {},
+    initialPlannerActive = false,
   ) => {
     let activeRepo = initialActiveRepo;
     let refreshSignal = initialRefreshSignal;
+    let plannerActive = initialPlannerActive;
     let current: ReturnType<typeof useProjectPlanner> | undefined;
     const root: Root = createRoot(document.createElement('div'));
     const onRepositorySelected = vi.fn().mockResolvedValue(undefined);
@@ -65,6 +67,7 @@ describe('ProjectPlannerProvider', () => {
           ProjectPlannerProvider,
           {
             activeRepo,
+            plannerActive,
             refreshSignal,
             onRepositorySelected,
             onRepositoryMaterialized,
@@ -82,14 +85,16 @@ describe('ProjectPlannerProvider', () => {
         if (!current) throw new Error('Planner context did not render.');
         return current;
       },
-      rerender: (nextActiveRepo: string | null, nextRefreshSignal: number) => {
+      rerender: (nextActiveRepo: string | null, nextRefreshSignal: number, nextPlannerActive = plannerActive) => {
         activeRepo = nextActiveRepo;
         refreshSignal = nextRefreshSignal;
+        plannerActive = nextPlannerActive;
         act(render);
       },
       unmount: () => act(() => root.unmount()),
       onToast,
       onRepositoryMaterialized,
+      setConfirmDialog,
     };
   };
 
@@ -128,17 +133,13 @@ describe('ProjectPlannerProvider', () => {
     provider.unmount();
   });
 
-  it('retries a failed repository ensure when the refresh signal changes', async () => {
+  it('only creates a repository project after confirmation when entering project planning', async () => {
     const project = createProject('demo', 'C:\\repos\\demo');
     vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(plannerClient, 'getData').mockResolvedValue({
-      success: true,
-      data: { version: 1, projects: [project], items: [] },
-    });
-    const ensureRepositoryProject = vi
-      .spyOn(plannerClient, 'ensureRepositoryProject')
-      .mockResolvedValueOnce({ success: false, error: 'planner locked' })
-      .mockResolvedValueOnce({ success: true, data: project });
+    vi.spyOn(plannerClient, 'getData')
+      .mockResolvedValueOnce({ success: true, data: EMPTY_DATA })
+      .mockResolvedValue({ success: true, data: { version: 1, projects: [project], items: [] } });
+    const ensureRepositoryProject = vi.spyOn(plannerClient, 'ensureRepositoryProject').mockResolvedValue({ success: true, data: project });
 
     const provider = renderProvider('C:\\repos\\demo');
     await act(async () => {
@@ -146,32 +147,42 @@ describe('ProjectPlannerProvider', () => {
         setTimeout(resolve, 0);
       });
     });
-    expect(ensureRepositoryProject).toHaveBeenCalledTimes(1);
+    expect(ensureRepositoryProject).not.toHaveBeenCalled();
 
-    provider.rerender('C:\\repos\\demo', 1);
+    provider.rerender('C:\\repos\\demo', 0, true);
     await act(async () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 0);
       });
     });
 
-    expect(ensureRepositoryProject).toHaveBeenCalledTimes(2);
-    expect(provider.current.error).toBeNull();
+    expect(ensureRepositoryProject).not.toHaveBeenCalled();
+    const prompt = provider.setConfirmDialog.mock.calls.at(-1)?.[0];
+    expect(prompt).toEqual(
+      expect.objectContaining({
+        variant: 'confirm',
+        confirmLabel: expect.stringMatching(/Projekt hinzufuegen|Add project/),
+      }),
+    );
+
+    await act(async () => {
+      await prompt?.onConfirm();
+    });
+
+    expect(ensureRepositoryProject).toHaveBeenCalledWith('C:\\repos\\demo');
+    expect(provider.current.selectedProjectId).toBe(project.id);
     provider.unmount();
   });
 
-  it('clears the old selection on a repository switch and ignores a late ensure response', async () => {
+  it('updates the selected project on a repository switch without creating planning data', async () => {
     const repoA = createProject('repo-a', 'C:\\repos\\a');
     const repoB = createProject('repo-b', 'C:\\repos\\b');
-    const lateRepoA = deferred<{ success: true; data: PlannerProject }>();
     vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(plannerClient, 'getData').mockResolvedValue({
       success: true,
       data: { version: 1, projects: [repoA, repoB], items: [] },
     });
-    vi.spyOn(plannerClient, 'ensureRepositoryProject').mockImplementation((repoPath) => {
-      return repoPath === repoA.repoPath ? lateRepoA.promise : Promise.resolve({ success: true, data: repoB });
-    });
+    const ensureRepositoryProject = vi.spyOn(plannerClient, 'ensureRepositoryProject');
 
     const provider = renderProvider(repoA.repoPath);
     await act(async () => {
@@ -188,12 +199,7 @@ describe('ProjectPlannerProvider', () => {
       });
     });
     expect(provider.current.selectedProjectId).toBe(repoB.id);
-
-    await act(async () => {
-      lateRepoA.resolve({ success: true, data: repoA });
-      await lateRepoA.promise;
-    });
-    expect(provider.current.selectedProjectId).toBe(repoB.id);
+    expect(ensureRepositoryProject).not.toHaveBeenCalled();
     provider.unmount();
   });
 

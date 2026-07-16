@@ -109,6 +109,7 @@ const App: React.FC = () => {
         <FeedbackReportProvider>
           <ProjectPlannerProvider
             activeRepo={state.activeRepo}
+            plannerActive={state.activeTab === 'planner'}
             refreshSignal={state.plannerRefreshSignal}
             onRepositorySelected={state.addOpenRepo}
             onRepositoryMaterialized={async (repoPath) => {
