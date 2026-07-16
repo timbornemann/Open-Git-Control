@@ -71,14 +71,10 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
                   {t('generated.components.actiontoastviewport.copy_5c2a9afe')}
                 </button>
                 {feedback && (
-                  <button
-                    type="button"
-                    className="toast-action-btn toast-action-btn-report"
-                    onClick={() => feedback.handleToastAction(toast)}
-                  >
+                  <button type="button" className="toast-action-btn toast-action-btn-report" onClick={() => feedback.handleToastAction(toast)}>
                     {feedback.getToastStatus(toast.id).state === 'reported'
-                        ? feedbackLabel('reported', t, feedback.getToastStatus(toast.id).issueNumber)
-                        : feedbackLabel('idle', t)}
+                      ? feedbackLabel('reported', t, feedback.getToastStatus(toast.id).issueNumber)
+                      : feedbackLabel('idle', t)}
                   </button>
                 )}
               </>
