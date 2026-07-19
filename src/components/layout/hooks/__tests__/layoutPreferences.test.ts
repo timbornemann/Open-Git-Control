@@ -166,6 +166,38 @@ describe('layout preferences', () => {
     hook.unmount();
   });
 
+  it('coalesces main-pane drag updates into animation frames', () => {
+    let frameCallback: FrameRequestCallback | undefined;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback;
+      return 1;
+    });
+    Object.defineProperty(window, 'requestAnimationFrame', { configurable: true, value: requestAnimationFrame });
+    Object.defineProperty(window, 'cancelAnimationFrame', { configurable: true, value: vi.fn() });
+    const hook = renderLayoutHooks();
+    const contentArea = document.createElement('div');
+    Object.defineProperty(contentArea, 'getBoundingClientRect', {
+      value: () => ({ left: 0, width: 1000 }),
+    });
+    hook.current.panes.contentAreaRef.current = contentArea;
+
+    act(() => {
+      hook.current.panes.handleContentResizeStart({ preventDefault: vi.fn() } as any);
+      for (const clientX of [500, 600]) {
+        const move = new window.Event('pointermove');
+        Object.defineProperty(move, 'clientX', { value: clientX });
+        window.dispatchEvent(move);
+      }
+    });
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(hook.current.panes.primaryPaneBasis).toBe('70.00%');
+
+    act(() => frameCallback?.(0));
+    expect(hook.current.panes.primaryPaneBasis).toBe('60.00%');
+    hook.unmount();
+  });
+
   it('clamps the initial pane split from ResizeObserver without forcing a bounding-box read', () => {
     let resizeCallback: ResizeObserverCallback | undefined;
     let observedElement: Element | undefined;
