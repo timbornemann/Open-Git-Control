@@ -53,8 +53,6 @@ type GithubConnectedContentProps = Pick<
   | 'setReleaseForm'
   | 'releaseSubmitting'
   | 'releaseNotesGenerating'
-  | 'releaseError'
-  | 'releaseSuccess'
   | 'onCreateRelease'
 >;
 
@@ -104,8 +102,6 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   setReleaseForm,
   releaseSubmitting,
   releaseNotesGenerating,
-  releaseError,
-  releaseSuccess,
   onCreateRelease,
 }) => {
   const { t } = useI18n();
@@ -189,10 +185,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             setReleaseForm={setReleaseForm}
             releaseSubmitting={releaseSubmitting}
             releaseNotesGenerating={releaseNotesGenerating}
-            releaseError={releaseError}
-            releaseSuccess={releaseSuccess}
             onCreateRelease={onCreateRelease}
-            onOpenUrl={onOpenPR}
           />
         </>
       )}

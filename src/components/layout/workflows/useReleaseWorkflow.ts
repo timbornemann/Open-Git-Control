@@ -80,9 +80,9 @@ export const useReleaseWorkflow = ({
   setReleaseFormState,
   releaseContext,
   setReleaseContext,
-  setReleaseContextError,
+  setReleaseContextError: setReleaseContextErrorState,
   setReleaseContextLoading,
-  setReleaseError,
+  setReleaseError: setReleaseErrorState,
   setReleaseSuccess,
   setReleaseSubmitting,
   showReleaseCreator,
@@ -111,6 +111,22 @@ export const useReleaseWorkflow = ({
   const releaseNotesGeneratingRef = useRef(releaseNotesGenerating);
   const releaseContextLoadingRef = useRef(false);
   const [releasePendingAssets, setReleasePendingAssets] = useState<string[]>([]);
+
+  const setReleaseContextError = useCallback(
+    (message: string | null) => {
+      setReleaseContextErrorState(null);
+      if (message) setGitActionToast({ msg: message, isError: true });
+    },
+    [setGitActionToast, setReleaseContextErrorState],
+  );
+
+  const setReleaseError = useCallback(
+    (message: string | null) => {
+      setReleaseErrorState(null);
+      if (message) setGitActionToast({ msg: message, isError: true });
+    },
+    [setGitActionToast, setReleaseErrorState],
+  );
 
   useLayoutEffect(() => {
     releaseNotesGeneratingRef.current = releaseNotesGenerating;

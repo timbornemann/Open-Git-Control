@@ -35,6 +35,7 @@ describe('useReleaseWorkflow repository binding', () => {
     vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
     const createRelease = vi.spyOn(githubClient, 'createRelease').mockResolvedValue({ success: true, data: {} as any });
     const setReleaseError = vi.fn();
+    const setGitActionToast = vi.fn();
     let workflow: ReturnType<typeof useReleaseWorkflow> | null = null;
     const noop = vi.fn();
     const setActiveTab = vi.fn();
@@ -78,7 +79,7 @@ describe('useReleaseWorkflow repository binding', () => {
         releaseNotesLanguage: 'en',
         releaseNotesOptions: DEFAULT_RELEASE_NOTES_OPTIONS,
         setConfirmDialog: noop,
-        setGitActionToast: noop,
+        setGitActionToast,
         setActiveTab,
         triggerRefresh: noop,
         language: 'en',
@@ -99,7 +100,8 @@ describe('useReleaseWorkflow repository binding', () => {
 
     expect(gitClient.getRepoOriginUrl).toHaveBeenCalledWith('C:/repos/a');
     expect(createRelease).not.toHaveBeenCalled();
-    expect(setReleaseError).toHaveBeenCalledWith('Requested repository is not the active repository.');
+    expect(setReleaseError).toHaveBeenCalledWith(null);
+    expect(setGitActionToast).toHaveBeenCalledWith({ msg: 'Requested repository is not the active repository.', isError: true });
     act(() => root.unmount());
   });
 

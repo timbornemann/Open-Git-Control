@@ -83,8 +83,6 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
       setReleaseForm={github.setReleaseForm}
       releaseSubmitting={github.releaseSubmitting}
       releaseNotesGenerating={github.releaseNotesGenerating}
-      releaseError={github.releaseError}
-      releaseSuccess={github.releaseSuccess}
       onCreateRelease={github.onCreateRelease}
     />
   );

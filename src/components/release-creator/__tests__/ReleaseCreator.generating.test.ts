@@ -33,8 +33,6 @@ const createReleaseCreatorProps = (overrides: Partial<ComponentProps<typeof Rele
   },
   setReleaseForm: vi.fn(),
   releaseSubmitting: false,
-  releaseError: null,
-  releaseSuccess: null,
   onCreateRelease: vi.fn(),
   pendingAssets: [],
   onAddPendingAssets: vi.fn(),
@@ -121,16 +119,37 @@ describe('ReleaseCreator while AI notes are generating', () => {
             setReleaseForm: vi.fn(),
             releaseSubmitting: false,
             releaseNotesGenerating: true,
-            releaseError: null,
-            releaseSuccess: null,
             onCreateRelease: vi.fn(),
-            onOpenUrl: vi.fn(),
           }),
         ),
       );
     });
 
     expect(Array.from(document.querySelectorAll('input, textarea, button')).every((node) => (node as HTMLInputElement).disabled)).toBe(true);
+    act(() => root.unmount());
+  });
+
+  it('does not render release results inline in the sidebar form', async () => {
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => {
+      root.render(
+        createElement(
+          I18nProvider,
+          { language: 'en' },
+          createElement(ReleaseMiniForm, {
+            ownerRepo: { owner: 'octo', repo: 'repo' },
+            releaseForm: createReleaseCreatorProps().releaseForm,
+            setReleaseForm: vi.fn(),
+            releaseSubmitting: false,
+            releaseNotesGenerating: false,
+            onCreateRelease: vi.fn(),
+          }),
+        ),
+      );
+    });
+
+    expect(document.querySelector('.release-mini-form__message--danger')).toBeNull();
+    expect(document.querySelector('.release-mini-form__message--success')).toBeNull();
     act(() => root.unmount());
   });
 });

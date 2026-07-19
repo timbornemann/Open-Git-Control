@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
@@ -17,14 +17,11 @@ type Props = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
-  releaseError: string | null;
-  releaseSuccess: GitHubReleaseDto | null;
   onCreateRelease: () => Promise<void>;
   pendingAssets: string[];
   onAddPendingAssets: () => Promise<void>;
   onRemovePendingAsset: (filePath: string) => void;
   contextLoading: boolean;
-  contextError: string | null;
   context: GitHubReleaseContextDto | null;
   onRefreshContext: () => Promise<void>;
   onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
@@ -40,14 +37,11 @@ export const ReleaseCreator: React.FC<Props> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
-  releaseError,
-  releaseSuccess,
   onCreateRelease,
   pendingAssets,
   onAddPendingAssets,
   onRemovePendingAsset,
   contextLoading,
-  contextError,
   context,
   onRefreshContext,
   onGenerateNotes,
@@ -153,13 +147,7 @@ export const ReleaseCreator: React.FC<Props> = ({
             commitsCount={commitsCount}
           />
 
-          <ReleaseCreatorAlerts
-            hasOwnerRepo={Boolean(ownerRepo)}
-            contextError={contextError}
-            fallbackUsed={Boolean(context?.fallbackUsed)}
-            releaseError={releaseError}
-            releaseSuccess={releaseSuccess}
-          />
+          <ReleaseCreatorAlerts hasOwnerRepo={Boolean(ownerRepo)} fallbackUsed={Boolean(context?.fallbackUsed)} />
 
           <section className="release-form-shell">
             <ReleaseVersionStep
