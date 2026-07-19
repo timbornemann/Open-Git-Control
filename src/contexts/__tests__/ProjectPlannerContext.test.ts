@@ -133,6 +133,38 @@ describe('ProjectPlannerProvider', () => {
     provider.unmount();
   });
 
+  it('does not reload while parent callbacks receive new identities', async () => {
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    const getData = vi.spyOn(plannerClient, 'getData').mockResolvedValue({ success: true, data: EMPTY_DATA });
+    const root = createRoot(document.createElement('div'));
+
+    const render = () => {
+      root.render(
+        createElement(ProjectPlannerProvider, {
+          activeRepo: null,
+          plannerActive: false,
+          onRepositorySelected: vi.fn().mockResolvedValue(undefined),
+          onRepositoryMaterialized: vi.fn().mockResolvedValue(undefined),
+          onToast: vi.fn(),
+          setConfirmDialog: vi.fn(),
+        }),
+      );
+    };
+
+    act(render);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getData).toHaveBeenCalledTimes(1);
+
+    act(render);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getData).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+  });
+
   it('only creates a repository project after confirmation when entering project planning', async () => {
     const project = createProject('demo', 'C:\\repos\\demo');
     vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);

@@ -39,6 +39,8 @@ export const useResizableSidebar = () => {
   });
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const sidebarResizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const pendingSidebarWidthRef = useRef<number | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
 
   const getSidebarMaxWidth = useCallback(() => {
     return getSidebarMaxWidthForViewport(window.innerWidth);
@@ -87,6 +89,14 @@ export const useResizableSidebar = () => {
   );
 
   useEffect(() => {
+    const applyPendingSidebarWidth = () => {
+      resizeFrameRef.current = null;
+      const nextWidth = pendingSidebarWidthRef.current;
+      pendingSidebarWidthRef.current = null;
+      if (nextWidth === null) return;
+      setSidebarWidth((previous) => (previous === nextWidth ? previous : nextWidth));
+    };
+
     const handlePointerMove = (event: PointerEvent) => {
       const dragState = sidebarResizeStateRef.current;
       if (!dragState) return;
@@ -94,12 +104,27 @@ export const useResizableSidebar = () => {
       const delta = event.clientX - dragState.startX;
       const nextWidth = Math.round(dragState.startWidth + delta);
       const clampedWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(getSidebarMaxWidth(), nextWidth));
-      setSidebarWidth(clampedWidth);
+      pendingSidebarWidthRef.current = clampedWidth;
+      if (resizeFrameRef.current !== null) return;
+
+      // Pointer events can arrive faster than the screen can paint. Limiting
+      // updates to animation frames keeps the resize responsive without
+      // repeatedly rerendering the app and its graph between frames.
+      if (typeof window.requestAnimationFrame === 'function') {
+        resizeFrameRef.current = window.requestAnimationFrame(applyPendingSidebarWidth);
+      } else {
+        applyPendingSidebarWidth();
+      }
     };
 
     const stopResize = () => {
       if (!sidebarResizeStateRef.current) return;
       sidebarResizeStateRef.current = null;
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+      applyPendingSidebarWidth();
       setIsSidebarResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -113,6 +138,11 @@ export const useResizableSidebar = () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', stopResize);
       window.removeEventListener('pointercancel', stopResize);
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+      pendingSidebarWidthRef.current = null;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };

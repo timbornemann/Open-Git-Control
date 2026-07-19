@@ -78,8 +78,10 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   const projectActionRequestIdRef = useRef(0);
   const activeRepoRef = useRef(activeRepo);
   const plannerActiveRef = useRef(plannerActive);
+  const hostCallbacksRef = useRef({ onRepositorySelected, onRepositoryMaterialized, onToast, setConfirmDialog });
   activeRepoRef.current = activeRepo;
   plannerActiveRef.current = plannerActive;
+  hostCallbacksRef.current = { onRepositorySelected, onRepositoryMaterialized, onToast, setConfirmDialog };
   useEffect(() => {
     refreshRequestGenerationRef.current += 1;
     setSelectedProjectId(null);
@@ -117,13 +119,13 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       try {
         await refresh();
       } catch (error) {
-        onToast(error instanceof Error ? error.message : String(error), true);
+        hostCallbacksRef.current.onToast(error instanceof Error ? error.message : String(error), true);
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [onToast, refresh]);
+  }, [refresh]);
 
   useEffect(() => {
     if (!plannerClient.isAvailable()) return;
@@ -135,7 +137,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         refreshTimer = setTimeout(() => {
           refreshTimer = null;
           void refresh().catch((error) => {
-            onToast(error instanceof Error ? error.message : String(error), true);
+            hostCallbacksRef.current.onToast(error instanceof Error ? error.message : String(error), true);
           });
         }, 25);
       });
@@ -148,14 +150,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (refreshTimer) clearTimeout(refreshTimer);
       unsubscribe();
     };
-  }, [onToast, refresh]);
+  }, [refresh]);
 
   useEffect(() => {
     if (!refreshSignal) return;
     void refresh().catch((error) => {
-      onToast(error instanceof Error ? error.message : String(error), true);
+      hostCallbacksRef.current.onToast(error instanceof Error ? error.message : String(error), true);
     });
-  }, [onToast, refresh, refreshSignal]);
+  }, [refresh, refreshSignal]);
 
   useEffect(() => {
     if (loading || selectedProjectId) return;
@@ -178,7 +180,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         const result = await operation();
         if (!result.success) {
           setError(result.error);
-          onToast(result.error, true);
+          hostCallbacksRef.current.onToast(result.error, true);
           return null;
         }
         try {
@@ -187,19 +189,22 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
           const message = refreshError instanceof Error ? refreshError.message : String(refreshError);
           // The write succeeded. Report the refresh problem without turning
           // the mutation into a false failure that users may retry.
-          onToast(tr(`Aenderung gespeichert, Aktualisierung fehlgeschlagen: ${message}`, `Change saved, but refresh failed: ${message}`), true);
+          hostCallbacksRef.current.onToast(
+            tr(`Aenderung gespeichert, Aktualisierung fehlgeschlagen: ${message}`, `Change saved, but refresh failed: ${message}`),
+            true,
+          );
         }
         return result.data;
       } catch (mutationError) {
         const message = mutationError instanceof Error ? mutationError.message : String(mutationError);
         setError(message);
-        onToast(message, true);
+        hostCallbacksRef.current.onToast(message, true);
         return null;
       } finally {
         setBusy(false);
       }
     },
-    [onToast, refresh, tr],
+    [refresh, tr],
   );
 
   const createRepositoryProject = useCallback(
@@ -207,12 +212,12 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (!plannerClient.isAvailable()) {
         const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
         setError(message);
-        onToast(message, true);
+        hostCallbacksRef.current.onToast(message, true);
         return null;
       }
       return runMutation(() => plannerClient.ensureRepositoryProject(repoPath));
     },
-    [onToast, runMutation],
+    [runMutation],
   );
   const confirmRepositoryProject = useCallback(
     async (repoPath: string) => {
@@ -234,7 +239,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     projects: data.projects,
     loading,
     error,
-    setConfirmDialog,
+    setConfirmDialog: hostCallbacksRef.current.setConfirmDialog,
     tr,
     onConfirmRepositoryProject: confirmRepositoryProject,
   });
@@ -243,14 +248,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (!plannerClient.isAvailable()) {
         const message = 'Die Projektplanung ist im laufenden App-Prozess noch nicht verfuegbar. Bitte Open-Git-Control neu starten.';
         setError(message);
-        onToast(message, true);
+        hostCallbacksRef.current.onToast(message, true);
         return null;
       }
       const project = await runMutation(() => plannerClient.createProject(input));
       if (project) setSelectedProjectId(project.id);
       return project;
     },
-    [onToast, runMutation],
+    [runMutation],
   );
 
   const updateProject = useCallback(
@@ -301,7 +306,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       const itemCount = data.items.filter((item) => item.projectId === projectId).length;
       const isPlannedProject = project.kind === 'planned';
 
-      setConfirmDialog({
+      hostCallbacksRef.current.setConfirmDialog({
         variant: 'danger',
         title: isPlannedProject
           ? t('generated.contexts.projectplannercontext.delete_project_idea_9116ddf5')
@@ -323,7 +328,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         },
       });
     },
-    [data.items, data.projects, deleteProject, setConfirmDialog, t],
+    [data.items, data.projects, deleteProject, t],
   );
 
   const requestDeleteItem = useCallback(
@@ -332,7 +337,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (!item) return;
       const project = data.projects.find((candidate) => candidate.id === item.projectId);
 
-      setConfirmDialog({
+      hostCallbacksRef.current.setConfirmDialog({
         variant: 'danger',
         title: t('generated.contexts.projectplannercontext.delete_item_e3fbac1b'),
         message: t('generated.contexts.projectplannercontext.the_selected_item_will_be_permanently_removed_from_proje_cf6c54ee'),
@@ -348,7 +353,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         },
       });
     },
-    [data.items, data.projects, deleteItem, setConfirmDialog, t],
+    [data.items, data.projects, deleteItem, t],
   );
 
   const materializeProject = useCallback(
@@ -358,18 +363,21 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (!result) return false;
       setSelectedProjectId(result.project.id);
       try {
-        await onRepositoryMaterialized(result.repoPath);
+        await hostCallbacksRef.current.onRepositoryMaterialized(result.repoPath);
       } catch (activationError: unknown) {
         const message = activationError instanceof Error ? activationError.message : String(activationError);
         // Materialization is already persisted at this point. Treat a
         // follow-up workspace activation failure as a partial success so a
         // retry cannot create a duplicate repository or report the write as
         // failed.
-        onToast(tr(`Repository erstellt, aber nicht aktiviert: ${message}`, `Repository was created, but could not be activated: ${message}`), true);
+        hostCallbacksRef.current.onToast(
+          tr(`Repository erstellt, aber nicht aktiviert: ${message}`, `Repository was created, but could not be activated: ${message}`),
+          true,
+        );
       }
       return true;
     },
-    [onRepositoryMaterialized, onToast, runMutation, tr],
+    [runMutation, tr],
   );
 
   const selectedProject = useMemo(() => data.projects.find((project) => project.id === selectedProjectId) || null, [data.projects, selectedProjectId]);
@@ -379,10 +387,10 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       setSelectedProjectId(projectId);
       const project = data.projects.find((candidate) => candidate.id === projectId);
       if (project?.repoPath && (!activeRepo || repoKey(project.repoPath) !== repoKey(activeRepo))) {
-        void onRepositorySelected(project.repoPath);
+        void hostCallbacksRef.current.onRepositorySelected(project.repoPath);
       }
     },
-    [activeRepo, data.projects, onRepositorySelected],
+    [activeRepo, data.projects],
   );
 
   const requestProjectAction = useCallback(
@@ -406,24 +414,21 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     async (repoPath: string) => {
       try {
         if (!activeRepo || repoKey(activeRepo) !== repoKey(repoPath)) {
-          await onRepositorySelected(repoPath);
+          await hostCallbacksRef.current.onRepositorySelected(repoPath);
         }
         return true;
       } catch (activationError) {
         const message = activationError instanceof Error ? activationError.message : String(activationError);
-        onToast(message, true);
+        hostCallbacksRef.current.onToast(message, true);
         return false;
       }
     },
-    [activeRepo, onRepositorySelected, onToast],
+    [activeRepo],
   );
 
-  const notify = useCallback(
-    (message: string, isError: boolean) => {
-      onToast(message, isError);
-    },
-    [onToast],
-  );
+  const notify = useCallback((message: string, isError: boolean) => {
+    hostCallbacksRef.current.onToast(message, isError);
+  }, []);
 
   const itemsForSelectedProject = useMemo(
     () => (selectedProjectId ? data.items.filter((item) => item.projectId === selectedProjectId) : []),

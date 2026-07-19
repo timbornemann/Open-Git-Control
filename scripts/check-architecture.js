@@ -48,6 +48,9 @@ const maxLineExceptions = new Map([
   ['electron/SecretScanService.ts', 604],
   // Cohesive test suite for the AI index transaction with shared git fixtures.
   ['electron/__tests__/AiAutoCommitIndexTransaction.test.ts', 524],
+  // Planner provider: refresh sequencing, selection and mutations share one
+  // data snapshot and generation guard; splitting would duplicate that state.
+  ['src/contexts/ProjectPlannerContext.tsx', 504],
 ]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];

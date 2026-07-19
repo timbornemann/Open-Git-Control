@@ -139,6 +139,33 @@ describe('layout preferences', () => {
     hook.unmount();
   });
 
+  it('coalesces sidebar drag updates into animation frames', () => {
+    let frameCallback: FrameRequestCallback | undefined;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback;
+      return 1;
+    });
+    Object.defineProperty(window, 'requestAnimationFrame', { configurable: true, value: requestAnimationFrame });
+    Object.defineProperty(window, 'cancelAnimationFrame', { configurable: true, value: vi.fn() });
+    const hook = renderLayoutHooks();
+
+    act(() => {
+      hook.current.sidebar.handleSidebarResizeStart({ preventDefault: vi.fn(), clientX: 100 } as any);
+      for (const clientX of [180, 260, 340]) {
+        const move = new window.Event('pointermove');
+        Object.defineProperty(move, 'clientX', { value: clientX });
+        window.dispatchEvent(move);
+      }
+    });
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(hook.current.sidebar.sidebarWidth).toBe(260);
+
+    act(() => frameCallback?.(0));
+    expect(hook.current.sidebar.sidebarWidth).toBe(500);
+    hook.unmount();
+  });
+
   it('clamps the initial pane split from ResizeObserver without forcing a bounding-box read', () => {
     let resizeCallback: ResizeObserverCallback | undefined;
     let observedElement: Element | undefined;
