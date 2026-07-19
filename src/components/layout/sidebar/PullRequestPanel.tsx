@@ -14,7 +14,6 @@ type PullRequestPanelProps = {
   setPrFilter: (value: 'open' | 'closed' | 'all') => void;
   prLoading: boolean;
   prHasLoaded: boolean;
-  prError?: string | null;
   pullRequests: PullRequestDto[];
   prCiByNumber: Record<number, PullRequestCiDto>;
   showCreatePR: boolean;
@@ -66,7 +65,6 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
   setPrFilter,
   prLoading,
   prHasLoaded,
-  prError = null,
   pullRequests,
   prCiByNumber,
   showCreatePR,
@@ -90,7 +88,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
   const { t } = useI18n();
   const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(null);
   const [mergingPrNumber, setMergingPrNumber] = useState<number | null>(null);
-  const isInitialLoad = !prHasLoaded && !prError;
+  const isInitialLoad = !prHasLoaded;
   const isRefreshing = prLoading && prHasLoaded;
 
   const prFilterOptions: Array<{ label: string; value: PullRequestFilter }> = [
@@ -179,15 +177,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
         <div className="github-panel-loading">{t('generated.components.layout.sidebar.githubconnectedcontent.loading_pull_requests_f64f6445')}</div>
       )}
 
-      {!isInitialLoad && prError && (
-        <div className="release-alert release-alert--danger" style={{ marginBottom: 8 }}>
-          <XCircle size={16} />
-          <div>{prError}</div>
-        </div>
-      )}
-
       {!isInitialLoad &&
-        !prError &&
         pullRequests.map((pr) => {
           const ci = prCiByNumber[pr.number];
           const badge = ci?.badge || 'unknown';
@@ -316,7 +306,7 @@ export const PullRequestPanel: React.FC<PullRequestPanelProps> = ({
           );
         })}
 
-      {!isInitialLoad && !prError && pullRequests.length === 0 && (
+      {!isInitialLoad && pullRequests.length === 0 && (
         <EmptyState
           icon={<GitPullRequest size={32} />}
           title={t('generated.components.layout.sidebar.githubconnectedcontent.no_pull_requests_4e17ae83')}

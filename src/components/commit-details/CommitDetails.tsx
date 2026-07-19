@@ -3,6 +3,7 @@ import { FileCode, FileEdit, FileMinus, FilePlus } from 'lucide-react';
 import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { useAppToast } from '@/hooks/useAppToast';
 import type { RepositoryPathOpenActionDto } from '@/shared/ipc/contracts/git';
 import { fileNameFromPath, useCommitDetailsData } from '@/components/commit-details/useCommitDetailsData';
 import { VirtualList } from '@/components/VirtualList';
@@ -20,7 +21,7 @@ export { extractCommitDescription } from '@/components/commit-details/useCommitD
 
 export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, onSelectCommit, onOpenDiff }) => {
   const { t, tr } = useI18n();
-  const [pathActionError, setPathActionError] = React.useState<string | null>(null);
+  const showToast = useAppToast();
   const {
     activeTab,
     blameError,
@@ -48,25 +49,22 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
     setSelectedFilePath,
   } = useCommitDetailsData({ repoPath, hash, onOpenDiff });
 
-  React.useEffect(() => {
-    setPathActionError(null);
-  }, [normalizedHash, selectedFile?.path]);
-
   const handleRepositoryPathAction = async (action: RepositoryPathOpenActionDto) => {
     if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
-    setPathActionError(null);
     try {
       const result = await gitClient.openRepositoryPath({ path: selectedFile.path, action, repoPath });
       if (!result.success) {
-        setPathActionError(
+        showToast(
           result.error || tr('Der Dateipfad konnte nicht im Dateisystem geoeffnet werden.', 'The file path could not be opened in the file system.'),
+          true,
         );
       }
     } catch (openError: unknown) {
-      setPathActionError(
+      showToast(
         openError instanceof Error
           ? openError.message
           : tr('Der Dateipfad konnte nicht im Dateisystem geoeffnet werden.', 'The file path could not be opened in the file system.'),
+        true,
       );
     }
   };
@@ -240,8 +238,6 @@ export const CommitDetails: React.FC<CommitDetailsProps> = ({ repoPath, hash, on
               {tr('Oeffnen mit...', 'Open with...')}
             </button>
           </div>
-          {pathActionError && <div style={{ color: 'var(--status-danger)', fontSize: '0.76rem' }}>{pathActionError}</div>}
-
           <div style={{ display: 'flex', gap: '6px' }}>
             {(['history', 'blame', 'patch'] as const).map((tab) => (
               <button

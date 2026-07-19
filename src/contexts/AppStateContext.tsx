@@ -127,6 +127,10 @@ export const useUIStore = <T,>(selector: (state: UIContextValue) => T): T => use
 
 export const useSettingsContext = () => useSettingsStore((state) => state);
 export const useRepositoryContext = () => useGitStore((state) => state);
+export const useOptionalRepositoryContext = () => {
+  const store = useContext(AppStateStoreContext);
+  return store?.getState().repository ?? null;
+};
 export const useGithubContext = () => useGitHubStore((state) => state);
 export const useWorkflowContext = () => useWorkflowStore((state) => state);
 export const useUIContext = () => useUIStore((state) => state);

@@ -141,7 +141,6 @@ export const useAppState = () => {
     newRepoPrivate,
     runGitCommand,
     setActiveGitActionLabel,
-    setConnectError,
     setNewRepoDescription,
     setNewRepoName,
     setNewRepoPrivate,
@@ -268,7 +267,7 @@ export const useAppState = () => {
   const handleCreateGithubRepoForCurrent = async () => {
     if (!githubClient.isAvailable() || !workspace.activeRepo) return;
     if (!github.isAuthenticated) {
-      setConnectError(t('generated.components.layout.useappstate.please_connect_github_first_github_tab_68715c85'));
+      setGitActionToast({ msg: t('generated.components.layout.useappstate.please_connect_github_first_github_tab_68715c85'), isError: true });
       return;
     }
     await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });

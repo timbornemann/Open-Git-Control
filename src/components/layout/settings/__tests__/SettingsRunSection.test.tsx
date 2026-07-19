@@ -7,12 +7,13 @@ import { createEmptyRepositoryRunConfig } from '@/types/repositoryRun';
 import { I18nProvider } from '@/i18n';
 import { SettingsRunSection } from '@/components/layout/settings/SettingsRunSection';
 
-const { getConfigMock, saveConfigMock, refreshRunConfigMock, setConfirmDialogMock, repositoryContextState } = vi.hoisted(() => ({
+const { getConfigMock, saveConfigMock, refreshRunConfigMock, setConfirmDialogMock, onToastMock, repositoryContextState } = vi.hoisted(() => ({
   getConfigMock: vi.fn(),
   saveConfigMock: vi.fn(),
   refreshRunConfigMock: vi.fn(),
   setConfirmDialogMock: vi.fn(),
-  repositoryContextState: { openRepos: ['C:/repos/a', 'C:/repos/b'], activeRepo: 'C:/repos/a' as string | null },
+  onToastMock: vi.fn(),
+  repositoryContextState: { openRepos: ['C:/repos/a', 'C:/repos/b'], activeRepo: 'C:/repos/a' as string | null, onToast: undefined as unknown },
 }));
 
 vi.mock('@/contexts/AppStateContext', () => ({
@@ -51,6 +52,8 @@ beforeEach(() => {
   saveConfigMock.mockReset();
   refreshRunConfigMock.mockReset();
   setConfirmDialogMock.mockReset();
+  onToastMock.mockReset();
+  repositoryContextState.onToast = onToastMock;
   window.sessionStorage.clear();
   repositoryContextState.openRepos = ['C:/repos/a', 'C:/repos/b'];
   repositoryContextState.activeRepo = 'C:/repos/a';

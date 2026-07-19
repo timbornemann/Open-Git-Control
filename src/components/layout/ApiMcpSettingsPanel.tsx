@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
+import { useAppToast } from '@/hooks/useAppToast';
 import { appClient } from '@/services/appClient';
 
 type EndpointInfo = {
@@ -28,18 +29,21 @@ const formatDateTime = (value: number | null): string | null => {
 
 const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
   const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
+  const showToast = useAppToast();
 
   const copyValue = async () => {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast(t('generated.components.layout.apimcpsettingspanel.copied_08c1a6a7'), false);
+    } catch {
+      showToast(t('generated.components.layout.sidebar.settingssidebarcontent.clipboard_is_not_available_a62a50d3'), true);
+    }
   };
 
   return (
     <button className="settings-copy-btn" type="button" onClick={() => void copyValue()} title={t('generated.components.actiontoastviewport.copy_5c2a9afe')}>
       <Copy size={13} />
-      {copied ? t('generated.components.layout.apimcpsettingspanel.copied_08c1a6a7') : label || t('generated.components.actiontoastviewport.copy_5c2a9afe')}
+      {label || t('generated.components.actiontoastviewport.copy_5c2a9afe')}
     </button>
   );
 };
@@ -81,26 +85,24 @@ const buildAgentConfig = (mcpUrl: string, authHeaderName: string, authToken: str
 
 export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSettings }) => {
   const { t } = useI18n();
+  const showToast = useAppToast();
   const [apiInfo, setApiInfo] = useState<PlanningApiInfoDto | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [tokenLifetime, setTokenLifetime] = useState<PlanningApiTokenLifetimeDto>('month');
-  const [tokenActionError, setTokenActionError] = useState<string | null>(null);
-  const [tokenActionMessage, setTokenActionMessage] = useState<string | null>(null);
   const [isTokenActionRunning, setIsTokenActionRunning] = useState(false);
 
   const loadApiInfo = useCallback(async () => {
     if (!appClient.isAvailable()) {
-      setLoadError(t('generated.components.layout.apimcpsettingspanel.api_status_is_not_available_in_this_app_process_e90733fe'));
+      showToast(t('generated.components.layout.apimcpsettingspanel.api_status_is_not_available_in_this_app_process_e90733fe'), true);
       return;
     }
     try {
       const result = await appClient.getPlanningApiInfo();
       setApiInfo(result);
-      setLoadError(null);
+      if (result.error) showToast(result.error, true);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : String(error));
+      showToast(error instanceof Error ? error.message : String(error), true);
     }
-  }, [t]);
+  }, [showToast, t]);
 
   useEffect(() => {
     void loadApiInfo();
@@ -109,19 +111,17 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
   const runTokenAction = async (action: 'generate' | 'clear') => {
     if (!appClient.isAvailable()) return;
     setIsTokenActionRunning(true);
-    setTokenActionError(null);
-    setTokenActionMessage(null);
     try {
       const result = action === 'generate' ? await appClient.generatePlanningApiToken(tokenLifetime) : await appClient.clearPlanningApiToken();
       setApiInfo(result);
-      setLoadError(null);
-      setTokenActionMessage(
+      showToast(
         action === 'generate'
           ? t('generated.components.layout.apimcpsettingspanel.new_api_token_is_active_93efc190')
           : t('generated.components.layout.apimcpsettingspanel.saved_api_token_was_removed_57346f73'),
+        false,
       );
     } catch (error) {
-      setTokenActionError(error instanceof Error ? error.message : String(error));
+      showToast(error instanceof Error ? error.message : String(error), true);
     } finally {
       setIsTokenActionRunning(false);
     }
@@ -239,8 +239,6 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
           </button>
         </div>
         <p>{t('generated.components.layout.apimcpsettingspanel.these_values_belong_to_the_current_app_process_if_port_2_891cfc37')}</p>
-        {loadError && <p className="settings-danger">{loadError}</p>}
-        {apiInfo?.error && <p className="settings-danger">{apiInfo.error}</p>}
         <div className="settings-api-status-grid">
           <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.status_b853ab43')} value={apiInfo?.status || 'starting'} />
           <CopyValueRow label="IP" value={apiHost} />
@@ -290,8 +288,6 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
           {authTokenSource === 'environment' && (
             <p>{t('generated.components.layout.apimcpsettingspanel.open_git_control_api_token_is_set_and_overrides_saved_ap_c28b0658')}</p>
           )}
-          {tokenActionError && <p className="settings-danger">{tokenActionError}</p>}
-          {tokenActionMessage && <p className="settings-success">{tokenActionMessage}</p>}
         </div>
       </section>
 

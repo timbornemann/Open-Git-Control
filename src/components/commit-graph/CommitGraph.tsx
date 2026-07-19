@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import type { GitStatusDetailed } from '@/utils/gitParsing';
 import type { GraphNode, GraphEdge } from '@/utils/graphLayout';
-import { useToastQueue } from '@/hooks/useToastQueue';
-import { ActionToastViewport } from '@/components/ActionToastViewport';
+import { useAppToastSetter } from '@/hooks/useAppToast';
 import type { DiffRequest } from '@/types/diff';
 import { useI18n } from '@/i18n';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
@@ -73,7 +72,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   onRefreshWorkingTree,
 }) => {
   const { t, locale, tr } = useI18n();
-  const { toasts, setToast, dismiss } = useToastQueue(4000);
+  const setToast = useAppToastSetter();
   const { setConfirmDialog, setInputDialog } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
   const didRunInitialBranchEffectRef = useRef(false);
@@ -152,8 +151,8 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     forensicEndLine,
     setForensicEndLine,
     forensicLoading,
-    forensicError,
-    setForensicError,
+    forensicNoMatches,
+    clearForensicFeedback,
     forensicResults,
     forensicPathSuggestions,
     runForensicSearch,
@@ -162,6 +161,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     repoPath,
     workingTreeStatus,
     t,
+    onError: (message) => setToast({ msg: message, isError: true }),
   });
   resetForensicStateRef.current = resetForensicState;
   const runGitAction = useCommitGraphGitActions({
@@ -337,7 +337,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         activeSearchPanel={activeSearchPanel}
         onActiveSearchPanelChange={(mode) => {
           setActiveSearchPanel(mode);
-          if (mode === 'forensic') setForensicError(null);
+          if (mode === 'forensic') clearForensicFeedback();
         }}
         searchScope={searchScope}
         onSearchScopeChange={setSearchScope}
@@ -357,12 +357,12 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         activeSearchPanel={activeSearchPanel}
         setActiveSearchPanel={(mode) => {
           setActiveSearchPanel(mode);
-          if (mode === 'forensic') setForensicError(null);
+          if (mode === 'forensic') clearForensicFeedback();
         }}
         forensicType={forensicType}
         setForensicType={(type) => {
           setForensicType(type);
-          setForensicError(null);
+          clearForensicFeedback();
         }}
         forensicSearchTypeLabels={forensicSearchTypeLabels}
         forensicPath={forensicPath}
@@ -375,7 +375,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         forensicEndLine={forensicEndLine}
         setForensicEndLine={setForensicEndLine}
         forensicLoading={forensicLoading}
-        forensicError={forensicError}
+        forensicNoMatches={forensicNoMatches}
         forensicResults={forensicResults}
         runForensicSearch={runForensicSearch}
         onSelectCommit={onSelectCommit}
@@ -464,8 +464,6 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         t={t}
         tr={tr}
       />
-
-      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </>
   );
 };

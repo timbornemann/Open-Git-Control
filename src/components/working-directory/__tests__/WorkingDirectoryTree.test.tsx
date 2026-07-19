@@ -8,6 +8,7 @@ import { gitClient } from '@/services/gitClient';
 
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog: vi.fn(), setInputDialog: vi.fn() }),
+  useOptionalRepositoryContext: () => null,
 }));
 
 let root: Root | null = null;

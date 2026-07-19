@@ -4,9 +4,8 @@ import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitCommandNameDto } from '@/types/gitDtos';
 import type { GitReflogEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
-import { useToastQueue } from '@/hooks/useToastQueue';
+import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
-import { ActionToastViewport } from './ActionToastViewport';
 import { DangerConfirm } from './DangerConfirm';
 
 type Props = {
@@ -25,7 +24,7 @@ type DangerAction = {
 
 export const RecoveryCenter: React.FC<Props> = ({ repoPath, refreshTrigger, onRepoChanged, settings }) => {
   const { t, tr } = useI18n();
-  const { toasts, setToast, dismiss } = useToastQueue(4000);
+  const setToast = useAppToastSetter();
   const [entries, setEntries] = useState<GitReflogEntryDto[]>([]);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -218,7 +217,6 @@ export const RecoveryCenter: React.FC<Props> = ({ repoPath, refreshTrigger, onRe
           }}
         />
       )}
-      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 };

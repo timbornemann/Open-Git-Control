@@ -58,7 +58,6 @@ type ReposSidebarContentProps = Pick<
   | 'hasRemoteOrigin'
   | 'forceGithubRepoCreationPrompt'
   | 'isConnectingGithubRepo'
-  | 'connectError'
   | 'newRepoName'
   | 'setNewRepoName'
   | 'newRepoDescription'
@@ -118,7 +117,6 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
   hasRemoteOrigin,
   forceGithubRepoCreationPrompt,
   isConnectingGithubRepo,
-  connectError,
   newRepoName,
   setNewRepoName,
   newRepoDescription,
@@ -266,7 +264,6 @@ export const ReposSidebarContent: React.FC<ReposSidebarContentProps> = ({
                 {t('generated.components.layout.sidebar.reposidebarcontent.private_d6902471')}
               </label>
             </div>
-            {connectError && <div style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>{connectError}</div>}
             <button
               onClick={onCreateGithubRepoForCurrent}
               disabled={isConnectingGithubRepo}

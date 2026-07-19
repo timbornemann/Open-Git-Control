@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { ChevronDown, ChevronRight, Archive } from 'lucide-react';
 import type { GitStashEntryDto } from '@/types/gitDtos';
 import { useI18n } from '@/i18n';
+import { useAppToast } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import { EmptyState } from '@/components/EmptyState';
 import type { InputDialogState } from './types';
@@ -20,11 +21,11 @@ type StashOp = 'apply' | 'pop' | 'drop';
 type StashFileState = {
   loading: boolean;
   files: string[];
-  error: string | null;
 };
 
 export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputDialog, refreshTrigger }) => {
   const { t, tr } = useI18n();
+  const showToast = useAppToast();
   const [collapsed, setCollapsed] = useState(true);
   const [stashes, setStashes] = useState<GitStashEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,7 +35,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
   const [pendingFileOp, setPendingFileOp] = useState<{ stashName: string; path: string } | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
   const [stashFiles, setStashFiles] = useState<Record<string, StashFileState>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const generationRef = useRef(0);
   // State updates are asynchronous; refs make the guards effective for two clicks
   // occurring in the same event turn.
@@ -56,7 +57,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     setStashes([]);
     setExpandedFiles(new Set());
     setStashFiles({});
-    setError(null);
+    setLoadError(null);
     setPendingOp(null);
     setRunningStashOp(null);
     setIsStashMutationRunning(false);
@@ -100,24 +101,28 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     const requestId = ++stashListRequestRef.current;
     const isCurrentRequest = () => isCurrentGeneration(generation, capturedRepoPath) && requestId === stashListRequestRef.current;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const result = await gitClient.getStashes(repoPath);
       if (!isCurrentRequest()) return;
       if (result.success) {
         setStashes((result as any).data ?? []);
       } else {
-        setError((result as any).error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_list_29c36606'));
+        const message = (result as any).error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_list_29c36606');
+        setLoadError(message);
+        showToast(message, true);
       }
     } catch (e: any) {
       if (!isCurrentRequest()) return;
-      setError(e.message);
+      const message = e.message || t('generated.components.staging_area.stashpanel.failed_to_load_stash_list_29c36606');
+      setLoadError(message);
+      showToast(message, true);
     } finally {
       if (isCurrentRequest()) {
         setLoading(false);
       }
     }
-  }, [isCurrentGeneration, repoPath, t]);
+  }, [isCurrentGeneration, repoPath, showToast, t]);
 
   const loadStashFiles = useCallback(
     async (stashName: string) => {
@@ -129,20 +134,14 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
       loadingStashFilesRef.current.add(stashName);
       setStashFiles((current) => ({
         ...current,
-        [stashName]: { loading: true, files: current[stashName]?.files || [], error: null },
+        [stashName]: { loading: true, files: current[stashName]?.files || [] },
       }));
       try {
         const result = await gitClient.runGitCommandForRepo(capturedRepoPath, 'stash', 'show', '-u', '--name-only', '-z', stashName);
         if (!isCurrentRequest()) return;
         if (!result.success) {
-          setStashFiles((current) => ({
-            ...current,
-            [stashName]: {
-              loading: false,
-              files: [],
-              error: result.error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_files_7a7abbc7'),
-            },
-          }));
+          setStashFiles((current) => ({ ...current, [stashName]: { loading: false, files: [] } }));
+          showToast(result.error || t('generated.components.staging_area.stashpanel.failed_to_load_stash_files_7a7abbc7'), true);
           return;
         }
         const rawFiles = String(result.data || '');
@@ -151,19 +150,17 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         if (!isCurrentRequest()) return;
         setStashFiles((current) => ({
           ...current,
-          [stashName]: { loading: false, files, error: null },
+          [stashName]: { loading: false, files },
         }));
       } catch (e: any) {
         if (!isCurrentRequest()) return;
-        setStashFiles((current) => ({
-          ...current,
-          [stashName]: { loading: false, files: [], error: e.message },
-        }));
+        setStashFiles((current) => ({ ...current, [stashName]: { loading: false, files: [] } }));
+        showToast(e.message || t('generated.components.staging_area.stashpanel.failed_to_load_stash_files_7a7abbc7'), true);
       } finally {
         loadingStashFilesRef.current.delete(stashName);
       }
     },
-    [isCurrentGeneration, repoPath, t],
+    [isCurrentGeneration, repoPath, showToast, t],
   );
 
   useEffect(() => {
@@ -197,11 +194,11 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         if (!isCurrentGeneration(generation, capturedRepoPath)) return;
         if (op !== 'drop') onRepoChanged?.();
       } else {
-        setError(result.error || t('generated.components.staging_area.stashpanel.stash_operation_failed_7a8358ef'));
+        showToast(result.error || t('generated.components.staging_area.stashpanel.stash_operation_failed_7a8358ef'), true);
       }
     } catch (e: any) {
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
-      setError(e.message);
+      showToast(e.message, true);
     } finally {
       finishStashMutation(operationId, generation, capturedRepoPath);
       if (isCurrentGeneration(generation, capturedRepoPath)) {
@@ -223,7 +220,7 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     (stash: GitStashEntryDto) => {
       if (!gitClient.isAvailable()) return;
       if (!setInputDialog) {
-        setError(t('generated.components.staging_area.stashpanel.branch_dialog_is_not_available_00daf191'));
+        showToast(t('generated.components.staging_area.stashpanel.branch_dialog_is_not_available_00daf191'), true);
         return;
       }
 
@@ -260,7 +257,6 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
           const operationId = beginStashMutation();
           if (operationId === null) return;
           const branchName = String(values.branchName || '').trim();
-          setError(null);
           try {
             const result = await gitClient.gitStashBranch(stash.name, branchName, capturedRepoPath);
             if (!isCurrentGeneration(generation, capturedRepoPath)) return;
@@ -273,16 +269,16 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
               onRepoChanged?.();
               return;
             }
-            setError(result.error || t('generated.components.staging_area.stashpanel.failed_to_create_branch_from_stash_1bbcc9af'));
+            showToast(result.error || t('generated.components.staging_area.stashpanel.failed_to_create_branch_from_stash_1bbcc9af'), true);
           } catch (e: any) {
-            if (isCurrentGeneration(generation, capturedRepoPath)) setError(e.message);
+            if (isCurrentGeneration(generation, capturedRepoPath)) showToast(e.message, true);
           } finally {
             finishStashMutation(operationId, generation, capturedRepoPath);
           }
         },
       });
     },
-    [beginStashMutation, finishStashMutation, isCurrentGeneration, load, onRepoChanged, repoPath, setInputDialog, t],
+    [beginStashMutation, finishStashMutation, isCurrentGeneration, load, onRepoChanged, repoPath, setInputDialog, showToast, t],
   );
 
   const toggleFiles = (stash: GitStashEntryDto) => {
@@ -305,7 +301,6 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
     const operationId = beginStashMutation();
     if (operationId === null) return;
     setPendingFileOp({ stashName, path: filePath });
-    setError(null);
     try {
       const trackedResult = await gitClient.runGitCommandForRepo(capturedRepoPath, 'checkout', stashName, '--', filePath);
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
@@ -317,11 +312,14 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
       if (finalResult.success) {
         onRepoChanged?.();
       } else {
-        setError(trackedResult.error || finalResult.error || t('generated.components.staging_area.stashpanel.could_not_apply_file_from_the_stash_cd8005a7'));
+        showToast(
+          trackedResult.error || finalResult.error || t('generated.components.staging_area.stashpanel.could_not_apply_file_from_the_stash_cd8005a7'),
+          true,
+        );
       }
     } catch (e: any) {
       if (!isCurrentGeneration(generation, capturedRepoPath)) return;
-      setError(e.message);
+      showToast(e.message, true);
     } finally {
       finishStashMutation(operationId, generation, capturedRepoPath);
       if (isCurrentGeneration(generation, capturedRepoPath)) {
@@ -351,9 +349,13 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
         <div className="stash-panel-body">
           {loading && <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.loading_stashes_0cdfcdf1')}</div>}
 
-          {!loading && error && <div className="stash-panel-hint stash-panel-hint--error">{error}</div>}
+          {!loading && loadError && (
+            <button className="staging-btn-sm" onClick={() => void load()}>
+              {tr('Erneut versuchen', 'Retry')}
+            </button>
+          )}
 
-          {!loading && !error && stashes.length === 0 && (
+          {!loading && !loadError && stashes.length === 0 && (
             <EmptyState
               icon={<Archive size={24} />}
               title={t('generated.components.staging_area.stashpanel.no_stashes_found_b1e3c59f')}
@@ -449,12 +451,10 @@ export const StashPanel: React.FC<Props> = ({ repoPath, onRepoChanged, setInputD
                           {fileState?.loading && (
                             <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.loading_files_df8b1d70')}</div>
                           )}
-                          {!fileState?.loading && fileState?.error && <div className="stash-panel-hint stash-panel-hint--error">{fileState.error}</div>}
-                          {!fileState?.loading && !fileState?.error && (fileState?.files || []).length === 0 && (
+                          {!fileState?.loading && (fileState?.files || []).length === 0 && (
                             <div className="stash-panel-hint">{t('generated.components.staging_area.stashpanel.no_files_found_5e448811')}</div>
                           )}
                           {!fileState?.loading &&
-                            !fileState?.error &&
                             (fileState?.files || []).map((filePath) => (
                               <div key={`${stash.name}:${filePath}`} className="stash-file-row">
                                 <span className="stash-file-path" title={filePath}>

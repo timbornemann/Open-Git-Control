@@ -25,6 +25,7 @@ const { appClientMock, onUpdateSettingsMock, settingsState } = vi.hoisted(() => 
 vi.mock('@/services/appClient', () => ({ appClient: appClientMock }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useSettingsStore: (selector: (state: typeof settingsState) => unknown) => selector(settingsState),
+  useOptionalRepositoryContext: () => null,
 }));
 
 const availableStatus = (state: UpdaterStatusDto['state'] = 'update-available'): UpdaterStatusDto => ({

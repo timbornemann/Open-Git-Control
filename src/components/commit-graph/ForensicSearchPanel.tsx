@@ -22,7 +22,7 @@ type ForensicSearchPanelProps = {
   forensicEndLine: string;
   setForensicEndLine: (value: string) => void;
   forensicLoading: boolean;
-  forensicError: string | null;
+  forensicNoMatches: boolean;
   forensicResults: GraphNode[];
   runForensicSearch: () => Promise<void>;
   onSelectCommit?: (hash: string | null) => void;
@@ -46,7 +46,7 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
   forensicEndLine,
   setForensicEndLine,
   forensicLoading,
-  forensicError,
+  forensicNoMatches,
   forensicResults,
   runForensicSearch,
   onSelectCommit,
@@ -219,7 +219,11 @@ export const ForensicSearchPanel: React.FC<ForensicSearchPanelProps> = ({
           : t('generated.components.commit_graph.forensicsearchpanel.run_forensic_search_d22d9803')}
       </button>
     </div>
-    {forensicError && <div style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>{forensicError}</div>}
+    {forensicNoMatches && (
+      <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+        {t('generated.components.commit_graph.useforensicsearch.no_matches_found_f24033f1')}
+      </div>
+    )}
     {forensicResults.length > 0 && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: 180, overflowY: 'auto' }}>
         {forensicResults.map((node) => (

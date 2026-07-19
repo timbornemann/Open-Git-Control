@@ -107,12 +107,13 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       });
       setForceGithubRepoCreationPrompt(true);
       const shortError = compactGitError(failureMessage, 320);
-      setConnectError(
-        shortError || t('generated.components.layout.workflows.useremoterecoveryworkflow.the_current_remote_is_no_longer_usable_please_create_a_n_3133bbff'),
-      );
+      const message =
+        shortError || t('generated.components.layout.workflows.useremoterecoveryworkflow.the_current_remote_is_no_longer_usable_please_create_a_n_3133bbff');
+      setConnectError(message);
+      setGitActionToast({ msg: message, isError: true });
       workspace.setActiveTab('repo');
     },
-    [t, workspace],
+    [setGitActionToast, t, workspace],
   );
 
   const requestGithubRepoCreationRecovery = useCallback(

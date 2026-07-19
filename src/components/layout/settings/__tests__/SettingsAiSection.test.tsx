@@ -15,8 +15,7 @@ const aiState = {
   setGeminiApiKeyInput: vi.fn(),
   openAiApiKeyInput: '',
   setOpenAiApiKeyInput: vi.fn(),
-  aiStatus: null,
-  setAiStatus: vi.fn(),
+  showToast: vi.fn(),
   isTestingAi: false,
   isLoadingModels: false,
   testConnection: vi.fn(),
@@ -150,6 +149,6 @@ describe('SettingsAiSection base URL drafts', () => {
     await act(async () => removeButton.click());
 
     expect(onUpdateSettings).not.toHaveBeenCalled();
-    expect(aiState.setAiStatus).toHaveBeenCalledWith('OpenAI key file is locked.');
+    expect(aiState.showToast).toHaveBeenCalledWith('OpenAI key file is locked.', true);
   });
 });

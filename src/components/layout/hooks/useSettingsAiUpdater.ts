@@ -13,18 +13,17 @@ type Params = {
   onUpdateSettings: SettingsUpdateHandler;
   t: CatalogTranslateFn;
   tr: TranslateFn;
+  onToast: (message: string, isError: boolean) => void;
 };
 
-export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Params) => {
+export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr, onToast }: Params) => {
   const [isTestingAi, setIsTestingAi] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
-  const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
   const [openAiApiKeyInput, setOpenAiApiKeyInput] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(null);
-  const [updaterMessage, setUpdaterMessage] = useState<string | null>(null);
   const [isRunningUpdate, setIsRunningUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
@@ -110,21 +109,21 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
   const testConnection = async () => {
     if (!aiClient.isAvailable()) return;
     setIsTestingAi(true);
-    setAiStatus(null);
     try {
       const result = await aiClient.testConnection();
       if (!result.success) {
-        setAiStatus(tr(`Verbindung fehlgeschlagen: ${result.error}`, `Connection failed: ${result.error}`));
+        onToast(tr(`Verbindung fehlgeschlagen: ${result.error}`, `Connection failed: ${result.error}`), true);
         return;
       }
-      setAiStatus(
+      onToast(
         tr(
           `Verbunden: ${result.data.provider} / ${result.data.model} (${result.data.detail})`,
           `Connected: ${result.data.provider} / ${result.data.model} (${result.data.detail})`,
         ),
+        false,
       );
     } catch (error: unknown) {
-      setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.connection_failed_8780a183'));
+      onToast(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.connection_failed_8780a183'), true);
     } finally {
       setIsTestingAi(false);
     }
@@ -135,22 +134,21 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     const generation = modelsGenerationRef.current;
     const isCurrent = () => modelsGenerationRef.current === generation;
     setIsLoadingModels(true);
-    setAiStatus(null);
     try {
       const result = await aiClient.listModels();
       if (!isCurrent()) return;
       if (!result.success) {
-        setAiStatus(tr(`Modelle konnten nicht geladen werden: ${result.error}`, `Could not load models: ${result.error}`));
+        onToast(tr(`Modelle konnten nicht geladen werden: ${result.error}`, `Could not load models: ${result.error}`), true);
         return;
       }
       setModelOptions(result.data);
       if (!selectedModel && result.data.length > 0) {
         await setSelectedModel(result.data[0]);
       }
-      setAiStatus(tr(`${result.data.length} Modell(e) geladen.`, `${result.data.length} model(s) loaded.`));
+      onToast(tr(`${result.data.length} Modell(e) geladen.`, `${result.data.length} model(s) loaded.`), false);
     } catch (error: unknown) {
       if (!isCurrent()) return;
-      setAiStatus(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_models_c6582ed1'));
+      onToast(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_models_c6582ed1'), true);
     } finally {
       if (isCurrent()) setIsLoadingModels(false);
     }
@@ -161,17 +159,17 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
 
     if (updaterStatus?.state === 'downloaded') {
       setIsInstallingUpdate(true);
-      setUpdaterMessage(null);
       try {
         const result = await appClient.installAppUpdate();
         if (!result.success) {
-          setUpdaterMessage(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'));
+          onToast(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'), true);
           return;
         }
-        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.restarting_app_to_install_update_f142b007'));
+        onToast(t('generated.components.layout.hooks.usesettingsaiupdater.restarting_app_to_install_update_f142b007'), false);
       } catch (error: unknown) {
-        setUpdaterMessage(
+        onToast(
           error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_installation_21a3223d'),
+          true,
         );
       } finally {
         setIsInstallingUpdate(false);
@@ -180,24 +178,23 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     }
 
     setIsRunningUpdate(true);
-    setUpdaterMessage(null);
     try {
       const result = await appClient.runOneClickAppUpdate();
       if (!result.success) {
-        setUpdaterMessage(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'));
+        onToast(result.error || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'), true);
         return;
       }
       if (result.action === 'downloaded') {
-        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.update_downloaded_and_ready_to_install_06156b66'));
+        onToast(t('generated.components.layout.hooks.usesettingsaiupdater.update_downloaded_and_ready_to_install_06156b66'), false);
         return;
       }
       if (result.action === 'no-update') {
-        setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.app_is_already_up_to_date_0f3d23f1'));
+        onToast(t('generated.components.layout.hooks.usesettingsaiupdater.app_is_already_up_to_date_0f3d23f1'), false);
         return;
       }
-      setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.update_check_completed_bde0b1e8'));
+      onToast(t('generated.components.layout.hooks.usesettingsaiupdater.update_check_completed_bde0b1e8'), false);
     } catch (error: unknown) {
-      setUpdaterMessage(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'));
+      onToast(error instanceof Error ? error.message : t('generated.components.layout.hooks.usesettingsaiupdater.could_not_start_update_cc36018f'), true);
     } finally {
       setIsRunningUpdate(false);
     }
@@ -212,7 +209,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
         const version = await appClient.getAppVersion();
         if (active) setAppVersion(version);
       } catch {
-        if (active) setUpdaterMessage(t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_app_version_417cc507'));
+        if (active) onToast(t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_app_version_417cc507'), true);
       }
 
       try {
@@ -222,7 +219,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
         if (status.currentVersion) setAppVersion((current) => current || status.currentVersion);
       } catch {
         if (!active) return;
-        setUpdaterMessage((current) => current || t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_updater_status_2df70231'));
+        onToast(t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_updater_status_2df70231'), true);
       }
     };
 
@@ -238,13 +235,12 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
       active = false;
       unsubscribe();
     };
-  }, [t, tr]);
+  }, [onToast, t, tr]);
 
   return {
     isTestingAi,
     isLoadingModels,
-    aiStatus,
-    setAiStatus,
+    showToast: onToast,
     modelOptions,
     geminiApiKeyInput,
     setGeminiApiKeyInput,
@@ -252,7 +248,6 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr }: Para
     setOpenAiApiKeyInput,
     appVersion,
     updaterStatus,
-    updaterMessage,
     isRunningUpdate,
     selectedModel,
     mergedModelOptions,

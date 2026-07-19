@@ -162,14 +162,14 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setGeminiApiKeyInput('');
                   await onUpdateSettings({});
                   if (keyToSave.trim() && !next.hasGeminiApiKey) {
-                    ai.setAiStatus(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'));
+                    ai.showToast(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'), true);
                   }
                 } catch (error: unknown) {
                   const message =
                     error instanceof Error
                       ? error.message
                       : t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad');
-                  ai.setAiStatus(message);
+                  ai.showToast(message, true);
                 }
               }}
             >
@@ -184,7 +184,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setGeminiApiKeyInput('');
                   await onUpdateSettings({});
                 } catch (error: unknown) {
-                  ai.setAiStatus(error instanceof Error ? error.message : 'The Gemini API key could not be removed.');
+                  ai.showToast(error instanceof Error ? error.message : 'The Gemini API key could not be removed.', true);
                 }
               }}
               disabled={!settings.hasGeminiApiKey}
@@ -237,14 +237,14 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setOpenAiApiKeyInput('');
                   await onUpdateSettings({});
                   if (keyToSave.trim() && !next.hasOpenAiApiKey) {
-                    ai.setAiStatus(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'));
+                    ai.showToast(t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad'), true);
                   }
                 } catch (error: unknown) {
                   const message =
                     error instanceof Error
                       ? error.message
                       : t('generated.components.layout.apimcpsettingspanel.os_encryption_is_not_available_persistent_api_tokens_can_975016ad');
-                  ai.setAiStatus(message);
+                  ai.showToast(message, true);
                 }
               }}
             >
@@ -259,7 +259,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                   ai.setOpenAiApiKeyInput('');
                   await onUpdateSettings({});
                 } catch (error: unknown) {
-                  ai.setAiStatus(error instanceof Error ? error.message : 'The OpenAI API key could not be removed.');
+                  ai.showToast(error instanceof Error ? error.message : 'The OpenAI API key could not be removed.', true);
                 }
               }}
               disabled={!settings.hasOpenAiApiKey}
@@ -292,12 +292,6 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
             : t('generated.components.layout.settingsmaincontent.load_models_a363b3f8')}
         </button>
       </div>
-      {ai.aiStatus && (
-        <p className={hintClass(variant)} style={variant === 'sidebar' ? { whiteSpace: 'pre-wrap' } : undefined}>
-          {ai.aiStatus}
-        </p>
-      )}
-
       <label className={fieldClass(variant)}>
         {t('generated.components.layout.settingsmaincontent.model_83e8c02e')}
         {variant === 'main' && ai.modelOptions.length > 0 ? (

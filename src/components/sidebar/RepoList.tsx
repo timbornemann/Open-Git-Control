@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FolderGit2, FolderOpen, Loader2, Pin, PinOff, Search, X } from 'lucide-react';
 import type { RepoSortByDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
+import { useAppToast } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 
 type Props = {
@@ -24,7 +25,6 @@ type RepositoryContextMenu = {
   x: number;
   y: number;
   repoPath: string;
-  error: string | null;
 };
 
 const CONTEXT_MENU_MARGIN = 8;
@@ -49,6 +49,7 @@ export const RepoList: React.FC<Props> = ({
   const [query, setQuery] = useState('');
   const [contextMenu, setContextMenu] = useState<RepositoryContextMenu | null>(null);
   const { t, tr, locale } = useI18n();
+  const showToast = useAppToast();
   const sortOptions: Array<{ value: RepoSortByDto; label: string }> = [
     { value: 'lastOpenedDesc', label: t('generated.components.sidebar.repolist.last_opened_6ece1ffe') },
     { value: 'nameAsc', label: t('generated.components.sidebar.repolist.name_a_z_fcdceb45') },
@@ -75,20 +76,11 @@ export const RepoList: React.FC<Props> = ({
         setContextMenu(null);
         return;
       }
-      setContextMenu((current) =>
-        current?.repoPath === menuAtStart.repoPath
-          ? { ...current, error: result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.') }
-          : current,
-      );
+      setContextMenu(null);
+      showToast(result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'), true);
     } catch (openError: unknown) {
-      setContextMenu((current) =>
-        current?.repoPath === menuAtStart.repoPath
-          ? {
-              ...current,
-              error: openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'),
-            }
-          : current,
-      );
+      setContextMenu(null);
+      showToast(openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'), true);
     }
   };
 
@@ -195,7 +187,6 @@ export const RepoList: React.FC<Props> = ({
                       x: Math.max(CONTEXT_MENU_MARGIN, Math.min(event.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - CONTEXT_MENU_MARGIN)),
                       y: Math.max(CONTEXT_MENU_MARGIN, Math.min(event.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - CONTEXT_MENU_MARGIN)),
                       repoPath,
-                      error: null,
                     });
                   }}
                   style={{
@@ -348,7 +339,6 @@ export const RepoList: React.FC<Props> = ({
               <X size={14} />
               {t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')}
             </button>
-            {contextMenu.error && <div className="repo-list-context-error">{contextMenu.error}</div>}
           </div>
         </div>
       )}

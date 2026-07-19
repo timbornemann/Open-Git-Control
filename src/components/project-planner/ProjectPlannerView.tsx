@@ -28,7 +28,6 @@ export const ProjectPlannerView: React.FC = () => {
     projectActionRequest,
     loading,
     busy,
-    error,
     createProject,
     updateProject,
     createItem,
@@ -181,7 +180,6 @@ export const ProjectPlannerView: React.FC = () => {
   if (!selectedProject) {
     return (
       <div className="project-planner-view">
-        {error && <div className="planner-error">{error}</div>}
         <EmptyState
           icon={<Lightbulb size={42} />}
           title={t('generated.components.project_planner.projectplannerview.no_project_yet_bd4bb891')}
@@ -281,8 +279,6 @@ export const ProjectPlannerView: React.FC = () => {
           {filteredItems.length}/{itemsForSelectedProject.length}
         </span>
       </div>
-
-      {error && <div className="planner-error">{error}</div>}
 
       <div className="planner-board">
         {STATUS_OPTIONS.map((status) => {

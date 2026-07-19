@@ -80,7 +80,7 @@ const createStep = (label: string): RepositoryRunStepDto => ({
 });
 
 export const SettingsRunSection: React.FC = () => {
-  const { openRepos, activeRepo } = useRepositoryContext();
+  const { openRepos, activeRepo, onToast } = useRepositoryContext();
   const workflow = useWorkflowContext();
   const { setConfirmDialog } = useUIContext();
   const { tr } = useI18n();
@@ -90,7 +90,7 @@ export const SettingsRunSection: React.FC = () => {
   const [configRepositoryPath, setConfigRepositoryPath] = useState<string | null>(null);
   const [configPath, setConfigPath] = useState('');
   const [templates, setTemplates] = useState<RepositoryRunTemplateDto[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const repositories = useMemo(() => Array.from(new Set(openRepos)), [openRepos]);
@@ -124,7 +124,7 @@ export const SettingsRunSection: React.FC = () => {
     setConfigRepositoryPath(null);
     setConfigPath('');
     setTemplates([]);
-    setError(null);
+    setLoadError(null);
     setSaving(false);
 
     if (!repoPath || !repositoryRunClient.isAvailable()) {
@@ -142,7 +142,7 @@ export const SettingsRunSection: React.FC = () => {
 
         setLoading(false);
         if (!result.success) {
-          setError(result.error);
+          setLoadError(result.error);
           return;
         }
 
@@ -152,11 +152,11 @@ export const SettingsRunSection: React.FC = () => {
         setConfig(savedDraft?.config || result.data.config);
         setPersistedConfig(savedDraft ? savedDraft.persistedConfig : result.data.config);
         setConfigRepositoryPath(repoPath);
-        setError(result.data.error || null);
+        setLoadError(result.data.error || null);
       } catch (loadError: unknown) {
         if (cancelled || loadRequestIdRef.current !== requestId || selectedRepoRef.current !== repoPath) return;
         setLoading(false);
-        setError(loadError instanceof Error ? loadError.message : String(loadError));
+        setLoadError(loadError instanceof Error ? loadError.message : String(loadError));
       }
     })();
 
@@ -192,20 +192,21 @@ export const SettingsRunSection: React.FC = () => {
       if (saveRequestIdRef.current === requestId && selectedRepoRef.current === repoPath) {
         setSaving(false);
         if (!result.success) {
-          setError(result.error);
+          onToast(result.error, true);
           return;
         }
         setConfig(result.data);
         setPersistedConfig(result.data);
         clearRunConfigDraft(repoPath);
         setConfigRepositoryPath(repoPath);
-        setError(null);
+        setLoadError(null);
+        onToast(tr('Run-Konfiguration gespeichert.', 'Run configuration saved.'), false);
       }
       if (result.success) await workflow.onRefreshRunConfig();
     } catch (saveError: unknown) {
       if (saveRequestIdRef.current !== requestId || selectedRepoRef.current !== repoPath) return;
       setSaving(false);
-      setError(saveError instanceof Error ? saveError.message : String(saveError));
+      onToast(saveError instanceof Error ? saveError.message : String(saveError), true);
     }
   };
 
@@ -272,7 +273,7 @@ export const SettingsRunSection: React.FC = () => {
       </label>
       {configIsDirty && <p className="settings-hint repository-run-settings__dirty">{tr('Ungespeicherte Aenderungen', 'Unsaved changes')}</p>}
       {configPath && <p className="settings-hint repository-run-settings__path">{configPath}</p>}
-      {error && <div className="settings-danger repository-run-settings__error">{error}</div>}
+      {loadError && <div className="settings-danger repository-run-settings__error">{loadError}</div>}
       {!config && !loading && (
         <button
           className="staging-tool-btn"
@@ -280,7 +281,7 @@ export const SettingsRunSection: React.FC = () => {
             setConfig(createEmptyRepositoryRunConfig());
             setPersistedConfig(null);
             setConfigRepositoryPath(selectedRepo);
-            setError(null);
+            setLoadError(null);
           }}
         >
           {tr('Neue Konfiguration erstellen', 'Create new configuration')}

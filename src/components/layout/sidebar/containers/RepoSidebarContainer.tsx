@@ -46,7 +46,6 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
       hasRemoteOrigin={repository.hasRemoteOrigin}
       forceGithubRepoCreationPrompt={repository.forceGithubRepoCreationPrompt}
       isConnectingGithubRepo={repository.isConnectingGithubRepo}
-      connectError={repository.connectError}
       newRepoName={repository.newRepoName}
       setNewRepoName={repository.setNewRepoName}
       newRepoDescription={repository.newRepoDescription}

@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
-import { useToastQueue } from '@/hooks/useToastQueue';
+import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
-import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { getAvailableWorkingDirectoryCopyPath } from '@/utils/workingDirectoryCopyName';
 import '@/styles/working-directory-tree.css';
 
@@ -22,7 +21,7 @@ const basename = (value: string) => value.split('/').pop() || value;
 
 export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger, expandedPaths, onExpandedPathsChange, onOpenFile, onRepoChanged }) => {
   const { setConfirmDialog, setInputDialog } = useUIContext();
-  const { toasts, setToast, dismiss } = useToastQueue(3000);
+  const setToast = useAppToastSetter();
   const [entriesByParent, setEntriesByParent] = useState<Record<string, WorkingDirectoryEntryDto[]>>({});
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
@@ -402,7 +401,6 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
           )}
         </div>
       )}
-      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 };

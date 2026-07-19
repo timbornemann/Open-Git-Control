@@ -3,6 +3,7 @@ import { ExternalLink, Plus, RefreshCw, Search, XCircle } from 'lucide-react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import type { GithubWorkflowRunDto } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
+import { useAppToast } from '@/hooks/useAppToast';
 import { githubClient } from '@/services/githubClient';
 import { formatDateTime } from '@/utils/dateTime';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus, RepoCardToolbar } from '@/components/sidebar/RepoCard';
@@ -16,7 +17,6 @@ type RepoGithubActionsContentProps = Pick<
   | 'setPrFilter'
   | 'prLoading'
   | 'prHasLoaded'
-  | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
   | 'onOpenPR'
@@ -42,6 +42,7 @@ type RepoGithubActionsContentProps = Pick<
 
 export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> = (props) => {
   const { t, locale } = useI18n();
+  const showToast = useAppToast();
   const [isPrCollapsed, setIsPrCollapsed] = useState(false);
   const [isWorkflowCollapsed, setIsWorkflowCollapsed] = useState(false);
   const [workflowRuns, setWorkflowRuns] = useState<GithubWorkflowRunDto[]>([]);
@@ -80,13 +81,17 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
 
         if (!active) return;
         if (!result.success) {
-          setWorkflowRunsError(result.error || t('generated.components.layout.sidebar.repogithubactionscontent.could_not_load_workflows_bf2c858f'));
+          const message = result.error || t('generated.components.layout.sidebar.repogithubactionscontent.could_not_load_workflows_bf2c858f');
+          setWorkflowRunsError(message);
+          showToast(message, true);
           return;
         }
         setWorkflowRuns(result.data || []);
       } catch (error: any) {
         if (!active) return;
-        setWorkflowRunsError(error?.message || t('generated.components.layout.sidebar.repogithubactionscontent.could_not_load_workflows_bf2c858f'));
+        const message = error?.message || t('generated.components.layout.sidebar.repogithubactionscontent.could_not_load_workflows_bf2c858f');
+        setWorkflowRunsError(message);
+        showToast(message, true);
       } finally {
         if (active) setIsLoadingWorkflowRuns(false);
       }
@@ -96,7 +101,7 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
     return () => {
       active = false;
     };
-  }, [ownerRepoKey, props.currentBranch, props.prOwnerRepo, props.refreshTrigger, t]);
+  }, [ownerRepoKey, props.currentBranch, props.prOwnerRepo, props.refreshTrigger, showToast, t]);
 
   const filteredWorkflowRuns = useMemo(() => {
     const normalized = workflowQuery.trim().toLowerCase();
@@ -168,7 +173,6 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               setPrFilter={props.setPrFilter}
               prLoading={props.prLoading}
               prHasLoaded={props.prHasLoaded}
-              prError={props.prError}
               pullRequests={props.pullRequests}
               prCiByNumber={props.prCiByNumber}
               showCreatePR={props.showCreatePR}
@@ -245,7 +249,9 @@ export const RepoGithubActionsContent: React.FC<RepoGithubActionsContentProps> =
               {isLoadingWorkflowRuns && workflowRuns.length === 0 && (
                 <div className="repo-state-text">{t('generated.components.layout.sidebar.repogithubactionscontent.loading_workflow_runs_f20efa79')}</div>
               )}
-              {workflowRunsError && workflowRuns.length === 0 && <div className="repo-state-text repo-state-text--danger">{workflowRunsError}</div>}
+              {workflowRunsError && workflowRuns.length === 0 && (
+                <div className="repo-state-text">{t('generated.components.layout.sidebar.repogithubactionscontent.no_workflow_runs_found_87510581')}</div>
+              )}
               {!isLoadingWorkflowRuns && !workflowRunsError && filteredWorkflowRuns.length === 0 && (
                 <div className="repo-state-text">
                   {workflowQuery.trim()

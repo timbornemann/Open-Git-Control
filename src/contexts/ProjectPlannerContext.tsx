@@ -116,14 +116,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       setLoading(true);
       try {
         await refresh();
-      } catch {
-        // The visible error state explains how to recover.
+      } catch (error) {
+        onToast(error instanceof Error ? error.message : String(error), true);
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [refresh]);
+  }, [onToast, refresh]);
 
   useEffect(() => {
     if (!plannerClient.isAvailable()) return;
@@ -134,8 +134,8 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         if (refreshTimer) clearTimeout(refreshTimer);
         refreshTimer = setTimeout(() => {
           refreshTimer = null;
-          void refresh().catch(() => {
-            // The visible error state explains how to recover.
+          void refresh().catch((error) => {
+            onToast(error instanceof Error ? error.message : String(error), true);
           });
         }, 25);
       });
@@ -148,14 +148,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (refreshTimer) clearTimeout(refreshTimer);
       unsubscribe();
     };
-  }, [refresh]);
+  }, [onToast, refresh]);
 
   useEffect(() => {
     if (!refreshSignal) return;
-    void refresh().catch(() => {
-      // The visible error state explains how to recover.
+    void refresh().catch((error) => {
+      onToast(error instanceof Error ? error.message : String(error), true);
     });
-  }, [refresh, refreshSignal]);
+  }, [onToast, refresh, refreshSignal]);
 
   useEffect(() => {
     if (loading || selectedProjectId) return;

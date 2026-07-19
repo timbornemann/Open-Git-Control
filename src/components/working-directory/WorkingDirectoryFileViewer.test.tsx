@@ -12,9 +12,11 @@ import {
 } from './workingDirectoryNavigationGuard';
 
 const setConfirmDialog = vi.fn();
+const onToast = vi.fn();
 const editorState = vi.hoisted(() => ({ onChange: null as ((value: string) => void) | null }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog }),
+  useOptionalRepositoryContext: () => ({ onToast }),
 }));
 vi.mock('./WorkingDirectoryCodeEditor', () => ({
   WorkingDirectoryCodeEditor: ({ onChange }: { onChange: (value: string) => void }) => {
@@ -46,6 +48,7 @@ afterEach(() => {
   resetWorkingDirectoryNavigationGuardForTests();
   vi.restoreAllMocks();
   setConfirmDialog.mockReset();
+  onToast.mockReset();
   editorState.onChange = null;
   document.body.innerHTML = '';
 });
@@ -142,7 +145,7 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
 
     expect(proceed).not.toHaveBeenCalled();
     expect(cancel).toHaveBeenCalledTimes(1);
-    expect(document.body.textContent).toContain('File is locked.');
+    expect(onToast).toHaveBeenCalledWith('File is locked.', true);
     act(() => root.unmount());
   });
 

@@ -9,6 +9,7 @@ import { RepositoryLicensePanel } from '@/components/sidebar/RepositoryLicensePa
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardStatus } from '@/components/sidebar/RepoCard';
 import { RepoGithubActionsContent } from './RepoGithubActionsContent';
 import { useI18n } from '@/i18n';
+import { useAppToast } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 
 type RepoSidebarContentProps = Pick<
@@ -50,7 +51,6 @@ type RepoSidebarContentProps = Pick<
   | 'hasRemoteOrigin'
   | 'forceGithubRepoCreationPrompt'
   | 'isConnectingGithubRepo'
-  | 'connectError'
   | 'newRepoName'
   | 'setNewRepoName'
   | 'newRepoDescription'
@@ -106,25 +106,20 @@ type RepoSidebarContentProps = Pick<
 
 export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => {
   const { t, tr } = useI18n();
-  const [repoPathError, setRepoPathError] = React.useState<string | null>(null);
+  const showToast = useAppToast();
   const shouldShowGithubConnect = props.hasRemoteOrigin === false || props.forceGithubRepoCreationPrompt;
 
   const openActiveRepositoryFolder = async () => {
     if (!props.activeRepo || !gitClient.isAvailable()) return;
-    setRepoPathError(null);
     try {
       const result = await gitClient.openRepositoryPath({ action: 'open', repoPath: props.activeRepo });
       if (!result.success) {
-        setRepoPathError(result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'));
+        showToast(result.error || tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'), true);
       }
     } catch (openError: unknown) {
-      setRepoPathError(openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'));
+      showToast(openError instanceof Error ? openError.message : tr('Der Ordner konnte nicht geoeffnet werden.', 'Could not open the folder.'), true);
     }
   };
-
-  React.useEffect(() => {
-    setRepoPathError(null);
-  }, [props.activeRepo]);
 
   if (!props.activeRepo) {
     return (
@@ -161,7 +156,6 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
             <FolderOpen size={14} />
           </button>
         </div>
-        {repoPathError && <div className="repo-cockpit-path-error">{repoPathError}</div>}
       </div>
 
       <RemotePanel
@@ -250,11 +244,6 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
                 </label>
               </div>
             </div>
-            {props.connectError && (
-              <div className="repo-state-text" style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
-                {props.connectError}
-              </div>
-            )}
             <button
               className="staging-tool-btn"
               onClick={props.onCreateGithubRepoForCurrent}

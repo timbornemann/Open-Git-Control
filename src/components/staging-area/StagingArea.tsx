@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useToastQueue } from '@/hooks/useToastQueue';
+import { useAppToastSetter } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { useSettingsContext, useUIContext } from '@/contexts/AppStateContext';
 import { getCommitMessageStyleLabel } from '@/utils/commitMessagePreferences';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
-import { ActionToastViewport } from '@/components/ActionToastViewport';
 import { ConflictResolverPanel } from './ConflictResolverPanel';
 import { StagingCommitPanel } from './StagingCommitPanel';
 import { StagingContextMenu } from './StagingContextMenu';
@@ -71,7 +70,7 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
   const { t } = useI18n();
   const { setConfirmDialog, setInputDialog } = useUIContext();
   const { onUpdateSettings } = useSettingsContext();
-  const { toasts, setToast, dismiss } = useToastQueue(3000);
+  const setToast = useAppToastSetter();
   const [stashRefreshTrigger, setStashRefreshTrigger] = useState(0);
 
   const isConflictOnly = viewMode === 'conflictOnly';
@@ -273,7 +272,6 @@ export const StagingArea: React.FC<StagingAreaProps> = ({
       )}
 
       <StagingContextMenu contextMenu={fileOps.contextMenu} fileOps={fileOps} />
-      <ActionToastViewport toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 };

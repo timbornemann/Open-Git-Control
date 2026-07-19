@@ -50,12 +50,10 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
   oauthConfigured,
   deviceFlow,
   isDeviceFlowRunning,
-  deviceFlowError,
   onStartDeviceFlowLogin,
   onCancelAuthentication,
   onCancelDeviceFlow,
   isWebFlowRunning,
-  webFlowError,
   onStartWebFlowLogin,
   selectedGithubAuthHelpMethod,
   onSelectGithubAuthHelpMethod,
@@ -135,11 +133,6 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
             }}
           />
         </div>
-        {authError && (
-          <p className="sidebar-meta-text" style={{ fontSize: '0.8rem', color: 'var(--status-danger)' }}>
-            {authError}
-          </p>
-        )}
         <button
           disabled={!canTokenLogin}
           onClick={onTokenLogin}
@@ -193,12 +186,6 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         {!oauthConfigured && (
           <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
             {t('generated.components.layout.sidebar.githubauthcontent.device_flow_is_not_configured_missing_github_oauth_clien_c635aff5')}
-          </div>
-        )}
-
-        {deviceFlowError && (
-          <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
-            {deviceFlowError}
           </div>
         )}
 
@@ -284,11 +271,6 @@ export const GithubAuthContent: React.FC<GithubAuthContentProps> = ({
         <p className="sidebar-meta-text">
           {t('generated.components.layout.sidebar.githubauthcontent.no_oauth_app_or_keys_click_button_sign_in_in_browser_don_bcb115cc')}
         </p>
-        {webFlowError && (
-          <div className="sidebar-meta-text" style={{ fontSize: '0.76rem', color: 'var(--status-danger)' }}>
-            {webFlowError}
-          </div>
-        )}
 
         <button
           disabled={!canStartWebFlow}

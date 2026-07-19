@@ -13,16 +13,17 @@ type UseForensicSearchParams = {
   repoPath: string | null;
   workingTreeStatus: GitStatusDetailed | null;
   t: CatalogTranslateFn;
+  onError?: (message: string) => void;
 };
 
-export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensicSearchParams) => {
+export const useForensicSearch = ({ repoPath, workingTreeStatus, t, onError }: UseForensicSearchParams) => {
   const [forensicType, setForensicType] = useState<ForensicSearchType>('string');
   const [forensicPath, setForensicPath] = useState('');
   const [forensicValue, setForensicValue] = useState('');
   const [forensicStartLine, setForensicStartLine] = useState('1');
   const [forensicEndLine, setForensicEndLine] = useState('1');
   const [forensicLoading, setForensicLoading] = useState(false);
-  const [forensicError, setForensicError] = useState<string | null>(null);
+  const [forensicNoMatches, setForensicNoMatches] = useState(false);
   const [forensicResults, setForensicResults] = useState<GraphNode[]>([]);
   const [forensicPathHistory, setForensicPathHistory] = useState<string[]>([]);
 
@@ -33,7 +34,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
   useEffect(() => {
     searchGenerationRef.current += 1;
     setForensicResults([]);
-    setForensicError(null);
+    setForensicNoMatches(false);
     setForensicLoading(false);
   }, [repoPath]);
 
@@ -63,9 +64,21 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
 
   const resetForensicState = useCallback(() => {
     setForensicResults([]);
-    setForensicError(null);
+    setForensicNoMatches(false);
     setForensicLoading(false);
   }, []);
+
+  const clearForensicFeedback = useCallback(() => {
+    setForensicNoMatches(false);
+  }, []);
+
+  const reportError = useCallback(
+    (message: string) => {
+      setForensicNoMatches(false);
+      onError?.(message);
+    },
+    [onError],
+  );
 
   const forensicPathSuggestions = useMemo(() => {
     const query = forensicPath.trim().toLowerCase();
@@ -91,7 +104,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
 
     const normalizedPath = forensicPath.trim();
     if (!normalizedPath) {
-      setForensicError(t('generated.components.commit_graph.useforensicsearch.please_provide_a_path_for_the_forensic_search_f6cd25dd'));
+      reportError(t('generated.components.commit_graph.useforensicsearch.please_provide_a_path_for_the_forensic_search_f6cd25dd'));
       setForensicResults([]);
       return;
     }
@@ -107,7 +120,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
       const start = Number(forensicStartLine);
       const end = Number(forensicEndLine);
       if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) {
-        setForensicError(t('generated.components.commit_graph.useforensicsearch.invalid_line_range_please_check_start_end_295dd362'));
+        reportError(t('generated.components.commit_graph.useforensicsearch.invalid_line_range_please_check_start_end_295dd362'));
         setForensicResults([]);
         return;
       }
@@ -115,7 +128,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
     } else {
       const searchTerm = forensicValue.trim();
       if (!searchTerm) {
-        setForensicError(
+        reportError(
           forensicType === 'regex'
             ? t('generated.components.commit_graph.useforensicsearch.please_provide_a_regex_9d370edb')
             : t('generated.components.commit_graph.useforensicsearch.please_provide_a_search_string_1b25a17f'),
@@ -133,7 +146,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
     const isCurrent = () => searchGenerationRef.current === generation;
 
     setForensicLoading(true);
-    setForensicError(null);
+    setForensicNoMatches(false);
 
     try {
       const { success, data, error } = await gitClient.runGitCommandForRepo(repoAtStart, args[0] as GitCommandNameDto, ...args.slice(1));
@@ -141,7 +154,7 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
       if (!success) {
         const message = String(error || t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
         const invalidPattern = /invalid|regex|regular expression|fatal/i.test(message);
-        setForensicError(
+        reportError(
           invalidPattern ? t('generated.components.commit_graph.useforensicsearch.invalid_regex_pattern_please_fix_the_expression_1ce435a7') : message,
         );
         setForensicResults([]);
@@ -152,16 +165,16 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
       const nodes = commits.map((commit) => ({ commit, lane: 0, row: 0, color: 'var(--accent-primary)', isMerge: commit.parentHashes.length > 1 }));
       setForensicResults(nodes);
       if (commits.length === 0) {
-        setForensicError(t('generated.components.commit_graph.useforensicsearch.no_matches_found_f24033f1'));
+        setForensicNoMatches(true);
       }
     } catch (error: unknown) {
       if (!isCurrent()) return;
       setForensicResults([]);
-      setForensicError(error instanceof Error ? error.message : t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
+      reportError(error instanceof Error ? error.message : t('generated.components.commit_graph.useforensicsearch.forensic_search_failed_e97e5ca2'));
     } finally {
       if (isCurrent()) setForensicLoading(false);
     }
-  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, t]);
+  }, [forensicEndLine, forensicPath, forensicStartLine, forensicType, forensicValue, repoPath, reportError, t]);
 
   return {
     forensicType,
@@ -175,8 +188,8 @@ export const useForensicSearch = ({ repoPath, workingTreeStatus, t }: UseForensi
     forensicEndLine,
     setForensicEndLine,
     forensicLoading,
-    forensicError,
-    setForensicError,
+    forensicNoMatches,
+    clearForensicFeedback,
     forensicResults,
     forensicPathSuggestions,
     runForensicSearch,

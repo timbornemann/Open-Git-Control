@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Save } from 'lucide-react';
 import { gitClient } from '@/services/gitClient';
 import { useUIContext } from '@/contexts/AppStateContext';
+import { useAppToast } from '@/hooks/useAppToast';
 import { isHtmlFilePath } from '@/utils/htmlPreview';
 import { isMarkdownFilePath } from '@/utils/markdownPreview';
 import { applyLineEnding, detectLineEnding, normalizeToLf, type LineEnding } from '@/utils/lineEndings';
@@ -46,7 +47,8 @@ const getNavigationDestination = (target: WorkingDirectoryNavigationTarget): str
 };
 
 export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, onClose, onRepoChanged, onCloseRequestChange, onNavigationGuardChange }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
+  const showToast = useAppToast();
   const { setConfirmDialog } = useUIContext();
   const requestCloseRef = useRef<() => void>(() => onClose());
   const navigationGuardRef = useRef<WorkingDirectoryNavigationGuard | null>(null);
@@ -68,7 +70,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const blameRequestGenerationRef = useRef(0);
   const activeBlameRequestRef = useRef<{ id: number; generation: number } | null>(null);
   const nextBlameRequestIdRef = useRef(0);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const dirty = text !== savedText;
   const isMarkdown = isMarkdownFilePath(path);
@@ -88,7 +90,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     let active = true;
     activeFileKeyRef.current = `${repoPath}\0${path}`;
     setPreview(null);
-    setError(null);
+    setLoadError(null);
     setTab('content');
     setText('');
     setSavedText('');
@@ -105,7 +107,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     void gitClient.getWorkingDirectoryPreview(path, repoPath).then((result) => {
       if (!active) return;
       if (!result.success) {
-        setError(result.error || 'Could not open file.');
+        setLoadError(result.error || 'Could not open file.');
         setIsLoading(false);
         return;
       }
@@ -212,18 +214,19 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         if (activeFileKeyRef.current === fileKeyAtSave) {
           setSavedText(textAtSave);
           onRepoChanged();
+          showToast(tr('Datei gespeichert.', 'File saved.'), false);
         }
         return true;
       }
-      if (activeFileKeyRef.current === fileKeyAtSave) setError(result.error || 'Could not save file.');
+      if (activeFileKeyRef.current === fileKeyAtSave) showToast(result.error || 'Could not save file.', true);
       return false;
     } catch (saveError: unknown) {
       if (activeFileKeyRef.current === fileKeyAtSave) {
-        setError(saveError instanceof Error ? saveError.message : 'Could not save file.');
+        showToast(saveError instanceof Error ? saveError.message : 'Could not save file.', true);
       }
       return false;
     }
-  }, [isLoading, onRepoChanged, path, preview?.kind, repoPath, text]);
+  }, [isLoading, onRepoChanged, path, preview?.kind, repoPath, showToast, text, tr]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && dirty && !isLoading) {
@@ -317,7 +320,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
           </div>
         )}
       </div>
-      {error && <div className="working-file-viewer__empty working-file-viewer__empty--error">{error}</div>}
+      {loadError && <div className="working-file-viewer__empty working-file-viewer__empty--error">{loadError}</div>}
       {preview?.kind === 'image' && (
         <div className="working-file-viewer__image">
           <img src={preview.dataUrl} alt={path} />

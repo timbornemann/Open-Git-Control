@@ -3,6 +3,7 @@ import { Download } from 'lucide-react';
 import { DialogFrame } from '@/components/DialogFrame';
 import { ReleaseNotesContent } from '@/components/layout/ReleaseNotesContent';
 import { useSettingsStore } from '@/contexts/AppStateContext';
+import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import type { UpdaterStatusDto } from '@/types/appDtos';
@@ -13,13 +14,13 @@ const versionKey = (status: UpdaterStatusDto): string => status.availableVersion
 
 export const UpdateNotification: React.FC = () => {
   const { t } = useI18n();
+  const showToast = useAppToast();
   const autoUpdateEnabled = useSettingsStore((state) => state.settings.autoUpdateEnabled);
   const onUpdateSettings = useSettingsStore((state) => state.onUpdateSettings);
   const [status, setStatus] = React.useState<UpdaterStatusDto | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [dismissedVersion, setDismissedVersion] = React.useState<string | null>(null);
   const [working, setWorking] = React.useState(false);
-  const [actionError, setActionError] = React.useState<string | null>(null);
 
   const activeUpdateState = Boolean(status && updateStates.has(status.state));
   const updateErrorVisible = Boolean(status?.state === 'error' && status.availableVersion);
@@ -33,7 +34,9 @@ export const UpdateNotification: React.FC = () => {
     void appClient
       .getUpdaterStatus()
       .then((nextStatus) => {
-        if (active) setStatus(nextStatus);
+        if (!active) return;
+        setStatus(nextStatus);
+        if (nextStatus.state === 'error' && nextStatus.error) showToast(nextStatus.error, true);
       })
       .catch(() => {
         if (active) setStatus(null);
@@ -42,14 +45,14 @@ export const UpdateNotification: React.FC = () => {
     const unsubscribe = appClient.onUpdaterEvent((nextStatus) => {
       if (!active) return;
       setStatus(nextStatus);
-      if (nextStatus.state !== 'error') setActionError(null);
+      if (nextStatus.state === 'error' && nextStatus.error) showToast(nextStatus.error, true);
     });
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [showToast]);
 
   React.useEffect(() => {
     if (!autoUpdateEnabled || status?.state !== 'downloaded' || !currentVersionKey || dismissedVersion === currentVersionKey) return;
@@ -59,22 +62,20 @@ export const UpdateNotification: React.FC = () => {
   const dismissDialog = () => {
     if (currentVersionKey) setDismissedVersion(currentVersionKey);
     setDialogOpen(false);
-    setActionError(null);
   };
 
   const installUpdate = async () => {
     if (!status || working || !appClient.isAvailable()) return;
     setWorking(true);
-    setActionError(null);
     try {
       if (status.state !== 'downloaded') {
         const download = await appClient.runOneClickAppUpdate();
         if (!download.success) {
-          setActionError(download.error || t('updates.downloadFailed'));
+          showToast(download.error || t('updates.downloadFailed'), true);
           return;
         }
         if (download.action === 'no-update') {
-          setActionError(t('updates.noLongerAvailable'));
+          showToast(t('updates.noLongerAvailable'), true);
           return;
         }
         if (download.action !== 'downloaded') return;
@@ -82,10 +83,10 @@ export const UpdateNotification: React.FC = () => {
 
       const installation = await appClient.installAppUpdate();
       if (!installation.success) {
-        setActionError(installation.error || t('updates.installFailed'));
+        showToast(installation.error || t('updates.installFailed'), true);
       }
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : t('updates.installFailed'));
+      showToast(error instanceof Error ? error.message : t('updates.installFailed'), true);
     } finally {
       setWorking(false);
     }
@@ -94,16 +95,14 @@ export const UpdateNotification: React.FC = () => {
   const skipAndDisable = async () => {
     if (working) return;
     setWorking(true);
-    setActionError(null);
     try {
       const result = await onUpdateSettings({ autoUpdateEnabled: false });
       if (!result.success) {
-        setActionError(result.error);
         return;
       }
       dismissDialog();
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : t('updates.settingsFailed'));
+      showToast(error instanceof Error ? error.message : t('updates.settingsFailed'), true);
     } finally {
       setWorking(false);
     }
@@ -126,7 +125,6 @@ export const UpdateNotification: React.FC = () => {
         <button
           className={`icon-btn activity-update-btn activity-update-btn--${status.state}`}
           onClick={() => {
-            setActionError(null);
             setDialogOpen(true);
           }}
           title={iconLabel}
@@ -164,7 +162,6 @@ export const UpdateNotification: React.FC = () => {
             <p className="update-promotion-notes__empty">{t('updates.noReleaseNotes')}</p>
           )}
         </section>
-        {(actionError || status.error) && <p className="update-promotion-error">{actionError || status.error}</p>}
       </DialogFrame>
     </>
   );

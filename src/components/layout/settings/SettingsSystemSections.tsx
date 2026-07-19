@@ -55,19 +55,6 @@ export const SettingsUpdatesSection = ({
           </div>
         </details>
       )}
-      {ai.updaterStatus?.error && (
-        <p
-          className={hintClass(variant, variant === 'main' ? 'settings-danger' : undefined)}
-          style={variant === 'sidebar' ? { color: 'var(--status-danger)' } : undefined}
-        >
-          {ai.updaterStatus.error}
-        </p>
-      )}
-      {ai.updaterMessage && (
-        <p className={hintClass(variant)} style={variant === 'sidebar' ? { whiteSpace: 'pre-wrap' } : undefined}>
-          {ai.updaterMessage}
-        </p>
-      )}
       {!ai.updaterSupported && (
         <p className={hintClass(variant)}>
           {variant === 'sidebar'

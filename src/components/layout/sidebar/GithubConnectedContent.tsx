@@ -9,7 +9,6 @@ import { ReleaseMiniForm } from './ReleaseMiniForm';
 type GithubConnectedContentProps = Pick<
   AppSidebarProps,
   | 'githubUser'
-  | 'authError'
   | 'githubRepos'
   | 'githubReposHasMore'
   | 'isLoadingGithubRepos'
@@ -29,7 +28,6 @@ type GithubConnectedContentProps = Pick<
   | 'setPrFilter'
   | 'prLoading'
   | 'prHasLoaded'
-  | 'prError'
   | 'pullRequests'
   | 'prCiByNumber'
   | 'onOpenPR'
@@ -58,7 +56,6 @@ type GithubConnectedContentProps = Pick<
 
 export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   githubUser,
-  authError,
   githubRepos,
   githubReposHasMore,
   isLoadingGithubRepos,
@@ -78,7 +75,6 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   setPrFilter,
   prLoading,
   prHasLoaded,
-  prError,
   pullRequests,
   prCiByNumber,
   onOpenPR,
@@ -128,12 +124,6 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
           <LogOut size={14} />
         </button>
       </div>
-      {authError && (
-        <div role="status" className="github-account-summary__error">
-          {authError}
-        </div>
-      )}
-
       <GithubRepoList
         repos={githubRepos}
         hasMore={githubReposHasMore}
@@ -158,7 +148,6 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             setPrFilter={setPrFilter}
             prLoading={prLoading}
             prHasLoaded={prHasLoaded}
-            prError={prError}
             pullRequests={pullRequests}
             prCiByNumber={prCiByNumber}
             showCreatePR={showCreatePR}

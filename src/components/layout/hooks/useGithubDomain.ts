@@ -39,11 +39,20 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const activeAuthRunRef = useRef<AuthRun | null>(null);
   const nextAuthRunIdRef = useRef(0);
   const oauthStatusRequestRef = useRef(0);
+  const reportedAuthFeedbackRef = useRef({ auth: null as string | null, device: null as string | null, web: null as string | null });
 
   const { t } = useLanguageTranslations(language);
   const repositoryPages = useGithubRepositoryPages({ isAuthenticated, t });
   const cloneWorkflow = useGithubCloneWorkflow({ onRepoCloned, setActiveTab, t });
   const { resetRepositoryPages } = repositoryPages;
+
+  useEffect(() => {
+    const reported = reportedAuthFeedbackRef.current;
+    if (authError && authError !== reported.auth) onError?.(authError);
+    if (deviceFlowError && deviceFlowError !== reported.device) onError?.(deviceFlowError);
+    if (webFlowError && webFlowError !== reported.web) onError?.(webFlowError);
+    reportedAuthFeedbackRef.current = { auth: authError, device: deviceFlowError, web: webFlowError };
+  }, [authError, deviceFlowError, onError, webFlowError]);
 
   const clearDevicePolling = () => {
     if (pollingRef.current !== null) {
@@ -353,7 +362,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       if (!loginResult.success) {
         const message = loginResult.error || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360');
         setWebFlowError(message);
-        if (message !== 'GitHub-Anmeldung wurde abgebrochen.') onError?.(message);
         return;
       }
 
@@ -370,7 +378,6 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
       if (!isCurrentAuthRun(run)) return;
       const message = error?.message || t('generated.components.layout.hooks.usegithubdomain.github_one_click_login_failed_b976a360');
       setWebFlowError(message);
-      onError?.(message);
     } finally {
       if (isCurrentAuthRun(run)) setIsWebFlowRunning(false);
       finishAuthRun(run);

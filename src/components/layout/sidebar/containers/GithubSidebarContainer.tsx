@@ -39,7 +39,6 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
   return (
     <GithubConnectedContent
       githubUser={github.githubUser}
-      authError={github.authError}
       githubRepos={github.githubRepos}
       githubReposHasMore={github.githubReposHasMore}
       isLoadingGithubRepos={github.isLoadingGithubRepos}
@@ -59,7 +58,6 @@ const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
       setPrFilter={github.setPrFilter}
       prLoading={github.prLoading}
       prHasLoaded={github.prHasLoaded}
-      prError={github.prError}
       pullRequests={github.pullRequests}
       prCiByNumber={github.prCiByNumber}
       onOpenPR={github.onOpenPR}
