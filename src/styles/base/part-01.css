@@ -350,6 +350,8 @@ pre {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  container-name: main-view;
+  container-type: inline-size;
   background-color: var(--bg-darker);
   position: relative;
   overflow: hidden;
@@ -396,7 +398,7 @@ pre {
   font-weight: 700;
   font-size: 1.05rem;
   min-width: 0;
-  max-width: 320px;
+  max-width: min(320px, 26cqw);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,7 +418,7 @@ pre {
 
 .topbar-chip-branch {
   min-width: 0;
-  max-width: min(260px, 20vw);
+  max-width: min(260px, 20cqw);
   overflow: hidden;
   text-overflow: ellipsis;
   background: color-mix(in srgb, var(--status-success) 18%, var(--bg-panel));
@@ -428,7 +430,7 @@ pre {
 
 .topbar-chip-remote {
   min-width: 0;
-  max-width: 220px;
+  max-width: min(220px, 18cqw);
   overflow: hidden;
   text-overflow: ellipsis;
 }
