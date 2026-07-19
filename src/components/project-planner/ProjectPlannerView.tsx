@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerPriority, PlannerStatus } from '@/types/projectPlanner';
 import { ItemDialog, MaterializeDialog, PRIORITY_OPTIONS, ProjectDialog, STATUS_OPTIONS, usePlannerLabels } from './PlannerDialogs';
 import { appClient } from '@/services/appClient';
-import { usePlannerAiActions } from './usePlannerAiActions';
+import { usePlannerAiActions, type PlannerCommitMessageItem } from './usePlannerAiActions';
 import { PlannerItemContextMenu, type PlannerItemContextMenuState } from './PlannerItemContextMenu';
 import '@/styles/project-planner.css';
 
@@ -61,10 +61,21 @@ export const ProjectPlannerView: React.FC = () => {
   const projectDialogProjectIdRef = React.useRef<string | null>(null);
   const itemDialogProjectIdRef = React.useRef<string | null>(null);
   const materializeProjectIdRef = React.useRef<string | null>(null);
+  const markItemsDone = React.useCallback(
+    async (items: PlannerCommitMessageItem[]) => {
+      for (const item of items) {
+        if (item.id && (item.persistedStatus ?? item.status) !== 'done') {
+          await updateItem(item.id, { status: 'done' });
+        }
+      }
+    },
+    [updateItem],
+  );
   const plannerAiActions = usePlannerAiActions({
     project: selectedProject,
     settings: settingsState.settings,
     activateRepositoryProject,
+    markItemsDone,
     notify,
     setConfirmDialog,
   });

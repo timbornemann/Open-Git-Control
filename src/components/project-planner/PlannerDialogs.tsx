@@ -4,6 +4,7 @@ import { DialogFrame } from '@/components/DialogFrame';
 import { useI18n } from '@/i18n';
 import type { PlannerItem, PlannerItemInput, PlannerPriority, PlannerProject, PlannerProjectInput, PlannerStatus } from '@/types/projectPlanner';
 import type { PlannerPromptItem } from '@/utils/plannerAiPrompts';
+import type { PlannerCommitMessageItem } from './usePlannerAiActions';
 
 export const PRIORITY_OPTIONS: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
 export const STATUS_OPTIONS: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
@@ -107,7 +108,7 @@ type ItemDialogProps = {
   onClose: () => void;
   onSubmit: (input: PlannerItemInput) => Promise<void>;
   onCopyAgentPrompt?: (item: PlannerPromptItem) => void;
-  onGenerateCommitMessage?: (item: PlannerPromptItem) => void;
+  onGenerateCommitMessage?: (item: PlannerCommitMessageItem) => void;
   isAiCommitGenerating?: boolean;
 };
 
@@ -163,6 +164,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
       .map((tag) => tag.trim())
       .filter(Boolean),
   };
+  const commitMessageItem: PlannerCommitMessageItem = item ? { ...promptItem, id: item.id, persistedStatus: item.status } : promptItem;
   const canRunAiAction = Boolean(promptItem.title);
 
   return (
@@ -241,7 +243,7 @@ export const ItemDialog: React.FC<ItemDialogProps> = ({
               <button
                 type="button"
                 className="planner-btn planner-btn-secondary"
-                onClick={() => onGenerateCommitMessage(promptItem)}
+                onClick={() => onGenerateCommitMessage(commitMessageItem)}
                 disabled={!canRunAiAction || isAiCommitGenerating}
                 title={tr('KI-Commit-Nachricht aus diesem Todo erstellen', 'Create an AI commit message from this todo')}
               >

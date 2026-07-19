@@ -32,11 +32,15 @@ const project = {
 };
 
 const item = {
+  id: 'item-1',
+  projectId: project.id,
   title: 'Fix copy detection',
   description: 'Support copied paths.',
   priority: 'high' as const,
   status: 'bug' as const,
   tags: ['git'],
+  createdAt: 1,
+  updatedAt: 1,
 };
 
 describe('usePlannerAiActions', () => {
@@ -45,6 +49,7 @@ describe('usePlannerAiActions', () => {
   let actions: ReturnType<typeof usePlannerAiActions> | null = null;
   const notify = vi.fn();
   const activateRepositoryProject = vi.fn();
+  const markItemsDone = vi.fn();
   const setConfirmDialog = vi.fn();
 
   const render = () => {
@@ -53,6 +58,7 @@ describe('usePlannerAiActions', () => {
         project,
         settings: { ...DEFAULT_SETTINGS, aiCommitMessageLanguage: 'en' },
         activateRepositoryProject,
+        markItemsDone,
         notify,
         setConfirmDialog,
       });
@@ -78,6 +84,7 @@ describe('usePlannerAiActions', () => {
     actions = null;
     notify.mockReset();
     activateRepositoryProject.mockReset().mockResolvedValue(true);
+    markItemsDone.mockReset().mockResolvedValue(undefined);
     setConfirmDialog.mockReset();
     vi.mocked(copyTextToClipboard).mockReset().mockResolvedValue(true);
     vi.mocked(openStagingCommitArea).mockReset();
@@ -130,7 +137,7 @@ describe('usePlannerAiActions', () => {
     expect(prompt.indexOf('<title>High priority</title>')).toBeLessThan(prompt.indexOf('<title>Low priority</title>'));
   });
 
-  it('generates a commit message, stores it as a draft, and opens staging', async () => {
+  it('generates a commit message, stores it as a draft, opens staging, and completes the selected todo', async () => {
     render();
 
     act(() => actions!.generateCommitMessageForItem(item));
@@ -143,6 +150,30 @@ describe('usePlannerAiActions', () => {
       commitDescription: 'Keeps copied paths aligned.',
     });
     expect(openStagingCommitArea).toHaveBeenCalledOnce();
+    expect(markItemsDone).toHaveBeenCalledWith([item]);
+  });
+
+  it('completes every visible todo supplied to a status action', async () => {
+    render();
+    const visibleItems = [
+      { ...item, id: 'item-urgent', title: 'Urgent priority', priority: 'urgent' as const },
+      { ...item, id: 'item-high', title: 'High priority', priority: 'high' as const },
+    ];
+
+    act(() => actions!.generateCommitMessageForStatus(visibleItems));
+    await flush();
+
+    expect(markItemsDone).toHaveBeenCalledWith(visibleItems);
+  });
+
+  it('does not complete todos when generating the AI commit message fails', async () => {
+    vi.mocked(aiClient.generateCommitMessage).mockResolvedValue({ success: false, error: 'AI unavailable' });
+    render();
+
+    act(() => actions!.generateCommitMessageForItem(item));
+    await flush();
+
+    expect(markItemsDone).not.toHaveBeenCalled();
   });
 
   it('requires confirmation before replacing a non-empty commit draft', async () => {

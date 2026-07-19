@@ -10,15 +10,21 @@ import { copyTextToClipboard } from '@/utils/clipboard';
 import { openStagingCommitArea } from '@/utils/layoutPreferences';
 import { buildPlannerAgentPrompt, buildPlannerCommitNotes, sortPlannerPromptItemsByPriority, type PlannerPromptItem } from '@/utils/plannerAiPrompts';
 
+export type PlannerCommitMessageItem = PlannerPromptItem & {
+  id?: string;
+  persistedStatus?: PlannerPromptItem['status'];
+};
+
 type UsePlannerAiActionsParams = {
   project: PlannerProject | null;
   settings: AppSettingsDto;
   activateRepositoryProject: (repoPath: string) => Promise<boolean>;
+  markItemsDone: (items: PlannerCommitMessageItem[]) => Promise<void>;
   notify: (message: string, isError: boolean) => void;
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
 };
 
-export const usePlannerAiActions = ({ project, settings, activateRepositoryProject, notify, setConfirmDialog }: UsePlannerAiActionsParams) => {
+export const usePlannerAiActions = ({ project, settings, activateRepositoryProject, markItemsDone, notify, setConfirmDialog }: UsePlannerAiActionsParams) => {
   const { tr } = useI18n();
   const [isAiCommitGenerating, setIsAiCommitGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
@@ -36,7 +42,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
   );
 
   const generateCommitMessage = useCallback(
-    (items: PlannerPromptItem[]) => {
+    (items: PlannerCommitMessageItem[]) => {
       const repoPath = project?.repoPath;
       if (!project || !repoPath || items.length === 0 || isGeneratingRef.current) return;
 
@@ -69,6 +75,7 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
             settings.commitTemplate,
           );
           openStagingCommitArea();
+          await markItemsDone(items);
           notify(tr('KI-Commit-Nachricht in die Staging-Ansicht uebernommen.', 'AI commit message added to the staging view.'), false);
         } catch (error: unknown) {
           notify(error instanceof Error ? error.message : tr('KI-Commit-Nachricht konnte nicht erstellt werden.', 'Could not create AI commit message.'), true);
@@ -98,13 +105,13 @@ export const usePlannerAiActions = ({ project, settings, activateRepositoryProje
         onConfirm: run,
       });
     },
-    [activateRepositoryProject, notify, project, setConfirmDialog, settings.aiCommitMessageLanguage, settings.commitTemplate, tr],
+    [activateRepositoryProject, markItemsDone, notify, project, setConfirmDialog, settings.aiCommitMessageLanguage, settings.commitTemplate, tr],
   );
 
   return {
     copyItemPrompt: (item: PlannerPromptItem) => copyPrompt([item]),
     copyStatusPrompt: (items: PlannerPromptItem[]) => copyPrompt(sortPlannerPromptItemsByPriority(items)),
-    generateCommitMessageForItem: (item: PlannerPromptItem) => generateCommitMessage([item]),
+    generateCommitMessageForItem: (item: PlannerCommitMessageItem) => generateCommitMessage([item]),
     generateCommitMessageForStatus: generateCommitMessage,
     isAiCommitGenerating,
   };

@@ -59,6 +59,11 @@ describe('ItemDialog AI actions', () => {
 
     act(() => copyButton?.click());
     expect(onCopyAgentPrompt).toHaveBeenCalledWith(expect.objectContaining({ title: item.title, description: item.description }));
+
+    act(() => commitButton?.click());
+    expect(onGenerateCommitMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ id: item.id, persistedStatus: item.status, title: item.title, description: item.description }),
+    );
   });
 
   it('does not render the commit action when no repository action is supplied', async () => {
