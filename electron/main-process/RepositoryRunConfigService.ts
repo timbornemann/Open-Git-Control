@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveRepositoryPathForCreate } from '../git/RepositoryPathSafety';
 import { writeTextFileAtomically } from './atomicFile';
+import { ensureOpenGitControlReadme, getOpenGitControlAssetPath } from './openGitControlDirectory';
 import {
   REPOSITORY_RUN_ACTION_IDS,
   createEmptyRepositoryRunConfig,
@@ -21,22 +21,7 @@ import {
 const MAX_CONFIG_BYTES = 256 * 1024;
 const MAX_COMMAND_LENGTH = 16_000;
 const MAX_STEPS_PER_ACTION = 24;
-const CONFIG_DIRECTORY = '.Open-Git-Control';
 const CONFIG_FILE = 'run.json';
-const CONFIG_README_FILE = 'README.md';
-const CONFIG_README_CONTENT = `# Open Git Control run workflows
-
-This directory contains \`run.json\`, the repository-local workflow configuration used by Open Git Control's **Run** menu. It can define command steps for running, testing, formatting, starting, and building this repository. Open Git Control selects the command for the current platform and runs each configured step in order.
-
-Commit this directory when you want to share the same repository workflows with your team.
-
-## Created with Open Git Control
-
-[Open Git Control](https://github.com/timbornemann/Open-Git-Control) is a desktop app for working with local Git repositories. It brings together staging and commits, branches and remotes, a commit graph, GitHub tools, project planning, AI assistance, and configurable repository workflows.
-
-- [Open the Open Git Control repository](https://github.com/timbornemann/Open-Git-Control)
-- [View Open Git Control releases](https://github.com/timbornemann/Open-Git-Control/releases)
-`;
 const PARSERS = new Set<RepositoryRunParser>(['none', 'vitest-jest', 'eslint', 'typescript', 'prettier', 'diagnostic']);
 const SHELLS_BY_PLATFORM: Record<RepositoryRunPlatform, ReadonlySet<RepositoryRunShell>> = {
   windows: new Set(['powershell', 'cmd']),
@@ -45,16 +30,6 @@ const SHELLS_BY_PLATFORM: Record<RepositoryRunPlatform, ReadonlySet<RepositoryRu
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const pathExistsWithoutFollowingLinks = (filePath: string): boolean => {
-  try {
-    fs.lstatSync(filePath);
-    return true;
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
-  }
-};
 
 const asText = (value: unknown, field: string, maximum: number): string => {
   if (typeof value !== 'string') throw new Error(`${field} must be text.`);
@@ -163,27 +138,8 @@ export const detectRepositoryRunTemplates = (repoPath: string): RepositoryRunTem
 };
 
 export class RepositoryRunConfigService {
-  private getConfigAssetPath(repoPath: string, fileName: string, label: string): string {
-    const physicalRepoPath = fs.realpathSync(repoPath);
-    const configDirectoryPath = path.join(physicalRepoPath, CONFIG_DIRECTORY);
-    if (fs.existsSync(configDirectoryPath) && fs.lstatSync(configDirectoryPath).isSymbolicLink()) {
-      throw new Error('Run configuration directory cannot be a symbolic link.');
-    }
-    return resolveRepositoryPathForCreate(physicalRepoPath, `${CONFIG_DIRECTORY}/${fileName}`, label);
-  }
-
   getConfigPath(repoPath: string): string {
-    return this.getConfigAssetPath(repoPath, CONFIG_FILE, 'Run configuration path');
-  }
-
-  private getReadmePath(repoPath: string): string {
-    return this.getConfigAssetPath(repoPath, CONFIG_README_FILE, 'Run configuration README path');
-  }
-
-  private writeReadmeIfMissing(repoPath: string): void {
-    const readmePath = this.getReadmePath(repoPath);
-    if (pathExistsWithoutFollowingLinks(readmePath)) return;
-    writeTextFileAtomically(readmePath, CONFIG_README_CONTENT);
+    return getOpenGitControlAssetPath(repoPath, CONFIG_FILE, 'Run configuration path');
   }
 
   read(repoPath: string): RepositoryRunConfigStateDto {
@@ -219,7 +175,7 @@ export class RepositoryRunConfigService {
   write(repoPath: string, rawConfig: unknown): RepositoryRunConfigDto {
     const config = normalizeRepositoryRunConfig(rawConfig);
     writeTextFileAtomically(this.getConfigPath(repoPath), `${JSON.stringify(config, null, 2)}\n`);
-    this.writeReadmeIfMissing(repoPath);
+    ensureOpenGitControlReadme(repoPath);
     return config;
   }
 }

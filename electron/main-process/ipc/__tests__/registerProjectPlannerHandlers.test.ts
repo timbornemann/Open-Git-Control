@@ -130,6 +130,7 @@ describe('registerProjectPlannerHandlers', () => {
 
   it('deletes a repository planning project and its items by repository path through IPC', async () => {
     const repoPath = path.join(tempDirectory, 'deleted-repo');
+    fs.mkdirSync(repoPath);
     const project = ensureRepositoryProject(repoPath);
     createPlannerItem(project.id, {
       title: 'Remove me with the missing repo',

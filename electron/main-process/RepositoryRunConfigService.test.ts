@@ -62,6 +62,33 @@ describe('RepositoryRunConfigService', () => {
     expect(fs.readFileSync(readmePath, 'utf8')).toBe('# Team-specific workflow notes\n');
   });
 
+  it('updates the former generated workflow README with the planning-file description', () => {
+    const repoPath = createRepository();
+    const readmePath = path.join(repoPath, '.Open-Git-Control', 'README.md');
+    fs.mkdirSync(path.dirname(readmePath));
+    fs.writeFileSync(
+      readmePath,
+      `# Open Git Control run workflows
+
+This directory contains \`run.json\`, the repository-local workflow configuration used by Open Git Control's **Run** menu. It can define command steps for running, testing, formatting, starting, and building this repository. Open Git Control selects the command for the current platform and runs each configured step in order.
+
+Commit this directory when you want to share the same repository workflows with your team.
+
+## Created with Open Git Control
+
+[Open Git Control](https://github.com/timbornemann/Open-Git-Control) is a desktop app for working with local Git repositories. It brings together staging and commits, branches and remotes, a commit graph, GitHub tools, project planning, AI assistance, and configurable repository workflows.
+
+- [Open the Open Git Control repository](https://github.com/timbornemann/Open-Git-Control)
+- [View Open Git Control releases](https://github.com/timbornemann/Open-Git-Control/releases)
+`,
+      'utf8',
+    );
+
+    new RepositoryRunConfigService().write(repoPath, createEmptyRepositoryRunConfig());
+
+    expect(fs.readFileSync(readmePath, 'utf8')).toContain('`planning.json`');
+  });
+
   it('rejects a symlinked run-configuration directory', () => {
     const repoPath = createRepository();
     const externalDirectory = createRepository();

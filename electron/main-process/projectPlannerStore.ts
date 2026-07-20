@@ -1,9 +1,11 @@
-import { app } from 'electron';
 import { randomUUID } from 'crypto';
+import { app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { writeTextFileAtomically } from './atomicFile';
+import { ensureOpenGitControlReadme, getOpenGitControlAssetPath } from './openGitControlDirectory';
 import { ApiError } from './planningApiTypes';
+import { readStoreData } from './repoStore';
 
 export type PlannerProjectKind = 'repository' | 'planned';
 export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -45,23 +47,17 @@ export type PlannerItemInput = {
   tags?: string[];
 };
 
-const EMPTY_DATA: ProjectPlannerData = {
-  version: 1,
-  projects: [],
-  items: [],
-};
+const EMPTY_DATA: ProjectPlannerData = { version: 1, projects: [], items: [] };
+const PLANNING_FILE = 'planning.json';
 
 export const PLANNER_PRIORITIES: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
 export const PLANNER_STATUSES: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
 
 const PRIORITIES = new Set<PlannerPriority>(PLANNER_PRIORITIES);
 const STATUSES = new Set<PlannerStatus>(PLANNER_STATUSES);
-
 const cleanText = (value: unknown, maxLength: number): string => (typeof value === 'string' ? value.trim().slice(0, maxLength) : '');
-
 const cleanTimestamp = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
-
 const normalizeRepoPath = (value: unknown): string | null => {
   const repoPath = cleanText(value, 4_096);
   return repoPath ? path.resolve(repoPath) : null;
@@ -76,7 +72,6 @@ const normalizeTags = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
   const tags: string[] = [];
-
   for (const entry of value) {
     const tag = cleanText(entry, 40);
     const key = tag.toLowerCase();
@@ -85,7 +80,6 @@ const normalizeTags = (value: unknown): string[] => {
     tags.push(tag);
     if (tags.length >= 20) break;
   }
-
   return tags;
 };
 
@@ -96,7 +90,6 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
   const projectIds = new Set<string>();
   const repoKeys = new Set<string>();
   const projects: PlannerProject[] = [];
-
   for (const raw of Array.isArray(candidate.projects) ? candidate.projects : []) {
     const source = raw as Partial<PlannerProject>;
     const id = cleanText(source.id, 100);
@@ -104,26 +97,15 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
     const kind: PlannerProjectKind = source.kind === 'repository' ? 'repository' : 'planned';
     const repoPath = kind === 'repository' ? normalizeRepoPath(source.repoPath) : null;
     if (!id || !name || projectIds.has(id) || (kind === 'repository' && !repoPath)) continue;
-
     if (repoPath) {
       const repoKey = getRepositoryProjectKey(repoPath);
       if (repoKeys.has(repoKey)) continue;
       repoKeys.add(repoKey);
     }
-
     const createdAt = cleanTimestamp(source.createdAt, now);
-    projects.push({
-      id,
-      name,
-      description: cleanText(source.description, 8_000),
-      kind,
-      repoPath,
-      createdAt,
-      updatedAt: cleanTimestamp(source.updatedAt, createdAt),
-    });
+    projects.push({ id, name, description: cleanText(source.description, 8_000), kind, repoPath, createdAt, updatedAt: cleanTimestamp(source.updatedAt, createdAt) });
     projectIds.add(id);
   }
-
   const itemIds = new Set<string>();
   const items: PlannerItem[] = [];
   for (const raw of Array.isArray(candidate.items) ? candidate.items : []) {
@@ -132,7 +114,6 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
     const projectId = cleanText(source.projectId, 100);
     const title = cleanText(source.title, 240);
     if (!id || !projectIds.has(projectId) || !title || itemIds.has(id)) continue;
-
     const createdAt = cleanTimestamp(source.createdAt, now);
     items.push({
       id,
@@ -147,275 +128,362 @@ export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData 
     });
     itemIds.add(id);
   }
-
   return { version: 1, projects, items };
 }
 
-function getStorePath(): string {
-  return path.join(app.getPath('userData'), 'project-planner.json');
-}
-
+const getLegacyStorePath = (): string => path.join(app.getPath('userData'), 'project-planner.json');
+const getPlanningPath = (repoPath: string): string => getOpenGitControlAssetPath(repoPath, PLANNING_FILE, 'Repository planning path');
 const plannerDataListeners = new Set<() => void>();
+const knownRepositoryPaths = new Map<string, string>();
+const rememberRepositoryPath = (repoPath: string): void => {
+  if (repositoryExists(repoPath)) knownRepositoryPaths.set(getRepositoryProjectKey(repoPath), repoPath);
+};
+const notifyDataChanged = (): void => {
+  for (const listener of plannerDataListeners) {
+    try {
+      listener();
+    } catch {
+      // A UI refresh failure must not change the result of an already committed write.
+    }
+  }
+};
 
 export function onProjectPlannerDataChanged(listener: () => void): () => void {
   plannerDataListeners.add(listener);
   return () => plannerDataListeners.delete(listener);
 }
 
-export function readProjectPlannerData(): ProjectPlannerData {
+const parsePlannerData = (raw: string, fileLabel: string): ProjectPlannerData => {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== 'object') throw new Error(`${fileLabel} is not a JSON object.`);
+  const candidate = parsed as Partial<ProjectPlannerData>;
+  if (candidate.version !== 1 || !Array.isArray(candidate.projects) || !Array.isArray(candidate.items)) {
+    throw new Error(`${fileLabel} has an unsupported or incomplete schema.`);
+  }
+  const normalized = normalizeProjectPlannerData(candidate);
+  if (normalized.projects.length !== candidate.projects.length || normalized.items.length !== candidate.items.length) {
+    throw new Error(`${fileLabel} contains invalid or orphaned records.`);
+  }
+  return normalized;
+};
+
+const readLegacyData = (): ProjectPlannerData => {
   try {
-    const raw = fs.readFileSync(getStorePath(), 'utf8');
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object') throw new Error('Planner data is not a JSON object.');
-    const candidate = parsed as Partial<ProjectPlannerData>;
-    if (candidate.version !== 1 || !Array.isArray(candidate.projects) || !Array.isArray(candidate.items)) {
-      throw new Error('Planner data has an unsupported or incomplete schema.');
-    }
-    const normalized = normalizeProjectPlannerData(candidate);
-    if (normalized.projects.length !== candidate.projects.length || normalized.items.length !== candidate.items.length) {
-      throw new Error('Planner data contains invalid or orphaned records.');
-    }
-    return normalized;
+    return parsePlannerData(fs.readFileSync(getLegacyStorePath(), 'utf8'), 'Planner data');
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return { ...EMPTY_DATA };
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Planner data could not be read safely; the existing file was left untouched. ${message}`);
   }
-}
+};
 
-export function writeProjectPlannerData(data: ProjectPlannerData): ProjectPlannerData {
+const writeLegacyData = (data: ProjectPlannerData): ProjectPlannerData => {
   const normalized = normalizeProjectPlannerData(data);
-  const storePath = getStorePath();
-  writeTextFileAtomically(storePath, JSON.stringify(normalized, null, 2));
-  for (const listener of plannerDataListeners) {
+  writeTextFileAtomically(getLegacyStorePath(), JSON.stringify(normalized, null, 2));
+  return normalized;
+};
+
+const repositoryExists = (repoPath: string): boolean => {
+  try {
+    return fs.statSync(repoPath).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+const plannerRepositoryPaths = (legacyData: ProjectPlannerData): string[] => {
+  const paths = [
+    ...readStoreData().repos.map((repo) => repo.path),
+    ...knownRepositoryPaths.values(),
+    ...legacyData.projects.filter((project) => project.kind === 'repository').map((project) => project.repoPath || ''),
+  ];
+  const unique = new Map<string, string>();
+  for (const repoPath of paths) {
+    if (!repoPath || !repositoryExists(repoPath)) continue;
+    unique.set(getRepositoryProjectKey(repoPath), repoPath);
+  }
+  return [...unique.values()];
+};
+
+const normalizeRepositoryData = (data: ProjectPlannerData, repoPath: string): { data: ProjectPlannerData; changed: boolean } => {
+  const repository = data.projects.find((project) => project.kind === 'repository');
+  if (!repository) return { data: { ...EMPTY_DATA }, changed: data.projects.length > 0 || data.items.length > 0 };
+  const physicalPath = fs.realpathSync(repoPath);
+  const requiresNewIds = !repository.repoPath || getRepositoryProjectKey(repository.repoPath) !== getRepositoryProjectKey(physicalPath);
+  const projectId = requiresNewIds ? randomUUID() : repository.id;
+  const items = data.items
+    .filter((item) => item.projectId === repository.id)
+    .map((item) => ({ ...item, id: requiresNewIds ? randomUUID() : item.id, projectId }));
+  const project: PlannerProject = { ...repository, id: projectId, kind: 'repository', repoPath: physicalPath };
+  const normalized = { version: 1 as const, projects: [project], items };
+  const changed = requiresNewIds || data.projects.length !== 1 || data.items.length !== items.length || repository.repoPath !== physicalPath;
+  return { data: normalized, changed };
+};
+
+const readRepositoryData = (repoPath: string): ProjectPlannerData => {
+  const planningPath = getPlanningPath(repoPath);
+  if (!fs.existsSync(planningPath)) return { ...EMPTY_DATA };
+  try {
+    const parsed = parsePlannerData(fs.readFileSync(planningPath, 'utf8'), 'Repository planning data');
+    const normalized = normalizeRepositoryData(parsed, repoPath);
+    if (normalized.changed) writeTextFileAtomically(planningPath, `${JSON.stringify(normalized.data, null, 2)}\n`);
+    return normalized.data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Repository planning data could not be read safely; the existing file was left untouched. ${message}`);
+  }
+};
+
+const writeRepositoryData = (repoPath: string, data: ProjectPlannerData, notify = true): ProjectPlannerData => {
+  rememberRepositoryPath(repoPath);
+  const normalized = normalizeRepositoryData(normalizeProjectPlannerData(data), repoPath).data;
+  const planningPath = getPlanningPath(repoPath);
+  if (normalized.projects.length === 0) {
+    fs.rmSync(planningPath, { force: true });
+  } else {
+    writeTextFileAtomically(planningPath, `${JSON.stringify(normalized, null, 2)}\n`);
+    ensureOpenGitControlReadme(repoPath);
+  }
+  if (notify) notifyDataChanged();
+  return normalized;
+};
+
+const mergeLegacyProject = (existing: ProjectPlannerData, legacyProject: PlannerProject, legacyItems: PlannerItem[], repoPath: string): ProjectPlannerData => {
+  if (existing.projects.length === 0) return normalizeRepositoryData({ version: 1, projects: [legacyProject], items: legacyItems }, repoPath).data;
+  const project = existing.projects[0];
+  const items = [...existing.items];
+  const itemIds = new Set(items.map((item) => item.id));
+  for (const item of legacyItems) {
+    const duplicate = items.find((candidate) => candidate.id === item.id);
+    if (duplicate) {
+      if (item.updatedAt > duplicate.updatedAt) Object.assign(duplicate, { ...item, projectId: project.id });
+      continue;
+    }
+    items.push({ ...item, id: itemIds.has(item.id) ? randomUUID() : item.id, projectId: project.id });
+    itemIds.add(items[items.length - 1].id);
+  }
+  return { version: 1, projects: [project], items };
+};
+
+const migrateLegacyRepositoryData = (legacy: ProjectPlannerData): ProjectPlannerData => {
+  const migratedIds = new Set<string>();
+  for (const project of legacy.projects) {
+    if (project.kind !== 'repository' || !project.repoPath || !repositoryExists(project.repoPath)) continue;
     try {
-      listener();
+      const existing = readRepositoryData(project.repoPath);
+      const merged = mergeLegacyProject(existing, project, legacy.items.filter((item) => item.projectId === project.id), project.repoPath);
+      writeRepositoryData(project.repoPath, merged, false);
+      rememberRepositoryPath(project.repoPath);
+      migratedIds.add(project.id);
     } catch {
-      // Persistence succeeded; a UI notification failure must not turn the
-      // committed mutation into an apparent write failure.
+      // Keep this entry in the legacy file so a later run can retry safely.
     }
   }
-  return normalized;
+  if (migratedIds.size === 0) return legacy;
+  const remaining: ProjectPlannerData = {
+    version: 1,
+    projects: legacy.projects.filter((project) => !migratedIds.has(project.id)),
+    items: legacy.items.filter((item) => !migratedIds.has(item.projectId)),
+  };
+  if (remaining.projects.length === 0 && remaining.items.length === 0) fs.rmSync(getLegacyStorePath(), { force: true });
+  else writeLegacyData(remaining);
+  return remaining;
+};
+
+export function readProjectPlannerData(): ProjectPlannerData {
+  const legacyBeforeMigration = readLegacyData();
+  const pathsBeforeMigration = plannerRepositoryPaths(legacyBeforeMigration);
+  const legacy = migrateLegacyRepositoryData(legacyBeforeMigration);
+  const projects = legacy.projects.filter((project) => project.kind === 'planned');
+  const items = legacy.items.filter((item) => projects.some((project) => project.id === item.projectId));
+  for (const repoPath of [...new Map([...pathsBeforeMigration, ...plannerRepositoryPaths(legacy)].map((repoPath) => [getRepositoryProjectKey(repoPath), repoPath])).values()]) {
+    const repositoryData = readRepositoryData(repoPath);
+    projects.push(...repositoryData.projects);
+    items.push(...repositoryData.items);
+  }
+  return normalizeProjectPlannerData({ version: 1, projects, items });
 }
 
-/** Adds a repository project to the supplied in-memory document when needed. */
+/** Persists explicit bulk data by splitting repository data into its repositories. */
+export function writeProjectPlannerData(data: ProjectPlannerData): ProjectPlannerData {
+  const normalized = normalizeProjectPlannerData(data);
+  const existingLegacy = readLegacyData();
+  writeLegacyData({
+    version: 1,
+    projects: [...existingLegacy.projects.filter((project) => project.kind === 'repository'), ...normalized.projects.filter((project) => project.kind === 'planned')],
+    items: [
+      ...existingLegacy.items.filter((item) => existingLegacy.projects.some((project) => project.kind === 'repository' && project.id === item.projectId)),
+      ...normalized.items.filter((item) => normalized.projects.some((project) => project.kind === 'planned' && project.id === item.projectId)),
+    ],
+  });
+  for (const project of normalized.projects.filter((candidate) => candidate.kind === 'repository' && candidate.repoPath)) {
+    writeRepositoryData(project.repoPath!, { version: 1, projects: [project], items: normalized.items.filter((item) => item.projectId === project.id) }, false);
+  }
+  notifyDataChanged();
+  return readProjectPlannerData();
+}
+
 export function ensureRepositoryProjectInData(data: ProjectPlannerData, repoPath: string): PlannerProject {
   const resolvedPath = normalizeRepoPath(repoPath);
   if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
-  const repoKey = getRepositoryProjectKey(resolvedPath);
-  const existing = data.projects.find((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey);
+  const existing = data.projects.find((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === getRepositoryProjectKey(resolvedPath));
   if (existing) return existing;
-
   const now = Date.now();
-  const project: PlannerProject = {
-    id: randomUUID(),
-    name: path.basename(resolvedPath) || resolvedPath,
-    description: '',
-    kind: 'repository',
-    repoPath: resolvedPath,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const project: PlannerProject = { id: randomUUID(), name: path.basename(resolvedPath) || resolvedPath, description: '', kind: 'repository', repoPath: resolvedPath, createdAt: now, updatedAt: now };
   data.projects = [...data.projects, project];
   return project;
 }
 
 export function ensureRepositoryProject(repoPath: string): PlannerProject {
-  const data = readProjectPlannerData();
-  const projectCount = data.projects.length;
+  if (!repositoryExists(repoPath)) throw new ApiError(404, 'REPOSITORY_NOT_FOUND', 'Repository path is not accessible.');
+  rememberRepositoryPath(repoPath);
+  const data = readRepositoryData(repoPath);
+  if (data.projects[0]) return data.projects[0];
   const project = ensureRepositoryProjectInData(data, repoPath);
-  if (data.projects.length !== projectCount) {
-    writeProjectPlannerData(data);
-  }
-  return project;
+  return writeRepositoryData(repoPath, data).projects[0] || project;
 }
 
 export function createPlannedProject(input: { name: string; description?: string }): PlannerProject {
   const name = cleanText(input?.name, 160);
   if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
-  const data = readProjectPlannerData();
+  const data = readLegacyData();
   const now = Date.now();
-  const project: PlannerProject = {
-    id: randomUUID(),
-    name,
-    description: cleanText(input?.description, 8_000),
-    kind: 'planned',
-    repoPath: null,
-    createdAt: now,
-    updatedAt: now,
-  };
-  writeProjectPlannerData({ ...data, projects: [...data.projects, project] });
+  const project: PlannerProject = { id: randomUUID(), name, description: cleanText(input?.description, 8_000), kind: 'planned', repoPath: null, createdAt: now, updatedAt: now };
+  writeLegacyData({ ...data, projects: [...data.projects, project] });
+  notifyDataChanged();
   return project;
 }
 
-export function updatePlannerProject(projectId: string, input: { name?: string; description?: string }): PlannerProject {
-  const data = readProjectPlannerData();
-  const index = data.projects.findIndex((project) => project.id === projectId);
-  if (index < 0) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  const current = data.projects[index];
-  const name = input.name === undefined ? current.name : cleanText(input.name, 160);
-  if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
+type Storage = { repoPath: string | null; data: ProjectPlannerData; project: PlannerProject };
+const findProjectStorage = (projectId: string): Storage => {
+  readProjectPlannerData();
+  const legacy = readLegacyData();
+  const planned = legacy.projects.find((project) => project.id === projectId && project.kind === 'planned');
+  if (planned) return { repoPath: null, data: legacy, project: planned };
+  for (const repoPath of plannerRepositoryPaths(legacy)) {
+    const data = readRepositoryData(repoPath);
+    const project = data.projects.find((candidate) => candidate.id === projectId);
+    if (project) return { repoPath, data, project };
+  }
+  throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
+};
+const writeStorage = (storage: Storage, data: ProjectPlannerData): ProjectPlannerData => {
+  if (storage.repoPath) return writeRepositoryData(storage.repoPath, data);
+  const written = writeLegacyData(data);
+  notifyDataChanged();
+  return written;
+};
 
-  const updated: PlannerProject = {
-    ...current,
-    name,
-    description: input.description === undefined ? current.description : cleanText(input.description, 8_000),
-    updatedAt: Date.now(),
-  };
-  const projects = [...data.projects];
-  projects[index] = updated;
-  writeProjectPlannerData({ ...data, projects });
+export function updatePlannerProject(projectId: string, input: { name?: string; description?: string }): PlannerProject {
+  const storage = findProjectStorage(projectId);
+  const name = input.name === undefined ? storage.project.name : cleanText(input.name, 160);
+  if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
+  const updated = { ...storage.project, name, description: input.description === undefined ? storage.project.description : cleanText(input.description, 8_000), updatedAt: Date.now() };
+  writeStorage(storage, { ...storage.data, projects: storage.data.projects.map((project) => (project.id === projectId ? updated : project)) });
   return updated;
 }
 
 export function deletePlannerProject(projectId: string): void {
-  const data = readProjectPlannerData();
-  if (!data.projects.some((project) => project.id === projectId)) {
-    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  }
-  writeProjectPlannerData({
-    ...data,
-    projects: data.projects.filter((project) => project.id !== projectId),
-    items: data.items.filter((item) => item.projectId !== projectId),
-  });
+  const storage = findProjectStorage(projectId);
+  writeStorage(storage, { ...storage.data, projects: storage.data.projects.filter((project) => project.id !== projectId), items: storage.data.items.filter((item) => item.projectId !== projectId) });
 }
 
 export function deleteRepositoryPlannerProjectByPath(repoPath: string): { deletedProjectCount: number; deletedItemCount: number } {
-  const resolvedPath = normalizeRepoPath(repoPath);
-  if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
-
-  const data = readProjectPlannerData();
-  const repoKey = getRepositoryProjectKey(resolvedPath);
-  const projectIds = new Set(
-    data.projects.filter((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey).map((project) => project.id),
-  );
-
-  if (projectIds.size === 0) {
-    return { deletedProjectCount: 0, deletedItemCount: 0 };
+  const legacy = readLegacyData();
+  const repoKey = getRepositoryProjectKey(repoPath);
+  const legacyProjects = legacy.projects.filter((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey);
+  const legacyItemCount = legacy.items.filter((item) => legacyProjects.some((project) => project.id === item.projectId)).length;
+  if (legacyProjects.length) writeLegacyData({ ...legacy, projects: legacy.projects.filter((project) => !legacyProjects.includes(project)), items: legacy.items.filter((item) => !legacyProjects.some((project) => project.id === item.projectId)) });
+  let repositoryData: ProjectPlannerData = { ...EMPTY_DATA };
+  try {
+    repositoryData = readRepositoryData(repoPath);
+    writeRepositoryData(repoPath, { ...EMPTY_DATA }, false);
+  } catch (error) {
+    if (!legacyProjects.length) throw error;
   }
-
-  const deletedItemCount = data.items.filter((item) => projectIds.has(item.projectId)).length;
-  writeProjectPlannerData({
-    ...data,
-    projects: data.projects.filter((project) => !projectIds.has(project.id)),
-    items: data.items.filter((item) => !projectIds.has(item.projectId)),
-  });
-
-  return { deletedProjectCount: projectIds.size, deletedItemCount };
-}
-
-export function createPlannerItem(projectId: string, input: PlannerItemInput): PlannerItem {
-  const data = readProjectPlannerData();
-  const item = createPlannerItemInData(data, projectId, input);
-  writeProjectPlannerData(data);
-  return item;
+  if (legacyProjects.length || repositoryData.projects.length) notifyDataChanged();
+  return { deletedProjectCount: legacyProjects.length + repositoryData.projects.length, deletedItemCount: legacyItemCount + repositoryData.items.length };
 }
 
 /** Adds a validated item to an in-memory document without persisting it. */
 export function createPlannerItemInData(data: ProjectPlannerData, projectId: string, input: PlannerItemInput): PlannerItem {
-  if (!data.projects.some((project) => project.id === projectId)) {
-    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  }
+  if (!data.projects.some((project) => project.id === projectId)) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   const title = cleanText(input?.title, 240);
   if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
   const now = Date.now();
-  const item: PlannerItem = {
-    id: randomUUID(),
-    projectId,
-    title,
-    description: cleanText(input?.description, 20_000),
-    priority: PRIORITIES.has(input?.priority as PlannerPriority) ? (input.priority as PlannerPriority) : 'medium',
-    status: STATUSES.has(input?.status as PlannerStatus) ? (input.status as PlannerStatus) : 'idea',
-    tags: normalizeTags(input?.tags),
-    createdAt: now,
-    updatedAt: now,
-  };
+  const item: PlannerItem = { id: randomUUID(), projectId, title, description: cleanText(input?.description, 20_000), priority: PRIORITIES.has(input?.priority as PlannerPriority) ? (input.priority as PlannerPriority) : 'medium', status: STATUSES.has(input?.status as PlannerStatus) ? (input.status as PlannerStatus) : 'idea', tags: normalizeTags(input?.tags), createdAt: now, updatedAt: now };
   data.items = [...data.items, item];
   return item;
 }
 
-export type PlannerItemUpdateOptions = {
-  projectId?: string;
-};
+export function createPlannerItem(projectId: string, input: PlannerItemInput): PlannerItem {
+  const storage = findProjectStorage(projectId);
+  const item = createPlannerItemInData(storage.data, projectId, input);
+  writeStorage(storage, storage.data);
+  return item;
+}
 
-/** Applies an item update to an in-memory document without persisting it. */
-export function updatePlannerItemInData(
-  data: ProjectPlannerData,
-  itemId: string,
-  input: Partial<PlannerItemInput>,
-  options: PlannerItemUpdateOptions = {},
-): PlannerItem {
+export type PlannerItemUpdateOptions = { projectId?: string };
+export function updatePlannerItemInData(data: ProjectPlannerData, itemId: string, input: Partial<PlannerItemInput>, options: PlannerItemUpdateOptions = {}): PlannerItem {
   const index = data.items.findIndex((item) => item.id === itemId);
-  if (index < 0) throw new ApiError(404, 'TODO_NOT_FOUND', 'Item not found.');
+  if (index < 0) throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
   const current = data.items[index];
   const title = input.title === undefined ? current.title : cleanText(input.title, 240);
   if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
-
   const projectId = options.projectId === undefined ? current.projectId : cleanText(options.projectId, 100);
-  if (!data.projects.some((project) => project.id === projectId)) {
-    throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  }
-
-  const updated: PlannerItem = {
-    ...current,
-    projectId,
-    title,
-    description: input.description === undefined ? current.description : cleanText(input.description, 20_000),
-    priority: input.priority !== undefined && PRIORITIES.has(input.priority) ? input.priority : current.priority,
-    status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status,
-    tags: input.tags === undefined ? current.tags : normalizeTags(input.tags),
-    updatedAt: Date.now(),
-  };
-  const items = [...data.items];
-  items[index] = updated;
-  data.items = items;
+  if (!data.projects.some((project) => project.id === projectId)) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
+  const updated: PlannerItem = { ...current, projectId, title, description: input.description === undefined ? current.description : cleanText(input.description, 20_000), priority: input.priority !== undefined && PRIORITIES.has(input.priority) ? input.priority : current.priority, status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status, tags: input.tags === undefined ? current.tags : normalizeTags(input.tags), updatedAt: Date.now() };
+  data.items = data.items.map((item, itemIndex) => (itemIndex === index ? updated : item));
   return updated;
 }
 
-export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInput>, options: PlannerItemUpdateOptions = {}): PlannerItem {
+const findItemStorage = (itemId: string): Storage => {
   const data = readProjectPlannerData();
-  const updated = updatePlannerItemInData(data, itemId, input, options);
-  writeProjectPlannerData(data);
-  return updated;
+  const item = data.items.find((candidate) => candidate.id === itemId);
+  if (!item) throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
+  return findProjectStorage(item.projectId);
+};
+
+export function updatePlannerItem(itemId: string, input: Partial<PlannerItemInput>, options: PlannerItemUpdateOptions = {}): PlannerItem {
+  const source = findItemStorage(itemId);
+  if (!options.projectId || options.projectId === source.project.id) {
+    const updated = updatePlannerItemInData(source.data, itemId, input, options);
+    writeStorage(source, source.data);
+    return updated;
+  }
+  const target = findProjectStorage(options.projectId);
+  if (source.repoPath === target.repoPath) {
+    const updated = updatePlannerItemInData(source.data, itemId, input, { projectId: target.project.id });
+    writeStorage(source, source.data);
+    return updated;
+  }
+  const updated = updatePlannerItemInData(source.data, itemId, input);
+  source.data.items = source.data.items.filter((item) => item.id !== itemId);
+  const moved = { ...updated, projectId: target.project.id, updatedAt: Date.now() };
+  target.data.items = [...target.data.items, moved];
+  writeStorage(target, target.data);
+  writeStorage(source, source.data);
+  return moved;
 }
 
 export function movePlannerItem(itemId: string, input: { projectId?: string; status?: PlannerStatus }): PlannerItem {
-  const data = readProjectPlannerData();
-  const updated = updatePlannerItemInData(data, itemId, { status: input.status }, { projectId: input.projectId });
-  writeProjectPlannerData(data);
-  return updated;
+  return updatePlannerItem(itemId, { status: input.status }, { projectId: input.projectId });
 }
 
 export function deletePlannerItem(itemId: string): void {
-  const data = readProjectPlannerData();
-  if (!data.items.some((item) => item.id === itemId)) {
-    throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
-  }
-  writeProjectPlannerData({ ...data, items: data.items.filter((item) => item.id !== itemId) });
+  const storage = findItemStorage(itemId);
+  writeStorage(storage, { ...storage.data, items: storage.data.items.filter((item) => item.id !== itemId) });
 }
 
 export function convertProjectToRepository(projectId: string, repoPath: string): PlannerProject {
-  const data = readProjectPlannerData();
-  const index = data.projects.findIndex((project) => project.id === projectId);
-  if (index < 0) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  if (data.projects[index].kind !== 'planned') throw new ApiError(409, 'PROJECT_ALREADY_REPOSITORY', 'Project already has a repository.');
-
-  const resolvedPath = normalizeRepoPath(repoPath);
-  if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
-  const repoKey = getRepositoryProjectKey(resolvedPath);
-  if (data.projects.some((project, projectIndex) => projectIndex !== index && project.repoPath && getRepositoryProjectKey(project.repoPath) === repoKey)) {
-    throw new ApiError(409, 'REPOSITORY_PROJECT_EXISTS', 'A planning project already exists for this repository.');
-  }
-
-  const updated: PlannerProject = {
-    ...data.projects[index],
-    kind: 'repository',
-    repoPath: resolvedPath,
-    updatedAt: Date.now(),
-  };
-  const projects = [...data.projects];
-  projects[index] = updated;
-  writeProjectPlannerData({ ...data, projects });
+  const source = findProjectStorage(projectId);
+  if (source.project.kind !== 'planned') throw new ApiError(409, 'PROJECT_ALREADY_REPOSITORY', 'Project already has a repository.');
+  if (!repositoryExists(repoPath)) throw new ApiError(404, 'REPOSITORY_NOT_FOUND', 'Repository path is not accessible.');
+  const destination = readRepositoryData(repoPath);
+  if (destination.projects.length) throw new ApiError(409, 'REPOSITORY_PROJECT_EXISTS', 'A planning project already exists for this repository.');
+  const updated = { ...source.project, kind: 'repository' as const, repoPath: fs.realpathSync(repoPath), updatedAt: Date.now() };
+  writeRepositoryData(repoPath, { version: 1, projects: [updated], items: source.data.items.filter((item) => item.projectId === projectId) }, false);
+  writeStorage(source, { ...source.data, projects: source.data.projects.filter((project) => project.id !== projectId), items: source.data.items.filter((item) => item.projectId !== projectId) });
   return updated;
 }
 
@@ -423,14 +491,8 @@ export function validateProjectFolderName(value: unknown): string {
   const folderName = cleanText(value, 100);
   if (!folderName) throw new ApiError(400, 'PROJECT_FOLDER_REQUIRED', 'Project folder name is required.');
   // eslint-disable-next-line no-control-regex -- Windows folder names must reject ASCII control characters.
-  if (folderName === '.' || folderName === '..' || /[<>:"/\\|?*\u0000-\u001F]/.test(folderName)) {
-    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name contains invalid characters.');
-  }
-  if (/[. ]$/.test(folderName)) {
-    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name must not end with a dot or space.');
-  }
-  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(folderName)) {
-    throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name is reserved by the operating system.');
-  }
+  if (folderName === '.' || folderName === '..' || /[<>:"/\\|?*\u0000-\u001F]/.test(folderName)) throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name contains invalid characters.');
+  if (/[. ]$/.test(folderName)) throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name must not end with a dot or space.');
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(folderName)) throw new ApiError(400, 'INVALID_PROJECT_FOLDER', 'Project folder name is reserved by the operating system.');
   return folderName;
 }

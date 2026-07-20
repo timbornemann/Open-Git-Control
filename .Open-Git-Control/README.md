@@ -1,8 +1,11 @@
-# Open Git Control run workflows
+# Open Git Control repository data
 
-This directory contains `run.json`, the repository-local workflow configuration used by Open Git Control's **Run** menu. It can define command steps for running, testing, formatting, starting, and building this repository. Open Git Control selects the command for the current platform and runs each configured step in order.
+This directory contains repository-local data created by [Open Git Control](https://github.com/timbornemann/Open-Git-Control):
 
-Commit this directory when you want to share the same repository workflows with your team.
+- `run.json` is the repository-local workflow configuration for optional command workflows in the **Run** menu.
+- `planning.json` contains this repository's project plan and todos.
+
+Commit this directory when you want to share and version these workflows and planning data with your team. Both files are optional and are only created when their respective feature is used.
 
 ## Created with Open Git Control
 

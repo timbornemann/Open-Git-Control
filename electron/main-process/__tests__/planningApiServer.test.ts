@@ -245,6 +245,32 @@ describe('planningApiServer', () => {
     });
   });
 
+  it('persists repository todos created through the API and returns them through MCP', async () => {
+    const repoPath = path.join(tempDirectory, 'repository-planning');
+    fs.mkdirSync(repoPath);
+
+    const created = await requestJson('/api/todos', {
+      method: 'POST',
+      body: JSON.stringify({ repoPath, title: 'Repository API todo', priority: 'high', status: 'planned' }),
+    });
+    expect(created.data).toMatchObject({ title: 'Repository API todo', projectKind: 'repository', projectRepoPath: repoPath });
+    expect(fs.existsSync(path.join(repoPath, '.Open-Git-Control', 'planning.json'))).toBe(true);
+
+    const listed = await requestJson('/mcp', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'get_next_todos', arguments: { repoPath } },
+      }),
+    });
+    expect(listed.result).toMatchObject({
+      isError: false,
+      structuredContent: { todos: [expect.objectContaining({ id: created.data.id, title: 'Repository API todo' })] },
+    });
+  });
+
   it('does not persist a repository project when todo validation fails', async () => {
     const response = await fetch(`${server!.url}/api/todos`, {
       method: 'POST',
