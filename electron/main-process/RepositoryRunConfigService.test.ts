@@ -26,6 +26,7 @@ describe('RepositoryRunConfigService', () => {
     expect(state.exists).toBe(false);
     expect(state.config?.actions.run.steps).toEqual([]);
     expect(fs.existsSync(state.configPath)).toBe(false);
+    expect(fs.existsSync(path.join(repoPath, '.Open-Git-Control', 'README.md'))).toBe(false);
   });
 
   it('writes a validated configuration below .Open-Git-Control', () => {
@@ -44,6 +45,21 @@ describe('RepositoryRunConfigService', () => {
     service.write(repoPath, config);
 
     expect(JSON.parse(fs.readFileSync(path.join(repoPath, '.Open-Git-Control', 'run.json'), 'utf8'))).toEqual(config);
+    const readme = fs.readFileSync(path.join(repoPath, '.Open-Git-Control', 'README.md'), 'utf8');
+    expect(readme).toContain('repository-local workflow configuration');
+    expect(readme).toContain('https://github.com/timbornemann/Open-Git-Control');
+    expect(readme).toContain('https://github.com/timbornemann/Open-Git-Control/releases');
+  });
+
+  it('keeps an existing run-workflow README unchanged', () => {
+    const repoPath = createRepository();
+    const readmePath = path.join(repoPath, '.Open-Git-Control', 'README.md');
+    fs.mkdirSync(path.dirname(readmePath));
+    fs.writeFileSync(readmePath, '# Team-specific workflow notes\n', 'utf8');
+
+    new RepositoryRunConfigService().write(repoPath, createEmptyRepositoryRunConfig());
+
+    expect(fs.readFileSync(readmePath, 'utf8')).toBe('# Team-specific workflow notes\n');
   });
 
   it('rejects a symlinked run-configuration directory', () => {
