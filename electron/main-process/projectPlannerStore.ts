@@ -6,138 +6,36 @@ import { writeTextFileAtomically } from './atomicFile';
 import { ensureOpenGitControlReadme, getOpenGitControlAssetPath } from './openGitControlDirectory';
 import { ApiError } from './planningApiTypes';
 import { readStoreData } from './repoStore';
+import {
+  cleanPlannerText,
+  createEmptyProjectPlannerData,
+  getRepositoryProjectKey,
+  isPlannerPriority,
+  isPlannerStatus,
+  normalizePlannerRepoPath,
+  normalizePlannerTags,
+  normalizeProjectPlannerData,
+  type PlannerItem,
+  type PlannerItemInput,
+  type PlannerProject,
+  type PlannerStatus,
+  type ProjectPlannerData,
+} from './projectPlannerData';
 
-export type PlannerProjectKind = 'repository' | 'planned';
-export type PlannerPriority = 'low' | 'medium' | 'high' | 'urgent';
-export type PlannerStatus = 'idea' | 'bug' | 'planned' | 'in-progress' | 'blocked' | 'done';
+export {
+  PLANNER_PRIORITIES,
+  PLANNER_STATUSES,
+  getRepositoryProjectKey,
+  normalizeProjectPlannerData,
+  type PlannerItem,
+  type PlannerItemInput,
+  type PlannerPriority,
+  type PlannerProject,
+  type PlannerStatus,
+  type ProjectPlannerData,
+} from './projectPlannerData';
 
-export interface PlannerProject {
-  id: string;
-  name: string;
-  description: string;
-  kind: PlannerProjectKind;
-  repoPath: string | null;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface PlannerItem {
-  id: string;
-  projectId: string;
-  title: string;
-  description: string;
-  priority: PlannerPriority;
-  status: PlannerStatus;
-  tags: string[];
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface ProjectPlannerData {
-  version: 1;
-  projects: PlannerProject[];
-  items: PlannerItem[];
-}
-
-export type PlannerItemInput = {
-  title: string;
-  description?: string;
-  priority?: PlannerPriority;
-  status?: PlannerStatus;
-  tags?: string[];
-};
-
-const EMPTY_DATA: ProjectPlannerData = { version: 1, projects: [], items: [] };
 const PLANNING_FILE = 'planning.json';
-
-export const PLANNER_PRIORITIES: PlannerPriority[] = ['low', 'medium', 'high', 'urgent'];
-export const PLANNER_STATUSES: PlannerStatus[] = ['idea', 'bug', 'planned', 'in-progress', 'blocked', 'done'];
-
-const PRIORITIES = new Set<PlannerPriority>(PLANNER_PRIORITIES);
-const STATUSES = new Set<PlannerStatus>(PLANNER_STATUSES);
-const cleanText = (value: unknown, maxLength: number): string => (typeof value === 'string' ? value.trim().slice(0, maxLength) : '');
-const cleanTimestamp = (value: unknown, fallback: number): number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
-const normalizeRepoPath = (value: unknown): string | null => {
-  const repoPath = cleanText(value, 4_096);
-  return repoPath ? path.resolve(repoPath) : null;
-};
-
-export const getRepositoryProjectKey = (repoPath: string): string => {
-  const resolved = path.resolve(repoPath);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-};
-
-const normalizeTags = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const tags: string[] = [];
-  for (const entry of value) {
-    const tag = cleanText(entry, 40);
-    const key = tag.toLowerCase();
-    if (!tag || seen.has(key)) continue;
-    seen.add(key);
-    tags.push(tag);
-    if (tags.length >= 20) break;
-  }
-  return tags;
-};
-
-export function normalizeProjectPlannerData(input: unknown): ProjectPlannerData {
-  if (!input || typeof input !== 'object') return { ...EMPTY_DATA };
-  const candidate = input as Partial<ProjectPlannerData>;
-  const now = Date.now();
-  const projectIds = new Set<string>();
-  const repoKeys = new Set<string>();
-  const projects: PlannerProject[] = [];
-  for (const raw of Array.isArray(candidate.projects) ? candidate.projects : []) {
-    const source = raw as Partial<PlannerProject>;
-    const id = cleanText(source.id, 100);
-    const name = cleanText(source.name, 160);
-    const kind: PlannerProjectKind = source.kind === 'repository' ? 'repository' : 'planned';
-    const repoPath = kind === 'repository' ? normalizeRepoPath(source.repoPath) : null;
-    if (!id || !name || projectIds.has(id) || (kind === 'repository' && !repoPath)) continue;
-    if (repoPath) {
-      const repoKey = getRepositoryProjectKey(repoPath);
-      if (repoKeys.has(repoKey)) continue;
-      repoKeys.add(repoKey);
-    }
-    const createdAt = cleanTimestamp(source.createdAt, now);
-    projects.push({
-      id,
-      name,
-      description: cleanText(source.description, 8_000),
-      kind,
-      repoPath,
-      createdAt,
-      updatedAt: cleanTimestamp(source.updatedAt, createdAt),
-    });
-    projectIds.add(id);
-  }
-  const itemIds = new Set<string>();
-  const items: PlannerItem[] = [];
-  for (const raw of Array.isArray(candidate.items) ? candidate.items : []) {
-    const source = raw as Partial<PlannerItem>;
-    const id = cleanText(source.id, 100);
-    const projectId = cleanText(source.projectId, 100);
-    const title = cleanText(source.title, 240);
-    if (!id || !projectIds.has(projectId) || !title || itemIds.has(id)) continue;
-    const createdAt = cleanTimestamp(source.createdAt, now);
-    items.push({
-      id,
-      projectId,
-      title,
-      description: cleanText(source.description, 20_000),
-      priority: PRIORITIES.has(source.priority as PlannerPriority) ? (source.priority as PlannerPriority) : 'medium',
-      status: STATUSES.has(source.status as PlannerStatus) ? (source.status as PlannerStatus) : 'idea',
-      tags: normalizeTags(source.tags),
-      createdAt,
-      updatedAt: cleanTimestamp(source.updatedAt, createdAt),
-    });
-    itemIds.add(id);
-  }
-  return { version: 1, projects, items };
-}
 
 const getLegacyStorePath = (): string => path.join(app.getPath('userData'), 'project-planner.json');
 const getPlanningPath = (repoPath: string): string => getOpenGitControlAssetPath(repoPath, PLANNING_FILE, 'Repository planning path');
@@ -179,7 +77,7 @@ const readLegacyData = (): ProjectPlannerData => {
   try {
     return parsePlannerData(fs.readFileSync(getLegacyStorePath(), 'utf8'), 'Planner data');
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return { ...EMPTY_DATA };
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return createEmptyProjectPlannerData();
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Planner data could not be read safely; the existing file was left untouched. ${message}`);
   }
@@ -215,7 +113,7 @@ const plannerRepositoryPaths = (legacyData: ProjectPlannerData): string[] => {
 
 const normalizeRepositoryData = (data: ProjectPlannerData, repoPath: string): { data: ProjectPlannerData; changed: boolean } => {
   const repository = data.projects.find((project) => project.kind === 'repository');
-  if (!repository) return { data: { ...EMPTY_DATA }, changed: data.projects.length > 0 || data.items.length > 0 };
+  if (!repository) return { data: createEmptyProjectPlannerData(), changed: data.projects.length > 0 || data.items.length > 0 };
   const physicalPath = fs.realpathSync(repoPath);
   const requiresNewIds = !repository.repoPath || getRepositoryProjectKey(repository.repoPath) !== getRepositoryProjectKey(physicalPath);
   const projectId = requiresNewIds ? randomUUID() : repository.id;
@@ -230,7 +128,7 @@ const normalizeRepositoryData = (data: ProjectPlannerData, repoPath: string): { 
 
 const readRepositoryData = (repoPath: string): ProjectPlannerData => {
   const planningPath = getPlanningPath(repoPath);
-  if (!fs.existsSync(planningPath)) return { ...EMPTY_DATA };
+  if (!fs.existsSync(planningPath)) return createEmptyProjectPlannerData();
   try {
     const parsed = parsePlannerData(fs.readFileSync(planningPath, 'utf8'), 'Repository planning data');
     const normalized = normalizeRepositoryData(parsed, repoPath);
@@ -342,7 +240,7 @@ export function writeProjectPlannerData(data: ProjectPlannerData): ProjectPlanne
 }
 
 export function ensureRepositoryProjectInData(data: ProjectPlannerData, repoPath: string): PlannerProject {
-  const resolvedPath = normalizeRepoPath(repoPath);
+  const resolvedPath = normalizePlannerRepoPath(repoPath);
   if (!resolvedPath) throw new ApiError(400, 'REPOSITORY_PATH_REQUIRED', 'Repository path is required.');
   const existing = data.projects.find((project) => project.repoPath && getRepositoryProjectKey(project.repoPath) === getRepositoryProjectKey(resolvedPath));
   if (existing) return existing;
@@ -370,14 +268,14 @@ export function ensureRepositoryProject(repoPath: string): PlannerProject {
 }
 
 export function createPlannedProject(input: { name: string; description?: string }): PlannerProject {
-  const name = cleanText(input?.name, 160);
+  const name = cleanPlannerText(input?.name, 160);
   if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
   const data = readLegacyData();
   const now = Date.now();
   const project: PlannerProject = {
     id: randomUUID(),
     name,
-    description: cleanText(input?.description, 8_000),
+    description: cleanPlannerText(input?.description, 8_000),
     kind: 'planned',
     repoPath: null,
     createdAt: now,
@@ -410,12 +308,12 @@ const writeStorage = (storage: Storage, data: ProjectPlannerData): ProjectPlanne
 
 export function updatePlannerProject(projectId: string, input: { name?: string; description?: string }): PlannerProject {
   const storage = findProjectStorage(projectId);
-  const name = input.name === undefined ? storage.project.name : cleanText(input.name, 160);
+  const name = input.name === undefined ? storage.project.name : cleanPlannerText(input.name, 160);
   if (!name) throw new ApiError(400, 'PROJECT_NAME_REQUIRED', 'Project name is required.');
   const updated = {
     ...storage.project,
     name,
-    description: input.description === undefined ? storage.project.description : cleanText(input.description, 8_000),
+    description: input.description === undefined ? storage.project.description : cleanPlannerText(input.description, 8_000),
     updatedAt: Date.now(),
   };
   writeStorage(storage, { ...storage.data, projects: storage.data.projects.map((project) => (project.id === projectId ? updated : project)) });
@@ -442,10 +340,10 @@ export function deleteRepositoryPlannerProjectByPath(repoPath: string): { delete
       projects: legacy.projects.filter((project) => !legacyProjects.includes(project)),
       items: legacy.items.filter((item) => !legacyProjects.some((project) => project.id === item.projectId)),
     });
-  let repositoryData: ProjectPlannerData = { ...EMPTY_DATA };
+  let repositoryData: ProjectPlannerData = createEmptyProjectPlannerData();
   try {
     repositoryData = readRepositoryData(repoPath);
-    writeRepositoryData(repoPath, { ...EMPTY_DATA }, false);
+    writeRepositoryData(repoPath, createEmptyProjectPlannerData(), false);
   } catch (error) {
     if (!legacyProjects.length) throw error;
   }
@@ -456,17 +354,17 @@ export function deleteRepositoryPlannerProjectByPath(repoPath: string): { delete
 /** Adds a validated item to an in-memory document without persisting it. */
 export function createPlannerItemInData(data: ProjectPlannerData, projectId: string, input: PlannerItemInput): PlannerItem {
   if (!data.projects.some((project) => project.id === projectId)) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
-  const title = cleanText(input?.title, 240);
+  const title = cleanPlannerText(input?.title, 240);
   if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
   const now = Date.now();
   const item: PlannerItem = {
     id: randomUUID(),
     projectId,
     title,
-    description: cleanText(input?.description, 20_000),
-    priority: PRIORITIES.has(input?.priority as PlannerPriority) ? (input.priority as PlannerPriority) : 'medium',
-    status: STATUSES.has(input?.status as PlannerStatus) ? (input.status as PlannerStatus) : 'idea',
-    tags: normalizeTags(input?.tags),
+    description: cleanPlannerText(input?.description, 20_000),
+    priority: isPlannerPriority(input?.priority) ? input.priority : 'medium',
+    status: isPlannerStatus(input?.status) ? input.status : 'idea',
+    tags: normalizePlannerTags(input?.tags),
     createdAt: now,
     updatedAt: now,
   };
@@ -491,18 +389,18 @@ export function updatePlannerItemInData(
   const index = data.items.findIndex((item) => item.id === itemId);
   if (index < 0) throw new ApiError(404, 'TODO_NOT_FOUND', 'Todo not found.');
   const current = data.items[index];
-  const title = input.title === undefined ? current.title : cleanText(input.title, 240);
+  const title = input.title === undefined ? current.title : cleanPlannerText(input.title, 240);
   if (!title) throw new ApiError(400, 'TITLE_REQUIRED', 'Item title is required.');
-  const projectId = options.projectId === undefined ? current.projectId : cleanText(options.projectId, 100);
+  const projectId = options.projectId === undefined ? current.projectId : cleanPlannerText(options.projectId, 100);
   if (!data.projects.some((project) => project.id === projectId)) throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project not found.');
   const updated: PlannerItem = {
     ...current,
     projectId,
     title,
-    description: input.description === undefined ? current.description : cleanText(input.description, 20_000),
-    priority: input.priority !== undefined && PRIORITIES.has(input.priority) ? input.priority : current.priority,
-    status: input.status !== undefined && STATUSES.has(input.status) ? input.status : current.status,
-    tags: input.tags === undefined ? current.tags : normalizeTags(input.tags),
+    description: input.description === undefined ? current.description : cleanPlannerText(input.description, 20_000),
+    priority: input.priority !== undefined && isPlannerPriority(input.priority) ? input.priority : current.priority,
+    status: input.status !== undefined && isPlannerStatus(input.status) ? input.status : current.status,
+    tags: input.tags === undefined ? current.tags : normalizePlannerTags(input.tags),
     updatedAt: Date.now(),
   };
   data.items = data.items.map((item, itemIndex) => (itemIndex === index ? updated : item));
@@ -564,7 +462,7 @@ export function convertProjectToRepository(projectId: string, repoPath: string):
 }
 
 export function validateProjectFolderName(value: unknown): string {
-  const folderName = cleanText(value, 100);
+  const folderName = cleanPlannerText(value, 100);
   if (!folderName) throw new ApiError(400, 'PROJECT_FOLDER_REQUIRED', 'Project folder name is required.');
   // eslint-disable-next-line no-control-regex -- Windows folder names must reject ASCII control characters.
   if (folderName === '.' || folderName === '..' || /[<>:"/\\|?*\u0000-\u001F]/.test(folderName))
