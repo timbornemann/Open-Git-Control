@@ -107,7 +107,19 @@ describe('projectPlannerStore persistence', () => {
       JSON.stringify({
         version: 1,
         projects: [{ id: 'pending', name: 'Pending migration', description: '', kind: 'repository', repoPath: missingRepoPath, createdAt: 1, updatedAt: 1 }],
-        items: [{ id: 'pending-item', projectId: 'pending', title: 'Do not lose', description: '', priority: 'medium', status: 'idea', tags: [], createdAt: 1, updatedAt: 1 }],
+        items: [
+          {
+            id: 'pending-item',
+            projectId: 'pending',
+            title: 'Do not lose',
+            description: '',
+            priority: 'medium',
+            status: 'idea',
+            tags: [],
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
       }),
       'utf8',
     );

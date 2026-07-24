@@ -263,15 +263,9 @@ describe('secret scan renderer approval', () => {
     } as any;
 
     await expect(
-      runSecretScanGuard(
-        { args: ['push', 'origin', 'main'], command: 'push', successMsg: 'pushed', repoPath: 'C:/repo' },
-        runtime,
-        false,
-      ),
+      runSecretScanGuard({ args: ['push', 'origin', 'main'], command: 'push', successMsg: 'pushed', repoPath: 'C:/repo' }, runtime, false),
     ).resolves.toBe(false);
 
-    expect(runtime.setGitActionToast).toHaveBeenCalledWith(
-      expect.objectContaining({ isError: true, msg: expect.stringContaining('could not be fully read') }),
-    );
+    expect(runtime.setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: true, msg: expect.stringContaining('could not be fully read') }));
   });
 });
