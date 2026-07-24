@@ -41,6 +41,8 @@ export interface SecretScanResult {
   strictness: SecretScanStrictness;
   findings: SecretScanFinding[];
   notes: string[];
+  /** True when at least one requested push source could not be fully inspected. */
+  historyScanIncomplete?: boolean;
   stats: {
     checkedLines: number;
     stagedLines: number;
@@ -373,6 +375,7 @@ export class SecretScanService {
     const allowlistRules = parseAllowlist(options.allowlistText || '');
     const notes: string[] = [];
     const findings: SecretScanFinding[] = [];
+    let historyScanIncomplete = false;
     let stagedLines = 0;
     let toPushLines = 0;
     let tagLines = 0;
@@ -530,23 +533,33 @@ export class SecretScanService {
     // precise because Git calculates that range from the selected upstream.
     const remoteExclusionArgs = pushPlan || options.revisions?.length ? [] : excludedRemote ? ['--not', `--remotes=${excludedRemote}`] : ['--not', '--remotes'];
 
-    const scanRequestedRevisions = async (revisions: string[]) => {
+    const scanRequestedRevisions = async (revisions: string[], continueOnFailure = false): Promise<boolean> => {
+      let scannedSource = false;
       for (const revision of revisions) {
-        const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
-          'rev-list',
-          '--reverse',
-          '--topo-order',
-          revision,
-          ...remoteExclusionArgs,
-        ]);
-        const commits = parseCommitList(commitsRaw);
-        await scanCommits(commits, 'to-push');
-        notes.push(
-          commits.length > 0
-            ? `Scanned ${commits.length} commit(s) from requested push source ${revision}.`
-            : `No unpublished commits found for requested push source ${revision}.`,
-        );
+        try {
+          const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
+            'rev-list',
+            '--reverse',
+            '--topo-order',
+            revision,
+            ...remoteExclusionArgs,
+          ]);
+          const commits = parseCommitList(commitsRaw);
+          await scanCommits(commits, 'to-push');
+          scannedSource = true;
+          notes.push(
+            commits.length > 0
+              ? `Scanned ${commits.length} commit(s) from requested push source ${revision}.`
+              : `No unpublished commits found for requested push source ${revision}.`,
+          );
+        } catch (error) {
+          if (isAbortError(error)) throw error;
+          historyScanIncomplete = true;
+          if (!continueOnFailure) throw error;
+          notes.push(`Could not inspect requested push source ${revision}; continuing with another safe scan source.`);
+        }
       }
+      return scannedSource;
     };
 
     const isAbortError = (error: unknown): boolean => options.signal?.aborted === true || (error as { name?: string } | null)?.name === 'AbortError';
@@ -564,11 +577,12 @@ export class SecretScanService {
     const scanPushSourceCommits = async () => {
       const requestedRevisions = normalizeRequestedRevisions(pushPlan?.revisions ?? options.revisions);
       if (requestedRevisions.length > 0) {
-        try {
-          await scanRequestedRevisions(requestedRevisions);
-        } catch (error) {
-          if (isAbortError(error)) throw error;
-          throw new Error('Could not determine commits for the requested push source in the secret scan.');
+        const scannedRequestedSource = await scanRequestedRevisions(requestedRevisions, Boolean(pushPlan || options.revisions?.length));
+        if (!scannedRequestedSource && !requestedRevisions.includes('HEAD')) {
+          const scannedHead = await scanRequestedRevisions(['HEAD'], true);
+          if (!scannedHead) {
+            notes.push('Could not inspect a commit source for this push; the staged diff was still scanned.');
+          }
         }
         return;
       }
@@ -626,6 +640,7 @@ export class SecretScanService {
       strictness,
       findings,
       notes,
+      historyScanIncomplete: historyScanIncomplete || undefined,
       stats: {
         checkedLines: stagedLines + toPushLines + tagLines,
         stagedLines,
@@ -654,7 +669,7 @@ export class SecretScanService {
     const args = rawArgs.map((arg) => String(arg || ''));
     const values = args.filter((arg) => arg && !arg.startsWith('-'));
     const explicitRemote = values[0] || '';
-    const explicitRefspec = values[1] || '';
+    const explicitRefspecs = values.slice(1);
     const read = async (gitArgs: string[]): Promise<string> => {
       try {
         return (await this.gitService.runCommandAtPath(repoPath, gitArgs)).trim();
@@ -679,6 +694,7 @@ export class SecretScanService {
 
     const normalizeRefspecSource = (refspec: string): string | null => {
       const normalized = refspec.replace(/^\+/, '');
+      if (normalized.startsWith('^')) return null;
       const source = normalized.includes(':') ? normalized.slice(0, normalized.indexOf(':')) : normalized;
       if (!source) return null;
       if (source.startsWith('refs/tags/')) {
@@ -688,10 +704,9 @@ export class SecretScanService {
       return source;
     };
 
-    if (explicitRefspec) {
-      const source = normalizeRefspecSource(explicitRefspec);
-      if (!source) return { revisions: [], excludeRemote, includeTags };
-      return { revisions: [source], excludeRemote, includeTags };
+    if (explicitRefspecs.length > 0) {
+      const revisions = [...new Set(explicitRefspecs.map(normalizeRefspecSource).filter((source): source is string => Boolean(source)))];
+      return { revisions, excludeRemote, includeTags };
     }
 
     const configuredPush = excludeRemote ? await read(['config', '--get-all', `remote.${excludeRemote}.push`]) : '';

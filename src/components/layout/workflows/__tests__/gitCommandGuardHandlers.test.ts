@@ -239,4 +239,39 @@ describe('secret scan renderer approval', () => {
     expect(cancel).not.toHaveBeenCalled();
     expect(runtime.setConfirmDialog).not.toHaveBeenCalled();
   });
+
+  it('shows a warning toast when the push source scan falls back to HEAD', async () => {
+    vi.spyOn(gitClient, 'scanPushSecrets').mockResolvedValue({
+      success: true,
+      data: {
+        scanned: true,
+        strictness: 'medium',
+        findings: [],
+        notes: [],
+        historyScanIncomplete: true,
+        stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 },
+      },
+    });
+    const runtime = {
+      isRepoCurrent: vi.fn(() => true),
+      runRemoteAheadQuickFix: vi.fn(),
+      runWithOptions: vi.fn(),
+      setConfirmDialog: vi.fn(),
+      setGitActionToast: vi.fn(),
+      t: (key: string) => key,
+      tr: (_de: string, en: string) => en,
+    } as any;
+
+    await expect(
+      runSecretScanGuard(
+        { args: ['push', 'origin', 'main'], command: 'push', successMsg: 'pushed', repoPath: 'C:/repo' },
+        runtime,
+        false,
+      ),
+    ).resolves.toBe(false);
+
+    expect(runtime.setGitActionToast).toHaveBeenCalledWith(
+      expect.objectContaining({ isError: true, msg: expect.stringContaining('could not be fully read') }),
+    );
+  });
 });

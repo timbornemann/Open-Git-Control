@@ -177,6 +177,15 @@ export const runSecretScanGuard = async (request: GitCommandGuardRequest, runtim
     }
 
     const findings = scanResult.data.findings || [];
+    if (scanResult.data.historyScanIncomplete) {
+      setGitActionToast({
+        msg: tr(
+          'Die angeforderte Push-Quelle konnte nicht vollstaendig gelesen werden. Gestagte Aenderungen und die lokale HEAD-Historie wurden trotzdem auf Secrets geprueft.',
+          'The requested push source could not be fully read. Staged changes and the local HEAD history were still scanned for secrets.',
+        ),
+        isError: true,
+      });
+    }
     if (findings.length === 0) return false;
 
     const contextItems = findings.slice(0, 8).map((finding, index) => ({

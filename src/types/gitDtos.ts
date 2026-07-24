@@ -28,6 +28,8 @@ export interface SecretScanResultDto {
   strictness: SecretScanStrictnessDto;
   findings: SecretScanFindingDto[];
   notes: string[];
+  /** True when at least one requested push source could not be fully inspected. */
+  historyScanIncomplete?: boolean;
   stats: {
     checkedLines: number;
     stagedLines: number;

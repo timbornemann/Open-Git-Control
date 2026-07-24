@@ -200,26 +200,15 @@
       "updatedAt": 1784045168703
     },
     {
-      "id": "02fd3b0d-3114-4fcf-815e-71c5e4926434",
+      "id": "88a9817b-6dad-4894-bc0b-1c62ec3424b4",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "eigenwerbung",
-      "description": "im .Open-Git-Control odern der angelegt wird wenn man in einem repo einen run workflow erstellt und anlegt soll auch eine readme dort drinnen erstellt werden die das ganze featur kurz erklärt und dann noch einen weiteren abschnitt hat der schlichtweg eigenwerbugn für Open Git crontol ist mit einer kurzen bescrheibung und acion links direkt zum repo damit wenn andere etwas damit machen und dann das ganze in deren github ordner landen überall etwas subtile eigenwerbung plaziert wird",
+      "title": "Agent prompt copy button for run configurations",
+      "description": "Damit man nicht imemr alles manuell machen muss soll man einen ki angeten einen probpt geben könenn der dann eine akkurate run konfiguration erstellt im richtigen order von open git controll, dabei soll der prompt sagen wie es ersteltl werden muss und was genau bei welchen schritten erstellt werden muss. und auch eine leere vorlage mitgeben und auch wie die datei heißen muss und wie der order angelegt werdne muss damit ein ki agent alles wichtige weiß",
       "priority": "high",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1784553617754,
-      "updatedAt": 1784573237451
-    },
-    {
-      "id": "081afc22-c5f3-43c0-ade0-8460430b8c8c",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "planing in projekt anstatt zentral in appdata",
-      "description": "project planing soll nicht zentral gespoeichert werden sondern auch pro repo artig wie die run workflows, damit man das ganze auch miteinander teilen kann und versionieren kann wenn man möchte es braucht eine migrierung damit bestehende projekt daten nicht verloren gehen und danach eine bereinigung damit keine nicht zugreifbaren daten existieren. ein potenzieller bug könnte sein wenn ich die planing seite mgriere weil ich mur npm run dev in der anwendung bind aber dann zur installierten version wechsel, aber eventuell wäre das kein probelm ich hätte übergangsweise nur keine todos die würden in dem zwischen zeitraum einfach leer angezeigt werden. heißt es muss sicher migriert werden und funktionieren. damit die todos auch im .Open-Git-Control order liegen werden. die automatische readme von vorhin müsste dann auch angepasst werden. auch muss der order angelegt werden sobald man todos erstellt auch wenn man keinen workflow bisher hat.",
-      "priority": "medium",
       "status": "planned",
       "tags": [],
-      "createdAt": 1784553696376,
-      "updatedAt": 1784573842818
+      "createdAt": 1784826618903,
+      "updatedAt": 1784826618903
     }
   ]
 }
