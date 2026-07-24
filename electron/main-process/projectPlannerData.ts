@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 export type PlannerProjectKind = 'repository' | 'planned';
@@ -58,7 +59,13 @@ export const normalizePlannerRepoPath = (value: unknown): string | null => {
 };
 
 export const getRepositoryProjectKey = (repoPath: string): string => {
-  const resolved = path.resolve(repoPath);
+  let resolved = path.resolve(repoPath);
+  try {
+    resolved = fs.realpathSync(resolved);
+  } catch {
+    // A planned repository may not exist yet. Its lexical path remains the
+    // stable identity until it can be resolved on disk.
+  }
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 };
 

@@ -114,15 +114,16 @@ const plannerRepositoryPaths = (legacyData: ProjectPlannerData): string[] => {
 const normalizeRepositoryData = (data: ProjectPlannerData, repoPath: string): { data: ProjectPlannerData; changed: boolean } => {
   const repository = data.projects.find((project) => project.kind === 'repository');
   if (!repository) return { data: createEmptyProjectPlannerData(), changed: data.projects.length > 0 || data.items.length > 0 };
-  const physicalPath = fs.realpathSync(repoPath);
-  const requiresNewIds = !repository.repoPath || getRepositoryProjectKey(repository.repoPath) !== getRepositoryProjectKey(physicalPath);
+  const normalizedRepoPath = normalizePlannerRepoPath(repoPath);
+  if (!normalizedRepoPath) return { data: createEmptyProjectPlannerData(), changed: true };
+  const requiresNewIds = !repository.repoPath || getRepositoryProjectKey(repository.repoPath) !== getRepositoryProjectKey(normalizedRepoPath);
   const projectId = requiresNewIds ? randomUUID() : repository.id;
   const items = data.items
     .filter((item) => item.projectId === repository.id)
     .map((item) => ({ ...item, id: requiresNewIds ? randomUUID() : item.id, projectId }));
-  const project: PlannerProject = { ...repository, id: projectId, kind: 'repository', repoPath: physicalPath };
+  const project: PlannerProject = { ...repository, id: projectId, kind: 'repository', repoPath: normalizedRepoPath };
   const normalized = { version: 1 as const, projects: [project], items };
-  const changed = requiresNewIds || data.projects.length !== 1 || data.items.length !== items.length || repository.repoPath !== physicalPath;
+  const changed = requiresNewIds || data.projects.length !== 1 || data.items.length !== items.length || repository.repoPath !== normalizedRepoPath;
   return { data: normalized, changed };
 };
 
@@ -451,7 +452,7 @@ export function convertProjectToRepository(projectId: string, repoPath: string):
   if (!repositoryExists(repoPath)) throw new ApiError(404, 'REPOSITORY_NOT_FOUND', 'Repository path is not accessible.');
   const destination = readRepositoryData(repoPath);
   if (destination.projects.length) throw new ApiError(409, 'REPOSITORY_PROJECT_EXISTS', 'A planning project already exists for this repository.');
-  const updated = { ...source.project, kind: 'repository' as const, repoPath: fs.realpathSync(repoPath), updatedAt: Date.now() };
+  const updated = { ...source.project, kind: 'repository' as const, repoPath: normalizePlannerRepoPath(repoPath), updatedAt: Date.now() };
   writeRepositoryData(repoPath, { version: 1, projects: [updated], items: source.data.items.filter((item) => item.projectId === projectId) }, false);
   writeStorage(source, {
     ...source.data,
