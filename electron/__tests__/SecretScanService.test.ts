@@ -434,6 +434,40 @@ describe('SecretScanService', () => {
     expect(result.notes.join('\n')).toContain('refs/heads/release');
   });
 
+  it('uses HEAD for a normal push so an up-to-date push never depends on resolving the branch ref', async () => {
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+        'rev-list --reverse --topo-order HEAD': '',
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '', pushArgs: [] });
+
+    expect(result.historyScanIncomplete).toBeUndefined();
+    expect(result.notes).toContain('No unpublished commits found for requested push source HEAD.');
+  });
+
+  it('uses HEAD for a normal push with outgoing commits too', async () => {
+    const commitHash = '2'.repeat(40);
+    const service = new SecretScanService(
+      createGitServiceMock({
+        'diff --cached --no-ext-diff --no-textconv --no-color --unified=0': '',
+        'symbolic-ref --quiet --short HEAD': 'main',
+        remote: 'origin',
+        'rev-list --reverse --topo-order HEAD': commitHash,
+        [`show --format= --diff-merges=first-parent --no-ext-diff --no-textconv --no-color --unified=0 --find-renames --find-copies ${commitHash}`]: '',
+      }),
+    );
+
+    const result = await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '', pushArgs: [] });
+
+    expect(result.historyScanIncomplete).toBeUndefined();
+    expect(result.notes).toContain('Scanned 1 commit(s) from requested push source HEAD.');
+  });
+
   it('honors push.default=matching instead of scanning only HEAD', async () => {
     const commitHash = '1'.repeat(40);
     const diff = ['diff --git a/feature.env b/feature.env', '+++ b/feature.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');

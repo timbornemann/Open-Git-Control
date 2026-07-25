@@ -757,6 +757,12 @@ export class SecretScanService {
     if (!currentBranch) {
       throw new Error('Could not determine the source branch for the requested push secret scan.');
     }
-    return { revisions: [`refs/heads/${currentBranch}`], excludeRemote, includeTags };
+    // With Git's default push modes (simple, current, and upstream), the
+    // source that is sent is the commit currently checked out. Using HEAD
+    // rather than spelling the local branch ref is equivalent for the push,
+    // but it also avoids a false incomplete-scan fallback when a branch ref
+    // cannot be resolved while HEAD is perfectly readable. This matters for
+    // an "Everything up-to-date" push just as much as for a real update.
+    return { revisions: ['HEAD'], excludeRemote, includeTags };
   }
 }
