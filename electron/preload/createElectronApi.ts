@@ -14,8 +14,8 @@ import type {
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
 import type { RepositoryInitializationOptionsDto } from '../../src/shared/ipc/contracts/git';
-import type { RepositoryRunActionId, RepositoryRunConfigDto, RepositoryRunEventDto } from '../../src/types/repositoryRun';
 import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
+import { createRepositoryRunApi } from './createRepositoryRunApi';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -240,16 +240,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     },
     getStoredRepos: () => ipcRenderer.invoke(IpcChannel.ReposGetStored),
     setStoredRepos: (data: StoredRepoData) => ipcRenderer.invoke(IpcChannel.ReposSetStored, data),
-    getRepositoryRunConfig: (repoPath: string) => ipcRenderer.invoke(IpcChannel.RepositoryRunGetConfig, repoPath),
-    saveRepositoryRunConfig: (repoPath: string, config: RepositoryRunConfigDto) => ipcRenderer.invoke(IpcChannel.RepositoryRunSaveConfig, repoPath, config),
-    startRepositoryRun: (repoPath: string, action: RepositoryRunActionId) => ipcRenderer.invoke(IpcChannel.RepositoryRunStart, repoPath, action),
-    stopRepositoryRun: (runId?: string) => ipcRenderer.invoke(IpcChannel.RepositoryRunStop, runId),
-    getRepositoryRunState: () => ipcRenderer.invoke(IpcChannel.RepositoryRunGetState),
-    onRepositoryRunEvent: (callback: (event: RepositoryRunEventDto) => void) => {
-      const handler = (_event: IpcRendererEvent, payload: RepositoryRunEventDto) => callback(payload);
-      ipcRenderer.on(IpcChannel.RepositoryRunEvent, handler);
-      return () => ipcRenderer.removeListener(IpcChannel.RepositoryRunEvent, handler);
-    },
+    ...createRepositoryRunApi(ipcRenderer),
     plannerGetData: () => ipcRenderer.invoke(IpcChannel.PlannerGetData),
     onPlannerDataChanged: (callback: () => void) => {
       const handler = () => callback();
@@ -488,9 +479,11 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     runs: {
       getRepositoryRunConfig: flatApi.getRepositoryRunConfig,
       saveRepositoryRunConfig: flatApi.saveRepositoryRunConfig,
+      watchRepositoryRunConfig: flatApi.watchRepositoryRunConfig,
       startRepositoryRun: flatApi.startRepositoryRun,
       stopRepositoryRun: flatApi.stopRepositoryRun,
       getRepositoryRunState: flatApi.getRepositoryRunState,
+      onRepositoryRunConfigChanged: flatApi.onRepositoryRunConfigChanged,
       onRepositoryRunEvent: flatApi.onRepositoryRunEvent,
     },
   };

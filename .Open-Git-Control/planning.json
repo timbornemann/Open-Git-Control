@@ -203,12 +203,12 @@
       "id": "88a9817b-6dad-4894-bc0b-1c62ec3424b4",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Agent prompt copy button for run configurations",
-      "description": "Damit man nicht imemr alles manuell machen muss soll man einen ki angeten einen probpt geben könenn der dann eine akkurate run konfiguration erstellt im richtigen order von open git controll, dabei soll der prompt sagen wie es ersteltl werden muss und was genau bei welchen schritten erstellt werden muss. und auch eine leere vorlage mitgeben und auch wie die datei heißen muss und wie der order angelegt werdne muss damit ein ki agent alles wichtige weiß",
+      "description": "Agent prompt copy button for run configurations: Damit man nicht imemr alles manuell machen muss soll man einen ki angeten einen probpt geben könenn der dann eine akkurate run konfiguration erstellt im richtigen order von open git controll, dabei soll der prompt sagen wie es ersteltl werden muss und was genau bei welchen schritten erstellt werden muss. und auch eine leere vorlage mitgeben und auch wie die datei heißen muss und wie der order angelegt werdne muss damit ein ki agent alles wichtige weiß",
       "priority": "high",
       "status": "planned",
       "tags": [],
       "createdAt": 1784826618903,
-      "updatedAt": 1784826618903
+      "updatedAt": 1784997233847
     }
   ]
 }

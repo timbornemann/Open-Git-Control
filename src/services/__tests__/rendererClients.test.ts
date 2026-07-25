@@ -122,9 +122,11 @@ describe('renderer service clients', () => {
 
     await expectDelegation(() => repositoryRunClient.getConfig('C:/repo'), api.runs.getRepositoryRunConfig, ['C:/repo']);
     await expectDelegation(() => repositoryRunClient.saveConfig('C:/repo', config), api.runs.saveRepositoryRunConfig, ['C:/repo', config]);
+    await expectDelegation(() => repositoryRunClient.watchConfig('C:/repo'), api.runs.watchRepositoryRunConfig, ['C:/repo']);
     await expectDelegation(() => repositoryRunClient.start('C:/repo', 'test'), api.runs.startRepositoryRun, ['C:/repo', 'test']);
     await expectDelegation(() => repositoryRunClient.stop('run-1'), api.runs.stopRepositoryRun, ['run-1']);
     await expectDelegation(() => repositoryRunClient.getState(), api.runs.getRepositoryRunState, []);
+    await expectDelegation(() => repositoryRunClient.onConfigChanged(listener), api.runs.onRepositoryRunConfigChanged, [listener]);
     await expectDelegation(() => repositoryRunClient.onEvent(listener), api.runs.onRepositoryRunEvent, [listener]);
   });
 

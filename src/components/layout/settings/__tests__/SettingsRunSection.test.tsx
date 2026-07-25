@@ -7,14 +7,17 @@ import { createEmptyRepositoryRunConfig } from '@/types/repositoryRun';
 import { I18nProvider } from '@/i18n';
 import { SettingsRunSection } from '@/components/layout/settings/SettingsRunSection';
 
-const { getConfigMock, saveConfigMock, refreshRunConfigMock, setConfirmDialogMock, onToastMock, repositoryContextState } = vi.hoisted(() => ({
-  getConfigMock: vi.fn(),
-  saveConfigMock: vi.fn(),
-  refreshRunConfigMock: vi.fn(),
-  setConfirmDialogMock: vi.fn(),
-  onToastMock: vi.fn(),
-  repositoryContextState: { openRepos: ['C:/repos/a', 'C:/repos/b'], activeRepo: 'C:/repos/a' as string | null, onToast: undefined as unknown },
-}));
+const { copyTextToClipboardMock, getConfigMock, saveConfigMock, refreshRunConfigMock, setConfirmDialogMock, onToastMock, repositoryContextState } = vi.hoisted(
+  () => ({
+    copyTextToClipboardMock: vi.fn(),
+    getConfigMock: vi.fn(),
+    saveConfigMock: vi.fn(),
+    refreshRunConfigMock: vi.fn(),
+    setConfirmDialogMock: vi.fn(),
+    onToastMock: vi.fn(),
+    repositoryContextState: { openRepos: ['C:/repos/a', 'C:/repos/b'], activeRepo: 'C:/repos/a' as string | null, onToast: undefined as unknown },
+  }),
+);
 
 vi.mock('@/contexts/AppStateContext', () => ({
   useRepositoryContext: () => repositoryContextState,
@@ -29,6 +32,8 @@ vi.mock('@/services/repositoryRunClient', () => ({
     saveConfig: saveConfigMock,
   },
 }));
+
+vi.mock('@/utils/clipboard', () => ({ copyTextToClipboard: copyTextToClipboardMock }));
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -48,6 +53,7 @@ let root: Root | null = null;
 beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>';
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  copyTextToClipboardMock.mockReset().mockResolvedValue(true);
   getConfigMock.mockReset();
   saveConfigMock.mockReset();
   refreshRunConfigMock.mockReset();
@@ -67,6 +73,32 @@ afterEach(() => {
 });
 
 describe('SettingsRunSection', () => {
+  it('copies an agent prompt for the selected repository', async () => {
+    const config = createEmptyRepositoryRunConfig();
+    getConfigMock.mockResolvedValue({
+      success: true,
+      data: { exists: true, config, configPath: 'C:/repos/a/.Open-Git-Control/run.json', availableActions: {}, templates: [] },
+    });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(createElement(I18nProvider, { language: 'en' }, createElement(SettingsRunSection)));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const copyButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes('Copy AI agent prompt'));
+    if (!copyButton) throw new Error('Missing copy agent prompt button.');
+    await act(async () => {
+      copyButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(copyTextToClipboardMock).toHaveBeenCalledWith(expect.stringContaining('<target_file>C:/repos/a/.Open-Git-Control/run.json</target_file>'));
+    expect(onToastMock).toHaveBeenCalledWith('AI agent prompt copied.', false);
+  });
+
   it('never applies a stale repository configuration after switching repositories', async () => {
     const configA = createEmptyRepositoryRunConfig();
     const configB = createEmptyRepositoryRunConfig();

@@ -78,6 +78,31 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
 
   useEffect(() => {
     if (!repositoryRunClient.isAvailable()) return;
+    void repositoryRunClient.watchConfig(activeRepo);
+  }, [activeRepo]);
+
+  useEffect(() => {
+    if (!repositoryRunClient.isAvailable()) return;
+    return repositoryRunClient.onConfigChanged((repositoryPath) => {
+      if (repositoryPath === activeRepoRef.current) void refreshConfig(repositoryPath);
+    });
+  }, [refreshConfig]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void refreshConfig();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [refreshConfig]);
+
+  useEffect(() => {
+    if (!repositoryRunClient.isAvailable()) return;
     let active = true;
     void repositoryRunClient.getState().then((result) => {
       if (active && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);

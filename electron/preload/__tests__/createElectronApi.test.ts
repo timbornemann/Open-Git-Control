@@ -99,6 +99,26 @@ describe('createElectronApi', () => {
     expect(ipcRenderer.removeListener).toHaveBeenCalledWith(IpcChannel.PlannerDataChanged, expect.any(Function));
   });
 
+  it('forwards repository run configuration watch changes', async () => {
+    const handlers = new Map<string, (...args: any[]) => void>();
+    const ipcRenderer = {
+      invoke: vi.fn().mockResolvedValue({ success: true, data: true }),
+      on: vi.fn((channel: string, handler: (...args: any[]) => void) => handlers.set(channel, handler)),
+      removeListener: vi.fn(),
+    } as any;
+    const api = createElectronApi(ipcRenderer);
+    const listener = vi.fn();
+
+    await api.runs.watchRepositoryRunConfig('C:/repo');
+    const unsubscribe = api.runs.onRepositoryRunConfigChanged(listener);
+    handlers.get(IpcChannel.RepositoryRunConfigChanged)?.({}, 'C:/repo');
+
+    expect(ipcRenderer.invoke).toHaveBeenCalledWith(IpcChannel.RepositoryRunWatchConfig, 'C:/repo');
+    expect(listener).toHaveBeenCalledWith('C:/repo');
+    unsubscribe();
+    expect(ipcRenderer.removeListener).toHaveBeenCalledWith(IpcChannel.RepositoryRunConfigChanged, expect.any(Function));
+  });
+
   it('requests sequencer state for the explicitly captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { operation: 'rebase' } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

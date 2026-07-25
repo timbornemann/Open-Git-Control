@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Plus, Save, Trash2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import {
@@ -14,6 +14,8 @@ import {
   type RepositoryRunTemplateDto,
 } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
+import { copyTextToClipboard } from '@/utils/clipboard';
+import { buildRepositoryRunAgentPrompt } from '@/utils/repositoryRunAgentPrompt';
 import { COMMON_REPOSITORY_RUN_TEMPLATES, applyRepositoryRunTemplate, type RepositoryRunCommandTemplate } from '@/utils/repositoryRunTemplates';
 import '@/styles/repository-run-settings.css';
 
@@ -83,7 +85,7 @@ export const SettingsRunSection: React.FC = () => {
   const { openRepos, activeRepo, onToast } = useRepositoryContext();
   const workflow = useWorkflowContext();
   const { setConfirmDialog } = useUIContext();
-  const { tr } = useI18n();
+  const { language, tr } = useI18n();
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [config, setConfig] = useState<RepositoryRunConfigDto | null>(null);
   const [persistedConfig, setPersistedConfig] = useState<RepositoryRunConfigDto | null>(null);
@@ -93,6 +95,7 @@ export const SettingsRunSection: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copyingAgentPrompt, setCopyingAgentPrompt] = useState(false);
   const repositories = useMemo(() => Array.from(new Set(openRepos)), [openRepos]);
   const configIsDirty = useMemo(() => config !== null && JSON.stringify(config) !== JSON.stringify(persistedConfig), [config, persistedConfig]);
   const selectedRepositoryIsOpen = repositories.includes(selectedRepo);
@@ -210,6 +213,24 @@ export const SettingsRunSection: React.FC = () => {
     }
   };
 
+  const copyAgentPrompt = async () => {
+    if (!selectedRepo || copyingAgentPrompt) return;
+    setCopyingAgentPrompt(true);
+    try {
+      const copied = await copyTextToClipboard(buildRepositoryRunAgentPrompt({ language, repositoryPath: selectedRepo }));
+      onToast(
+        copied
+          ? tr('KI-Agent-Prompt kopiert.', 'AI agent prompt copied.')
+          : tr('KI-Agent-Prompt konnte nicht kopiert werden.', 'Could not copy AI agent prompt.'),
+        !copied,
+      );
+    } catch (copyError: unknown) {
+      onToast(copyError instanceof Error ? copyError.message : tr('KI-Agent-Prompt konnte nicht kopiert werden.', 'Could not copy AI agent prompt.'), true);
+    } finally {
+      setCopyingAgentPrompt(false);
+    }
+  };
+
   const selectRepository = (nextRepo: string) => {
     if (!nextRepo || nextRepo === selectedRepo) return;
     if (!configIsDirty) {
@@ -253,13 +274,18 @@ export const SettingsRunSection: React.FC = () => {
           <h3>{tr('Run-Konfiguration', 'Run configuration')}</h3>
           <p className="settings-hint">{tr('Versionierte Befehle in .Open-Git-Control/run.json', 'Versioned commands in .Open-Git-Control/run.json')}</p>
         </div>
-        <button
-          className="staging-tool-btn"
-          onClick={() => void save()}
-          disabled={!config || !selectedRepositoryIsOpen || configRepositoryPath !== selectedRepo || loading || saving}
-        >
-          <Save size={13} /> {saving ? tr('Speichern…', 'Saving…') : tr('Speichern', 'Save')}
-        </button>
+        <div className="settings-inline-actions">
+          <button className="staging-tool-btn" onClick={() => void copyAgentPrompt()} disabled={!selectedRepo || copyingAgentPrompt}>
+            <Copy size={13} /> {copyingAgentPrompt ? tr('Kopiere...', 'Copying...') : tr('KI-Agent-Prompt kopieren', 'Copy AI agent prompt')}
+          </button>
+          <button
+            className="staging-tool-btn"
+            onClick={() => void save()}
+            disabled={!config || !selectedRepositoryIsOpen || configRepositoryPath !== selectedRepo || loading || saving}
+          >
+            <Save size={13} /> {saving ? tr('Speichern…', 'Saving…') : tr('Speichern', 'Save')}
+          </button>
+        </div>
       </div>
       <label className="settings-field">
         <span>{tr('Repository', 'Repository')}</span>

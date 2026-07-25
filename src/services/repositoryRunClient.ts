@@ -11,6 +11,9 @@ export const repositoryRunClient = {
   saveConfig(repoPath: string, config: RepositoryRunConfigDto) {
     return requireElectronApi().runs.saveRepositoryRunConfig(repoPath, config);
   },
+  watchConfig(repoPath: string | null) {
+    return requireElectronApi().runs.watchRepositoryRunConfig(repoPath);
+  },
   start(repoPath: string, action: RepositoryRunActionId) {
     return requireElectronApi().runs.startRepositoryRun(repoPath, action);
   },
@@ -19,6 +22,9 @@ export const repositoryRunClient = {
   },
   getState() {
     return requireElectronApi().runs.getRepositoryRunState();
+  },
+  onConfigChanged(callback: (repoPath: string) => void) {
+    return requireElectronApi().runs.onRepositoryRunConfigChanged(callback);
   },
   onEvent(callback: (event: RepositoryRunEventDto) => void) {
     return requireElectronApi().runs.onRepositoryRunEvent(callback);

@@ -21,6 +21,8 @@ describe('useRepositoryRun configuration binding', () => {
     root = createRoot(host);
     vi.spyOn(repositoryRunClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(repositoryRunClient, 'getState').mockResolvedValue({ success: true, data: null } as any);
+    vi.spyOn(repositoryRunClient, 'watchConfig').mockResolvedValue({ success: true, data: true });
+    vi.spyOn(repositoryRunClient, 'onConfigChanged').mockReturnValue(vi.fn());
     vi.spyOn(repositoryRunClient, 'onEvent').mockReturnValue(vi.fn());
   });
 
@@ -53,6 +55,69 @@ describe('useRepositoryRun configuration binding', () => {
     await act(async () => resolveFirstConfig?.({ success: true, data: { configPath: 'C:/repo-a/.ogc.json' } }));
 
     expect(current?.activeRunConfig).toBeNull();
+  });
+
+  it('refreshes the active configuration after a watched run.json change', async () => {
+    const configChanged = vi.fn();
+    vi.mocked(repositoryRunClient.onConfigChanged).mockImplementation((handler) => {
+      configChanged.mockImplementation(handler);
+      return vi.fn();
+    });
+    const getConfig = vi
+      .spyOn(repositoryRunClient, 'getConfig')
+      .mockResolvedValue({ success: true, data: { configPath: 'C:/repo-a/.Open-Git-Control/run.json' } } as any);
+    let current: ReturnType<typeof useRepositoryRun> | null = null;
+    const Harness = () => {
+      current = useRepositoryRun({ activeRepo: 'C:/repo-a', triggerRefresh: vi.fn() });
+      return null;
+    };
+
+    await act(async () => {
+      root.render(createElement(Harness));
+      await Promise.resolve();
+    });
+    expect(repositoryRunClient.watchConfig).toHaveBeenCalledWith('C:/repo-a');
+    const callsBeforeChange = getConfig.mock.calls.length;
+
+    await act(async () => {
+      configChanged('C:/repo-a');
+      await Promise.resolve();
+    });
+
+    expect(getConfig).toHaveBeenCalledTimes(callsBeforeChange + 1);
+    expect(current?.activeRunConfig).toEqual({ configPath: 'C:/repo-a/.Open-Git-Control/run.json' });
+  });
+
+  it('ignores run configuration changes for repositories that are no longer active', async () => {
+    const configChanged = vi.fn();
+    vi.mocked(repositoryRunClient.onConfigChanged).mockImplementation((handler) => {
+      configChanged.mockImplementation(handler);
+      return vi.fn();
+    });
+    const getConfig = vi
+      .spyOn(repositoryRunClient, 'getConfig')
+      .mockResolvedValue({ success: true, data: { configPath: 'C:/repo-b/.Open-Git-Control/run.json' } } as any);
+    const Harness = ({ activeRepo }: { activeRepo: string }) => {
+      useRepositoryRun({ activeRepo, triggerRefresh: vi.fn() });
+      return null;
+    };
+
+    await act(async () => {
+      root.render(createElement(Harness, { activeRepo: 'C:/repo-a' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      root.render(createElement(Harness, { activeRepo: 'C:/repo-b' }));
+      await Promise.resolve();
+    });
+    const callsBeforeChange = getConfig.mock.calls.length;
+
+    await act(async () => {
+      configChanged('C:/repo-a');
+      await Promise.resolve();
+    });
+
+    expect(getConfig).toHaveBeenCalledTimes(callsBeforeChange);
   });
 
   it('bounds output received from both getState and full state events by lines and UTF-8 bytes', async () => {
