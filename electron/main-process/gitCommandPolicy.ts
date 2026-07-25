@@ -212,6 +212,25 @@ const validateFetchArgs = (args: string[]): void => {
   if (values[1]) assertSafeValue(values[1], 'refspec');
 };
 
+const TAG_REFERENCE_STATUS_FORMAT = '--format=%(refname)%00%(objectname)%00%(*objectname)';
+
+const validateForEachRefArgs = (args: string[]): void => {
+  if (args.length !== 3 || args[0] !== TAG_REFERENCE_STATUS_FORMAT || args[1] !== 'refs/tags') {
+    throw new Error('Unsupported argument combination for git for-each-ref.');
+  }
+  const trackingRefPrefix = 'refs/ogc/remote-tags/';
+  if (!args[2].startsWith(trackingRefPrefix) || args[2].length === trackingRefPrefix.length) {
+    throw new Error('Unsupported tag tracking reference.');
+  }
+};
+
+const validateAdoptRemoteTagArgs = (args: string[]): void => {
+  if (args.length !== 2 || !/^[A-Za-z0-9._-]+$/.test(args[0])) {
+    throw new Error('Invalid remote tag adoption request.');
+  }
+  assertSafeValue(args[1], 'tag name');
+};
+
 const validatePullArgs = (args: string[]): void => {
   assertAllOptions(args, new Set(['--rebase', '--ff-only', '--no-ff', '--autostash']), 'pull');
 };
@@ -413,6 +432,10 @@ const validateCommandSpecificArgs = (commandName: GitCommandName, args: string[]
       return validateRemoteArgs(args);
     case 'tag':
       return validateTagArgs(args);
+    case 'forEachRef':
+      return validateForEachRefArgs(args);
+    case 'adoptRemoteTag':
+      return validateAdoptRemoteTagArgs(args);
     case 'fetch':
       return validateFetchArgs(args);
     case 'pull':

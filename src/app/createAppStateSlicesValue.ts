@@ -58,6 +58,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   onCheckoutBranch: (name) => state.runGitCommand(gitClient.buildCheckoutBranchArgs(name), tr(`Ausgecheckt: ${name}`, `Checked out: ${name}`)),
   onSetBranchContextMenu: state.setBranchContextMenu,
   tags: state.tags,
+  tagConflicts: state.tagConflicts,
   onCreateTag: state.handleCreateTag,
   onPushTags: state.handlePushTags,
   onDeleteTag: state.handleDeleteTag,

@@ -25,6 +25,24 @@ type ReleaseAssetAuthorization = {
 };
 
 const RELEASE_ASSET_AUTHORIZATION_TTL_MS = 30 * 60 * 1000;
+// Git tag names are refs. Keep this main-process validation local instead of
+// importing renderer code, which is intentionally excluded from tsconfig.node.
+// eslint-disable-next-line no-control-regex -- Git ref names reject ASCII control bytes.
+const RELEASE_TAG_PATTERN = /^[^\s\x00-\x1F\x7F~^:?*[\]\\]+$/;
+
+const isValidReleaseTagName = (tagName: string): boolean => {
+  if (!RELEASE_TAG_PATTERN.test(tagName)) return false;
+  return (
+    tagName !== '@' &&
+    !tagName.startsWith('/') &&
+    !tagName.endsWith('/') &&
+    !tagName.includes('//') &&
+    !tagName.includes('..') &&
+    !tagName.includes('@{') &&
+    !tagName.endsWith('.') &&
+    !tagName.split('/').some((component) => component.startsWith('.') || component.endsWith('.lock'))
+  );
+};
 
 function parseGithubRemoteTarget(remoteUrl: unknown, configuredHost: string, githubService: Pick<GitHubService, 'normalizeHost'>): GithubRemoteTarget | null {
   const remote = String(remoteUrl || '').trim();
@@ -84,6 +102,51 @@ async function localCommitishExists(gitService: GitService, repoPath: string, co
   } catch {
     return false;
   }
+}
+
+async function resolveLocalCommitish(gitService: GitService, repoPath: string, commitish: string): Promise<string | null> {
+  try {
+    const resolved = await gitService.runCommandAtPath(repoPath, ['rev-parse', '--verify', '--quiet', `${commitish}^{commit}`]);
+    return resolved.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GitHub can recreate a deleted remote tag without touching an older local
+ * tag of the same name. Never let a release request silently create that
+ * divergence: known local and remotely tracked tags must resolve to the
+ * requested release target before GitHub is allowed to create the release.
+ */
+async function validateReleaseTagTarget(gitService: GitService, repoPath: string, tagName: string, targetCommitish: unknown): Promise<string | null> {
+  const localTagCommit = await resolveLocalCommitish(gitService, repoPath, `refs/tags/${tagName}`);
+  const remoteTagCommit = await resolveLocalCommitish(gitService, repoPath, `refs/ogc/remote-tags/origin/${tagName}`);
+  if (!localTagCommit && !remoteTagCommit) return null;
+
+  const requestedTarget = String(targetCommitish || '').trim();
+  if (!requestedTarget) {
+    return 'A release target is required when the tag already exists locally or on the remote.';
+  }
+
+  let targetRevision: string;
+  try {
+    targetRevision = normalizeReleaseRevision(requestedTarget, 'release target');
+  } catch (error: unknown) {
+    return error instanceof Error ? error.message : 'Invalid release target.';
+  }
+  const targetCommit = await resolveLocalCommitish(gitService, repoPath, targetRevision);
+  if (!targetCommit) {
+    return 'The release target could not be resolved to a local commit.';
+  }
+  if (localTagCommit && targetCommit !== localTagCommit) {
+    return `Local tag "${tagName}" points to a different commit than the release target. Delete or move the local tag, or use a new tag name.`;
+  }
+  if (remoteTagCommit && targetCommit !== remoteTagCommit) {
+    return `Remote tag "${tagName}" points to a different commit than the release target. Refresh the repository and align the tag, or use a new tag name.`;
+  }
+
+  return null;
 }
 
 export function registerGithubReleaseHandlers({ gitService, githubService, readSettingsWithMigration }: RegisterGithubReleaseHandlersDeps): void {
@@ -156,6 +219,10 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         return { success: false, error: 'Tag-Name ist erforderlich.' };
       }
 
+      if (!isValidReleaseTagName(tagName)) {
+        return { success: false, error: 'Invalid tag name.' };
+      }
+
       if (!releaseName) {
         return { success: false, error: 'Release-Name ist erforderlich.' };
       }
@@ -194,6 +261,13 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         ) {
           return { success: false, error: 'Release target does not match the active repository origin.' };
         }
+        const tagValidationError = await validateReleaseTagTarget(gitService, authorizedRepoPath, tagName, params.targetCommitish);
+        if (tagValidationError) {
+          return { success: false, error: tagValidationError };
+        }
+        // The local tag lookup above is asynchronous, so bind the irreversible
+        // GitHub write to the active repository once more immediately before it.
+        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath());
         const currentAuthError = assertGithubAuthenticated(githubService);
         if (currentAuthError) return currentAuthError;
 

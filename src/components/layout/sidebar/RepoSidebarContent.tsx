@@ -25,6 +25,7 @@ type RepoSidebarContentProps = Pick<
   | 'isBranchPanelCollapsed'
   | 'onToggleBranchPanelCollapsed'
   | 'tags'
+  | 'tagConflicts'
   | 'onCreateTag'
   | 'onPushTags'
   | 'onDeleteTag'
@@ -187,6 +188,7 @@ export const RepoSidebarContent: React.FC<RepoSidebarContentProps> = (props) => 
 
       <TagPanel
         tags={props.tags}
+        tagConflicts={props.tagConflicts}
         onCreateTag={props.onCreateTag}
         onPushTags={props.onPushTags}
         onDeleteTag={props.onDeleteTag}

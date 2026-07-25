@@ -250,6 +250,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 onToggleRecoveryCenter={handleToggleRecoveryCenter}
                 currentBranch={repository.currentBranch}
                 branches={repository.branches}
+                conflictingTags={repository.tagConflicts}
                 onMergeBranch={repository.onMergeBranch}
                 onRunGitCommand={workflow.runGitCommand}
                 onOpenConflictResolverForPath={workflow.onOpenConflictResolverForPath}

@@ -18,6 +18,14 @@ const LOG_RECORD_SEPARATOR = '\x00';
 const LOG_FIELD_SEPARATOR = '\x1f';
 const LOG_REF_SEPARATOR = '\x1d';
 
+function parseDecoratedRefs(refsRaw: string): string[] {
+  if (!refsRaw) return [];
+  return refsRaw
+    .split(LOG_REF_SEPARATOR)
+    .map((ref) => ref.trim())
+    .filter(Boolean);
+}
+
 function splitGitLogRecord(record: string): string[] {
   const fields: string[] = [];
   let start = 0;
@@ -64,12 +72,7 @@ export function parseGitLog(logOutput: string): GitCommit[] {
           date,
           subject,
           parentHashes: parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [],
-          refs: refsRaw
-            ? refsRaw
-                .split(LOG_REF_SEPARATOR)
-                .map((ref) => ref.trim())
-                .filter(Boolean)
-            : [],
+          refs: parseDecoratedRefs(refsRaw),
           stats: null,
           statsState: 'missing' as const,
         };
@@ -98,12 +101,7 @@ export function parseGitLog(logOutput: string): GitCommit[] {
       ensureCurrent();
       const [hash = '', abbrevHash = '', author = '', date = '', subject = '', parentsRaw = '', refsRaw = ''] = splitGitLogRecord(token);
       const parentHashes = parentsRaw.trim() ? parentsRaw.trim().split(/\s+/).filter(Boolean) : [];
-      const refs = refsRaw
-        ? refsRaw
-            .split(LOG_REF_SEPARATOR)
-            .map((ref) => ref.trim())
-            .filter(Boolean)
-        : [];
+      const refs = parseDecoratedRefs(refsRaw);
 
       current = {
         hash,

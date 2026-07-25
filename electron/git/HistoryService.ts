@@ -88,7 +88,11 @@ export class HistoryService {
     const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso'];
 
     if (includeAll) {
-      args.splice(1, 0, '--all');
+      // Remote tags are synchronized into an internal namespace solely to
+      // detect conflicts safely. Local tags are the canonical UI truth, so
+      // internal tracking refs must neither add commits to the graph nor
+      // create a second visible tag with the same name.
+      args.splice(1, 0, '--exclude=refs/ogc/remote-tags/*', '--all');
     }
 
     return this.execute(args, repoPath);

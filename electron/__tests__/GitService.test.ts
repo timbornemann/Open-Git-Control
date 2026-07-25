@@ -33,6 +33,7 @@ describe('GitService.getLog pagination', () => {
     const args = runCommandSpy.mock.calls[0][0];
     expect(args).toContain('--skip=0');
     expect(args).toContain('--all');
+    expect(args).toContain('--exclude=refs/ogc/remote-tags/*');
   });
 });
 

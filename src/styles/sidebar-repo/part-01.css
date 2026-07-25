@@ -378,6 +378,23 @@
   opacity: 1 !important;
 }
 
+.tag-card.tag-card--conflict {
+  border-color: color-mix(in srgb, var(--status-danger) 64%, var(--border-color));
+  background: color-mix(in srgb, var(--status-danger) 14%, var(--bg-panel));
+  color: color-mix(in srgb, var(--status-danger) 72%, var(--text-primary));
+}
+
+.tag-card.tag-card--conflict:hover,
+.tag-card.tag-card--conflict:focus-visible {
+  border-color: color-mix(in srgb, var(--status-danger) 82%, var(--border-color));
+  background: color-mix(in srgb, var(--status-danger) 20%, var(--bg-hover));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-danger) 26%, transparent);
+}
+
+.tag-card.tag-card--conflict .tag-card-icon {
+  color: var(--status-danger);
+}
+
 .remote-card-content {
   display: flex;
   flex-direction: column;

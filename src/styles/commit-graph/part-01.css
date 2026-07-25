@@ -285,6 +285,15 @@
   --ref-chip-color: var(--status-warning);
 }
 
+.branch-label.tag.tag-conflict {
+  --ref-chip-color: var(--status-danger);
+}
+
+.branch-label.tag.tag-conflict::before {
+  content: '\26a0';
+  margin-right: 4px;
+}
+
 .branch-label.head-pointer {
   --ref-chip-color: var(--status-merged);
 }

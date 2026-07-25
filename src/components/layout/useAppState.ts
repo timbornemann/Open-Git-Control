@@ -386,6 +386,7 @@ export const useAppState = () => {
     toggleRepoPanelCollapsed,
 
     tags: repository.tags,
+    tagConflicts: repository.tagConflicts,
     remotes: repository.remotes,
     submodules: repository.submodules,
     hasRemoteOrigin: repository.hasRemoteOrigin,

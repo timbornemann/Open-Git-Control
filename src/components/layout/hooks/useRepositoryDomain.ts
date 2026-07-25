@@ -40,18 +40,6 @@ export const useRepositoryDomain = ({
     setInputDialog,
   });
 
-  const tags = useRepositoryTags({
-    activeRepo,
-    refreshTrigger,
-    currentBranch: branches.currentBranch,
-    language,
-    setGitActionToast,
-    runGitCommand,
-    setConfirmDialog,
-    setInputDialog,
-    onNavigateToCommit,
-  });
-
   const remoteSync = useRepositoryRemoteSync({
     activeRepo,
     refreshTrigger,
@@ -65,6 +53,19 @@ export const useRepositoryDomain = ({
     isGitActionRunningRef,
   });
 
+  const tags = useRepositoryTags({
+    activeRepo,
+    refreshTrigger,
+    currentBranch: branches.currentBranch,
+    trackedRemoteName: remoteSync.lastFetchedRemote,
+    language,
+    setGitActionToast,
+    runGitCommand,
+    setConfirmDialog,
+    setInputDialog,
+    onNavigateToCommit,
+  });
+
   const submodules = useRepositorySubmodules({
     activeRepo,
     refreshTrigger,
@@ -76,6 +77,7 @@ export const useRepositoryDomain = ({
   return {
     ...branches,
     tags: tags.tags,
+    tagConflicts: tags.tagConflicts,
     remotes: remotes.remotes,
     submodules: submodules.submodules,
     hasRemoteOrigin: remotes.hasRemoteOrigin,

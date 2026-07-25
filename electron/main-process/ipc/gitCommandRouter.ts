@@ -102,7 +102,7 @@ const executeLog: GitCommandExecutor = (context) => {
   const includeAll = context.args[1] !== 'head';
   const offset = Number(context.args[2]) || 0;
   const args = ['log', '--topo-order', '-z', `-${limit}`, `--skip=${offset}`, `--pretty=format:${STRUCTURED_LOG_FORMAT}`, '--date=iso'];
-  if (includeAll) args.splice(1, 0, '--all');
+  if (includeAll) args.splice(1, 0, '--exclude=refs/ogc/remote-tags/*', '--all');
   return runInContext(context, args);
 };
 
@@ -114,6 +114,37 @@ const executeCommitDetails: GitCommandExecutor = async (context) => {
     return runInContext(context, ['diff', '--name-status', '-M', '-z', firstParent, commitHash]);
   }
   return runInContext(context, ['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', '-z', commitHash]);
+};
+
+const ZERO_OBJECT_ID = '0'.repeat(40);
+
+const executeAdoptRemoteTag: GitCommandExecutor = async (context) => {
+  const [remote, tagName] = context.args;
+  const localRef = `refs/tags/${tagName}`;
+  const trackedRemoteRef = `refs/ogc/remote-tags/${remote}/${tagName}`;
+
+  try {
+    // A local ref wins the race as well as the normal reconciliation rule.
+    await runInContext(context, ['rev-parse', '--verify', '--quiet', `${localRef}^{commit}`]);
+    return '';
+  } catch {
+    // A missing local tag is the only state that may be adopted.
+  }
+
+  const remoteObject = (await runInContext(context, ['rev-parse', '--verify', '--quiet', trackedRemoteRef])).trim();
+  if (!/^[0-9a-f]{40,64}$/i.test(remoteObject)) {
+    throw new Error('Tracked remote tag could not be resolved.');
+  }
+
+  try {
+    // The zero old-value makes this an atomic create: never overwrite a tag
+    // created between the existence check above and this update.
+    await runInContext(context, ['update-ref', localRef, remoteObject, ZERO_OBJECT_ID]);
+  } catch (error: unknown) {
+    if (/reference already exists|cannot lock ref/i.test(error instanceof Error ? error.message : String(error))) return '';
+    throw error;
+  }
+  return '';
 };
 
 const executeConflictMarkResolved: GitCommandExecutor = async (context) => {
@@ -158,6 +189,8 @@ const COMMAND_EXECUTORS: Partial<Record<GitCommandName, GitCommandExecutor>> = {
   cherryPickContinue: async (context) => executeSequencerCommand(context, ['cherry-pick', '--continue'], { GIT_EDITOR: 'true' }),
   cherryPickAbort: async (context) => executeSequencerCommand(context, ['cherry-pick', '--abort']),
   fetch: executeStreamingCommand,
+  forEachRef: (context) => runInContext(context, ['for-each-ref', ...context.args]),
+  adoptRemoteTag: executeAdoptRemoteTag,
   pull: executeStreamingCommand,
   submoduleStatus: async (context) => {
     try {

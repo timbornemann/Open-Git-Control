@@ -43,6 +43,7 @@ interface CommitGraphProps {
   onToggleRecoveryCenter?: () => void;
   currentBranch?: string;
   branches?: BranchInfo[];
+  conflictingTags?: string[];
   onMergeBranch?: (branchName: string, mode: GitMergeMode) => void;
   onRunGitCommand?: (args: string[], successMsg: string, actionLabel?: string, options?: RunGitCommandOptions) => Promise<boolean>;
   /** Wenn ein Git-Befehl hier direkt fehlschlaegt (Fallback ohne zentralen Runner), Konflikt-Resolver oeffnen */
@@ -65,6 +66,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   onToggleRecoveryCenter,
   currentBranch = '',
   branches = [],
+  conflictingTags = [],
   onMergeBranch,
   onRunGitCommand,
   onOpenConflictResolverForPath,
@@ -72,6 +74,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
   onRefreshWorkingTree,
 }) => {
   const { t, locale, tr } = useI18n();
+  const conflictingTagNames = useMemo(() => new Set(conflictingTags), [conflictingTags]);
   const setToast = useAppToastSetter();
   const { setConfirmDialog, setInputDialog } = useCommitGraphDialogs();
   const [highlightedBranchRef, setHighlightedBranchRef] = useState<string | null>(null);
@@ -429,6 +432,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
           selectedPathColor={selectedPathColor}
           branchTipByRef={branchTipByRef}
           localBranchNames={localBranchNames}
+          conflictingTags={conflictingTagNames}
           activeHighlightedBranch={activeHighlightedBranch}
           selectedBranchTarget={selectedBranchTarget}
           hasSelectedCommitFocus={hasSelectedCommitFocus}

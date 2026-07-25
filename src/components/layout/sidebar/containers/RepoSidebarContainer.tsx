@@ -20,6 +20,7 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
       isBranchPanelCollapsed={ui.isBranchPanelCollapsed}
       onToggleBranchPanelCollapsed={ui.onToggleBranchPanelCollapsed}
       tags={repository.tags}
+      tagConflicts={repository.tagConflicts}
       onCreateTag={repository.onCreateTag}
       onPushTags={repository.onPushTags}
       onDeleteTag={repository.onDeleteTag}

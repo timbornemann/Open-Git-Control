@@ -375,6 +375,134 @@ describe('registerGithubHandlers fork flow', () => {
     });
   });
 
+  it('rejects a release when the same local tag points to a different commit', async () => {
+    const createRelease = vi.fn();
+    const oldCommit = 'a'.repeat(40);
+    const releaseCommit = 'b'.repeat(40);
+    const gitService = {
+      getRepoPath: vi.fn().mockReturnValue('C:/repos/project'),
+      getRepoOriginUrl: vi.fn().mockResolvedValue('https://github.com/acme/project.git'),
+      runCommandAtPath: vi.fn(async (_repoPath: string, args: string[]) => {
+        if (args[3] === 'refs/tags/v1.3.0^{commit}') return oldCommit;
+        if (args[3] === 'main^{commit}') return releaseCommit;
+        throw new Error(`Unexpected revision: ${args[3]}`);
+      }),
+    } as any;
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'acme',
+          repo: 'project',
+          repoPath: 'C:/repos/project',
+          tagName: 'v1.3.0',
+          targetCommitish: 'main',
+          releaseName: 'Release 1.3.0',
+        },
+      ),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Local tag "v1.3.0" points to a different commit than the release target. Delete or move the local tag, or use a new tag name.',
+    });
+    expect(createRelease).not.toHaveBeenCalled();
+  });
+
+  it('accepts a release when the existing local tag matches its target commit', async () => {
+    const createRelease = vi.fn().mockResolvedValue({ id: 43, tagName: 'v1.3.0', name: 'Release 1.3.0' });
+    const releaseCommit = 'b'.repeat(40);
+    const gitService = {
+      getRepoPath: vi.fn().mockReturnValue('C:/repos/project'),
+      getRepoOriginUrl: vi.fn().mockResolvedValue('https://github.com/acme/project.git'),
+      runCommandAtPath: vi.fn(async (_repoPath: string, args: string[]) => {
+        if (args[3] === 'refs/tags/v1.3.0^{commit}' || args[3] === 'main^{commit}') return releaseCommit;
+        throw new Error(`Unexpected revision: ${args[3]}`);
+      }),
+    } as any;
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'acme',
+          repo: 'project',
+          repoPath: 'C:/repos/project',
+          tagName: 'v1.3.0',
+          targetCommitish: 'main',
+          releaseName: 'Release 1.3.0',
+        },
+      ),
+    ).resolves.toMatchObject({ success: true });
+    expect(createRelease).toHaveBeenCalledWith(expect.objectContaining({ tagName: 'v1.3.0', targetCommitish: 'main' }));
+  });
+
+  it('rejects a release when the remotely tracked tag points to a different commit', async () => {
+    const createRelease = vi.fn();
+    const remoteCommit = 'a'.repeat(40);
+    const releaseCommit = 'b'.repeat(40);
+    const gitService = {
+      getRepoPath: vi.fn().mockReturnValue('C:/repos/project'),
+      getRepoOriginUrl: vi.fn().mockResolvedValue('https://github.com/acme/project.git'),
+      runCommandAtPath: vi.fn(async (_repoPath: string, args: string[]) => {
+        if (args[3] === 'refs/tags/v1.3.0^{commit}') throw new Error('missing local tag');
+        if (args[3] === 'refs/ogc/remote-tags/origin/v1.3.0^{commit}') return remoteCommit;
+        if (args[3] === 'main^{commit}') return releaseCommit;
+        throw new Error(`Unexpected revision: ${args[3]}`);
+      }),
+    } as any;
+    const githubService = {
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      createRelease,
+      normalizeHost: vi.fn().mockReturnValue('github.com'),
+      isDeviceFlowConfigured: vi.fn().mockReturnValue(true),
+    } as any;
+    registerGithubHandlers({
+      gitService,
+      githubService,
+      readSettingsWithMigration: vi.fn().mockReturnValue({ githubHost: 'github.com', githubOauthClientId: '' }),
+    });
+
+    await expect(
+      handlers.get('github:createRelease')!(
+        {},
+        {
+          owner: 'acme',
+          repo: 'project',
+          repoPath: 'C:/repos/project',
+          tagName: 'v1.3.0',
+          targetCommitish: 'main',
+          releaseName: 'Release 1.3.0',
+        },
+      ),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Remote tag "v1.3.0" points to a different commit than the release target. Refresh the repository and align the tag, or use a new tag name.',
+    });
+    expect(createRelease).not.toHaveBeenCalled();
+  });
+
   it('accepts the fork origin itself as the release target', async () => {
     const createRelease = vi.fn().mockResolvedValue({ id: 43, tagName: 'v2.0.0' });
     const githubService = {

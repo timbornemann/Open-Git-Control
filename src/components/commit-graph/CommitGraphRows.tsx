@@ -36,6 +36,7 @@ type CommitGraphRowsProps = {
   selectedPathColor: string;
   branchTipByRef: Map<string, GraphNode>;
   localBranchNames: ReadonlySet<string>;
+  conflictingTags: ReadonlySet<string>;
   activeHighlightedBranch: string | null;
   selectedBranchTarget?: string;
   hasSelectedCommitFocus: boolean;
@@ -99,6 +100,7 @@ export const CommitGraphRows = ({
   selectedPathColor,
   branchTipByRef,
   localBranchNames,
+  conflictingTags,
   activeHighlightedBranch,
   selectedBranchTarget,
   hasSelectedCommitFocus,
@@ -201,6 +203,7 @@ export const CommitGraphRows = ({
                 <div className="commit-refs">
                   {sortedRefs.map((ref, index) => {
                     const branchTarget = resolveHighlightableBranchRef(ref);
+                    const hasTagConflict = ref.startsWith('tag:') && conflictingTags.has(ref.slice('tag:'.length).trim());
                     const isActiveBranchRef = Boolean(
                       branchTarget && (hasSelectedCommitFocus ? selectedBranchTarget === branchTarget : activeHighlightedBranch === branchTarget),
                     );
@@ -208,7 +211,11 @@ export const CommitGraphRows = ({
 
                     if (!branchTarget) {
                       return (
-                        <span key={index} className={`branch-label ${getRefKind(ref, localBranchNames)}`}>
+                        <span
+                          key={index}
+                          className={`branch-label ${getRefKind(ref, localBranchNames)}${hasTagConflict ? ' tag-conflict' : ''}`}
+                          title={hasTagConflict ? 'Tag-Konflikt: Lokaler und Remote-Tag zeigen auf unterschiedliche Commits.' : undefined}
+                        >
                           {ref}
                         </span>
                       );

@@ -136,6 +136,7 @@ export type RepositoryStateContract = {
   onCheckoutBranch: (name: string) => void;
   onSetBranchContextMenu: (value: BranchContextMenuState) => void;
   tags: string[];
+  tagConflicts: string[];
   onCreateTag: () => void;
   onPushTags: () => void;
   onDeleteTag: (name: string) => void;

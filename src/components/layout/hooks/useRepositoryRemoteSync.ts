@@ -3,6 +3,7 @@ import type { RemoteSyncState } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getLocale } from '@/i18nCore';
 import { parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
+import { parseTagReferenceStatus, remoteTagTrackingRefPrefix, TAG_REFERENCE_STATUS_FORMAT } from '@/utils/tagConflicts';
 import { formatTime } from '@/utils/dateTime';
 import { gitClient } from '@/services/gitClient';
 import type { RemoteStatusInfo } from '@/components/layout/layoutTypes';
@@ -16,6 +17,11 @@ export const EMPTY_REMOTE_SYNC_STATE: RemoteSyncState = {
   behind: 0,
   hasUpstream: false,
 };
+
+// Remote tags are fetched into an application-owned ref namespace rather than
+// `refs/tags/*`. That preserves their history markers while guaranteeing an
+// automatic refresh cannot overwrite a user's local tag with the same name.
+const remoteTagTrackingRefspec = (remote: string) => `+refs/tags/*:refs/ogc/remote-tags/${remote}/*`;
 
 type Params = {
   activeRepo: string | null;
@@ -45,6 +51,7 @@ export const useRepositoryRemoteSync = ({
   isGitActionRunningRef,
 }: Params) => {
   const [remoteSync, setRemoteSync] = useState<RemoteSyncState>({ ...EMPTY_REMOTE_SYNC_STATE });
+  const [lastFetchedRemote, setLastFetchedRemote] = useState<string | null>(null);
   const isRemoteFetchRunningRef = useRef(false);
   const remoteFetchRunIdRef = useRef(0);
   const activeRepoRef = useRef<string | null>(activeRepo);
@@ -75,6 +82,7 @@ export const useRepositoryRemoteSync = ({
     remoteFetchRunIdRef.current += 1;
     isRemoteFetchRunningRef.current = false;
     setRemoteSync({ ...EMPTY_REMOTE_SYNC_STATE });
+    setLastFetchedRemote(null);
   }, [activeRepo]);
 
   const formatLastFetchedAt = useCallback(
@@ -126,6 +134,7 @@ export const useRepositoryRemoteSync = ({
   }, [activeRepo, refreshTrigger, setRemoteSync]);
 
   const refreshRemoteState = useCallback(
+    // eslint-disable-next-line complexity -- Branch fetch, tag reconciliation and UI state must remain one repository-bound operation.
     async (showToast = false) => {
       if (!gitClient.isAvailable() || !activeRepo || hasAnyRemote !== true) return false;
       if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
@@ -152,26 +161,82 @@ export const useRepositoryRemoteSync = ({
         // Keep this operation bound to the repository whose remote and branch
         // state were inspected. The main process rejects it if that repository
         // ceased to be active while the asynchronous status call was pending.
-        // The status indicator only needs remote-tracking branches. Fetching
-        // every tag makes this background check fail when a local tag has the
-        // same name as a remote tag but points to a different commit.
+        // Fetch branch tracking refs first. Pulling tags into `refs/tags/*`
+        // would make a normal background refresh fail if a same-named local
+        // tag points to another commit.
         const result = await gitClient.runGitCommandForRepo(repoAtStart, 'fetch', fetchRemote, '--prune', '--no-tags', '--quiet');
         if (activeRepoRef.current !== repoAtStart) return false;
-        if (result.success) {
-          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
-          triggerRefresh();
+        if (!result.success) {
+          const errorMessage = String(result.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
+          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
           if (showToast) {
-            setGitActionToast({ msg: t('generated.components.layout.hooks.userepositorydomain.remote_updated_d577a6b1'), isError: false });
+            setGitActionToast({ msg: errorMessage, isError: true });
           }
-          return true;
+          return false;
         }
 
-        const errorMessage = String(result.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
-        setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
-        if (showToast) {
-          setGitActionToast({ msg: errorMessage, isError: true });
+        // Maintain remote release state independently from local tags.
+        // `--prune` removes tags deleted on the remote from this tracking
+        // namespace on the next sync, without moving local tags.
+        const remoteTagsResult = await gitClient.runGitCommandForRepo(
+          repoAtStart,
+          'fetch',
+          fetchRemote,
+          '--prune',
+          '--no-tags',
+          '--quiet',
+          remoteTagTrackingRefspec(fetchRemote),
+        );
+        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!remoteTagsResult.success) {
+          const errorMessage = String(remoteTagsResult.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
+          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
+          if (showToast) {
+            setGitActionToast({ msg: errorMessage, isError: true });
+          }
+          return false;
         }
-        return false;
+
+        // Adopt remote tags that do not exist locally yet. Existing local tags
+        // are deliberately left untouched; a mismatching name is exposed as a
+        // conflict instead of being silently moved by an automatic fetch.
+        const referenceStatus = await gitClient.runGitCommandForRepo(
+          repoAtStart,
+          'forEachRef',
+          TAG_REFERENCE_STATUS_FORMAT,
+          'refs/tags',
+          remoteTagTrackingRefPrefix(fetchRemote),
+        );
+        if (activeRepoRef.current !== repoAtStart) return false;
+        if (!referenceStatus.success) {
+          const errorMessage = String(referenceStatus.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
+          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
+          if (showToast) {
+            setGitActionToast({ msg: errorMessage, isError: true });
+          }
+          return false;
+        }
+
+        for (const tagName of parseTagReferenceStatus(referenceStatus.data, fetchRemote).remoteOnlyTagNames) {
+          const adoptionResult = await gitClient.runGitCommandForRepo(repoAtStart, 'adoptRemoteTag', fetchRemote, tagName);
+          if (activeRepoRef.current !== repoAtStart) return false;
+          if (adoptionResult.success) continue;
+
+          const errorMessage = String(adoptionResult.error || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423'));
+          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: errorMessage }));
+          if (showToast) {
+            setGitActionToast({ msg: errorMessage, isError: true });
+          }
+          return false;
+        }
+
+        setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));
+        setLastFetchedRemote(fetchRemote);
+        triggerRefresh();
+        if (showToast) {
+          setGitActionToast({ msg: t('generated.components.layout.hooks.userepositorydomain.remote_updated_d577a6b1'), isError: false });
+        }
+        return true;
       } catch (error: any) {
         if (activeRepoRef.current !== repoAtStart) return false;
         const errorMessage = error?.message || t('generated.components.layout.hooks.userepositorydomain.could_not_update_remote_fbb52423');
@@ -314,6 +379,7 @@ export const useRepositoryRemoteSync = ({
   return {
     remoteSync,
     remoteStatus,
+    lastFetchedRemote,
     refreshRemoteState,
   };
 };

@@ -37,6 +37,22 @@ describe('gitCommandPolicy', () => {
 
   it('allows the tag-free background fetch used for remote status checks', () => {
     expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet'])).not.toThrow();
+    expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet', '+refs/tags/*:refs/ogc/remote-tags/origin/*'])).not.toThrow();
+    expect(() => validateCommandArgs('fetch', ['origin', '--no-tags', '--quiet', '+refs/tags/v2.0.3:refs/tags/v2.0.3'])).not.toThrow();
+  });
+
+  it('allows only the bounded tag-reference query used for conflict indicators', () => {
+    expect(() =>
+      validateCommandArgs('forEachRef', ['--format=%(refname)%00%(objectname)%00%(*objectname)', 'refs/tags', 'refs/ogc/remote-tags/origin/']),
+    ).not.toThrow();
+    expect(() => validateCommandArgs('forEachRef', ['--format=%(refname)', 'refs/tags', 'refs/ogc/remote-tags/origin/'])).toThrow(
+      'Unsupported argument combination for git for-each-ref.',
+    );
+  });
+
+  it('allows the atomic adoption of a missing remote tag', () => {
+    expect(() => validateCommandArgs('adoptRemoteTag', ['origin', 'v2.0.3'])).not.toThrow();
+    expect(() => validateCommandArgs('adoptRemoteTag', ['origin/unsafe', 'v2.0.3'])).toThrow('Invalid remote tag adoption request.');
   });
 
   it('converts accepted IPC pathspecs to literal form, including filenames that resemble pathspec magic', () => {

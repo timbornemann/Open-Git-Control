@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowUpCircle, Plus, Search, Tag, X } from 'lucide-react';
+import { AlertTriangle, ArrowUpCircle, Plus, Search, Tag, X } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { RepoCard, RepoCardContent, RepoCardHeader, RepoCardToolbar } from './RepoCard';
 
 type Props = {
   tags: string[];
+  tagConflicts: string[];
   onCreateTag: () => void;
   onPushTags: () => void;
   onDeleteTag: (name: string) => void;
@@ -13,9 +14,10 @@ type Props = {
   onToggleCollapsed: () => void;
 };
 
-export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDeleteTag, onSelectTag, collapsed, onToggleCollapsed }) => {
-  const { t } = useI18n();
+export const TagPanel: React.FC<Props> = ({ tags, tagConflicts, onCreateTag, onPushTags, onDeleteTag, onSelectTag, collapsed, onToggleCollapsed }) => {
+  const { t, tr } = useI18n();
   const [query, setQuery] = useState('');
+  const conflictingTagNames = useMemo(() => new Set(tagConflicts), [tagConflicts]);
 
   const filteredTags = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -60,35 +62,49 @@ export const TagPanel: React.FC<Props> = ({ tags, onCreateTag, onPushTags, onDel
           <RepoCardContent className="repo-card-scroll">
             {filteredTags.length > 0 ? (
               <div className="tag-grid">
-                {filteredTags.map((tag) => (
-                  <div
-                    key={tag}
-                    className="tag-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onSelectTag(tag)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        onSelectTag(tag);
-                      }
-                    }}
-                    title={t('generated.components.sidebar.tagpanel.jump_to_this_tag_commit_a17f9ab2')}
-                  >
-                    <Tag size={12} className="tag-card-icon" />
-                    <span className="tag-card-name">{tag}</span>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteTag(tag);
+                {filteredTags.map((tag) => {
+                  const hasConflict = conflictingTagNames.has(tag);
+                  const title = hasConflict
+                    ? tr(
+                        'Tag-Konflikt: Der lokale und der Remote-Tag zeigen auf unterschiedliche Commits. Loesche oder verschiebe den gewuenschten Tag bewusst.',
+                        'Tag conflict: the local and remote tags point to different commits. Delete or move the intended tag deliberately.',
+                      )
+                    : t('generated.components.sidebar.tagpanel.jump_to_this_tag_commit_a17f9ab2');
+
+                  return (
+                    <div
+                      key={tag}
+                      className={`tag-card${hasConflict ? ' tag-card--conflict' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onSelectTag(tag)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onSelectTag(tag);
+                        }
                       }}
-                      className="icon-btn repo-close-btn tag-card-delete"
-                      title={t('generated.components.sidebar.tagpanel.delete_tag_0014c6f5')}
+                      title={title}
                     >
-                      <X size={11} />
-                    </button>
-                  </div>
-                ))}
+                      {hasConflict ? (
+                        <AlertTriangle size={12} className="tag-card-icon" aria-label={tr('Tag-Konflikt', 'Tag conflict')} />
+                      ) : (
+                        <Tag size={12} className="tag-card-icon" />
+                      )}
+                      <span className="tag-card-name">{tag}</span>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteTag(tag);
+                        }}
+                        className="icon-btn repo-close-btn tag-card-delete"
+                        title={t('generated.components.sidebar.tagpanel.delete_tag_0014c6f5')}
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="repo-state-text">

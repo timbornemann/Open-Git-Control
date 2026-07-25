@@ -121,13 +121,15 @@ describe('useRepositoryRemoteSync', () => {
 
   it('fetches the tracked upstream remote when it is not named origin', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
-    const runGitCommandForRepo = vi
-      .spyOn(gitClient, 'runGitCommandForRepo')
-      .mockImplementation(async (_repoPath, command) =>
-        command === 'status'
-          ? { success: true, data: '# branch.head feature\n# branch.upstream upstream/feature\n# branch.ab +0 -0\n' }
-          : { success: true, data: '' },
-      );
+    const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repoPath, command) => {
+      if (command === 'status') {
+        return { success: true, data: '# branch.head feature\n# branch.upstream upstream/feature\n# branch.ab +0 -0\n' };
+      }
+      if (command === 'forEachRef') {
+        return { success: true, data: `refs/ogc/remote-tags/upstream/v3.0.0\0${'a'.repeat(40)}\0\n` };
+      }
+      return { success: true, data: '' };
+    });
     const triggerRefresh = vi.fn();
     const setGitActionToast = vi.fn();
     const setActiveGitActionLabel = vi.fn();
@@ -155,6 +157,23 @@ describe('useRepositoryRemoteSync', () => {
     });
 
     expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\fork', 'fetch', 'upstream', '--prune', '--no-tags', '--quiet');
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(
+      'C:\\repos\\fork',
+      'fetch',
+      'upstream',
+      '--prune',
+      '--no-tags',
+      '--quiet',
+      '+refs/tags/*:refs/ogc/remote-tags/upstream/*',
+    );
+    expect(runGitCommandForRepo).toHaveBeenCalledWith(
+      'C:\\repos\\fork',
+      'forEachRef',
+      '--format=%(refname)%00%(objectname)%00%(*objectname)',
+      'refs/tags',
+      'refs/ogc/remote-tags/upstream/',
+    );
+    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\fork', 'adoptRemoteTag', 'upstream', 'v3.0.0');
     expect(runGitCommandForRepo.mock.calls.some(([, command, ...args]) => command === 'fetch' && args.includes('origin'))).toBe(false);
     hook.unmount();
   });
