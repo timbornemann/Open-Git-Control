@@ -32,4 +32,8 @@ export const gitWorkflowCommands = {
   stashPop(): GitCommandArgs {
     return gitClient.buildStashPopArgs();
   },
+
+  adoptRemoteTag(remote: string, tagName: string): GitCommandArgs {
+    return ['fetch', remote, '--no-tags', '--quiet', `+refs/tags/${tagName}:refs/tags/${tagName}`];
+  },
 };

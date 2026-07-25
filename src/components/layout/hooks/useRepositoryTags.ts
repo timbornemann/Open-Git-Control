@@ -7,6 +7,7 @@ import type { ConfirmDialogState, InputDialogState } from '@/components/layout/l
 import { buildCreateTagDialog, buildDeleteTagDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
+import { gitWorkflowCommands } from '../workflows/gitWorkflowCommands';
 
 type Params = {
   activeRepo: string | null;
@@ -124,7 +125,7 @@ export const useRepositoryTags = ({
           // Fetching this one remote ref preserves annotated-tag metadata and
           // makes the now-unambiguous remote tag the single local tag.
           await runGitCommand(
-            ['fetch', trackedRemoteName, '--no-tags', '--quiet', `+refs/tags/${tagName}:refs/tags/${tagName}`],
+            gitWorkflowCommands.adoptRemoteTag(trackedRemoteName, tagName),
             tr(`Remote-Tag "${tagName}" lokal übernommen.`, `Remote tag "${tagName}" adopted locally.`),
             undefined,
             { expectedRepoPath: repoAtDialogOpen },
