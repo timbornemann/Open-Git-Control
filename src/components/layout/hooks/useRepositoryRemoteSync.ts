@@ -152,7 +152,10 @@ export const useRepositoryRemoteSync = ({
         // Keep this operation bound to the repository whose remote and branch
         // state were inspected. The main process rejects it if that repository
         // ceased to be active while the asynchronous status call was pending.
-        const result = await gitClient.runGitCommandForRepo(repoAtStart, 'fetch', fetchRemote, '--prune', '--tags', '--quiet');
+        // The status indicator only needs remote-tracking branches. Fetching
+        // every tag makes this background check fail when a local tag has the
+        // same name as a remote tag but points to a different commit.
+        const result = await gitClient.runGitCommandForRepo(repoAtStart, 'fetch', fetchRemote, '--prune', '--no-tags', '--quiet');
         if (activeRepoRef.current !== repoAtStart) return false;
         if (result.success) {
           setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchedAt: Date.now(), lastFetchError: null }));

@@ -203,7 +203,7 @@ const validateTagArgs = (args: string[]): void => {
 
 const validateFetchArgs = (args: string[]): void => {
   const options = args.filter((arg) => arg.startsWith('-'));
-  assertAllOptions(options, new Set(['--all', '--prune', '--tags', '--quiet']), 'fetch');
+  assertAllOptions(options, new Set(['--all', '--prune', '--tags', '--no-tags', '--quiet']), 'fetch');
   const values = args.filter((arg) => !arg.startsWith('-'));
   if (values.length > 2 || (options.includes('--all') && values.length > 0)) {
     throw new Error('Unsupported argument combination for git fetch.');

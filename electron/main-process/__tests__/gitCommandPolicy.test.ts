@@ -35,6 +35,10 @@ describe('gitCommandPolicy', () => {
     expect(() => validateCommandArgs('push', ['ext::sh -c evil', 'HEAD'])).toThrow('remote-helper URLs are not allowed');
   });
 
+  it('allows the tag-free background fetch used for remote status checks', () => {
+    expect(() => validateCommandArgs('fetch', ['origin', '--prune', '--no-tags', '--quiet'])).not.toThrow();
+  });
+
   it('converts accepted IPC pathspecs to literal form, including filenames that resemble pathspec magic', () => {
     expect(normalizeCommandArgs('checkout', ['stash@{0}', '--', 'docs/[draft].md'])).toEqual(['stash@{0}', '--', ':(literal)docs/[draft].md']);
     expect(normalizeCommandArgs('clean', ['-f', '--', 'generated/[temp].txt'])).toEqual(['-f', '--', ':(literal)generated/[temp].txt']);

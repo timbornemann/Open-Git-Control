@@ -80,7 +80,7 @@ describe('useRepositoryRemoteSync', () => {
     });
 
     expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\demo', 'status', '--porcelain=v2', '--branch');
-    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\demo', 'fetch', 'origin', '--prune', '--tags', '--quiet');
+    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\demo', 'fetch', 'origin', '--prune', '--no-tags', '--quiet');
     expect(runGitCommandForRepo.mock.calls.some(([, command, ...args]) => command === 'fetch' && args.includes('--all'))).toBe(false);
     expect(removeRemote).not.toHaveBeenCalled();
     expect(hook.current.remoteSync.lastFetchError).toContain('404');
@@ -154,7 +154,7 @@ describe('useRepositoryRemoteSync', () => {
       });
     });
 
-    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\fork', 'fetch', 'upstream', '--prune', '--tags', '--quiet');
+    expect(runGitCommandForRepo).toHaveBeenCalledWith('C:\\repos\\fork', 'fetch', 'upstream', '--prune', '--no-tags', '--quiet');
     expect(runGitCommandForRepo.mock.calls.some(([, command, ...args]) => command === 'fetch' && args.includes('origin'))).toBe(false);
     hook.unmount();
   });
