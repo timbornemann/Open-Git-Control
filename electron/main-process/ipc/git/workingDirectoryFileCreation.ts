@@ -150,6 +150,23 @@ try {
   }
 };
 
+export const createWorkingDirectoryEntrySafely = (targetPath: string, kind: 'file' | 'folder'): void => {
+  if (process.platform === 'win32') createWindowsEntryWithExplicitAccess(targetPath, kind);
+  else if (kind === 'file') fs.writeFileSync(targetPath, '', { encoding: 'utf8', flag: 'wx' });
+  else fs.mkdirSync(targetPath);
+  try {
+    fs.accessSync(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+  } catch (permissionError: unknown) {
+    try {
+      if (kind === 'file') fs.unlinkSync(targetPath);
+      else fs.rmdirSync(targetPath);
+    } catch {
+      // Keep the original permission error; the recovery cleanup is best-effort.
+    }
+    throw permissionError;
+  }
+};
+
 export function registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath }: RegisterWorkingDirectoryFileCreationHandlerDeps): void {
   const createEntry = (kind: 'file' | 'folder') => async (_event: unknown, entryPath: unknown, requestedRepoPath?: unknown) => {
     try {
@@ -161,20 +178,7 @@ export function registerWorkingDirectoryFileCreationHandler({ gitService, workin
       // Windows parent ACLs may not propagate usable access to new children.
       // Create with an explicit descriptor there so no inaccessible entry
       // exists even briefly. The native APIs retain exclusive creation.
-      if (process.platform === 'win32') createWindowsEntryWithExplicitAccess(targetPath, kind);
-      else if (kind === 'file') fs.writeFileSync(targetPath, '', { encoding: 'utf8', flag: 'wx' });
-      else fs.mkdirSync(targetPath);
-      try {
-        fs.accessSync(targetPath, fs.constants.R_OK | fs.constants.W_OK);
-      } catch (permissionError: unknown) {
-        try {
-          if (kind === 'file') fs.unlinkSync(targetPath);
-          else fs.rmdirSync(targetPath);
-        } catch {
-          // Keep the original permission error; the recovery cleanup is best-effort.
-        }
-        throw permissionError;
-      }
+      createWorkingDirectoryEntrySafely(targetPath, kind);
       return { success: true, targetPath: relativePath };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

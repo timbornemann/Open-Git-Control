@@ -220,6 +220,14 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       invokeGitOperationForRepo(repoPath, 'file info', IpcChannel.GitGetWorkingDirectoryFileInfo, filePath, repoPath),
     getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) =>
       invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath, allowLargeImage),
+    applyWorkingDirectoryMoves: (moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'move files', IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders }, repoPath),
+    findEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'find empty folders', IpcChannel.GitFindEmptyWorkingDirectoryFolders, folderPaths, repoPath),
+    deleteEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'delete empty folders', IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, folderPaths, repoPath),
+    createWorkingDirectoryArchive: (sourcePaths: string[], targetPath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'create archive', IpcChannel.GitCreateWorkingDirectoryArchive, { sourcePaths, targetPath }, repoPath),
     moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'move file', IpcChannel.GitMoveWorkingDirectoryEntry, { sourcePath, targetPath, overwrite }, repoPath),
     copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
@@ -393,6 +401,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       createWorkingDirectoryFolder: flatApi.createWorkingDirectoryFolder,
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
+      applyWorkingDirectoryMoves: flatApi.applyWorkingDirectoryMoves,
+      findEmptyWorkingDirectoryFolders: flatApi.findEmptyWorkingDirectoryFolders,
+      deleteEmptyWorkingDirectoryFolders: flatApi.deleteEmptyWorkingDirectoryFolders,
+      createWorkingDirectoryArchive: flatApi.createWorkingDirectoryArchive,
       moveWorkingDirectoryEntry: flatApi.moveWorkingDirectoryEntry,
       copyWorkingDirectoryEntry: flatApi.copyWorkingDirectoryEntry,
       deleteWorkingDirectoryEntry: flatApi.deleteWorkingDirectoryEntry,

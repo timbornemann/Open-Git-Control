@@ -211,6 +211,27 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitCreateWorkingDirectoryFolder, 'src/new-folder', 'C:/captured-repo');
   });
 
+  it('pins working-directory batch tools to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const moves = [{ sourcePath: 'photo.jpeg', targetPath: 'images/photo.jpeg' }];
+
+    await api.git.applyWorkingDirectoryMoves(moves, true, 'C:/captured-repo');
+    await api.git.findEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
+    await api.git.deleteEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
+    await api.git.createWorkingDirectoryArchive(['README.md'], 'README.zip', 'C:/captured-repo');
+
+    expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders: true }, 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitFindEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(3, IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(
+      4,
+      IpcChannel.GitCreateWorkingDirectoryArchive,
+      { sourcePaths: ['README.md'], targetPath: 'README.zip' },
+      'C:/captured-repo',
+    );
+  });
+
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

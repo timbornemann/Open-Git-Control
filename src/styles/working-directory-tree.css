@@ -157,6 +157,8 @@
 .working-tree-context-menu {
   min-width: 210px;
   max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border-color);
   border-radius: 0;

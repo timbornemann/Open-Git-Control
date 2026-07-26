@@ -53,7 +53,10 @@ const maxLineExceptions = new Map([
   ['src/contexts/ProjectPlannerContext.tsx', 504],
   // Filetree: its directory cache, mutation invalidation and context-menu
   // callbacks share one synchronized view of the working directory.
-  ['src/components/working-directory/WorkingDirectoryTree.tsx', 740],
+  ['src/components/working-directory/WorkingDirectoryTree.tsx', 632],
+  // Preload API composition root: wraps IPC calls with repository pinning and
+  // exposes the same typed operations through flat and domain namespaces.
+  ['electron/preload/createElectronApi.ts', 512],
 ]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];

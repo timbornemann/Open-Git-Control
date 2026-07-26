@@ -406,6 +406,24 @@ describe('renderer service clients', () => {
       'C:/repo',
       true,
     ]);
+    await expectDelegation(
+      () => gitClient.applyWorkingDirectoryMoves([{ sourcePath: 'a.txt', targetPath: 'b.txt' }], false, 'C:/repo'),
+      api.git.applyWorkingDirectoryMoves,
+      [[{ sourcePath: 'a.txt', targetPath: 'b.txt' }], false, 'C:/repo'],
+    );
+    await expectDelegation(() => gitClient.findEmptyWorkingDirectoryFolders(['tmp'], 'C:/repo'), api.git.findEmptyWorkingDirectoryFolders, [
+      ['tmp'],
+      'C:/repo',
+    ]);
+    await expectDelegation(() => gitClient.deleteEmptyWorkingDirectoryFolders(['tmp'], 'C:/repo'), api.git.deleteEmptyWorkingDirectoryFolders, [
+      ['tmp'],
+      'C:/repo',
+    ]);
+    await expectDelegation(() => gitClient.createWorkingDirectoryArchive(['README.md'], 'README.zip', 'C:/repo'), api.git.createWorkingDirectoryArchive, [
+      ['README.md'],
+      'README.zip',
+      'C:/repo',
+    ]);
     await expectDelegation(() => gitClient.moveWorkingDirectoryEntry('src/old.ts', 'src/new.ts', true, 'C:/repo'), api.git.moveWorkingDirectoryEntry, [
       'src/old.ts',
       'src/new.ts',

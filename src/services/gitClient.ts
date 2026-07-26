@@ -311,6 +311,18 @@ export const gitClient = {
       ? requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath, true)
       : requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
   },
+  async applyWorkingDirectoryMoves(moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) {
+    return requireElectronGitApi().applyWorkingDirectoryMoves(moves, createParentFolders, repoPath);
+  },
+  async findEmptyWorkingDirectoryFolders(folderPaths: string[], repoPath: string) {
+    return requireElectronGitApi().findEmptyWorkingDirectoryFolders(folderPaths, repoPath);
+  },
+  async deleteEmptyWorkingDirectoryFolders(folderPaths: string[], repoPath: string) {
+    return requireElectronGitApi().deleteEmptyWorkingDirectoryFolders(folderPaths, repoPath);
+  },
+  async createWorkingDirectoryArchive(sourcePaths: string[], targetPath: string, repoPath: string) {
+    return requireElectronGitApi().createWorkingDirectoryArchive(sourcePaths, targetPath, repoPath);
+  },
   async moveWorkingDirectoryEntry(sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) {
     return requireElectronGitApi().moveWorkingDirectoryEntry(sourcePath, targetPath, overwrite, repoPath);
   },

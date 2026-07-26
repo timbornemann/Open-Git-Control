@@ -15,6 +15,7 @@ import { IpcChannel } from '../../../../src/types/ipcContract';
 import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
 import { registerWorkingDirectoryFileInfoHandler } from './workingDirectoryFileInfo';
 import { registerWorkingDirectoryFileCreationHandler } from './workingDirectoryFileCreation';
+import { registerWorkingDirectoryToolsHandlers } from './workingDirectoryTools';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -41,7 +42,6 @@ const IMAGE_MIME_TYPES = new Map([
 // Never trim a repository-relative path: leading/trailing whitespace is a
 // significant part of a Git filename. Only reject an entirely empty value.
 const asRepositoryFilePath = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value));
-
 const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => {
   const source = String(value || '').trim();
   if (!REPOSITORY_FILE_SOURCES.has(source as RepositoryFileSource)) {
@@ -49,7 +49,6 @@ const normalizeRepositoryFileSource = (value: unknown): RepositoryFileSource => 
   }
   return source as RepositoryFileSource;
 };
-
 const findExistingParentPath = (targetPath: string): string => {
   let currentPath = targetPath;
   while (!fs.existsSync(currentPath)) {
@@ -195,6 +194,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
 
   registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
   registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath });
+  registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath });
 
   ipcMain.handle(
     IpcChannel.GitGetWorkingDirectoryPreview,

@@ -142,6 +142,8 @@ export type WorkingDirectoryPreviewDto =
   | { kind: 'image'; dataUrl: string; mimeType: string; bytes: number }
   | { kind: 'binary'; bytes: number; mimeType: string | null; reason: 'binary' | 'tooLarge'; canLoadImage?: boolean };
 export type WorkingDirectoryMutationResultDto = { success: boolean; error?: string; targetPath?: string };
+export type WorkingDirectoryMoveDto = { sourcePath: string; targetPath: string };
+export type WorkingDirectoryEmptyFoldersResultDto = { success: boolean; data?: string[]; error?: string };
 
 export type OpenSubmoduleResultDto = {
   success: boolean;
@@ -213,6 +215,10 @@ export interface ElectronGitAPI {
   createWorkingDirectoryFolder: (folderPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
+  applyWorkingDirectoryMoves: (moves: WorkingDirectoryMoveDto[], createParentFolders: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
+  findEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) => Promise<WorkingDirectoryEmptyFoldersResultDto>;
+  deleteEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
+  createWorkingDirectoryArchive: (sourcePaths: string[], targetPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   deleteWorkingDirectoryEntry: (filePath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

@@ -239,14 +239,21 @@ describe('WorkingDirectoryTree', () => {
 
     expect(container.querySelector('.working-tree-context-menu__header')?.textContent).toBe('3 items selected');
     const actions = Array.from(container.querySelectorAll('.working-tree-context-menu__item')).map((item) => item.textContent);
-    expect(actions).toContain('Copy paths');
+    expect(actions).toContain('Copy relative paths');
+    expect(actions).toContain('Copy absolute paths');
     expect(actions).toContain('Add prefix / suffix');
+    expect(actions).toContain('Remove prefix / suffix');
+    expect(actions).toContain('Change file extension');
+    expect(actions).toContain('Normalize names');
+    expect(actions).toContain('Sort files by type');
+    expect(actions).toContain('Add to .gitignore');
+    expect(actions).toContain('Create ZIP archive');
     expect(actions).toContain('Delete selected');
     expect(actions).not.toContain('Open');
     expect(actions).not.toContain('Rename');
 
     const copyPaths = Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-context-menu__item')).find(
-      (item) => item.textContent === 'Copy paths',
+      (item) => item.textContent === 'Copy relative paths',
     );
     if (!copyPaths) throw new Error('Missing copy paths action.');
     await act(async () => {
@@ -264,18 +271,24 @@ describe('WorkingDirectoryTree', () => {
     const inputDialog = setInputDialogMock.mock.calls.at(-1)?.[0];
     if (!inputDialog) throw new Error('Missing batch rename dialog.');
     expect(inputDialog).toMatchObject({
-      title: 'Batch rename',
+      title: 'Add prefix / suffix',
       confirmLabel: 'Rename selected',
       fields: [{ id: 'prefix' }, { id: 'suffix' }],
     });
 
-    const moveWorkingDirectoryEntry = vi.spyOn(gitClient, 'moveWorkingDirectoryEntry').mockResolvedValue({ success: true });
+    const applyWorkingDirectoryMoves = vi.spyOn(gitClient, 'applyWorkingDirectoryMoves').mockResolvedValue({ success: true });
     await act(async () => {
       await inputDialog.onSubmit({ prefix: 'archive-', suffix: '-old' });
     });
-    expect(moveWorkingDirectoryEntry).toHaveBeenNthCalledWith(1, 'alpha.txt', 'archive-alpha-old.txt', false, 'C:/repos/demo');
-    expect(moveWorkingDirectoryEntry).toHaveBeenNthCalledWith(2, 'beta.txt', 'archive-beta-old.txt', false, 'C:/repos/demo');
-    expect(moveWorkingDirectoryEntry).toHaveBeenNthCalledWith(3, 'gamma.txt', 'archive-gamma-old.txt', false, 'C:/repos/demo');
+    expect(applyWorkingDirectoryMoves).toHaveBeenCalledWith(
+      [
+        { sourcePath: 'alpha.txt', targetPath: 'archive-alpha-old.txt' },
+        { sourcePath: 'beta.txt', targetPath: 'archive-beta-old.txt' },
+        { sourcePath: 'gamma.txt', targetPath: 'archive-gamma-old.txt' },
+      ],
+      false,
+      'C:/repos/demo',
+    );
   });
 
   it('offers adding files and folders from folder and repository-root context menus', async () => {
@@ -307,6 +320,12 @@ describe('WorkingDirectoryTree', () => {
     act(() => rootFolder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add folder'))).toBe(true);
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Sort files by type'))).toBe(
+      true,
+    );
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Clean empty folders'))).toBe(
+      true,
+    );
 
     act(() => folder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
