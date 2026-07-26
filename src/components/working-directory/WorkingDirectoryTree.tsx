@@ -4,11 +4,13 @@ import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { getAvailableWorkingDirectoryCopyPath } from '@/utils/workingDirectoryCopyName';
 import { WorkingDirectoryFileInfoDialog } from './WorkingDirectoryFileInfoDialog';
 import '@/styles/working-directory-tree.css';
 
 type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
+type ContextMenu = { entry: WorkingDirectoryEntryDto; entries: WorkingDirectoryEntryDto[]; x: number; y: number };
 type Props = {
   repoPath: string | null;
   refreshTrigger: number;
@@ -22,6 +24,19 @@ type Props = {
 
 const basename = (value: string) => value.split('/').pop() || value;
 const isEntryName = (value: string) => value.length > 0 && value !== '.' && value !== '..' && !/[\\/]/.test(value);
+const isSameOrDescendantPath = (candidatePath: string, parentPath: string) => candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);
+const sortEntries = (entries: WorkingDirectoryEntryDto[]) =>
+  entries.slice().sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
+const getVisibleEntries = (
+  entriesByParent: Record<string, WorkingDirectoryEntryDto[]>,
+  expandedPaths: Set<string>,
+  parentPath = '',
+): WorkingDirectoryEntryDto[] =>
+  sortEntries(entriesByParent[parentPath] || []).flatMap((entry) =>
+    entry.kind === 'directory' && expandedPaths.has(entry.path) ? [entry, ...getVisibleEntries(entriesByParent, expandedPaths, entry.path)] : [entry],
+  );
+const getTopLevelEntries = (entries: WorkingDirectoryEntryDto[]) =>
+  entries.filter((entry) => !entries.some((candidate) => candidate.path !== entry.path && isSameOrDescendantPath(entry.path, candidate.path)));
 
 export const WorkingDirectoryTree: React.FC<Props> = ({
   repoPath,
@@ -38,21 +53,34 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   const [entriesByParent, setEntriesByParent] = useState<Record<string, WorkingDirectoryEntryDto[]>>({});
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
-  const [context, setContext] = useState<{ entry: WorkingDirectoryEntryDto; x: number; y: number } | null>(null);
+  const [context, setContext] = useState<ContextMenu | null>(null);
   const [fileInfoPath, setFileInfoPath] = useState<string | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
   const activeRepoPathRef = useRef(repoPath);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
   const initializedRepoPathRef = useRef<string | null>(null);
   const expandedPathsRef = useRef(expandedPaths);
+  const selectionAnchorPathRef = useRef<string | null>(null);
   activeRepoPathRef.current = repoPath;
   expandedPathsRef.current = expandedPaths;
+  const clearSelectedPaths = useCallback((paths: string[]) => {
+    if (paths.length === 0) return;
+    setSelectedPaths((current) => {
+      const next = new Set([...current].filter((candidatePath) => !paths.some((path) => isSameOrDescendantPath(candidatePath, path))));
+      return next.size === current.size ? current : next;
+    });
+    if (selectionAnchorPathRef.current && paths.some((path) => isSameOrDescendantPath(selectionAnchorPathRef.current!, path))) {
+      selectionAnchorPathRef.current = null;
+    }
+  }, []);
   const removeDirectoryFromTreeCache = useCallback(
     (directoryPath: string) => {
-      const isRemovedDirectory = (candidatePath: string) => candidatePath === directoryPath || candidatePath.startsWith(`${directoryPath}/`);
+      const isRemovedDirectory = (candidatePath: string) => isSameOrDescendantPath(candidatePath, directoryPath);
       loadedDirectoryPathsRef.current = new Set([...loadedDirectoryPathsRef.current].filter((loadedPath) => !isRemovedDirectory(loadedPath)));
       onExpandedPathsChange((current) => new Set([...current].filter((expandedPath) => !isRemovedDirectory(expandedPath))));
+      clearSelectedPaths([directoryPath]);
     },
-    [onExpandedPathsChange],
+    [clearSelectedPaths, onExpandedPathsChange],
   );
   const loadDirectory = useCallback(
     async (parentPath = '', options?: { silent?: boolean }): Promise<WorkingDirectoryEntryDto[]> => {
@@ -109,6 +137,8 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       setClipboard(null);
       setContext(null);
       setFileInfoPath(null);
+      setSelectedPaths(new Set());
+      selectionAnchorPathRef.current = null;
       if (repoPath) {
         void loadDirectory('');
         if (isFreshMount) {
@@ -138,7 +168,10 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       setToast({ msg: result.error || 'File operation failed.', isError: true });
       return false;
     }
-    invalidatedEntries.forEach((entryPath) => onEntryInvalidated(entryPath));
+    invalidatedEntries.forEach((entryPath) => {
+      onEntryInvalidated(entryPath);
+      clearSelectedPaths([entryPath]);
+    });
     removedDirectories.forEach(removeDirectoryFromTreeCache);
     await refreshLoadedDirectories();
     onRepoChanged();
@@ -218,19 +251,77 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         ]);
       },
     });
-  const remove = (entry: WorkingDirectoryEntryDto) =>
+  const remove = (entries: WorkingDirectoryEntryDto[]) => {
+    const targets = getTopLevelEntries(entries);
+    const isBatch = targets.length > 1;
     setConfirmDialog({
       variant: 'danger',
-      title: 'Delete permanently?',
-      message: `Delete "${entry.name}" from the working directory?`,
-      contextItems: [{ label: 'Path', value: entry.path }],
+      title: isBatch ? `Delete ${targets.length} entries permanently?` : 'Delete permanently?',
+      message: isBatch ? `Delete ${targets.length} selected entries from the working directory?` : `Delete "${targets[0].name}" from the working directory?`,
+      contextItems: isBatch ? [{ label: 'Selected entries', value: String(targets.length) }] : [{ label: 'Path', value: targets[0].path }],
       irreversible: true,
-      consequences: entry.kind === 'directory' ? 'All files inside this folder will be deleted.' : 'This file will be deleted.',
-      confirmLabel: 'Delete',
+      consequences: isBatch
+        ? 'All selected files and folders will be deleted. Files inside selected folders are included.'
+        : targets[0].kind === 'directory'
+          ? 'All files inside this folder will be deleted.'
+          : 'This file will be deleted.',
+      confirmLabel: isBatch ? 'Delete selected' : 'Delete',
       onConfirm: async () => {
-        await runMutation(() => gitClient.deleteWorkingDirectoryEntry(entry.path, repoPath!), entry.kind === 'directory' ? [entry.path] : [], [entry.path]);
+        await runMutation(
+          async () => {
+            for (const entry of targets) {
+              const result = await gitClient.deleteWorkingDirectoryEntry(entry.path, repoPath!);
+              if (!result.success) return result;
+            }
+            return { success: true };
+          },
+          targets.filter((entry) => entry.kind === 'directory').map((entry) => entry.path),
+          targets.map((entry) => entry.path),
+        );
       },
     });
+  };
+  const copyPaths = async (entries: WorkingDirectoryEntryDto[]) => {
+    const copied = await copyTextToClipboard(entries.map((entry) => entry.path).join('\n'));
+    if (copied) {
+      setToast({ msg: `${entries.length} ${entries.length === 1 ? 'path' : 'paths'} copied to the clipboard.`, isError: false });
+    } else {
+      setToast({ msg: 'Could not copy the selected paths.', isError: true });
+    }
+  };
+  const visibleEntries = getVisibleEntries(entriesByParent, expandedPaths);
+  const selectEntry = (entry: WorkingDirectoryEntryDto, event: React.MouseEvent<HTMLButtonElement>) => {
+    const additive = event.ctrlKey || event.metaKey;
+    const anchorPath = selectionAnchorPathRef.current;
+    if (event.shiftKey && anchorPath) {
+      const anchorIndex = visibleEntries.findIndex((visibleEntry) => visibleEntry.path === anchorPath);
+      const entryIndex = visibleEntries.findIndex((visibleEntry) => visibleEntry.path === entry.path);
+      if (anchorIndex >= 0 && entryIndex >= 0) {
+        const rangePaths = visibleEntries
+          .slice(Math.min(anchorIndex, entryIndex), Math.max(anchorIndex, entryIndex) + 1)
+          .map((visibleEntry) => visibleEntry.path);
+        setSelectedPaths((current) => (additive ? new Set([...current, ...rangePaths]) : new Set(rangePaths)));
+        return;
+      }
+    }
+    setSelectedPaths((current) => {
+      if (!additive) return new Set([entry.path]);
+      const next = new Set(current);
+      next.has(entry.path) ? next.delete(entry.path) : next.add(entry.path);
+      return next;
+    });
+    selectionAnchorPathRef.current = entry.path;
+  };
+  const openContextMenu = (entry: WorkingDirectoryEntryDto, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const selectedEntries = visibleEntries.filter((visibleEntry) => selectedPaths.has(visibleEntry.path));
+    const entries = selectedPaths.has(entry.path) && selectedEntries.length > 1 ? selectedEntries : [entry];
+    if (entries.length === 1 && entries[0].path === entry.path && !selectedPaths.has(entry.path)) {
+      setSelectedPaths(new Set([entry.path]));
+      selectionAnchorPathRef.current = entry.path;
+    }
+    setContext({ entry, entries, x: event.clientX, y: event.clientY });
+  };
   const createEntry = (folder: string, kind: 'file' | 'folder') =>
     setInputDialog({
       title: kind === 'file' ? 'Add file' : 'Add folder',
@@ -266,57 +357,57 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       },
     });
   const render = (parent: string, ancestorIsLast: boolean[] = []): React.ReactNode =>
-    (entriesByParent[parent] || [])
-      .slice()
-      .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1))
-      .map((entry, index, siblings) => {
-        const open = expandedPaths.has(entry.path);
-        const isLast = index === siblings.length - 1;
-        const loading = loadingDirectories.has(entry.path);
-        return (
-          <React.Fragment key={entry.path}>
-            <button
-              type="button"
-              className={`working-tree-row${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
-              onClick={() => {
-                if (entry.kind !== 'directory') {
-                  onOpenFile(entry.path);
-                  return;
-                }
-                if (!open && !loadedDirectoryPathsRef.current.has(entry.path)) void loadDirectory(entry.path);
-                onExpandedPathsChange((current) => {
-                  const next = new Set(current);
-                  open ? next.delete(entry.path) : next.add(entry.path);
-                  return next;
-                });
-              }}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                setContext({ entry, x: event.clientX, y: event.clientY });
-              }}
-            >
-              <span className="working-tree-row__guide" aria-hidden>
-                {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
-                  <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
-                ))}
-                {isLast ? '└──' : '├──'}
-              </span>
-              {entry.kind === 'directory' ? (
-                open ? (
-                  <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
-                ) : (
-                  <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
-                )
+    sortEntries(entriesByParent[parent] || []).map((entry, index, siblings) => {
+      const open = expandedPaths.has(entry.path);
+      const isLast = index === siblings.length - 1;
+      const loading = loadingDirectories.has(entry.path);
+      return (
+        <React.Fragment key={entry.path}>
+          <button
+            type="button"
+            className={`working-tree-row${selectedPaths.has(entry.path) ? ' working-tree-row--selected' : ''}${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
+            onClick={(event) => {
+              if (event.ctrlKey || event.metaKey || event.shiftKey) {
+                selectEntry(entry, event);
+                return;
+              }
+              setSelectedPaths(new Set([entry.path]));
+              selectionAnchorPathRef.current = entry.path;
+              if (entry.kind !== 'directory') {
+                onOpenFile(entry.path);
+                return;
+              }
+              if (!open && !loadedDirectoryPathsRef.current.has(entry.path)) void loadDirectory(entry.path);
+              onExpandedPathsChange((current) => {
+                const next = new Set(current);
+                open ? next.delete(entry.path) : next.add(entry.path);
+                return next;
+              });
+            }}
+            onContextMenu={(event) => openContextMenu(entry, event)}
+          >
+            <span className="working-tree-row__guide" aria-hidden>
+              {ancestorIsLast.map((ancestorLast, ancestorIndex) => (
+                <span key={ancestorIndex}>{ancestorLast ? '    ' : '│   '}</span>
+              ))}
+              {isLast ? '└──' : '├──'}
+            </span>
+            {entry.kind === 'directory' ? (
+              open ? (
+                <FolderOpen className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
               ) : (
-                <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
-              )}
-              <span className="working-tree-row__label">{entry.name}</span>
-              {loading && <span className="working-tree-row__loading">…</span>}
-            </button>
-            {entry.kind === 'directory' && open && render(entry.path, [...ancestorIsLast, isLast])}
-          </React.Fragment>
-        );
-      });
+                <Folder className="working-tree-row__icon working-tree-row__icon--directory" size={15} strokeWidth={1.8} />
+              )
+            ) : (
+              <File className="working-tree-row__icon working-tree-row__icon--file" size={15} strokeWidth={1.8} />
+            )}
+            <span className="working-tree-row__label">{entry.name}</span>
+            {loading && <span className="working-tree-row__loading">…</span>}
+          </button>
+          {entry.kind === 'directory' && open && render(entry.path, [...ancestorIsLast, isLast])}
+        </React.Fragment>
+      );
+    });
   const targetFolder =
     context?.entry.kind === 'directory'
       ? context.entry.path
@@ -329,7 +420,8 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         className={`working-tree-root${context?.entry.path === '' ? ' working-tree-root--context' : ''}`}
         onContextMenu={(event) => {
           event.preventDefault();
-          setContext({ entry: { path: '', name: 'Repository', kind: 'directory' }, x: event.clientX, y: event.clientY });
+          const entry = { path: '', name: 'Repository', kind: 'directory' } as const;
+          setContext({ entry, entries: [entry], x: event.clientX, y: event.clientY });
         }}
       >
         <FolderOpen className="working-tree-root__icon" size={16} strokeWidth={1.8} />
@@ -344,170 +436,204 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
           role="menu"
           aria-label="File actions"
         >
-          <div className="working-tree-context-menu__header">{context.entry.path || (repoPath ? basename(repoPath) : 'Repository')}</div>
-          {context.entry.kind === 'directory' && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                const folder = context.entry.path;
-                setContext(null);
-                createEntry(folder, 'file');
-              }}
-            >
-              <FilePlus size={14} />
-              <span>Add file</span>
-            </button>
-          )}
-          {context.entry.kind === 'directory' && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                const folder = context.entry.path;
-                setContext(null);
-                createEntry(folder, 'folder');
-              }}
-            >
-              <FolderPlus size={14} />
-              <span>Add folder</span>
-            </button>
-          )}
-          {context.entry.path && context.entry.kind === 'file' && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setContext(null);
-                onOpenFile(context.entry.path);
-              }}
-            >
-              <File size={14} />
-              <span>Open</span>
-            </button>
-          )}
-          {context.entry.path && context.entry.kind === 'file' && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setFileInfoPath(context.entry.path);
-                setContext(null);
-              }}
-            >
-              <Info size={14} />
-              <span>File information</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setContext(null);
-                rename(context.entry);
-              }}
-            >
-              <Pencil size={14} />
-              <span>Rename</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: false });
-                setContext(null);
-              }}
-            >
-              <Copy size={14} />
-              <span>Copy</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: true });
-                setContext(null);
-              }}
-            >
-              <Scissors size={14} />
-              <span>Cut</span>
-            </button>
-          )}
-          {clipboard && (
+          <div className="working-tree-context-menu__header">
+            {context.entries.length > 1 ? `${context.entries.length} items selected` : context.entry.path || (repoPath ? basename(repoPath) : 'Repository')}
+          </div>
+          {context.entries.length > 1 ? (
             <>
-              <div className="working-tree-context-menu__separator" />
               <button
                 type="button"
                 className="working-tree-context-menu__item"
                 onClick={() => {
+                  const entries = context.entries;
                   setContext(null);
-                  void pasteInto(targetFolder);
+                  void copyPaths(entries);
                 }}
               >
-                <ClipboardPaste size={14} />
-                <span>Paste</span>
+                <Copy size={14} />
+                <span>Copy paths</span>
               </button>
-            </>
-          )}
-          {context.entry.path && <div className="working-tree-context-menu__separator" />}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setContext(null);
-                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'reveal', repoPath: repoPath! });
-              }}
-            >
-              <FolderOpen size={14} />
-              <span>Show in file system</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setContext(null);
-                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'open', repoPath: repoPath! });
-              }}
-            >
-              <ExternalLink size={14} />
-              <span>Open externally</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <button
-              type="button"
-              className="working-tree-context-menu__item"
-              onClick={() => {
-                setContext(null);
-                void gitClient.openRepositoryPath({ path: context.entry.path, action: 'openWith', repoPath: repoPath! });
-              }}
-            >
-              <ExternalLink size={14} />
-              <span>Open with</span>
-            </button>
-          )}
-          {context.entry.path && (
-            <>
               <div className="working-tree-context-menu__separator" />
               <button
                 type="button"
                 className="working-tree-context-menu__item working-tree-context-menu__item--danger"
                 onClick={() => {
+                  const entries = context.entries;
                   setContext(null);
-                  remove(context.entry);
+                  remove(entries);
                 }}
               >
                 <Trash2 size={14} />
-                <span>Delete</span>
+                <span>Delete selected</span>
               </button>
+            </>
+          ) : (
+            <>
+              {context.entry.kind === 'directory' && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    const folder = context.entry.path;
+                    setContext(null);
+                    createEntry(folder, 'file');
+                  }}
+                >
+                  <FilePlus size={14} />
+                  <span>Add file</span>
+                </button>
+              )}
+              {context.entry.kind === 'directory' && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    const folder = context.entry.path;
+                    setContext(null);
+                    createEntry(folder, 'folder');
+                  }}
+                >
+                  <FolderPlus size={14} />
+                  <span>Add folder</span>
+                </button>
+              )}
+              {context.entry.path && context.entry.kind === 'file' && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setContext(null);
+                    onOpenFile(context.entry.path);
+                  }}
+                >
+                  <File size={14} />
+                  <span>Open</span>
+                </button>
+              )}
+              {context.entry.path && context.entry.kind === 'file' && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setFileInfoPath(context.entry.path);
+                    setContext(null);
+                  }}
+                >
+                  <Info size={14} />
+                  <span>File information</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setContext(null);
+                    rename(context.entry);
+                  }}
+                >
+                  <Pencil size={14} />
+                  <span>Rename</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: false });
+                    setContext(null);
+                  }}
+                >
+                  <Copy size={14} />
+                  <span>Copy</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setClipboard({ path: context.entry.path, kind: context.entry.kind, cut: true });
+                    setContext(null);
+                  }}
+                >
+                  <Scissors size={14} />
+                  <span>Cut</span>
+                </button>
+              )}
+              {clipboard && (
+                <>
+                  <div className="working-tree-context-menu__separator" />
+                  <button
+                    type="button"
+                    className="working-tree-context-menu__item"
+                    onClick={() => {
+                      setContext(null);
+                      void pasteInto(targetFolder);
+                    }}
+                  >
+                    <ClipboardPaste size={14} />
+                    <span>Paste</span>
+                  </button>
+                </>
+              )}
+              {context.entry.path && <div className="working-tree-context-menu__separator" />}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setContext(null);
+                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'reveal', repoPath: repoPath! });
+                  }}
+                >
+                  <FolderOpen size={14} />
+                  <span>Show in file system</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setContext(null);
+                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'open', repoPath: repoPath! });
+                  }}
+                >
+                  <ExternalLink size={14} />
+                  <span>Open externally</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <button
+                  type="button"
+                  className="working-tree-context-menu__item"
+                  onClick={() => {
+                    setContext(null);
+                    void gitClient.openRepositoryPath({ path: context.entry.path, action: 'openWith', repoPath: repoPath! });
+                  }}
+                >
+                  <ExternalLink size={14} />
+                  <span>Open with</span>
+                </button>
+              )}
+              {context.entry.path && (
+                <>
+                  <div className="working-tree-context-menu__separator" />
+                  <button
+                    type="button"
+                    className="working-tree-context-menu__item working-tree-context-menu__item--danger"
+                    onClick={() => {
+                      setContext(null);
+                      remove([context.entry]);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

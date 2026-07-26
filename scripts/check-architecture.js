@@ -53,7 +53,7 @@ const maxLineExceptions = new Map([
   ['src/contexts/ProjectPlannerContext.tsx', 504],
   // Filetree: its directory cache, mutation invalidation and context-menu
   // callbacks share one synchronized view of the working directory.
-  ['src/components/working-directory/WorkingDirectoryTree.tsx', 517],
+  ['src/components/working-directory/WorkingDirectoryTree.tsx', 636],
 ]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];

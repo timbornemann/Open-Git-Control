@@ -6,12 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkingDirectoryTree } from '@/components/working-directory/WorkingDirectoryTree';
 import { gitClient } from '@/services/gitClient';
 
-const { setConfirmDialogMock, setInputDialogMock } = vi.hoisted(() => ({ setConfirmDialogMock: vi.fn(), setInputDialogMock: vi.fn() }));
+const { copyTextToClipboardMock, setConfirmDialogMock, setInputDialogMock } = vi.hoisted(() => ({
+  copyTextToClipboardMock: vi.fn(),
+  setConfirmDialogMock: vi.fn(),
+  setInputDialogMock: vi.fn(),
+}));
 
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog: setConfirmDialogMock, setInputDialog: setInputDialogMock }),
   useOptionalRepositoryContext: () => null,
 }));
+
+vi.mock('@/utils/clipboard', () => ({ copyTextToClipboard: copyTextToClipboardMock }));
 
 let root: Root | null = null;
 
@@ -20,6 +26,7 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   setConfirmDialogMock.mockReset();
   setInputDialogMock.mockReset();
+  copyTextToClipboardMock.mockReset().mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -176,6 +183,76 @@ describe('WorkingDirectoryTree', () => {
     expect(file.classList.contains('working-tree-row--context')).toBe(true);
     act(() => window.dispatchEvent(new window.MouseEvent('click')));
     expect(file.classList.contains('working-tree-row--context')).toBe(false);
+  });
+
+  it('selects a visible range without opening files and shows batch actions in the context menu', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({
+      success: true,
+      data: [
+        { path: 'alpha.txt', name: 'alpha.txt', kind: 'file' },
+        { path: 'beta.txt', name: 'beta.txt', kind: 'file' },
+        { path: 'gamma.txt', name: 'gamma.txt', kind: 'file' },
+      ],
+    });
+    const onOpenFile = vi.fn();
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile,
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const rowFor = (name: string) =>
+      Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-row')).find((row) => row.textContent?.includes(name));
+    const alpha = rowFor('alpha.txt');
+    const beta = rowFor('beta.txt');
+    const gamma = rowFor('gamma.txt');
+    if (!alpha || !beta || !gamma) throw new Error('Missing file rows.');
+
+    act(() => alpha.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ctrlKey: true })));
+    act(() => gamma.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ctrlKey: true })));
+
+    expect(alpha.classList.contains('working-tree-row--selected')).toBe(true);
+    expect(beta.classList.contains('working-tree-row--selected')).toBe(false);
+    expect(gamma.classList.contains('working-tree-row--selected')).toBe(true);
+
+    act(() => alpha.dispatchEvent(new window.MouseEvent('click', { bubbles: true, shiftKey: true })));
+
+    expect(onOpenFile).not.toHaveBeenCalled();
+    expect(alpha.classList.contains('working-tree-row--selected')).toBe(true);
+    expect(beta.classList.contains('working-tree-row--selected')).toBe(true);
+    expect(gamma.classList.contains('working-tree-row--selected')).toBe(true);
+
+    act(() => beta.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+
+    expect(container.querySelector('.working-tree-context-menu__header')?.textContent).toBe('3 items selected');
+    const actions = Array.from(container.querySelectorAll('.working-tree-context-menu__item')).map((item) => item.textContent);
+    expect(actions).toContain('Copy paths');
+    expect(actions).toContain('Delete selected');
+    expect(actions).not.toContain('Open');
+    expect(actions).not.toContain('Rename');
+
+    const copyPaths = Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-context-menu__item')).find(
+      (item) => item.textContent === 'Copy paths',
+    );
+    if (!copyPaths) throw new Error('Missing copy paths action.');
+    await act(async () => {
+      copyPaths.click();
+      await Promise.resolve();
+    });
+    expect(copyTextToClipboardMock).toHaveBeenCalledWith('alpha.txt\nbeta.txt\ngamma.txt');
   });
 
   it('offers adding files and folders from folder and repository-root context menus', async () => {
