@@ -35,7 +35,14 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
   const expandedPathsRef = useRef(expandedPaths);
   activeRepoPathRef.current = repoPath;
   expandedPathsRef.current = expandedPaths;
-
+  const removeDirectoryFromTreeCache = useCallback(
+    (directoryPath: string) => {
+      const isRemovedDirectory = (candidatePath: string) => candidatePath === directoryPath || candidatePath.startsWith(`${directoryPath}/`);
+      loadedDirectoryPathsRef.current = new Set([...loadedDirectoryPathsRef.current].filter((loadedPath) => !isRemovedDirectory(loadedPath)));
+      onExpandedPathsChange((current) => new Set([...current].filter((expandedPath) => !isRemovedDirectory(expandedPath))));
+    },
+    [onExpandedPathsChange],
+  );
   const loadDirectory = useCallback(
     async (parentPath = '', options?: { silent?: boolean }): Promise<WorkingDirectoryEntryDto[]> => {
       if (!repoPath || !gitClient.isAvailable()) return [];
@@ -45,6 +52,10 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
         const result = await gitClient.listWorkingDirectory(repoAtStart, parentPath);
         if (activeRepoPathRef.current !== repoAtStart) return [];
         if (!result.success) {
+          if (parentPath && /\bENOENT\b/.test(result.error || '')) {
+            removeDirectoryFromTreeCache(parentPath);
+            return [];
+          }
           loadedDirectoryPathsRef.current.delete(parentPath);
           if (!options?.silent) setToast({ msg: result.error || 'Could not load working directory.', isError: true });
           return [];
@@ -61,13 +72,12 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
         });
       }
     },
-    [repoPath, setToast],
+    [removeDirectoryFromTreeCache, repoPath, setToast],
   );
 
   const refreshLoadedDirectories = useCallback(async () => {
     const paths = new Set(loadedDirectoryPathsRef.current);
-    // The root has no UI affordance to retry itself. Always include it so a
-    // transient initial failure recovers on the next refresh.
+    // Always include root so a transient initial failure recovers on refresh.
     paths.add('');
     await Promise.all([...paths].map((parentPath) => loadDirectory(parentPath)));
   }, [loadDirectory]);
@@ -107,12 +117,13 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
     return () => window.removeEventListener('click', close);
   }, []);
 
-  const runMutation = async (action: () => Promise<{ success: boolean; error?: string }>) => {
+  const runMutation = async (action: () => Promise<{ success: boolean; error?: string }>, removedDirectories: string[] = []) => {
     const result = await action();
     if (!result.success) {
       setToast({ msg: result.error || 'File operation failed.', isError: true });
       return false;
     }
+    removedDirectories.forEach(removeDirectoryFromTreeCache);
     await refreshLoadedDirectories();
     onRepoChanged();
     return true;
@@ -125,10 +136,12 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       return;
     }
     const execute = async (destinationPath: string, overwrite: boolean) =>
-      runMutation(() =>
-        clipboard.cut
-          ? gitClient.moveWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath)
-          : gitClient.copyWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath),
+      runMutation(
+        () =>
+          clipboard.cut
+            ? gitClient.moveWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath)
+            : gitClient.copyWorkingDirectoryEntry(clipboard.path, destinationPath, overwrite, repoPath),
+        clipboard.cut && clipboard.kind === 'directory' ? [clipboard.path] : [],
       );
     const destinationEntries = entriesByParent[folder] || (await loadDirectory(folder));
     const exists = destinationEntries.some((entry) => entry.path === targetPath);
@@ -183,7 +196,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
           setToast({ msg: 'A file or folder with that name already exists.', isError: true });
           return;
         }
-        await runMutation(() => gitClient.moveWorkingDirectoryEntry(entry.path, target, false, repoPath!));
+        await runMutation(() => gitClient.moveWorkingDirectoryEntry(entry.path, target, false, repoPath!), entry.kind === 'directory' ? [entry.path] : []);
       },
     });
   const remove = (entry: WorkingDirectoryEntryDto) =>
@@ -196,7 +209,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       consequences: entry.kind === 'directory' ? 'All files inside this folder will be deleted.' : 'This file will be deleted.',
       confirmLabel: 'Delete',
       onConfirm: async () => {
-        await runMutation(() => gitClient.deleteWorkingDirectoryEntry(entry.path, repoPath!));
+        await runMutation(() => gitClient.deleteWorkingDirectoryEntry(entry.path, repoPath!), entry.kind === 'directory' ? [entry.path] : []);
       },
     });
   const createEntry = (folder: string, kind: 'file' | 'folder') =>

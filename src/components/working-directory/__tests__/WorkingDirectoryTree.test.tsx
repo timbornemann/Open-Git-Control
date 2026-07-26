@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkingDirectoryTree } from '@/components/working-directory/WorkingDirectoryTree';
 import { gitClient } from '@/services/gitClient';
 
+const { setConfirmDialogMock, setInputDialogMock } = vi.hoisted(() => ({ setConfirmDialogMock: vi.fn(), setInputDialogMock: vi.fn() }));
+
 vi.mock('@/contexts/AppStateContext', () => ({
-  useUIContext: () => ({ setConfirmDialog: vi.fn(), setInputDialog: vi.fn() }),
+  useUIContext: () => ({ setConfirmDialog: setConfirmDialogMock, setInputDialog: setInputDialogMock }),
   useOptionalRepositoryContext: () => null,
 }));
 
@@ -16,6 +18,8 @@ let root: Root | null = null;
 beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>';
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  setConfirmDialogMock.mockReset();
+  setInputDialogMock.mockReset();
 });
 
 afterEach(() => {
@@ -204,5 +208,56 @@ describe('WorkingDirectoryTree', () => {
     act(() => folder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add folder'))).toBe(true);
+  });
+
+  it('does not re-load or report an error for a deleted expanded folder', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    let folderExists = true;
+    const listWorkingDirectory = vi.spyOn(gitClient, 'listWorkingDirectory').mockImplementation(async (_repoPath, parentPath) => {
+      if (!parentPath) return { success: true, data: folderExists ? [{ path: 'Testtest', name: 'Testtest', kind: 'directory' }] : [] };
+      if (parentPath === 'Testtest') return { success: true, data: [{ path: 'Testtest/example.txt', name: 'example.txt', kind: 'file' }] };
+      return { success: true, data: [] };
+    });
+    vi.spyOn(gitClient, 'deleteWorkingDirectoryEntry').mockImplementation(async () => {
+      folderExists = false;
+      return { success: true };
+    });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    const TestTree = () => {
+      const [expandedPaths, setExpandedPaths] = useState(new Set<string>());
+      return createElement(WorkingDirectoryTree, {
+        repoPath: 'C:/repos/demo',
+        refreshTrigger: 0,
+        expandedPaths,
+        onExpandedPathsChange: setExpandedPaths,
+        onOpenFile: vi.fn(),
+        onRepoChanged: vi.fn(),
+      });
+    };
+    act(() => root?.render(createElement(TestTree)));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const folder = container.querySelector<HTMLButtonElement>('.working-tree-row');
+    if (!folder) throw new Error('Missing directory row.');
+    await act(async () => {
+      folder.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    act(() => folder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+    const deleteItem = Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-context-menu__item')).find(
+      (item) => item.textContent === 'Delete',
+    );
+    if (!deleteItem) throw new Error('Missing delete action.');
+    act(() => deleteItem.click());
+    const confirmDialog = setConfirmDialogMock.mock.calls.at(-1)?.[0];
+    if (!confirmDialog) throw new Error('Missing delete confirmation.');
+    await act(async () => {
+      await confirmDialog.onConfirm();
+    });
+
+    expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === 'Testtest')).toHaveLength(1);
   });
 });
