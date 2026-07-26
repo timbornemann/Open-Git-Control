@@ -212,6 +212,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
         : invokeGitOperation('delete', IpcChannel.GitDeleteRepoFile, filePath),
     listWorkingDirectory: (repoPath: string, parentPath = '') =>
       invokeGitOperationForRepo(repoPath, 'list files', IpcChannel.GitListWorkingDirectory, repoPath, parentPath),
+    createWorkingDirectoryFile: (filePath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'create file', IpcChannel.GitCreateWorkingDirectoryFile, filePath, repoPath),
+    createWorkingDirectoryFolder: (folderPath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'create folder', IpcChannel.GitCreateWorkingDirectoryFolder, folderPath, repoPath),
     getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'file info', IpcChannel.GitGetWorkingDirectoryFileInfo, filePath, repoPath),
     getWorkingDirectoryPreview: (filePath: string, repoPath: string) =>
@@ -342,7 +346,6 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     }) => ipcRenderer.invoke(IpcChannel.GithubMergePr, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
   } satisfies ElectronFlatAPI;
-
   const electronAPI: ElectronAPI = {
     ...flatApi,
     git: {
@@ -386,6 +389,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       writeRepoFile: flatApi.writeRepoFile,
       deleteRepoFile: flatApi.deleteRepoFile,
       listWorkingDirectory: flatApi.listWorkingDirectory,
+      createWorkingDirectoryFile: flatApi.createWorkingDirectoryFile,
+      createWorkingDirectoryFolder: flatApi.createWorkingDirectoryFolder,
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
       moveWorkingDirectoryEntry: flatApi.moveWorkingDirectoryEntry,
@@ -490,6 +495,5 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       onRepositoryRunEvent: flatApi.onRepositoryRunEvent,
     },
   };
-
   return electronAPI;
 };

@@ -14,6 +14,7 @@ import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepo
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
 import { registerWorkingDirectoryFileInfoHandler } from './workingDirectoryFileInfo';
+import { registerWorkingDirectoryFileCreationHandler } from './workingDirectoryFileCreation';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -192,6 +193,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   });
 
   registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
+  registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath });
 
   ipcMain.handle(IpcChannel.GitGetWorkingDirectoryPreview, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {

@@ -170,4 +170,39 @@ describe('WorkingDirectoryTree', () => {
       true,
     );
   });
+
+  it('offers adding files and folders from folder and repository-root context menus', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({ success: true, data: [{ path: 'src', name: 'src', kind: 'directory' }] });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile: vi.fn(),
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const rootFolder = container.querySelector<HTMLElement>('.working-tree-root');
+    const folder = container.querySelector<HTMLButtonElement>('.working-tree-row');
+    if (!rootFolder || !folder) throw new Error('Missing working directory entries.');
+
+    act(() => rootFolder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add folder'))).toBe(true);
+
+    act(() => folder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add folder'))).toBe(true);
+  });
 });

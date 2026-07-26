@@ -77,6 +77,30 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(result).toMatchObject({ success: false, error: expect.stringContaining('repository-relative') });
   });
 
+  it('creates an empty file without overwriting an existing entry', async () => {
+    const firstResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFile)!({}, 'src/new-file.ts', repoPath);
+
+    expect(firstResult).toEqual({ success: true, targetPath: 'src/new-file.ts' });
+    expect(fs.readFileSync(path.join(repoPath, 'src', 'new-file.ts'), 'utf8')).toBe('');
+
+    fs.writeFileSync(path.join(repoPath, 'src', 'new-file.ts'), 'keep this content');
+    const duplicateResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFile)!({}, 'src/new-file.ts', repoPath);
+
+    expect(duplicateResult).toMatchObject({ success: false, error: expect.stringContaining('EEXIST') });
+    expect(fs.readFileSync(path.join(repoPath, 'src', 'new-file.ts'), 'utf8')).toBe('keep this content');
+  });
+
+  it('creates a folder without overwriting an existing entry', async () => {
+    const firstResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFolder)!({}, 'src/new-folder', repoPath);
+
+    expect(firstResult).toEqual({ success: true, targetPath: 'src/new-folder' });
+    expect(fs.statSync(path.join(repoPath, 'src', 'new-folder')).isDirectory()).toBe(true);
+
+    const duplicateResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFolder)!({}, 'src/new-folder', repoPath);
+
+    expect(duplicateResult).toMatchObject({ success: false, error: expect.stringContaining('EEXIST') });
+  });
+
   it('returns filesystem metadata and Git history summary for a working-directory file', async () => {
     const runCommandAtPath = vi.fn(async (_requestedRepoPath: string, args: string[]) => {
       if (args[0] === 'ls-files') return '100644 deadbeef 0\tsrc/app.ts\n';

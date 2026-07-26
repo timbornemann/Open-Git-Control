@@ -184,6 +184,24 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryFileInfo, 'src/app.ts', 'C:/captured-repo');
   });
 
+  it('pins working-directory file creation to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.createWorkingDirectoryFile('src/new-file.ts', 'C:/captured-repo');
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitCreateWorkingDirectoryFile, 'src/new-file.ts', 'C:/captured-repo');
+  });
+
+  it('pins working-directory folder creation to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.createWorkingDirectoryFolder('src/new-folder', 'C:/captured-repo');
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitCreateWorkingDirectoryFolder, 'src/new-folder', 'C:/captured-repo');
+  });
+
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

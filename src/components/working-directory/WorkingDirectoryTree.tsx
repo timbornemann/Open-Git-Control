@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Info, Pencil, Scissors, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
@@ -19,6 +19,7 @@ type Props = {
 };
 
 const basename = (value: string) => value.split('/').pop() || value;
+const isEntryName = (value: string) => value.length > 0 && value !== '.' && value !== '..' && !/[\\/]/.test(value);
 
 export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger, expandedPaths, onExpandedPathsChange, onOpenFile, onRepoChanged }) => {
   const { setConfirmDialog, setInputDialog } = useUIContext();
@@ -198,6 +199,40 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
         await runMutation(() => gitClient.deleteWorkingDirectoryEntry(entry.path, repoPath!));
       },
     });
+  const createEntry = (folder: string, kind: 'file' | 'folder') =>
+    setInputDialog({
+      title: kind === 'file' ? 'Add file' : 'Add folder',
+      message: folder ? `Create a new ${kind} in "${folder}".` : `Create a new ${kind} in the repository root.`,
+      fields: [
+        {
+          id: 'name',
+          label: kind === 'file' ? 'File name' : 'Folder name',
+          helperText: kind === 'file' ? 'Include the file extension, for example "notes.md".' : 'Enter a single folder name.',
+          required: true,
+          validate: (value) => (isEntryName(value) ? null : `Enter a ${kind} name, not a path.`),
+        },
+      ],
+      contextItems: [{ label: 'Folder', value: folder || 'Repository root' }],
+      irreversible: false,
+      consequences: kind === 'file' ? 'An empty file will be added to the working directory.' : 'A folder will be added to the working directory.',
+      confirmLabel: kind === 'file' ? 'Add file' : 'Add folder',
+      onSubmit: async (values) => {
+        const name = values.name ?? '';
+        if (!isEntryName(name)) {
+          setToast({ msg: `Enter a ${kind} name, not a path.`, isError: true });
+          return;
+        }
+        const targetPath = folder ? `${folder}/${name}` : name;
+        const exists = (entriesByParent[folder] || []).some((entry) => entry.path === targetPath);
+        if (exists) {
+          setToast({ msg: 'A file or folder with that name already exists.', isError: true });
+          return;
+        }
+        await runMutation(() =>
+          kind === 'file' ? gitClient.createWorkingDirectoryFile(targetPath, repoPath!) : gitClient.createWorkingDirectoryFolder(targetPath, repoPath!),
+        );
+      },
+    });
   const render = (parent: string, ancestorIsLast: boolean[] = []): React.ReactNode =>
     (entriesByParent[parent] || [])
       .slice()
@@ -278,6 +313,34 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
           aria-label="File actions"
         >
           <div className="working-tree-context-menu__header">{context.entry.path || (repoPath ? basename(repoPath) : 'Repository')}</div>
+          {context.entry.kind === 'directory' && (
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                const folder = context.entry.path;
+                setContext(null);
+                createEntry(folder, 'file');
+              }}
+            >
+              <FilePlus size={14} />
+              <span>Add file</span>
+            </button>
+          )}
+          {context.entry.kind === 'directory' && (
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                const folder = context.entry.path;
+                setContext(null);
+                createEntry(folder, 'folder');
+              }}
+            >
+              <FolderPlus size={14} />
+              <span>Add folder</span>
+            </button>
+          )}
           {context.entry.path && context.entry.kind === 'file' && (
             <button
               type="button"
