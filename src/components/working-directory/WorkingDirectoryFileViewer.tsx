@@ -72,6 +72,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const nextBlameRequestIdRef = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLargeImageLoading, setIsLargeImageLoading] = useState(false);
   const dirty = text !== savedText;
   const isMarkdown = isMarkdownFilePath(path);
   const isHtml = isHtmlFilePath(path);
@@ -104,6 +105,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     blameRequestGenerationRef.current += 1;
     activeBlameRequestRef.current = null;
     setIsLoading(true);
+    setIsLargeImageLoading(false);
     void gitClient.getWorkingDirectoryPreview(path, repoPath).then((result) => {
       if (!active) return;
       if (!result.success) {
@@ -123,6 +125,24 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     return () => {
       active = false;
     };
+  }, [path, repoPath]);
+  const loadLargeImage = useCallback(async () => {
+    const fileKey = `${repoPath}\0${path}`;
+    setIsLargeImageLoading(true);
+    setLoadError(null);
+    try {
+      const result = await gitClient.getWorkingDirectoryPreview(path, repoPath, true);
+      if (activeFileKeyRef.current !== fileKey) return;
+      if (!result.success) {
+        setLoadError(result.error || 'Could not load image.');
+        return;
+      }
+      setPreview(result.data);
+    } catch (imageLoadError: unknown) {
+      if (activeFileKeyRef.current === fileKey) setLoadError(imageLoadError instanceof Error ? imageLoadError.message : 'Could not load image.');
+    } finally {
+      if (activeFileKeyRef.current === fileKey) setIsLargeImageLoading(false);
+    }
   }, [path, repoPath]);
   useEffect(() => {
     if (tab !== 'history') return;
@@ -328,9 +348,14 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       )}
       {preview?.kind === 'binary' && (
         <div className="working-file-viewer__empty">
-          <h3>Binary file</h3>
+          <h3>{preview.reason === 'tooLarge' && preview.mimeType ? 'Large image' : 'Binary file'}</h3>
           <p>{preview.reason === 'tooLarge' ? 'This file is too large for the in-app viewer.' : 'This file cannot be shown as text.'}</p>
           <p>{preview.bytes.toLocaleString()} bytes</p>
+          {preview.reason === 'tooLarge' && preview.canLoadImage && (
+            <button className="working-file-viewer__button" onClick={() => void loadLargeImage()} disabled={isLargeImageLoading}>
+              {isLargeImageLoading ? 'Loading image…' : 'Show image anyway'}
+            </button>
+          )}
           <div className="working-file-viewer__binary-actions">
             <button className="working-file-viewer__button" onClick={() => void gitClient.openRepositoryPath({ path, action: 'reveal', repoPath })}>
               Show in file system

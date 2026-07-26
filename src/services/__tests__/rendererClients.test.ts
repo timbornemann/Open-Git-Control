@@ -401,6 +401,11 @@ describe('renderer service clients', () => {
       'C:/repo',
     ]);
     await expectDelegation(() => gitClient.getWorkingDirectoryPreview('src/app.ts', 'C:/repo'), api.git.getWorkingDirectoryPreview, ['src/app.ts', 'C:/repo']);
+    await expectDelegation(() => gitClient.getWorkingDirectoryPreview('assets/large.png', 'C:/repo', true), api.git.getWorkingDirectoryPreview, [
+      'assets/large.png',
+      'C:/repo',
+      true,
+    ]);
     await expectDelegation(() => gitClient.moveWorkingDirectoryEntry('src/old.ts', 'src/new.ts', true, 'C:/repo'), api.git.moveWorkingDirectoryEntry, [
       'src/old.ts',
       'src/new.ts',

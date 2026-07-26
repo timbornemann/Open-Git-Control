@@ -218,8 +218,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       invokeGitOperationForRepo(repoPath, 'create folder', IpcChannel.GitCreateWorkingDirectoryFolder, folderPath, repoPath),
     getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'file info', IpcChannel.GitGetWorkingDirectoryFileInfo, filePath, repoPath),
-    getWorkingDirectoryPreview: (filePath: string, repoPath: string) =>
-      invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath),
+    getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) =>
+      invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath, allowLargeImage),
     moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'move file', IpcChannel.GitMoveWorkingDirectoryEntry, { sourcePath, targetPath, overwrite }, repoPath),
     copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>

@@ -140,7 +140,7 @@ export type WorkingDirectoryFileInfoDto = {
 export type WorkingDirectoryPreviewDto =
   | { kind: 'text'; text: string; bytes: number; isMarkdown: boolean }
   | { kind: 'image'; dataUrl: string; mimeType: string; bytes: number }
-  | { kind: 'binary'; bytes: number; mimeType: string | null; reason: 'binary' | 'tooLarge' };
+  | { kind: 'binary'; bytes: number; mimeType: string | null; reason: 'binary' | 'tooLarge'; canLoadImage?: boolean };
 export type WorkingDirectoryMutationResultDto = { success: boolean; error?: string; targetPath?: string };
 
 export type OpenSubmoduleResultDto = {
@@ -212,7 +212,7 @@ export interface ElectronGitAPI {
   createWorkingDirectoryFile: (filePath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   createWorkingDirectoryFolder: (folderPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
-  getWorkingDirectoryPreview: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
+  getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
   moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   deleteWorkingDirectoryEntry: (filePath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

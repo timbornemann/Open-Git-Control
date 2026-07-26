@@ -184,6 +184,15 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryFileInfo, 'src/app.ts', 'C:/captured-repo');
   });
 
+  it('pins an explicitly requested large-image preview to the captured repository', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.getWorkingDirectoryPreview('assets/large.png', 'C:/captured-repo', true);
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryPreview, 'assets/large.png', 'C:/captured-repo', true);
+  });
+
   it('pins working-directory file creation to the repository captured by the caller', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

@@ -306,8 +306,10 @@ export const gitClient = {
   async getWorkingDirectoryFileInfo(filePath: string, repoPath: string) {
     return requireElectronGitApi().getWorkingDirectoryFileInfo(filePath, repoPath);
   },
-  async getWorkingDirectoryPreview(filePath: string, repoPath: string) {
-    return requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
+  async getWorkingDirectoryPreview(filePath: string, repoPath: string, allowLargeImage?: boolean) {
+    return allowLargeImage
+      ? requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath, true)
+      : requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
   },
   async moveWorkingDirectoryEntry(sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) {
     return requireElectronGitApi().moveWorkingDirectoryEntry(sourcePath, targetPath, overwrite, repoPath);

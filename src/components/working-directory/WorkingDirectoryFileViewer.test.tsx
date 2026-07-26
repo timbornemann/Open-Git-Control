@@ -54,6 +54,50 @@ afterEach(() => {
 });
 
 describe('WorkingDirectoryFileViewer history and blame', () => {
+  it('loads an oversized image when explicitly requested', async () => {
+    const getPreview = vi
+      .spyOn(gitClient, 'getWorkingDirectoryPreview')
+      .mockResolvedValueOnce({
+        success: true,
+        data: { kind: 'binary', bytes: 3 * 1024 * 1024, mimeType: 'image/png', reason: 'tooLarge', canLoadImage: true },
+      } as any)
+      .mockResolvedValueOnce({
+        success: true,
+        data: { kind: 'image', dataUrl: 'data:image/png;base64,AA==', mimeType: 'image/png', bytes: 3 * 1024 * 1024 },
+      } as any);
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => {
+      root.render(
+        createElement(I18nProvider, {
+          language: 'en',
+          children: createElement(WorkingDirectoryFileViewer, {
+            repoPath: 'C:/repo',
+            path: 'assets/large.png',
+            onClose: vi.fn(),
+            onRepoChanged: vi.fn(),
+            onCloseRequestChange: vi.fn(),
+            onNavigationGuardChange: vi.fn(),
+          }),
+        }),
+      );
+      await Promise.resolve();
+    });
+    const loadButton = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === 'Show image anyway');
+      expect(button).toBeTruthy();
+      return button!;
+    });
+
+    await act(async () => {
+      loadButton.click();
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() => expect(getPreview).toHaveBeenLastCalledWith('assets/large.png', 'C:/repo', true));
+    await vi.waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA=='));
+    act(() => root.unmount());
+  });
+
   it('shows history errors and loads blame beyond the first 500 lines', async () => {
     vi.spyOn(gitClient, 'getFileHistory').mockResolvedValue({ success: false, error: 'History failed.' });
     const getBlameRange = vi

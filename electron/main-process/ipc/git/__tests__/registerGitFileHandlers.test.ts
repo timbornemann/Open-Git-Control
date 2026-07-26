@@ -101,6 +101,23 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(duplicateResult).toMatchObject({ success: false, error: expect.stringContaining('EEXIST') });
   });
 
+  it('loads a large image only after the caller explicitly requests it', async () => {
+    const imagePath = path.join(repoPath, 'src', 'large.png');
+    fs.writeFileSync(imagePath, Buffer.alloc(2 * 1024 * 1024 + 1));
+
+    const deferredResult = await handlers.get(IpcChannel.GitGetWorkingDirectoryPreview)!({}, 'src/large.png', repoPath);
+    expect(deferredResult).toEqual({
+      success: true,
+      data: expect.objectContaining({ kind: 'binary', reason: 'tooLarge', mimeType: 'image/png', canLoadImage: true }),
+    });
+
+    const imageResult = await handlers.get(IpcChannel.GitGetWorkingDirectoryPreview)!({}, 'src/large.png', repoPath, true);
+    expect(imageResult).toEqual({
+      success: true,
+      data: expect.objectContaining({ kind: 'image', mimeType: 'image/png', bytes: 2 * 1024 * 1024 + 1 }),
+    });
+  });
+
   it('returns filesystem metadata and Git history summary for a working-directory file', async () => {
     const runCommandAtPath = vi.fn(async (_requestedRepoPath: string, args: string[]) => {
       if (args[0] === 'ls-files') return '100644 deadbeef 0\tsrc/app.ts\n';
