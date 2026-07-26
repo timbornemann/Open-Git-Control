@@ -13,6 +13,7 @@ import {
 import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
+import { registerWorkingDirectoryFileInfoHandler } from './workingDirectoryFileInfo';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -189,6 +190,8 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+
+  registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
 
   ipcMain.handle(IpcChannel.GitGetWorkingDirectoryPreview, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Pencil, Scissors, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, ExternalLink, File, Folder, FolderOpen, Info, Pencil, Scissors, Trash2 } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import { getAvailableWorkingDirectoryCopyPath } from '@/utils/workingDirectoryCopyName';
+import { WorkingDirectoryFileInfoDialog } from './WorkingDirectoryFileInfoDialog';
 import '@/styles/working-directory-tree.css';
 
 type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
@@ -26,6 +27,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<{ entry: WorkingDirectoryEntryDto; x: number; y: number } | null>(null);
+  const [fileInfoPath, setFileInfoPath] = useState<string | null>(null);
   const activeRepoPathRef = useRef(repoPath);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
   const initializedRepoPathRef = useRef<string | null>(null);
@@ -84,6 +86,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
       setLoadingDirectories(new Set());
       setClipboard(null);
       setContext(null);
+      setFileInfoPath(null);
       if (repoPath) {
         void loadDirectory('');
         if (isFreshMount) {
@@ -288,6 +291,19 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
               <span>Open</span>
             </button>
           )}
+          {context.entry.path && context.entry.kind === 'file' && (
+            <button
+              type="button"
+              className="working-tree-context-menu__item"
+              onClick={() => {
+                setFileInfoPath(context.entry.path);
+                setContext(null);
+              }}
+            >
+              <Info size={14} />
+              <span>File information</span>
+            </button>
+          )}
           {context.entry.path && (
             <button
               type="button"
@@ -401,6 +417,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({ repoPath, refreshTrigger
           )}
         </div>
       )}
+      {repoPath && fileInfoPath && <WorkingDirectoryFileInfoDialog repoPath={repoPath} path={fileInfoPath} onClose={() => setFileInfoPath(null)} />}
     </div>
   );
 };

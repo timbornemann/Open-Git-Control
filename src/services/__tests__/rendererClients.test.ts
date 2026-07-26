@@ -388,6 +388,10 @@ describe('renderer service clients', () => {
     await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);
     await expectDelegation(() => gitClient.getWorkingTreeStats(), api.git.getWorkingTreeStats, []);
     await expectDelegation(() => gitClient.listWorkingDirectory('C:/repo', 'src'), api.git.listWorkingDirectory, ['C:/repo', 'src']);
+    await expectDelegation(() => gitClient.getWorkingDirectoryFileInfo('src/app.ts', 'C:/repo'), api.git.getWorkingDirectoryFileInfo, [
+      'src/app.ts',
+      'C:/repo',
+    ]);
     await expectDelegation(() => gitClient.getWorkingDirectoryPreview('src/app.ts', 'C:/repo'), api.git.getWorkingDirectoryPreview, ['src/app.ts', 'C:/repo']);
     await expectDelegation(() => gitClient.moveWorkingDirectoryEntry('src/old.ts', 'src/new.ts', true, 'C:/repo'), api.git.moveWorkingDirectoryEntry, [
       'src/old.ts',

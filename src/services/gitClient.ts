@@ -297,6 +297,9 @@ export const gitClient = {
   async listWorkingDirectory(repoPath: string, parentPath?: string) {
     return requireElectronGitApi().listWorkingDirectory(repoPath, parentPath);
   },
+  async getWorkingDirectoryFileInfo(filePath: string, repoPath: string) {
+    return requireElectronGitApi().getWorkingDirectoryFileInfo(filePath, repoPath);
+  },
   async getWorkingDirectoryPreview(filePath: string, repoPath: string) {
     return requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
   },

@@ -116,6 +116,27 @@ export type RepoFileDeleteResultDto = {
 };
 
 export type WorkingDirectoryEntryDto = { path: string; name: string; kind: 'file' | 'directory'; bytes?: number };
+export type WorkingDirectoryFileInfoDto = {
+  path: string;
+  name: string;
+  extension: string | null;
+  bytes: number;
+  createdAt: string;
+  modifiedAt: string;
+  accessedAt: string;
+  readOnly: boolean;
+  git: {
+    tracked: boolean;
+    ignored: boolean;
+    staged: boolean;
+    modified: boolean;
+    conflicted: boolean;
+    historyCount: number;
+    firstCommit: GitFileHistoryEntryDto | null;
+    latestCommit: GitFileHistoryEntryDto | null;
+    error?: string;
+  };
+};
 export type WorkingDirectoryPreviewDto =
   | { kind: 'text'; text: string; bytes: number; isMarkdown: boolean }
   | { kind: 'image'; dataUrl: string; mimeType: string; bytes: number }
@@ -188,6 +209,7 @@ export interface ElectronGitAPI {
   writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
   deleteRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileDeleteResultDto>;
   listWorkingDirectory: (repoPath: string, parentPath?: string) => Promise<IpcResult<WorkingDirectoryEntryDto[]>>;
+  getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
   moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   copyWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

@@ -138,4 +138,36 @@ describe('WorkingDirectoryTree', () => {
 
     expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === '')).toHaveLength(2);
   });
+
+  it('offers file information from a file context menu', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({ success: true, data: [{ path: 'README.md', name: 'README.md', kind: 'file', bytes: 12 }] });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile: vi.fn(),
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const file = container.querySelector<HTMLButtonElement>('.working-tree-row');
+    if (!file) throw new Error('Missing file row.');
+
+    act(() => file.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+
+    expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('File information'))).toBe(
+      true,
+    );
+  });
 });

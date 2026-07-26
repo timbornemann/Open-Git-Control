@@ -77,6 +77,81 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(result).toMatchObject({ success: false, error: expect.stringContaining('repository-relative') });
   });
 
+  it('returns filesystem metadata and Git history summary for a working-directory file', async () => {
+    const runCommandAtPath = vi.fn(async (_requestedRepoPath: string, args: string[]) => {
+      if (args[0] === 'ls-files') return '100644 deadbeef 0\tsrc/app.ts\n';
+      if (args[0] === 'status') return ' M src/app.ts\n';
+      if (args[0] === 'log') {
+        return (
+          'newesthash\x1fnewest\x1fAda\x1f2026-07-26T12:00:00+00:00\x1fUpdate app\x00' +
+          'oldesthash\x1foldest\x1fLin\x1f2026-07-01T08:30:00+00:00\x1fAdd app\x00'
+        );
+      }
+      throw new Error(`Unexpected command: ${args[0]}`);
+    });
+    registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, runCommandAtPath } as any });
+
+    const result = await handlers.get(IpcChannel.GitGetWorkingDirectoryFileInfo)!({}, 'src/app.ts', repoPath);
+
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({
+        path: 'src/app.ts',
+        name: 'app.ts',
+        extension: 'ts',
+        bytes: expect.any(Number),
+        readOnly: false,
+        git: {
+          tracked: true,
+          ignored: false,
+          staged: false,
+          modified: true,
+          conflicted: false,
+          historyCount: 2,
+          firstCommit: {
+            hash: 'oldesthash',
+            abbrevHash: 'oldest',
+            author: 'Lin',
+            date: '2026-07-01T08:30:00+00:00',
+            subject: 'Add app',
+          },
+          latestCommit: {
+            hash: 'newesthash',
+            abbrevHash: 'newest',
+            author: 'Ada',
+            date: '2026-07-26T12:00:00+00:00',
+            subject: 'Update app',
+          },
+        },
+      }),
+    });
+    expect(runCommandAtPath).toHaveBeenCalledWith(repoPath, expect.arrayContaining(['log', '--follow']));
+  });
+
+  it('still returns file information for a repository without commits', async () => {
+    const runCommandAtPath = vi.fn(async (_requestedRepoPath: string, args: string[]) => {
+      if (args[0] === 'ls-files' || args[0] === 'status') return '';
+      if (args[0] === 'log') throw new Error("fatal: your current branch 'main' does not have any commits yet");
+      throw new Error(`Unexpected command: ${args[0]}`);
+    });
+    registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, runCommandAtPath } as any });
+
+    const result = await handlers.get(IpcChannel.GitGetWorkingDirectoryFileInfo)!({}, 'src/app.ts', repoPath);
+
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        git: {
+          tracked: false,
+          historyCount: 0,
+          firstCommit: null,
+          latestCommit: null,
+        },
+      },
+    });
+    expect(result.data.git.error).toBeUndefined();
+  });
+
   it('deletes only a file in the active repository', async () => {
     const deleteRepoFileAtPath = vi.fn().mockResolvedValue(undefined);
     registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, files: { deleteRepoFileAtPath } } as any });

@@ -82,12 +82,12 @@
       "id": "f63b1b2d-57de-4143-a6a2-50ce001c5fe2",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Filetree",
-      "description": "neuer button im rechtsklick menü: \"Datei infos\" hier sollen alle möglichen infos über die datei angezeigt werdne können. eventuell auch mit git hitory verküpfen, damit man mehr infos bekommen kann, zb.b wann zum ersten mal hinzugefügt, anzahl der änderunegn und so weiter",
+      "description": "im Filetree (Working Directory) neuer button im rechtsklick menü: \"Datei infos\" hier sollen alle möglichen infos über die datei angezeigt werdne können. eventuell auch mit git hitory verküpfen, damit man mehr infos bekommen kann, zb.b wann zum ersten mal hinzugefügt, anzahl der änderunegn und so weiter",
       "priority": "medium",
       "status": "idea",
       "tags": [],
       "createdAt": 1784043228977,
-      "updatedAt": 1784043228977
+      "updatedAt": 1785063342041
     },
     {
       "id": "4febcdfe-caff-4919-ac38-38aaa2c08535",
@@ -205,10 +205,10 @@
       "title": "Agent prompt copy button for run configurations",
       "description": "Agent prompt copy button for run configurations: Damit man nicht imemr alles manuell machen muss soll man einen ki angeten einen probpt geben könenn der dann eine akkurate run konfiguration erstellt im richtigen order von open git controll, dabei soll der prompt sagen wie es ersteltl werden muss und was genau bei welchen schritten erstellt werden muss. und auch eine leere vorlage mitgeben und auch wie die datei heißen muss und wie der order angelegt werdne muss damit ein ki agent alles wichtige weiß",
       "priority": "high",
-      "status": "planned",
+      "status": "done",
       "tags": [],
       "createdAt": 1784826618903,
-      "updatedAt": 1784997233847
+      "updatedAt": 1785004834350
     }
   ]
 }

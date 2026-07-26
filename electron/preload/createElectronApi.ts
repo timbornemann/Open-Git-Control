@@ -212,6 +212,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
         : invokeGitOperation('delete', IpcChannel.GitDeleteRepoFile, filePath),
     listWorkingDirectory: (repoPath: string, parentPath = '') =>
       invokeGitOperationForRepo(repoPath, 'list files', IpcChannel.GitListWorkingDirectory, repoPath, parentPath),
+    getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'file info', IpcChannel.GitGetWorkingDirectoryFileInfo, filePath, repoPath),
     getWorkingDirectoryPreview: (filePath: string, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath),
     moveWorkingDirectoryEntry: (sourcePath: string, targetPath: string, overwrite: boolean, repoPath: string) =>
@@ -384,6 +386,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       writeRepoFile: flatApi.writeRepoFile,
       deleteRepoFile: flatApi.deleteRepoFile,
       listWorkingDirectory: flatApi.listWorkingDirectory,
+      getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
       moveWorkingDirectoryEntry: flatApi.moveWorkingDirectoryEntry,
       copyWorkingDirectoryEntry: flatApi.copyWorkingDirectoryEntry,

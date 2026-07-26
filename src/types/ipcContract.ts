@@ -55,6 +55,7 @@ export const enum IpcChannel {
   GitDeleteRepoFile = 'git:deleteRepoFile',
   GitWriteRepoFile = 'git:writeRepoFile',
   GitListWorkingDirectory = 'git:listWorkingDirectory',
+  GitGetWorkingDirectoryFileInfo = 'git:getWorkingDirectoryFileInfo',
   GitGetWorkingDirectoryPreview = 'git:getWorkingDirectoryPreview',
   GitMoveWorkingDirectoryEntry = 'git:moveWorkingDirectoryEntry',
   GitCopyWorkingDirectoryEntry = 'git:copyWorkingDirectoryEntry',

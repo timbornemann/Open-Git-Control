@@ -175,6 +175,15 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitDeleteRepoFile, 'NOTICE', 'C:/captured-repo');
   });
 
+  it('pins working-directory file information to the repository captured by the caller', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.getWorkingDirectoryFileInfo('src/app.ts', 'C:/captured-repo');
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryFileInfo, 'src/app.ts', 'C:/captured-repo');
+  });
+
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { findings: [] } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

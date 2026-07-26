@@ -195,3 +195,82 @@
   border-color: var(--status-danger-border);
   background: var(--status-danger-soft);
 }
+
+.working-file-info__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.working-file-info__section + .working-file-info__section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.working-file-info__section h4 {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+
+.working-file-info__list {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  gap: 6px 10px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+.working-file-info__list dt {
+  color: var(--text-secondary);
+}
+
+.working-file-info__list dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.working-file-info__commit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+  font-size: 0.76rem;
+}
+
+.working-file-info__commit-label {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+}
+
+.working-file-info__commit strong {
+  color: var(--text-accent);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+.working-file-info__commit span:not(.working-file-info__commit-label),
+.working-file-info__commit small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.working-file-info__commit small {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+}
+
+.working-file-info__loading,
+.working-file-info__empty {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.working-file-info__error {
+  color: var(--status-danger);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
