@@ -46,6 +46,7 @@ const MainViewComponent: React.FC = () => {
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
     handleOpenWorkingDirectoryFile,
+    handleWorkingDirectoryEntryInvalidated,
     setWorkingDirectoryNavigationGuard,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
@@ -147,6 +148,7 @@ const MainViewComponent: React.FC = () => {
             commitHistoryStack={commitHistoryStack}
             workingTreeSelection={workingTreeSelection}
             onOpenWorkingDirectoryFile={handleOpenWorkingDirectoryFile}
+            onWorkingDirectoryEntryInvalidated={handleWorkingDirectoryEntryInvalidated}
             isCommitInspectorOpen={isCommitInspectorOpen}
             handleOpenDiff={handleOpenDiff}
             handleOpenConflictResolver={handleOpenConflictResolver}

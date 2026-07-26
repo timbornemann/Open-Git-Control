@@ -76,6 +76,19 @@ describe('useMainViewInspector working-directory viewer binding', () => {
     hook.unmount();
   });
 
+  it('closes the working-file editor when its file or parent folder is invalidated', () => {
+    const hook = renderInspector('C:/repositories/a');
+
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.handleWorkingDirectoryEntryInvalidated('src/index.ts'));
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+
+    act(() => hook.current.handleOpenWorkingDirectoryFile('src/index.ts'));
+    act(() => hook.current.handleWorkingDirectoryEntryInvalidated('src'));
+    expect(hook.current.workingDirectoryFilePath).toBeNull();
+    hook.unmount();
+  });
+
   it('keeps the working file open until guarded staging navigation proceeds', () => {
     const hook = renderInspector('C:/repositories/a');
     let proceed: (() => void) | undefined;

@@ -29,6 +29,7 @@ type MainInspectorPaneProps = {
   handleCommitBack: () => void;
   closeInspector: () => void;
   onOpenWorkingDirectoryFile: (path: string) => void;
+  onWorkingDirectoryEntryInvalidated: (path: string) => void;
   directoryMode: 'staging' | 'tree';
   onDirectoryModeChange: (mode: 'staging' | 'tree') => void;
   expandedDirectoryPaths: Set<string>;
@@ -50,6 +51,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
   handleCommitBack,
   closeInspector,
   onOpenWorkingDirectoryFile,
+  onWorkingDirectoryEntryInvalidated,
   directoryMode,
   onDirectoryModeChange,
   expandedDirectoryPaths,
@@ -141,6 +143,7 @@ export const MainInspectorPane: React.FC<MainInspectorPaneProps> = ({
                   expandedPaths={expandedDirectoryPaths}
                   onExpandedPathsChange={onExpandedDirectoryPathsChange}
                   onOpenFile={onOpenWorkingDirectoryFile}
+                  onEntryInvalidated={onWorkingDirectoryEntryInvalidated}
                   onRepoChanged={repository.triggerRefresh}
                 />
               </div>

@@ -212,6 +212,7 @@ describe('WorkingDirectoryTree', () => {
 
   it('does not re-load or report an error for a deleted expanded folder', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    const onEntryInvalidated = vi.fn();
     let folderExists = true;
     const listWorkingDirectory = vi.spyOn(gitClient, 'listWorkingDirectory').mockImplementation(async (_repoPath, parentPath) => {
       if (!parentPath) return { success: true, data: folderExists ? [{ path: 'Testtest', name: 'Testtest', kind: 'directory' }] : [] };
@@ -233,6 +234,7 @@ describe('WorkingDirectoryTree', () => {
         expandedPaths,
         onExpandedPathsChange: setExpandedPaths,
         onOpenFile: vi.fn(),
+        onEntryInvalidated,
         onRepoChanged: vi.fn(),
       });
     };
@@ -259,5 +261,6 @@ describe('WorkingDirectoryTree', () => {
     });
 
     expect(listWorkingDirectory.mock.calls.filter(([, parentPath]) => parentPath === 'Testtest')).toHaveLength(1);
+    expect(onEntryInvalidated).toHaveBeenCalledWith('Testtest');
   });
 });

@@ -51,6 +51,9 @@ const maxLineExceptions = new Map([
   // Planner provider: refresh sequencing, selection and mutations share one
   // data snapshot and generation guard; splitting would duplicate that state.
   ['src/contexts/ProjectPlannerContext.tsx', 504],
+  // Filetree: its directory cache, mutation invalidation and context-menu
+  // callbacks share one synchronized view of the working directory.
+  ['src/components/working-directory/WorkingDirectoryTree.tsx', 517],
 ]);
 
 const sharedForbiddenPrefixes = ['src/components/', 'src/hooks/', 'src/contexts/', 'src/app/', 'src/services/'];

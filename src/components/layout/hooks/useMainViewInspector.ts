@@ -219,6 +219,13 @@ export const useMainViewInspector = ({
     [activeRepo, setSelectedCommit],
   );
 
+  const handleWorkingDirectoryEntryInvalidated = useCallback((entryPath: string) => {
+    setWorkingDirectoryFile((current) => {
+      if (!current || (current.path !== entryPath && !current.path.startsWith(`${entryPath}/`))) return current;
+      return null;
+    });
+  }, []);
+
   const setWorkingDirectoryNavigationGuard = useCallback((guard: WorkingDirectoryNavigationGuard | null) => {
     workingDirectoryNavigationGuardRef.current = guard;
     setActiveWorkingDirectoryNavigationGuard(guard);
@@ -296,6 +303,7 @@ export const useMainViewInspector = ({
     handleSelectCommitFromHistory,
     handleSelectWorkingTreeFile,
     handleOpenWorkingDirectoryFile,
+    handleWorkingDirectoryEntryInvalidated,
     setWorkingDirectoryNavigationGuard,
     handleSelectCommitFromWorkingTree,
     handleCommitBack,
