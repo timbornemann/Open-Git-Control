@@ -148,6 +148,7 @@ const MainViewComponent: React.FC = () => {
             commitHistoryStack={commitHistoryStack}
             workingTreeSelection={workingTreeSelection}
             onOpenWorkingDirectoryFile={handleOpenWorkingDirectoryFile}
+            workingDirectoryFilePath={workingDirectoryFilePath}
             onWorkingDirectoryEntryInvalidated={handleWorkingDirectoryEntryInvalidated}
             isCommitInspectorOpen={isCommitInspectorOpen}
             handleOpenDiff={handleOpenDiff}

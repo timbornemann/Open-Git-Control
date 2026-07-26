@@ -15,6 +15,7 @@ type Props = {
   expandedPaths: Set<string>;
   onExpandedPathsChange: React.Dispatch<React.SetStateAction<Set<string>>>;
   onOpenFile: (path: string) => void;
+  activeFilePath?: string | null;
   onEntryInvalidated?: (path: string) => void;
   onRepoChanged: () => void;
 };
@@ -28,6 +29,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   expandedPaths,
   onExpandedPathsChange,
   onOpenFile,
+  activeFilePath = null,
   onEntryInvalidated = () => {},
   onRepoChanged,
 }) => {
@@ -275,7 +277,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
           <React.Fragment key={entry.path}>
             <button
               type="button"
-              className="working-tree-row"
+              className={`working-tree-row${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
               onClick={() => {
                 if (entry.kind !== 'directory') {
                   onOpenFile(entry.path);
@@ -324,7 +326,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   return (
     <div className="working-directory-tree">
       <div
-        className="working-tree-root"
+        className={`working-tree-root${context?.entry.path === '' ? ' working-tree-root--context' : ''}`}
         onContextMenu={(event) => {
           event.preventDefault();
           setContext({ entry: { path: '', name: 'Repository', kind: 'directory' }, x: event.clientX, y: event.clientY });

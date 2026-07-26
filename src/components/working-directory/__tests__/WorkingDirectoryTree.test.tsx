@@ -173,6 +173,9 @@ describe('WorkingDirectoryTree', () => {
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('File information'))).toBe(
       true,
     );
+    expect(file.classList.contains('working-tree-row--context')).toBe(true);
+    act(() => window.dispatchEvent(new window.MouseEvent('click')));
+    expect(file.classList.contains('working-tree-row--context')).toBe(false);
   });
 
   it('offers adding files and folders from folder and repository-root context menus', async () => {
@@ -208,6 +211,32 @@ describe('WorkingDirectoryTree', () => {
     act(() => folder.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add file'))).toBe(true);
     expect(Array.from(container.querySelectorAll('.working-tree-context-menu__item')).some((item) => item.textContent?.includes('Add folder'))).toBe(true);
+  });
+
+  it('highlights the file open in the viewer', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({ success: true, data: [{ path: 'README.md', name: 'README.md', kind: 'file', bytes: 12 }] });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile: vi.fn(),
+          activeFilePath: 'README.md',
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('.working-tree-row--active')?.textContent).toContain('README.md');
   });
 
   it('does not re-load or report an error for a deleted expanded folder', async () => {
