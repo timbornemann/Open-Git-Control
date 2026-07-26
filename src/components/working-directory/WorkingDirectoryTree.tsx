@@ -23,7 +23,9 @@ type Props = {
 };
 
 const basename = (value: string) => value.split('/').pop() || value;
+const parentPath = (value: string) => (value.includes('/') ? value.slice(0, value.lastIndexOf('/')) : '');
 const isEntryName = (value: string) => value.length > 0 && value !== '.' && value !== '..' && !/[\\/]/.test(value);
+const isRenameAffix = (value: string) => !/[\\/]/.test(value);
 const isSameOrDescendantPath = (candidatePath: string, parentPath: string) => candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);
 const sortEntries = (entries: WorkingDirectoryEntryDto[]) =>
   entries.slice().sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'directory' ? -1 : 1));
@@ -37,6 +39,12 @@ const getVisibleEntries = (
   );
 const getTopLevelEntries = (entries: WorkingDirectoryEntryDto[]) =>
   entries.filter((entry) => !entries.some((candidate) => candidate.path !== entry.path && isSameOrDescendantPath(entry.path, candidate.path)));
+const withAffixes = (entry: WorkingDirectoryEntryDto, prefix: string, suffix: string) => {
+  if (entry.kind !== 'file') return `${prefix}${entry.name}${suffix}`;
+  const extensionStart = entry.name.lastIndexOf('.');
+  if (extensionStart <= 0) return `${prefix}${entry.name}${suffix}`;
+  return `${prefix}${entry.name.slice(0, extensionStart)}${suffix}${entry.name.slice(extensionStart)}`;
+};
 
 export const WorkingDirectoryTree: React.FC<Props> = ({
   repoPath,
@@ -289,6 +297,89 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       setToast({ msg: 'Could not copy the selected paths.', isError: true });
     }
   };
+  const batchRename = (entries: WorkingDirectoryEntryDto[]) =>
+    setInputDialog({
+      title: 'Batch rename',
+      message: `Add a prefix and/or suffix to ${getTopLevelEntries(entries).length} selected entries. For files, the suffix is inserted before the file extension.`,
+      fields: [
+        {
+          id: 'prefix',
+          label: 'Prefix',
+          placeholder: 'for example, archive-',
+          helperText: 'Optional. Prefixes and suffixes cannot contain a path separator.',
+          validate: (value, values) => {
+            if (!isRenameAffix(value)) return 'A prefix cannot contain a path separator.';
+            if (!value.trim() && !(values.suffix || '').trim()) return 'Enter a prefix or a suffix.';
+            return null;
+          },
+        },
+        {
+          id: 'suffix',
+          label: 'Suffix',
+          placeholder: 'for example, -old',
+          helperText: 'Optional. For files, it is placed before the extension.',
+          validate: (value, values) => {
+            if (!isRenameAffix(value)) return 'A suffix cannot contain a path separator.';
+            if (!value.trim() && !(values.prefix || '').trim()) return 'Enter a prefix or a suffix.';
+            return null;
+          },
+        },
+      ],
+      contextItems: [{ label: 'Selected entries', value: String(getTopLevelEntries(entries).length) }],
+      irreversible: false,
+      consequences: 'The selected names will change in the working directory. Existing files and folders will not be overwritten.',
+      confirmLabel: 'Rename selected',
+      onSubmit: async (values) => {
+        const prefix = values.prefix || '';
+        const suffix = values.suffix || '';
+        if (!prefix.trim() && !suffix.trim()) {
+          setToast({ msg: 'Enter a prefix or a suffix.', isError: true });
+          return;
+        }
+        const targets = getTopLevelEntries(entries);
+        const operations = targets.map((entry) => {
+          const name = withAffixes(entry, prefix, suffix);
+          return { entry, targetPath: parentPath(entry.path) ? `${parentPath(entry.path)}/${name}` : name };
+        });
+        if (operations.some(({ targetPath }) => !isEntryName(basename(targetPath)))) {
+          setToast({ msg: 'The prefix or suffix produces an invalid file or folder name.', isError: true });
+          return;
+        }
+        const targetPaths = new Set(operations.map(({ targetPath }) => targetPath));
+        if (targetPaths.size !== operations.length) {
+          setToast({ msg: 'The prefix or suffix would create duplicate names.', isError: true });
+          return;
+        }
+        const sourcePaths = new Set(operations.map(({ entry }) => entry.path));
+        if (operations.some(({ entry, targetPath }) => entry.path !== targetPath && sourcePaths.has(targetPath))) {
+          setToast({ msg: 'The selected entries would overlap after renaming. Choose a different prefix or suffix.', isError: true });
+          return;
+        }
+        const parentPaths = [...new Set(operations.map(({ entry }) => parentPath(entry.path)))];
+        const listingResults = await Promise.all(parentPaths.map((directory) => gitClient.listWorkingDirectory(repoPath!, directory)));
+        const failedListing = listingResults.find((result) => !result.success);
+        if (failedListing) {
+          setToast({ msg: failedListing.error || 'Could not validate the target names.', isError: true });
+          return;
+        }
+        const existingPaths = new Set(listingResults.flatMap((result) => result.data || []).map((entry) => entry.path));
+        if (operations.some(({ entry, targetPath }) => entry.path !== targetPath && existingPaths.has(targetPath))) {
+          setToast({ msg: 'A file or folder with one of the new names already exists.', isError: true });
+          return;
+        }
+        await runMutation(
+          async () => {
+            for (const { entry, targetPath } of operations) {
+              const result = await gitClient.moveWorkingDirectoryEntry(entry.path, targetPath, false, repoPath!);
+              if (!result.success) return result;
+            }
+            return { success: true };
+          },
+          targets.filter((entry) => entry.kind === 'directory').map((entry) => entry.path),
+          targets.map((entry) => entry.path),
+        );
+      },
+    });
   const visibleEntries = getVisibleEntries(entriesByParent, expandedPaths);
   const selectEntry = (entry: WorkingDirectoryEntryDto, event: React.MouseEvent<HTMLButtonElement>) => {
     const additive = event.ctrlKey || event.metaKey;
@@ -452,6 +543,18 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
               >
                 <Copy size={14} />
                 <span>Copy paths</span>
+              </button>
+              <button
+                type="button"
+                className="working-tree-context-menu__item"
+                onClick={() => {
+                  const entries = context.entries;
+                  setContext(null);
+                  batchRename(entries);
+                }}
+              >
+                <Pencil size={14} />
+                <span>Add prefix / suffix</span>
               </button>
               <div className="working-tree-context-menu__separator" />
               <button
