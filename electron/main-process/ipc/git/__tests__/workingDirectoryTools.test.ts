@@ -180,8 +180,9 @@ describe('working-directory tool handlers', () => {
   it('omits destination folders that do not have usable Windows access', async () => {
     fs.mkdirSync(path.join(repoPath, 'accessible'));
     fs.mkdirSync(path.join(repoPath, 'blocked'));
+    const blockedPath = fs.realpathSync(path.join(repoPath, 'blocked'));
     assertEntryAccessMock.mockImplementation((targetPath: string) => {
-      if (targetPath === path.join(repoPath, 'blocked')) throw new Error('Access denied.');
+      if (path.resolve(targetPath) === blockedPath) throw new Error('Access denied.');
     });
 
     await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, '')).resolves.toEqual({
