@@ -13,7 +13,11 @@ import type {
 } from '../../src/types/preloadDtos';
 import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/projectPlanner';
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
-import type { RepositoryInitializationOptionsDto } from '../../src/shared/ipc/contracts/git';
+import type {
+  RepositoryInitializationOptionsDto,
+  WorkingDirectoryReplaceRequestDto,
+  WorkingDirectorySearchRequestDto,
+} from '../../src/shared/ipc/contracts/git';
 import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
 import { createRepositoryRunApi } from './createRepositoryRunApi';
 
@@ -220,6 +224,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       invokeGitOperationForRepo(repoPath, 'file info', IpcChannel.GitGetWorkingDirectoryFileInfo, filePath, repoPath),
     getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) =>
       invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath, allowLargeImage),
+    searchWorkingDirectory: (request: WorkingDirectorySearchRequestDto, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'search files', IpcChannel.GitSearchWorkingDirectory, request, repoPath),
+    replaceWorkingDirectory: (request: WorkingDirectoryReplaceRequestDto, repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'replace in files', IpcChannel.GitReplaceWorkingDirectory, request, repoPath),
     applyWorkingDirectoryMoves: (moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'move files', IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders }, repoPath),
     listWorkingDirectoryFolders: (repoPath: string, parentPath = '') =>
@@ -403,6 +411,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       createWorkingDirectoryFolder: flatApi.createWorkingDirectoryFolder,
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
+      searchWorkingDirectory: flatApi.searchWorkingDirectory,
+      replaceWorkingDirectory: flatApi.replaceWorkingDirectory,
       applyWorkingDirectoryMoves: flatApi.applyWorkingDirectoryMoves,
       listWorkingDirectoryFolders: flatApi.listWorkingDirectoryFolders,
       findEmptyWorkingDirectoryFolders: flatApi.findEmptyWorkingDirectoryFolders,

@@ -49,12 +49,12 @@
       "id": "b52945a1-4969-47e0-864a-f3ee1d67a340",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Suche in Working Directory",
-      "description": "Datei suche, voltext suche in working direktory",
+      "description": "Datei suche, voltext suche in working direktory, das man nach dateinamen priorisiert suchen kann, aber auch zur volltext suche umschalten kann, dass man wie in visual strudio code die ganzen code dateien durchsuchen kann, und auch replace und replace all machen kann, so das man wie bei vs code auch imme rsieht pro datei in wlechen zeilen der gefundenen teil steht. damit man effizient und schnell und einfach inhalte suchen kann und direkte änderunegn machen kann",
       "priority": "medium",
       "status": "idea",
       "tags": [],
       "createdAt": 1784027524037,
-      "updatedAt": 1784027524037
+      "updatedAt": 1785140337076
     },
     {
       "id": "5ea8d0cb-c8b7-49d8-89af-77bc7322196b",

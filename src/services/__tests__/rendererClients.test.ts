@@ -406,6 +406,15 @@ describe('renderer service clients', () => {
       'C:/repo',
       true,
     ]);
+    await expectDelegation(() => gitClient.searchWorkingDirectory({ query: 'app', mode: 'content' }, 'C:/repo'), api.git.searchWorkingDirectory, [
+      { query: 'app', mode: 'content' },
+      'C:/repo',
+    ]);
+    await expectDelegation(
+      () => gitClient.replaceWorkingDirectory({ query: 'app', replacement: 'tool', all: true }, 'C:/repo'),
+      api.git.replaceWorkingDirectory,
+      [{ query: 'app', replacement: 'tool', all: true }, 'C:/repo'],
+    );
     await expectDelegation(
       () => gitClient.applyWorkingDirectoryMoves([{ sourcePath: 'a.txt', targetPath: 'b.txt' }], false, 'C:/repo'),
       api.git.applyWorkingDirectoryMoves,

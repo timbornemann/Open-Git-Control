@@ -221,6 +221,8 @@ describe('createElectronApi', () => {
     await api.git.findEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
     await api.git.deleteEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
     await api.git.createWorkingDirectoryArchive(['README.md'], 'README.zip', 'C:/captured-repo');
+    await api.git.searchWorkingDirectory({ query: 'app', mode: 'content' }, 'C:/captured-repo');
+    await api.git.replaceWorkingDirectory({ query: 'app', replacement: 'tool', all: true }, 'C:/captured-repo');
 
     expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders: true }, 'C:/captured-repo');
     expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitListWorkingDirectoryFolders, 'C:/captured-repo', 'src');
@@ -232,6 +234,8 @@ describe('createElectronApi', () => {
       { sourcePaths: ['README.md'], targetPath: 'README.zip' },
       'C:/captured-repo',
     );
+    expect(invoke).toHaveBeenNthCalledWith(6, IpcChannel.GitSearchWorkingDirectory, { query: 'app', mode: 'content' }, 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(7, IpcChannel.GitReplaceWorkingDirectory, { query: 'app', replacement: 'tool', all: true }, 'C:/captured-repo');
   });
 
   it('pins secret-scan and approval IPC calls to the captured repository', async () => {

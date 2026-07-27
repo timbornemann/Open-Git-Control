@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Trash2 } from 'lucide-react';
+import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Search, Trash2, X } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToastSetter } from '@/hooks/useAppToast';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import { getAvailableWorkingDirectoryCopyPath } from '@/utils/workingDirectoryCopyName';
 import { WorkingDirectoryFileInfoDialog } from './WorkingDirectoryFileInfoDialog';
+import { WorkingDirectorySearchPanel } from './WorkingDirectorySearchPanel';
 import { createWorkingDirectoryToolActions } from './workingDirectoryToolActions';
 import { basename, getTopLevelEntries, isEntryName, isSameOrDescendantPath } from './workingDirectoryToolTransforms';
 import { WorkingDirectoryToolsMenu } from './WorkingDirectoryToolsMenu';
@@ -22,6 +23,38 @@ type Props = {
   activeFilePath?: string | null;
   onEntryInvalidated?: (path: string) => void;
   onRepoChanged: () => void;
+};
+
+const WorkingDirectorySearchToggle: React.FC<{ visible: boolean; open: boolean; onToggle: () => void }> = ({ visible, open, onToggle }) => {
+  if (!visible) return null;
+  return (
+    <button
+      type="button"
+      className={open ? 'working-tree-root__search working-tree-root__search--active' : 'working-tree-root__search'}
+      aria-label={open ? 'Close working directory search' : 'Search working directory'}
+      title={open ? 'Close search' : 'Search files'}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      {open ? <X size={14} /> : <Search size={14} />}
+    </button>
+  );
+};
+
+const WorkingDirectoryTreeContent: React.FC<{
+  searchOpen: boolean;
+  repoPath: string | null;
+  renderTree: () => React.ReactNode;
+  onOpenFile: (path: string) => void;
+  onFilesChanged: (paths: string[]) => Promise<void>;
+  activeFilePath: string | null;
+}> = ({ searchOpen, repoPath, renderTree, onOpenFile, onFilesChanged, activeFilePath }) => {
+  if (searchOpen && repoPath) {
+    return <WorkingDirectorySearchPanel repoPath={repoPath} onOpenFile={onOpenFile} onFilesChanged={onFilesChanged} activeFilePath={activeFilePath} />;
+  }
+  return <>{renderTree()}</>;
 };
 
 const sortEntries = (entries: WorkingDirectoryEntryDto[]) =>
@@ -52,6 +85,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<ContextMenu | null>(null);
   const [fileInfoPath, setFileInfoPath] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
   const activeRepoPathRef = useRef(repoPath);
   const loadedDirectoryPathsRef = useRef(new Set<string>());
@@ -134,6 +168,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       setClipboard(null);
       setContext(null);
       setFileInfoPath(null);
+      setSearchOpen(false);
       setSelectedPaths(new Set());
       selectionAnchorPathRef.current = null;
       if (repoPath) {
@@ -411,6 +446,14 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       : context?.entry.path.includes('/')
         ? context.entry.path.slice(0, context.entry.path.lastIndexOf('/'))
         : '';
+  const handleSearchFilesChanged = async (paths: string[]) => {
+    paths.forEach((entryPath) => {
+      onEntryInvalidated(entryPath);
+      clearSelectedPaths([entryPath]);
+    });
+    await refreshLoadedDirectories();
+    onRepoChanged();
+  };
   return (
     <div className="working-directory-tree">
       <div
@@ -423,8 +466,23 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       >
         <FolderOpen className="working-tree-root__icon" size={16} strokeWidth={1.8} />
         <span className="working-tree-root__label">{repoPath ? `${basename(repoPath)}/` : 'Repository/'}</span>
+        <WorkingDirectorySearchToggle
+          visible={Boolean(repoPath)}
+          open={searchOpen}
+          onToggle={() => {
+            setContext(null);
+            setSearchOpen((current) => !current);
+          }}
+        />
       </div>
-      {render('')}
+      <WorkingDirectoryTreeContent
+        searchOpen={searchOpen}
+        repoPath={repoPath}
+        renderTree={() => render('')}
+        onOpenFile={onOpenFile}
+        onFilesChanged={handleSearchFilesChanged}
+        activeFilePath={activeFilePath}
+      />
       {context && (
         <div
           className="working-tree-context-menu"

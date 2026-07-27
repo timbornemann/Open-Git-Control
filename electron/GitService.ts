@@ -286,6 +286,10 @@ export class GitService {
     return this.repositoryFiles.readRepoFile(relativePath);
   }
 
+  async readRepoFileAtPath(repoPath: string, relativePath: string): Promise<string> {
+    return this.repositoryFiles.readRepoFileAtPath(repoPath, relativePath);
+  }
+
   async readRepositoryFileTextAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
     return this.repositoryFiles.readRepositoryFileTextAtSource(source, relativePath, commitHash);
   }
@@ -299,6 +303,10 @@ export class GitService {
    */
   async writeRepoFile(relativePath: string, content: string): Promise<void> {
     await this.repositoryFiles.writeRepoFile(relativePath, content);
+  }
+
+  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string): Promise<void> {
+    await this.repositoryFiles.writeRepoFileAtPath(repoPath, relativePath, content);
   }
 
   /**

@@ -7,6 +7,7 @@ import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { createZipArchive, type ZipArchiveEntry } from '../../zipArchive';
 import { assertWindowsWorkingDirectoryAccess, createWorkingDirectoryEntrySafely } from './workingDirectoryFileCreation';
+import { registerWorkingDirectorySearchHandlers } from './workingDirectorySearch';
 
 type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string;
 type RegisterWorkingDirectoryToolsHandlersDeps = {
@@ -195,6 +196,7 @@ const collectZipEntries = (sourcePath: string, archivePath: string, entries: Zip
 };
 
 export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath }: RegisterWorkingDirectoryToolsHandlersDeps): void {
+  registerWorkingDirectorySearchHandlers({ gitService });
   ipcMain.handle(
     IpcChannel.GitApplyWorkingDirectoryMoves,
     async (_event: unknown, params: { moves?: unknown; createParentFolders?: unknown } = {}, requestedRepoPath?: unknown) => {

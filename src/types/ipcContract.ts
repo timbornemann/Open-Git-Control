@@ -59,6 +59,8 @@ export const enum IpcChannel {
   GitCreateWorkingDirectoryFolder = 'git:createWorkingDirectoryFolder',
   GitGetWorkingDirectoryFileInfo = 'git:getWorkingDirectoryFileInfo',
   GitGetWorkingDirectoryPreview = 'git:getWorkingDirectoryPreview',
+  GitSearchWorkingDirectory = 'git:searchWorkingDirectory',
+  GitReplaceWorkingDirectory = 'git:replaceWorkingDirectory',
   GitApplyWorkingDirectoryMoves = 'git:applyWorkingDirectoryMoves',
   GitListWorkingDirectoryFolders = 'git:listWorkingDirectoryFolders',
   GitCreateWorkingDirectoryArchive = 'git:createWorkingDirectoryArchive',

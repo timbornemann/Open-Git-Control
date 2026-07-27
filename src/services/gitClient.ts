@@ -311,6 +311,12 @@ export const gitClient = {
       ? requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath, true)
       : requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath);
   },
+  async searchWorkingDirectory(...args: Parameters<ElectronAPI['searchWorkingDirectory']>): ReturnType<ElectronAPI['searchWorkingDirectory']> {
+    return requireElectronGitApi().searchWorkingDirectory(...args);
+  },
+  async replaceWorkingDirectory(...args: Parameters<ElectronAPI['replaceWorkingDirectory']>): ReturnType<ElectronAPI['replaceWorkingDirectory']> {
+    return requireElectronGitApi().replaceWorkingDirectory(...args);
+  },
   async applyWorkingDirectoryMoves(moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) {
     return requireElectronGitApi().applyWorkingDirectoryMoves(moves, createParentFolders, repoPath);
   },

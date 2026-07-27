@@ -144,6 +144,47 @@ export type WorkingDirectoryPreviewDto =
 export type WorkingDirectoryMutationResultDto = { success: boolean; error?: string; targetPath?: string };
 export type WorkingDirectoryMoveDto = { sourcePath: string; targetPath: string };
 export type WorkingDirectoryEmptyFoldersResultDto = { success: boolean; data?: string[]; error?: string };
+export type WorkingDirectorySearchModeDto = 'filename' | 'content';
+export type WorkingDirectorySearchMatchDto = {
+  line: number;
+  column: number;
+  preview: string;
+  previewMatchStart: number;
+  matchLength: number;
+};
+export type WorkingDirectorySearchFileDto = {
+  path: string;
+  name: string;
+  matches: WorkingDirectorySearchMatchDto[];
+};
+export type WorkingDirectorySearchResultDto = {
+  files: WorkingDirectorySearchFileDto[];
+  totalMatches: number;
+  scannedFiles: number;
+  truncated: boolean;
+};
+export type WorkingDirectorySearchRequestDto = {
+  query: string;
+  mode: WorkingDirectorySearchModeDto;
+  caseSensitive?: boolean;
+};
+export type WorkingDirectoryReplaceTargetDto = {
+  path: string;
+  line: number;
+  column: number;
+};
+export type WorkingDirectoryReplaceRequestDto = {
+  query: string;
+  replacement: string;
+  caseSensitive?: boolean;
+  target?: WorkingDirectoryReplaceTargetDto;
+  all?: boolean;
+  paths?: string[];
+};
+export type WorkingDirectoryReplaceResultDto = {
+  replacements: number;
+  paths: string[];
+};
 
 export type OpenSubmoduleResultDto = {
   success: boolean;
@@ -215,6 +256,8 @@ export interface ElectronGitAPI {
   createWorkingDirectoryFolder: (folderPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
+  searchWorkingDirectory: (request: WorkingDirectorySearchRequestDto, repoPath: string) => Promise<IpcResult<WorkingDirectorySearchResultDto>>;
+  replaceWorkingDirectory: (request: WorkingDirectoryReplaceRequestDto, repoPath: string) => Promise<IpcResult<WorkingDirectoryReplaceResultDto>>;
   applyWorkingDirectoryMoves: (moves: WorkingDirectoryMoveDto[], createParentFolders: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   listWorkingDirectoryFolders: (repoPath: string, parentPath?: string) => Promise<IpcResult<string[]>>;
   findEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) => Promise<WorkingDirectoryEmptyFoldersResultDto>;
