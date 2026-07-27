@@ -21,6 +21,7 @@ import type { WorkingDirectoryToolGroup, WorkingDirectoryToolItem } from './Work
 type Translate = (german: string, english: string) => string;
 type ApplyTransform = (transform: (source: string) => string | Promise<string>, successMessage: string) => void;
 type ApplySelectionTransform = (transform: (source: string) => string, successMessage: string) => void;
+type HashAlgorithm = 'sha256' | 'sha1' | 'md5';
 
 type Params = {
   path: string;
@@ -40,6 +41,8 @@ type Params = {
   setTargetLineEnding: (lineEnding: LineEnding) => void;
   toggleWhitespace: () => void;
   showHashes: () => void;
+  copyHash: (algorithm: HashAlgorithm) => void;
+  copyAllHashes: () => void;
 };
 
 const buildLineItems = (params: Params): WorkingDirectoryToolItem[] => {
@@ -208,7 +211,13 @@ export const buildWorkingDirectoryFileToolGroups = (params: Params): WorkingDire
       label: tr('Hashwerte', 'Hashes'),
       description: tr('SHA-256, SHA-1 und MD5 der gespeicherten Datei', 'SHA-256, SHA-1 and MD5 of the saved file'),
       icon: Fingerprint,
-      items: [{ id: 'show-hashes', label: tr('Hashwerte berechnen', 'Calculate hashes'), action: params.showHashes }],
+      items: [
+        { id: 'show-hashes', label: tr('Hashwerte anzeigen', 'Show hashes'), action: params.showHashes },
+        { id: 'copy-sha256', label: tr('SHA-256 kopieren', 'Copy SHA-256'), action: () => params.copyHash('sha256') },
+        { id: 'copy-sha1', label: tr('SHA-1 kopieren', 'Copy SHA-1'), action: () => params.copyHash('sha1') },
+        { id: 'copy-md5', label: tr('MD5 kopieren', 'Copy MD5'), action: () => params.copyHash('md5') },
+        { id: 'copy-all-hashes', label: tr('Alle Hashwerte kopieren', 'Copy all hashes'), action: params.copyAllHashes },
+      ],
     },
   ];
 };

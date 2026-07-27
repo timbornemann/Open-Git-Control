@@ -4,7 +4,7 @@ import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import type { TextFileEncodingDto } from '@/shared/ipc/contracts/git';
+import type { TextFileEncodingDto, WorkingDirectoryFileInfoDto } from '@/shared/ipc/contracts/git';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import type { LineEnding } from '@/utils/lineEndings';
 import { compactTextToSingleLine, getJsonPathAtOffset } from './fileContentTransforms';
@@ -28,6 +28,9 @@ type Props = {
   onLineEndingChange?: (lineEnding: LineEnding) => void;
   onShowWhitespaceChange?: (show: boolean) => void;
 };
+
+type FileHashes = NonNullable<WorkingDirectoryFileInfoDto['hashes']>;
+type HashAlgorithm = keyof FileHashes;
 
 export const WorkingDirectoryFileTools: React.FC<Props> = ({
   repoPath = '',
@@ -209,26 +212,52 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
     }
   };
 
-  const showHashes = async () => {
-    closeMenu();
+  const loadSavedHashes = async (): Promise<FileHashes | null> => {
     const result = await gitClient.getWorkingDirectoryFileInfo(path, repoPath);
     if (!result.success || !result.data?.hashes) {
       showToast(result.data?.hashError || result.error || tr('Hashwerte konnten nicht berechnet werden.', 'Could not calculate hashes.'), true);
-      return;
+      return null;
     }
+    return result.data.hashes;
+  };
+
+  const copyHashes = async (hashes: FileHashes, algorithm?: HashAlgorithm): Promise<void> => {
+    const labels: Record<HashAlgorithm, string> = { sha256: 'SHA-256', sha1: 'SHA-1', md5: 'MD5' };
+    const value = algorithm ? hashes[algorithm] : (Object.keys(labels) as HashAlgorithm[]).map((key) => `${labels[key]}: ${hashes[key]}`).join('\n');
+    const copied = await copyTextToClipboard(value);
+    const targetLabel = algorithm ? labels[algorithm] : tr('Alle Hashwerte', 'All hashes');
+    showToast(
+      copied ? tr(`${targetLabel} kopiert.`, `${targetLabel} copied.`) : tr(`${targetLabel} konnte nicht kopiert werden.`, `Could not copy ${targetLabel}.`),
+      !copied,
+    );
+  };
+
+  const copySavedHashes = async (algorithm?: HashAlgorithm) => {
+    closeMenu();
+    const hashes = await loadSavedHashes();
+    if (hashes) await copyHashes(hashes, algorithm);
+  };
+
+  const showHashes = async () => {
+    closeMenu();
+    const hashes = await loadSavedHashes();
+    if (!hashes) return;
     setConfirmDialog({
       variant: 'confirm',
       title: tr('Hashwerte der gespeicherten Datei', 'Hashes of the saved file'),
       message: tr('Die Werte beziehen sich auf die aktuellen Bytes auf dem Datenträger.', 'These values refer to the current bytes on disk.'),
       contextItems: [
-        { label: 'SHA-256', value: result.data.hashes.sha256 },
-        { label: 'SHA-1', value: result.data.hashes.sha1 },
-        { label: 'MD5', value: result.data.hashes.md5 },
+        { label: 'SHA-256', value: hashes.sha256 },
+        { label: 'SHA-1', value: hashes.sha1 },
+        { label: 'MD5', value: hashes.md5 },
       ],
       irreversible: false,
       consequences: tr('Ungespeicherte Änderungen sind nicht enthalten.', 'Unsaved changes are not included.'),
       confirmLabel: tr('Schließen', 'Close'),
+      secondaryActionLabel: tr('Alle kopieren', 'Copy all'),
+      secondaryActionVariant: 'default',
       onConfirm: () => undefined,
+      onSecondaryAction: () => copyHashes(hashes),
     });
   };
 
@@ -277,6 +306,8 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       onShowWhitespaceChange(!showWhitespace);
     },
     showHashes: () => void showHashes(),
+    copyHash: (algorithm) => void copySavedHashes(algorithm),
+    copyAllHashes: () => void copySavedHashes(),
   });
 
   return (

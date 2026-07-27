@@ -3,9 +3,11 @@
 import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gitClient } from '@/services/gitClient';
 import { WorkingDirectoryFileTools } from './WorkingDirectoryFileTools';
 
-const { setConfirmDialogMock, setInputDialogMock, showToastMock } = vi.hoisted(() => ({
+const { copyTextToClipboardMock, setConfirmDialogMock, setInputDialogMock, showToastMock } = vi.hoisted(() => ({
+  copyTextToClipboardMock: vi.fn(),
   setConfirmDialogMock: vi.fn(),
   setInputDialogMock: vi.fn(),
   showToastMock: vi.fn(),
@@ -16,6 +18,9 @@ vi.mock('@/contexts/AppStateContext', () => ({
 }));
 vi.mock('@/hooks/useAppToast', () => ({
   useAppToast: () => showToastMock,
+}));
+vi.mock('@/utils/clipboard', () => ({
+  copyTextToClipboard: copyTextToClipboardMock,
 }));
 vi.mock('@/i18n', () => ({
   useI18n: () => ({ tr: (_german: string, english: string) => english }),
@@ -30,6 +35,7 @@ describe('WorkingDirectoryFileTools', () => {
     setConfirmDialogMock.mockReset();
     setInputDialogMock.mockReset();
     showToastMock.mockReset();
+    copyTextToClipboardMock.mockReset().mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -160,5 +166,39 @@ describe('WorkingDirectoryFileTools', () => {
     clickButton('Latin-1');
 
     expect(onEncodingChange).toHaveBeenCalledWith('latin1');
+  });
+
+  it('copies individual hashes and all visible hashes directly', async () => {
+    const hashes = { sha256: 'sha256-value', sha1: 'sha1-value', md5: 'md5-value' };
+    vi.spyOn(gitClient, 'getWorkingDirectoryFileInfo').mockResolvedValue({ success: true, data: { hashes } } as any);
+    root = createRoot(document.getElementById('root')!);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryFileTools, {
+          repoPath: 'C:/repo',
+          path: 'release.zip',
+          text: 'content',
+          onChange: vi.fn(),
+        }),
+      ),
+    );
+
+    clickButton('Tools');
+    clickButton('Hashes');
+    const copySha256 = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.includes('Copy SHA-256'));
+    await act(async () => {
+      copySha256?.click();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(copyTextToClipboardMock).toHaveBeenCalledWith('sha256-value'));
+
+    clickButton('Tools');
+    clickButton('Hashes');
+    clickButton('Show hashes');
+    await vi.waitFor(() => expect(setConfirmDialogMock).toHaveBeenCalled());
+    const dialog = setConfirmDialogMock.mock.calls.at(-1)?.[0];
+    expect(dialog.secondaryActionLabel).toBe('Copy all');
+    await act(async () => dialog.onSecondaryAction());
+    expect(copyTextToClipboardMock).toHaveBeenLastCalledWith('SHA-256: sha256-value\nSHA-1: sha1-value\nMD5: md5-value');
   });
 });
