@@ -3,8 +3,9 @@ import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
 import { CancellationToken } from 'builder-util-runtime';
 import { IpcChannel } from '../../src/types/ipcContract';
+import { formatUpdaterError, normalizeReleaseNotes, pendingReleaseFromError, withTimeout } from './updaterSupport';
 
-export type UpdaterState = 'idle' | 'checking' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
+export type UpdaterState = 'idle' | 'checking' | 'release-pending' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
 export type UpdaterStatusPayload = {
   isSupported: boolean;
@@ -25,63 +26,6 @@ const AUTO_UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const UPDATER_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const UPDATER_STATE_WAIT_TIMEOUT_MS = 5 * 1000;
 const UPDATER_STATE_POLL_INTERVAL_MS = 150;
-
-function formatUpdaterError(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message.trim();
-  }
-  if (typeof error === 'string' && error.trim()) {
-    return error.trim();
-  }
-  return 'Unbekannter Update-Fehler.';
-}
-
-function normalizeReleaseNotes(releaseNotes: UpdateInfo['releaseNotes']): string | null {
-  if (!releaseNotes) return null;
-  if (typeof releaseNotes === 'string') {
-    const trimmed = releaseNotes.trim();
-    return trimmed || null;
-  }
-
-  const normalized = releaseNotes
-    .map((item) => {
-      if (item && typeof item.note === 'string') return item.note.trim();
-      return '';
-    })
-    .filter(Boolean)
-    .join('\n\n')
-    .trim();
-
-  return normalized || null;
-}
-
-function withTimeout<T>(operation: Promise<T>, timeoutMs: number, timeoutMessage: string, onTimeout?: () => void): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      try {
-        onTimeout?.();
-      } catch {
-        // Timeout reporting must still settle if updater cancellation throws.
-      } finally {
-        reject(new Error(timeoutMessage));
-      }
-    }, timeoutMs);
-
-    if (typeof timeout.unref === 'function') {
-      timeout.unref();
-    }
-
-    operation
-      .then((value) => {
-        clearTimeout(timeout);
-        resolve(value);
-      })
-      .catch((error: unknown) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-  });
-}
 
 export class UpdaterManager {
   private autoUpdateInterval: NodeJS.Timeout | null = null;
@@ -150,6 +94,33 @@ export class UpdaterManager {
     if (this.updaterStatus.state !== 'update-available') return;
 
     void this.downloadAvailableUpdate();
+  }
+
+  private applyUpdaterFailure(error: unknown): { releasePending: boolean; error?: string } {
+    const pendingRelease = pendingReleaseFromError(error);
+    if (pendingRelease) {
+      this.setUpdaterStatus({
+        state: 'release-pending',
+        availableVersion: pendingRelease.version,
+        releaseNotes: null,
+        error: null,
+        downloaded: false,
+        downloadPercent: null,
+        bytesPerSecond: null,
+        transferred: null,
+        total: null,
+        lastCheckedAt: Date.now(),
+      });
+      return { releasePending: true };
+    }
+
+    const message = formatUpdaterError(error);
+    this.setUpdaterStatus({
+      state: 'error',
+      error: message,
+      lastCheckedAt: Date.now(),
+    });
+    return { releasePending: false, error: message };
   }
 
   private waitForUpdaterState(targetStates: UpdaterState[], timeoutMs: number): Promise<UpdaterStatusPayload> {
@@ -232,13 +203,8 @@ export class UpdaterManager {
       await autoUpdater.checkForUpdates();
       return { success: true };
     } catch (error: unknown) {
-      const message = formatUpdaterError(error);
-      this.setUpdaterStatus({
-        state: 'error',
-        error: message,
-        lastCheckedAt: Date.now(),
-      });
-      return { success: false, error: message };
+      const failure = this.applyUpdaterFailure(error);
+      return failure.releasePending ? { success: true } : { success: false, error: failure.error };
     }
   }
 
@@ -307,7 +273,7 @@ export class UpdaterManager {
     return { success: true };
   }
 
-  async runOneClickUpdate(): Promise<{ success: boolean; action?: 'no-update' | 'downloaded'; error?: string }> {
+  async runOneClickUpdate(): Promise<{ success: boolean; action?: 'no-update' | 'release-pending' | 'downloaded'; error?: string }> {
     if (!this.updaterStatus.isSupported) {
       return { success: false, error: 'Auto-Updates sind nur in der installierten App verfuegbar.' };
     }
@@ -332,7 +298,7 @@ export class UpdaterManager {
 
       try {
         stateAfterCheck = await this.waitForUpdaterState(
-          ['no-update', 'update-available', 'downloading', 'downloaded', 'error'],
+          ['no-update', 'release-pending', 'update-available', 'downloading', 'downloaded', 'error'],
           UPDATER_STATE_WAIT_TIMEOUT_MS,
         );
       } catch (error: unknown) {
@@ -353,6 +319,10 @@ export class UpdaterManager {
 
     if (stateAfterCheck.state === 'no-update') {
       return { success: true, action: 'no-update' };
+    }
+
+    if (stateAfterCheck.state === 'release-pending') {
+      return { success: true, action: 'release-pending' };
     }
 
     if (stateAfterCheck.state === 'downloaded') {
@@ -476,11 +446,7 @@ export class UpdaterManager {
     });
 
     autoUpdater.on('error', (error: Error) => {
-      this.setUpdaterStatus({
-        state: 'error',
-        error: formatUpdaterError(error),
-        lastCheckedAt: Date.now(),
-      });
+      this.applyUpdaterFailure(error);
     });
 
     this.setAutoUpdatesEnabled(autoUpdatesEnabled);

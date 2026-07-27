@@ -50,6 +50,8 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr, onToas
     switch (updaterStatus.state) {
       case 'checking':
         return t('generated.components.layout.hooks.usesettingsaiupdater.checking_for_updates_67d1a534');
+      case 'release-pending':
+        return t('updates.releasePendingStatus');
       case 'update-available':
         return t('generated.components.layout.hooks.usesettingsaiupdater.update_available_7d5009e4');
       case 'no-update':
@@ -190,6 +192,10 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr, onToas
       }
       if (result.action === 'no-update') {
         onToast(t('generated.components.layout.hooks.usesettingsaiupdater.app_is_already_up_to_date_0f3d23f1'), false);
+        return;
+      }
+      if (result.action === 'release-pending') {
+        onToast(t('updates.releasePendingMessage'), false);
         return;
       }
       onToast(t('generated.components.layout.hooks.usesettingsaiupdater.update_check_completed_bde0b1e8'), false);

@@ -21,38 +21,48 @@ export const UpdateNotification: React.FC = () => {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [dismissedVersion, setDismissedVersion] = React.useState<string | null>(null);
   const [working, setWorking] = React.useState(false);
+  const announcedPendingReleaseRef = React.useRef<string | null>(null);
 
   const activeUpdateState = Boolean(status && updateStates.has(status.state));
+  const releasePending = status?.state === 'release-pending';
   const updateErrorVisible = Boolean(status?.state === 'error' && status.availableVersion);
-  const iconVisible = Boolean(status?.state === 'downloaded' || (!autoUpdateEnabled && activeUpdateState) || updateErrorVisible);
+  const iconVisible = Boolean(releasePending || status?.state === 'downloaded' || (!autoUpdateEnabled && activeUpdateState) || updateErrorVisible);
   const currentVersionKey = status ? versionKey(status) : null;
 
   React.useEffect(() => {
     if (!appClient.isAvailable()) return;
     let active = true;
 
+    const applyStatus = (nextStatus: UpdaterStatusDto) => {
+      if (!active) return;
+      setStatus(nextStatus);
+      if (nextStatus.state === 'error' && nextStatus.error) {
+        showToast(nextStatus.error, true);
+        return;
+      }
+      if (nextStatus.state === 'release-pending') {
+        const pendingReleaseKey = nextStatus.availableVersion || 'unknown-release';
+        if (announcedPendingReleaseRef.current !== pendingReleaseKey) {
+          announcedPendingReleaseRef.current = pendingReleaseKey;
+          showToast(t('updates.releasePendingMessage'), false);
+        }
+      }
+    };
+
     void appClient
       .getUpdaterStatus()
-      .then((nextStatus) => {
-        if (!active) return;
-        setStatus(nextStatus);
-        if (nextStatus.state === 'error' && nextStatus.error) showToast(nextStatus.error, true);
-      })
+      .then(applyStatus)
       .catch(() => {
         if (active) setStatus(null);
       });
 
-    const unsubscribe = appClient.onUpdaterEvent((nextStatus) => {
-      if (!active) return;
-      setStatus(nextStatus);
-      if (nextStatus.state === 'error' && nextStatus.error) showToast(nextStatus.error, true);
-    });
+    const unsubscribe = appClient.onUpdaterEvent(applyStatus);
 
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [showToast]);
+  }, [showToast, t]);
 
   React.useEffect(() => {
     if (!autoUpdateEnabled || status?.state !== 'downloaded' || !currentVersionKey || dismissedVersion === currentVersionKey) return;
@@ -110,7 +120,11 @@ export const UpdateNotification: React.FC = () => {
 
   if ((!iconVisible && !dialogOpen) || !status) return null;
 
-  const iconLabel = status.state === 'downloaded' ? t('updates.readyIconLabel') : t('updates.availableIconLabel');
+  const iconLabel = releasePending
+    ? t('updates.releasePendingIconLabel')
+    : status.state === 'downloaded'
+      ? t('updates.readyIconLabel')
+      : t('updates.availableIconLabel');
   const confirmLabel = working
     ? t('updates.preparingInstall')
     : status.state === 'downloaded'
@@ -137,31 +151,39 @@ export const UpdateNotification: React.FC = () => {
 
       <DialogFrame
         open={dialogOpen}
-        title={t('updates.dialogTitle')}
+        title={releasePending ? t('updates.releasePendingTitle') : t('updates.dialogTitle')}
         onClose={dismissDialog}
-        onConfirm={() => void installUpdate()}
-        onEnter={() => void installUpdate()}
-        onSecondaryAction={() => void skipAndDisable()}
+        onConfirm={releasePending ? undefined : () => void installUpdate()}
+        onEnter={releasePending ? undefined : () => void installUpdate()}
+        onSecondaryAction={releasePending ? undefined : () => void skipAndDisable()}
         confirmLabel={confirmLabel}
         confirmDisabled={working}
-        secondaryActionLabel={t('updates.skipAndDisable')}
-        cancelLabel={t('updates.later')}
+        secondaryActionLabel={releasePending ? undefined : t('updates.skipAndDisable')}
+        cancelLabel={releasePending ? t('updates.close') : t('updates.later')}
         closeOnBackdrop={false}
       >
-        <p className="dialog-message">{t('updates.dialogMessage', { version: status.availableVersion || t('updates.unknownVersion') })}</p>
-        {status.state === 'downloading' && (
-          <div className="update-promotion-progress" aria-label={t('updates.downloadProgress')}>
-            <div className="update-promotion-progress__bar" style={{ width: `${Math.max(0, Math.min(100, status.downloadPercent || 0))}%` }} />
-          </div>
+        <p className="dialog-message">
+          {releasePending
+            ? t('updates.releasePendingMessage')
+            : t('updates.dialogMessage', { version: status.availableVersion || t('updates.unknownVersion') })}
+        </p>
+        {!releasePending && (
+          <>
+            {status.state === 'downloading' && (
+              <div className="update-promotion-progress" aria-label={t('updates.downloadProgress')}>
+                <div className="update-promotion-progress__bar" style={{ width: `${Math.max(0, Math.min(100, status.downloadPercent || 0))}%` }} />
+              </div>
+            )}
+            <section className="update-promotion-notes">
+              <h4>{t('updates.releaseNotes')}</h4>
+              {status.releaseNotes ? (
+                <ReleaseNotesContent className="update-promotion-notes__content" releaseNotes={status.releaseNotes} />
+              ) : (
+                <p className="update-promotion-notes__empty">{t('updates.noReleaseNotes')}</p>
+              )}
+            </section>
+          </>
         )}
-        <section className="update-promotion-notes">
-          <h4>{t('updates.releaseNotes')}</h4>
-          {status.releaseNotes ? (
-            <ReleaseNotesContent className="update-promotion-notes__content" releaseNotes={status.releaseNotes} />
-          ) : (
-            <p className="update-promotion-notes__empty">{t('updates.noReleaseNotes')}</p>
-          )}
-        </section>
       </DialogFrame>
     </>
   );

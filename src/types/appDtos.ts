@@ -15,7 +15,7 @@ export interface StoredRepoData {
   sortBy?: RepoSortByDto;
 }
 
-export type UpdaterStateDto = 'idle' | 'checking' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
+export type UpdaterStateDto = 'idle' | 'checking' | 'release-pending' | 'update-available' | 'no-update' | 'downloading' | 'downloaded' | 'error';
 
 export interface UpdaterStatusDto {
   isSupported: boolean;
@@ -34,7 +34,7 @@ export interface UpdaterStatusDto {
 
 export interface UpdaterOneClickResultDto {
   success: boolean;
-  action?: 'no-update' | 'downloaded';
+  action?: 'no-update' | 'release-pending' | 'downloaded';
   error?: string;
 }
 

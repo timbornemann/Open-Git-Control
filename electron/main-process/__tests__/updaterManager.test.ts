@@ -31,6 +31,11 @@ const setStatus = (manager: UpdaterManager, patch: Partial<UpdaterStatusPayload>
   (manager as unknown as UpdaterManagerInternals).setUpdaterStatus(patch);
 };
 
+const missingReleaseMetadataError = (metadataFile = 'latest.yml') =>
+  new Error(
+    `Cannot find ${metadataFile} in the latest release artifacts (https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/${metadataFile}): HttpError: 404\nHeaders: {"content-type":"text/plain"}`,
+  );
+
 describe('UpdaterManager', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -92,6 +97,41 @@ describe('UpdaterManager', () => {
     resolveCheck();
     await expect(check).resolves.toEqual({ success: true });
     expect(manager.getStatus()).toMatchObject({ state: 'checking', error: null });
+  });
+
+  it.each(['latest.yml', 'latest-mac.yml', 'latest-linux.yml'])(
+    'reports a published release without %s as pending instead of exposing the raw HTTP error',
+    async (metadataFile) => {
+      autoUpdaterMock.checkForUpdates.mockRejectedValue(missingReleaseMetadataError(metadataFile));
+      const manager = new UpdaterManager(false);
+
+      await expect(manager.runOneClickUpdate()).resolves.toEqual({ success: true, action: 'release-pending' });
+      expect(manager.getStatus()).toMatchObject({
+        state: 'release-pending',
+        availableVersion: '2.1.0',
+        releaseNotes: null,
+        downloaded: false,
+        error: null,
+      });
+      expect(JSON.stringify(manager.getStatus())).not.toContain(metadataFile);
+      expect(JSON.stringify(manager.getStatus())).not.toContain('HttpError');
+    },
+  );
+
+  it('replaces technical HTTP details from other updater failures with a safe message', async () => {
+    autoUpdaterMock.checkForUpdates.mockRejectedValue(
+      new Error('HttpError: 503\nHeaders: {"server":"github.com"}\n    at ElectronHttpExecutor.handleResponse (node_modules/httpExecutor.js:121:20)'),
+    );
+    const manager = new UpdaterManager(false);
+
+    await expect(manager.checkForAppUpdates()).resolves.toEqual({
+      success: false,
+      error: 'Die Update-Pruefung konnte nicht abgeschlossen werden. Bitte versuche es spaeter erneut.',
+    });
+    expect(manager.getStatus()).toMatchObject({
+      state: 'error',
+      error: 'Die Update-Pruefung konnte nicht abgeschlossen werden. Bitte versuche es spaeter erneut.',
+    });
   });
 
   it('cancels the underlying download when its timeout expires', async () => {

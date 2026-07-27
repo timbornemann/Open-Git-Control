@@ -7,7 +7,7 @@ import { I18nProvider } from '@/i18n';
 import type { UpdaterStatusDto } from '@/types/appDtos';
 import { UpdateNotification } from './UpdateNotification';
 
-const { appClientMock, onUpdateSettingsMock, settingsState } = vi.hoisted(() => ({
+const { appClientMock, onUpdateSettingsMock, settingsState, showToastMock } = vi.hoisted(() => ({
   appClientMock: {
     isAvailable: vi.fn(() => true),
     getUpdaterStatus: vi.fn(),
@@ -16,6 +16,7 @@ const { appClientMock, onUpdateSettingsMock, settingsState } = vi.hoisted(() => 
     installAppUpdate: vi.fn(),
   },
   onUpdateSettingsMock: vi.fn(),
+  showToastMock: vi.fn(),
   settingsState: {
     settings: { autoUpdateEnabled: true },
     onUpdateSettings: vi.fn(),
@@ -23,6 +24,7 @@ const { appClientMock, onUpdateSettingsMock, settingsState } = vi.hoisted(() => 
 }));
 
 vi.mock('@/services/appClient', () => ({ appClient: appClientMock }));
+vi.mock('@/hooks/useAppToast', () => ({ useAppToast: () => showToastMock }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useSettingsStore: (selector: (state: typeof settingsState) => unknown) => selector(settingsState),
   useOptionalRepositoryContext: () => null,
@@ -58,6 +60,7 @@ describe('UpdateNotification', () => {
     appClientMock.onUpdaterEvent.mockClear();
     appClientMock.runOneClickAppUpdate.mockReset();
     appClientMock.installAppUpdate.mockReset();
+    showToastMock.mockReset();
   });
 
   afterEach(() => {
@@ -109,6 +112,26 @@ describe('UpdateNotification', () => {
 
     expect(document.querySelector('.activity-update-btn')).toBeNull();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('shows a friendly pending notice when a release exists without downloadable artifacts', async () => {
+    appClientMock.getUpdaterStatus.mockResolvedValue({
+      ...availableStatus('release-pending'),
+      releaseNotes: null,
+    });
+    await renderNotification();
+
+    const pendingMessage =
+      'A new version has been published, but it is not yet available to download. Once the release build is ready, the update will be offered normally during the next check.';
+    expect(showToastMock).toHaveBeenCalledWith(pendingMessage, false);
+
+    const icon = document.querySelector<HTMLButtonElement>('[aria-label="A new app version is being prepared"]');
+    if (!icon) throw new Error('Missing pending release icon.');
+    act(() => icon.click());
+
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('New version is being prepared');
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(pendingMessage);
+    expect(Array.from(document.querySelectorAll('button')).some((button) => button.textContent === 'Download and install')).toBe(false);
   });
 
   it('downloads and installs from the primary action and can disable automatic update promotions', async () => {
