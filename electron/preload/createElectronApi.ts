@@ -222,6 +222,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       invokeGitOperationForRepo(repoPath, 'preview file', IpcChannel.GitGetWorkingDirectoryPreview, filePath, repoPath, allowLargeImage),
     applyWorkingDirectoryMoves: (moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'move files', IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders }, repoPath),
+    listWorkingDirectoryFolders: (repoPath: string, parentPath = '') =>
+      invokeGitOperationForRepo(repoPath, 'list folders', IpcChannel.GitListWorkingDirectoryFolders, repoPath, parentPath),
     findEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'find empty folders', IpcChannel.GitFindEmptyWorkingDirectoryFolders, folderPaths, repoPath),
     deleteEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) =>
@@ -402,6 +404,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
       applyWorkingDirectoryMoves: flatApi.applyWorkingDirectoryMoves,
+      listWorkingDirectoryFolders: flatApi.listWorkingDirectoryFolders,
       findEmptyWorkingDirectoryFolders: flatApi.findEmptyWorkingDirectoryFolders,
       deleteEmptyWorkingDirectoryFolders: flatApi.deleteEmptyWorkingDirectoryFolders,
       createWorkingDirectoryArchive: flatApi.createWorkingDirectoryArchive,

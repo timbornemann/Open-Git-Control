@@ -217,15 +217,17 @@ describe('createElectronApi', () => {
     const moves = [{ sourcePath: 'photo.jpeg', targetPath: 'images/photo.jpeg' }];
 
     await api.git.applyWorkingDirectoryMoves(moves, true, 'C:/captured-repo');
+    await api.git.listWorkingDirectoryFolders('C:/captured-repo', 'src');
     await api.git.findEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
     await api.git.deleteEmptyWorkingDirectoryFolders(['tmp'], 'C:/captured-repo');
     await api.git.createWorkingDirectoryArchive(['README.md'], 'README.zip', 'C:/captured-repo');
 
     expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitApplyWorkingDirectoryMoves, { moves, createParentFolders: true }, 'C:/captured-repo');
-    expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitFindEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
-    expect(invoke).toHaveBeenNthCalledWith(3, IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(2, IpcChannel.GitListWorkingDirectoryFolders, 'C:/captured-repo', 'src');
+    expect(invoke).toHaveBeenNthCalledWith(3, IpcChannel.GitFindEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
+    expect(invoke).toHaveBeenNthCalledWith(4, IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, ['tmp'], 'C:/captured-repo');
     expect(invoke).toHaveBeenNthCalledWith(
-      4,
+      5,
       IpcChannel.GitCreateWorkingDirectoryArchive,
       { sourcePaths: ['README.md'], targetPath: 'README.zip' },
       'C:/captured-repo',

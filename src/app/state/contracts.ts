@@ -33,6 +33,12 @@ export interface DialogContextItem {
   value: string;
 }
 
+export interface InputDialogOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
 export interface InputDialogField {
   id: string;
   label: string;
@@ -42,8 +48,9 @@ export interface InputDialogField {
   helperText?: string;
   multiline?: boolean;
   rows?: number;
-  type?: 'text' | 'url' | 'checkbox' | 'select';
-  options?: Array<{ value: string; label: string }>;
+  type?: 'text' | 'url' | 'checkbox' | 'select' | 'folder-tree';
+  options?: InputDialogOption[];
+  loadChildren?: (parentValue: string) => Promise<InputDialogOption[]>;
   visible?: (values: Record<string, string>) => boolean;
   validate?: (value: string, values: Record<string, string>) => string | null;
 }

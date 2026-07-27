@@ -142,6 +142,107 @@
   margin-left: 24px;
 }
 
+.dialog-folder-tree {
+  max-height: min(320px, 42vh);
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-dark);
+}
+
+.dialog-folder-tree__row {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  min-height: 29px;
+  padding-right: 6px;
+  border-radius: 5px;
+}
+
+.dialog-folder-tree__row:hover {
+  background: var(--bg-hover);
+}
+
+.dialog-folder-tree__row--selected {
+  background: var(--accent-primary);
+  color: var(--on-accent);
+}
+
+.dialog-folder-tree__row--selected:hover {
+  background: var(--accent-hover);
+}
+
+.dialog-folder-tree__toggle,
+.dialog-folder-tree__option {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dialog-folder-tree__toggle {
+  width: 24px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  padding: 0;
+}
+
+.dialog-folder-tree__toggle-placeholder {
+  width: 24px;
+  flex: 0 0 24px;
+}
+
+.dialog-folder-tree__option {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 4px;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.dialog-folder-tree__option span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.dialog-folder-tree__option[aria-disabled='true'] {
+  color: var(--text-secondary);
+}
+
+.dialog-folder-tree__toggle:focus-visible,
+.dialog-folder-tree__option:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: -1px;
+}
+
+.dialog-folder-tree__spinner {
+  animation: dialog-folder-tree-spin 0.8s linear infinite;
+}
+
+.dialog-folder-tree__error {
+  color: var(--status-danger);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.dialog-folder-tree__selection {
+  overflow-wrap: anywhere;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+@keyframes dialog-folder-tree-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .dialog-validation {
   font-size: 0.78rem;
   color: var(--status-danger);

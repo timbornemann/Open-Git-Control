@@ -411,6 +411,7 @@ describe('renderer service clients', () => {
       api.git.applyWorkingDirectoryMoves,
       [[{ sourcePath: 'a.txt', targetPath: 'b.txt' }], false, 'C:/repo'],
     );
+    await expectDelegation(() => gitClient.listWorkingDirectoryFolders('C:/repo', 'src'), api.git.listWorkingDirectoryFolders, ['C:/repo', 'src']);
     await expectDelegation(() => gitClient.findEmptyWorkingDirectoryFolders(['tmp'], 'C:/repo'), api.git.findEmptyWorkingDirectoryFolders, [
       ['tmp'],
       'C:/repo',

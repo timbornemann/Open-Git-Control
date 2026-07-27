@@ -205,6 +205,23 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
     },
   );
 
+  ipcMain.handle(IpcChannel.GitListWorkingDirectoryFolders, async (_event: unknown, requestedRepoPath?: unknown, rawParentPath?: unknown) => {
+    try {
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const relativeParentPath = asPath(rawParentPath);
+      const folderPath = relativeParentPath ? workingDirectoryPath(repoPath, relativeParentPath, 'Parent folder') : fs.realpathSync(repoPath);
+      if (!fs.statSync(folderPath).isDirectory()) throw new Error('Parent path is not a folder.');
+      const folders = fs
+        .readdirSync(folderPath, { withFileTypes: true })
+        .filter((entry) => entry.name.toLowerCase() !== '.git' && entry.isDirectory() && !entry.isSymbolicLink())
+        .map((entry) => (relativeParentPath ? `${relativeParentPath}/${entry.name}` : entry.name))
+        .sort((left, right) => left.localeCompare(right));
+      return { success: true, data: folders };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
   ipcMain.handle(IpcChannel.GitFindEmptyWorkingDirectoryFolders, async (_event: unknown, rawFolderPaths: unknown, requestedRepoPath?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { ConfirmDialogState, InputDialogState } from '@/app/state/contracts';
+import type { ConfirmDialogState, InputDialogOption, InputDialogState } from '@/app/state/contracts';
 import { gitClient } from '@/services/gitClient';
 import type { WorkingDirectoryEntryDto, WorkingDirectoryMoveDto, WorkingDirectoryMutationResultDto } from '@/shared/ipc/contracts/git';
 import type { ToastMessage } from '@/types/git';
@@ -12,6 +12,7 @@ import {
   getTopLevelEntries,
   gitignorePatterns,
   isEntryName,
+  isSameOrDescendantPath,
   normalizeNameMoves,
   parentPath,
   removeAffixMoves,
@@ -55,6 +56,68 @@ export const createWorkingDirectoryToolActions = ({ repoPath, setConfirmDialog, 
       moves.map((move) => move.sourcePath),
     );
     if (ok) setToast({ msg: successMessage, isError: false });
+  };
+
+  const moveTo = async (entries: WorkingDirectoryEntryDto[]) => {
+    const topLevelEntries = getTopLevelEntries(entries).filter((entry) => entry.path);
+    const result = await gitClient.listWorkingDirectoryFolders(repoPath);
+    if (!result.success) {
+      setToast({ msg: result.error || 'Could not load destination folders.', isError: true });
+      return;
+    }
+    const selectedFolders = topLevelEntries.filter((entry) => entry.kind === 'directory');
+    const folderOptions = (folderPaths: string[]): InputDialogOption[] =>
+      folderPaths
+        .filter((folderPath) => selectedFolders.every((entry) => !isSameOrDescendantPath(folderPath, entry.path)))
+        .map((folderPath) => ({
+          value: folderPath,
+          label: folderPath ? basename(folderPath) : 'Repository root',
+          ...(topLevelEntries.some((entry) => parentPath(entry.path) !== folderPath) ? {} : { disabled: true }),
+        }));
+    const initialOptions = folderOptions(['', ...result.data]);
+    const defaultDestination = initialOptions.find((option) => !option.disabled);
+    if (!defaultDestination) {
+      setToast({ msg: 'No valid destination folder is available.', isError: true });
+      return;
+    }
+    setInputDialog({
+      title: 'Move to folder',
+      message: `Move ${formatCount(topLevelEntries.length, 'selected entry', 'selected entries')} to another folder in this repository.`,
+      fields: [
+        {
+          id: 'destination',
+          label: 'Destination folder',
+          type: 'folder-tree',
+          defaultValue: defaultDestination.value,
+          options: initialOptions,
+          loadChildren: async (parentPath) => {
+            const childResult = await gitClient.listWorkingDirectoryFolders(repoPath, parentPath);
+            if (!childResult.success) throw new Error(childResult.error || 'Could not load destination folders.');
+            return folderOptions(childResult.data);
+          },
+        },
+      ],
+      contextItems: [{ label: 'Selected entries', value: String(topLevelEntries.length) }],
+      irreversible: false,
+      consequences: 'Existing files and folders will not be overwritten. Invalid destinations inside selected folders are excluded.',
+      confirmLabel: 'Move selected',
+      onSubmit: async (values) => {
+        const destination = values.destination || '';
+        const moves = topLevelEntries
+          .map((entry) => ({ sourcePath: entry.path, targetPath: joinPath(destination, basename(entry.path)) }))
+          .filter((move) => move.sourcePath !== move.targetPath);
+        if (moves.length === 0) {
+          setToast({ msg: 'The selected entries are already in this folder.', isError: true });
+          return;
+        }
+        const ok = await runMutation(
+          () => gitClient.applyWorkingDirectoryMoves(moves, false, repoPath),
+          topLevelEntries.filter((entry) => entry.kind === 'directory').map((entry) => entry.path),
+          moves.map((move) => move.sourcePath),
+        );
+        if (ok) setToast({ msg: `${formatCount(moves.length, 'entry', 'entries')} moved.`, isError: false });
+      },
+    });
   };
 
   const addAffixes = (entries: WorkingDirectoryEntryDto[]) =>
@@ -350,6 +413,7 @@ export const createWorkingDirectoryToolActions = ({ repoPath, setConfirmDialog, 
   };
 
   return {
+    moveTo,
     addAffixes,
     removeAffixes,
     changeExtension,

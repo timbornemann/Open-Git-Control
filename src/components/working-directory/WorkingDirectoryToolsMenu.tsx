@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, CaseLower, Copy, FileCog, FolderSearch, ListTree, Pencil, RotateCcw, ShieldPlus } from 'lucide-react';
+import { Archive, CaseLower, Copy, FileCog, FolderInput, FolderSearch, ListTree, Pencil, RotateCcw, ShieldPlus } from 'lucide-react';
 import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import type { WorkingDirectoryToolActions } from './workingDirectoryToolActions';
 
@@ -24,6 +24,10 @@ export const WorkingDirectoryToolsMenu: React.FC<Props> = ({ entries, actions, o
       <div className="working-tree-context-menu__separator" />
       {!hasRoot && (
         <>
+          <button type="button" className="working-tree-context-menu__item" onClick={() => run((selected) => void actions.moveTo(selected))}>
+            <FolderInput size={14} />
+            <span>Move to...</span>
+          </button>
           <button type="button" className="working-tree-context-menu__item" onClick={() => run((selected) => void actions.copyPaths(selected, false))}>
             <Copy size={14} />
             <span>Copy relative path{labelSuffix}</span>

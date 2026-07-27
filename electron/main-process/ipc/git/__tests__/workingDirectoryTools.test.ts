@@ -96,6 +96,21 @@ describe('working-directory tool handlers', () => {
     expect(fs.readFileSync(path.join(repoPath, 'photo.jpg'), 'utf8')).toBe('jpg');
   });
 
+  it('lists repository folders without exposing Git metadata', async () => {
+    fs.mkdirSync(path.join(repoPath, 'zeta'));
+    fs.mkdirSync(path.join(repoPath, 'alpha', 'nested'), { recursive: true });
+    fs.mkdirSync(path.join(repoPath, '.git', 'objects'), { recursive: true });
+
+    await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, '')).resolves.toEqual({
+      success: true,
+      data: ['alpha', 'zeta'],
+    });
+    await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, 'alpha')).resolves.toEqual({
+      success: true,
+      data: ['alpha/nested'],
+    });
+  });
+
   it('finds top-level empty trees and deletes only folders that are still empty', async () => {
     fs.mkdirSync(path.join(repoPath, 'empty', 'nested'), { recursive: true });
     fs.mkdirSync(path.join(repoPath, 'kept'));

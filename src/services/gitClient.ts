@@ -314,6 +314,9 @@ export const gitClient = {
   async applyWorkingDirectoryMoves(moves: Array<{ sourcePath: string; targetPath: string }>, createParentFolders: boolean, repoPath: string) {
     return requireElectronGitApi().applyWorkingDirectoryMoves(moves, createParentFolders, repoPath);
   },
+  async listWorkingDirectoryFolders(repoPath: string, parentPath = '') {
+    return requireElectronGitApi().listWorkingDirectoryFolders(repoPath, parentPath);
+  },
   async findEmptyWorkingDirectoryFolders(folderPaths: string[], repoPath: string) {
     return requireElectronGitApi().findEmptyWorkingDirectoryFolders(folderPaths, repoPath);
   },

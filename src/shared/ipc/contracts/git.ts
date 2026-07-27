@@ -216,6 +216,7 @@ export interface ElectronGitAPI {
   getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
   applyWorkingDirectoryMoves: (moves: WorkingDirectoryMoveDto[], createParentFolders: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
+  listWorkingDirectoryFolders: (repoPath: string, parentPath?: string) => Promise<IpcResult<string[]>>;
   findEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) => Promise<WorkingDirectoryEmptyFoldersResultDto>;
   deleteEmptyWorkingDirectoryFolders: (folderPaths: string[], repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   createWorkingDirectoryArchive: (sourcePaths: string[], targetPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

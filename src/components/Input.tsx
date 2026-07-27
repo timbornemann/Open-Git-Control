@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { DialogContextItem, InputDialogField } from '@/app/state/contracts';
 import { DialogFrame } from './DialogFrame';
+import { FolderTreeSelect } from './FolderTreeSelect';
 import { useI18n } from '@/i18n';
 
 export type { InputDialogField } from '@/app/state/contracts';
@@ -108,6 +109,16 @@ export const Input: React.FC<InputProps> = ({
                 <span>{field.label}</span>
                 {field.helperText && <small>{field.helperText}</small>}
               </label>
+            );
+          }
+
+          if (field.type === 'folder-tree') {
+            return (
+              <div key={field.id} className="dialog-field">
+                <span>{field.label}</span>
+                <FolderTreeSelect value={values[field.id] ?? ''} options={field.options || []} loadChildren={field.loadChildren} onChange={setValue} />
+                {field.helperText && <small>{field.helperText}</small>}
+              </div>
             );
           }
 

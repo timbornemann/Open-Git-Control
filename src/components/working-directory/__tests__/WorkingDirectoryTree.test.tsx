@@ -239,6 +239,7 @@ describe('WorkingDirectoryTree', () => {
 
     expect(container.querySelector('.working-tree-context-menu__header')?.textContent).toBe('3 items selected');
     const actions = Array.from(container.querySelectorAll('.working-tree-context-menu__item')).map((item) => item.textContent);
+    expect(actions).toContain('Move to...');
     expect(actions).toContain('Copy relative paths');
     expect(actions).toContain('Copy absolute paths');
     expect(actions).toContain('Add prefix / suffix');
@@ -285,6 +286,90 @@ describe('WorkingDirectoryTree', () => {
         { sourcePath: 'alpha.txt', targetPath: 'archive-alpha-old.txt' },
         { sourcePath: 'beta.txt', targetPath: 'archive-beta-old.txt' },
         { sourcePath: 'gamma.txt', targetPath: 'archive-gamma-old.txt' },
+      ],
+      false,
+      'C:/repos/demo',
+    );
+  });
+
+  it('moves a mixed selection to a valid repository folder', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({
+      success: true,
+      data: [
+        { path: 'source', name: 'source', kind: 'directory' },
+        { path: 'target', name: 'target', kind: 'directory' },
+        { path: 'loose.txt', name: 'loose.txt', kind: 'file' },
+      ],
+    });
+    const listWorkingDirectoryFolders = vi.spyOn(gitClient, 'listWorkingDirectoryFolders').mockImplementation(async (_repoPath, parentPath = '') => ({
+      success: true,
+      data: parentPath === 'target' ? ['target/nested'] : ['source', 'target'],
+    }));
+    const applyWorkingDirectoryMoves = vi.spyOn(gitClient, 'applyWorkingDirectoryMoves').mockResolvedValue({ success: true });
+    const container = document.getElementById('root');
+    if (!container) throw new Error('Missing test root.');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryTree, {
+          repoPath: 'C:/repos/demo',
+          refreshTrigger: 0,
+          expandedPaths: new Set<string>(),
+          onExpandedPathsChange: vi.fn(),
+          onOpenFile: vi.fn(),
+          onRepoChanged: vi.fn(),
+        }),
+      ),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const rowFor = (name: string) =>
+      Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-row')).find((row) => row.textContent?.includes(name));
+    const source = rowFor('source');
+    const loose = rowFor('loose.txt');
+    if (!source || !loose) throw new Error('Missing working-directory rows.');
+
+    act(() => source.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ctrlKey: true })));
+    act(() => loose.dispatchEvent(new window.MouseEvent('click', { bubbles: true, ctrlKey: true })));
+    act(() => source.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 40 })));
+    const moveTo = Array.from(container.querySelectorAll<HTMLButtonElement>('.working-tree-context-menu__item')).find(
+      (item) => item.textContent === 'Move to...',
+    );
+    if (!moveTo) throw new Error('Missing move-to action.');
+    await act(async () => {
+      moveTo.click();
+      await Promise.resolve();
+    });
+
+    const inputDialog = setInputDialogMock.mock.calls.at(-1)?.[0];
+    if (!inputDialog) throw new Error('Missing move-to dialog.');
+    expect(inputDialog).toMatchObject({
+      title: 'Move to folder',
+      confirmLabel: 'Move selected',
+      fields: [
+        {
+          id: 'destination',
+          type: 'folder-tree',
+          defaultValue: 'target',
+          options: [
+            { value: '', label: 'Repository root', disabled: true },
+            { value: 'target', label: 'target' },
+          ],
+        },
+      ],
+    });
+    await expect(inputDialog.fields[0].loadChildren?.('target')).resolves.toEqual([{ value: 'target/nested', label: 'nested' }]);
+    expect(listWorkingDirectoryFolders).toHaveBeenLastCalledWith('C:/repos/demo', 'target');
+
+    await act(async () => {
+      await inputDialog.onSubmit({ destination: 'target' });
+    });
+    expect(applyWorkingDirectoryMoves).toHaveBeenCalledWith(
+      [
+        { sourcePath: 'source', targetPath: 'target/source' },
+        { sourcePath: 'loose.txt', targetPath: 'target/loose.txt' },
       ],
       false,
       'C:/repos/demo',
