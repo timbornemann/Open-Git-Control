@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks } from './RepositoryPathSafety';
-import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile } from './RepositoryFileEncoding';
+import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile, type RepositoryTextEncoding } from './RepositoryFileEncoding';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
 
@@ -122,7 +122,7 @@ export class RepositoryFiles {
     return this.writeRepoFileAtPath(this.getRepoPath(), relativePath, content);
   }
 
-  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string): Promise<void> {
+  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string, targetEncoding?: RepositoryTextEncoding): Promise<void> {
     const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
 
     const stat = fs.statSync(resolvedPath);
@@ -134,10 +134,11 @@ export class RepositoryFiles {
     // on-disk bytes means an unchanged conflict resolution is written back
     // identically instead of being silently converted to UTF-8. Binary files
     // are refused rather than corrupted.
-    const encoding = detectRepositoryFileEncoding(fs.readFileSync(resolvedPath));
-    if (encoding === 'binary') {
+    const detectedEncoding = detectRepositoryFileEncoding(fs.readFileSync(resolvedPath));
+    if (detectedEncoding === 'binary') {
       throw new Error('This file appears to be binary and cannot be edited as text.');
     }
+    const encoding = targetEncoding ?? detectedEncoding;
 
     const textValue = typeof content === 'string' ? content : String(content ?? '');
     writeRepositoryFileAtomically(resolvedPath, encodeRepositoryFile(textValue, encoding), stat.mode & 0o777);

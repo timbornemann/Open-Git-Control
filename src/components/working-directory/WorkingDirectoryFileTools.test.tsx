@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
 
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkingDirectoryFileTools } from './WorkingDirectoryFileTools';
 
-const { setConfirmDialogMock, showToastMock } = vi.hoisted(() => ({
+const { setConfirmDialogMock, setInputDialogMock, showToastMock } = vi.hoisted(() => ({
   setConfirmDialogMock: vi.fn(),
+  setInputDialogMock: vi.fn(),
   showToastMock: vi.fn(),
 }));
 
 vi.mock('@/contexts/AppStateContext', () => ({
-  useUIContext: () => ({ setConfirmDialog: setConfirmDialogMock }),
+  useUIContext: () => ({ setConfirmDialog: setConfirmDialogMock, setInputDialog: setInputDialogMock }),
 }));
 vi.mock('@/hooks/useAppToast', () => ({
   useAppToast: () => showToastMock,
@@ -27,6 +28,7 @@ describe('WorkingDirectoryFileTools', () => {
     document.body.innerHTML = '<div id="root"></div>';
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     setConfirmDialogMock.mockReset();
+    setInputDialogMock.mockReset();
     showToastMock.mockReset();
   });
 
@@ -38,8 +40,19 @@ describe('WorkingDirectoryFileTools', () => {
   });
 
   const renderTools = (path: string, text: string, onChange = vi.fn()) => {
+    const Harness = () => {
+      const [value, setValue] = useState(text);
+      return createElement(WorkingDirectoryFileTools, {
+        path,
+        text: value,
+        onChange: (nextValue: string) => {
+          onChange(nextValue);
+          setValue(nextValue);
+        },
+      });
+    };
     root = createRoot(document.getElementById('root')!);
-    act(() => root?.render(createElement(WorkingDirectoryFileTools, { path, text, onChange })));
+    act(() => root?.render(createElement(Harness)));
     return onChange;
   };
 
@@ -53,11 +66,13 @@ describe('WorkingDirectoryFileTools', () => {
     const onChange = renderTools('config.json', '{"big":12345678901234567890,"items":[1,2]}');
 
     clickButton('Tools');
-    clickButton('Format JSON');
+    clickButton('JSON');
+    clickButton('Format');
     expect(onChange).toHaveBeenLastCalledWith('{\n  "big": 12345678901234567890,\n  "items": [\n    1,\n    2\n  ]\n}');
 
     clickButton('Tools');
-    clickButton('Minify JSON');
+    clickButton('JSON');
+    clickButton('Minify');
     expect(onChange).toHaveBeenLastCalledWith('{"big":12345678901234567890,"items":[1,2]}');
   });
 
@@ -65,7 +80,8 @@ describe('WorkingDirectoryFileTools', () => {
     const onChange = renderTools('config.json', '{"invalid": }');
 
     clickButton('Tools');
-    clickButton('Format JSON');
+    clickButton('JSON');
+    clickButton('Format');
 
     expect(onChange).not.toHaveBeenCalled();
     expect(showToastMock).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON'), true);
@@ -75,16 +91,18 @@ describe('WorkingDirectoryFileTools', () => {
     const onChange = renderTools('tsconfig.json', '{/* Bundler mode */"compilerOptions":{"module":"ESNext",},}');
 
     clickButton('Tools');
-    clickButton('Minify JSON');
+    clickButton('JSON');
+    clickButton('Minify');
 
     expect(onChange).toHaveBeenCalledWith('{"compilerOptions":{"module":"ESNext"}}');
-    expect(showToastMock).toHaveBeenCalledWith('JSON minified. Save to apply it.', false);
+    expect(showToastMock).toHaveBeenCalledWith('JSON minified.', false);
   });
 
   it('requires confirmation before compacting ordinary text to one line', () => {
     const onChange = renderTools('notes.txt', ' first \n\n second ');
 
     clickButton('Tools');
+    clickButton('Edit lines');
     clickButton('Compact to one line');
     expect(onChange).not.toHaveBeenCalled();
     const dialog = setConfirmDialogMock.mock.calls.at(-1)?.[0];
@@ -93,9 +111,54 @@ describe('WorkingDirectoryFileTools', () => {
     expect(onChange).toHaveBeenCalledWith('first second');
   });
 
-  it('leaves CSV transformations to the dedicated table editor', () => {
+  it('offers general tools for CSV without offering JSON-specific tools', () => {
     renderTools('data.csv', 'name,value\nAda,1');
 
-    expect(document.querySelector('button')).toBeNull();
+    clickButton('Tools');
+    expect(document.body.textContent).toContain('Edit lines');
+    expect(document.body.textContent).not.toContain('Format, validate and convert');
+  });
+
+  it('encodes only the current selection when one exists', () => {
+    const onChange = vi.fn();
+    root = createRoot(document.getElementById('root')!);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryFileTools, {
+          path: 'notes.txt',
+          text: 'before ä after',
+          selection: { from: 7, to: 8 },
+          onChange,
+        }),
+      ),
+    );
+
+    clickButton('Tools');
+    clickButton('Base64 and URL encoding');
+    clickButton('Encode Base64');
+
+    expect(onChange).toHaveBeenCalledWith('before w6Q= after');
+  });
+
+  it('marks encoding changes for the next save', () => {
+    const onEncodingChange = vi.fn();
+    root = createRoot(document.getElementById('root')!);
+    act(() =>
+      root?.render(
+        createElement(WorkingDirectoryFileTools, {
+          path: 'notes.txt',
+          text: 'café',
+          encoding: 'utf8',
+          onChange: vi.fn(),
+          onEncodingChange,
+        }),
+      ),
+    );
+
+    clickButton('Tools');
+    clickButton('Encoding and line endings');
+    clickButton('Latin-1');
+
+    expect(onEncodingChange).toHaveBeenCalledWith('latin1');
   });
 });

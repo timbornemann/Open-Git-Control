@@ -105,6 +105,17 @@ export const WorkingDirectoryFileInfoDialog: React.FC<Props> = ({ repoPath, path
               <dt>Writable</dt>
               <dd>{info.readOnly ? 'No' : 'Yes'}</dd>
             </dl>
+            {info.hashes && (
+              <dl className="working-file-info__list">
+                <dt>SHA-256</dt>
+                <dd>{info.hashes.sha256}</dd>
+                <dt>SHA-1</dt>
+                <dd>{info.hashes.sha1}</dd>
+                <dt>MD5</dt>
+                <dd>{info.hashes.md5}</dd>
+              </dl>
+            )}
+            {info.hashError && <p className="working-file-info__error">Hashes could not be calculated: {info.hashError}</p>}
           </section>
 
           <section className="working-file-info__section" aria-labelledby="working-file-info-git">

@@ -12,10 +12,11 @@ import {
 } from '../../../git/RepositoryPathSafety';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
-import { decodeRepositoryFile, detectRepositoryFileEncoding } from '../../../git/RepositoryFileEncoding';
+import type { RepositoryTextEncoding } from '../../../git/RepositoryFileEncoding';
 import { registerWorkingDirectoryFileInfoHandler } from './workingDirectoryFileInfo';
 import { registerWorkingDirectoryFileCreationHandler } from './workingDirectoryFileCreation';
 import { registerWorkingDirectoryToolsHandlers } from './workingDirectoryTools';
+import { registerWorkingDirectoryPreviewHandler } from './workingDirectoryPreview';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -24,20 +25,7 @@ type RegisterGitFileHandlersDeps = {
 
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
 const REPOSITORY_PATH_OPEN_ACTIONS = new Set(['reveal', 'open', 'openWith']);
-const WORKING_DIRECTORY_PREVIEW_LIMIT = 2 * 1024 * 1024;
-const WORKING_DIRECTORY_LARGE_IMAGE_PREVIEW_LIMIT = 25 * 1024 * 1024;
-const IMAGE_MIME_TYPES = new Map([
-  ['apng', 'image/apng'],
-  ['avif', 'image/avif'],
-  ['bmp', 'image/bmp'],
-  ['gif', 'image/gif'],
-  ['ico', 'image/x-icon'],
-  ['jpeg', 'image/jpeg'],
-  ['jpg', 'image/jpeg'],
-  ['png', 'image/png'],
-  ['svg', 'image/svg+xml'],
-  ['webp', 'image/webp'],
-]);
+const TEXT_ENCODINGS = new Set<RepositoryTextEncoding>(['utf8', 'utf8-bom', 'utf16le', 'utf16be', 'latin1']);
 
 // Never trim a repository-relative path: leading/trailing whitespace is a
 // significant part of a Git filename. Only reject an entirely empty value.
@@ -195,43 +183,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
   registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath });
   registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath });
-
-  ipcMain.handle(
-    IpcChannel.GitGetWorkingDirectoryPreview,
-    async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown, allowLargeImage?: unknown) => {
-      try {
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
-        const resolvedPath = workingDirectoryPath(repoPath, filePath, 'File path');
-        const stat = fs.statSync(resolvedPath);
-        if (!stat.isFile()) throw new Error('Target path is not a file.');
-        const extension = path.extname(resolvedPath).slice(1).toLowerCase();
-        const mimeType = IMAGE_MIME_TYPES.get(extension) || null;
-        if (stat.size > WORKING_DIRECTORY_PREVIEW_LIMIT && (!mimeType || allowLargeImage !== true || stat.size > WORKING_DIRECTORY_LARGE_IMAGE_PREVIEW_LIMIT)) {
-          return {
-            success: true,
-            data: {
-              kind: 'binary',
-              bytes: stat.size,
-              mimeType,
-              reason: 'tooLarge',
-              canLoadImage: Boolean(mimeType) && stat.size <= WORKING_DIRECTORY_LARGE_IMAGE_PREVIEW_LIMIT,
-            },
-          };
-        }
-        const buffer = fs.readFileSync(resolvedPath);
-        if (mimeType)
-          return { success: true, data: { kind: 'image', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`, mimeType, bytes: stat.size } };
-        if (detectRepositoryFileEncoding(buffer) === 'binary')
-          return { success: true, data: { kind: 'binary', bytes: stat.size, mimeType: null, reason: 'binary' } };
-        return {
-          success: true,
-          data: { kind: 'text', text: decodeRepositoryFile(buffer).text, bytes: stat.size, isMarkdown: /\.md(?:own)?$/i.test(String(filePath)) },
-        };
-      } catch (error: unknown) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
-    },
-  );
+  registerWorkingDirectoryPreviewHandler(gitService, workingDirectoryPath);
 
   const mutateWorkingDirectory =
     (operation: 'move' | 'copy') =>
@@ -347,20 +299,28 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
     },
   );
 
-  ipcMain.handle(IpcChannel.GitWriteRepoFile, async (_event: unknown, filePath: unknown, content: unknown, requestedRepoPath?: unknown) => {
-    try {
-      const repositoryFilePath = asRepositoryFilePath(filePath);
-      if (repositoryFilePath.length === 0) {
-        return { success: false, error: 'File path is required' };
-      }
+  ipcMain.handle(
+    IpcChannel.GitWriteRepoFile,
+    async (_event: unknown, filePath: unknown, content: unknown, requestedRepoPath?: unknown, requestedEncoding?: unknown) => {
+      try {
+        const repositoryFilePath = asRepositoryFilePath(filePath);
+        if (repositoryFilePath.length === 0) {
+          return { success: false, error: 'File path is required' };
+        }
 
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
-      await gitService.files.writeRepoFileAtPath(repoPath, repositoryFilePath, typeof content === 'string' ? content : String(content ?? ''));
-      return { success: true };
-    } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const encoding =
+          typeof requestedEncoding === 'string' && TEXT_ENCODINGS.has(requestedEncoding as RepositoryTextEncoding)
+            ? (requestedEncoding as RepositoryTextEncoding)
+            : undefined;
+        if (requestedEncoding != null && !encoding) return { success: false, error: 'Unsupported text encoding.' };
+        await gitService.files.writeRepoFileAtPath(repoPath, repositoryFilePath, typeof content === 'string' ? content : String(content ?? ''), encoding);
+        return { success: true };
+      } catch (error: unknown) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
 
   ipcMain.handle(IpcChannel.GitDeleteRepoFile, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {

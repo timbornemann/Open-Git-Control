@@ -18,6 +18,9 @@ import { useHtmlPreview } from './useHtmlPreview';
 import { CsvTableEditor } from './CsvTableEditor';
 import { isCsvFilePath } from './fileContentTransforms';
 import { WorkingDirectoryFileTools } from './WorkingDirectoryFileTools';
+import { getEncodedTextByteLength, WorkingDirectoryFileStatusBar } from './WorkingDirectoryFileStatusBar';
+import type { TextSelection } from './textContentTransforms';
+import type { TextFileEncodingDto } from '@/shared/ipc/contracts/git';
 import type { WorkingDirectoryNavigationGuard, WorkingDirectoryNavigationTarget } from './workingDirectoryNavigationGuard';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
@@ -97,12 +100,15 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const requestCloseRef = useRef<() => void>(() => onClose());
   const navigationGuardRef = useRef<WorkingDirectoryNavigationGuard | null>(null);
   const activeFileKeyRef = useRef('');
-  // The editor normalizes to LF; remember the file's real ending so we can write
-  // it back unchanged instead of rewriting the whole file with LF endings.
-  const lineEndingRef = useRef<LineEnding>('\n');
   const [preview, setPreview] = useState<any>(null);
   const [text, setText] = useState('');
   const [savedText, setSavedText] = useState('');
+  const [encoding, setEncoding] = useState<TextFileEncodingDto>('utf8');
+  const [savedEncoding, setSavedEncoding] = useState<TextFileEncodingDto>('utf8');
+  const [lineEnding, setLineEnding] = useState<LineEnding>('\n');
+  const [savedLineEnding, setSavedLineEnding] = useState<LineEnding>('\n');
+  const [showWhitespace, setShowWhitespace] = useState(false);
+  const [selection, setSelection] = useState<TextSelection>({ from: 0, to: 0 });
   const [tab, setTab] = useState<Tab>('content');
   const [history, setHistory] = useState<GitFileHistoryEntryDto[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -117,7 +123,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLargeImageLoading, setIsLargeImageLoading] = useState(false);
-  const dirty = text !== savedText;
+  const dirty = text !== savedText || encoding !== savedEncoding || lineEnding !== savedLineEnding;
   const isMarkdown = isMarkdownFilePath(path);
   const isHtml = isHtmlFilePath(path);
   const isCsv = isCsvFilePath(path);
@@ -140,6 +146,12 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     setTab('content');
     setText('');
     setSavedText('');
+    setEncoding('utf8');
+    setSavedEncoding('utf8');
+    setLineEnding('\n');
+    setSavedLineEnding('\n');
+    setShowWhitespace(false);
+    setSelection({ from: 0, to: 0 });
     setHistory([]);
     setHistoryError(null);
     setIsHistoryLoading(false);
@@ -160,10 +172,15 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       }
       setPreview(result.data);
       if (result.data.kind === 'text') {
-        lineEndingRef.current = detectLineEnding(result.data.text);
+        const detectedLineEnding = detectLineEnding(result.data.text);
+        const detectedEncoding = result.data.encoding || 'utf8';
         const normalized = normalizeToLf(result.data.text);
         setText(normalized);
         setSavedText(normalized);
+        setEncoding(detectedEncoding);
+        setSavedEncoding(detectedEncoding);
+        setLineEnding(detectedLineEnding);
+        setSavedLineEnding(detectedLineEnding);
       }
       setIsLoading(false);
     });
@@ -274,10 +291,21 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     const textAtSave = text;
     const fileKeyAtSave = `${repoAtSave}\0${pathAtSave}`;
     try {
-      const result = await gitClient.writeRepoFile(pathAtSave, applyLineEnding(textAtSave, lineEndingRef.current), repoAtSave);
+      const result = await gitClient.writeRepoFile(pathAtSave, applyLineEnding(textAtSave, lineEnding), repoAtSave, encoding);
       if (result.success) {
         if (activeFileKeyRef.current === fileKeyAtSave) {
           setSavedText(textAtSave);
+          setSavedEncoding(encoding);
+          setSavedLineEnding(lineEnding);
+          setPreview((current: any) =>
+            current?.kind === 'text'
+              ? {
+                  ...current,
+                  bytes: getEncodedTextByteLength(textAtSave, encoding, lineEnding),
+                  modifiedAt: new Date().toISOString(),
+                }
+              : current,
+          );
           onRepoChanged();
           showToast(tr('Datei gespeichert.', 'File saved.'), false);
         }
@@ -291,7 +319,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       }
       return false;
     }
-  }, [isLoading, onRepoChanged, path, preview?.kind, repoPath, showToast, text, tr]);
+  }, [encoding, isLoading, lineEnding, onRepoChanged, path, preview?.kind, repoPath, showToast, text, tr]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's' && dirty && !isLoading) {
@@ -367,12 +395,20 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
           <div className="working-file-viewer__actions">
             <WorkingDirectoryViewerTabs tab={tab} isCsv={isCsv} supportsPreview={supportsPreview} tr={tr} onTabChange={setTab} />
             <WorkingDirectoryFileTools
+              repoPath={repoPath}
               path={path}
               text={text}
+              selection={selection}
+              encoding={encoding}
+              lineEnding={lineEnding}
+              showWhitespace={showWhitespace}
               onChange={(transformedText) => {
                 setText(transformedText);
                 setTab('content');
               }}
+              onEncodingChange={setEncoding}
+              onLineEndingChange={setLineEnding}
+              onShowWhitespaceChange={setShowWhitespace}
             />
             <button className="working-file-viewer__button working-file-viewer__button--save" onClick={() => void save()} disabled={!dirty || isLoading}>
               <Save size={15} /> Save
@@ -411,7 +447,14 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       )}
       {preview?.kind === 'text' && tab === 'content' && (
         <React.Suspense fallback={<div className="working-file-viewer__code-editor-loading">Loading editor…</div>}>
-          <WorkingDirectoryCodeEditor path={path} value={text} onChange={setText} onSave={() => void save()} />
+          <WorkingDirectoryCodeEditor
+            path={path}
+            value={text}
+            onChange={setText}
+            onSave={() => void save()}
+            showWhitespace={showWhitespace}
+            onSelectionChange={setSelection}
+          />
         </React.Suspense>
       )}
       <WorkingDirectoryCsvView preview={preview} tab={tab} isCsv={isCsv} text={text} onChange={setText} />
@@ -422,6 +465,9 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       )}
       {preview?.kind === 'text' && tab === 'blame' && (
         <BlamePanel lines={blame} loading={isBlameLoading} error={blameError} hasMore={blameHasMore} onLoadMore={loadMoreBlame} />
+      )}
+      {preview?.kind === 'text' && (
+        <WorkingDirectoryFileStatusBar text={text} encoding={encoding} lineEnding={lineEnding} modifiedAt={preview.modifiedAt} tr={tr} />
       )}
     </div>
   );

@@ -56,6 +56,49 @@ afterEach(() => {
 });
 
 describe('WorkingDirectoryFileViewer history and blame', () => {
+  it('saves an encoding-only conversion through the byte-aware writer', async () => {
+    vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({
+      success: true,
+      data: { kind: 'text', text: 'hello\n', bytes: 6, encoding: 'utf8', modifiedAt: '2026-07-27T08:00:00.000Z' },
+    } as any);
+    const writeRepoFile = vi.spyOn(gitClient, 'writeRepoFile').mockResolvedValue({ success: true });
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => {
+      root.render(
+        createElement(I18nProvider, {
+          language: 'en',
+          children: createElement(WorkingDirectoryFileViewer, {
+            repoPath: 'C:/repo',
+            path: 'notes.txt',
+            onClose: vi.fn(),
+            onRepoChanged: vi.fn(),
+            onCloseRequestChange: vi.fn(),
+            onNavigationGuardChange: vi.fn(),
+          }),
+        }),
+      );
+      await Promise.resolve();
+    });
+    const clickButton = (label: string) => {
+      const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.includes(label));
+      if (!button) throw new Error(`Missing "${label}" button.`);
+      act(() => button.click());
+    };
+
+    clickButton('Tools');
+    clickButton('Encoding and line endings');
+    clickButton('UTF-8 BOM');
+    const saveButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.includes('Save'));
+    expect(saveButton?.disabled).toBe(false);
+    await act(async () => {
+      saveButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(writeRepoFile).toHaveBeenCalledWith('notes.txt', 'hello\n', 'C:/repo', 'utf8-bom');
+    act(() => root.unmount());
+  });
+
   it('edits and saves CSV content through the table view', async () => {
     vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({
       success: true,
@@ -99,7 +142,7 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
       await Promise.resolve();
     });
 
-    expect(writeRepoFile).toHaveBeenCalledWith('data/people.csv', 'name,age\r\nAda,37\r\n', 'C:/repo');
+    expect(writeRepoFile).toHaveBeenCalledWith('data/people.csv', 'name,age\r\nAda,37\r\n', 'C:/repo', 'utf8');
     act(() => root.unmount());
   });
 

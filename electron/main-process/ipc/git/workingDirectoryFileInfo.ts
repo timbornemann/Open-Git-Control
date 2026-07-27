@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import type { GitService } from '../../../GitService';
 import { toLiteralPathspec } from '../../../git/RepositoryPathSafety';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
@@ -26,6 +27,29 @@ const parseFileHistoryEntries = (raw: string): GitFileHistoryEntryDto[] =>
     .map(([hash, abbrevHash, author, date, subject]) => ({ hash, abbrevHash, author, date, subject }));
 
 const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+const calculateHashes = (filePath: string): Promise<{ sha256: string; sha1: string; md5: string }> =>
+  new Promise((resolve, reject) => {
+    const hashes = {
+      sha256: createHash('sha256'),
+      sha1: createHash('sha1'),
+      md5: createHash('md5'),
+    };
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => {
+      hashes.sha256.update(chunk);
+      hashes.sha1.update(chunk);
+      hashes.md5.update(chunk);
+    });
+    stream.on('error', reject);
+    stream.on('end', () =>
+      resolve({
+        sha256: hashes.sha256.digest('hex'),
+        sha1: hashes.sha1.digest('hex'),
+        md5: hashes.md5.digest('hex'),
+      }),
+    );
+  });
 
 const isUnbornHeadError = (error: unknown): boolean =>
   /needed a single revision|does not have any commits yet|unknown revision or path not in the working tree|ambiguous argument ['"]?HEAD['"]?: unknown revision/i.test(
@@ -59,10 +83,11 @@ export function registerWorkingDirectoryFileInfoHandler({ gitService, workingDir
       if (!stat.isFile()) throw new Error('Target path is not a file.');
 
       const literalPathspec = toLiteralPathspec(relativePath, 'File path');
-      const [trackedResult, statusResult, historyResult] = await Promise.allSettled([
+      const [trackedResult, statusResult, historyResult, hashesResult] = await Promise.allSettled([
         gitService.runCommandAtPath(repoPath, ['ls-files', '--stage', '--', literalPathspec]),
         gitService.runCommandAtPath(repoPath, ['status', '--porcelain=v1', '--ignored', '--untracked-files=all', '--', literalPathspec]),
         gitService.runCommandAtPath(repoPath, ['log', '--follow', '--date=iso-strict', `--pretty=format:${FILE_HISTORY_FORMAT}`, '--', literalPathspec]),
+        calculateHashes(resolvedPath),
       ]);
 
       const tracked = trackedResult.status === 'fulfilled' && trackedResult.value.trim().length > 0;
@@ -85,6 +110,8 @@ export function registerWorkingDirectoryFileInfoHandler({ gitService, workingDir
           modifiedAt: stat.mtime.toISOString(),
           accessedAt: stat.atime.toISOString(),
           readOnly: (stat.mode & 0o222) === 0,
+          hashes: hashesResult.status === 'fulfilled' ? hashesResult.value : null,
+          ...(hashesResult.status === 'rejected' ? { hashError: getErrorMessage(hashesResult.reason) } : {}),
           git: {
             ...getWorkingDirectoryGitStatus(statusRaw, tracked),
             historyCount: history.length,

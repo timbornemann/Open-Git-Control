@@ -60,6 +60,21 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.working-file-viewer__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 13px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-dark);
+  color: var(--text-muted);
+  font-size: 0.67rem;
+}
+
+.working-file-viewer__status span {
+  white-space: nowrap;
+}
 .working-file-viewer__code-editor {
   flex: 1;
   min-height: 0;

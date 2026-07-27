@@ -1,8 +1,13 @@
+import { getLocation, parseTree, type Node as JsonNode, type ParseError } from 'jsonc-parser';
+
 export const isJsonFilePath = (filePath: string): boolean => {
   const lowerPath = filePath.toLowerCase();
   return lowerPath.endsWith('.json') || lowerPath.endsWith('.jsonc');
 };
 export const isCsvFilePath = (filePath: string): boolean => filePath.toLowerCase().endsWith('.csv');
+export const isYamlFilePath = (filePath: string): boolean => /\.(?:ya?ml)$/i.test(filePath);
+export const isXmlFilePath = (filePath: string): boolean => /\.(?:xml|svg|xhtml)$/i.test(filePath);
+export const isHtmlFilePathForTools = (filePath: string): boolean => /\.html?$/i.test(filePath);
 
 type JsoncToken = {
   type: 'comment' | 'punctuation' | 'string' | 'literal';
@@ -123,6 +128,8 @@ export const minifyJsonText = (source: string): string => {
   return stripJsonWhitespace(normalizeAndValidateJsonc(source));
 };
 
+export const parseJsonText = (source: string): unknown => JSON.parse(normalizeAndValidateJsonc(source));
+
 const tokenizeJsonc = (source: string): JsoncToken[] => {
   const tokens: JsoncToken[] = [];
   for (let index = 0; index < source.length;) {
@@ -232,3 +239,59 @@ export const compactTextToSingleLine = (source: string): string =>
     .map((line) => line.trim())
     .filter(Boolean)
     .join(' ');
+
+const assertJsonTree = (source: string): JsonNode => {
+  const errors: ParseError[] = [];
+  const tree = parseTree(source, errors, { allowTrailingComma: true, disallowComments: false });
+  if (!tree || errors.length > 0) {
+    normalizeAndValidateJsonc(source);
+    throw new Error('Invalid JSON/JSONC.');
+  }
+  return tree;
+};
+
+const renderSortedJsonNode = (source: string, node: JsonNode, depth: number, indentation: number): string => {
+  if (node.type !== 'object' && node.type !== 'array') return source.slice(node.offset, node.offset + node.length);
+  const children = node.children || [];
+  if (children.length === 0) return node.type === 'object' ? '{}' : '[]';
+
+  const indent = (level: number) => ' '.repeat(level * indentation);
+  if (node.type === 'array') {
+    const values = children.map((child) => `${indent(depth + 1)}${renderSortedJsonNode(source, child, depth + 1, indentation)}`);
+    return `[\n${values.join(',\n')}\n${indent(depth)}]`;
+  }
+
+  const properties = [...children].sort((left, right) => {
+    const leftKey = String(left.children?.[0]?.value ?? '');
+    const rightKey = String(right.children?.[0]?.value ?? '');
+    return leftKey.localeCompare(rightKey);
+  });
+  const values = properties.map((property) => {
+    const key = property.children?.[0];
+    const value = property.children?.[1];
+    if (!key || !value) throw new Error('Invalid JSON/JSONC object property.');
+    const rawKey = source.slice(key.offset, key.offset + key.length);
+    return `${indent(depth + 1)}${rawKey}: ${renderSortedJsonNode(source, value, depth + 1, indentation)}`;
+  });
+  return `{\n${values.join(',\n')}\n${indent(depth)}}`;
+};
+
+export const sortJsonKeys = (source: string, indentation = 2): string => {
+  normalizeAndValidateJsonc(source);
+  if (stripJsonComments(source) !== source) {
+    throw new Error('JSONC keys cannot be sorted without removing comments. Remove the comments or use a strict JSON file.');
+  }
+  return renderSortedJsonNode(source, assertJsonTree(source), 0, indentation);
+};
+
+const formatJsonPath = (segments: Array<string | number>): string =>
+  segments.reduce<string>((result, segment) => {
+    if (typeof segment === 'number') return `${result}[${segment}]`;
+    return /^[A-Za-z_$][\w$]*$/.test(segment) ? `${result}.${segment}` : `${result}[${JSON.stringify(segment)}]`;
+  }, '$');
+
+export const getJsonPathAtOffset = (source: string, offset: number): string => {
+  normalizeAndValidateJsonc(source);
+  const boundedOffset = Math.max(0, Math.min(source.length, offset));
+  return formatJsonPath(getLocation(source, boundedOffset).path);
+};

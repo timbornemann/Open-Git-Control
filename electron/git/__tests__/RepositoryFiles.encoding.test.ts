@@ -47,4 +47,28 @@ describe('RepositoryFiles text preview encoding', () => {
     await expect(files.writeRepoFileAtPath(repositoryPath, 'linked/note.txt', 'changed\n')).rejects.toThrow(/symbolic link/);
     expect(fs.readFileSync(path.join(targetDirectory, 'note.txt'), 'utf8')).toBe('original\n');
   });
+
+  it('converts a text file to an explicitly requested encoding', async () => {
+    const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repository-files-encoding-'));
+    repositories.push(repositoryPath);
+    const targetPath = path.join(repositoryPath, 'note.txt');
+    fs.writeFileSync(targetPath, 'café\n', 'utf8');
+    const files = new RepositoryFiles(() => repositoryPath, vi.fn());
+
+    await files.writeRepoFileAtPath(repositoryPath, 'note.txt', 'café\r\n', 'utf8-bom');
+    expect(fs.readFileSync(targetPath)).toEqual(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('café\r\n', 'utf8')]));
+
+    await files.writeRepoFileAtPath(repositoryPath, 'note.txt', 'café\n', 'latin1');
+    expect(fs.readFileSync(targetPath)).toEqual(Buffer.from('café\n', 'latin1'));
+  });
+
+  it('refuses a lossy Latin-1 conversion', async () => {
+    const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repository-files-latin1-'));
+    repositories.push(repositoryPath);
+    fs.writeFileSync(path.join(repositoryPath, 'note.txt'), 'plain\n', 'utf8');
+    const files = new RepositoryFiles(() => repositoryPath, vi.fn());
+
+    await expect(files.writeRepoFileAtPath(repositoryPath, 'note.txt', 'emoji 👋', 'latin1')).rejects.toThrow('Latin-1');
+    expect(fs.readFileSync(path.join(repositoryPath, 'note.txt'), 'utf8')).toBe('plain\n');
+  });
 });

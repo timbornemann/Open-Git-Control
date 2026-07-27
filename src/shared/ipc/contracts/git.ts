@@ -115,6 +115,8 @@ export type RepoFileDeleteResultDto = {
   error?: string;
 };
 
+export type TextFileEncodingDto = 'utf8' | 'utf8-bom' | 'utf16le' | 'utf16be' | 'latin1';
+
 export type WorkingDirectoryEntryDto = { path: string; name: string; kind: 'file' | 'directory'; bytes?: number };
 export type WorkingDirectoryFileInfoDto = {
   path: string;
@@ -125,6 +127,8 @@ export type WorkingDirectoryFileInfoDto = {
   modifiedAt: string;
   accessedAt: string;
   readOnly: boolean;
+  hashes: { sha256: string; sha1: string; md5: string } | null;
+  hashError?: string;
   git: {
     tracked: boolean;
     ignored: boolean;
@@ -138,9 +142,9 @@ export type WorkingDirectoryFileInfoDto = {
   };
 };
 export type WorkingDirectoryPreviewDto =
-  | { kind: 'text'; text: string; bytes: number; isMarkdown: boolean }
-  | { kind: 'image'; dataUrl: string; mimeType: string; bytes: number }
-  | { kind: 'binary'; bytes: number; mimeType: string | null; reason: 'binary' | 'tooLarge'; canLoadImage?: boolean };
+  | { kind: 'text'; text: string; bytes: number; isMarkdown: boolean; encoding: TextFileEncodingDto; modifiedAt: string }
+  | { kind: 'image'; dataUrl: string; mimeType: string; bytes: number; modifiedAt: string }
+  | { kind: 'binary'; bytes: number; mimeType: string | null; reason: 'binary' | 'tooLarge'; canLoadImage?: boolean; modifiedAt: string };
 export type WorkingDirectoryMutationResultDto = { success: boolean; error?: string; targetPath?: string };
 export type WorkingDirectoryMoveDto = { sourcePath: string; targetPath: string };
 export type WorkingDirectoryEmptyFoldersResultDto = { success: boolean; data?: string[]; error?: string };
@@ -249,7 +253,7 @@ export interface ElectronGitAPI {
   readRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileReadResultDto>;
   getMarkdownPreviewFile: (params: RepositoryFileRequestDto) => Promise<IpcResult<MarkdownPreviewFileDto>>;
   getRepoFileDataUrl: (params: RepositoryFileRequestDto) => Promise<IpcResult<RepoFileDataUrlDto>>;
-  writeRepoFile: (filePath: string, content: string, repoPath?: string) => Promise<RepoFileWriteResultDto>;
+  writeRepoFile: (filePath: string, content: string, repoPath?: string, encoding?: TextFileEncodingDto) => Promise<RepoFileWriteResultDto>;
   deleteRepoFile: (filePath: string, repoPath?: string) => Promise<RepoFileDeleteResultDto>;
   listWorkingDirectory: (repoPath: string, parentPath?: string) => Promise<IpcResult<WorkingDirectoryEntryDto[]>>;
   createWorkingDirectoryFile: (filePath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

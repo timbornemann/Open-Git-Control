@@ -8,8 +8,10 @@
   top: calc(100% + 5px);
   right: 0;
   display: grid;
-  width: 260px;
-  overflow: hidden;
+  width: 290px;
+  max-height: min(520px, calc(100vh - 100px));
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: 7px;
   background: var(--bg-panel);
@@ -18,7 +20,7 @@
 
 .working-file-tools__menu > button {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 8px;
   padding: 9px 10px;
@@ -43,6 +45,14 @@
 .working-file-tools__menu > button > svg {
   margin-top: 2px;
   color: var(--text-accent);
+}
+
+.working-file-tools__menu > button > svg:last-child:not(:first-child) {
+  color: var(--text-muted);
+}
+
+.working-file-tools__back {
+  background: var(--bg-dark) !important;
 }
 
 .working-file-tools__menu span {

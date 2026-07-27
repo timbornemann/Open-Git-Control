@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { indentWithTab } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, type Extension } from '@codemirror/state';
-import { EditorView, keymap } from '@codemirror/view';
+import { EditorView, highlightTrailingWhitespace, highlightWhitespace, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 
@@ -11,6 +11,8 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
+  showWhitespace?: boolean;
+  onSelectionChange?: (selection: { from: number; to: number }) => void;
 };
 
 type LanguageDefinition = { label: string; load: () => Promise<Extension> };
@@ -118,15 +120,19 @@ const languageDefinitionForPath = (path: string): LanguageDefinition | null => L
 
 export const getLanguageLabelForPath = (path: string): string | null => languageDefinitionForPath(path)?.label || null;
 
-export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave }) => {
+export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave, showWhitespace = false, onSelectionChange }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartmentRef = useRef(new Compartment());
+  const whitespaceCompartmentRef = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const initialValueRef = useRef(value);
+  const initialShowWhitespaceRef = useRef(showWhitespace);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
+  onSelectionChangeRef.current = onSelectionChange;
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -138,6 +144,7 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
           editorTheme,
           syntaxHighlighting(editorHighlightStyle),
           languageCompartmentRef.current.of([]),
+          whitespaceCompartmentRef.current.of(initialShowWhitespaceRef.current ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
           keymap.of([
             indentWithTab,
             {
@@ -150,6 +157,10 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
           ]),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+            if (update.selectionSet) {
+              const selection = update.state.selection.main;
+              onSelectionChangeRef.current?.({ from: selection.from, to: selection.to });
+            }
           }),
         ],
       }),
@@ -188,6 +199,12 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
       active = false;
     };
   }, [path]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: whitespaceCompartmentRef.current.reconfigure(showWhitespace ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
+    });
+  }, [showWhitespace]);
 
   return <div ref={hostRef} className="working-file-viewer__code-editor" aria-label={`Code editor for ${path}`} />;
 };

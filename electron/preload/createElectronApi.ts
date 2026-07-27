@@ -15,6 +15,7 @@ import type { PlannerItemInput, PlannerProjectInput } from '../../src/types/proj
 import { isRepoUnavailableError, type RepoUnavailablePayload } from '../../src/shared/git/errors';
 import type {
   RepositoryInitializationOptionsDto,
+  TextFileEncodingDto,
   WorkingDirectoryReplaceRequestDto,
   WorkingDirectorySearchRequestDto,
 } from '../../src/shared/ipc/contracts/git';
@@ -206,10 +207,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       params.repoPath
         ? invokeGitOperationForRepo(params.repoPath, 'show', IpcChannel.GitRepoFileDataUrl, params)
         : invokeGitOperation('show', IpcChannel.GitRepoFileDataUrl, params),
-    writeRepoFile: (filePath: string, content: string, repoPath?: string) =>
+    writeRepoFile: (filePath: string, content: string, repoPath?: string, encoding?: TextFileEncodingDto) =>
       repoPath
-        ? invokeGitOperationForRepo(repoPath, 'write', IpcChannel.GitWriteRepoFile, filePath, content, repoPath)
-        : invokeGitOperation('write', IpcChannel.GitWriteRepoFile, filePath, content),
+        ? invokeGitOperationForRepo(repoPath, 'write', IpcChannel.GitWriteRepoFile, filePath, content, repoPath, encoding)
+        : invokeGitOperation('write', IpcChannel.GitWriteRepoFile, filePath, content, undefined, encoding),
     deleteRepoFile: (filePath: string, repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'delete', IpcChannel.GitDeleteRepoFile, filePath, repoPath)

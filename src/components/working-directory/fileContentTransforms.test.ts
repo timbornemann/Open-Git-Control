@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { compactTextToSingleLine, formatJsonText, isCsvFilePath, isJsonFilePath, minifyJsonText } from './fileContentTransforms';
+import {
+  compactTextToSingleLine,
+  formatJsonText,
+  getJsonPathAtOffset,
+  isCsvFilePath,
+  isJsonFilePath,
+  minifyJsonText,
+  sortJsonKeys,
+} from './fileContentTransforms';
 
 describe('file content transforms', () => {
   it('compacts non-empty trimmed lines without changing internal spaces', () => {
@@ -65,5 +73,23 @@ describe('file content transforms', () => {
     expect(isJsonFilePath('config/SETTINGS.JSON')).toBe(true);
     expect(isJsonFilePath('settings.jsonc')).toBe(true);
     expect(isCsvFilePath('data/EXPORT.CSV')).toBe(true);
+  });
+
+  it('sorts JSONC keys recursively without changing large numeric or escaped tokens', () => {
+    const source = '{"z":12345678901234567890,"nested":{"b":"\\u0041","a":1},"a":true}';
+
+    expect(sortJsonKeys(source)).toBe(
+      ['{', '  "a": true,', '  "nested": {', '    "a": 1,', '    "b": "\\u0041"', '  },', '  "z": 12345678901234567890', '}'].join('\n'),
+    );
+  });
+
+  it('does not silently discard JSONC comments while sorting keys', () => {
+    expect(() => sortJsonKeys('{"z": 1, // keep this\n"a": 2}')).toThrow('without removing comments');
+  });
+
+  it('returns a JSON path for the selected value', () => {
+    const source = '{"users":[{"display-name":"Ada"}]}';
+
+    expect(getJsonPathAtOffset(source, source.indexOf('Ada'))).toBe('$.users[0]["display-name"]');
   });
 });

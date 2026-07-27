@@ -184,6 +184,15 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryFileInfo, 'src/app.ts', 'C:/captured-repo');
   });
 
+  it('passes a requested text encoding through the repository-pinned writer', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+
+    await api.git.writeRepoFile('notes.txt', 'café', 'C:/captured-repo', 'latin1');
+
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitWriteRepoFile, 'notes.txt', 'café', 'C:/captured-repo', 'latin1');
+  });
+
   it('pins an explicitly requested large-image preview to the captured repository', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

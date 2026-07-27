@@ -12,6 +12,7 @@ import { RebaseService } from './git/RebaseService';
 import { normalizeRepositoryRelativePath } from './git/RepositoryPathSafety';
 import { RepositoryBareState } from './git/RepositoryBareState';
 import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource } from './git/RepositoryFiles';
+import type { RepositoryTextEncoding } from './git/RepositoryFileEncoding';
 import { StashService } from './git/StashService';
 import { SubmoduleService } from './git/SubmoduleService';
 
@@ -305,8 +306,8 @@ export class GitService {
     await this.repositoryFiles.writeRepoFile(relativePath, content);
   }
 
-  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string): Promise<void> {
-    await this.repositoryFiles.writeRepoFileAtPath(repoPath, relativePath, content);
+  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string, targetEncoding?: RepositoryTextEncoding): Promise<void> {
+    await this.repositoryFiles.writeRepoFileAtPath(repoPath, relativePath, content, targetEncoding);
   }
 
   /**

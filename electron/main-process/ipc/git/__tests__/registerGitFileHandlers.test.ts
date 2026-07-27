@@ -118,6 +118,23 @@ describe('registerGitFileHandlers repository path opening', () => {
     });
   });
 
+  it('returns text encoding and modification metadata with a text preview', async () => {
+    const targetPath = path.join(repoPath, 'src', 'bom.txt');
+    fs.writeFileSync(targetPath, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('hello\r\n')]));
+
+    const result = await handlers.get(IpcChannel.GitGetWorkingDirectoryPreview)!({}, 'src/bom.txt', repoPath);
+
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({
+        kind: 'text',
+        text: 'hello\r\n',
+        encoding: 'utf8-bom',
+        modifiedAt: expect.any(String),
+      }),
+    });
+  });
+
   it('returns filesystem metadata and Git history summary for a working-directory file', async () => {
     const runCommandAtPath = vi.fn(async (_requestedRepoPath: string, args: string[]) => {
       if (args[0] === 'ls-files') return '100644 deadbeef 0\tsrc/app.ts\n';
@@ -142,6 +159,11 @@ describe('registerGitFileHandlers repository path opening', () => {
         extension: 'ts',
         bytes: expect.any(Number),
         readOnly: false,
+        hashes: {
+          sha256: '8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881',
+          sha1: 'b878c11a77128e74c3cf15c93ef2ceddf2aa0b38',
+          md5: 'e2ebd7ddedcadeeadbf819c35985c768',
+        },
         git: {
           tracked: true,
           ignored: false,
@@ -201,6 +223,16 @@ describe('registerGitFileHandlers repository path opening', () => {
 
     expect(result).toEqual({ success: true });
     expect(deleteRepoFileAtPath).toHaveBeenCalledWith(repoPath, 'NOTICE');
+  });
+
+  it('passes an explicitly requested target encoding to the repository writer', async () => {
+    const writeRepoFileAtPath = vi.fn().mockResolvedValue(undefined);
+    registerGitFileHandlers({ gitService: { getRepoPath: () => repoPath, files: { writeRepoFileAtPath } } as any });
+
+    const result = await handlers.get(IpcChannel.GitWriteRepoFile)!({}, 'src/app.ts', 'café', repoPath, 'latin1');
+
+    expect(result).toEqual({ success: true });
+    expect(writeRepoFileAtPath).toHaveBeenCalledWith(repoPath, 'src/app.ts', 'café', 'latin1');
   });
 
   it('rejects deletion paths that leave the repository', async () => {
