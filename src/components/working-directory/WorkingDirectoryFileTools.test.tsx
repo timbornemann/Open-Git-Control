@@ -71,6 +71,16 @@ describe('WorkingDirectoryFileTools', () => {
     expect(showToastMock).toHaveBeenCalledWith(expect.stringContaining('Invalid JSON'), true);
   });
 
+  it('minifies a tsconfig JSONC file with comments and trailing commas', () => {
+    const onChange = renderTools('tsconfig.json', '{/* Bundler mode */"compilerOptions":{"module":"ESNext",},}');
+
+    clickButton('Tools');
+    clickButton('Minify JSON');
+
+    expect(onChange).toHaveBeenCalledWith('{"compilerOptions":{"module":"ESNext"}}');
+    expect(showToastMock).toHaveBeenCalledWith('JSON minified. Save to apply it.', false);
+  });
+
   it('requires confirmation before compacting ordinary text to one line', () => {
     const onChange = renderTools('notes.txt', ' first \n\n second ');
 

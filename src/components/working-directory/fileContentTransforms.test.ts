@@ -32,9 +32,38 @@ describe('file content transforms', () => {
     expect(() => formatJsonText('')).toThrow('Invalid JSON');
   });
 
+  it('minifies JSONC comments and trailing commas while preserving comment-like strings', () => {
+    const source = [
+      '{',
+      '  // TypeScript accepts JSON with comments.',
+      '  "url": "https://example.test/a//b",',
+      '  "compilerOptions": {',
+      '    /* Preserve this large numeric token exactly. */',
+      '    "large": 12345678901234567890,',
+      '    "libs": ["DOM", "ES2020",],',
+      '  },',
+      '}',
+    ].join('\n');
+
+    expect(minifyJsonText(source)).toBe('{"url":"https://example.test/a//b","compilerOptions":{"large":12345678901234567890,"libs":["DOM","ES2020"]}}');
+  });
+
+  it('formats JSONC without discarding its comments or trailing commas', () => {
+    const source = '{"compilerOptions":{/* Bundler mode */"module":"ESNext",// keep this\n"strict":true,},}';
+
+    expect(formatJsonText(source)).toBe(
+      ['{', '  "compilerOptions": {', '    /* Bundler mode */', '    "module": "ESNext", // keep this', '    "strict": true,', '  },', '}'].join('\n'),
+    );
+  });
+
+  it('rejects malformed JSONC comments and values', () => {
+    expect(() => minifyJsonText('{"value": 1, /* unfinished')).toThrow('unterminated block comment');
+    expect(() => formatJsonText('{"value": nope,}')).toThrow('Invalid JSON/JSONC');
+  });
+
   it('detects JSON and CSV extensions case-insensitively', () => {
     expect(isJsonFilePath('config/SETTINGS.JSON')).toBe(true);
-    expect(isJsonFilePath('settings.jsonc')).toBe(false);
+    expect(isJsonFilePath('settings.jsonc')).toBe(true);
     expect(isCsvFilePath('data/EXPORT.CSV')).toBe(true);
   });
 });

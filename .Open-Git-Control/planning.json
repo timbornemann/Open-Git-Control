@@ -106,10 +106,10 @@
       "title": "File Editor / Viewer",
       "description": "File Editor / Viewer funktionen für den viewer:\n- Dateien komprimieren können, um platz zu spaaren zeilenumbrüche entfernen und so weiter \n- Json beatrifier und minifirer \n- CSVs tabellenartig anschaun und bearbeitbar machen",
       "priority": "medium",
-      "status": "idea",
+      "status": "done",
       "tags": [],
       "createdAt": 1784044338963,
-      "updatedAt": 1785141747872
+      "updatedAt": 1785143094487
     },
     {
       "id": "0c2b6746-40c6-4fc6-b5a3-17885bba2188",
