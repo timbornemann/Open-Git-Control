@@ -11,6 +11,7 @@ import {
   commonEntryParent,
   getTopLevelEntries,
   gitignorePatterns,
+  hasNestedSelection,
   isEntryName,
   isSameOrDescendantPath,
   normalizeNameMoves,
@@ -59,7 +60,15 @@ export const createWorkingDirectoryToolActions = ({ repoPath, setConfirmDialog, 
   };
 
   const moveTo = async (entries: WorkingDirectoryEntryDto[]) => {
-    const topLevelEntries = getTopLevelEntries(entries).filter((entry) => entry.path);
+    const selectedEntries = entries.filter((entry) => entry.path);
+    if (hasNestedSelection(selectedEntries)) {
+      setToast({
+        msg: 'The selection contains a folder and entries inside it. Select either the folder or its contents before moving.',
+        isError: true,
+      });
+      return;
+    }
+    const topLevelEntries = selectedEntries;
     const result = await gitClient.listWorkingDirectoryFolders(repoPath);
     if (!result.success) {
       setToast({ msg: result.error || 'Could not load destination folders.', isError: true });

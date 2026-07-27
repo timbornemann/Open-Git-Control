@@ -5,12 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IpcChannel } from '../../../../../src/types/ipcContract';
 import { registerWorkingDirectoryToolsHandlers } from '../workingDirectoryTools';
 
-const { createEntrySafelyMock, handleMock } = vi.hoisted(() => ({ createEntrySafelyMock: vi.fn(), handleMock: vi.fn() }));
+const { assertEntryAccessMock, createEntrySafelyMock, handleMock } = vi.hoisted(() => ({
+  assertEntryAccessMock: vi.fn(),
+  createEntrySafelyMock: vi.fn(),
+  handleMock: vi.fn(),
+}));
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock },
 }));
 vi.mock('../workingDirectoryFileCreation', () => ({
+  assertWindowsWorkingDirectoryAccess: assertEntryAccessMock,
   createWorkingDirectoryEntrySafely: createEntrySafelyMock,
 }));
 
@@ -22,6 +27,7 @@ describe('working-directory tool handlers', () => {
     repoPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-working-tools-'));
     handlers.clear();
     handleMock.mockReset();
+    assertEntryAccessMock.mockReset();
     createEntrySafelyMock.mockReset();
     createEntrySafelyMock.mockImplementation((targetPath: string) => fs.mkdirSync(targetPath));
     handleMock.mockImplementation((channel: string, handler: (...args: any[]) => Promise<any>) => handlers.set(channel, handler));
@@ -96,6 +102,66 @@ describe('working-directory tool handlers', () => {
     expect(fs.readFileSync(path.join(repoPath, 'photo.jpg'), 'utf8')).toBe('jpg');
   });
 
+  it('rejects a folder selected together with one of its descendants before moving anything', async () => {
+    fs.mkdirSync(path.join(repoPath, 'source'));
+    fs.mkdirSync(path.join(repoPath, 'target'));
+    fs.writeFileSync(path.join(repoPath, 'source', 'child.txt'), 'child');
+
+    await expect(
+      handlers.get(IpcChannel.GitApplyWorkingDirectoryMoves)?.(
+        {},
+        {
+          moves: [
+            { sourcePath: 'source', targetPath: 'target/source' },
+            { sourcePath: 'source/child.txt', targetPath: 'target/child.txt' },
+          ],
+          createParentFolders: false,
+        },
+        repoPath,
+      ),
+    ).resolves.toEqual({ success: false, error: 'Select either a folder or entries inside it, not both.' });
+
+    expect(fs.readFileSync(path.join(repoPath, 'source', 'child.txt'), 'utf8')).toBe('child');
+    expect(fs.existsSync(path.join(repoPath, 'target', 'source'))).toBe(false);
+    expect(fs.existsSync(path.join(repoPath, 'target', 'child.txt'))).toBe(false);
+  });
+
+  it('rejects an inaccessible source before staging any move', async () => {
+    fs.writeFileSync(path.join(repoPath, 'source.txt'), 'source');
+    assertEntryAccessMock.mockImplementation((targetPath: string) => {
+      if (targetPath === path.join(repoPath, 'source.txt')) throw new Error('Source access denied.');
+    });
+
+    await expect(
+      handlers.get(IpcChannel.GitApplyWorkingDirectoryMoves)?.(
+        {},
+        { moves: [{ sourcePath: 'source.txt', targetPath: 'target.txt' }], createParentFolders: false },
+        repoPath,
+      ),
+    ).resolves.toEqual({ success: false, error: 'Source access denied.' });
+
+    expect(fs.readFileSync(path.join(repoPath, 'source.txt'), 'utf8')).toBe('source');
+    expect(fs.existsSync(path.join(repoPath, 'target.txt'))).toBe(false);
+  });
+
+  it('rolls back a move if the published target loses usable access', async () => {
+    fs.writeFileSync(path.join(repoPath, 'source.txt'), 'source');
+    assertEntryAccessMock.mockImplementation((targetPath: string) => {
+      if (targetPath === path.join(repoPath, 'target.txt')) throw new Error('Target access denied.');
+    });
+
+    await expect(
+      handlers.get(IpcChannel.GitApplyWorkingDirectoryMoves)?.(
+        {},
+        { moves: [{ sourcePath: 'source.txt', targetPath: 'target.txt' }], createParentFolders: false },
+        repoPath,
+      ),
+    ).resolves.toEqual({ success: false, error: 'Target access denied.' });
+
+    expect(fs.readFileSync(path.join(repoPath, 'source.txt'), 'utf8')).toBe('source');
+    expect(fs.existsSync(path.join(repoPath, 'target.txt'))).toBe(false);
+  });
+
   it('lists repository folders without exposing Git metadata', async () => {
     fs.mkdirSync(path.join(repoPath, 'zeta'));
     fs.mkdirSync(path.join(repoPath, 'alpha', 'nested'), { recursive: true });
@@ -108,6 +174,19 @@ describe('working-directory tool handlers', () => {
     await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, 'alpha')).resolves.toEqual({
       success: true,
       data: ['alpha/nested'],
+    });
+  });
+
+  it('omits destination folders that do not have usable Windows access', async () => {
+    fs.mkdirSync(path.join(repoPath, 'accessible'));
+    fs.mkdirSync(path.join(repoPath, 'blocked'));
+    assertEntryAccessMock.mockImplementation((targetPath: string) => {
+      if (targetPath === path.join(repoPath, 'blocked')) throw new Error('Access denied.');
+    });
+
+    await expect(handlers.get(IpcChannel.GitListWorkingDirectoryFolders)?.({}, repoPath, '')).resolves.toEqual({
+      success: true,
+      data: ['accessible'],
     });
   });
 

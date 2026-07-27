@@ -6,7 +6,7 @@ import type { GitService } from '../../../GitService';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { createZipArchive, type ZipArchiveEntry } from '../../zipArchive';
-import { createWorkingDirectoryEntrySafely } from './workingDirectoryFileCreation';
+import { assertWindowsWorkingDirectoryAccess, createWorkingDirectoryEntrySafely } from './workingDirectoryFileCreation';
 
 type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: string, allowMissing?: boolean) => string;
 type RegisterWorkingDirectoryToolsHandlersDeps = {
@@ -60,6 +60,7 @@ const applyMoves = (repoPath: string, rawMoves: unknown, createParentFolders: bo
     const targetPath = workingDirectoryPath(repoPath, candidate.targetPath, `Target path ${index + 1}`, true);
     const sourceStats = fs.lstatSync(sourcePath);
     if (sourceStats.isSymbolicLink()) throw new Error('Symbolic links cannot be moved with batch tools.');
+    assertWindowsWorkingDirectoryAccess(sourcePath);
     return {
       sourcePath,
       targetPath,
@@ -99,6 +100,7 @@ const applyMoves = (repoPath: string, rawMoves: unknown, createParentFolders: bo
     for (const parentFolder of [...new Set(moves.map((move) => path.dirname(move.targetPath)))]) {
       if (fs.existsSync(parentFolder)) {
         if (!fs.statSync(parentFolder).isDirectory()) throw new Error('A target parent is not a folder.');
+        assertWindowsWorkingDirectoryAccess(parentFolder);
         continue;
       }
       if (!createParentFolders || !fs.existsSync(path.dirname(parentFolder))) throw new Error('Target folder does not exist.');
@@ -122,6 +124,7 @@ const applyMoves = (repoPath: string, rawMoves: unknown, createParentFolders: bo
       for (const move of moves) {
         fs.renameSync(move.temporaryPath, move.targetPath);
         publishedCount += 1;
+        assertWindowsWorkingDirectoryAccess(move.targetPath);
       }
     } catch (error) {
       rollbackMoves(moves, publishedCount);
@@ -213,7 +216,15 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
       if (!fs.statSync(folderPath).isDirectory()) throw new Error('Parent path is not a folder.');
       const folders = fs
         .readdirSync(folderPath, { withFileTypes: true })
-        .filter((entry) => entry.name.toLowerCase() !== '.git' && entry.isDirectory() && !entry.isSymbolicLink())
+        .filter((entry) => {
+          if (entry.name.toLowerCase() === '.git' || !entry.isDirectory() || entry.isSymbolicLink()) return false;
+          try {
+            assertWindowsWorkingDirectoryAccess(path.join(folderPath, entry.name));
+            return true;
+          } catch {
+            return false;
+          }
+        })
         .map((entry) => (relativeParentPath ? `${relativeParentPath}/${entry.name}` : entry.name))
         .sort((left, right) => left.localeCompare(right));
       return { success: true, data: folders };

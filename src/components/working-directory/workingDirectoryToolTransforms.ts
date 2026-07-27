@@ -13,6 +13,7 @@ export const isSameOrDescendantPath = (candidatePath: string, parent: string) =>
 export const isEntryName = (value: string) => value.length > 0 && value !== '.' && value !== '..' && !/[\\/]/.test(value);
 export const getTopLevelEntries = (entries: WorkingDirectoryEntryDto[]) =>
   entries.filter((entry) => !entries.some((candidate) => candidate.path !== entry.path && isSameOrDescendantPath(entry.path, candidate.path)));
+export const hasNestedSelection = (entries: WorkingDirectoryEntryDto[]) => getTopLevelEntries(entries).length !== entries.length;
 
 const joinPath = (parent: string, name: string) => (parent ? `${parent}/${name}` : name);
 const splitFileName = (entry: WorkingDirectoryEntryDto): { stem: string; extension: string } => {

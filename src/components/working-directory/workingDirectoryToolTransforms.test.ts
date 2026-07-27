@@ -3,6 +3,7 @@ import type { WorkingDirectoryEntryDto } from '@/shared/ipc/contracts/git';
 import {
   changeExtensionMoves,
   commonEntryParent,
+  hasNestedSelection,
   gitignorePatterns,
   normalizeNameMoves,
   removeAffixMoves,
@@ -49,5 +50,14 @@ describe('working-directory tool transforms', () => {
   it('uses the shared parent as the archive destination', () => {
     expect(commonEntryParent(files('assets/a.png', 'assets/icons/b.png'))).toBe('assets');
     expect(commonEntryParent(files('src/a.ts', 'docs/b.md'))).toBe('');
+  });
+
+  it('detects a folder selected together with one of its descendants', () => {
+    const entries: WorkingDirectoryEntryDto[] = [
+      { path: 'docs', name: 'docs', kind: 'directory' },
+      { path: 'docs/guide.md', name: 'guide.md', kind: 'file' },
+    ];
+    expect(hasNestedSelection(entries)).toBe(true);
+    expect(hasNestedSelection([entries[1], ...files('README.md')])).toBe(false);
   });
 });

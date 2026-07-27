@@ -150,12 +150,20 @@ try {
   }
 };
 
+export const assertWorkingDirectoryEntryAccess = (targetPath: string): void => {
+  fs.accessSync(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+};
+
+export const assertWindowsWorkingDirectoryAccess = (targetPath: string): void => {
+  if (process.platform === 'win32') assertWorkingDirectoryEntryAccess(targetPath);
+};
+
 export const createWorkingDirectoryEntrySafely = (targetPath: string, kind: 'file' | 'folder'): void => {
   if (process.platform === 'win32') createWindowsEntryWithExplicitAccess(targetPath, kind);
   else if (kind === 'file') fs.writeFileSync(targetPath, '', { encoding: 'utf8', flag: 'wx' });
   else fs.mkdirSync(targetPath);
   try {
-    fs.accessSync(targetPath, fs.constants.R_OK | fs.constants.W_OK);
+    assertWorkingDirectoryEntryAccess(targetPath);
   } catch (permissionError: unknown) {
     try {
       if (kind === 'file') fs.unlinkSync(targetPath);
