@@ -13,14 +13,15 @@ import {
 
 const setConfirmDialog = vi.fn();
 const onToast = vi.fn();
-const editorState = vi.hoisted(() => ({ onChange: null as ((value: string) => void) | null }));
+const editorState = vi.hoisted(() => ({ onChange: null as ((value: string) => void) | null, value: '' }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useUIContext: () => ({ setConfirmDialog }),
   useOptionalRepositoryContext: () => ({ onToast }),
 }));
 vi.mock('./WorkingDirectoryCodeEditor', () => ({
-  WorkingDirectoryCodeEditor: ({ onChange }: { onChange: (value: string) => void }) => {
+  WorkingDirectoryCodeEditor: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
     editorState.onChange = onChange;
+    editorState.value = value;
     return null;
   },
 }));
@@ -50,10 +51,58 @@ afterEach(() => {
   setConfirmDialog.mockReset();
   onToast.mockReset();
   editorState.onChange = null;
+  editorState.value = '';
   document.body.innerHTML = '';
 });
 
 describe('WorkingDirectoryFileViewer history and blame', () => {
+  it('edits and saves CSV content through the table view', async () => {
+    vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({
+      success: true,
+      data: { kind: 'text', text: 'name,age\r\nAda,36\r\n' },
+    } as any);
+    const writeRepoFile = vi.spyOn(gitClient, 'writeRepoFile').mockResolvedValue({ success: true });
+    const root = createRoot(document.getElementById('root')!);
+    await act(async () => {
+      root.render(
+        createElement(I18nProvider, {
+          language: 'en',
+          children: createElement(WorkingDirectoryFileViewer, {
+            repoPath: 'C:/repo',
+            path: 'data/people.csv',
+            onClose: vi.fn(),
+            onRepoChanged: vi.fn(),
+            onCloseRequestChange: vi.fn(),
+            onNavigationGuardChange: vi.fn(),
+          }),
+        }),
+      );
+      await Promise.resolve();
+    });
+    const tableButton = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === 'Table');
+      expect(button).toBeTruthy();
+      return button!;
+    });
+    act(() => tableButton.click());
+    const ageCell = document.querySelector<HTMLInputElement>('input[aria-label="Row 2, column B"]');
+    if (!ageCell) throw new Error('Missing CSV age cell.');
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(ageCell, '37');
+      ageCell.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    const saveButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.includes('Save'));
+    if (!saveButton) throw new Error('Missing save button.');
+    await act(async () => {
+      saveButton.click();
+      await Promise.resolve();
+    });
+
+    expect(writeRepoFile).toHaveBeenCalledWith('data/people.csv', 'name,age\r\nAda,37\r\n', 'C:/repo');
+    act(() => root.unmount());
+  });
+
   it('loads an oversized image when explicitly requested', async () => {
     const getPreview = vi
       .spyOn(gitClient, 'getWorkingDirectoryPreview')

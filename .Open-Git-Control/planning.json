@@ -51,10 +51,10 @@
       "title": "Suche in Working Directory",
       "description": "Datei suche, voltext suche in working direktory, das man nach dateinamen priorisiert suchen kann, aber auch zur volltext suche umschalten kann, dass man wie in visual strudio code die ganzen code dateien durchsuchen kann, und auch replace und replace all machen kann, so das man wie bei vs code auch imme rsieht pro datei in wlechen zeilen der gefundenen teil steht. damit man effizient und schnell und einfach inhalte suchen kann und direkte änderunegn machen kann",
       "priority": "medium",
-      "status": "idea",
+      "status": "done",
       "tags": [],
       "createdAt": 1784027524037,
-      "updatedAt": 1785140337076
+      "updatedAt": 1785141664211
     },
     {
       "id": "5ea8d0cb-c8b7-49d8-89af-77bc7322196b",
@@ -84,10 +84,10 @@
       "title": "Filetree",
       "description": "im Filetree (Working Directory) neuer button im rechtsklick menü: \"Datei infos\" hier sollen alle möglichen infos über die datei angezeigt werdne können. eventuell auch mit git hitory verküpfen, damit man mehr infos bekommen kann, zb.b wann zum ersten mal hinzugefügt, anzahl der änderunegn und so weiter",
       "priority": "medium",
-      "status": "idea",
+      "status": "done",
       "tags": [],
       "createdAt": 1784043228977,
-      "updatedAt": 1785063342041
+      "updatedAt": 1785141685052
     },
     {
       "id": "4febcdfe-caff-4919-ac38-38aaa2c08535",
@@ -104,12 +104,12 @@
       "id": "d4a43508-9cfe-43e0-a8a1-67d943e579cb",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "File Editor / Viewer",
-      "description": "- Dateien komprimieren können, um platz zu spaaren zeilenumbrüche entfernen und so weiter \n- Json beatrifier und minifirer \n- CSVs tabellenartig anschaun und bearbeitbar machen",
+      "description": "File Editor / Viewer funktionen für den viewer:\n- Dateien komprimieren können, um platz zu spaaren zeilenumbrüche entfernen und so weiter \n- Json beatrifier und minifirer \n- CSVs tabellenartig anschaun und bearbeitbar machen",
       "priority": "medium",
       "status": "idea",
       "tags": [],
       "createdAt": 1784044338963,
-      "updatedAt": 1784044338963
+      "updatedAt": 1785141747872
     },
     {
       "id": "0c2b6746-40c6-4fc6-b5a3-17885bba2188",

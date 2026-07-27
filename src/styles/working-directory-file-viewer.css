@@ -25,6 +25,9 @@
 }
 .working-file-viewer__actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 4px;
   margin-left: auto;
 }

@@ -1,0 +1,63 @@
+.working-file-tools {
+  position: relative;
+}
+
+.working-file-tools__menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  width: 260px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-panel);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 32%);
+}
+
+.working-file-tools__menu > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.working-file-tools__menu > button:last-child {
+  border-bottom: 0;
+}
+
+.working-file-tools__menu > button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.working-file-tools__menu > button > svg {
+  margin-top: 2px;
+  color: var(--text-accent);
+}
+
+.working-file-tools__menu span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.working-file-tools__menu strong {
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
+.working-file-tools__menu small {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  line-height: 1.35;
+}

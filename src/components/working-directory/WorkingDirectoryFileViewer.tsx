@@ -15,6 +15,9 @@ import { MarkdownPreviewPane } from '@/components/diff-viewer/MarkdownPreviewPan
 import { useMarkdownPreview } from '@/components/diff-viewer/useMarkdownPreview';
 import { HtmlPreviewPane } from './HtmlPreviewPane';
 import { useHtmlPreview } from './useHtmlPreview';
+import { CsvTableEditor } from './CsvTableEditor';
+import { isCsvFilePath } from './fileContentTransforms';
+import { WorkingDirectoryFileTools } from './WorkingDirectoryFileTools';
 import type { WorkingDirectoryNavigationGuard, WorkingDirectoryNavigationTarget } from './workingDirectoryNavigationGuard';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
@@ -29,7 +32,7 @@ type Props = {
   onCloseRequestChange: (request: (() => void) | null) => void;
   onNavigationGuardChange: (guard: WorkingDirectoryNavigationGuard | null) => void;
 };
-type Tab = 'content' | 'preview' | 'history' | 'blame';
+type Tab = 'content' | 'table' | 'preview' | 'history' | 'blame';
 type FilePreviewKind = 'html' | 'markdown' | 'none';
 
 const getFilePreviewKind = (preview: { kind?: string } | null, tab: Tab, isMarkdown: boolean, isHtml: boolean): FilePreviewKind => {
@@ -39,6 +42,47 @@ const getFilePreviewKind = (preview: { kind?: string } | null, tab: Tab, isMarkd
 };
 
 const supportsFilePreview = (isMarkdown: boolean, isHtml: boolean): boolean => isMarkdown || isHtml;
+
+const WorkingDirectoryViewerTabs: React.FC<{
+  tab: Tab;
+  isCsv: boolean;
+  supportsPreview: boolean;
+  tr: (german: string, english: string) => string;
+  onTabChange: (tab: Tab) => void;
+}> = ({ tab, isCsv, supportsPreview, tr, onTabChange }) => (
+  <>
+    <button className={`working-file-viewer__button${tab === 'content' ? ' is-active' : ''}`} onClick={() => onTabChange('content')}>
+      Text
+    </button>
+    {isCsv && (
+      <button className={`working-file-viewer__button${tab === 'table' ? ' is-active' : ''}`} onClick={() => onTabChange('table')}>
+        {tr('Tabelle', 'Table')}
+      </button>
+    )}
+    {supportsPreview && (
+      <button className={`working-file-viewer__button${tab === 'preview' ? ' is-active' : ''}`} onClick={() => onTabChange('preview')}>
+        Preview
+      </button>
+    )}
+    <button className={`working-file-viewer__button${tab === 'history' ? ' is-active' : ''}`} onClick={() => onTabChange('history')}>
+      History
+    </button>
+    <button className={`working-file-viewer__button${tab === 'blame' ? ' is-active' : ''}`} onClick={() => onTabChange('blame')}>
+      Blame
+    </button>
+  </>
+);
+
+const WorkingDirectoryCsvView: React.FC<{
+  preview: { kind?: string } | null;
+  tab: Tab;
+  isCsv: boolean;
+  text: string;
+  onChange: (text: string) => void;
+}> = ({ preview, tab, isCsv, text, onChange }) => {
+  if (preview?.kind !== 'text' || tab !== 'table' || !isCsv) return null;
+  return <CsvTableEditor value={text} onChange={onChange} />;
+};
 
 const getNavigationDestination = (target: WorkingDirectoryNavigationTarget): string => {
   if (target.kind === 'file') return `"${target.path}"`;
@@ -76,6 +120,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const dirty = text !== savedText;
   const isMarkdown = isMarkdownFilePath(path);
   const isHtml = isHtmlFilePath(path);
+  const isCsv = isCsvFilePath(path);
   const filePreviewKind = getFilePreviewKind(preview, tab, isMarkdown, isHtml);
   const supportsPreview = supportsFilePreview(isMarkdown, isHtml);
   const markdownRequest = useMemo(() => ({ source: 'unstaged' as const, path, title: path }), [path]);
@@ -320,20 +365,15 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         <strong className="working-file-viewer__path">{path}</strong>
         {preview?.kind === 'text' && (
           <div className="working-file-viewer__actions">
-            <button className={`working-file-viewer__button${tab === 'content' ? ' is-active' : ''}`} onClick={() => setTab('content')}>
-              Text
-            </button>
-            {supportsPreview && (
-              <button className={`working-file-viewer__button${tab === 'preview' ? ' is-active' : ''}`} onClick={() => setTab('preview')}>
-                Preview
-              </button>
-            )}
-            <button className={`working-file-viewer__button${tab === 'history' ? ' is-active' : ''}`} onClick={() => setTab('history')}>
-              History
-            </button>
-            <button className={`working-file-viewer__button${tab === 'blame' ? ' is-active' : ''}`} onClick={() => setTab('blame')}>
-              Blame
-            </button>
+            <WorkingDirectoryViewerTabs tab={tab} isCsv={isCsv} supportsPreview={supportsPreview} tr={tr} onTabChange={setTab} />
+            <WorkingDirectoryFileTools
+              path={path}
+              text={text}
+              onChange={(transformedText) => {
+                setText(transformedText);
+                setTab('content');
+              }}
+            />
             <button className="working-file-viewer__button working-file-viewer__button--save" onClick={() => void save()} disabled={!dirty || isLoading}>
               <Save size={15} /> Save
             </button>
@@ -374,6 +414,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
           <WorkingDirectoryCodeEditor path={path} value={text} onChange={setText} onSave={() => void save()} />
         </React.Suspense>
       )}
+      <WorkingDirectoryCsvView preview={preview} tab={tab} isCsv={isCsv} text={text} onChange={setText} />
       {filePreviewKind === 'markdown' && <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />}
       {filePreviewKind === 'html' && <HtmlPreviewPane preview={htmlPreview} title={path} />}
       {preview?.kind === 'text' && tab === 'history' && (
