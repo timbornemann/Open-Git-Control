@@ -542,7 +542,11 @@ describe('registerGitHandlers', () => {
 
     const result = await handlers.get('git:scanPushSecrets')!({ sender: { send: vi.fn() } }, { repoPath: 'C:/private-other-repo' });
 
-    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "git:scanPushSecrets". Requested repository: "C:/private-other-repo". Active repository: "C:/active-repo".',
+    });
     expect(scanPushDiffs).not.toHaveBeenCalled();
   });
 
@@ -562,7 +566,11 @@ describe('registerGitHandlers', () => {
 
     const result = await handlers.get('git:stagePaths')!({ sender: { send: vi.fn() } }, ['stale-file.ts'], 'C:/repos/previous');
 
-    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "git:stagePaths". Requested repository: "C:/repos/previous". Active repository: "C:/repos/current".',
+    });
     expect(stagePathsAtPath).not.toHaveBeenCalled();
   });
 
@@ -626,7 +634,11 @@ describe('registerGitHandlers', () => {
 
     const result = await handlers.get('git:commandForRepo')!({ sender: { send: vi.fn() } }, 'C:/repos/previous', 'reset', 'HEAD');
 
-    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "git:commandForRepo: reset". Requested repository: "C:/repos/previous". Active repository: "C:/repos/current".',
+    });
     expect(runCommand).not.toHaveBeenCalled();
   });
 
@@ -645,7 +657,8 @@ describe('registerGitHandlers', () => {
     await expect(handlers.get('git:cancelSecretScan')!({}, 'C:/repos/previous')).resolves.toEqual({
       success: false,
       cancelled: false,
-      error: 'Requested repository is not the active repository.',
+      error:
+        'Requested repository is not the active repository while handling "git:cancelSecretScan". Requested repository: "C:/repos/previous". Active repository: "C:/repos/current".',
     });
   });
 

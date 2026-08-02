@@ -28,7 +28,7 @@ export function registerWorkingDirectoryPreviewHandler(gitService: GitService, w
     IpcChannel.GitGetWorkingDirectoryPreview,
     async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown, allowLargeImage?: unknown) => {
       try {
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetWorkingDirectoryPreview);
         const resolvedPath = workingDirectoryPath(repoPath, filePath, 'File path');
         const stat = fs.statSync(resolvedPath);
         if (!stat.isFile()) throw new Error('Target path is not a file.');

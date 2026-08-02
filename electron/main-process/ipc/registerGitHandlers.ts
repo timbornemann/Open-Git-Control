@@ -57,6 +57,8 @@ export function registerGitHandlers({
     String(commandName || '')
       .trim()
       .toLowerCase() === 'commit';
+  const gitCommandAction = (channel: IpcChannel.GitCommand | IpcChannel.GitCommandForRepo, commandName: unknown): string =>
+    `${channel}: ${String(commandName || '').trim() || '(not provided)'}`;
 
   const secretScanPushGuard = registerSecretScanPushGuard({
     gitService,
@@ -128,7 +130,7 @@ export function registerGitHandlers({
       });
 
       try {
-        const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitCreateCommit);
         const releaseCommitProtection = beginCommitProtection(repoPath);
         if (!releaseCommitProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
         try {
@@ -196,7 +198,7 @@ export function registerGitHandlers({
     });
     try {
       const normalizedPaths = Array.isArray(paths) ? paths.map((filePath) => String(filePath || '')).slice(0, 100_000) : [];
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitStagePaths);
       ensureCommitProtectionIsIdle(repoPath);
       commitStatsService.interruptBackgroundWork();
       const data = await gitService.commits.stagePathsAtPath(repoPath, normalizedPaths);
@@ -226,7 +228,7 @@ export function registerGitHandlers({
       try {
         commitStatsService.interruptBackgroundWork();
         const normalizedArgs = normalizeDiffPreviewArgs(args);
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDiffPreview);
         const data = await gitService.runner.getDiffPreview(repoPath, normalizedArgs, {
           maxBytes: Number(limits.maxBytes) || undefined,
           maxLines: Number(limits.maxLines) || undefined,
@@ -241,7 +243,7 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitCommand, async (event: any, commandName: unknown, ...rawArgs: unknown[]) => {
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(undefined, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(undefined, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommand, commandName));
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'No repository selected.' };
     }
@@ -249,7 +251,7 @@ export function registerGitHandlers({
       const scanBlock = await secretScanPushGuard.requirePushSecretScanApproval(event, rawArgs, repoPath);
       if (scanBlock) return scanBlock;
       try {
-        requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommand, commandName));
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
       }
@@ -267,7 +269,7 @@ export function registerGitHandlers({
     try {
       const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
       if (scanBlock) return scanBlock;
-      requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommand, commandName));
       return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
@@ -279,7 +281,7 @@ export function registerGitHandlers({
   ipcMain.handle(IpcChannel.GitCommandForRepo, async (event: any, requestedRepoPath: unknown, commandName: unknown, ...rawArgs: unknown[]) => {
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommandForRepo, commandName));
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
     }
@@ -287,7 +289,7 @@ export function registerGitHandlers({
       const scanBlock = await secretScanPushGuard.requirePushSecretScanApproval(event, rawArgs, repoPath);
       if (scanBlock) return scanBlock;
       try {
-        requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommandForRepo, commandName));
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
       }
@@ -305,7 +307,7 @@ export function registerGitHandlers({
     try {
       const scanBlock = await secretScanCommitGuard.requireCommitSecretScanApproval(event, repoPath);
       if (scanBlock) return scanBlock;
-      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), gitCommandAction(IpcChannel.GitCommandForRepo, commandName));
       return await handleGitCommand(event, gitService, commandName, rawArgs, repoPath);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? redactGitSensitiveText(error.message) : 'Commit failed.' };
@@ -323,7 +325,7 @@ export function registerGitHandlers({
 
       const normalizedTodo = normalizeInteractiveRebaseTodo(todoLines);
 
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitInteractiveRebase);
       ensureCommitProtectionIsIdle(repoPath);
       const data = await gitService.startInteractiveRebaseAtPath(repoPath, normalizedBase, normalizedTodo);
       return { success: true, data };
@@ -344,7 +346,7 @@ export function registerGitHandlers({
           return { success: false, error: 'Patch is too large.' };
         }
 
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApplyPatch);
         ensureCommitProtectionIsIdle(repoPath);
         const data = await gitService.applyPatchAtPath(repoPath, normalizedPatch, {
           cached: Boolean(options.cached),
@@ -367,7 +369,7 @@ export function registerGitHandlers({
     });
 
     try {
-      const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitStashBranch);
       ensureCommitProtectionIsIdle(repoPath);
       const data = await gitService.createBranchFromStashAtPath(repoPath, String(params.stashName || ''), String(params.branchName || ''));
       emitJobEvent(event.sender, {
@@ -396,7 +398,7 @@ export function registerGitHandlers({
 
       let authorizedRepoPath: string;
       try {
-        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitRepoOriginUrl);
       } catch {
         // Origin lookup is the sole read-only operation needed for inactive
         // repositories in the sidebar. Authorize only exact, main-owned paths

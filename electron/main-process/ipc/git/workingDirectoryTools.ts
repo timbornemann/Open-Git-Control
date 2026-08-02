@@ -201,7 +201,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
     IpcChannel.GitApplyWorkingDirectoryMoves,
     async (_event: unknown, params: { moves?: unknown; createParentFolders?: unknown } = {}, requestedRepoPath?: unknown) => {
       try {
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApplyWorkingDirectoryMoves);
         applyMoves(repoPath, params.moves, params.createParentFolders === true, workingDirectoryPath);
         return { success: true };
       } catch (error: unknown) {
@@ -212,7 +212,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
 
   ipcMain.handle(IpcChannel.GitListWorkingDirectoryFolders, async (_event: unknown, requestedRepoPath?: unknown, rawParentPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitListWorkingDirectoryFolders);
       const relativeParentPath = asPath(rawParentPath);
       const folderPath = relativeParentPath ? workingDirectoryPath(repoPath, relativeParentPath, 'Parent folder') : fs.realpathSync(repoPath);
       if (!fs.statSync(folderPath).isDirectory()) throw new Error('Parent path is not a folder.');
@@ -237,7 +237,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
 
   ipcMain.handle(IpcChannel.GitFindEmptyWorkingDirectoryFolders, async (_event: unknown, rawFolderPaths: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFindEmptyWorkingDirectoryFolders);
       if (!Array.isArray(rawFolderPaths)) throw new Error('Folder paths must be an array.');
       const folderPaths = rawFolderPaths.map(asPath);
       const results =
@@ -256,7 +256,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
 
   ipcMain.handle(IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, async (_event: unknown, rawFolderPaths: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteEmptyWorkingDirectoryFolders);
       if (!Array.isArray(rawFolderPaths) || rawFolderPaths.length === 0) throw new Error('At least one empty folder is required.');
       const paths = rawFolderPaths.map((relativePath) => workingDirectoryPath(repoPath, relativePath, 'Folder path'));
       for (const folderPath of paths.sort((left, right) => right.length - left.length)) deleteEmptyFolderTree(folderPath);
@@ -271,7 +271,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
     async (_event: unknown, params: { sourcePaths?: unknown; targetPath?: unknown } = {}, requestedRepoPath?: unknown) => {
       let temporaryPath: string | null = null;
       try {
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
         if (!Array.isArray(params.sourcePaths) || params.sourcePaths.length === 0) throw new Error('At least one archive source is required.');
         const sourcePaths = params.sourcePaths.map((sourcePath) => workingDirectoryPath(repoPath, sourcePath, 'Archive source'));
         const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Archive path', true);
@@ -293,7 +293,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
         for (const sourcePath of sourcePaths) collectZipEntries(sourcePath, path.relative(basePath, sourcePath).replace(/\\/g, '/'), entries);
         temporaryPath = temporarySibling(targetPath, 'archive');
         await createZipArchive(temporaryPath, entries);
-        requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
         fs.renameSync(temporaryPath, targetPath);
         temporaryPath = null;
         return { success: true, targetPath: asPath(params.targetPath) };

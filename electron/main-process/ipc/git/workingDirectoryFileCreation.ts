@@ -178,7 +178,11 @@ export const createWorkingDirectoryEntrySafely = (targetPath: string, kind: 'fil
 export function registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath }: RegisterWorkingDirectoryFileCreationHandlerDeps): void {
   const createEntry = (kind: 'file' | 'folder') => async (_event: unknown, entryPath: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(
+        requestedRepoPath,
+        gitService.getRepoPath(),
+        kind === 'file' ? IpcChannel.GitCreateWorkingDirectoryFile : IpcChannel.GitCreateWorkingDirectoryFolder,
+      );
       const relativePath = asRepositoryFilePath(entryPath);
       const targetPath = workingDirectoryPath(repoPath, relativePath, kind === 'file' ? 'File path' : 'Folder path', true);
       if (!fs.statSync(path.dirname(targetPath)).isDirectory()) throw new Error('Target folder does not exist.');

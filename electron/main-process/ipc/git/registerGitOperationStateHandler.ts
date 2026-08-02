@@ -32,7 +32,7 @@ type RegisterGitOperationStateHandlerDeps = {
 export const registerGitOperationStateHandler = ({ gitService, readOperation = readSequencerOperation }: RegisterGitOperationStateHandlerDeps): void => {
   ipcMain.handle(IpcChannel.GitSequencerState, async (_event: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitSequencerState);
       const operation = await readOperation(gitService, repoPath);
       return { success: true, data: { operation } };
     } catch (error: unknown) {

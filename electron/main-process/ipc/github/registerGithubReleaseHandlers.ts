@@ -233,7 +233,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
       }
       let authorizedRepoPath: string;
       try {
-        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
       }
@@ -243,7 +243,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         // Origin resolution is asynchronous. Re-authorize immediately before
         // the irreversible GitHub write so a repository switch during that
         // read cannot validate a stale release request.
-        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
         const settings = readSettingsWithMigration();
         const originTarget = parseGithubRemoteTarget(originUrl, settings.githubHost, githubService);
         if (!originTarget) {
@@ -267,7 +267,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         }
         // The local tag lookup above is asynchronous, so bind the irreversible
         // GitHub write to the active repository once more immediately before it.
-        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
         const currentAuthError = assertGithubAuthenticated(githubService);
         if (currentAuthError) return currentAuthError;
 
@@ -331,8 +331,8 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
         return { success: false, error: 'RELEASE_ASSET_TARGET_NOT_AUTHORIZED' };
       }
       try {
-        requireActiveRepositoryPath(authorization.repoPath, gitService.getRepoPath());
-        requireActiveRepositoryPath(params.repoPath, authorization.repoPath);
+        requireActiveRepositoryPath(authorization.repoPath, gitService.getRepoPath(), IpcChannel.GithubUploadReleaseAsset);
+        requireActiveRepositoryPath(params.repoPath, authorization.repoPath, IpcChannel.GithubUploadReleaseAsset);
       } catch {
         return { success: false, error: 'RELEASE_ASSET_REPOSITORY_NOT_ACTIVE' };
       }
@@ -386,7 +386,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
 
       let repoPath: string;
       try {
-        repoPath = requireActiveRepositoryPath(params?.repoPath, gitService.getRepoPath());
+        repoPath = requireActiveRepositoryPath(params?.repoPath, gitService.getRepoPath(), IpcChannel.GithubGetReleaseContext);
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
       }

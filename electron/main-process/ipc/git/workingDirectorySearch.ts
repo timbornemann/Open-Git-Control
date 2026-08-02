@@ -234,7 +234,7 @@ const replaceMatches = async (
   const written: typeof prepared = [];
   try {
     for (const item of prepared) {
-      requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitReplaceWorkingDirectory);
       await gitService.writeRepoFileAtPath(repoPath, item.filePath, item.replacement);
       written.push(item);
     }
@@ -259,7 +259,7 @@ const replaceMatches = async (
 export function registerWorkingDirectorySearchHandlers({ gitService }: RegisterWorkingDirectorySearchHandlersDeps): void {
   ipcMain.handle(IpcChannel.GitSearchWorkingDirectory, async (_event: unknown, rawRequest: WorkingDirectorySearchRequestDto, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitSearchWorkingDirectory);
       const query = asSearchQuery(rawRequest?.query);
       const mode = rawRequest?.mode;
       if (mode !== 'filename' && mode !== 'content') throw new Error('Invalid search mode.');
@@ -277,7 +277,7 @@ export function registerWorkingDirectorySearchHandlers({ gitService }: RegisterW
 
   ipcMain.handle(IpcChannel.GitReplaceWorkingDirectory, async (_event: unknown, request: WorkingDirectoryReplaceRequestDto, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitReplaceWorkingDirectory);
       return { success: true, data: await replaceMatches(gitService, repoPath, request || ({} as WorkingDirectoryReplaceRequestDto)) };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

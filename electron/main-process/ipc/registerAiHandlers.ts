@@ -80,7 +80,7 @@ export function registerAiHandlers({
     const webContents = event.sender;
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(params?.repoPath, getActiveRepoPath());
+      repoPath = requireActiveRepositoryPath(params?.repoPath, getActiveRepoPath(), IpcChannel.GitAiAutoCommit);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'No repository selected.' };
     }

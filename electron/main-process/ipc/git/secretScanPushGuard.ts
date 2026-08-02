@@ -128,7 +128,7 @@ export function registerSecretScanPushGuard({
     }
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitScanPushSecrets);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
     }
@@ -255,7 +255,7 @@ export function registerSecretScanPushGuard({
     ) {
       try {
         const currentFingerprint = await readPushStateFingerprint(gitService, expectedRepoPath);
-        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath(), 'git:command push secret-scan approval');
         if (currentFingerprint === approval.stateFingerprint) return null;
         return { success: false, error: PUSH_STATE_CHANGED_ERROR };
       } catch {
@@ -272,7 +272,7 @@ export function registerSecretScanPushGuard({
     if (scanResult.data.findings.length === 0) return null;
 
     try {
-      requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath(), 'git:command push secret-scan approval');
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Requested repository is not the active repository.' };
     }
@@ -299,7 +299,7 @@ export function registerSecretScanPushGuard({
     }
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanPush);
     } catch {
       return { success: false };
     }
@@ -319,7 +319,7 @@ export function registerSecretScanPushGuard({
     let stateFingerprint: string;
     try {
       stateFingerprint = await readPushStateFingerprint(gitService, repoPath);
-      requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanPush);
     } catch {
       return { success: false };
     }
@@ -339,7 +339,7 @@ export function registerSecretScanPushGuard({
       return { success: false, cancelled: false, error: 'Repository path is required.' };
     }
     try {
-      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitCancelSecretScan);
     } catch (error: unknown) {
       return {
         success: false,

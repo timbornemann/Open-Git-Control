@@ -47,7 +47,11 @@ describe('registerGitOperationStateHandler', () => {
     await expect(handler({}, 'C:/repo')).resolves.toEqual({ success: true, data: { operation: 'cherry-pick' } });
     expect(readOperation).toHaveBeenCalledWith(gitService, 'C:/repo');
 
-    await expect(handler({}, 'C:/other')).resolves.toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    await expect(handler({}, 'C:/other')).resolves.toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "git:sequencerState". Requested repository: "C:/other". Active repository: "C:/repo".',
+    });
     expect(readOperation).toHaveBeenCalledTimes(1);
   });
 });

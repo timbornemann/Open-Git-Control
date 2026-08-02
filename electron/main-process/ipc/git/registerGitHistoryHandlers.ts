@@ -41,7 +41,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const limit = Math.max(1, Math.min(500, Math.floor(Number(params.limit) || 100)));
         const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
         const scope = params.scope === 'head' ? 'head' : 'all';
-        const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitCommitLogPage);
 
         try {
           await gitService.runCommandAtPath(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD']);
@@ -93,7 +93,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const normalizedHashes = Array.isArray(hashes) ? hashes.map((hash) => String(hash || '')).slice(0, 500) : [];
         const priority: CommitStatsPriority =
           requestedPriority === 'selected' || requestedPriority === 'visible' || requestedPriority === 'background' ? requestedPriority : 'background';
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitRequestCommitStats);
         const data = await commitStatsService.requestStats(normalizedHashes, priority, repoPath);
         return { success: true, data };
       } catch (error: unknown) {
@@ -104,7 +104,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
 
   ipcMain.handle(IpcChannel.GitWorkingTreeSnapshot, async (_event: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeSnapshot);
       return { success: true, data: await workingTreeService.getSnapshot(repoPath) };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -115,7 +115,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
     try {
       const normalizedId = String(snapshotId || '').trim();
       if (!normalizedId) throw new Error('Snapshot ID is required.');
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWorkingTreeStats);
       return { success: true, data: await workingTreeService.getStats(normalizedId, repoPath) };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -137,7 +137,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         commitStatsService.interruptBackgroundWork();
         const normalizedPath = String(filePath ?? '');
         if (!normalizedPath) throw new Error('File path is required.');
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFileBlameRange);
         const normalizedCommitHash = String(commitHash || '').trim() || undefined;
         if (requestedSource !== undefined && requestedSource !== 'staged' && requestedSource !== 'unstaged') {
           throw new Error('Invalid blame source.');
@@ -156,7 +156,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
 
   ipcMain.handle(IpcChannel.GitStashes, async (_event: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitStashes);
       const raw = await gitService.runCommandAtPath(repoPath, ['stash', 'list', '--format=%gd%x1f%H%x1f%gs%x00', '--max-count=200']);
       return { success: true, data: parseStashList(raw) };
     } catch (error: unknown) {
@@ -173,7 +173,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
           return { success: false, error: 'File path is required' };
         }
 
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFileHistory);
         const raw = await gitService.history.getFileHistory(normalizedPath, limit, commitHash, repoPath);
         return { success: true, data: parseFileHistory(raw) };
       } catch (error: unknown) {
@@ -191,7 +191,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
           return { success: false, error: 'File path is required' };
         }
 
-        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+        const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitFileBlame);
         if (requestedSource !== undefined && requestedSource !== 'staged' && requestedSource !== 'unstaged') {
           throw new Error('Invalid blame source.');
         }
@@ -209,7 +209,7 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
 
   ipcMain.handle(IpcChannel.GitGetFileTimelineData, async (_event: unknown, limit?: number, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetFileTimelineData);
       const commits = await gitService.history.getFileTimelineData(limit, repoPath);
       return { success: true, data: commits };
     } catch (error: unknown) {

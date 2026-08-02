@@ -76,7 +76,7 @@ const getWorkingDirectoryGitStatus = (statusRaw: string, tracked: boolean) => {
 export function registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath }: RegisterWorkingDirectoryFileInfoHandlerDeps): void {
   ipcMain.handle(IpcChannel.GitGetWorkingDirectoryFileInfo, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {
-      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitGetWorkingDirectoryFileInfo);
       const relativePath = asRepositoryFilePath(filePath);
       const resolvedPath = workingDirectoryPath(repoPath, relativePath, 'File path');
       const stat = fs.statSync(resolvedPath);

@@ -7,8 +7,12 @@ describe('requireActiveRepositoryPath', () => {
   });
 
   it('rejects absent or different repository contexts', () => {
-    expect(() => requireActiveRepositoryPath('C:/work/other', 'C:/work/repo')).toThrow('not the active repository');
-    expect(() => requireActiveRepositoryPath('C:/work/repo', null)).toThrow('No repository selected');
+    expect(() => requireActiveRepositoryPath('C:/work/other', 'C:/work/repo', 'test action')).toThrow(
+      'Requested repository is not the active repository while handling "test action". Requested repository: "C:/work/other". Active repository: "C:/work/repo".',
+    );
+    expect(() => requireActiveRepositoryPath('C:/work/repo', null, 'test action')).toThrow(
+      'No repository selected while handling "test action". Requested repository: "C:/work/repo".',
+    );
   });
 
   it('accepts a saved subdirectory path that Git canonicalized to the active root', () => {

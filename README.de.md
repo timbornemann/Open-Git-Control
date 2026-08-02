@@ -35,13 +35,13 @@ Aktuell neuestes Release: [v2.1.0](https://github.com/timbornemann/Open-Git-Cont
 
 Badge und Latest-Release-Seite bleiben automatisch aktuell. Die direkten Binary-Links unten sind durch die GitHub-Asset-Namen versioniert und werden vom Release-Workflow nach einem neuen stabilen Release aktualisiert.
 
-| Plattform | Paket | Direkter GitHub-Download |
-| --- | --- | --- |
-| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-2.1.0-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-win-x64.exe) |
-| Linux x64 | AppImage | [Open-Git-Control-2.1.0-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-linux-x86_64.AppImage) |
-| Linux amd64 | Debian-Paket `.deb` | [Open-Git-Control-2.1.0-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-linux-amd64.deb) |
-| macOS x64 | Disk Image `.dmg` | [Open-Git-Control-2.1.0-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-mac-x64.dmg) |
-| macOS x64 | Zip-Archiv | [Open-Git-Control-2.1.0-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-mac-x64.zip) |
+| Plattform   | Paket                 | Direkter GitHub-Download                                                                                                                                               |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-2.1.0-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-win-x64.exe)                     |
+| Linux x64   | AppImage              | [Open-Git-Control-2.1.0-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-linux-x86_64.AppImage) |
+| Linux amd64 | Debian-Paket `.deb`   | [Open-Git-Control-2.1.0-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-linux-amd64.deb)             |
+| macOS x64   | Disk Image `.dmg`     | [Open-Git-Control-2.1.0-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-mac-x64.dmg)                     |
+| macOS x64   | Zip-Archiv            | [Open-Git-Control-2.1.0-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.1.0/Open-Git-Control-2.1.0-mac-x64.zip)                     |
 
 Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
 

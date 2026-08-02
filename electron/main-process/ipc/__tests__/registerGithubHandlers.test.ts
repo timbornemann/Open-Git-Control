@@ -608,7 +608,11 @@ describe('registerGithubHandlers fork flow', () => {
     activeRepo = 'C:/repos/other';
     resolveOrigin?.('https://github.com/acme/project.git');
 
-    await expect(resultPromise).resolves.toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    await expect(resultPromise).resolves.toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "github:createRelease". Requested repository: "C:/repos/project". Active repository: "C:/repos/other".',
+    });
     expect(createRelease).not.toHaveBeenCalled();
   });
 
@@ -650,7 +654,11 @@ describe('registerGithubHandlers fork flow', () => {
           releaseName: 'Release v1.0.0',
         },
       ),
-    ).resolves.toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    ).resolves.toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "github:createRelease". Requested repository: "C:/repos/repo-a". Active repository: "C:/repos/repo-b".',
+    });
     expect(createRelease).not.toHaveBeenCalled();
   });
 
@@ -934,7 +942,11 @@ describe('registerGithubHandlers fork flow', () => {
 
     const result = await handlers.get('github:getReleaseContext')!({}, { owner: 'acme', repo: 'project', repoPath: '/tmp/private-other-repo' });
 
-    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "github:getReleaseContext". Requested repository: "/tmp/private-other-repo". Active repository: "/tmp/active-repo".',
+    });
     expect(listRepositoryTags).not.toHaveBeenCalled();
   });
 });

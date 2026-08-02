@@ -7,6 +7,7 @@ import { createJobId } from '../../gitCommandPolicy';
 import type { RepoJobRegistry } from '../../repoJobRegistry';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { emitJobEvent } from '../jobEvents';
+import { IpcChannel } from '../../../../src/types/ipcContract';
 
 type SecretScanCommitGuardDeps = {
   gitService: GitService;
@@ -76,7 +77,7 @@ export function registerSecretScanCommitGuard({
   const scanCommitSecrets: SecretScanCommitGuard['scanCommitSecrets'] = async (event, params) => {
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitScanCommitSecrets);
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
     }
@@ -158,7 +159,7 @@ export function registerSecretScanCommitGuard({
   const approveSecretScanCommit: SecretScanCommitGuard['approveSecretScanCommit'] = async (event, requestedRepoPath) => {
     let repoPath: string;
     try {
-      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath());
+      repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanCommit);
     } catch {
       return { success: false };
     }
@@ -169,7 +170,7 @@ export function registerSecretScanCommitGuard({
     }
     try {
       const stateFingerprint = await readCommitStateFingerprint(gitService, repoPath);
-      requireActiveRepositoryPath(repoPath, gitService.getRepoPath());
+      requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitApproveSecretScanCommit);
       if (stateFingerprint !== scan.stateFingerprint) return { success: false };
       commitApproval = { ...scan, stateFingerprint };
       return { success: true };
@@ -187,7 +188,7 @@ export function registerSecretScanCommitGuard({
     if (approval && approval.expiresAt > Date.now() && approval.senderId === senderIdOf(event) && approval.repoKey === repositoryPathKey(expectedRepoPath)) {
       try {
         const stateFingerprint = await readCommitStateFingerprint(gitService, expectedRepoPath);
-        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath());
+        requireActiveRepositoryPath(expectedRepoPath, gitService.getRepoPath(), 'git:commit secret-scan approval');
         if (stateFingerprint === approval.stateFingerprint) return null;
         return { success: false, error: COMMIT_STATE_CHANGED_ERROR };
       } catch {

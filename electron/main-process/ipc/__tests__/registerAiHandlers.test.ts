@@ -102,7 +102,11 @@ describe('registerAiHandlers', () => {
 
     const result = await handlers.get('git:aiAutoCommit')!({ sender: { send: vi.fn() } }, { repoPath: '/tmp/private-other-repo' });
 
-    expect(result).toEqual({ success: false, error: 'Requested repository is not the active repository.' });
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Requested repository is not the active repository while handling "git:aiAutoCommit". Requested repository: "/tmp/private-other-repo". Active repository: "/tmp/active-repo".',
+    });
     expect(aiService.runAutoCommitWithOptions).not.toHaveBeenCalled();
   });
 
