@@ -206,6 +206,42 @@ describe('ProjectPlannerProvider', () => {
     provider.unmount();
   });
 
+  it('closes the creation prompt when planning data arrives from outside the app', async () => {
+    const project = createProject('pulled', 'C:\\repos\\pulled');
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'getData')
+      .mockResolvedValueOnce({ success: true, data: EMPTY_DATA })
+      .mockResolvedValue({ success: true, data: { version: 1, projects: [project], items: [] } });
+    const ensureRepositoryProject = vi.spyOn(plannerClient, 'ensureRepositoryProject');
+
+    const provider = renderProvider(project.repoPath);
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    provider.rerender(project.repoPath, 0, true);
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(provider.setConfirmDialog.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ variant: 'confirm' }));
+
+    // A pulled planning file reaches the app through a refresh.
+    provider.rerender(project.repoPath, 1, true);
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    expect(provider.setConfirmDialog.mock.calls.at(-1)?.[0]).toBeNull();
+    expect(ensureRepositoryProject).not.toHaveBeenCalled();
+    provider.unmount();
+  });
+
   it('updates the selected project on a repository switch without creating planning data', async () => {
     const repoA = createProject('repo-a', 'C:\\repos\\a');
     const repoB = createProject('repo-b', 'C:\\repos\\b');

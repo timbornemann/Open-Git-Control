@@ -387,6 +387,8 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 ### Projektplanung
 
 - Planning View fuer repositorygebundene Projekte und zukuenftige Projekte.
+- Planungsdaten eines Repositorys werden in `.Open-Git-Control/planning.json` versioniert. Die Datei enthaelt keine maschinenspezifischen Pfade, deshalb liest und schreibt jeder Checkout denselben Inhalt und die Datei kann im Team committet werden.
+- Planungsdaten, die ausserhalb der App geaendert werden (zum Beispiel durch Pull, Checkout oder Branch-Wechsel), werden ohne Neustart automatisch uebernommen.
 - Board-Spalten:
   - Idea
   - Bug

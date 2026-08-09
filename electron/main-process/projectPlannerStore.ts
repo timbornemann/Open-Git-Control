@@ -21,6 +21,14 @@ import {
   type PlannerStatus,
   type ProjectPlannerData,
 } from './projectPlannerData';
+import {
+  REPOSITORY_PLANNING_FILE,
+  normalizeRepositoryPlannerData,
+  parsePlannerData,
+  readRepositoryPlanningFile,
+  renumberRepositoryPlannerData,
+  writeRepositoryPlanningFile,
+} from './repositoryPlanningFile';
 
 export {
   PLANNER_PRIORITIES,
@@ -35,10 +43,8 @@ export {
   type ProjectPlannerData,
 } from './projectPlannerData';
 
-const PLANNING_FILE = 'planning.json';
-
 const getLegacyStorePath = (): string => path.join(app.getPath('userData'), 'project-planner.json');
-const getPlanningPath = (repoPath: string): string => getOpenGitControlAssetPath(repoPath, PLANNING_FILE, 'Repository planning path');
+const getPlanningPath = (repoPath: string): string => getOpenGitControlAssetPath(repoPath, REPOSITORY_PLANNING_FILE, 'Repository planning path');
 const plannerDataListeners = new Set<() => void>();
 const knownRepositoryPaths = new Map<string, string>();
 const rememberRepositoryPath = (repoPath: string): void => {
@@ -58,20 +64,6 @@ export function onProjectPlannerDataChanged(listener: () => void): () => void {
   plannerDataListeners.add(listener);
   return () => plannerDataListeners.delete(listener);
 }
-
-const parsePlannerData = (raw: string, fileLabel: string): ProjectPlannerData => {
-  const parsed = JSON.parse(raw) as unknown;
-  if (!parsed || typeof parsed !== 'object') throw new Error(`${fileLabel} is not a JSON object.`);
-  const candidate = parsed as Partial<ProjectPlannerData>;
-  if (candidate.version !== 1 || !Array.isArray(candidate.projects) || !Array.isArray(candidate.items)) {
-    throw new Error(`${fileLabel} has an unsupported or incomplete schema.`);
-  }
-  const normalized = normalizeProjectPlannerData(candidate);
-  if (normalized.projects.length !== candidate.projects.length || normalized.items.length !== candidate.items.length) {
-    throw new Error(`${fileLabel} contains invalid or orphaned records.`);
-  }
-  return normalized;
-};
 
 const readLegacyData = (): ProjectPlannerData => {
   try {
@@ -111,44 +103,17 @@ const plannerRepositoryPaths = (legacyData: ProjectPlannerData): string[] => {
   return [...unique.values()];
 };
 
-const normalizeRepositoryData = (data: ProjectPlannerData, repoPath: string): { data: ProjectPlannerData; changed: boolean } => {
-  const repository = data.projects.find((project) => project.kind === 'repository');
-  if (!repository) return { data: createEmptyProjectPlannerData(), changed: data.projects.length > 0 || data.items.length > 0 };
-  const normalizedRepoPath = normalizePlannerRepoPath(repoPath);
-  if (!normalizedRepoPath) return { data: createEmptyProjectPlannerData(), changed: true };
-  const requiresNewIds = !repository.repoPath || getRepositoryProjectKey(repository.repoPath) !== getRepositoryProjectKey(normalizedRepoPath);
-  const projectId = requiresNewIds ? randomUUID() : repository.id;
-  const items = data.items
-    .filter((item) => item.projectId === repository.id)
-    .map((item) => ({ ...item, id: requiresNewIds ? randomUUID() : item.id, projectId }));
-  const project: PlannerProject = { ...repository, id: projectId, kind: 'repository', repoPath: normalizedRepoPath };
-  const normalized = { version: 1 as const, projects: [project], items };
-  const changed = requiresNewIds || data.projects.length !== 1 || data.items.length !== items.length || repository.repoPath !== normalizedRepoPath;
-  return { data: normalized, changed };
-};
-
-const readRepositoryData = (repoPath: string): ProjectPlannerData => {
-  const planningPath = getPlanningPath(repoPath);
-  if (!fs.existsSync(planningPath)) return createEmptyProjectPlannerData();
-  try {
-    const parsed = parsePlannerData(fs.readFileSync(planningPath, 'utf8'), 'Repository planning data');
-    const normalized = normalizeRepositoryData(parsed, repoPath);
-    if (normalized.changed) writeTextFileAtomically(planningPath, `${JSON.stringify(normalized.data, null, 2)}\n`);
-    return normalized.data;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Repository planning data could not be read safely; the existing file was left untouched. ${message}`);
-  }
-};
+/** Reads the repository-local planning file without ever rewriting it. */
+const readRepositoryData = (repoPath: string): ProjectPlannerData => readRepositoryPlanningFile(getPlanningPath(repoPath), repoPath);
 
 const writeRepositoryData = (repoPath: string, data: ProjectPlannerData, notify = true): ProjectPlannerData => {
   rememberRepositoryPath(repoPath);
-  const normalized = normalizeRepositoryData(normalizeProjectPlannerData(data), repoPath).data;
+  const normalized = normalizeRepositoryPlannerData(normalizeProjectPlannerData(data), repoPath);
   const planningPath = getPlanningPath(repoPath);
   if (normalized.projects.length === 0) {
     fs.rmSync(planningPath, { force: true });
   } else {
-    writeTextFileAtomically(planningPath, `${JSON.stringify(normalized, null, 2)}\n`);
+    writeRepositoryPlanningFile(planningPath, normalized);
     ensureOpenGitControlReadme(repoPath);
   }
   if (notify) notifyDataChanged();
@@ -156,7 +121,7 @@ const writeRepositoryData = (repoPath: string, data: ProjectPlannerData, notify 
 };
 
 const mergeLegacyProject = (existing: ProjectPlannerData, legacyProject: PlannerProject, legacyItems: PlannerItem[], repoPath: string): ProjectPlannerData => {
-  if (existing.projects.length === 0) return normalizeRepositoryData({ version: 1, projects: [legacyProject], items: legacyItems }, repoPath).data;
+  if (existing.projects.length === 0) return normalizeRepositoryPlannerData({ version: 1, projects: [legacyProject], items: legacyItems }, repoPath);
   const project = existing.projects[0];
   const items = [...existing.items];
   const itemIds = new Set(items.map((item) => item.id));
@@ -202,16 +167,31 @@ const migrateLegacyRepositoryData = (legacy: ProjectPlannerData): ProjectPlanner
   return remaining;
 };
 
+/**
+ * Committed planning files share their identifiers across every checkout, which
+ * is intended. Only a second local repository using the same identifiers (a
+ * clone or a copied folder) would hide one of them, so exactly that repository
+ * receives its own identifiers.
+ */
+const claimRepositoryIdentifiers = (repoPath: string, data: ProjectPlannerData, usedIds: Set<string>): ProjectPlannerData => {
+  const collides = data.projects.some((project) => usedIds.has(project.id)) || data.items.some((item) => usedIds.has(item.id));
+  const claimed = collides ? writeRepositoryData(repoPath, renumberRepositoryPlannerData(data), false) : data;
+  for (const project of claimed.projects) usedIds.add(project.id);
+  for (const item of claimed.items) usedIds.add(item.id);
+  return claimed;
+};
+
 export function readProjectPlannerData(): ProjectPlannerData {
   const legacyBeforeMigration = readLegacyData();
   const pathsBeforeMigration = plannerRepositoryPaths(legacyBeforeMigration);
   const legacy = migrateLegacyRepositoryData(legacyBeforeMigration);
   const projects = legacy.projects.filter((project) => project.kind === 'planned');
   const items = legacy.items.filter((item) => projects.some((project) => project.id === item.projectId));
+  const usedIds = new Set<string>([...projects.map((project) => project.id), ...items.map((item) => item.id)]);
   for (const repoPath of [
     ...new Map([...pathsBeforeMigration, ...plannerRepositoryPaths(legacy)].map((repoPath) => [getRepositoryProjectKey(repoPath), repoPath])).values(),
   ]) {
-    const repositoryData = readRepositoryData(repoPath);
+    const repositoryData = claimRepositoryIdentifiers(repoPath, readRepositoryData(repoPath), usedIds);
     projects.push(...repositoryData.projects);
     items.push(...repositoryData.items);
   }

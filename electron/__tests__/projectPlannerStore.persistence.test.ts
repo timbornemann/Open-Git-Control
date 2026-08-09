@@ -77,10 +77,12 @@ describe('projectPlannerStore persistence', () => {
       items: [expect.objectContaining({ id: 'legacy-item', title: 'Keep this todo' })],
     });
     const planningPath = path.join(repoPath, '.Open-Git-Control', 'planning.json');
-    expect(JSON.parse(fs.readFileSync(planningPath, 'utf8'))).toMatchObject({
-      projects: [expect.objectContaining({ id: 'legacy-project', repoPath })],
+    const planningFile = JSON.parse(fs.readFileSync(planningPath, 'utf8'));
+    expect(planningFile).toMatchObject({
+      projects: [expect.objectContaining({ id: 'legacy-project' })],
       items: [expect.objectContaining({ id: 'legacy-item' })],
     });
+    expect(planningFile.projects[0]).not.toHaveProperty('repoPath');
     expect(fs.readFileSync(path.join(repoPath, '.Open-Git-Control', 'README.md'), 'utf8')).toContain('`planning.json`');
     expect(fs.existsSync(path.join(temporaryDirectory, 'project-planner.json'))).toBe(false);
   });
@@ -98,6 +100,74 @@ describe('projectPlannerStore persistence', () => {
       items: [expect.objectContaining({ title: 'Repository-only todo' })],
     });
     expect(fs.readFileSync(path.join(directoryPath, 'README.md'), 'utf8')).toContain('repository-local data');
+  });
+
+  const createRepositoryWithPlanningFile = (name: string, projectId: string, itemId: string, storedRepoPath?: string): string => {
+    const repoPath = path.join(temporaryDirectory, name);
+    fs.mkdirSync(path.join(repoPath, '.Open-Git-Control'), { recursive: true });
+    fs.writeFileSync(
+      path.join(repoPath, '.Open-Git-Control', 'planning.json'),
+      JSON.stringify(
+        {
+          version: 1,
+          projects: [
+            {
+              id: projectId,
+              name: 'Shared planning',
+              description: '',
+              kind: 'repository',
+              ...(storedRepoPath === undefined ? {} : { repoPath: storedRepoPath }),
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          ],
+          items: [
+            { id: itemId, projectId, title: 'Shared todo', description: '', priority: 'medium', status: 'planned', tags: [], createdAt: 1, updatedAt: 1 },
+          ],
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+    return repoPath;
+  };
+
+  const registerRepositories = (...repoPaths: string[]): void => {
+    fs.writeFileSync(
+      path.join(temporaryDirectory, 'repos.json'),
+      JSON.stringify({
+        repos: repoPaths.map((repoPath) => ({ path: repoPath, lastOpened: 1, pinned: false, createdAt: 1 })),
+        activeRepo: repoPaths[0] || null,
+        sortBy: 'lastOpenedDesc',
+      }),
+      'utf8',
+    );
+  };
+
+  it('reads a planning file committed on another machine without rewriting it', () => {
+    const repoPath = createRepositoryWithPlanningFile('pulled-repo', 'shared-project', 'shared-item', 'D:\\other-machine\\checkout');
+    registerRepositories(repoPath);
+    const planningPath = path.join(repoPath, '.Open-Git-Control', 'planning.json');
+    const fileBeforeRead = fs.readFileSync(planningPath, 'utf8');
+
+    expect(readProjectPlannerData()).toMatchObject({
+      projects: [expect.objectContaining({ id: 'shared-project', repoPath })],
+      items: [expect.objectContaining({ id: 'shared-item', projectId: 'shared-project', title: 'Shared todo' })],
+    });
+    expect(fs.readFileSync(planningPath, 'utf8')).toBe(fileBeforeRead);
+  });
+
+  it('keeps both checkouts visible when two repositories share the same committed identifiers', () => {
+    const firstRepoPath = createRepositoryWithPlanningFile('checkout-a', 'shared-project', 'shared-item');
+    const secondRepoPath = createRepositoryWithPlanningFile('checkout-b', 'shared-project', 'shared-item');
+    registerRepositories(firstRepoPath, secondRepoPath);
+
+    const data = readProjectPlannerData();
+    expect(data.projects.map((project) => project.repoPath).sort()).toEqual([firstRepoPath, secondRepoPath].sort());
+    expect(new Set(data.projects.map((project) => project.id)).size).toBe(2);
+    expect(data.items).toHaveLength(2);
+    expect(fs.readFileSync(path.join(firstRepoPath, '.Open-Git-Control', 'planning.json'), 'utf8')).toContain('shared-project');
   });
 
   it('keeps inaccessible legacy repository data for a later retry without exposing a broken project', () => {

@@ -387,6 +387,8 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 ### Project Planning
 
 - Planning view for repository-backed projects and future projects.
+- Repository planning data is versioned in `.Open-Git-Control/planning.json`. The file contains no machine-specific paths, so every checkout of a repository reads and writes the same content and the file can be committed and shared with a team.
+- Planning data that changes outside the app (for example through a pull, a checkout, or a branch switch) is picked up automatically without restarting the app.
 - Board columns:
   - Idea
   - Bug

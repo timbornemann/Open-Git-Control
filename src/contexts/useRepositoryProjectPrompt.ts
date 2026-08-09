@@ -49,7 +49,16 @@ export const useRepositoryProjectPrompt = ({
   useEffect(() => {
     if (!plannerActive || !plannerEntry.id || !plannerEntry.repoPath || loading || error) return;
     const hasRepositoryProject = projects.some((project) => project.repoPath && repoKey(project.repoPath) === repoKey(plannerEntry.repoPath!));
-    if (hasRepositoryProject) return;
+    if (hasRepositoryProject) {
+      // Planning data can arrive after the prompt was opened, for example when a
+      // pull brings a committed planning file. Never offer to create data that
+      // already exists.
+      if (repositoryPromptOpenEntryRef.current === plannerEntry.id) {
+        repositoryPromptOpenEntryRef.current = 0;
+        setConfirmDialog(null);
+      }
+      return;
+    }
     if (promptedPlannerEntryRef.current === plannerEntry.id) return;
 
     const { id: entryId, repoPath } = plannerEntry;

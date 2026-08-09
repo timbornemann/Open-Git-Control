@@ -2,10 +2,11 @@ import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitService } from '../../GitService';
-import { readStoreData, writeStoreData } from '../repoStore';
+import { onRepoStoreChanged, readStoreData, writeStoreData } from '../repoStore';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { getAuthorizedProjectParentDirectory } from '../fileAccessGrant';
 import { ApiError } from '../planningApiTypes';
+import { RepositoryPlanningWatcher } from '../RepositoryPlanningWatcher';
 import {
   convertProjectToRepository,
   createPlannedProject,
@@ -34,30 +35,52 @@ const failure = (error: unknown) =>
 
 const plannerSubscribers = new Set<WebContents>();
 let plannerChangeBroadcasterRegistered = false;
+let planningWatcher: RepositoryPlanningWatcher | null = null;
 
 const rememberPlannerSubscriber = (event: IpcMainInvokeEvent | undefined): void => {
   if (event?.sender?.send) plannerSubscribers.add(event.sender);
 };
 
+const broadcastPlannerChange = (): void => {
+  for (const subscriber of plannerSubscribers) {
+    if (subscriber.isDestroyed?.()) {
+      plannerSubscribers.delete(subscriber);
+    } else {
+      subscriber.send(IpcChannel.PlannerDataChanged);
+    }
+  }
+};
+
 const ensurePlannerChangeBroadcaster = (): void => {
   if (plannerChangeBroadcasterRegistered) return;
   plannerChangeBroadcasterRegistered = true;
-  onProjectPlannerDataChanged(() => {
-    for (const subscriber of plannerSubscribers) {
-      if (subscriber.isDestroyed?.()) {
-        plannerSubscribers.delete(subscriber);
-      } else {
-        subscriber.send(IpcChannel.PlannerDataChanged);
-      }
-    }
-  });
+  onProjectPlannerDataChanged(broadcastPlannerChange);
+  onRepoStoreChanged(() => syncPlanningWatchers());
+};
+
+/**
+ * Planning files are versioned, so they also change through Git itself. Keeping
+ * a watcher on every known repository lets a pull, a checkout or an edit made
+ * outside the app reach the planning view without a restart.
+ */
+const syncPlanningWatchers = (): void => {
+  try {
+    if (!planningWatcher) planningWatcher = new RepositoryPlanningWatcher(broadcastPlannerChange);
+    planningWatcher.setRepositories(readStoreData().repos.map((repo) => repo.path));
+  } catch {
+    // Watching is an optimization: the regular refresh path stays available even
+    // when a repository is temporarily unavailable.
+  }
 };
 
 export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPlannerHandlersDeps): void {
   ensurePlannerChangeBroadcaster();
+  syncPlanningWatchers();
   ipcMain.handle(IpcChannel.PlannerGetData, async (event: IpcMainInvokeEvent) => {
     rememberPlannerSubscriber(event);
-    return success(readProjectPlannerData());
+    const data = readProjectPlannerData();
+    syncPlanningWatchers();
+    return success(data);
   });
 
   ipcMain.handle(IpcChannel.PlannerEnsureRepositoryProject, async (_event: unknown, repoPath: string) => {

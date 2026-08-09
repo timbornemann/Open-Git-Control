@@ -97,6 +97,21 @@ export function readStoreData(): StoredData {
   }
 }
 
+const storeListeners = new Set<() => void>();
+
+/** Notifies when the set of known repositories changed, for example after adding or removing one. */
+export function onRepoStoreChanged(listener: () => void): () => void {
+  storeListeners.add(listener);
+  return () => storeListeners.delete(listener);
+}
+
 export function writeStoreData(data: StoredData): void {
   writeTextFileAtomically(getStorePath(), JSON.stringify(normalizeStoredData(data), null, 2));
+  for (const listener of storeListeners) {
+    try {
+      listener();
+    } catch {
+      // A listener failure must not turn an already persisted write into an error.
+    }
+  }
 }
