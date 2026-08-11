@@ -115,6 +115,30 @@ describe('GitService stagePaths', () => {
     }
   });
 
+  it('stages the remaining files when one untracked path vanished before the git add ran', async () => {
+    // Regression test for a real race: a build tool (e.g. a WPF/MSBuild temp
+    // project file) creates and removes an untracked file between the status
+    // scan that populated "Add All" and the git add itself, which made the
+    // whole batch fail with "did not match any files" and stage nothing.
+    const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-stage-vanished-'));
+    try {
+      execFileSync('git', ['init'], { cwd: repoDir, stdio: 'ignore' });
+      fs.writeFileSync(path.join(repoDir, 'keep.txt'), 'keep\n', 'utf8');
+      const vanishingPath = path.join(repoDir, 'vanish.txt');
+      fs.writeFileSync(vanishingPath, 'vanish\n', 'utf8');
+      fs.rmSync(vanishingPath);
+
+      const service = new GitService();
+      service.setRepoPath(repoDir);
+      await expect(service.stagePaths(['keep.txt', 'vanish.txt'])).resolves.toBe('');
+
+      const staged = (await service.runCommand(['diff', '--cached', '--name-only'])).split(/\r?\n/).filter(Boolean).sort();
+      expect(staged).toEqual(['keep.txt']);
+    } finally {
+      fs.rmSync(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
+  });
+
   it('unstages an unborn-branch file with later working-tree edits without deleting it', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-unborn-unstage-'));
     try {

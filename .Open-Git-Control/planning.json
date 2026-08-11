@@ -260,10 +260,10 @@
       "title": "Nahc wechsel in anderes repo direkt add all geklickt:",
       "description": "Nahc wechsel in anderes repo direkt add all geklickt: \"Command failed: git add --pathspec-from-file=C:\\Users\\Tim\\AppData\\Local\\Temp\\ogc-add-pathspec-RY6OQ7\\paths.nul --pathspec-file-nul\nfatal: pathspec ':(literal)Daten-Auswerter/Daten-Auswerter_lvpaoeqo_wpftmp.csproj' did not match any files\n\nGit Output: fatal: pathspec ':(literal)Daten-Auswerter/Daten-Auswerter_lvpaoeqo_wpftmp.csproj' did not match any files\"",
       "priority": "medium",
-      "status": "bug",
+      "status": "done",
       "tags": [],
       "createdAt": 1786027826972,
-      "updatedAt": 1786027826972
+      "updatedAt": 1786488076845
     }
   ]
 }

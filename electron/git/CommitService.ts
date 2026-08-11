@@ -96,14 +96,39 @@ export class CommitService {
       throw new Error('Repository path is required.');
     }
 
-    const normalized = this.normalizePathspecEntries(paths);
-    if (normalized.length === 0) return '';
+    // The status snapshot the caller staged this batch from can go stale by
+    // the time this command runs: a build tool or editor may have created and
+    // already removed an untracked file (e.g. a transient *_wpftmp.csproj). A
+    // single non-matching pathspec entry makes `git add`/`reset` abort the
+    // whole batch, so retry without it instead of losing every other file in
+    // the same click.
+    let remaining = this.normalizePathspecEntries(paths);
 
-    const pathspec = this.createPathspecFile(tempPrefix, normalized);
-    try {
-      return await this.executeGit(normalizedPath, [commandName, `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
-    } finally {
-      cleanupPrivateTempDir(pathspec.tempDir);
+    while (remaining.length > 0) {
+      const pathspec = this.createPathspecFile(tempPrefix, remaining);
+      try {
+        return await this.executeGit(normalizedPath, [commandName, `--pathspec-from-file=${pathspec.pathspecFile}`, '--pathspec-file-nul']);
+      } catch (error: unknown) {
+        const vanishedEntry = this.findVanishedPathspecEntry(error, remaining);
+        if (!vanishedEntry) throw error;
+        remaining = remaining.filter((entry) => entry !== vanishedEntry);
+      } finally {
+        cleanupPrivateTempDir(pathspec.tempDir);
+      }
     }
+    return '';
+  }
+
+  /**
+   * Detects Git's "pathspec did not match any files" failure for one of the
+   * entries currently being submitted, so the caller can drop exactly that
+   * entry and retry. Matches full known entries rather than parsing the
+   * quoted text out of the error, since a filename could itself contain a
+   * quote character.
+   */
+  private findVanishedPathspecEntry(error: unknown, candidates: string[]): string | null {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    if (!/did not match any files/i.test(message)) return null;
+    return candidates.find((entry) => message.includes(`pathspec '${entry}' did not match any files`)) ?? null;
   }
 }
