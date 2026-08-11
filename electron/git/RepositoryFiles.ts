@@ -1,7 +1,11 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks } from './RepositoryPathSafety';
+import {
+  normalizeRepositoryRelativePath,
+  resolveExistingRepositoryPathWithoutSymlinks,
+  resolveRepositoryPathForCreateWithoutSymlinks,
+} from './RepositoryPathSafety';
 import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile, type RepositoryTextEncoding } from './RepositoryFileEncoding';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
@@ -123,7 +127,27 @@ export class RepositoryFiles {
   }
 
   async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string, targetEncoding?: RepositoryTextEncoding): Promise<void> {
-    const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
+    const textValue = typeof content === 'string' ? content : String(content ?? '');
+
+    // Most callers (conflict resolution, Markdown edits) overwrite a file that
+    // is already tracked, but adding a license or NOTICE to a project that has
+    // none yet writes a brand-new file. Fall back to create-path resolution
+    // only when the target itself is missing; any other failure (symlink
+    // traversal, escaping the repository, ...) must still surface as-is.
+    let resolvedPath: string;
+    try {
+      resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, relativePath);
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
+
+      const createPath = resolveRepositoryPathForCreateWithoutSymlinks(repoPath, relativePath);
+      const parentDirectory = path.dirname(createPath);
+      if (!fs.existsSync(parentDirectory) || !fs.statSync(parentDirectory).isDirectory()) {
+        throw new Error('Target folder does not exist.');
+      }
+      writeRepositoryFileAtomically(createPath, encodeRepositoryFile(textValue, targetEncoding ?? 'utf8'), 0o644);
+      return;
+    }
 
     const stat = fs.statSync(resolvedPath);
     if (!stat.isFile()) {
@@ -140,7 +164,6 @@ export class RepositoryFiles {
     }
     const encoding = targetEncoding ?? detectedEncoding;
 
-    const textValue = typeof content === 'string' ? content : String(content ?? '');
     writeRepositoryFileAtomically(resolvedPath, encodeRepositoryFile(textValue, encoding), stat.mode & 0o777);
   }
 

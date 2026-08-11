@@ -209,6 +209,61 @@
       "tags": [],
       "createdAt": 1784826618903,
       "updatedAt": 1785004834350
+    },
+    {
+      "id": "73a04ec6-322e-405f-9c43-7e18a3fda670",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Beim Erstellen einer lizenz in einem projekt ohne lizenz",
+      "description": "Beim Erstellen einer lizenz in einem projekt ohne lizenz: \"ENOENT: no such file or directory, lstat 'D:\\Projects\\Software\\A^3\\LICENSE'\"",
+      "priority": "high",
+      "status": "done",
+      "tags": [],
+      "createdAt": 1785796603719,
+      "updatedAt": 1786485862352
+    },
+    {
+      "id": "37082c91-b763-4ccb-8fee-20c43eb39c65",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "fetch bei offline repos",
+      "description": "bei repos die nur lokal sind ohne remote, kann man nicht aktualisieren... wenn also man z.b. mit der komando zeile oder anderen tools commits macht , werden diese nicht wirklichj in der app aktualisiert, erst wenn man die repos echselt und wieder zurück wechselt wird neu geladen und der tree ist wieder aktuell, aber das gaht aktuell nicht wirklcih, der fetch button soll also auch bei lokalen repos funktionieren",
+      "priority": "high",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1785839646499,
+      "updatedAt": 1785839646499
+    },
+    {
+      "id": "24fde104-5930-4560-8921-5ebeb6a95e7e",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "bug",
+      "description": "getaddrinfo ENOTFOUND api.github.com",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1785856977969,
+      "updatedAt": 1785856977969
+    },
+    {
+      "id": "c40ae23b-6151-4fe7-9e43-920be873e567",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "File menau context window",
+      "description": "wenn man mit rechtsklcik auf eine datei klickt die weit unten am rand ist, kann es sein, das der inhalt des rechtsklickmenüs abgeschnitten wird",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1785941702977,
+      "updatedAt": 1785941702977
+    },
+    {
+      "id": "f4810618-b4d8-4887-abf6-68debc5e7903",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Nahc wechsel in anderes repo direkt add all geklickt:",
+      "description": "Nahc wechsel in anderes repo direkt add all geklickt: \"Command failed: git add --pathspec-from-file=C:\\Users\\Tim\\AppData\\Local\\Temp\\ogc-add-pathspec-RY6OQ7\\paths.nul --pathspec-file-nul\nfatal: pathspec ':(literal)Daten-Auswerter/Daten-Auswerter_lvpaoeqo_wpftmp.csproj' did not match any files\n\nGit Output: fatal: pathspec ':(literal)Daten-Auswerter/Daten-Auswerter_lvpaoeqo_wpftmp.csproj' did not match any files\"",
+      "priority": "medium",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1786027826972,
+      "updatedAt": 1786027826972
     }
   ]
 }

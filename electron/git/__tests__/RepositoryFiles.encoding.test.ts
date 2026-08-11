@@ -71,4 +71,22 @@ describe('RepositoryFiles text preview encoding', () => {
     await expect(files.writeRepoFileAtPath(repositoryPath, 'note.txt', 'emoji 👋', 'latin1')).rejects.toThrow('Latin-1');
     expect(fs.readFileSync(path.join(repositoryPath, 'note.txt'), 'utf8')).toBe('plain\n');
   });
+
+  it('creates a new repository file instead of throwing ENOENT when it does not exist yet', async () => {
+    const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repository-files-create-'));
+    repositories.push(repositoryPath);
+    const files = new RepositoryFiles(() => repositoryPath, vi.fn());
+
+    await files.writeRepoFileAtPath(repositoryPath, 'LICENSE', 'MIT License\n');
+
+    expect(fs.readFileSync(path.join(repositoryPath, 'LICENSE'), 'utf8')).toBe('MIT License\n');
+  });
+
+  it('refuses to create a file in a directory that does not exist', async () => {
+    const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-repository-files-create-missing-dir-'));
+    repositories.push(repositoryPath);
+    const files = new RepositoryFiles(() => repositoryPath, vi.fn());
+
+    await expect(files.writeRepoFileAtPath(repositoryPath, 'docs/LICENSE', 'MIT License\n')).rejects.toThrow('Target folder does not exist.');
+  });
 });
