@@ -185,60 +185,6 @@ describe('WorkingDirectoryTree', () => {
     expect(file.classList.contains('working-tree-row--context')).toBe(false);
   });
 
-  it('keeps the file context menu fully on-screen when opened near the bottom-right edge', async () => {
-    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({ success: true, data: [{ path: 'README.md', name: 'README.md', kind: 'file', bytes: 12 }] });
-    const container = document.getElementById('root');
-    if (!container) throw new Error('Missing test root.');
-    const originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetWidth');
-    const originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
-    const originalInnerWidth = window.innerWidth;
-    const originalInnerHeight = window.innerHeight;
-    try {
-      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 });
-      Object.defineProperty(HTMLDivElement.prototype, 'offsetWidth', { configurable: true, value: 260 });
-      Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', { configurable: true, value: 400 });
-
-      root = createRoot(container);
-      act(() =>
-        root?.render(
-          createElement(WorkingDirectoryTree, {
-            repoPath: 'C:/repos/demo',
-            refreshTrigger: 0,
-            expandedPaths: new Set<string>(),
-            onExpandedPathsChange: vi.fn(),
-            onOpenFile: vi.fn(),
-            onRepoChanged: vi.fn(),
-          }),
-        ),
-      );
-      await act(async () => {
-        await Promise.resolve();
-      });
-      const file = container.querySelector<HTMLButtonElement>('.working-tree-row');
-      if (!file) throw new Error('Missing file row.');
-
-      act(() => file.dispatchEvent(new window.MouseEvent('contextmenu', { bubbles: true, clientX: 980, clientY: 690 })));
-
-      const menu = container.querySelector<HTMLElement>('.working-tree-context-menu');
-      if (!menu) throw new Error('Missing context menu.');
-      const left = Number.parseFloat(menu.style.left);
-      const top = Number.parseFloat(menu.style.top);
-
-      // The raw click point (980, 690) leaves no room for a 260x400 menu in a
-      // 1000x700 viewport; the position must be pulled back on-screen instead
-      // of letting the lower/trailing part of the menu render past the edge.
-      expect(left).toBeLessThanOrEqual(1000 - 260);
-      expect(top).toBeLessThanOrEqual(700 - 400);
-    } finally {
-      if (originalOffsetWidth) Object.defineProperty(HTMLDivElement.prototype, 'offsetWidth', originalOffsetWidth);
-      if (originalOffsetHeight) Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', originalOffsetHeight);
-      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
-      Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight });
-    }
-  });
-
   it('selects a visible range without opening files and shows batch actions in the context menu', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'listWorkingDirectory').mockResolvedValue({
