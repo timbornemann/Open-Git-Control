@@ -14,6 +14,11 @@ import '@/styles/working-directory-tree.css';
 
 type ClipboardEntry = { path: string; kind: WorkingDirectoryEntryDto['kind']; cut: boolean } | null;
 type ContextMenu = { entry: WorkingDirectoryEntryDto; entries: WorkingDirectoryEntryDto[]; x: number; y: number };
+
+const CONTEXT_MENU_WIDTH = 210;
+const CONTEXT_MENU_HEIGHT = 280;
+const CONTEXT_MENU_MARGIN = 8;
+
 type Props = {
   repoPath: string | null;
   refreshTrigger: number;
@@ -84,6 +89,8 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<ContextMenu | null>(null);
+  const [contextPlacement, setContextPlacement] = useState({ left: 0, top: 0 });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const [fileInfoPath, setFileInfoPath] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
@@ -189,6 +196,20 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
+
+  useLayoutEffect(() => {
+    if (!context) return;
+    // A menu opened near the bottom or right edge of the window must not be
+    // anchored at the raw click point: `working-tree-context-menu` can list
+    // many actions, so keeping `left`/`top` unclamped would push part of it
+    // past the viewport where it is visually cut off.
+    const width = contextMenuRef.current?.offsetWidth || CONTEXT_MENU_WIDTH;
+    const height = contextMenuRef.current?.offsetHeight || CONTEXT_MENU_HEIGHT;
+    setContextPlacement({
+      left: Math.max(CONTEXT_MENU_MARGIN, Math.min(context.x, window.innerWidth - width - CONTEXT_MENU_MARGIN)),
+      top: Math.max(CONTEXT_MENU_MARGIN, Math.min(context.y, window.innerHeight - height - CONTEXT_MENU_MARGIN)),
+    });
+  }, [context]);
 
   const runMutation = async (
     action: () => Promise<{ success: boolean; error?: string }>,
@@ -485,8 +506,9 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       />
       {context && (
         <div
+          ref={contextMenuRef}
           className="working-tree-context-menu"
-          style={{ position: 'fixed', left: context.x, top: context.y, zIndex: 50 }}
+          style={{ position: 'fixed', left: contextPlacement.left, top: contextPlacement.top, zIndex: 50 }}
           onClick={(event) => event.stopPropagation()}
           role="menu"
           aria-label="File actions"

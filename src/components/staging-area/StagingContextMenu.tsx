@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { FileSection, StagingContextMenuState } from './types';
 import type { useFileOperations } from './useFileOperations';
@@ -9,8 +10,28 @@ type StagingContextMenuProps = {
   fileOps: ReturnType<typeof useFileOperations>;
 };
 
+const CTX_MENU_WIDTH = 220;
+const CTX_MENU_HEIGHT = 260;
+const CTX_MENU_MARGIN = 8;
+
 export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextMenu, fileOps }) => {
   const { t, tr } = useI18n();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState({ left: 0, top: 0 });
+
+  useLayoutEffect(() => {
+    if (!contextMenu) return;
+    // A file near the bottom or right edge of the window must not anchor the
+    // menu at the raw click point: the number of items varies (ignore rules,
+    // stash actions, ...), so an unclamped position can push part of the menu
+    // past the viewport where it is visually cut off.
+    const width = menuRef.current?.offsetWidth || CTX_MENU_WIDTH;
+    const height = menuRef.current?.offsetHeight || CTX_MENU_HEIGHT;
+    setPlacement({
+      left: Math.max(CTX_MENU_MARGIN, Math.min(contextMenu.x, window.innerWidth - width - CTX_MENU_MARGIN)),
+      top: Math.max(CTX_MENU_MARGIN, Math.min(contextMenu.y, window.innerHeight - height - CTX_MENU_MARGIN)),
+    });
+  }, [contextMenu]);
 
   if (!contextMenu) return null;
 
@@ -23,7 +44,7 @@ export const StagingContextMenu: React.FC<StagingContextMenuProps> = ({ contextM
 
   return (
     <div className="ctx-menu-backdrop" onClick={closeContextMenu}>
-      <div className="ctx-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
+      <div ref={menuRef} className="ctx-menu" style={{ left: placement.left, top: placement.top }} onClick={(event) => event.stopPropagation()}>
         <div className="ctx-menu-header">{contextEntry.path}</div>
         <button
           className="ctx-menu-item"
