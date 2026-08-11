@@ -119,6 +119,49 @@ describe('useRepositoryRemoteSync', () => {
     hook.unmount();
   });
 
+  it('refreshes local repository state instead of doing nothing when the fetch button is used on a repo with no remote', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
+    const triggerRefresh = vi.fn();
+    const setGitActionToast = vi.fn();
+    const setActiveGitActionLabel = vi.fn();
+    const isGitActionRunningRef = { current: false };
+
+    const hook = renderHook(() =>
+      useRepositoryRemoteSync({
+        activeRepo: 'C:\\repos\\local-only',
+        refreshTrigger: 0,
+        triggerRefresh,
+        autoFetchIntervalMs: 60_000,
+        language: 'en',
+        hasAnyRemote: false,
+        remotes: [],
+        setGitActionToast,
+        setActiveGitActionLabel,
+        isGitActionRunningRef,
+      }),
+    );
+
+    // Let the initial mount-triggered background refresh settle first, then
+    // simulate an explicit click on the Fetch button (showToast = true).
+    await act(async () => {
+      await Promise.resolve();
+    });
+    triggerRefresh.mockClear();
+    setGitActionToast.mockClear();
+
+    let result: boolean | undefined;
+    await act(async () => {
+      result = await hook.current.refreshRemoteState(true);
+    });
+
+    expect(result).toBe(true);
+    expect(triggerRefresh).toHaveBeenCalledTimes(1);
+    expect(runGitCommandForRepo.mock.calls.some(([, command]) => command === 'fetch')).toBe(false);
+    expect(setGitActionToast).toHaveBeenCalledWith(expect.objectContaining({ isError: false }));
+    hook.unmount();
+  });
+
   it('fetches the tracked upstream remote when it is not named origin', async () => {
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     const runGitCommandForRepo = vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repoPath, command) => {

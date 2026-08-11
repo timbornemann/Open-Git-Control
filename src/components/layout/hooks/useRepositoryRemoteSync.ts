@@ -136,7 +136,10 @@ export const useRepositoryRemoteSync = ({
   const refreshRemoteState = useCallback(
     // eslint-disable-next-line complexity -- Branch fetch, tag reconciliation and UI state must remain one repository-bound operation.
     async (showToast = false) => {
-      if (!gitClient.isAvailable() || !activeRepo || hasAnyRemote !== true) return false;
+      // `hasAnyRemote === null` means the remote list has not loaded yet; wait
+      // rather than guessing. `false` is a confirmed local-only repository and
+      // is handled inside the try block below instead of being a no-op.
+      if (!gitClient.isAvailable() || !activeRepo || hasAnyRemote === null) return false;
       if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
       const repoAtStart = activeRepo;
       const fetchRunId = remoteFetchRunIdRef.current + 1;
@@ -148,6 +151,22 @@ export const useRepositoryRemoteSync = ({
       setRemoteSync((prev) => ({ ...prev, isFetching: true }));
 
       try {
+        // A repository with no configured remote cannot be fetched from, but its
+        // working tree, branches, and commit graph can still have changed
+        // outside the app (e.g. commits made from the command line). Route the
+        // fetch action to a local refresh instead of leaving the button inert.
+        if (hasAnyRemote === false) {
+          triggerRefresh();
+          setRemoteSync((prev) => ({ ...prev, isFetching: false, lastFetchError: null }));
+          if (showToast) {
+            setGitActionToast({
+              msg: tr('Lokales Repository aktualisiert (kein Remote konfiguriert).', 'Local repository refreshed (no remote configured).'),
+              isError: false,
+            });
+          }
+          return true;
+        }
+
         const statusResult = await gitClient.runGitCommandForRepo(repoAtStart, 'status', '--porcelain=v2', '--branch');
         if (activeRepoRef.current !== repoAtStart) return false;
         const fetchRemote = resolveFetchRemote(statusResult.success ? String(statusResult.data || '') : '');
@@ -254,7 +273,7 @@ export const useRepositoryRemoteSync = ({
         }
       }
     },
-    [activeRepo, hasAnyRemote, resolveFetchRemote, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setRemoteSync, t, triggerRefresh],
+    [activeRepo, hasAnyRemote, resolveFetchRemote, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setRemoteSync, t, tr, triggerRefresh],
   );
 
   useEffect(() => {

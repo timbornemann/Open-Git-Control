@@ -227,10 +227,10 @@
       "title": "fetch bei offline repos",
       "description": "bei repos die nur lokal sind ohne remote, kann man nicht aktualisieren... wenn also man z.b. mit der komando zeile oder anderen tools commits macht , werden diese nicht wirklichj in der app aktualisiert, erst wenn man die repos echselt und wieder zurück wechselt wird neu geladen und der tree ist wieder aktuell, aber das gaht aktuell nicht wirklcih, der fetch button soll also auch bei lokalen repos funktionieren",
       "priority": "high",
-      "status": "bug",
+      "status": "done",
       "tags": [],
       "createdAt": 1785839646499,
-      "updatedAt": 1785839646499
+      "updatedAt": 1786486864486
     },
     {
       "id": "24fde104-5930-4560-8921-5ebeb6a95e7e",
