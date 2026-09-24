@@ -74,8 +74,12 @@ afterEach(() => {
 describe('useWorkspaceDomain repository canonicalization', () => {
   it('keeps a remote detail switch cancelled by the working-file guard out of the active repo', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
-      repos: [{ path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 }, { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 }],
-      activeRepo: 'C:/repo-a', sortBy: 'lastOpenedDesc',
+      repos: [
+        { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
+        { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 },
+      ],
+      activeRepo: 'C:/repo-a',
+      sortBy: 'lastOpenedDesc',
     });
     const setRepoPath = vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
     setActiveWorkingDirectoryNavigationGuard((_target, _proceed, cancel) => cancel?.());
@@ -93,18 +97,35 @@ describe('useWorkspaceDomain repository canonicalization', () => {
 
   it('synchronizes a local favorite across clones and the GitHub pin setting', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
-      repos: [{ path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 }, { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 }],
-      activeRepo: 'C:/repo-a', sortBy: 'lastOpenedDesc',
+      repos: [
+        { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
+        { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 },
+      ],
+      activeRepo: 'C:/repo-a',
+      sortBy: 'lastOpenedDesc',
     });
     vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
     vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'git@github.com:alice/demo.git' });
     vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(githubClient, 'getCatalogSnapshot').mockResolvedValue({ success: true, data: {
-      host: 'github.com', username: 'alice', savedAt: '2026-01-01T00:00:00Z', repos: [{
-        id: 42, name: 'demo', fullName: 'alice/demo', private: true, cloneUrl: 'https://github.com/alice/demo.git', htmlUrl: 'https://github.com/alice/demo',
-      }],
-    } });
+    vi.spyOn(githubClient, 'getCatalogSnapshot').mockResolvedValue({
+      success: true,
+      data: {
+        host: 'github.com',
+        username: 'alice',
+        savedAt: '2026-01-01T00:00:00Z',
+        repos: [
+          {
+            id: 42,
+            name: 'demo',
+            fullName: 'alice/demo',
+            private: true,
+            cloneUrl: 'https://github.com/alice/demo.git',
+            htmlUrl: 'https://github.com/alice/demo',
+          },
+        ],
+      },
+    });
     const values = new Map<string, string>();
     vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) || null, setItem: (key: string, value: string) => values.set(key, value) });
     const hook = renderWorkspace();

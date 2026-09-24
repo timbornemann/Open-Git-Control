@@ -80,11 +80,15 @@ export function useGithubCatalog(isAuthenticated: boolean, username: string | nu
       setOffline(true);
       void loadSnapshot();
     }
-    return () => { generation.current += 1; };
+    return () => {
+      generation.current += 1;
+    };
   }, [isAuthenticated, loadSnapshot, refresh]);
 
   useEffect(() => {
-    const onRefresh = () => { void refresh(); };
+    const onRefresh = () => {
+      void refresh();
+    };
     window.addEventListener(GITHUB_CATALOG_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(GITHUB_CATALOG_REFRESH_EVENT, onRefresh);
   }, [refresh]);

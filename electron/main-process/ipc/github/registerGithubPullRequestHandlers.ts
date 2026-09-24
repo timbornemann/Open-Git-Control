@@ -6,9 +6,7 @@ import { assertGithubAuthenticated, getGithubApiErrorDetails, normalizePrState, 
 const actionsError = (error: unknown, fallback: string): string => {
   const message = toErrorMessage(error, fallback);
   const { status } = getGithubApiErrorDetails(error);
-  return status === 403 || status === 404
-    ? `${message} Check repository Actions permissions and API limits.`
-    : message;
+  return status === 403 || status === 404 ? `${message} Check repository Actions permissions and API limits.` : message;
 };
 
 type RegisterGithubPullRequestHandlersDeps = {
@@ -81,30 +79,51 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
     },
   );
 
-  ipcMain.handle(IpcChannel.GithubGetWorkflowRunsPage, async (_event: IpcMainInvokeEvent, params: {
-    owner: string; repo: string; branch?: string; status?: string; page?: number; perPage?: number;
-  }) => {
-    const authError = assertGithubAuthenticated(githubService);
-    if (authError) return authError;
-    try {
-      return { success: true, data: await githubService.getWorkflowRunsPage(params.owner, params.repo, params) };
-    } catch (error) {
-      return { success: false, error: actionsError(error, 'Workflow runs could not be loaded.') };
-    }
-  });
+  ipcMain.handle(
+    IpcChannel.GithubGetWorkflowRunsPage,
+    async (
+      _event: IpcMainInvokeEvent,
+      params: {
+        owner: string;
+        repo: string;
+        branch?: string;
+        status?: string;
+        page?: number;
+        perPage?: number;
+      },
+    ) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
+      try {
+        return { success: true, data: await githubService.getWorkflowRunsPage(params.owner, params.repo, params) };
+      } catch (error) {
+        return { success: false, error: actionsError(error, 'Workflow runs could not be loaded.') };
+      }
+    },
+  );
 
-  ipcMain.handle(IpcChannel.GithubGetWorkflowJobsPage, async (_event: IpcMainInvokeEvent, params: {
-    owner: string; repo: string; runId: number; page?: number; perPage?: number;
-  }) => {
-    const authError = assertGithubAuthenticated(githubService);
-    if (authError) return authError;
-    if (!Number.isSafeInteger(params?.runId) || params.runId <= 0) return { success: false, error: 'Invalid workflow run.' };
-    try {
-      return { success: true, data: await githubService.getWorkflowJobsPage(params.owner, params.repo, params.runId, params.page, params.perPage) };
-    } catch (error) {
-      return { success: false, error: actionsError(error, 'Workflow jobs could not be loaded.') };
-    }
-  });
+  ipcMain.handle(
+    IpcChannel.GithubGetWorkflowJobsPage,
+    async (
+      _event: IpcMainInvokeEvent,
+      params: {
+        owner: string;
+        repo: string;
+        runId: number;
+        page?: number;
+        perPage?: number;
+      },
+    ) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
+      if (!Number.isSafeInteger(params?.runId) || params.runId <= 0) return { success: false, error: 'Invalid workflow run.' };
+      try {
+        return { success: true, data: await githubService.getWorkflowJobsPage(params.owner, params.repo, params.runId, params.page, params.perPage) };
+      } catch (error) {
+        return { success: false, error: actionsError(error, 'Workflow jobs could not be loaded.') };
+      }
+    },
+  );
 
   ipcMain.handle(IpcChannel.GithubRerunFailedJobs, async (_event: IpcMainInvokeEvent, params: { owner: string; repo: string; runId: number }) => {
     const authError = assertGithubAuthenticated(githubService);

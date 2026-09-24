@@ -19,7 +19,9 @@ const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((m
 const DiffViewer = React.lazy(() => import('@/components/diff-viewer').then((module) => ({ default: module.DiffViewer })));
 const FileTimelineView = React.lazy(() => import('@/components/FileTimelineView').then((module) => ({ default: module.FileTimelineView })));
 const ProjectPlannerView = React.lazy(() => import('@/components/project-planner').then((module) => ({ default: module.ProjectPlannerView })));
-const GithubWorkspaceView = React.lazy(() => import('@/components/github-workspace/GithubWorkspaceView').then((module) => ({ default: module.GithubWorkspaceView })));
+const GithubWorkspaceView = React.lazy(() =>
+  import('@/components/github-workspace/GithubWorkspaceView').then((module) => ({ default: module.GithubWorkspaceView })),
+);
 const ReleaseCreator = React.lazy(() => import('@/components/release-creator/ReleaseCreator').then((module) => ({ default: module.ReleaseCreator })));
 const SettingsMainContent = React.lazy(() => import('@/components/layout/SettingsMainContent').then((module) => ({ default: module.SettingsMainContent })));
 

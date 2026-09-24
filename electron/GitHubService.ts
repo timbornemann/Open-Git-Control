@@ -165,7 +165,15 @@ export class GitHubService {
     return this.pullRequests.createPullRequest(owner, repo, title, body, head, base);
   }
 
-  mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string, expectedHeadSha?: string) {
+  mergePullRequest(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    mergeMethod: MergeMethod,
+    commitTitle?: string,
+    commitMessage?: string,
+    expectedHeadSha?: string,
+  ) {
     return this.pullRequests.mergePullRequest(owner, repo, pullNumber, mergeMethod, commitTitle, commitMessage, expectedHeadSha);
   }
 

@@ -3,13 +3,18 @@ import { GitHubRepositoryService } from '../GitHubRepositoryService';
 import { buildOpenGitControlReadme } from '../../../src/shared/licenseTemplates';
 
 const repository = {
-  id: 42, name: 'demo', full_name: 'alice/demo', private: true,
-  clone_url: 'https://github.com/alice/demo.git', html_url: 'https://github.com/alice/demo',
-  description: 'Demo', updated_at: '2026-01-01T00:00:00Z',
+  id: 42,
+  name: 'demo',
+  full_name: 'alice/demo',
+  private: true,
+  clone_url: 'https://github.com/alice/demo.git',
+  html_url: 'https://github.com/alice/demo',
+  description: 'Demo',
+  updated_at: '2026-01-01T00:00:00Z',
 };
 
 describe('GitHubRepositoryService remote creation', () => {
-  it('replaces GitHub\'s initial README with the app template', async () => {
+  it("replaces GitHub's initial README with the app template", async () => {
     const createForAuthenticatedUser = vi.fn().mockResolvedValue({ data: repository });
     const getContent = vi.fn().mockResolvedValue({ data: { type: 'file', sha: 'initial-sha' } });
     const createOrUpdateFileContents = vi.fn().mockResolvedValue({ data: {} });

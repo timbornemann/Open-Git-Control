@@ -85,11 +85,26 @@ describe('GitHubWorkflowService.getStatusChecks', () => {
 
 describe('GitHubWorkflowService Actions pages and controls', () => {
   it('loads all-branch runs by default and forwards branch, status and page filters', async () => {
-    const listWorkflowRunsForRepo = vi.fn().mockResolvedValue({ data: { total_count: 25, workflow_runs: [{
-      id: 1, name: 'CI', display_title: 'CI', status: 'completed', conclusion: 'failure', event: 'push',
-      html_url: 'https://github.com/alice/demo/actions/runs/1', head_branch: 'main', head_sha: 'abc',
-      created_at: '2026-01-01', updated_at: '2026-01-01',
-    }] } });
+    const listWorkflowRunsForRepo = vi.fn().mockResolvedValue({
+      data: {
+        total_count: 25,
+        workflow_runs: [
+          {
+            id: 1,
+            name: 'CI',
+            display_title: 'CI',
+            status: 'completed',
+            conclusion: 'failure',
+            event: 'push',
+            html_url: 'https://github.com/alice/demo/actions/runs/1',
+            head_branch: 'main',
+            head_sha: 'abc',
+            created_at: '2026-01-01',
+            updated_at: '2026-01-01',
+          },
+        ],
+      },
+    });
     const service = new GitHubWorkflowService(() => ({ rest: { actions: { listWorkflowRunsForRepo } } }) as any);
 
     const first = await service.getWorkflowRunsPage('alice', 'demo', { page: 1, perPage: 20 });
@@ -102,7 +117,23 @@ describe('GitHubWorkflowService Actions pages and controls', () => {
   });
 
   it('returns job steps and sends run control actions to GitHub', async () => {
-    const listJobsForWorkflowRun = vi.fn().mockResolvedValue({ data: { total_count: 1, jobs: [{ id: 7, name: 'build', status: 'completed', conclusion: 'failure', html_url: 'https://github.com/job/7', steps: [{ number: 1, name: 'npm test', status: 'completed', conclusion: 'failure' }] }] } });
+    const listJobsForWorkflowRun = vi
+      .fn()
+      .mockResolvedValue({
+        data: {
+          total_count: 1,
+          jobs: [
+            {
+              id: 7,
+              name: 'build',
+              status: 'completed',
+              conclusion: 'failure',
+              html_url: 'https://github.com/job/7',
+              steps: [{ number: 1, name: 'npm test', status: 'completed', conclusion: 'failure' }],
+            },
+          ],
+        },
+      });
     const reRunWorkflowFailedJobs = vi.fn().mockResolvedValue({});
     const cancelWorkflowRun = vi.fn().mockResolvedValue({});
     const service = new GitHubWorkflowService(() => ({ rest: { actions: { listJobsForWorkflowRun, reRunWorkflowFailedJobs, cancelWorkflowRun } } }) as any);

@@ -92,17 +92,20 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
     }
   });
 
-  ipcMain.handle(IpcChannel.GithubCreateRepoWithReadme, async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
-    const authError = assertGithubAuthenticated(githubService);
-    if (authError) return authError;
-    const name = String(params?.name || '').trim();
-    if (!name) return { success: false, error: 'Repository name is required.' };
-    try {
-      return { success: true, data: await githubService.createRepositoryWithReadme(name, String(params.description || ''), Boolean(params.isPrivate)) };
-    } catch (error) {
-      return { success: false, error: toErrorMessage(error, 'Repository could not be created.') };
-    }
-  });
+  ipcMain.handle(
+    IpcChannel.GithubCreateRepoWithReadme,
+    async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
+      const name = String(params?.name || '').trim();
+      if (!name) return { success: false, error: 'Repository name is required.' };
+      try {
+        return { success: true, data: await githubService.createRepositoryWithReadme(name, String(params.description || ''), Boolean(params.isPrivate)) };
+      } catch (error) {
+        return { success: false, error: toErrorMessage(error, 'Repository could not be created.') };
+      }
+    },
+  );
 
   ipcMain.handle(
     IpcChannel.GithubForkRepo,

@@ -77,10 +77,10 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
           {isGithubView
             ? 'GitHub'
             : isPlannerView
-            ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
-            : activeRepo
-              ? activeRepo.split(/[\\/]/).pop()
-              : 'Open-Git-Control'}
+              ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
+              : activeRepo
+                ? activeRepo.split(/[\\/]/).pop()
+                : 'Open-Git-Control'}
         </span>
         {!isWorkspaceView && currentBranch && (
           <span className="topbar-chip topbar-chip-branch">

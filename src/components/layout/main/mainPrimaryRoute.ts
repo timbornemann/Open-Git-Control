@@ -69,4 +69,5 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): stri
   }
 };
 
-export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean => route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';
+export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean =>
+  route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';

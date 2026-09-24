@@ -17,12 +17,16 @@ describe('GitHub Actions IPC errors', () => {
 
   it('explains permissions and API limits on an Actions access error', async () => {
     const accessError = Object.assign(new Error('Resource not accessible by integration'), { status: 403 });
-    registerGithubPullRequestHandlers({ githubService: {
-      isAuthenticated: () => true,
-      getWorkflowRunsPage: vi.fn().mockRejectedValue(accessError),
-    } as unknown as GitHubService });
+    registerGithubPullRequestHandlers({
+      githubService: {
+        isAuthenticated: () => true,
+        getWorkflowRunsPage: vi.fn().mockRejectedValue(accessError),
+      } as unknown as GitHubService,
+    });
 
-    await expect(handlers.get(IpcChannel.GithubGetWorkflowRunsPage)?.({}, { owner: 'alice', repo: 'demo', page: 1 }))
-      .resolves.toEqual({ success: false, error: expect.stringContaining('Check repository Actions permissions and API limits.') });
+    await expect(handlers.get(IpcChannel.GithubGetWorkflowRunsPage)?.({}, { owner: 'alice', repo: 'demo', page: 1 })).resolves.toEqual({
+      success: false,
+      error: expect.stringContaining('Check repository Actions permissions and API limits.'),
+    });
   });
 });

@@ -52,11 +52,18 @@ export class GitHubWorkflowService {
     const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const safePerPage = Number.isFinite(perPage) ? Math.max(1, Math.min(100, Math.floor(perPage))) : 50;
     const { data } = await octokit.rest.actions.listJobsForWorkflowRun({ owner, repo, run_id: runId, page: safePage, per_page: safePerPage });
-    const jobs = (data.jobs as Array<{
-      id: number; name: string; status: string; conclusion?: string | null; html_url?: string | null;
-      started_at?: string | null; completed_at?: string | null;
-      steps?: Array<{ number: number; name: string; status: string; conclusion?: string | null; started_at?: string | null; completed_at?: string | null }>;
-    }>).map((job) => ({
+    const jobs = (
+      data.jobs as Array<{
+        id: number;
+        name: string;
+        status: string;
+        conclusion?: string | null;
+        html_url?: string | null;
+        started_at?: string | null;
+        completed_at?: string | null;
+        steps?: Array<{ number: number; name: string; status: string; conclusion?: string | null; started_at?: string | null; completed_at?: string | null }>;
+      }>
+    ).map((job) => ({
       id: job.id,
       name: job.name,
       status: job.status,

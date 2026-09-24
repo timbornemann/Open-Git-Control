@@ -8,6 +8,8 @@ describe('GitHubPullRequestService merge', () => {
 
     await service.mergePullRequest('alice', 'demo', 12, 'squash', undefined, undefined, 'expected-head');
 
-    expect(merge).toHaveBeenCalledWith(expect.objectContaining({ owner: 'alice', repo: 'demo', pull_number: 12, merge_method: 'squash', sha: 'expected-head' }));
+    expect(merge).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: 'alice', repo: 'demo', pull_number: 12, merge_method: 'squash', sha: 'expected-head' }),
+    );
   });
 });

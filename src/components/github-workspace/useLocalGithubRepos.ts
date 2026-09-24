@@ -8,17 +8,21 @@ export function useLocalGithubRepos(openRepos: string[]) {
   useEffect(() => {
     let active = true;
     if (!gitClient.isAvailable()) return;
-    void Promise.all(openRepos.map(async (repoPath) => {
-      try {
-        const result = await gitClient.getRepoOriginUrl(repoPath);
-        return [repoPath, result.success ? toRepoIdentity(result.data || '') : null] as const;
-      } catch {
-        return [repoPath, null] as const;
-      }
-    })).then((entries) => {
+    void Promise.all(
+      openRepos.map(async (repoPath) => {
+        try {
+          const result = await gitClient.getRepoOriginUrl(repoPath);
+          return [repoPath, result.success ? toRepoIdentity(result.data || '') : null] as const;
+        } catch {
+          return [repoPath, null] as const;
+        }
+      }),
+    ).then((entries) => {
       if (active) setIdentities(Object.fromEntries(entries));
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [openRepos]);
 
   return useMemo(() => {

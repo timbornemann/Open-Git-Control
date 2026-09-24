@@ -630,15 +630,20 @@ export const useWorkspaceDomain = ({
       const origin = await gitClient.getRepoOriginUrl(repoPath);
       const identity = origin.success ? toRepoIdentity(origin.data || '') : null;
       if (!identity) return;
-      const entries = await Promise.all(openReposRef.current.map(async (path) => {
-        try {
-          const result = await gitClient.getRepoOriginUrl(path);
-          return { path, identity: result.success ? toRepoIdentity(result.data || '') : null };
-        } catch {
-          return { path, identity: null };
-        }
-      }));
-      setRepoPins(entries.filter((entry) => entry.identity === identity).map((entry) => entry.path), pinned);
+      const entries = await Promise.all(
+        openReposRef.current.map(async (path) => {
+          try {
+            const result = await gitClient.getRepoOriginUrl(path);
+            return { path, identity: result.success ? toRepoIdentity(result.data || '') : null };
+          } catch {
+            return { path, identity: null };
+          }
+        }),
+      );
+      setRepoPins(
+        entries.filter((entry) => entry.identity === identity).map((entry) => entry.path),
+        pinned,
+      );
       if (!githubClient.isAvailable()) return;
       const snapshot = await githubClient.getCatalogSnapshot();
       if (!snapshot.success || !snapshot.data) return;

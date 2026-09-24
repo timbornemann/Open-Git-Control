@@ -37,9 +37,10 @@ export function readGithubCatalogCache(host: string, username?: string | null): 
       clearGithubCatalogCache();
       return null;
     }
-    const privateRepos = stored.encryptedPrivateRepos && isSecureStorageAvailable()
-      ? JSON.parse(safeStorage.decryptString(Buffer.from(stored.encryptedPrivateRepos, 'base64'))) as GitHubRepositoryDto[]
-      : [];
+    const privateRepos =
+      stored.encryptedPrivateRepos && isSecureStorageAvailable()
+        ? (JSON.parse(safeStorage.decryptString(Buffer.from(stored.encryptedPrivateRepos, 'base64'))) as GitHubRepositoryDto[])
+        : [];
     sessionSnapshot = {
       host: stored.host,
       username: stored.username,
@@ -58,9 +59,8 @@ export function saveGithubCatalogCache(host: string, username: string, repos: Gi
   sessionSnapshot = { host, username, savedAt, repos: unique };
   const publicRepos = unique.filter((repo) => !repo.private);
   const privateRepos = unique.filter((repo) => repo.private);
-  const encryptedPrivateRepos = privateRepos.length > 0 && isSecureStorageAvailable()
-    ? safeStorage.encryptString(JSON.stringify(privateRepos)).toString('base64')
-    : undefined;
+  const encryptedPrivateRepos =
+    privateRepos.length > 0 && isSecureStorageAvailable() ? safeStorage.encryptString(JSON.stringify(privateRepos)).toString('base64') : undefined;
   const stored: StoredSnapshot = { host, username, savedAt, publicRepos, encryptedPrivateRepos };
   fs.writeFileSync(cachePath(), JSON.stringify(stored), { mode: 0o600 });
   return sessionSnapshot;

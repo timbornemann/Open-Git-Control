@@ -364,10 +364,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       ipcRenderer.invoke(IpcChannel.GithubGetWorkflowRunsPage, params),
     githubGetWorkflowJobsPage: (params: { owner: string; repo: string; runId: number; page?: number; perPage?: number }) =>
       ipcRenderer.invoke(IpcChannel.GithubGetWorkflowJobsPage, params),
-    githubRerunFailedJobs: (owner: string, repo: string, runId: number) =>
-      ipcRenderer.invoke(IpcChannel.GithubRerunFailedJobs, { owner, repo, runId }),
-    githubCancelWorkflowRun: (owner: string, repo: string, runId: number) =>
-      ipcRenderer.invoke(IpcChannel.GithubCancelWorkflowRun, { owner, repo, runId }),
+    githubRerunFailedJobs: (owner: string, repo: string, runId: number) => ipcRenderer.invoke(IpcChannel.GithubRerunFailedJobs, { owner, repo, runId }),
+    githubCancelWorkflowRun: (owner: string, repo: string, runId: number) => ipcRenderer.invoke(IpcChannel.GithubCancelWorkflowRun, { owner, repo, runId }),
     githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => ipcRenderer.invoke(IpcChannel.GithubGetStatusChecks, params),
     githubMergePR: (params: {
       owner: string;

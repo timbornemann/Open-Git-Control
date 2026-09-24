@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GitHubRepositoryDto } from '../../../src/types/githubDtos';
 
 const { getPathMock, encryptionAvailableMock } = vi.hoisted(() => ({
-  getPathMock: vi.fn(), encryptionAvailableMock: vi.fn(),
+  getPathMock: vi.fn(),
+  encryptionAvailableMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
@@ -19,8 +20,12 @@ vi.mock('../secureStore', () => ({ isSecureStorageAvailable: encryptionAvailable
 
 let directory: string;
 const repo = (id: number, name: string, isPrivate: boolean): GitHubRepositoryDto => ({
-  id, name, fullName: `alice/${name}`, private: isPrivate,
-  cloneUrl: `https://github.com/alice/${name}.git`, htmlUrl: `https://github.com/alice/${name}`,
+  id,
+  name,
+  fullName: `alice/${name}`,
+  private: isPrivate,
+  cloneUrl: `https://github.com/alice/${name}.git`,
+  htmlUrl: `https://github.com/alice/${name}`,
 });
 
 beforeEach(() => {
@@ -29,7 +34,10 @@ beforeEach(() => {
   encryptionAvailableMock.mockReturnValue(true);
   vi.resetModules();
 });
-afterEach(() => { fs.rmSync(directory, { recursive: true, force: true }); vi.clearAllMocks(); });
+afterEach(() => {
+  fs.rmSync(directory, { recursive: true, force: true });
+  vi.clearAllMocks();
+});
 
 describe('GitHub catalog snapshot', () => {
   it('persists private cards only through OS encryption and binds them to the account', async () => {

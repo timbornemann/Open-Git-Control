@@ -3,8 +3,12 @@ import type { GitHubRepositoryDto } from '@/types/githubDtos';
 import { selectGithubCatalogRepos } from '../githubCatalogSelectors';
 
 const repo = (id: number, name: string, privateRepo = false): GitHubRepositoryDto => ({
-  id, name, fullName: `alice/${name}`, private: privateRepo,
-  cloneUrl: `https://github.com/alice/${name}.git`, htmlUrl: `https://github.com/alice/${name}`,
+  id,
+  name,
+  fullName: `alice/${name}`,
+  private: privateRepo,
+  cloneUrl: `https://github.com/alice/${name}.git`,
+  htmlUrl: `https://github.com/alice/${name}`,
   description: id === 140 ? 'Needle in later page' : null,
   updatedAt: new Date(2026, 0, id).toISOString(),
 });
