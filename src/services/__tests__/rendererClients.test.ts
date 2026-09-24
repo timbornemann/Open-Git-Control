@@ -231,14 +231,26 @@ describe('renderer service clients', () => {
     await expectDelegation(() => githubClient.loginWithSavedToken(), api.github.githubLoginWithSavedToken, []);
     await expectDelegation(() => githubClient.logout(), api.github.githubLogout, []);
     await expectDelegation(() => githubClient.createRepository('repo', 'desc', true), api.github.githubCreateRepo, ['repo', 'desc', true]);
+    await expectDelegation(() => githubClient.createRepositoryWithReadme('repo', 'desc', true), api.github.githubCreateRepoWithReadme, ['repo', 'desc', true]);
+    await expectDelegation(() => githubClient.getCatalogSnapshot(), api.github.githubGetCatalogSnapshot, []);
+    await expectDelegation(() => githubClient.saveCatalogSnapshot([]), api.github.githubSaveCatalogSnapshot, [[]]);
     await expectDelegation(() => githubClient.forkRepository({ owner: 'octo', repo: 'hello' } as any), api.github.githubForkRepo, [
       { owner: 'octo', repo: 'hello' },
     ]);
     await expectDelegation(() => githubClient.getPullRequests('octo', 'hello', 'open'), api.github.githubGetPRs, ['octo', 'hello', 'open']);
+    await expectDelegation(() => githubClient.getBranches('octo', 'hello'), api.github.githubGetBranches, ['octo', 'hello']);
     await expectDelegation(() => githubClient.createPullRequest({ owner: 'octo' } as any), api.github.githubCreatePR, [{ owner: 'octo' }]);
     await expectDelegation(() => githubClient.getWorkflowRuns({ owner: 'octo', repo: 'hello' }), api.github.githubGetWorkflowRuns, [
       { owner: 'octo', repo: 'hello' },
     ]);
+    await expectDelegation(() => githubClient.getWorkflowRunsPage({ owner: 'octo', repo: 'hello', page: 2 }), api.github.githubGetWorkflowRunsPage, [
+      { owner: 'octo', repo: 'hello', page: 2 },
+    ]);
+    await expectDelegation(() => githubClient.getWorkflowJobsPage({ owner: 'octo', repo: 'hello', runId: 4 }), api.github.githubGetWorkflowJobsPage, [
+      { owner: 'octo', repo: 'hello', runId: 4 },
+    ]);
+    await expectDelegation(() => githubClient.rerunFailedJobs('octo', 'hello', 4), api.github.githubRerunFailedJobs, ['octo', 'hello', 4]);
+    await expectDelegation(() => githubClient.cancelWorkflowRun('octo', 'hello', 4), api.github.githubCancelWorkflowRun, ['octo', 'hello', 4]);
     await expectDelegation(() => githubClient.getStatusChecks({ owner: 'octo', repo: 'hello', ref: 'main' }), api.github.githubGetStatusChecks, [
       { owner: 'octo', repo: 'hello', ref: 'main' },
     ]);

@@ -117,23 +117,21 @@ describe('GitHubWorkflowService Actions pages and controls', () => {
   });
 
   it('returns job steps and sends run control actions to GitHub', async () => {
-    const listJobsForWorkflowRun = vi
-      .fn()
-      .mockResolvedValue({
-        data: {
-          total_count: 1,
-          jobs: [
-            {
-              id: 7,
-              name: 'build',
-              status: 'completed',
-              conclusion: 'failure',
-              html_url: 'https://github.com/job/7',
-              steps: [{ number: 1, name: 'npm test', status: 'completed', conclusion: 'failure' }],
-            },
-          ],
-        },
-      });
+    const listJobsForWorkflowRun = vi.fn().mockResolvedValue({
+      data: {
+        total_count: 1,
+        jobs: [
+          {
+            id: 7,
+            name: 'build',
+            status: 'completed',
+            conclusion: 'failure',
+            html_url: 'https://github.com/job/7',
+            steps: [{ number: 1, name: 'npm test', status: 'completed', conclusion: 'failure' }],
+          },
+        ],
+      },
+    });
     const reRunWorkflowFailedJobs = vi.fn().mockResolvedValue({});
     const cancelWorkflowRun = vi.fn().mockResolvedValue({});
     const service = new GitHubWorkflowService(() => ({ rest: { actions: { listJobsForWorkflowRun, reRunWorkflowFailedJobs, cancelWorkflowRun } } }) as any);
