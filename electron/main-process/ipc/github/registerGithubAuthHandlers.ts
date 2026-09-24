@@ -6,6 +6,7 @@ import { runGithubCliOneClickLogin } from '../../githubCliAuth';
 import { clearSavedGithubTokenSecurely, readSavedGithubTokenWithHost, saveGithubTokenSecurely } from '../../secureStore';
 import { toErrorMessage } from './githubHandlerUtils';
 import { getGithubUserFacingErrorMessage } from '../../../github/githubErrorUtils';
+import { clearGithubCatalogCache, readGithubCatalogCache } from '../../githubCatalogCache';
 
 type RegisterGithubAuthHandlersDeps = {
   githubService: GitHubService;
@@ -50,6 +51,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       return { success: false, error: isCurrentAuthAttempt(generation) ? lastAuthenticationError() : 'GitHub-Anmeldung wurde abgebrochen.' };
     }
     const persist = persistGithubToken(token, normalizedHost);
+    readGithubCatalogCache(normalizedHost, githubService.getUsername());
     return {
       success: true,
       tokenPersisted: persist.tokenPersisted,
@@ -114,6 +116,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       const failure = githubService.getLastAuthenticationFailure?.();
       if (failure?.invalidCredentials) {
         clearSavedGithubTokenSecurely();
+        clearGithubCatalogCache();
         githubService.logout();
       }
       return {
@@ -124,6 +127,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       };
     }
     const persist = persistGithubToken(savedToken.token, normalizedHost);
+    readGithubCatalogCache(normalizedHost, githubService.getUsername());
 
     return {
       success: true,
@@ -183,6 +187,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       }
 
       const persist = persistGithubToken(result.accessToken, normalizedHost);
+      readGithubCatalogCache(normalizedHost, githubService.getUsername());
       return {
         success: true,
         data: {
@@ -217,6 +222,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       }
 
       const persist = persistGithubToken(tokenResult.accessToken, normalizedHost);
+      readGithubCatalogCache(normalizedHost, githubService.getUsername());
       return {
         success: true,
         data: {
@@ -248,6 +254,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
       persistenceError = toErrorMessage(error, 'Saved GitHub token could not be deleted.');
     }
     githubService.logout();
+    clearGithubCatalogCache();
     if (persistenceError) {
       return { success: false, error: persistenceError, sessionCleared: true } as const;
     }

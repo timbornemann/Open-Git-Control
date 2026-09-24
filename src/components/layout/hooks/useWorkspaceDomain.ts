@@ -3,6 +3,9 @@ import type { RepoSortByDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
+import { toRepoIdentity } from '@/components/layout/sidebar/useGithubRepoOriginMap';
+import { setGithubRepoPinned } from '@/components/github-workspace/githubPinStore';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { AppTabId, InputDialogState } from '@/app/state/contracts';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -337,16 +340,17 @@ export const useWorkspaceDomain = ({
   }, [sortedOpenRepos, repoMeta, activeRepo, repoSortBy, reposLoaded, isRestoringRepos]);
 
   const handleSwitchRepo = async (repoPath: string) => {
-    if (!appClient.isAvailable() || normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(activeRepoRef.current || '')) return;
+    if (!appClient.isAvailable()) return false;
+    if (normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(activeRepoRef.current || '')) return true;
     // Close any repository-scoped action dialog before an asynchronous guard
     // decision or main-process repository switch can begin.
     setConfirmDialog(null);
-    if (!(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: repoPath }))) return;
+    if (!(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: repoPath }))) return false;
     const operationId = ++repoOperationSequenceRef.current;
     // Prevent a confirmation opened for repo A from being accepted while the
     // main process has already switched to repo B but React has not rerendered.
     const canonicalRepoPath = await appClient.setRepoPath(repoPath);
-    if (repoOperationSequenceRef.current !== operationId) return;
+    if (repoOperationSequenceRef.current !== operationId) return false;
     migrateRepoPathToCanonical(repoPath, canonicalRepoPath);
     activeRepoRef.current = canonicalRepoPath;
     setActiveRepo(canonicalRepoPath);
@@ -354,6 +358,7 @@ export const useWorkspaceDomain = ({
     touchRepo(canonicalRepoPath);
     onRepoActivated();
     triggerRefresh();
+    return true;
   };
 
   const handleCloseRepo = async (repoPath: string) => {
@@ -596,20 +601,50 @@ export const useWorkspaceDomain = ({
     triggerRefresh();
   };
 
-  const toggleRepoPin = (repoPath: string) => {
+  const setRepoPins = (repoPaths: string[], pinned: boolean) => {
+    const keys = new Set(repoPaths.map(normalizeRepoPathKey));
     const now = Date.now();
     setRepoMeta((prev) => {
-      const next = {
-        ...prev,
-        [repoPath]: {
-          pinned: !prev[repoPath]?.pinned,
-          lastOpened: normalizeTimestamp(prev[repoPath]?.lastOpened, now),
-          createdAt: normalizeTimestamp(prev[repoPath]?.createdAt, now),
-        },
-      };
+      const next = { ...prev };
+      let changed = false;
+      for (const path of openReposRef.current) {
+        if (!keys.has(normalizeRepoPathKey(path)) || Boolean(prev[path]?.pinned) === pinned) continue;
+        next[path] = {
+          pinned,
+          lastOpened: normalizeTimestamp(prev[path]?.lastOpened, now),
+          createdAt: normalizeTimestamp(prev[path]?.createdAt, now),
+        };
+        changed = true;
+      }
+      if (!changed) return prev;
       repoMetaRef.current = next;
       return next;
     });
+  };
+
+  const toggleRepoPin = (repoPath: string) => {
+    const pinned = !repoMetaRef.current[repoPath]?.pinned;
+    setRepoPins([repoPath], pinned);
+    if (!gitClient.isAvailable()) return;
+    void (async () => {
+      const origin = await gitClient.getRepoOriginUrl(repoPath);
+      const identity = origin.success ? toRepoIdentity(origin.data || '') : null;
+      if (!identity) return;
+      const entries = await Promise.all(openReposRef.current.map(async (path) => {
+        try {
+          const result = await gitClient.getRepoOriginUrl(path);
+          return { path, identity: result.success ? toRepoIdentity(result.data || '') : null };
+        } catch {
+          return { path, identity: null };
+        }
+      }));
+      setRepoPins(entries.filter((entry) => entry.identity === identity).map((entry) => entry.path), pinned);
+      if (!githubClient.isAvailable()) return;
+      const snapshot = await githubClient.getCatalogSnapshot();
+      if (!snapshot.success || !snapshot.data) return;
+      const remote = snapshot.data.repos.find((repo) => toRepoIdentity(repo.htmlUrl) === identity);
+      if (remote) setGithubRepoPinned(snapshot.data.host, snapshot.data.username, remote.id, pinned);
+    })();
   };
 
   const handleSetRepoSortBy = (sortBy: RepoSortByDto) => {
@@ -633,5 +668,6 @@ export const useWorkspaceDomain = ({
     handleOpenFolder,
     addOpenRepo,
     toggleRepoPin,
+    setRepoPins,
   };
 };

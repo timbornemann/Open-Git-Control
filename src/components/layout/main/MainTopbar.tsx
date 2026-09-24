@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
+import { GitBranch, Github, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
 import { useGitHubStore, useGitStore, useSettingsStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -50,6 +50,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onOpenReleaseCreator = useGitHubStore((state) => state.onOpenReleaseCreator);
   const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
+  const isGithubView = activeTab === 'github';
+  const isWorkspaceView = isPlannerView || isGithubView;
   const repositoryRunForActiveRepo = repositoryRun?.repoPath === activeRepo ? repositoryRun : null;
 
   return (
@@ -69,21 +71,23 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
             border: '1px solid var(--accent-primary-border)',
           }}
         >
-          <GitBranch size={14} />
+          {isGithubView ? <Github size={14} /> : <GitBranch size={14} />}
         </div>
         <span className="topbar-repo-title">
-          {isPlannerView
+          {isGithubView
+            ? 'GitHub'
+            : isPlannerView
             ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
             : activeRepo
               ? activeRepo.split(/[\\/]/).pop()
               : 'Open-Git-Control'}
         </span>
-        {!isPlannerView && currentBranch && (
+        {!isWorkspaceView && currentBranch && (
           <span className="topbar-chip topbar-chip-branch">
             <GitBranch size={12} /> {currentBranch}
           </span>
         )}
-        {!isPlannerView && activeRepo && (
+        {!isWorkspaceView && activeRepo && (
           <span
             className="topbar-chip topbar-chip-remote"
             style={{
@@ -99,7 +103,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
       </div>
 
       <div className="topbar-right">
-        {!isPlannerView && (
+        {!isWorkspaceView && (
           <TopbarActions
             activeRepo={activeRepo}
             branches={branches}

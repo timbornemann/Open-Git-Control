@@ -44,6 +44,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   repoSortBy: state.repoSortBy,
   onSetRepoSortBy: state.setRepoSortBy,
   onToggleRepoPin: state.handleToggleRepoPin,
+  onSetRepoPins: state.handleSetRepoPins,
   onOpenFolder: state.handleOpenFolder,
   onCloneByUrl: state.handleCloneByUrl,
   onSwitchRepo: state.handleSwitchRepo,

@@ -76,12 +76,28 @@ export const githubClient = {
     return requireElectronGithubApi().githubCreateRepo(name, description, isPrivate);
   },
 
+  async createRepositoryWithReadme(name: string, description: string, isPrivate: boolean) {
+    return requireElectronGithubApi().githubCreateRepoWithReadme(name, description, isPrivate);
+  },
+
+  async getCatalogSnapshot() {
+    return requireElectronGithubApi().githubGetCatalogSnapshot();
+  },
+
+  async saveCatalogSnapshot(repos: GitHubRepositoryDto[]) {
+    return requireElectronGithubApi().githubSaveCatalogSnapshot(repos);
+  },
+
   async forkRepository(params: GitHubForkParamsDto): Promise<IpcResult<GitHubRepositoryDto>> {
     return requireElectronGithubApi().githubForkRepo(params);
   },
 
   async getRepository(owner: string, repo: string) {
     return requireElectronGithubApi().githubGetRepository(owner, repo);
+  },
+
+  async getBranches(owner: string, repo: string) {
+    return requireElectronGithubApi().githubGetBranches(owner, repo);
   },
 
   async getPullRequests(owner: string, repo: string, state: string): Promise<IpcResult<PullRequestDto[]>> {
@@ -102,6 +118,22 @@ export const githubClient = {
     return requireElectronGithubApi().githubGetWorkflowRuns(params);
   },
 
+  async getWorkflowRunsPage(params: { owner: string; repo: string; branch?: string; status?: string; page?: number; perPage?: number }) {
+    return requireElectronGithubApi().githubGetWorkflowRunsPage(params);
+  },
+
+  async getWorkflowJobsPage(params: { owner: string; repo: string; runId: number; page?: number; perPage?: number }) {
+    return requireElectronGithubApi().githubGetWorkflowJobsPage(params);
+  },
+
+  async rerunFailedJobs(owner: string, repo: string, runId: number) {
+    return requireElectronGithubApi().githubRerunFailedJobs(owner, repo, runId);
+  },
+
+  async cancelWorkflowRun(owner: string, repo: string, runId: number) {
+    return requireElectronGithubApi().githubCancelWorkflowRun(owner, repo, runId);
+  },
+
   async getStatusChecks(params: { owner: string; repo: string; ref: string }): Promise<IpcResult<GithubStatusChecksDto>> {
     return requireElectronGithubApi().githubGetStatusChecks(params);
   },
@@ -111,6 +143,7 @@ export const githubClient = {
     repo: string;
     pullNumber: number;
     mergeMethod: PullRequestMergeMethodDto;
+    expectedHeadSha?: string;
   }): Promise<IpcResult<{ sha: string; merged: boolean; message: string }>> {
     return requireElectronGithubApi().githubMergePR(params);
   },

@@ -1,4 +1,5 @@
 import type { GithubRepositoryApi, GitHubOctokitProvider, GitHubRepositoryDto } from './types';
+import { buildOpenGitControlReadme } from '../../src/shared/licenseTemplates';
 
 const mapRepository = (repo: GithubRepositoryApi): GitHubRepositoryDto => ({
   id: repo.id,
@@ -86,6 +87,47 @@ export class GitHubRepositoryService {
     });
 
     return mapRepository(data as GithubRepositoryApi);
+  }
+
+  async createRepositoryWithReadme(name: string, description: string, isPrivate: boolean) {
+    const octokit = this.getOctokit();
+    const { data } = await octokit.rest.repos.createForAuthenticatedUser({
+      name,
+      description,
+      private: isPrivate,
+      auto_init: true,
+    });
+    const repository = mapRepository(data as GithubRepositoryApi);
+    const owner = repository.fullName.split('/')[0];
+    try {
+      const current = await octokit.rest.repos.getContent({ owner, repo: repository.name, path: 'README.md' });
+      if (Array.isArray(current.data) || current.data.type !== 'file' || !current.data.sha) {
+        throw new Error('GitHub did not return the initial README file.');
+      }
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner,
+        repo: repository.name,
+        path: 'README.md',
+        message: 'Add Open Git Control README template',
+        content: Buffer.from(buildOpenGitControlReadme(repository.name), 'utf8').toString('base64'),
+        sha: current.data.sha,
+      });
+      return { repository, brandedReadme: true };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return { repository, brandedReadme: false, warning: `Repository created with GitHub README. Open Git Control template could not be applied: ${reason}` };
+    }
+  }
+
+  async getBranches(owner: string, repo: string): Promise<string[]> {
+    const octokit = this.getOctokit();
+    const branches: string[] = [];
+    for (let page = 1; page <= 100; page += 1) {
+      const { data } = await octokit.rest.repos.listBranches({ owner, repo, per_page: 100, page });
+      branches.push(...(data as Array<{ name: string }>).map((branch) => branch.name));
+      if (data.length < 100) return branches;
+    }
+    throw new Error('Too many branches to list completely.');
   }
 
   async getRepository(owner: string, repo: string) {

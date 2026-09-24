@@ -134,6 +134,14 @@ export class GitHubService {
     return this.repositories.createRepository(name, description, isPrivate);
   }
 
+  createRepositoryWithReadme(name: string, description: string, isPrivate: boolean) {
+    return this.repositories.createRepositoryWithReadme(name, description, isPrivate);
+  }
+
+  getBranches(owner: string, repo: string) {
+    return this.repositories.getBranches(owner, repo);
+  }
+
   getRepository(owner: string, repo: string) {
     return this.repositories.getRepository(owner, repo);
   }
@@ -157,12 +165,28 @@ export class GitHubService {
     return this.pullRequests.createPullRequest(owner, repo, title, body, head, base);
   }
 
-  mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string) {
-    return this.pullRequests.mergePullRequest(owner, repo, pullNumber, mergeMethod, commitTitle, commitMessage);
+  mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string, expectedHeadSha?: string) {
+    return this.pullRequests.mergePullRequest(owner, repo, pullNumber, mergeMethod, commitTitle, commitMessage, expectedHeadSha);
   }
 
   getWorkflowRuns(owner: string, repo: string, params: { branch?: string; headSha?: string; perPage?: number } = {}) {
     return this.workflows.getWorkflowRuns(owner, repo, params);
+  }
+
+  getWorkflowRunsPage(owner: string, repo: string, params: { branch?: string; status?: string; page?: number; perPage?: number } = {}) {
+    return this.workflows.getWorkflowRunsPage(owner, repo, params);
+  }
+
+  getWorkflowJobsPage(owner: string, repo: string, runId: number, page?: number, perPage?: number) {
+    return this.workflows.getWorkflowJobsPage(owner, repo, runId, page, perPage);
+  }
+
+  rerunFailedJobs(owner: string, repo: string, runId: number) {
+    return this.workflows.rerunFailedJobs(owner, repo, runId);
+  }
+
+  cancelWorkflowRun(owner: string, repo: string, runId: number) {
+    return this.workflows.cancelWorkflowRun(owner, repo, runId);
   }
 
   getStatusChecks(owner: string, repo: string, ref: string) {

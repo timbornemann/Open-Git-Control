@@ -82,3 +82,37 @@ describe('GitHubWorkflowService.getStatusChecks', () => {
     await expect(service.getStatusChecks('owner', 'repo', 'abc')).rejects.toThrow('incomplete');
   });
 });
+
+describe('GitHubWorkflowService Actions pages and controls', () => {
+  it('loads all-branch runs by default and forwards branch, status and page filters', async () => {
+    const listWorkflowRunsForRepo = vi.fn().mockResolvedValue({ data: { total_count: 25, workflow_runs: [{
+      id: 1, name: 'CI', display_title: 'CI', status: 'completed', conclusion: 'failure', event: 'push',
+      html_url: 'https://github.com/alice/demo/actions/runs/1', head_branch: 'main', head_sha: 'abc',
+      created_at: '2026-01-01', updated_at: '2026-01-01',
+    }] } });
+    const service = new GitHubWorkflowService(() => ({ rest: { actions: { listWorkflowRunsForRepo } } }) as any);
+
+    const first = await service.getWorkflowRunsPage('alice', 'demo', { page: 1, perPage: 20 });
+    const second = await service.getWorkflowRunsPage('alice', 'demo', { branch: 'feature', status: 'failure', page: 2, perPage: 20 });
+
+    expect(first.hasMore).toBe(true);
+    expect(second.hasMore).toBe(false);
+    expect(listWorkflowRunsForRepo).toHaveBeenNthCalledWith(1, expect.not.objectContaining({ branch: expect.anything() }));
+    expect(listWorkflowRunsForRepo).toHaveBeenNthCalledWith(2, expect.objectContaining({ branch: 'feature', status: 'failure', page: 2 }));
+  });
+
+  it('returns job steps and sends run control actions to GitHub', async () => {
+    const listJobsForWorkflowRun = vi.fn().mockResolvedValue({ data: { total_count: 1, jobs: [{ id: 7, name: 'build', status: 'completed', conclusion: 'failure', html_url: 'https://github.com/job/7', steps: [{ number: 1, name: 'npm test', status: 'completed', conclusion: 'failure' }] }] } });
+    const reRunWorkflowFailedJobs = vi.fn().mockResolvedValue({});
+    const cancelWorkflowRun = vi.fn().mockResolvedValue({});
+    const service = new GitHubWorkflowService(() => ({ rest: { actions: { listJobsForWorkflowRun, reRunWorkflowFailedJobs, cancelWorkflowRun } } }) as any);
+
+    const jobs = await service.getWorkflowJobsPage('alice', 'demo', 5);
+    await service.rerunFailedJobs('alice', 'demo', 5);
+    await service.cancelWorkflowRun('alice', 'demo', 5);
+
+    expect(jobs.jobs[0].steps[0].name).toBe('npm test');
+    expect(reRunWorkflowFailedJobs).toHaveBeenCalledWith({ owner: 'alice', repo: 'demo', run_id: 5 });
+    expect(cancelWorkflowRun).toHaveBeenCalledWith({ owner: 'alice', repo: 'demo', run_id: 5 });
+  });
+});

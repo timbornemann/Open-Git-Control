@@ -120,6 +120,53 @@ export interface GithubWorkflowRunDto {
   updatedAt: string;
 }
 
+export interface GithubWorkflowRunsPageDto {
+  runs: GithubWorkflowRunDto[];
+  page: number;
+  hasMore: boolean;
+  totalCount: number;
+}
+
+export interface GithubWorkflowStepDto {
+  number: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface GithubWorkflowJobDto {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  htmlUrl: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  steps: GithubWorkflowStepDto[];
+}
+
+export interface GithubWorkflowJobsPageDto {
+  jobs: GithubWorkflowJobDto[];
+  page: number;
+  hasMore: boolean;
+  totalCount: number;
+}
+
+export interface GithubCatalogSnapshotDto {
+  host: string;
+  username: string;
+  savedAt: string;
+  repos: GitHubRepositoryDto[];
+}
+
+export interface GithubCreateRepositoryWithReadmeDto {
+  repository: GitHubRepositoryDto;
+  brandedReadme: boolean;
+  warning?: string;
+}
+
 export interface GithubCheckRunDto {
   id: number;
   name: string;

@@ -23,7 +23,7 @@ const App: React.FC = () => {
     (key: string, variables?: TranslationVariables) => translateFromCatalog(state.settings.language, key, variables),
     [state.settings.language],
   );
-  const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>('pat');
+  const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [quickTodoRequestId, setQuickTodoRequestId] = useState(0);

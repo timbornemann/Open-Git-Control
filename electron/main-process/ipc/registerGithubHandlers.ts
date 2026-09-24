@@ -14,7 +14,7 @@ type RegisterGithubHandlersDeps = {
 
 export function registerGithubHandlers({ gitService, githubService, readSettingsWithMigration }: RegisterGithubHandlersDeps): void {
   registerGithubAuthHandlers({ githubService, readSettingsWithMigration });
-  registerGithubRepositoryHandlers({ githubService });
+  registerGithubRepositoryHandlers({ githubService, readSettingsWithMigration });
   registerGithubPullRequestHandlers({ githubService });
   registerGithubReleaseHandlers({ gitService, githubService, readSettingsWithMigration });
 }

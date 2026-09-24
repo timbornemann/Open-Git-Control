@@ -129,9 +129,10 @@ export type RepositoryStateContract = {
   repoSortBy: RepoSortByDto;
   onSetRepoSortBy: (sortBy: RepoSortByDto) => void;
   onToggleRepoPin: (repoPath: string) => void;
+  onSetRepoPins: (repoPaths: string[], pinned: boolean) => void;
   onOpenFolder: () => void;
   onCloneByUrl: () => void;
-  onSwitchRepo: (repoPath: string) => void;
+  onSwitchRepo: (repoPath: string) => Promise<boolean>;
   onCloseRepo: (repoPath: string) => void;
   remoteSync: RemoteSyncState;
   onRefreshRemoteQuick: () => void;

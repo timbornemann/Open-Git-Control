@@ -9,9 +9,13 @@ import type {
   GitHubRepositoryDetailsDto,
   GitHubRepositoryDto,
   GitHubRepositoryPageDto,
+  GithubCatalogSnapshotDto,
+  GithubCreateRepositoryWithReadmeDto,
   GitHubUploadReleaseAssetParamsDto,
   GithubStatusChecksDto,
   GithubWorkflowRunDto,
+  GithubWorkflowRunsPageDto,
+  GithubWorkflowJobsPageDto,
   PullRequestDto,
   PullRequestMergeMethodDto,
   ReleaseCommitDto,
@@ -51,7 +55,11 @@ export type WorkflowRunsRequestDto = {
   branch?: string;
   headSha?: string;
   perPage?: number;
+  page?: number;
+  status?: string;
 };
+
+export type WorkflowJobsRequestDto = { owner: string; repo: string; runId: number; page?: number; perPage?: number };
 
 export type StatusChecksRequestDto = {
   owner: string;
@@ -66,6 +74,7 @@ export type MergePullRequestParamsDto = {
   mergeMethod: PullRequestMergeMethodDto;
   commitTitle?: string;
   commitMessage?: string;
+  expectedHeadSha?: string;
 };
 
 export type MergePullRequestResultDto = {
@@ -98,8 +107,12 @@ export interface ElectronGithubAPI {
   githubCheckAuthStatus: () => Promise<{ authenticated: boolean; username: string | null }>;
   githubLogout: () => Promise<{ success: true } | { success: false; error: string; sessionCleared: boolean }>;
   githubCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GitHubRepositoryDto>>;
+  githubCreateRepoWithReadme: (name: string, description: string, isPrivate: boolean) => Promise<IpcResult<GithubCreateRepositoryWithReadmeDto>>;
+  githubGetCatalogSnapshot: () => Promise<IpcResult<GithubCatalogSnapshotDto | null>>;
+  githubSaveCatalogSnapshot: (repos: GitHubRepositoryDto[]) => Promise<IpcResult<{ savedAt: string }>>;
   githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubGetRepository: (owner: string, repo: string) => Promise<IpcResult<GitHubRepositoryDetailsDto>>;
+  githubGetBranches: (owner: string, repo: string) => Promise<IpcResult<string[]>>;
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: CreatePullRequestParamsDto) => Promise<IpcResult<CreatePullRequestResultDto>>;
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
@@ -111,6 +124,10 @@ export interface ElectronGithubAPI {
     repoPath?: string;
   }) => Promise<IpcResult<GitHubReleaseContextDto>>;
   githubGetWorkflowRuns: (params: WorkflowRunsRequestDto) => Promise<IpcResult<GithubWorkflowRunDto[]>>;
+  githubGetWorkflowRunsPage: (params: WorkflowRunsRequestDto) => Promise<IpcResult<GithubWorkflowRunsPageDto>>;
+  githubGetWorkflowJobsPage: (params: WorkflowJobsRequestDto) => Promise<IpcResult<GithubWorkflowJobsPageDto>>;
+  githubRerunFailedJobs: (owner: string, repo: string, runId: number) => Promise<IpcResult<true>>;
+  githubCancelWorkflowRun: (owner: string, repo: string, runId: number) => Promise<IpcResult<true>>;
   githubGetStatusChecks: (params: StatusChecksRequestDto) => Promise<IpcResult<GithubStatusChecksDto>>;
   githubMergePR: (params: MergePullRequestParamsDto) => Promise<IpcResult<MergePullRequestResultDto>>;
 }

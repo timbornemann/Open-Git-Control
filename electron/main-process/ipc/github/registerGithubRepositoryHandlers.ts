@@ -1,13 +1,39 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { GitHubService } from '../../../GitHubService';
+import type { AppSettings } from '../../../settings';
+import type { GitHubRepositoryDto } from '../../../../src/types/githubDtos';
 import { IpcChannel } from '../../../../src/types/ipcContract';
+import { readSavedGithubTokenWithHost } from '../../secureStore';
+import { readGithubCatalogCache, saveGithubCatalogCache } from '../../githubCatalogCache';
 import { assertGithubAuthenticated, getGithubApiErrorDetails, toErrorMessage } from './githubHandlerUtils';
 
 type RegisterGithubRepositoryHandlersDeps = {
   githubService: GitHubService;
+  readSettingsWithMigration: () => AppSettings;
 };
 
-export function registerGithubRepositoryHandlers({ githubService }: RegisterGithubRepositoryHandlersDeps): void {
+export function registerGithubRepositoryHandlers({ githubService, readSettingsWithMigration }: RegisterGithubRepositoryHandlersDeps): void {
+  ipcMain.handle(IpcChannel.GithubGetCatalogSnapshot, async () => {
+    const configuredHost = githubService.normalizeHost(readSettingsWithMigration().githubHost);
+    const snapshot = readGithubCatalogCache(configuredHost, githubService.isAuthenticated() ? githubService.getUsername() : null);
+    const savedToken = readSavedGithubTokenWithHost();
+    const hasBoundSession = githubService.isAuthenticated() && githubService.getHost() === configuredHost;
+    const hasSavedSession = Boolean(savedToken && (savedToken.host || 'github.com') === configuredHost);
+    if (!hasBoundSession && !hasSavedSession) return { success: true, data: null };
+    return { success: true, data: snapshot };
+  });
+
+  ipcMain.handle(IpcChannel.GithubSaveCatalogSnapshot, async (_event: IpcMainInvokeEvent, repos: GitHubRepositoryDto[]) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
+    if (!Array.isArray(repos)) return { success: false, error: 'Invalid repository list.' };
+    try {
+      const saved = saveGithubCatalogCache(githubService.getHost(), githubService.getUsername() || '', repos);
+      return { success: true, data: { savedAt: saved.savedAt } };
+    } catch (error) {
+      return { success: false, error: toErrorMessage(error, 'Repository snapshot could not be saved.') };
+    }
+  });
   ipcMain.handle(IpcChannel.GithubGetRepos, async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string } = {}) => {
     const authError = assertGithubAuthenticated(githubService);
     if (authError) return authError;
@@ -38,6 +64,16 @@ export function registerGithubRepositoryHandlers({ githubService }: RegisterGith
     }
   });
 
+  ipcMain.handle(IpcChannel.GithubGetBranches, async (_event: IpcMainInvokeEvent, params: { owner: string; repo: string }) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
+    try {
+      return { success: true, data: await githubService.getBranches(params.owner, params.repo) };
+    } catch (error) {
+      return { success: false, error: toErrorMessage(error, 'Branches could not be loaded.') };
+    }
+  });
+
   ipcMain.handle(IpcChannel.GithubCreateRepo, async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
     const authError = assertGithubAuthenticated(githubService);
     if (authError) return authError;
@@ -53,6 +89,18 @@ export function registerGithubRepositoryHandlers({ githubService }: RegisterGith
     } catch (error: unknown) {
       const message = toErrorMessage(error, 'Failed to create repository');
       return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle(IpcChannel.GithubCreateRepoWithReadme, async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
+    const name = String(params?.name || '').trim();
+    if (!name) return { success: false, error: 'Repository name is required.' };
+    try {
+      return { success: true, data: await githubService.createRepositoryWithReadme(name, String(params.description || ''), Boolean(params.isPrivate)) };
+    } catch (error) {
+      return { success: false, error: toErrorMessage(error, 'Repository could not be created.') };
     }
   });
 

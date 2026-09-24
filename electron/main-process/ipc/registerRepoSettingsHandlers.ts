@@ -16,6 +16,7 @@ import {
 import { readSettingsWithMigration, writeSettings } from '../settingsStore';
 import type { UpdaterManager } from '../updaterManager';
 import type { GitHubService } from '../../GitHubService';
+import { clearGithubCatalogCache } from '../githubCatalogCache';
 
 type RegisterRepoSettingsHandlersDeps = {
   updaterManager: UpdaterManager;
@@ -100,6 +101,7 @@ export function registerRepoSettingsHandlers({ updaterManager, githubService }: 
     writeSettings(next);
     if (githubHostChanged) {
       githubService.logout();
+      clearGithubCatalogCache();
     }
     if (next.autoUpdateEnabled !== current.autoUpdateEnabled) {
       updaterManager.setAutoUpdatesEnabled(next.autoUpdateEnabled);

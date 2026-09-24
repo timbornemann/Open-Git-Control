@@ -5,7 +5,7 @@ const REPO_SWITCH_EDITABLE_SELECTOR = 'input, textarea, [contenteditable="true"]
 type UseRepoSwitcherKeyboardParams = {
   openRepos: string[];
   activeRepo: string | null;
-  onSwitchRepo: (repoPath: string) => Promise<void> | void;
+  onSwitchRepo: (repoPath: string) => Promise<boolean | void> | void;
   onRepositoryCommitted: () => void;
 };
 
@@ -74,8 +74,9 @@ export const useRepoSwitcherKeyboard = ({ openRepos, activeRepo, onSwitchRepo, o
     closeRepoSwitcher();
 
     if (!targetRepo) return;
-    void onSwitchRepo(targetRepo);
-    onRepositoryCommitted();
+    void Promise.resolve(onSwitchRepo(targetRepo)).then((activated) => {
+      if (activated !== false) onRepositoryCommitted();
+    });
   }, [closeRepoSwitcher, onRepositoryCommitted, onSwitchRepo, openRepos]);
 
   useEffect(() => {

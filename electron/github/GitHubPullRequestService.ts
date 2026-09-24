@@ -62,7 +62,7 @@ export class GitHubPullRequestService {
     };
   }
 
-  async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string) {
+  async mergePullRequest(owner: string, repo: string, pullNumber: number, mergeMethod: MergeMethod, commitTitle?: string, commitMessage?: string, expectedHeadSha?: string) {
     const octokit = this.getOctokit();
     const method: MergeMethod = mergeMethod === 'rebase' || mergeMethod === 'squash' ? mergeMethod : 'merge';
     const { data } = await octokit.rest.pulls.merge({
@@ -72,6 +72,7 @@ export class GitHubPullRequestService {
       merge_method: method,
       ...(commitTitle ? { commit_title: commitTitle } : {}),
       ...(commitMessage ? { commit_message: commitMessage } : {}),
+      ...(expectedHeadSha ? { sha: expectedHeadSha } : {}),
     });
 
     const merged = Boolean(data.merged);

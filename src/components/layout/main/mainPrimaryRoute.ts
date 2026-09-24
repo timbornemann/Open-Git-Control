@@ -3,7 +3,7 @@ import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 
 export type MainPrimaryRoute =
-  'planner' | 'settings' | 'release' | 'timeline' | 'runConsole' | 'githubGuide' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
+  'planner' | 'settings' | 'release' | 'timeline' | 'runConsole' | 'githubGuide' | 'github' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
 
 type RouteParams = {
   activeConflictPath: string | null;
@@ -38,6 +38,7 @@ export const getMainPrimaryRoute = ({
   if (activeTab === 'repo' && showTimeline) return 'timeline';
   if (activeTab === 'repo' && showRunConsole) return 'runConsole';
   if (activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod)) return 'githubGuide';
+  if (activeTab === 'github') return 'github';
   if (showRecoveryCenter) return 'recovery';
   if (activeConflictPath) return 'conflict';
   if (activeDiffRequest) return 'diff';
@@ -68,4 +69,4 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): stri
   }
 };
 
-export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean => route !== 'planner' && route !== 'graph' && route !== 'runConsole';
+export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean => route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';

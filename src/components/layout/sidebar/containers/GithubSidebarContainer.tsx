@@ -1,96 +1,35 @@
 import React from 'react';
+import { GitFork, Github, LogOut, RefreshCw, Download } from 'lucide-react';
 import { useGithubContext, useRepositoryContext } from '@/contexts/AppStateContext';
-import { GithubAuthContent } from '@/components/layout/sidebar/GithubAuthContent';
-import { GithubConnectedContent } from '@/components/layout/sidebar/GithubConnectedContent';
+import { useI18n } from '@/i18n';
 
-const GithubAuthSidebarContainer: React.FC = React.memo(() => {
-  const github = useGithubContext();
-
-  return (
-    <GithubAuthContent
-      tokenInput={github.tokenInput}
-      setTokenInput={github.setTokenInput}
-      isAuthenticating={github.isAuthenticating}
-      authError={github.authError}
-      setAuthError={github.setAuthError}
-      onTokenLogin={github.onTokenLogin}
-      oauthConfigured={github.oauthConfigured}
-      deviceFlow={github.deviceFlow}
-      isDeviceFlowRunning={github.isDeviceFlowRunning}
-      deviceFlowError={github.deviceFlowError}
-      onStartDeviceFlowLogin={github.onStartDeviceFlowLogin}
-      onCancelAuthentication={github.onCancelAuthentication}
-      onCancelDeviceFlow={github.onCancelDeviceFlow}
-      isWebFlowRunning={github.isWebFlowRunning}
-      webFlowError={github.webFlowError}
-      onStartWebFlowLogin={github.onStartWebFlowLogin}
-      selectedGithubAuthHelpMethod={github.selectedGithubAuthHelpMethod}
-      onSelectGithubAuthHelpMethod={github.onSelectGithubAuthHelpMethod}
-    />
-  );
-});
-
-GithubAuthSidebarContainer.displayName = 'GithubAuthSidebarContainer';
-
-const GithubConnectedSidebarContainer: React.FC = React.memo(() => {
-  const repository = useRepositoryContext();
-  const github = useGithubContext();
-
-  return (
-    <GithubConnectedContent
-      githubUser={github.githubUser}
-      githubRepos={github.githubRepos}
-      githubReposHasMore={github.githubReposHasMore}
-      isLoadingGithubRepos={github.isLoadingGithubRepos}
-      isLoadingMoreGithubRepos={github.isLoadingMoreGithubRepos}
-      loadMoreGithubRepos={github.loadMoreGithubRepos}
-      refreshGithubRepos={github.refreshGithubRepos}
-      onLogout={github.onLogout}
-      onClone={github.onClone}
-      onCloneByUrl={repository.onCloneByUrl}
-      onForkByUrl={github.onForkByUrl}
-      isCloning={github.isCloning}
-      openRepos={repository.openRepos}
-      activeRepo={repository.activeRepo}
-      onSwitchRepo={repository.onSwitchRepo}
-      prOwnerRepo={github.prOwnerRepo}
-      prFilter={github.prFilter}
-      setPrFilter={github.setPrFilter}
-      prLoading={github.prLoading}
-      prHasLoaded={github.prHasLoaded}
-      pullRequests={github.pullRequests}
-      prCiByNumber={github.prCiByNumber}
-      onOpenPR={github.onOpenPR}
-      onCopyPRUrl={github.onCopyPRUrl}
-      onCheckoutPR={github.onCheckoutPR}
-      onMergePR={github.onMergePR}
-      showCreatePR={github.showCreatePR}
-      setShowCreatePR={github.setShowCreatePR}
-      currentBranch={repository.currentBranch}
-      setNewPRHead={github.setNewPRHead}
-      newPRTitle={github.newPRTitle}
-      setNewPRTitle={github.setNewPRTitle}
-      newPRBody={github.newPRBody}
-      setNewPRBody={github.setNewPRBody}
-      newPRHead={github.newPRHead}
-      setNewPRHeadInput={github.setNewPRHeadInput}
-      newPRBase={github.newPRBase}
-      setNewPRBase={github.setNewPRBase}
-      onCreatePR={github.onCreatePR}
-      releaseForm={github.releaseForm}
-      setReleaseForm={github.setReleaseForm}
-      releaseSubmitting={github.releaseSubmitting}
-      releaseNotesGenerating={github.releaseNotesGenerating}
-      onCreateRelease={github.onCreateRelease}
-    />
-  );
-});
-
-GithubConnectedSidebarContainer.displayName = 'GithubConnectedSidebarContainer';
+export const GITHUB_CATALOG_REFRESH_EVENT = 'ogc:github-catalog-refresh';
 
 export const GithubSidebarContainer: React.FC = React.memo(() => {
-  const { isAuthenticated } = useGithubContext();
-  return isAuthenticated ? <GithubConnectedSidebarContainer /> : <GithubAuthSidebarContainer />;
+  const github = useGithubContext();
+  const repository = useRepositoryContext();
+  const { tr } = useI18n();
+
+  return (
+    <div className="github-sidebar-compact">
+      <div className="github-account-summary">
+        <div className="github-account-summary__identity">
+          <Github size={16} />
+          <span className="github-account-summary__name">{github.isAuthenticated ? github.githubUser || 'GitHub' : tr('Nicht verbunden', 'Not connected')}</span>
+        </div>
+        {github.isAuthenticated && (
+          <button className="icon-btn" aria-label={tr('Von GitHub abmelden', 'Sign out of GitHub')} title={tr('Abmelden', 'Sign out')} onClick={github.onLogout}><LogOut size={15} /></button>
+        )}
+      </div>
+      {github.isAuthenticated ? (
+        <div className="github-sidebar-compact__actions">
+          <button onClick={repository.onCloneByUrl}><Download size={15} /> {tr('Klonen per URL', 'Clone by URL')}</button>
+          <button onClick={github.onForkByUrl}><GitFork size={15} /> {tr('Forken per URL', 'Fork by URL')}</button>
+          <button onClick={() => window.dispatchEvent(new window.Event(GITHUB_CATALOG_REFRESH_EVENT))}><RefreshCw size={15} /> {tr('Aktualisieren', 'Refresh')}</button>
+        </div>
+      ) : <p className="sidebar-meta-text">{tr('Verbinde dein Konto im Hauptbereich, um Repositories und Aktivitäten zu sehen.', 'Connect your account in the main area to see repositories and activity.')}</p>}
+    </div>
+  );
 });
 
 GithubSidebarContainer.displayName = 'GithubSidebarContainer';

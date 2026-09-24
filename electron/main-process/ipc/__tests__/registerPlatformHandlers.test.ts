@@ -18,6 +18,7 @@ vi.mock('electron', () => ({
 const {
   clearSavedGeminiApiKeySecurelyMock,
   clearSavedGithubTokenSecurelyMock,
+  clearGithubCatalogCacheMock,
   clearSavedOpenAiApiKeySecurelyMock,
   readSettingsWithMigrationMock,
   readStoreDataMock,
@@ -28,6 +29,7 @@ const {
 } = vi.hoisted(() => ({
   clearSavedGeminiApiKeySecurelyMock: vi.fn(),
   clearSavedGithubTokenSecurelyMock: vi.fn(),
+  clearGithubCatalogCacheMock: vi.fn(),
   clearSavedOpenAiApiKeySecurelyMock: vi.fn(),
   readSettingsWithMigrationMock: vi.fn(),
   readStoreDataMock: vi.fn(),
@@ -57,6 +59,10 @@ vi.mock('../../secureStore', () => ({
   saveOpenAiApiKeySecurely: saveOpenAiApiKeySecurelyMock,
 }));
 
+vi.mock('../../githubCatalogCache', () => ({
+  clearGithubCatalogCache: clearGithubCatalogCacheMock,
+}));
+
 const getRegisteredHandlers = () => {
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
   handleMock.mockImplementation((channel: string, callback: (...args: any[]) => Promise<any>) => {
@@ -76,6 +82,7 @@ describe('platform IPC handlers', () => {
     saveGeminiApiKeySecurelyMock.mockReset();
     clearSavedGeminiApiKeySecurelyMock.mockReset();
     clearSavedGithubTokenSecurelyMock.mockReset();
+    clearGithubCatalogCacheMock.mockReset();
     saveOpenAiApiKeySecurelyMock.mockReset();
     clearSavedOpenAiApiKeySecurelyMock.mockReset();
   });
@@ -178,6 +185,7 @@ describe('platform IPC handlers', () => {
     expect(clearSavedGithubTokenSecurelyMock).toHaveBeenCalled();
     expect(clearSavedGithubTokenSecurelyMock.mock.invocationCallOrder[0]).toBeLessThan(writeSettingsMock.mock.invocationCallOrder[0]);
     expect(githubService.logout).toHaveBeenCalledOnce();
+    expect(clearGithubCatalogCacheMock).toHaveBeenCalledOnce();
     expect(updaterManager.setAutoUpdatesEnabled).toHaveBeenCalledWith(true);
 
     await expect(handlers.get(IpcChannel.AppGetVersion)?.({})).resolves.toBe('9.8.7');
@@ -206,6 +214,7 @@ describe('platform IPC handlers', () => {
 
     expect(writeSettingsMock).not.toHaveBeenCalled();
     expect(githubService.logout).not.toHaveBeenCalled();
+    expect(clearGithubCatalogCacheMock).not.toHaveBeenCalled();
     expect(updaterManager.setAutoUpdatesEnabled).not.toHaveBeenCalled();
   });
 

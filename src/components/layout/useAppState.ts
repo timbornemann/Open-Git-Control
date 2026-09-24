@@ -349,6 +349,7 @@ export const useAppState = () => {
     handleSwitchRepo: workspace.handleSwitchRepo,
     handleCloseRepo: workspace.handleCloseRepo,
     handleToggleRepoPin: workspace.toggleRepoPin,
+    handleSetRepoPins: workspace.setRepoPins,
 
     refreshTrigger,
     triggerRefresh,

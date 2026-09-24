@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceDomain } from '@/components/layout/hooks/useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
+import { gitClient } from '@/services/gitClient';
+import { githubClient } from '@/services/githubClient';
 import {
   resetWorkingDirectoryNavigationGuardForTests,
   setActiveWorkingDirectoryNavigationGuard,
@@ -70,6 +72,55 @@ afterEach(() => {
 });
 
 describe('useWorkspaceDomain repository canonicalization', () => {
+  it('keeps a remote detail switch cancelled by the working-file guard out of the active repo', async () => {
+    vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
+      repos: [{ path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 }, { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 }],
+      activeRepo: 'C:/repo-a', sortBy: 'lastOpenedDesc',
+    });
+    const setRepoPath = vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
+    setActiveWorkingDirectoryNavigationGuard((_target, _proceed, cancel) => cancel?.());
+    const hook = renderWorkspace();
+    await flushEffects();
+    await vi.waitFor(() => expect(hook.current.activeRepo).toBe('C:/repo-a'));
+
+    const activated = await hook.current.handleSwitchRepo('C:/repo-b');
+
+    expect(activated).toBe(false);
+    expect(hook.current.activeRepo).toBe('C:/repo-a');
+    expect(setRepoPath).toHaveBeenCalledTimes(1);
+    hook.unmount();
+  });
+
+  it('synchronizes a local favorite across clones and the GitHub pin setting', async () => {
+    vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
+      repos: [{ path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 }, { path: 'C:/repo-b', lastOpened: 1, pinned: false, createdAt: 1 }],
+      activeRepo: 'C:/repo-a', sortBy: 'lastOpenedDesc',
+    });
+    vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'git@github.com:alice/demo.git' });
+    vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(githubClient, 'getCatalogSnapshot').mockResolvedValue({ success: true, data: {
+      host: 'github.com', username: 'alice', savedAt: '2026-01-01T00:00:00Z', repos: [{
+        id: 42, name: 'demo', fullName: 'alice/demo', private: true, cloneUrl: 'https://github.com/alice/demo.git', htmlUrl: 'https://github.com/alice/demo',
+      }],
+    } });
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) || null, setItem: (key: string, value: string) => values.set(key, value) });
+    const hook = renderWorkspace();
+    await flushEffects();
+    await vi.waitFor(() => expect(hook.current.openRepos).toHaveLength(2));
+
+    act(() => hook.current.toggleRepoPin('C:/repo-a'));
+    await vi.waitFor(() => expect(hook.current.repoMeta['C:/repo-b']?.pinned).toBe(true));
+    await vi.waitFor(() => expect(values.get('ogc.githubPins.v1:github.com:alice')).toBe('[42]'));
+
+    act(() => hook.current.toggleRepoPin('C:/repo-b'));
+    await vi.waitFor(() => expect(hook.current.repoMeta['C:/repo-a']?.pinned).toBe(false));
+    await vi.waitFor(() => expect(values.get('ogc.githubPins.v1:github.com:alice')).toBe('[]'));
+    hook.unmount();
+  });
+
   it('starts on the current repository tab', () => {
     const hook = renderWorkspace();
 

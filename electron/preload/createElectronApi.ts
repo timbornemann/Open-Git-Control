@@ -20,6 +20,7 @@ import type {
   WorkingDirectorySearchRequestDto,
 } from '../../src/shared/ipc/contracts/git';
 import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
+import type { GitHubRepositoryDto } from '../../src/types/githubDtos';
 import { createRepositoryRunApi } from './createRepositoryRunApi';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
@@ -322,9 +323,14 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     githubLogout: () => ipcRenderer.invoke(IpcChannel.GithubLogout),
     githubCreateRepo: (name: string, description: string, isPrivate: boolean) =>
       ipcRenderer.invoke(IpcChannel.GithubCreateRepo, { name, description, isPrivate }),
+    githubCreateRepoWithReadme: (name: string, description: string, isPrivate: boolean) =>
+      ipcRenderer.invoke(IpcChannel.GithubCreateRepoWithReadme, { name, description, isPrivate }),
+    githubGetCatalogSnapshot: () => ipcRenderer.invoke(IpcChannel.GithubGetCatalogSnapshot),
+    githubSaveCatalogSnapshot: (repos: GitHubRepositoryDto[]) => ipcRenderer.invoke(IpcChannel.GithubSaveCatalogSnapshot, repos),
     githubForkRepo: (params: { owner: string; repo: string; name?: string; defaultBranchOnly?: boolean }) =>
       ipcRenderer.invoke(IpcChannel.GithubForkRepo, params),
     githubGetRepository: (owner: string, repo: string) => ipcRenderer.invoke(IpcChannel.GithubGetRepository, { owner, repo }),
+    githubGetBranches: (owner: string, repo: string) => ipcRenderer.invoke(IpcChannel.GithubGetBranches, { owner, repo }),
     githubGetPRs: (owner: string, repo: string, state: string) => ipcRenderer.invoke(IpcChannel.GithubGetPrs, owner, repo, state),
     githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubCreatePr, params),
@@ -354,6 +360,14 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     }) => ipcRenderer.invoke(IpcChannel.AiGenerateReleaseNotes, params),
     githubGetWorkflowRuns: (params: { owner: string; repo: string; branch?: string; headSha?: string; perPage?: number }) =>
       ipcRenderer.invoke(IpcChannel.GithubGetWorkflowRuns, params),
+    githubGetWorkflowRunsPage: (params: { owner: string; repo: string; branch?: string; status?: string; page?: number; perPage?: number }) =>
+      ipcRenderer.invoke(IpcChannel.GithubGetWorkflowRunsPage, params),
+    githubGetWorkflowJobsPage: (params: { owner: string; repo: string; runId: number; page?: number; perPage?: number }) =>
+      ipcRenderer.invoke(IpcChannel.GithubGetWorkflowJobsPage, params),
+    githubRerunFailedJobs: (owner: string, repo: string, runId: number) =>
+      ipcRenderer.invoke(IpcChannel.GithubRerunFailedJobs, { owner, repo, runId }),
+    githubCancelWorkflowRun: (owner: string, repo: string, runId: number) =>
+      ipcRenderer.invoke(IpcChannel.GithubCancelWorkflowRun, { owner, repo, runId }),
     githubGetStatusChecks: (params: { owner: string; repo: string; ref: string }) => ipcRenderer.invoke(IpcChannel.GithubGetStatusChecks, params),
     githubMergePR: (params: {
       owner: string;
@@ -362,6 +376,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       mergeMethod: 'merge' | 'squash' | 'rebase';
       commitTitle?: string;
       commitMessage?: string;
+      expectedHeadSha?: string;
     }) => ipcRenderer.invoke(IpcChannel.GithubMergePr, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
   } satisfies ElectronFlatAPI;
@@ -439,14 +454,22 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       githubCheckAuthStatus: flatApi.githubCheckAuthStatus,
       githubLogout: flatApi.githubLogout,
       githubCreateRepo: flatApi.githubCreateRepo,
+      githubCreateRepoWithReadme: flatApi.githubCreateRepoWithReadme,
+      githubGetCatalogSnapshot: flatApi.githubGetCatalogSnapshot,
+      githubSaveCatalogSnapshot: flatApi.githubSaveCatalogSnapshot,
       githubForkRepo: flatApi.githubForkRepo,
       githubGetRepository: flatApi.githubGetRepository,
+      githubGetBranches: flatApi.githubGetBranches,
       githubGetPRs: flatApi.githubGetPRs,
       githubCreatePR: flatApi.githubCreatePR,
       githubCreateRelease: flatApi.githubCreateRelease,
       githubUploadReleaseAsset: flatApi.githubUploadReleaseAsset,
       githubGetReleaseContext: flatApi.githubGetReleaseContext,
       githubGetWorkflowRuns: flatApi.githubGetWorkflowRuns,
+      githubGetWorkflowRunsPage: flatApi.githubGetWorkflowRunsPage,
+      githubGetWorkflowJobsPage: flatApi.githubGetWorkflowJobsPage,
+      githubRerunFailedJobs: flatApi.githubRerunFailedJobs,
+      githubCancelWorkflowRun: flatApi.githubCancelWorkflowRun,
       githubGetStatusChecks: flatApi.githubGetStatusChecks,
       githubMergePR: flatApi.githubMergePR,
     },
