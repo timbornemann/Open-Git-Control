@@ -1,3 +1,7 @@
+import { useGithubAuthRuns, type AuthRun } from './github/useGithubAuthRuns';
+import { useGithubReconnect } from './github/useGithubReconnect';
+import { clearGithubCatalogSession } from '@/data/githubCatalog';
+import { getGithubResourceScope, setGithubResourceScope } from '@/data/clientCache';
 import { useEffect, useRef, useState } from 'react';
 import type { DeviceFlowPollDto, DeviceFlowStartDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
@@ -16,15 +20,15 @@ type Params = {
   onError?: (message: string) => void;
 };
 
-type AuthRunKind = 'bootstrap' | 'token' | 'device' | 'web' | 'logout';
-type AuthRun = { id: number; kind: AuthRunKind };
-
 export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOauthClientId, githubHost, onError }: Params) => {
+  const [isAuthRestoring, setIsAuthRestoring] = useState(true);
+  const [isAuthenticationRequired, setIsAuthenticationRequired] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [githubUser, setGithubUser] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const { attempt: restoreAttempt, retry: retrySavedAuthentication } = useGithubReconnect(!isAuthRestoring && !isAuthenticated && !isAuthenticationRequired);
 
   const [oauthConfigured, setOauthConfigured] = useState(false);
   const [deviceFlow, setDeviceFlow] = useState<DeviceFlowStartDto | null>(null);
@@ -33,16 +37,13 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   const [isWebFlowRunning, setIsWebFlowRunning] = useState(false);
   const [webFlowError, setWebFlowError] = useState<string | null>(null);
 
-  const pollingRef = useRef<number | null>(null);
-  const stoppedRef = useRef(false);
+  const { pollingRef, activeAuthRunRef, clearDevicePolling, beginAuthRun, isCurrentAuthRun, finishAuthRun, invalidateAuthRuns } = useGithubAuthRuns();
   const initializedHostRef = useRef<string | null>(null);
-  const activeAuthRunRef = useRef<AuthRun | null>(null);
-  const nextAuthRunIdRef = useRef(0);
   const oauthStatusRequestRef = useRef(0);
   const reportedAuthFeedbackRef = useRef({ auth: null as string | null, device: null as string | null, web: null as string | null });
 
   const { t } = useLanguageTranslations(language);
-  const repositoryPages = useGithubRepositoryPages({ isAuthenticated, t });
+  const repositoryPages = useGithubRepositoryPages({ isAuthenticated, username: githubUser, host: githubHost, t });
   const cloneWorkflow = useGithubCloneWorkflow({ onRepoCloned, setActiveTab, t });
   const { resetRepositoryPages } = repositoryPages;
 
@@ -54,46 +55,18 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     reportedAuthFeedbackRef.current = { auth: authError, device: deviceFlowError, web: webFlowError };
   }, [authError, deviceFlowError, onError, webFlowError]);
 
-  const clearDevicePolling = () => {
-    if (pollingRef.current !== null) {
-      window.clearTimeout(pollingRef.current);
-      pollingRef.current = null;
-    }
-  };
-
-  const beginAuthRun = (kind: AuthRunKind, replaceBootstrap = false): AuthRun | null => {
-    const activeRun = activeAuthRunRef.current;
-    if (activeRun && !(replaceBootstrap && activeRun.kind === 'bootstrap')) return null;
-    const run = { id: ++nextAuthRunIdRef.current, kind };
-    activeAuthRunRef.current = run;
-    return run;
-  };
-
-  const isCurrentAuthRun = (run: AuthRun) => !stoppedRef.current && activeAuthRunRef.current?.id === run.id && activeAuthRunRef.current.kind === run.kind;
-
-  const finishAuthRun = (run: AuthRun) => {
-    if (activeAuthRunRef.current?.id === run.id) activeAuthRunRef.current = null;
-  };
-
-  const invalidateAuthRuns = () => {
-    nextAuthRunIdRef.current += 1;
-    activeAuthRunRef.current = null;
-    clearDevicePolling();
-  };
-
   useEffect(() => {
     const normalizedHost = (githubHost || '').trim().toLowerCase() || 'github.com';
-    if (initializedHostRef.current === normalizedHost) return;
-    initializedHostRef.current = normalizedHost;
+    const restoreKey = `${normalizedHost}/${restoreAttempt}`;
+    if (initializedHostRef.current === restoreKey) return;
+    initializedHostRef.current = restoreKey;
+    setIsAuthRestoring(true);
+    setIsAuthenticationRequired(false);
+    if (!getGithubResourceScope().startsWith(`${normalizedHost}/`)) setGithubResourceScope(normalizedHost, null);
 
     // Authentication and repository data are host-scoped. Clear the previous
     // host synchronously, before its saved-token bootstrap can race the new one.
-    nextAuthRunIdRef.current += 1;
-    activeAuthRunRef.current = null;
-    if (pollingRef.current !== null) {
-      window.clearTimeout(pollingRef.current);
-      pollingRef.current = null;
-    }
+    invalidateAuthRuns();
     setIsAuthenticated(false);
     setGithubUser(null);
     setAuthError(null);
@@ -106,7 +79,11 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     resetRepositoryPages({ clearRepos: true });
 
     const loginWithSavedToken = async () => {
-      if (!githubClient.isAvailable()) return;
+      if (!githubClient.isAvailable()) {
+        setIsAuthRestoring(false);
+        setIsAuthenticationRequired(true);
+        return;
+      }
       const run = beginAuthRun('bootstrap', true);
       if (!run) return;
 
@@ -116,6 +93,7 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         setOauthConfigured(status.oauthConfigured);
 
         if (!status.hasSavedToken) {
+          setIsAuthenticationRequired(!status.authenticated);
           setIsAuthenticated(status.authenticated);
           setGithubUser(status.username);
           return;
@@ -133,6 +111,11 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
             );
           }
         } else {
+          setIsAuthenticationRequired(loginResult.authenticationRequired === true);
+          if (loginResult.authenticationRequired) {
+            clearGithubCatalogSession();
+            setGithubResourceScope(normalizedHost, null);
+          }
           setIsAuthenticated(loginResult.authenticated);
           setGithubUser(loginResult.username);
           if (loginResult.authenticated) resetRepositoryPages();
@@ -144,21 +127,16 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         setGithubUser(null);
         setAuthError(error instanceof Error ? error.message : t('generated.components.layout.hooks.usegithubdomain.authentication_error_a366cc27'));
       } finally {
-        if (isCurrentAuthRun(run)) setIsAuthenticating(false);
+        if (isCurrentAuthRun(run)) {
+          setIsAuthenticating(false);
+          setIsAuthRestoring(false);
+        }
         finishAuthRun(run);
       }
     };
 
     void loginWithSavedToken();
-  }, [githubHost, resetRepositoryPages, t]);
-
-  useEffect(() => {
-    stoppedRef.current = false;
-    return () => {
-      stoppedRef.current = true;
-      clearDevicePolling();
-    };
-  }, []);
+  }, [githubHost, restoreAttempt, resetRepositoryPages, t, beginAuthRun, isCurrentAuthRun, finishAuthRun, invalidateAuthRuns]);
 
   useEffect(() => {
     const requestId = ++oauthStatusRequestRef.current;
@@ -392,6 +370,8 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
     }
     invalidateAuthRuns();
     setIsAuthenticating(false);
+    setIsAuthRestoring(false);
+    setIsAuthenticationRequired(!isAuthenticated);
     setIsDeviceFlowRunning(false);
     setDeviceFlow(null);
     setIsWebFlowRunning(false);
@@ -420,7 +400,10 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         if (!isCurrentAuthRun(run)) return;
         if (!result.success) {
           if (result.sessionCleared) {
+            clearGithubCatalogSession();
+            setGithubResourceScope(githubHost, null);
             setIsAuthenticated(false);
+            setIsAuthenticationRequired(true);
             setGithubUser(null);
             setTokenInput('');
             resetRepositoryPages({ clearRepos: true });
@@ -430,7 +413,10 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
         }
       }
       if (!isCurrentAuthRun(run)) return;
+      clearGithubCatalogSession();
+      setGithubResourceScope(githubHost, null);
       setIsAuthenticated(false);
+      setIsAuthenticationRequired(true);
       setGithubUser(null);
       setTokenInput('');
       resetRepositoryPages({ clearRepos: true });
@@ -446,6 +432,9 @@ export const useGithubDomain = ({ onRepoCloned, setActiveTab, language, githubOa
   };
 
   return {
+    isAuthRestoring,
+    isAuthenticationRequired,
+    retrySavedAuthentication,
     isAuthenticated,
     setIsAuthenticated,
     githubUser,

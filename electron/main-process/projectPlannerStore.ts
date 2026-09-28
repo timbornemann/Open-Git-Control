@@ -26,6 +26,7 @@ import {
   normalizeRepositoryPlannerData,
   parsePlannerData,
   readRepositoryPlanningFile,
+  readRepositoryPlanningFileAsync,
   renumberRepositoryPlannerData,
   writeRepositoryPlanningFile,
 } from './repositoryPlanningFile';
@@ -194,6 +195,32 @@ export function readProjectPlannerData(): ProjectPlannerData {
     const repositoryData = claimRepositoryIdentifiers(repoPath, readRepositoryData(repoPath), usedIds);
     projects.push(...repositoryData.projects);
     items.push(...repositoryData.items);
+  }
+  return normalizeProjectPlannerData({ version: 1, projects, items });
+}
+
+let previewInitialized = false;
+/** The first regular load retains the existing migrations. Later previews are
+ * asynchronous reads only; hover/startup work never rewrites planning files. */
+export async function readProjectPlannerDataAsync(): Promise<ProjectPlannerData> {
+  if (!previewInitialized) {
+    const initial = readProjectPlannerData();
+    previewInitialized = true;
+    return initial;
+  }
+  let legacy: ProjectPlannerData;
+  try {
+    legacy = parsePlannerData(await fs.promises.readFile(getLegacyStorePath(), 'utf8'), 'Planner data');
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
+    legacy = createEmptyProjectPlannerData();
+  }
+  const projects = legacy.projects.filter((project) => project.kind === 'planned');
+  const items = legacy.items.filter((item) => projects.some((project) => project.id === item.projectId));
+  for (const repoPath of plannerRepositoryPaths(legacy)) {
+    const data = await readRepositoryPlanningFileAsync(getPlanningPath(repoPath), repoPath);
+    projects.push(...data.projects);
+    items.push(...data.items);
   }
   return normalizeProjectPlannerData({ version: 1, projects, items });
 }

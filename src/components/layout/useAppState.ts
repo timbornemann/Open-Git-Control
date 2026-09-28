@@ -418,6 +418,9 @@ export const useAppState = () => {
     handleSetUpstreamForCurrentBranch,
     handleCheckoutRemoteBranch,
 
+    isAuthRestoring: github.isAuthRestoring,
+    isAuthenticationRequired: github.isAuthenticationRequired,
+    onRetryAuthentication: github.retrySavedAuthentication,
     isAuthenticated: github.isAuthenticated,
     githubUser: github.githubUser,
     githubRepos: github.githubRepos,

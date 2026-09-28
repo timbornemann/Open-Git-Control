@@ -75,6 +75,19 @@ export function readRepositoryPlanningFile(planningPath: string, repoPath: strin
   }
 }
 
+export async function readRepositoryPlanningFileAsync(planningPath: string, repoPath: string): Promise<ProjectPlannerData> {
+  try {
+    const raw = await fs.promises.readFile(planningPath, 'utf8');
+    return normalizeRepositoryPlannerData(
+      parsePlannerData(raw, 'Repository planning data', (value) => withRepositoryIdentity(value, repoPath)),
+      repoPath,
+    );
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return createEmptyProjectPlannerData();
+    throw error;
+  }
+}
+
 /** Serializes without the machine-local repository path so the file stays identical on every checkout. */
 export function serializeRepositoryPlanningFile(data: ProjectPlannerData): string {
   const projects = data.projects.map(({ repoPath: _repoPath, ...project }) => project);

@@ -1,3 +1,7 @@
+import { DataPlaceholder } from '@/components/common/DataPlaceholder';
+import { useResourceState } from '@/data/resourceHooks';
+import { resourceKey } from '@/data/clientCache';
+import { queryClient } from '@/data/queryClient';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
@@ -26,14 +30,14 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
   const [filter, setFilter] = useState<'open' | 'closed' | 'all'>('open');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [prs, setPrs] = useState<PullRequestDto[]>([]);
+  const [prs, setPrs, hasPrs] = useResourceState<PullRequestDto[]>('github', 'getPullRequests', [owner, repo, filter], []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [ci, setCi] = useState<Record<number, string>>({});
   const [showCreate, setShowCreate] = useState(false);
-  const [sourceBranches, setSourceBranches] = useState<string[]>([]);
-  const [baseBranches, setBaseBranches] = useState<string[]>([]);
+  const [sourceBranches, setSourceBranches] = useResourceState<string[]>('github', 'getBranches', [sourceOwner, sourceRepo], []);
+  const [baseBranches, setBaseBranches] = useResourceState<string[]>('github', 'getBranches', [owner, repo], []);
   const [head, setHead] = useState('');
   const [base, setBase] = useState(defaultBranch);
   const [title, setTitle] = useState('');
@@ -44,7 +48,6 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
     let active = true;
     setLoading(true);
     setError(null);
-    setPrs([]);
     setCi({});
     void githubClient
       .getPullRequests(owner, repo, filter)
@@ -62,12 +65,10 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
     return () => {
       active = false;
     };
-  }, [owner, repo, filter, refreshKey]);
+  }, [owner, repo, filter, refreshKey, setPrs]);
 
   useEffect(() => {
     let active = true;
-    setSourceBranches([]);
-    setBaseBranches([]);
     void Promise.all([
       githubClient.getBranches(sourceOwner, sourceRepo),
       sourceOwner === owner && sourceRepo === repo ? githubClient.getBranches(sourceOwner, sourceRepo) : githubClient.getBranches(owner, repo),
@@ -85,7 +86,7 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
     return () => {
       active = false;
     };
-  }, [owner, repo, sourceOwner, sourceRepo, defaultBranch]);
+  }, [owner, repo, sourceOwner, sourceRepo, defaultBranch, setBaseBranches, setSourceBranches]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -230,7 +231,14 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
             {owner}/{repo}
           </p>
         </div>
-        <button onClick={() => setRefreshKey((value) => value + 1)} aria-label={tr('Pull Requests aktualisieren', 'Refresh pull requests')}>
+        <button
+          disabled={loading}
+          onClick={() => {
+            void queryClient.invalidateQueries({ queryKey: resourceKey('github', 'getPullRequests', [owner, repo, filter]), exact: true, refetchType: 'none' });
+            setRefreshKey((value) => value + 1);
+          }}
+          aria-label={tr('Pull Requests aktualisieren', 'Refresh pull requests')}
+        >
           <RefreshCw size={15} />
         </button>
         <button className="github-workspace__primary" onClick={() => setShowCreate((value) => !value)}>
@@ -298,8 +306,8 @@ export const GithubPullRequests: React.FC<Props> = ({ owner, repo, sourceOwner, 
           {error}
         </div>
       )}
-      {loading ? (
-        <div className="github-workspace__empty">{tr('Pull Requests werden geladen …', 'Loading pull requests …')}</div>
+      {!hasPrs && !error ? (
+        <DataPlaceholder />
       ) : visible.length === 0 ? (
         <div className="github-workspace__empty">{tr('Keine passenden Pull Requests.', 'No matching pull requests.')}</div>
       ) : (

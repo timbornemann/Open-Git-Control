@@ -1,3 +1,7 @@
+import { useResourceState } from '@/data/resourceHooks';
+import { invalidateResources, resourceKey } from '@/data/clientCache';
+import { updateResource } from '@/data/queryClient';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
@@ -35,7 +39,7 @@ export const trimRepositoryRunOutput = (state: RepositoryRunStateDto): Repositor
 
 export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: string | null; triggerRefresh: () => void }) => {
   const [runState, setRunState] = useState<RepositoryRunStateDto | null>(null);
-  const [activeConfig, setActiveConfig] = useState<RepositoryRunConfigStateDto | null>(null);
+  const [activeConfig, setActiveConfig] = useResourceState<RepositoryRunConfigStateDto | null>('runs', 'getConfig', [activeRepo], null);
   const [isConsoleOpen, setConsoleOpen] = useState(false);
   const [lastViewedRunId, setLastViewedRunId] = useState<string | null>(null);
   const refreshedRunIds = useRef(new Set<string>());
@@ -51,26 +55,28 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
     configRequestGenerationRef.current += 1;
     isConsoleOpenRef.current = false;
     setConsoleOpen(false);
-    setActiveConfig(null);
   }, [activeRepo]);
 
-  const refreshConfig = useCallback(async (requestedRepoPath?: string) => {
-    const repoPath = requestedRepoPath ?? activeRepoRef.current;
-    if (!repoPath || !repositoryRunClient.isAvailable()) {
-      if (repoPath === activeRepoRef.current) setActiveConfig(null);
-      return;
-    }
-    // Run-completion events can arrive after the user selected another
-    // repository. Those events must not start (or invalidate) a config read
-    // for the repository currently shown in the sidebar.
-    if (repoPath !== activeRepoRef.current) return;
+  const refreshConfig = useCallback(
+    async (requestedRepoPath?: string) => {
+      const repoPath = requestedRepoPath ?? activeRepoRef.current;
+      if (!repoPath || !repositoryRunClient.isAvailable()) {
+        if (repoPath === activeRepoRef.current) setActiveConfig(null);
+        return;
+      }
+      // Run-completion events can arrive after the user selected another
+      // repository. Those events must not start (or invalidate) a config read
+      // for the repository currently shown in the sidebar.
+      if (repoPath !== activeRepoRef.current) return;
 
-    const requestGeneration = configRequestGenerationRef.current + 1;
-    configRequestGenerationRef.current = requestGeneration;
-    const result = await repositoryRunClient.getConfig(repoPath);
-    if (requestGeneration !== configRequestGenerationRef.current || repoPath !== activeRepoRef.current) return;
-    setActiveConfig(result.success ? result.data : null);
-  }, []);
+      const requestGeneration = configRequestGenerationRef.current + 1;
+      configRequestGenerationRef.current = requestGeneration;
+      const result = await repositoryRunClient.getConfig(repoPath);
+      if (requestGeneration !== configRequestGenerationRef.current || repoPath !== activeRepoRef.current) return;
+      if (result.success) setActiveConfig(result.data);
+    },
+    [setActiveConfig],
+  );
 
   useEffect(() => {
     void refreshConfig(activeRepo ?? undefined);
@@ -84,6 +90,7 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   useEffect(() => {
     if (!repositoryRunClient.isAvailable()) return;
     return repositoryRunClient.onConfigChanged((repositoryPath) => {
+      invalidateResources('runs', normalizeRepoPathKey(repositoryPath), ['getConfig']);
       if (repositoryPath === activeRepoRef.current) void refreshConfig(repositoryPath);
     });
   }, [refreshConfig]);
@@ -104,16 +111,23 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
   useEffect(() => {
     if (!repositoryRunClient.isAvailable()) return;
     let active = true;
-    void repositoryRunClient.getState().then((result) => {
-      if (active && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
-    });
-    return repositoryRunClient.onEvent((event) => {
+    void repositoryRunClient
+      .getState()
+      .then((result) => {
+        if (active && result.success) setRunState(result.data ? trimRepositoryRunOutput(result.data) : null);
+      })
+      .catch(() => {
+        /* A newer run event can supersede this initial read. */
+      });
+    const unsubscribe = repositoryRunClient.onEvent((event) => {
       if (!active) return;
       if (event.type === 'state') {
+        updateResource(resourceKey('runs', 'getState'), { success: true, data: event.state ? trimRepositoryRunOutput(event.state) : null });
         setRunState(event.state ? trimRepositoryRunOutput(event.state) : null);
         if (event.state && event.state.status !== 'running' && !refreshedRunIds.current.has(event.state.runId)) {
           if (isConsoleOpenRef.current && event.state.repoPath === activeRepoRef.current) setLastViewedRunId(event.state.runId);
           refreshedRunIds.current.add(event.state.runId);
+          invalidateResources('git', normalizeRepoPathKey(event.state.repoPath));
           triggerRefresh();
           void refreshConfig(event.state.repoPath);
         }
@@ -124,6 +138,10 @@ export const useRepositoryRun = ({ activeRepo, triggerRefresh }: { activeRepo: s
         return trimRepositoryRunOutput({ ...previous, output: [...previous.output, event.line] });
       });
     });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [refreshConfig, triggerRefresh]);
 
   const startRun = useCallback(

@@ -1,4 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isDataLoading, previewTextState, readCachedFilePreview } from './workingDirectoryPreviewState';
+import { useBlamePreview } from '@/data/useBlamePreview';
+import { viewModules } from '@/data/viewModules';
+import { useResourceState } from '@/data/resourceHooks';
+import type { WorkingDirectoryPreviewDto, TextFileEncodingDto } from '@/shared/ipc/contracts/git';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, Save } from 'lucide-react';
 import { gitClient } from '@/services/gitClient';
 import { useUIContext } from '@/contexts/AppStateContext';
@@ -9,7 +14,7 @@ import { applyLineEnding, detectLineEnding, normalizeToLf, type LineEnding } fro
 import { BlamePanel } from '@/components/file-details/BlamePanel';
 import { FileHistoryPanel } from '@/components/file-details/FileHistoryPanel';
 import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '@/components/file-details/blamePagination';
-import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
+import type { GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
 import { MarkdownPreviewPane } from '@/components/diff-viewer/MarkdownPreviewPane';
 import { useMarkdownPreview } from '@/components/diff-viewer/useMarkdownPreview';
@@ -20,12 +25,11 @@ import { isCsvFilePath } from './fileContentTransforms';
 import { WorkingDirectoryFileTools } from './WorkingDirectoryFileTools';
 import { getEncodedTextByteLength, WorkingDirectoryFileStatusBar } from './WorkingDirectoryFileStatusBar';
 import type { TextSelection } from './textContentTransforms';
-import type { TextFileEncodingDto } from '@/shared/ipc/contracts/git';
 import type { WorkingDirectoryNavigationGuard, WorkingDirectoryNavigationTarget } from './workingDirectoryNavigationGuard';
 import '@/styles/working-directory-file-viewer.css';
 import '@/styles/diff-viewer.css';
 
-const WorkingDirectoryCodeEditor = React.lazy(() => import('./WorkingDirectoryCodeEditor').then((module) => ({ default: module.WorkingDirectoryCodeEditor })));
+const WorkingDirectoryCodeEditor = viewModules.editor.View;
 
 type Props = {
   repoPath: string;
@@ -100,30 +104,40 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   const requestCloseRef = useRef<() => void>(() => onClose());
   const navigationGuardRef = useRef<WorkingDirectoryNavigationGuard | null>(null);
   const activeFileKeyRef = useRef('');
-  const [preview, setPreview] = useState<any>(null);
-  const [text, setText] = useState('');
-  const [savedText, setSavedText] = useState('');
-  const [encoding, setEncoding] = useState<TextFileEncodingDto>('utf8');
-  const [savedEncoding, setSavedEncoding] = useState<TextFileEncodingDto>('utf8');
-  const [lineEnding, setLineEnding] = useState<LineEnding>('\n');
-  const [savedLineEnding, setSavedLineEnding] = useState<LineEnding>('\n');
+  const getCachedPreview = useCallback(() => readCachedFilePreview(repoPath, path), [repoPath, path]);
+  const initialPreview = getCachedPreview();
+  const { text: initialText, encoding: initialEncoding, lineEnding: initialLineEnding } = previewTextState(initialPreview);
+  const [preview, setPreview] = useState<WorkingDirectoryPreviewDto | null>(initialPreview);
+  const [text, setText] = useState(initialText);
+  const [savedText, setSavedText] = useState(initialText);
+  const [encoding, setEncoding] = useState<TextFileEncodingDto>(initialEncoding);
+  const [savedEncoding, setSavedEncoding] = useState<TextFileEncodingDto>(initialEncoding);
+  const [lineEnding, setLineEnding] = useState<LineEnding>(initialLineEnding);
+  const [savedLineEnding, setSavedLineEnding] = useState<LineEnding>(initialLineEnding);
   const [showWhitespace, setShowWhitespace] = useState(false);
   const [selection, setSelection] = useState<TextSelection>({ from: 0, to: 0 });
   const [tab, setTab] = useState<Tab>('content');
-  const [history, setHistory] = useState<GitFileHistoryEntryDto[]>([]);
+  const [history, setHistory, hasHistory] = useResourceState<GitFileHistoryEntryDto[]>('git', 'getFileHistory', [path, undefined, 80, repoPath], []);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-  const [blame, setBlame] = useState<GitFileBlameLineDto[]>([]);
+  const {
+    lines: blame,
+    setLines: setBlame,
+    hasMore: blameHasMore,
+    setHasMore: setBlameHasMore,
+    hasData: hasBlame,
+  } = useBlamePreview(repoPath, path, undefined, 'unstaged');
   const [blameError, setBlameError] = useState<string | null>(null);
   const [isBlameLoading, setIsBlameLoading] = useState(false);
-  const [blameHasMore, setBlameHasMore] = useState(false);
   const blameRequestGenerationRef = useRef(0);
   const activeBlameRequestRef = useRef<{ id: number; generation: number } | null>(null);
   const nextBlameRequestIdRef = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialPreview);
+  const dirtyRef = useRef(false);
   const [isLargeImageLoading, setIsLargeImageLoading] = useState(false);
   const dirty = text !== savedText || encoding !== savedEncoding || lineEnding !== savedLineEnding;
+  dirtyRef.current = dirty;
   const isMarkdown = isMarkdownFilePath(path);
   const isHtml = isHtmlFilePath(path);
   const isCsv = isCsvFilePath(path);
@@ -138,35 +152,38 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     markdownText: preview?.kind === 'text' ? text : undefined,
   });
   const htmlPreview = useHtmlPreview({ repoPath, path, html: text, isActive: filePreviewKind === 'html' });
-  useEffect(() => {
+  useLayoutEffect(() => {
     let active = true;
     activeFileKeyRef.current = `${repoPath}\0${path}`;
-    setPreview(null);
+    const cached = getCachedPreview();
+    setPreview(cached);
     setLoadError(null);
     setTab('content');
-    setText('');
-    setSavedText('');
-    setEncoding('utf8');
-    setSavedEncoding('utf8');
-    setLineEnding('\n');
-    setSavedLineEnding('\n');
+    const { text: cachedText, encoding: cachedEncoding, lineEnding: cachedLineEnding } = previewTextState(cached);
+    setText(cachedText);
+    setSavedText(cachedText);
+    setEncoding(cachedEncoding);
+    setSavedEncoding(cachedEncoding);
+    setLineEnding(cachedLineEnding);
+    setSavedLineEnding(cachedLineEnding);
     setShowWhitespace(false);
     setSelection({ from: 0, to: 0 });
-    setHistory([]);
     setHistoryError(null);
     setIsHistoryLoading(false);
-    setBlame([]);
     setBlameError(null);
     setIsBlameLoading(false);
-    setBlameHasMore(false);
     blameRequestGenerationRef.current += 1;
     activeBlameRequestRef.current = null;
-    setIsLoading(true);
+    setIsLoading(!cached);
     setIsLargeImageLoading(false);
     void gitClient.getWorkingDirectoryPreview(path, repoPath).then((result) => {
       if (!active) return;
       if (!result.success) {
         setLoadError(result.error || 'Could not open file.');
+        setIsLoading(false);
+        return;
+      }
+      if (dirtyRef.current) {
         setIsLoading(false);
         return;
       }
@@ -187,7 +204,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     return () => {
       active = false;
     };
-  }, [path, repoPath]);
+  }, [path, repoPath, getCachedPreview]);
   const loadLargeImage = useCallback(async () => {
     const fileKey = `${repoPath}\0${path}`;
     setIsLargeImageLoading(true);
@@ -209,7 +226,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
   useEffect(() => {
     if (tab !== 'history') return;
     let active = true;
-    setIsHistoryLoading(true);
+    setIsHistoryLoading(!hasHistory);
     setHistoryError(null);
     void gitClient
       .getFileHistory(path, undefined, 80, repoPath)
@@ -217,13 +234,11 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         if (!active) return;
         if (result.success) setHistory(result.data || []);
         else {
-          setHistory([]);
           setHistoryError(result.error || 'Could not load file history.');
         }
       })
       .catch((loadError: unknown) => {
         if (!active) return;
-        setHistory([]);
         setHistoryError(loadError instanceof Error ? loadError.message : 'Could not load file history.');
       })
       .finally(() => {
@@ -232,7 +247,7 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
     return () => {
       active = false;
     };
-  }, [path, repoPath, tab]);
+  }, [path, repoPath, tab, setHistory, hasHistory]);
 
   const loadBlamePage = useCallback(
     async (startLine: number, append: boolean, generation: number) => {
@@ -245,7 +260,6 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         const result = await gitClient.getFileBlameRange(path, undefined, startLine, BLAME_LOOKAHEAD_COUNT, repoPath, 'unstaged');
         if (generation !== blameRequestGenerationRef.current) return;
         if (!result.success) {
-          if (!append) setBlame([]);
           setBlameError(result.error || 'Could not load blame data.');
           return;
         }
@@ -254,7 +268,6 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         setBlameHasMore(page.hasMore);
       } catch (loadError: unknown) {
         if (generation !== blameRequestGenerationRef.current) return;
-        if (!append) setBlame([]);
         setBlameError(loadError instanceof Error ? loadError.message : 'Could not load blame data.');
       } finally {
         const activeRequest = activeBlameRequestRef.current;
@@ -264,14 +277,12 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
         }
       }
     },
-    [path, repoPath],
+    [path, repoPath, setBlame, setBlameHasMore],
   );
 
   useEffect(() => {
     if (tab !== 'blame') return;
     const generation = ++blameRequestGenerationRef.current;
-    setBlame([]);
-    setBlameHasMore(false);
     void loadBlamePage(1, false, generation);
     return () => {
       if (blameRequestGenerationRef.current === generation) blameRequestGenerationRef.current += 1;
@@ -461,10 +472,21 @@ export const WorkingDirectoryFileViewer: React.FC<Props> = ({ repoPath, path, on
       {filePreviewKind === 'markdown' && <MarkdownPreviewPane markdownPreview={markdownPreview} onPreviewClick={handleMarkdownPreviewClick} />}
       {filePreviewKind === 'html' && <HtmlPreviewPane preview={htmlPreview} title={path} />}
       {preview?.kind === 'text' && tab === 'history' && (
-        <FileHistoryPanel entries={history} loading={isHistoryLoading} error={historyError} formatDate={(value) => value} />
+        <FileHistoryPanel
+          entries={history}
+          loading={isDataLoading(isHistoryLoading, hasHistory, historyError)}
+          error={historyError}
+          formatDate={(value) => value}
+        />
       )}
       {preview?.kind === 'text' && tab === 'blame' && (
-        <BlamePanel lines={blame} loading={isBlameLoading} error={blameError} hasMore={blameHasMore} onLoadMore={loadMoreBlame} />
+        <BlamePanel
+          lines={blame}
+          loading={isDataLoading(isBlameLoading, hasBlame, blameError)}
+          error={blameError}
+          hasMore={blameHasMore}
+          onLoadMore={loadMoreBlame}
+        />
       )}
       {preview?.kind === 'text' && (
         <WorkingDirectoryFileStatusBar text={text} encoding={encoding} lineEnding={lineEnding} modifiedAt={preview.modifiedAt} tr={tr} />

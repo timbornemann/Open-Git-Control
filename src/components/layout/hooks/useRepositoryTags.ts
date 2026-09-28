@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, withReadPriority } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import { isFullGitObjectId } from '@/utils/gitObjectId';
@@ -40,7 +43,9 @@ export const useRepositoryTags = ({
   setInputDialog,
   onNavigateToCommit,
 }: Params) => {
-  const [tags, setTags] = useState<string[]>([]);
+  const [loadedTags, setTags] = useState<string[]>([]);
+  const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'tag', '-l', '--sort=-v:refname']));
+  const tags = useMemo(() => (cached.data?.success ? parseTags(cached.data.data) : loadedTags), [cached.data, loadedTags]);
   const [tagConflicts, setTagConflicts] = useState<string[]>([]);
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef<string | null>(activeRepo);
@@ -61,12 +66,22 @@ export const useRepositoryTags = ({
     let cancelled = false;
     const fetchTags = async () => {
       try {
-        const [byVersion, referenceStatus] = await Promise.all([
-          gitClient.runGitCommandForRepo(activeRepo, 'tag', '-l', '--sort=-v:refname'),
-          trackedRemoteName
-            ? gitClient.runGitCommandForRepo(activeRepo, 'forEachRef', TAG_REFERENCE_STATUS_FORMAT, 'refs/tags', remoteTagTrackingRefPrefix(trackedRemoteName))
-            : Promise.resolve(null),
-        ]);
+        const [byVersion, referenceStatus] = await withReadPriority(
+          () =>
+            Promise.all([
+              gitClient.runGitCommandForRepo(activeRepo, 'tag', '-l', '--sort=-v:refname'),
+              trackedRemoteName
+                ? gitClient.runGitCommandForRepo(
+                    activeRepo,
+                    'forEachRef',
+                    TAG_REFERENCE_STATUS_FORMAT,
+                    'refs/tags',
+                    remoteTagTrackingRefPrefix(trackedRemoteName),
+                  )
+                : Promise.resolve(null),
+            ]),
+          'repository',
+        );
         if (cancelled) return;
         setTags(byVersion.success ? parseTags(byVersion.data) : []);
         setTagConflicts(referenceStatus?.success ? parseConflictingTagNames(referenceStatus.data, trackedRemoteName) : []);

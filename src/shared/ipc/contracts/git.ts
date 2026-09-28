@@ -1,3 +1,4 @@
+import type { ReadRequest } from '../../cache/resource';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
 import type {
   CommitLogPageDto,
@@ -36,6 +37,7 @@ export type CreateCommitParamsDto = {
 };
 
 export type CommitLogPageRequestDto = {
+  readRequest?: ReadRequest;
   repoPath?: string;
   limit: number;
   offset: number;

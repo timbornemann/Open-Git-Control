@@ -1,4 +1,6 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferredFrame } from './commitGraphRequestUtils';
+import { useCachedResult } from '@/data/resourceHooks';
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GraphLayout } from '@/utils/graphLayout';
 import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -9,6 +11,7 @@ import {
   applyCachedStats,
   getGraphCacheEntry,
   getGraphCacheKey,
+  graphQueryKey,
   LOG_MAX_LIMIT,
   LOG_PAGE_SIZE,
   mergeUniqueCommits,
@@ -32,15 +35,6 @@ type Params = {
   onRefreshWorkingTree?: () => Promise<void>;
 };
 
-const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error || ''));
-const isGitOperationAborted = (error: unknown): boolean => /git operation was aborted/i.test(errorMessage(error));
-const requestDeferredFrame = (callback: FrameRequestCallback): number =>
-  typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(callback) : window.setTimeout(() => callback(performance.now()), 0);
-const cancelDeferredFrame = (id: number): void => {
-  if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(id);
-  else window.clearTimeout(id);
-};
-
 export const useCommitGraphData = ({
   repoPath,
   showSecondaryHistory,
@@ -51,14 +45,16 @@ export const useCommitGraphData = ({
   externalWorkingTreeStatus,
   onRefreshWorkingTree,
 }: Params) => {
-  const [layout, setLayout] = useState<GraphLayout | null>(null);
-  const [commitCount, setCommitCount] = useState(0);
+  useCachedResult(graphQueryKey(getGraphCacheKey(repoPath || '', showSecondaryHistory)));
+  const cachedAtMount = repoPath ? getGraphCacheEntry(repoPath, showSecondaryHistory) : undefined;
+  const [layout, setLayout] = useState<GraphLayout | null>(() => cachedAtMount?.layout || null);
+  const [commitCount, setCommitCount] = useState(() => cachedAtMount?.commits.length || 0);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMoreCommits, setHasMoreCommits] = useState(true);
+  const [hasMoreCommits, setHasMoreCommits] = useState(cachedAtMount?.hasMore ?? true);
 
   const commitCountRef = useRef(0);
-  const layoutRef = useRef<GraphLayout | null>(null);
+  const layoutRef = useRef<GraphLayout | null>(cachedAtMount?.layout || null);
   const onRepoClearedRef = useRef(onRepoCleared);
   const pendingScrollTopRef = useRef<number | null>(null);
   const pendingScrollHeightRef = useRef<number | null>(null);
@@ -67,13 +63,14 @@ export const useCommitGraphData = ({
   const pendingRefreshAfterAppendRef = useRef<RefreshMode | null>(null);
   const lastRepoPathRef = useRef<string | null>(null);
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
+  const layoutBelongsToRepository = lastRepoPathRef.current === repoPath && lastSecondaryHistoryRef.current === showSecondaryHistory;
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
   const requestGenerationRef = useRef(0);
   const abortRetryCountRef = useRef(0);
   const abortRetryTimeoutRef = useRef<number | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
-  const updateLayout = useGraphLayoutEngine(setLayout);
+  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '');
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
     externalWorkingTreeStatus,
@@ -245,7 +242,7 @@ export const useCommitGraphData = ({
     await refreshCommits('append');
   }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!repoPath) {
       requestGenerationRef.current += 1;
       abortRetryCountRef.current = 0;
@@ -305,7 +302,10 @@ export const useCommitGraphData = ({
         commitCountRef.current = cached.commits.length;
         setCommitCount(cached.commits.length);
         setHasMoreCommits(cached.hasMore);
-        updateLayout(cached.commits);
+        if (cached.layout) {
+          setLayout(cached.layout);
+          layoutRef.current = cached.layout;
+        } else updateLayout(cached.commits);
       }
     }
 
@@ -314,6 +314,14 @@ export const useCommitGraphData = ({
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
   }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout, clearWorkingTreeStatus]);
+
+  useLayoutEffect(() => {
+    if (layoutRef.current || !cachedAtMount?.layout) return;
+    layoutRef.current = cachedAtMount.layout;
+    setLayout(cachedAtMount.layout);
+    setCommitCount(cachedAtMount.commits.length);
+    setHasMoreCommits(cachedAtMount.hasMore);
+  }, [cachedAtMount]);
 
   useEffect(() => {
     if (commitRefreshTrigger === lastCommitRefreshTriggerRef.current) return;
@@ -324,8 +332,16 @@ export const useCommitGraphData = ({
   }, [commitRefreshTrigger, refreshCommits, refreshWorkingTreeStatus, repoPath]);
 
   useEffect(() => {
+    if (!layoutBelongsToRepository) return;
     layoutRef.current = layout;
-  }, [layout]);
+    if (layout && repoPath)
+      storeGraphCache(
+        getGraphCacheKey(repoPath, showSecondaryHistory),
+        layout.nodes.map((node) => node.commit),
+        hasMoreCommits,
+        layout,
+      );
+  }, [layout, repoPath, showSecondaryHistory, hasMoreCommits, layoutBelongsToRepository]);
 
   useEffect(() => {
     commitCountRef.current = commitCount;

@@ -1,7 +1,10 @@
+import { updateResource, cacheDiagnostics } from '@/data/queryClient';
+import { backgroundQueue } from '@/data/backgroundQueue';
+import { cachedClient, resourceKey } from '@/data/clientCache';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAppApi, requireElectronReposApi, requireElectronSettingsApi } from './electronApi';
 
-export const appClient = {
+export const appClient = cachedClient('app', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
@@ -89,7 +92,10 @@ export const appClient = {
   },
 
   onUpdaterEvent(...args: Parameters<ElectronAPI['onUpdaterEvent']>): ReturnType<ElectronAPI['onUpdaterEvent']> {
-    return requireElectronAppApi().onUpdaterEvent(...args);
+    return requireElectronAppApi().onUpdaterEvent((status) => {
+      updateResource(resourceKey('app', 'getUpdaterStatus'), status);
+      args[0](status);
+    });
   },
 
   async getStoredRepos(...args: Parameters<ElectronAPI['getStoredRepos']>): ReturnType<ElectronAPI['getStoredRepos']> {
@@ -113,6 +119,14 @@ export const appClient = {
   },
 
   async getDiagnosticsReport(...args: Parameters<ElectronAPI['getDiagnosticsReport']>): ReturnType<ElectronAPI['getDiagnosticsReport']> {
-    return requireElectronAppApi().getDiagnosticsReport(...args);
+    const result = await requireElectronAppApi().getDiagnosticsReport(...args);
+    if (!result.success) return result;
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        report: `${result.data.report}\n\nRenderer data cache\n${JSON.stringify({ ...cacheDiagnostics, queueLength: backgroundQueue.size, backgroundReads: backgroundQueue.active }, null, 2)}`,
+      },
+    };
   },
-};
+});

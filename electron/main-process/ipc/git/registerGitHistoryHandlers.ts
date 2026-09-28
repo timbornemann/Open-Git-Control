@@ -1,3 +1,5 @@
+import { beginReadRequest } from '../../readRequests';
+import type { ReadRequest } from '../../../../src/shared/cache/resource';
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron';
 import type { CommitStatsPriority, CommitStatsService } from '../../../CommitStatsService';
 import type { GitService } from '../../../GitService';
@@ -36,7 +38,8 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
 
   ipcMain.handle(
     IpcChannel.GitCommitLogPage,
-    async (_event: unknown, params: { repoPath?: unknown; limit?: unknown; offset?: unknown; scope?: unknown } = {}) => {
+    async (event: IpcMainInvokeEvent, params: { repoPath?: unknown; limit?: unknown; offset?: unknown; scope?: unknown; readRequest?: ReadRequest } = {}) => {
+      const request = beginReadRequest(event, params.readRequest);
       try {
         const limit = Math.max(1, Math.min(500, Math.floor(Number(params.limit) || 100)));
         const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
@@ -64,7 +67,8 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
           };
         }
 
-        const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset, repoPath);
+        const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset, repoPath, ...(params.readRequest ? [request.signal] : []));
+        request.signal.throwIfAborted();
         // eslint-disable-next-line no-control-regex -- Git log records are NUL/unit-separator delimited.
         const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)].map((match) => match[1]);
         const hasMore = hashes.length > limit;
@@ -81,6 +85,8 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         };
       } catch (error: unknown) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
+      } finally {
+        request.finish();
       }
     },
   );

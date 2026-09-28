@@ -159,6 +159,8 @@ export interface GithubCatalogSnapshotDto {
   username: string;
   savedAt: string;
   repos: GitHubRepositoryDto[];
+  /** Some private repositories are unavailable in this snapshot. */
+  refreshRequired?: boolean;
 }
 
 export interface GithubCreateRepositoryWithReadmeDto {

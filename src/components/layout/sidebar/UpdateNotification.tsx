@@ -1,3 +1,4 @@
+import { peekResource } from '@/data/clientCache';
 import React from 'react';
 import { Download } from 'lucide-react';
 import { DialogFrame } from '@/components/DialogFrame';
@@ -17,7 +18,7 @@ export const UpdateNotification: React.FC = () => {
   const showToast = useAppToast();
   const autoUpdateEnabled = useSettingsStore((state) => state.settings.autoUpdateEnabled);
   const onUpdateSettings = useSettingsStore((state) => state.onUpdateSettings);
-  const [status, setStatus] = React.useState<UpdaterStatusDto | null>(null);
+  const [status, setStatus] = React.useState<UpdaterStatusDto | null>(() => peekResource<UpdaterStatusDto>('app', 'getUpdaterStatus') || null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [dismissedVersion, setDismissedVersion] = React.useState<string | null>(null);
   const [working, setWorking] = React.useState(false);
@@ -53,7 +54,7 @@ export const UpdateNotification: React.FC = () => {
       .getUpdaterStatus()
       .then(applyStatus)
       .catch(() => {
-        if (active) setStatus(null);
+        /* Keep the latest status delivered by the event stream. */
       });
 
     const unsubscribe = appClient.onUpdaterEvent(applyStatus);

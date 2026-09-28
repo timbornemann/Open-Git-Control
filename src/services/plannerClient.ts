@@ -1,7 +1,8 @@
+import { cachedClient } from '@/data/clientCache';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronPlannerApi } from './electronApi';
 
-export const plannerClient = {
+export const plannerClient = cachedClient('planner', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
@@ -51,4 +52,4 @@ export const plannerClient = {
   async materializeProject(...args: Parameters<ElectronAPI['plannerMaterializeProject']>): ReturnType<ElectronAPI['plannerMaterializeProject']> {
     return requireElectronPlannerApi().plannerMaterializeProject(...args);
   },
-};
+});

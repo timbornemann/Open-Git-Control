@@ -1,3 +1,7 @@
+import { DataPlaceholder } from '@/components/common/DataPlaceholder';
+import { queryClient } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
+import { useResourceState } from '@/data/resourceHooks';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Ban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Workflow } from 'lucide-react';
 import { useI18n } from '@/i18n';
@@ -11,17 +15,29 @@ const POLL_INTERVAL_MS = 45_000;
 export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
   const { tr, locale } = useI18n();
   const ui = useUIContext();
-  const [branches, setBranches] = useState<string[]>([]);
+  const [branches, setBranches] = useResourceState<string[]>('github', 'getBranches', [owner, repo], []);
   const [branch, setBranch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-  const [runs, setRuns] = useState<GithubWorkflowRunDto[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
+  const [runPage, setRunPage, hasRunPage] = useResourceState<{ runs: GithubWorkflowRunDto[]; hasMore: boolean; totalCount: number } | null>(
+    'github',
+    'getWorkflowRunsPage',
+    [{ owner, repo, branch: branch || undefined, status: status || undefined, page, perPage: 20 }],
+    null,
+  );
+  const runs = runPage?.runs || [];
+  const hasMore = runPage?.hasMore || false;
+  const totalCount = runPage?.totalCount || 0;
   const [selectedRun, setSelectedRun] = useState<GithubWorkflowRunDto | null>(null);
-  const [jobs, setJobs] = useState<GithubWorkflowJobDto[]>([]);
   const [jobsPage, setJobsPage] = useState(1);
-  const [jobsHasMore, setJobsHasMore] = useState(false);
+  const [jobResult, setJobResult] = useResourceState<{ jobs: GithubWorkflowJobDto[]; hasMore: boolean } | null>(
+    'github',
+    'getWorkflowJobsPage',
+    [{ owner, repo, runId: selectedRun?.id, page: jobsPage, perPage: 50 }],
+    null,
+  );
+  const jobs = jobResult?.jobs || [];
+  const jobsHasMore = jobResult?.hasMore || false;
   const [loading, setLoading] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +48,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
   const retryDelay = useRef(POLL_INTERVAL_MS);
 
   const loadRuns = useCallback(
-    async (manual = false) => {
+    async (manual = false, force = false) => {
       if ((!manual && (inFlight.current || Date.now() < nextAllowedAt.current)) || document.visibilityState !== 'visible') return;
       const currentRequest = ++requestId.current;
       inFlight.current = true;
@@ -40,16 +56,22 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
         nextAllowedAt.current = 0;
         retryDelay.current = POLL_INTERVAL_MS;
       }
+      if (force)
+        await queryClient.invalidateQueries({
+          queryKey: resourceKey('github', 'getWorkflowRunsPage', [
+            { owner, repo, branch: branch || undefined, status: status || undefined, page, perPage: 20 },
+          ]),
+          exact: true,
+          refetchType: 'none',
+        });
       setLoading(true);
       setError(null);
       try {
         const result = await githubClient.getWorkflowRunsPage({ owner, repo, branch: branch || undefined, status: status || undefined, page, perPage: 20 });
         if (currentRequest !== requestId.current) return;
         if (!result.success) throw new Error(result.error || 'Actions-Läufe konnten nicht geladen werden.');
-        setRuns(result.data.runs);
+        setRunPage(result.data);
         setSelectedRun((current) => (current ? result.data.runs.find((run) => run.id === current.id) || null : null));
-        setHasMore(result.data.hasMore);
-        setTotalCount(result.data.totalCount);
         retryDelay.current = POLL_INTERVAL_MS;
         nextAllowedAt.current = Date.now() + POLL_INTERVAL_MS;
       } catch (caught) {
@@ -65,7 +87,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
         }
       }
     },
-    [owner, repo, branch, status, page],
+    [owner, repo, branch, status, page, setRunPage],
   );
 
   useEffect(() => {
@@ -92,12 +114,9 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
     return () => {
       active = false;
     };
-  }, [owner, repo]);
+  }, [owner, repo, setBranches]);
   useEffect(() => {
-    if (!selectedRun) {
-      setJobs([]);
-      return;
-    }
+    if (!selectedRun) return;
     let active = true;
     setJobsLoading(true);
     void githubClient
@@ -105,8 +124,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
       .then((result) => {
         if (!active) return;
         if (!result.success) throw new Error(result.error || 'Jobs konnten nicht geladen werden.');
-        setJobs(result.data.jobs);
-        setJobsHasMore(result.data.hasMore);
+        setJobResult(result.data);
       })
       .catch((caught) => {
         if (active) setActionError(caught instanceof Error ? caught.message : String(caught));
@@ -117,7 +135,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
     return () => {
       active = false;
     };
-  }, [owner, repo, selectedRun, jobsPage]);
+  }, [owner, repo, selectedRun, jobsPage, setJobResult]);
 
   const controlRun = async (run: GithubWorkflowRunDto, action: 'rerun' | 'cancel') => {
     setActionError(null);
@@ -152,7 +170,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
           <h2>GitHub Actions</h2>
           <p>{tr('Workflow-Läufe aller Branches', 'Workflow runs across all branches')}</p>
         </div>
-        <button onClick={() => void loadRuns(true)} aria-label={tr('Actions aktualisieren', 'Refresh Actions')}>
+        <button onClick={() => void loadRuns(true, true)} aria-label={tr('Actions aktualisieren', 'Refresh Actions')}>
           <RefreshCw size={15} />
         </button>
       </div>
@@ -201,8 +219,8 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
           {actionError}
         </div>
       )}
-      {loading && !runs.length ? (
-        <div className="github-workspace__empty">{tr('Actions-Läufe werden geladen …', 'Loading Actions runs …')}</div>
+      {!hasRunPage && !error ? (
+        <DataPlaceholder />
       ) : runs.length === 0 ? (
         <div className="github-workspace__empty">{tr('Keine passenden Läufe gefunden.', 'No matching runs found.')}</div>
       ) : (
@@ -249,7 +267,7 @@ export const GithubActions: React.FC<Props> = ({ owner, repo }) => {
               </div>
               {selectedRun?.id === run.id && (
                 <div className="github-run-row__jobs">
-                  {jobsLoading
+                  {jobsLoading && !jobResult
                     ? tr('Jobs werden geladen …', 'Loading jobs …')
                     : jobs.length === 0
                       ? tr('Keine Jobs vorhanden.', 'No jobs available.')

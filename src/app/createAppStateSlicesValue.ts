@@ -107,6 +107,9 @@ const createGithubSlice = (
   selectedGithubAuthHelpMethod: 'pat' | 'device' | 'web' | null,
   setSelectedGithubAuthHelpMethod: Dispatch<SetStateAction<'pat' | 'device' | 'web' | null>>,
 ): GithubContextValue => ({
+  isAuthRestoring: state.isAuthRestoring,
+  isAuthenticationRequired: state.isAuthenticationRequired,
+  onRetryAuthentication: state.onRetryAuthentication,
   isAuthenticated: state.isAuthenticated,
   tokenInput: state.tokenInput,
   setTokenInput: state.setTokenInput,

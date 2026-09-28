@@ -54,6 +54,7 @@ const createElectronApi = (): TestElectronApi => ({
   settings: createBucket(),
 });
 
+const visibleReadRequest = { priority: 'visible', requestId: expect.any(String) };
 let api: TestElectronApi;
 
 const installApi = () => {
@@ -238,7 +239,8 @@ describe('renderer service clients', () => {
       { owner: 'octo', repo: 'hello' },
     ]);
     await expectDelegation(() => githubClient.getPullRequests('octo', 'hello', 'open'), api.github.githubGetPRs, ['octo', 'hello', 'open']);
-    await expectDelegation(() => githubClient.getBranches('octo', 'hello'), api.github.githubGetBranches, ['octo', 'hello']);
+    api.github.githubGetBranchesPage.mockResolvedValue({ success: true, data: [] });
+    await expectDelegation(() => githubClient.getBranches('octo', 'hello'), api.github.githubGetBranchesPage, ['octo', 'hello', 1, visibleReadRequest]);
     await expectDelegation(() => githubClient.createPullRequest({ owner: 'octo' } as any), api.github.githubCreatePR, [{ owner: 'octo' }]);
     await expectDelegation(() => githubClient.getWorkflowRuns({ owner: 'octo', repo: 'hello' }), api.github.githubGetWorkflowRuns, [
       { owner: 'octo', repo: 'hello' },
@@ -394,7 +396,7 @@ describe('renderer service clients', () => {
     ]);
     await expectDelegation(() => gitClient.cancelSecretScan('C:/repo'), api.git.cancelSecretScan, ['C:/repo']);
     await expectDelegation(() => gitClient.createCommit({ message: 'm' } as any), api.git.createCommit, [{ message: 'm' }]);
-    await expectDelegation(() => gitClient.getCommitLogPage({ limit: 10 } as any), api.git.getCommitLogPage, [{ limit: 10 }]);
+    await expectDelegation(() => gitClient.getCommitLogPage({ limit: 10 } as any), api.git.getCommitLogPage, [{ limit: 10, readRequest: visibleReadRequest }]);
     await expectDelegation(() => gitClient.requestCommitStats(['a'] as any), api.git.requestCommitStats, [['a']]);
     await expectDelegation(() => gitClient.onCommitStats(vi.fn()), api.git.onCommitStats, [expect.any(Function)]);
     await expectDelegation(() => gitClient.getWorkingTreeSnapshot(), api.git.getWorkingTreeSnapshot, []);

@@ -1,3 +1,5 @@
+import { preload, peekResource } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
@@ -216,6 +218,11 @@ export const useReleaseWorkflow = ({
     }));
   }, [currentBranch, ownerRepo, setReleaseFormState]);
 
+  useEffect(() => {
+    if (!activeRepo || !isGithubAuthenticated || !ownerRepo || !githubClient.isAvailable()) return;
+    void preload(() => githubClient.getReleaseContext({ owner: ownerRepo.owner, repo: ownerRepo.repo, repoPath: activeRepo, targetCommitish: currentBranch }));
+  }, [activeRepo, currentBranch, isGithubAuthenticated, ownerRepo]);
+
   const refreshReleaseContext = useCallback(
     async (targetCommitishOverride?: string) => {
       if (releaseNotesGeneratingRef.current) return;
@@ -229,7 +236,16 @@ export const useReleaseWorkflow = ({
       }
 
       releaseContextLoadingRef.current = true;
-      setReleaseContextLoading(true);
+      const cachedContext = peekResource<IpcResult<GitHubReleaseContextDto>>('github', 'getReleaseContext', [
+        {
+          owner: ownerRepo.owner,
+          repo: ownerRepo.repo,
+          repoPath: activeRepoRef.current || undefined,
+          targetCommitish: (targetCommitishOverride ?? releaseForm.targetCommitish ?? '').trim() || currentBranch,
+        },
+      ]);
+      if (cachedContext?.success) setReleaseContext(cachedContext.data);
+      setReleaseContextLoading(!cachedContext?.success);
       setReleaseContextError(null);
       const generation = generationRef.current;
       const repoPath = activeRepoRef.current;
@@ -247,7 +263,6 @@ export const useReleaseWorkflow = ({
         if (!isCurrentRefresh()) return;
 
         if (!result.success) {
-          setReleaseContext(null);
           setReleaseContextError(result.error || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
           return;
         }
@@ -274,7 +289,6 @@ export const useReleaseWorkflow = ({
         });
       } catch (error: any) {
         if (!isCurrentRefresh()) return;
-        setReleaseContext(null);
         setReleaseContextError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_load_release_context_410f4bdf'));
       } finally {
         if (isCurrentRefresh()) {

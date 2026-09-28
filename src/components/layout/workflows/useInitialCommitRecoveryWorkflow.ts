@@ -1,3 +1,4 @@
+import { freshRead } from '@/data/clientCache';
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
@@ -39,7 +40,7 @@ export const useInitialCommitRecoveryWorkflow = ({
         /user\.email/i.test(message);
       const isNothingToCommitError = (message: string) => /nothing to commit/i.test(message) || /working tree clean/i.test(message);
 
-      const statusResult = await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
+      const statusResult = await freshRead(() => gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain'));
       const hasChanges = Boolean(statusResult.success && String(statusResult.data || '').trim().length > 0);
 
       if (hasChanges) {
@@ -123,7 +124,7 @@ export const useInitialCommitRecoveryWorkflow = ({
 
       let changedFiles: number | null = null;
       try {
-        const statusResult = await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
+        const statusResult = await freshRead(() => gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain'));
         if (statusResult.success) {
           changedFiles = String(statusResult.data || '')
             .split('\n')

@@ -1,3 +1,4 @@
+import { useAppPreloading } from './data/useAppPreloading';
 import React, { useCallback, useMemo, useState } from 'react';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { MainView } from './components/layout/MainView';
@@ -18,6 +19,7 @@ import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRep
 
 const App: React.FC = () => {
   const state = useAppState();
+  useAppPreloading(state.activeRepo, state.openRepos, state.activeTab, state.settings.showSecondaryHistory);
   const tr = useCallback((deText: string, enText: string) => (state.settings.language === 'en' ? enText : deText), [state.settings.language]);
   const t = useCallback(
     (key: string, variables?: TranslationVariables) => translateFromCatalog(state.settings.language, key, variables),

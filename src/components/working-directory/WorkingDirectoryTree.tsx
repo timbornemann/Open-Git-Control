@@ -1,3 +1,6 @@
+import { usePreloadIntent } from '@/data/usePreloadIntent';
+import { peekResource } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ClipboardPaste, Copy, ExternalLink, File, FilePlus, Folder, FolderOpen, FolderPlus, Info, Pencil, Scissors, Search, Trash2, X } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
@@ -85,7 +88,12 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
 }) => {
   const { setConfirmDialog, setInputDialog } = useUIContext();
   const setToast = useAppToastSetter();
-  const [entriesByParent, setEntriesByParent] = useState<Record<string, WorkingDirectoryEntryDto[]>>({});
+  const intent = usePreloadIntent();
+  const cachedRoot = useCallback((): Record<string, WorkingDirectoryEntryDto[]> => {
+    const result = peekResource<IpcResult<WorkingDirectoryEntryDto[]>>('git', 'listWorkingDirectory', [repoPath, '']);
+    return result?.success ? { '': result.data } : {};
+  }, [repoPath]);
+  const [entriesByParent, setEntriesByParent] = useState<Record<string, WorkingDirectoryEntryDto[]>>(cachedRoot);
   const [loadingDirectories, setLoadingDirectories] = useState<Set<string>>(() => new Set());
   const [clipboard, setClipboard] = useState<ClipboardEntry>(null);
   const [context, setContext] = useState<ContextMenu | null>(null);
@@ -170,7 +178,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       const isFreshMount = initializedRepoPathRef.current === null;
       initializedRepoPathRef.current = repoPath;
       loadedDirectoryPathsRef.current.clear();
-      setEntriesByParent({});
+      setEntriesByParent(cachedRoot());
       setLoadingDirectories(new Set());
       setClipboard(null);
       setContext(null);
@@ -189,7 +197,7 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
       return;
     }
     if (repoPath) void refreshLoadedDirectories();
-  }, [loadDirectory, refreshLoadedDirectories, refreshTrigger, repoPath]);
+  }, [loadDirectory, refreshLoadedDirectories, refreshTrigger, repoPath, cachedRoot]);
 
   useEffect(() => {
     const close = () => setContext(null);
@@ -418,6 +426,21 @@ export const WorkingDirectoryTree: React.FC<Props> = ({
         <React.Fragment key={entry.path}>
           <button
             type="button"
+            onMouseEnter={() =>
+              intent.hover(() =>
+                entry.kind === 'directory'
+                  ? gitClient.listWorkingDirectory(repoPath!, entry.path)
+                  : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
+              )
+            }
+            onMouseLeave={intent.cancel}
+            onFocus={() =>
+              intent.focus(() =>
+                entry.kind === 'directory'
+                  ? gitClient.listWorkingDirectory(repoPath!, entry.path)
+                  : gitClient.getWorkingDirectoryPreview(entry.path, repoPath!),
+              )
+            }
             className={`working-tree-row${selectedPaths.has(entry.path) ? ' working-tree-row--selected' : ''}${activeFilePath === entry.path ? ' working-tree-row--active' : ''}${context?.entry.path === entry.path ? ' working-tree-row--context' : ''}`}
             onClick={(event) => {
               if (event.ctrlKey || event.metaKey || event.shiftKey) {

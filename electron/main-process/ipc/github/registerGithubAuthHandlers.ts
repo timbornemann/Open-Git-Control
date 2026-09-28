@@ -124,6 +124,7 @@ export function registerGithubAuthHandlers({ githubService, readSettingsWithMigr
         authenticated: githubService.isAuthenticated(),
         username: githubService.getUsername(),
         error: failure?.message,
+        authenticationRequired: failure?.invalidCredentials === true,
       };
     }
     const persist = persistGithubToken(savedToken.token, normalizedHost);

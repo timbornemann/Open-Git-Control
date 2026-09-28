@@ -15,7 +15,7 @@ const mapRepository = (repo: GithubRepositoryApi): GitHubRepositoryDto => ({
 export class GitHubRepositoryService {
   constructor(private readonly getOctokit: GitHubOctokitProvider) {}
 
-  async getMyRepositories(page: number = 1, perPage: number = 50, search: string = '') {
+  async getMyRepositories(page: number = 1, perPage: number = 50, search: string = '', signal?: AbortSignal) {
     const octokit = this.getOctokit();
     const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
     const safePerPage = Number.isFinite(perPage) ? Math.max(10, Math.min(Math.floor(perPage), 100)) : 50;
@@ -29,6 +29,7 @@ export class GitHubRepositoryService {
 
     if (!normalizedSearch) {
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+        ...(signal ? { request: { signal } } : {}),
         sort: 'updated',
         per_page: safePerPage,
         page: safePage,
@@ -49,6 +50,7 @@ export class GitHubRepositoryService {
 
     while (matchedRepos.length <= requiredMatches) {
       const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+        ...(signal ? { request: { signal } } : {}),
         sort: 'updated',
         per_page: 100,
         page: sourcePage,
@@ -128,6 +130,12 @@ export class GitHubRepositoryService {
       if (data.length < 100) return branches;
     }
     throw new Error('Too many branches to list completely.');
+  }
+
+  async getBranchesPage(owner: string, repo: string, page: number, signal?: AbortSignal): Promise<string[]> {
+    if (!Number.isInteger(page) || page < 1 || page > 100) throw new Error('Invalid branch page.');
+    const { data } = await this.getOctokit().rest.repos.listBranches({ owner, repo, page, per_page: 100, request: { signal } });
+    return (data as Array<{ name: string }>).map((branch) => branch.name);
   }
 
   async getRepository(owner: string, repo: string) {

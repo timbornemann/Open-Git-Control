@@ -126,8 +126,8 @@ export class GitHubService {
     return this.username;
   }
 
-  getMyRepositories(page: number = 1, perPage: number = 50, search: string = '') {
-    return this.repositories.getMyRepositories(page, perPage, search);
+  getMyRepositories(page: number = 1, perPage: number = 50, search: string = '', signal?: AbortSignal) {
+    return this.repositories.getMyRepositories(page, perPage, search, signal);
   }
 
   createRepository(name: string, description: string, isPrivate: boolean) {
@@ -140,6 +140,10 @@ export class GitHubService {
 
   getBranches(owner: string, repo: string) {
     return this.repositories.getBranches(owner, repo);
+  }
+
+  getBranchesPage(owner: string, repo: string, page: number, signal?: AbortSignal) {
+    return this.repositories.getBranchesPage(owner, repo, page, signal);
   }
 
   getRepository(owner: string, repo: string) {

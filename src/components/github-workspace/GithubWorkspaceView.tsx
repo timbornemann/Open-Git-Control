@@ -101,7 +101,7 @@ export const GithubWorkspaceView: React.FC = () => {
 
   return (
     <div className="github-workspace">
-      {!github.isAuthenticated && (
+      {!github.isAuthenticated && !github.isAuthRestoring && github.isAuthenticationRequired !== false && (
         <div className="github-workspace__login">
           <GithubAuthContent
             tokenInput={github.tokenInput}
@@ -125,27 +125,33 @@ export const GithubWorkspaceView: React.FC = () => {
           />
         </div>
       )}
-      {(catalog.offline || catalog.error) && catalog.repos.length > 0 && (
+      {catalog.offline && catalog.savedAt && catalog.repos.length > 0 && (
         <div className="github-workspace__offline" role="status">
           {tr('Offline-Momentaufnahme', 'Offline snapshot')} ·{' '}
           {catalog.savedAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(catalog.savedAt)) : '—'}
           {catalog.error ? ` · ${catalog.error}` : ''}
         </div>
       )}
-      {catalog.error && catalog.repos.length === 0 && (
+      {catalog.error && !catalog.savedAt && (
         <div className="github-workspace__error" role="alert">
           {catalog.error}
         </div>
       )}
+      {!github.isAuthenticated && !github.isAuthRestoring && github.isAuthenticationRequired === false && github.authError && (
+        <div className="github-workspace__offline" role="status">
+          {github.authError}
+          {github.onRetryAuthentication && <button onClick={github.onRetryAuthentication}>{tr('Erneut versuchen', 'Retry')}</button>}
+        </div>
+      )}
       {!selected ? (
-        (github.isAuthenticated || catalog.repos.length > 0) && (
+        (github.isAuthenticated || github.isAuthRestoring || github.isAuthenticationRequired === false || catalog.hasData) && (
           <GithubCatalog
             repos={catalog.repos}
             localRepos={localRepos}
             pinnedIds={pinnedIds}
             online={online}
-            loading={catalog.loading}
-            loadedCount={catalog.loadedCount}
+            loading={catalog.loading || github.isAuthRestoring === true || (!catalog.hasData && !github.isAuthenticated)}
+            hasData={catalog.hasData}
             onOpen={openRepository}
             onTogglePin={togglePin}
             onClone={(repo) => github.onClone(repo.cloneUrl, repo.name)}

@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, withReadPriority } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { ConfirmDialogState, InputDialogState } from '@/components/layout/layoutTypes';
@@ -53,9 +56,14 @@ export const parseRepositoryRemotes = (rawRemoteOutput: string): { hasOrigin: bo
 };
 
 export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, runGitCommand, setConfirmDialog, setInputDialog }: Params) => {
-  const [remotes, setRemotes] = useState<RepositoryRemote[]>([]);
-  const [hasRemoteOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
-  const [remotesRepositoryPath, setRemotesRepositoryPath] = useState<string | null>(null);
+  const [loadedRemotes, setRemotes] = useState<RepositoryRemote[]>([]);
+  const [loadedHasOrigin, setHasRemoteOrigin] = useState<boolean | null>(null);
+  const [loadedRepoPath, setRemotesRepositoryPath] = useState<string | null>(null);
+  const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'remote', '-v']));
+  const preview = useMemo(() => (cached.data?.success ? parseRepositoryRemotes(cached.data.data) : null), [cached.data]);
+  const remotes = preview?.remotes || loadedRemotes;
+  const hasRemoteOrigin = preview?.hasOrigin ?? loadedHasOrigin;
+  const remotesRepositoryPath = preview ? activeRepo : loadedRepoPath;
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef(activeRepo);
 
@@ -87,7 +95,7 @@ export const useRepositoryRemotes = ({ activeRepo, refreshTrigger, language, run
     let cancelled = false;
     const checkRemote = async () => {
       try {
-        const result = await gitClient.runGitCommandForRepo(activeRepo, 'remote', '-v');
+        const result = await withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'remote', '-v'), 'repository');
         if (cancelled) return;
         if (!result.success) return;
 

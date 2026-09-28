@@ -1,3 +1,4 @@
+import { freshRead } from '@/data/clientCache';
 import { gitClient } from '@/services/gitClient';
 import { countChangedEntriesFromPorcelainV2, parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
@@ -69,7 +70,7 @@ export const openRemoteAheadDirtyStateGuard = async (request: GitCommandGuardReq
 
   try {
     if (!request.repoPath) return false;
-    const statusResult = await gitClient.runGitCommandForRepo(request.repoPath, 'status', '--porcelain=v2', '--branch');
+    const statusResult = await freshRead(() => gitClient.runGitCommandForRepo(request.repoPath!, 'status', '--porcelain=v2', '--branch'));
     if (!runtime.isRepoCurrent(request.repoPath)) return true;
     const statusText = statusResult.success ? String(statusResult.data || '') : '';
     const remoteSyncState = parseBranchSyncFromPorcelainV2(statusText);
@@ -129,7 +130,7 @@ export const openDirtyWorktreeGuard = async (request: GitCommandGuardRequest, ru
 
   try {
     if (!request.repoPath) return false;
-    const status = await gitClient.runGitCommandForRepo(request.repoPath, 'statusPorcelain');
+    const status = await freshRead(() => gitClient.runGitCommandForRepo(request.repoPath!, 'statusPorcelain'));
     if (!runtime.isRepoCurrent(request.repoPath)) return true;
     const hasLocalChanges = Boolean(status.success && String(status.data || '').trim().length > 0);
     if (!hasLocalChanges) return false;

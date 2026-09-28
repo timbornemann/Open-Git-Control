@@ -1,3 +1,5 @@
+import { registerReadCancellation } from '../readRequests';
+import { registerBootstrapHandlers } from './registerBootstrapHandlers';
 import type { AiService } from '../../AiService';
 import type { GitService } from '../../GitService';
 import type { GitHubService } from '../../GitHubService';
@@ -57,6 +59,8 @@ export function setupIPC({
 }: SetupIpcDeps): { repositoryRunService: RepositoryRunService } {
   const repositoryRunConfigService = new RepositoryRunConfigService();
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
+  registerReadCancellation();
+  registerBootstrapHandlers(githubService);
   registerDialogHandlers({ gitService });
   registerGitHandlers({
     gitService,

@@ -50,6 +50,7 @@ describe('GitHub catalog snapshot', () => {
     vi.resetModules();
     const afterRestart = await import('../githubCatalogCache');
     expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.repos).toHaveLength(2);
+    expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.refreshRequired).toBe(false);
     expect(afterRestart.readGithubCatalogCache('github.com', 'bob')).toBeNull();
     expect(fs.existsSync(path.join(directory, 'github-catalog.json'))).toBe(false);
   });
@@ -59,10 +60,23 @@ describe('GitHub catalog snapshot', () => {
     const cache = await import('../githubCatalogCache');
     cache.saveGithubCatalogCache('ghe.example', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
     expect(cache.readGithubCatalogCache('ghe.example', 'alice')?.repos).toHaveLength(2);
+    expect(cache.readGithubCatalogCache('ghe.example', 'alice')?.refreshRequired).toBeUndefined();
 
     vi.resetModules();
     const afterRestart = await import('../githubCatalogCache');
     expect(afterRestart.readGithubCatalogCache('ghe.example', 'alice')?.repos.map((item) => item.name)).toEqual(['public-demo']);
+    expect(afterRestart.readGithubCatalogCache('ghe.example', 'alice')?.refreshRequired).toBe(true);
     expect(afterRestart.readGithubCatalogCache('github.com', 'alice')).toBeNull();
+  });
+
+  it('refreshes an encrypted snapshot if OS decryption becomes unavailable', async () => {
+    const cache = await import('../githubCatalogCache');
+    cache.saveGithubCatalogCache('github.com', 'alice', [repo(1, 'public-demo', false), repo(2, 'private-secret', true)]);
+
+    encryptionAvailableMock.mockReturnValue(false);
+    vi.resetModules();
+    const afterRestart = await import('../githubCatalogCache');
+    expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.repos.map((item) => item.name)).toEqual(['public-demo']);
+    expect(afterRestart.readGithubCatalogCache('github.com', 'alice')?.refreshRequired).toBe(true);
   });
 });

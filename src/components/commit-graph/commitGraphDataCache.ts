@@ -1,3 +1,5 @@
+import { queryClient } from '@/data/queryClient';
+import type { GraphLayout } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 
@@ -9,28 +11,24 @@ type GraphCacheEntry = {
   commits: GitCommit[];
   hasMore: boolean;
   touchedAt: number;
+  layout?: GraphLayout;
 };
-
-const graphCache = new Map<string, GraphCacheEntry>();
 
 export const getGraphCacheKey = (repoPath: string, showSecondaryHistory: boolean) =>
   `${normalizeRepoPathKey(repoPath)}\0${showSecondaryHistory ? 'all' : 'head'}`;
 
-export const getGraphCacheEntry = (repoPath: string, showSecondaryHistory: boolean) => {
-  const cached = graphCache.get(getGraphCacheKey(repoPath, showSecondaryHistory));
-  if (cached) cached.touchedAt = Date.now();
-  return cached;
-};
+export const graphQueryKey = (key: string) => ['resource', 'git', key.split('\0')[0], 'graph', key.split('\0')[1]] as const;
+export const getGraphCacheEntry = (repoPath: string, showSecondaryHistory: boolean) =>
+  queryClient.getQueryData<GraphCacheEntry>(graphQueryKey(getGraphCacheKey(repoPath, showSecondaryHistory)));
 
-export const storeGraphCache = (key: string, commits: GitCommit[], hasMore: boolean) => {
-  graphCache.set(key, {
+export const storeGraphCache = (key: string, commits: GitCommit[], hasMore: boolean, layout?: GraphLayout) => {
+  queryClient.setQueryData<GraphCacheEntry>(graphQueryKey(key), (old) => ({
     commits: commits.slice(0, LOG_MAX_LIMIT),
     hasMore,
     touchedAt: Date.now(),
-  });
-  if (graphCache.size <= 8) return;
-  const oldest = [...graphCache.entries()].sort((a, b) => a[1].touchedAt - b[1].touchedAt)[0];
-  if (oldest) graphCache.delete(oldest[0]);
+    layout:
+      layout || (old?.commits.length === commits.length && old.commits.every((commit, index) => commit.hash === commits[index].hash) ? old.layout : undefined),
+  }));
 };
 
 export const applyCachedStats = (commits: GitCommit[], stats: Record<string, { files: number; additions: number; deletions: number }>) =>

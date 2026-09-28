@@ -1,7 +1,7 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { GitHubService } from '../../../GitHubService';
 import { IpcChannel } from '../../../../src/types/ipcContract';
-import { assertGithubAuthenticated, getGithubApiErrorDetails, normalizePrState, toErrorMessage } from './githubHandlerUtils';
+import { githubReadFailure, assertGithubAuthenticated, getGithubApiErrorDetails, normalizePrState, toErrorMessage } from './githubHandlerUtils';
 
 const actionsError = (error: unknown, fallback: string): string => {
   const message = toErrorMessage(error, fallback);
@@ -22,7 +22,7 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
       const prs = await githubService.getPullRequests(owner, repo, normalizePrState(state));
       return { success: true, data: prs };
     } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Pull requests could not be loaded.') };
+      return githubReadFailure(error, 'Pull requests could not be loaded.');
     }
   });
 
@@ -46,7 +46,7 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
         const pr = await githubService.createPullRequest(params.owner, params.repo, params.title, params.body, params.head, params.base);
         return { success: true, data: pr };
       } catch (error: unknown) {
-        return { success: false, error: toErrorMessage(error, 'Pull request could not be created.') };
+        return githubReadFailure(error, 'Pull request could not be created.');
       }
     },
   );
@@ -74,7 +74,7 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
         });
         return { success: true, data: runs };
       } catch (error: unknown) {
-        return { success: false, error: toErrorMessage(error, 'Workflow runs could not be loaded.') };
+        return githubReadFailure(error, 'Workflow runs could not be loaded.');
       }
     },
   );
@@ -155,7 +155,7 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
       const checks = await githubService.getStatusChecks(params.owner, params.repo, params.ref);
       return { success: true, data: checks };
     } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Status checks could not be loaded.') };
+      return githubReadFailure(error, 'Status checks could not be loaded.');
     }
   });
 
@@ -198,7 +198,7 @@ export function registerGithubPullRequestHandlers({ githubService }: RegisterGit
 
         return { success: true, data: result };
       } catch (error: unknown) {
-        return { success: false, error: toErrorMessage(error, 'Pull request could not be merged.') };
+        return githubReadFailure(error, 'Pull request could not be merged.');
       }
     },
   );

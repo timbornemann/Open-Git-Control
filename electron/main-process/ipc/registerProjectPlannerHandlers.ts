@@ -18,6 +18,7 @@ import {
   getRepositoryProjectKey,
   onProjectPlannerDataChanged,
   readProjectPlannerData,
+  readProjectPlannerDataAsync,
   updatePlannerItem,
   updatePlannerProject,
   validateProjectFolderName,
@@ -78,7 +79,7 @@ export function registerProjectPlannerHandlers({ gitService }: RegisterProjectPl
   syncPlanningWatchers();
   ipcMain.handle(IpcChannel.PlannerGetData, async (event: IpcMainInvokeEvent) => {
     rememberPlannerSubscriber(event);
-    const data = readProjectPlannerData();
+    const data = await readProjectPlannerDataAsync();
     syncPlanningWatchers();
     return success(data);
   });

@@ -8,6 +8,7 @@ export default defineConfig({
     },
   },
   test: {
+    setupFiles: ['src/data/testSetup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'src/**/__tests__/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
     coverage: {
       provider: 'v8',

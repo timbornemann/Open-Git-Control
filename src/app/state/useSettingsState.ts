@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey } from '@/data/clientCache';
+import { updateResource } from '@/data/queryClient';
+import { useCallback, useEffect } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { translateFromCatalog, trByLanguage, type TranslationVariables } from '@/i18nCore';
 import { appClient } from '@/services/appClient';
@@ -12,7 +15,9 @@ type UseSettingsStateParams = {
 };
 
 export const useSettingsState = ({ setGitActionToast }: UseSettingsStateParams) => {
-  const [settings, setSettings] = useState<AppSettingsDto>(DEFAULT_SETTINGS);
+  const cached = useCachedResult<AppSettingsDto>(resourceKey('app', 'getSettings'));
+  const settings = cached.data || DEFAULT_SETTINGS;
+  const setSettings = useCallback((value: AppSettingsDto) => updateResource(resourceKey('app', 'getSettings'), value), []);
 
   const tr = useCallback(
     (deText: string, enText: string) => {
@@ -42,7 +47,7 @@ export const useSettingsState = ({ setGitActionToast }: UseSettingsStateParams) 
         return { success: false, error };
       }
     },
-    [setGitActionToast, t],
+    [setGitActionToast, t, setSettings],
   );
 
   const handleUpdateSettings = useCallback(
@@ -59,12 +64,12 @@ export const useSettingsState = ({ setGitActionToast }: UseSettingsStateParams) 
         const loaded = await appClient.getSettings();
         setSettings(loaded);
       } catch {
-        setSettings(DEFAULT_SETTINGS);
+        // Keep already restored settings when a background read fails.
       }
     };
 
     loadSettings();
-  }, []);
+  }, [setSettings]);
 
   useEffect(() => {
     document.body.setAttribute('data-theme', settings.theme);

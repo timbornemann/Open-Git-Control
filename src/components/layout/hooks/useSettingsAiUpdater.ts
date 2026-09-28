@@ -1,3 +1,4 @@
+import { peekResource } from '@/data/clientCache';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettingsDto, UpdaterStatusDto } from '@/types/appDtos';
 import type { TranslationVariables } from '@/i18n';
@@ -22,8 +23,8 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr, onToas
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [geminiApiKeyInput, setGeminiApiKeyInput] = useState('');
   const [openAiApiKeyInput, setOpenAiApiKeyInput] = useState('');
-  const [appVersion, setAppVersion] = useState('');
-  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(null);
+  const [appVersion, setAppVersion] = useState(() => peekResource<string>('app', 'getAppVersion') || '');
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatusDto | null>(() => peekResource<UpdaterStatusDto>('app', 'getUpdaterStatus') || null);
   const [isRunningUpdate, setIsRunningUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
@@ -224,7 +225,7 @@ export const useSettingsAiUpdater = ({ settings, onUpdateSettings, t, tr, onToas
         setUpdaterStatus(status);
         if (status.currentVersion) setAppVersion((current) => current || status.currentVersion);
       } catch {
-        if (!active) return;
+        if (!active || peekResource('app', 'getUpdaterStatus')) return;
         onToast(t('generated.components.layout.hooks.usesettingsaiupdater.could_not_load_updater_status_2df70231'), true);
       }
     };

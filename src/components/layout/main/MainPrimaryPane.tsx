@@ -1,3 +1,4 @@
+import { viewModules } from '@/data/viewModules';
 /* eslint-disable complexity -- this component is the intentionally central primary-pane route switch. */
 import React from 'react';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
@@ -15,15 +16,13 @@ import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from '
 import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 
-const CommitGraph = React.lazy(() => import('@/components/commit-graph').then((module) => ({ default: module.CommitGraph })));
-const DiffViewer = React.lazy(() => import('@/components/diff-viewer').then((module) => ({ default: module.DiffViewer })));
-const FileTimelineView = React.lazy(() => import('@/components/FileTimelineView').then((module) => ({ default: module.FileTimelineView })));
-const ProjectPlannerView = React.lazy(() => import('@/components/project-planner').then((module) => ({ default: module.ProjectPlannerView })));
-const GithubWorkspaceView = React.lazy(() =>
-  import('@/components/github-workspace/GithubWorkspaceView').then((module) => ({ default: module.GithubWorkspaceView })),
-);
-const ReleaseCreator = React.lazy(() => import('@/components/release-creator/ReleaseCreator').then((module) => ({ default: module.ReleaseCreator })));
-const SettingsMainContent = React.lazy(() => import('@/components/layout/SettingsMainContent').then((module) => ({ default: module.SettingsMainContent })));
+const CommitGraph = viewModules.repo.View;
+const DiffViewer = viewModules.diff.View;
+const FileTimelineView = viewModules.timeline.View;
+const ProjectPlannerView = viewModules.planner.View;
+const GithubWorkspaceView = viewModules.github.View;
+const ReleaseCreator = viewModules.release.View;
+const SettingsMainContent = viewModules.settings.View;
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;

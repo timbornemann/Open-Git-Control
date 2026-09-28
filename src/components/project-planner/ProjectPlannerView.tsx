@@ -1,3 +1,4 @@
+import { DataPlaceholder } from '@/components/common/DataPlaceholder';
 import React from 'react';
 import { AlertTriangle, Bug, CheckCircle2, CircleDot, Copy, FolderGit2, Lightbulb, Pencil, Plus, Rocket, Search, Sparkles, Tag } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
@@ -27,6 +28,7 @@ export const ProjectPlannerView: React.FC = () => {
     createProjectRequestId,
     projectActionRequest,
     loading,
+    error,
     busy,
     createProject,
     updateProject,
@@ -174,7 +176,11 @@ export const ProjectPlannerView: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="planner-loading">{t('generated.components.project_planner.projectplannersidebarcontent.loading_project_planning_77574995')}</div>;
+    return (
+      <div className="project-planner-view">
+        <DataPlaceholder />
+      </div>
+    );
   }
 
   if (!selectedProject) {
@@ -204,6 +210,11 @@ export const ProjectPlannerView: React.FC = () => {
 
   return (
     <div className="project-planner-view">
+      {error && (
+        <div role="status" className="data-refresh-error">
+          {error}
+        </div>
+      )}
       <header className="planner-hero">
         <div className="planner-hero-copy">
           <div className="planner-project-kind">

@@ -1,3 +1,5 @@
+import { useResourceState } from '@/data/resourceHooks';
+import { preloadGithubRepository } from '@/data/preloading';
 /* eslint-disable complexity -- repository detail coordinates the three intentionally distinct tabs. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Download, FolderGit2, GitPullRequest, LockKeyhole, Workflow } from 'lucide-react';
@@ -35,12 +37,12 @@ export const GithubRepositoryDetail: React.FC<Props> = ({
   onOpenReleaseCreator,
 }) => {
   const { tr, locale } = useI18n();
+  const [owner, repo] = repository.fullName.split('/');
   const [tab, setTab] = useState<'overview' | 'prs' | 'actions'>('overview');
-  const [details, setDetails] = useState<GitHubRepositoryDetailsDto | null>(null);
+  const [details, setDetails] = useResourceState<GitHubRepositoryDetailsDto | null>('github', 'getRepository', [owner, repo], null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [activationMessage, setActivationMessage] = useState<string | null>(null);
   const [upstreamDefaultBranch, setUpstreamDefaultBranch] = useState<string | null>(null);
-  const [owner, repo] = repository.fullName.split('/');
   const localPaths = localRepos.get(toRepoIdentity(repository.htmlUrl) || '') || [];
   const activeLocalPath = localPaths.find((path) => activeRepo && normalizeRepoPathKey(path) === normalizeRepoPathKey(activeRepo)) || null;
   const upstreamUrl = useMemo(
@@ -56,10 +58,10 @@ export const GithubRepositoryDetail: React.FC<Props> = ({
   useEffect(() => {
     setTab('overview');
     setUseUpstream(false);
-    setDetails(null);
     setDetailError(null);
     setUpstreamDefaultBranch(null);
     if (!online) return;
+    preloadGithubRepository(owner, repo);
     let active = true;
     void githubClient
       .getRepository(owner, repo)
@@ -74,7 +76,7 @@ export const GithubRepositoryDetail: React.FC<Props> = ({
     return () => {
       active = false;
     };
-  }, [repository.id, online, owner, repo]);
+  }, [repository.id, online, owner, repo, setDetails]);
 
   useEffect(() => {
     if (!online || !details?.parent) return;

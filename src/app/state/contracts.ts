@@ -175,6 +175,9 @@ export type RepositoryStateContract = {
 };
 
 export type GithubStateContract = {
+  isAuthRestoring?: boolean;
+  isAuthenticationRequired?: boolean;
+  onRetryAuthentication?: () => void;
   isAuthenticated: boolean;
   tokenInput: string;
   setTokenInput: (value: string) => void;

@@ -32,12 +32,14 @@ export const BlamePanel: React.FC<BlamePanelProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {intro && <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>{intro}</span>}
-      {loading && <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>}
+      {loading && lines.length === 0 && (
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.loading_blame_9947698c')}</span>
+      )}
       {error && <span style={{ color: 'var(--status-danger)', fontSize: '0.82rem' }}>{error}</span>}
       {!loading && !error && lines.length === 0 && (
         <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{t('generated.components.commitdetails.no_blame_data_found_e996f81f')}</span>
       )}
-      {!loading && !error && lines.length > 0 && (
+      {lines.length > 0 && (
         <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
           {isDetailed && (
             <div

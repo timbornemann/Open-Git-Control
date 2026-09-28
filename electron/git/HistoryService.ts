@@ -50,8 +50,8 @@ export class HistoryService {
     private readonly readGitFileBufferAtPath?: ReadGitFileBufferAtPath,
   ) {}
 
-  private execute(args: string[], repoPath?: string): Promise<string> {
-    return repoPath ? this.runCommandAtPathWithSignal(repoPath, args, new AbortController().signal) : this.runCommand(args);
+  private execute(args: string[], repoPath?: string, signal?: AbortSignal): Promise<string> {
+    return repoPath ? this.runCommandAtPathWithSignal(repoPath, args, signal || new AbortController().signal) : this.runCommand(args);
   }
 
   private getStructuredLogFormat(): string {
@@ -82,7 +82,7 @@ export class HistoryService {
     }
   }
 
-  async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0, repoPath?: string): Promise<string> {
+  async getLog(limit: number = 50, includeAll: boolean = true, offset: number = 0, repoPath?: string, signal?: AbortSignal): Promise<string> {
     const format = this.getStructuredLogFormat();
     const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
     const args = ['log', '--topo-order', '-z', '-' + limit, `--skip=${safeOffset}`, '--pretty=format:' + format, '--date=iso'];
@@ -95,7 +95,7 @@ export class HistoryService {
       args.splice(1, 0, '--exclude=refs/ogc/remote-tags/*', '--all');
     }
 
-    return this.execute(args, repoPath);
+    return this.execute(args, repoPath, signal);
   }
 
   async getForensicHistoryByString(search: string, filePath: string, limit: number = 200): Promise<string> {

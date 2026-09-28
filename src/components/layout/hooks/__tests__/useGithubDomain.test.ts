@@ -134,6 +134,66 @@ describe('useGithubDomain StrictMode bootstrap', () => {
     hook.unmount();
   });
 
+  it('restores a temporarily offline saved session when the connection returns', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    vi.spyOn(githubClient, 'getSavedAuthStatus').mockResolvedValue({
+      hasSavedToken: true,
+      authenticated: false,
+      username: null,
+      oauthConfigured: true,
+    });
+    const login = vi
+      .spyOn(githubClient, 'loginWithSavedToken')
+      .mockResolvedValueOnce({ success: false, authenticated: false, username: null, authenticationRequired: false, error: 'Offline' })
+      .mockResolvedValue({ success: true, authenticated: true, username: 'octocat', tokenPersisted: true });
+    vi.spyOn(githubClient, 'getRepositories').mockResolvedValue({ success: true, data: { repos: [], nextPage: null, hasMore: false } });
+    const hook = renderStrictHook();
+    await flush();
+    expect(hook.current.isAuthRestoring).toBe(false);
+    expect(hook.current.isAuthenticationRequired).toBe(false);
+    expect(hook.current.authError).toBe('Offline');
+
+    act(() => window.dispatchEvent(new window.Event('online')));
+    await flush();
+
+    expect(login).toHaveBeenCalledTimes(2);
+    expect(hook.current.isAuthenticated).toBe(true);
+    expect(hook.current.githubUser).toBe('octocat');
+    expect(hook.current.authError).toBeNull();
+    hook.unmount();
+  });
+
+  it('does not retry saved authentication after an explicit logout', async () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    vi.spyOn(githubClient, 'getSavedAuthStatus').mockResolvedValue({
+      hasSavedToken: true,
+      authenticated: false,
+      username: null,
+      oauthConfigured: true,
+    });
+    const login = vi.spyOn(githubClient, 'loginWithSavedToken').mockResolvedValue({
+      success: true,
+      authenticated: true,
+      username: 'octocat',
+      tokenPersisted: true,
+    });
+    vi.spyOn(githubClient, 'getRepositories').mockResolvedValue({ success: true, data: { repos: [], nextPage: null, hasMore: false } });
+    vi.spyOn(githubClient, 'logout').mockResolvedValue({ success: true });
+    const hook = renderStrictHook();
+    await flush();
+    await act(async () => hook.current.handleLogout());
+    act(() => {
+      window.dispatchEvent(new window.Event('online'));
+      document.dispatchEvent(new window.Event('visibilitychange'));
+    });
+    await flush();
+
+    expect(login).toHaveBeenCalledTimes(1);
+    expect(hook.current.isAuthenticated).toBe(false);
+    expect(hook.current.isAuthenticationRequired).toBe(true);
+    hook.unmount();
+  });
+
   it('lets the user cancel a pending personal-token login', async () => {
     vi.spyOn(githubClient, 'getSavedAuthStatus').mockResolvedValue({
       hasSavedToken: false,

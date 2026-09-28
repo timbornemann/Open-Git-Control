@@ -1,3 +1,6 @@
+import { usePreloadIntent } from '@/data/usePreloadIntent';
+import { getActiveResourceRepository } from '@/data/clientCache';
+import { gitClient } from '@/services/gitClient';
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, History, MoreHorizontal } from 'lucide-react';
 import type { CatalogTranslateFn } from '@/i18n';
@@ -39,6 +42,8 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
 }) => {
   const [isCompactMenuOpen, setIsCompactMenuOpen] = useState(false);
   const searchModeLabel = t('generated.components.commit_graph.commitsearchtoolbar.search_mode_c1fd11c1');
+  const intent = usePreloadIntent();
+  const preloadRecovery = () => gitClient.runGitCommandForRepo(getActiveResourceRepository(), 'reflog', '300');
   const searchScopeLabel = t('generated.components.commit_graph.commitsearchtoolbar.field_efd9469b');
   const recoveryLabel = showRecoveryCenter
     ? t('generated.components.commit_graph.commitsearchtoolbar.history_e5fd93ca')
@@ -105,7 +110,16 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
           />
 
           {onToggleRecoveryCenter && (
-            <button type="button" className="commit-search-toolbar__recovery" onClick={toggleRecoveryCenter} title={recoveryLabel} aria-label={recoveryLabel}>
+            <button
+              type="button"
+              className="commit-search-toolbar__recovery"
+              onClick={toggleRecoveryCenter}
+              onMouseEnter={() => intent.hover(preloadRecovery)}
+              onMouseLeave={intent.cancel}
+              onFocus={() => intent.focus(preloadRecovery)}
+              title={recoveryLabel}
+              aria-label={recoveryLabel}
+            >
               <span className="commit-search-toolbar__recovery-label">{recoveryLabel}</span>
               <History size={15} className="commit-search-toolbar__compact-icon" aria-hidden="true" />
             </button>
@@ -177,7 +191,14 @@ export const CommitSearchToolbar: React.FC<CommitSearchToolbarProps> = ({
                   </select>
                 </label>
                 {onToggleRecoveryCenter && (
-                  <button type="button" className="commit-search-toolbar__more-action" onClick={toggleRecoveryCenter}>
+                  <button
+                    type="button"
+                    className="commit-search-toolbar__more-action"
+                    onClick={toggleRecoveryCenter}
+                    onMouseEnter={() => intent.hover(preloadRecovery)}
+                    onMouseLeave={intent.cancel}
+                    onFocus={() => intent.focus(preloadRecovery)}
+                  >
                     {recoveryLabel}
                   </button>
                 )}

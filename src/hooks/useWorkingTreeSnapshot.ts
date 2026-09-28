@@ -1,3 +1,6 @@
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, peekResource, invalidateResources } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/types/gitDtos';
 import { gitClient } from '@/services/gitClient';
@@ -15,6 +18,8 @@ export type WorkingTreeState = {
 };
 
 export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?: number): WorkingTreeState => {
+  const cached = useCachedResult<IpcResult<WorkingTreeSnapshotDto>>(resourceKey('git', 'getWorkingTreeSnapshot', [repoPath]));
+  const cachedSnapshot = cached.data?.success ? cached.data.data : null;
   const [snapshot, setSnapshot] = useState<WorkingTreeSnapshotDto | null>(null);
   const [status, setStatus] = useState<GitStatusDetailed | null>(null);
   const [stats, setStats] = useState<WorkingTreeStatsDto | null>(null);
@@ -53,6 +58,17 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
       if (generation !== generationRef.current) return;
       if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
         const nextSnapshot = result.data;
+        if (snapshotRef.current && snapshotRef.current.snapshotId !== nextSnapshot.snapshotId) {
+          invalidateResources('git', normalizeRepoPathKey(repoPath), [
+            'getDiffPreview',
+            'listWorkingDirectory',
+            'getWorkingDirectoryPreview',
+            'getFileHistory',
+            'getFileBlame',
+            'getFileBlameRange',
+            'readRepoFile',
+          ]);
+        }
         snapshotRef.current = nextSnapshot;
         setSnapshot(nextSnapshot);
         setDataRepoPath(nextSnapshot.repoPath);
@@ -105,7 +121,8 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   useLayoutEffect(() => {
     generationRef.current += 1;
     queuedRefreshGenerationRef.current = null;
-    snapshotRef.current = null;
+    const preview = peekResource<IpcResult<WorkingTreeSnapshotDto>>('git', 'getWorkingTreeSnapshot', [repoPath]);
+    snapshotRef.current = preview?.success ? preview.data : null;
     statsRef.current = null;
     inFlightRef.current = null;
     setSnapshot(null);
@@ -150,9 +167,11 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
     void refresh();
   }, [refresh, refreshTrigger, repoPath]);
 
-  const currentDataRepoPath = repoPath && dataRepoPath && normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(dataRepoPath) ? dataRepoPath : null;
-  const currentSnapshot = currentDataRepoPath ? snapshot : null;
-  const currentStatus = currentDataRepoPath ? status : null;
+  const localDataMatches = repoPath && dataRepoPath && normalizeRepoPathKey(repoPath) === normalizeRepoPathKey(dataRepoPath);
+  const validPreview = repoPath && cachedSnapshot && normalizeRepoPathKey(cachedSnapshot.repoPath) === normalizeRepoPathKey(repoPath) ? cachedSnapshot : null;
+  const currentDataRepoPath = localDataMatches ? dataRepoPath : validPreview?.repoPath || null;
+  const currentSnapshot = localDataMatches ? snapshot : validPreview;
+  const currentStatus = localDataMatches ? status : validPreview ? parseGitStatusDetailed(validPreview.statusRaw) : null;
   const currentStats = currentSnapshot && stats?.snapshotId === currentSnapshot.snapshotId ? stats : null;
 
   return {

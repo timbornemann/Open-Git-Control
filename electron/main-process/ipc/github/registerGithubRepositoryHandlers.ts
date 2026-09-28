@@ -1,3 +1,5 @@
+import { beginReadRequest } from '../../readRequests';
+import type { ReadRequest } from '../../../../src/shared/cache/resource';
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { GitHubService } from '../../../GitHubService';
 import type { AppSettings } from '../../../settings';
@@ -5,7 +7,7 @@ import type { GitHubRepositoryDto } from '../../../../src/types/githubDtos';
 import { IpcChannel } from '../../../../src/types/ipcContract';
 import { readSavedGithubTokenWithHost } from '../../secureStore';
 import { readGithubCatalogCache, saveGithubCatalogCache } from '../../githubCatalogCache';
-import { assertGithubAuthenticated, getGithubApiErrorDetails, toErrorMessage } from './githubHandlerUtils';
+import { githubReadFailure, assertGithubAuthenticated, getGithubApiErrorDetails, toErrorMessage } from './githubHandlerUtils';
 
 type RegisterGithubRepositoryHandlersDeps = {
   githubService: GitHubService;
@@ -31,20 +33,26 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
       const saved = saveGithubCatalogCache(githubService.getHost(), githubService.getUsername() || '', repos);
       return { success: true, data: { savedAt: saved.savedAt } };
     } catch (error) {
-      return { success: false, error: toErrorMessage(error, 'Repository snapshot could not be saved.') };
+      return githubReadFailure(error, 'Repository snapshot could not be saved.');
     }
   });
-  ipcMain.handle(IpcChannel.GithubGetRepos, async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string } = {}) => {
-    const authError = assertGithubAuthenticated(githubService);
-    if (authError) return authError;
+  ipcMain.handle(
+    IpcChannel.GithubGetRepos,
+    async (_event: IpcMainInvokeEvent, params: { page?: number; perPage?: number; search?: string; readRequest?: ReadRequest } = {}) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
 
-    try {
-      const repos = await githubService.getMyRepositories(params.page, params.perPage, params.search || '');
-      return { success: true, data: repos };
-    } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Repositories could not be loaded.') };
-    }
-  });
+      const request = beginReadRequest(_event, params.readRequest);
+      try {
+        const repos = await githubService.getMyRepositories(params.page, params.perPage, params.search || '', ...(params.readRequest ? [request.signal] : []));
+        return { success: true, data: repos };
+      } catch (error: unknown) {
+        return githubReadFailure(error, 'Repositories could not be loaded.');
+      } finally {
+        request.finish();
+      }
+    },
+  );
 
   ipcMain.handle(IpcChannel.GithubGetRepository, async (_event: IpcMainInvokeEvent, params: { owner: string; repo: string }) => {
     const authError = assertGithubAuthenticated(githubService);
@@ -60,7 +68,7 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
       const repository = await githubService.getRepository(owner, repo);
       return { success: true, data: repository };
     } catch (error: unknown) {
-      return { success: false, error: toErrorMessage(error, 'Repository could not be loaded.') };
+      return githubReadFailure(error, 'Repository could not be loaded.');
     }
   });
 
@@ -70,9 +78,26 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
     try {
       return { success: true, data: await githubService.getBranches(params.owner, params.repo) };
     } catch (error) {
-      return { success: false, error: toErrorMessage(error, 'Branches could not be loaded.') };
+      return githubReadFailure(error, 'Branches could not be loaded.');
     }
   });
+
+  ipcMain.handle(
+    IpcChannel.GithubGetBranchesPage,
+    async (event: IpcMainInvokeEvent, params: { owner: string; repo: string; page: number; readRequest?: ReadRequest }) => {
+      const authError = assertGithubAuthenticated(githubService);
+      if (authError) return authError;
+      const request = beginReadRequest(event, params?.readRequest);
+      try {
+        if (!params?.owner || !params.repo) throw new Error('Owner and repository are required.');
+        return { success: true, data: await githubService.getBranchesPage(params.owner, params.repo, params.page, request.signal) };
+      } catch (error) {
+        return githubReadFailure(error, 'Branches could not be loaded.');
+      } finally {
+        request.finish();
+      }
+    },
+  );
 
   ipcMain.handle(IpcChannel.GithubCreateRepo, async (_event: IpcMainInvokeEvent, params: { name: string; description: string; isPrivate: boolean }) => {
     const authError = assertGithubAuthenticated(githubService);
@@ -102,7 +127,7 @@ export function registerGithubRepositoryHandlers({ githubService, readSettingsWi
       try {
         return { success: true, data: await githubService.createRepositoryWithReadme(name, String(params.description || ''), Boolean(params.isPrivate)) };
       } catch (error) {
-        return { success: false, error: toErrorMessage(error, 'Repository could not be created.') };
+        return githubReadFailure(error, 'Repository could not be created.');
       }
     },
   );

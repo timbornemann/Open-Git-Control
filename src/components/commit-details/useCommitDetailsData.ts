@@ -1,9 +1,10 @@
+import { useBlamePreview } from '@/data/useBlamePreview';
+import { useResourceState } from '@/data/resourceHooks';
+import { loadCommitOverview, EMPTY_COMMIT_OVERVIEW } from '@/data/commitDetails';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
-import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
+import type { GitFileHistoryEntryDto } from '@/types/git';
 import { useI18n } from '@/i18n';
-import type { CommitFileDetail } from '@/utils/gitParsing';
-import { parseCommitDetails } from '@/utils/gitParsing';
 import { extractGitObjectId } from '@/utils/gitObjectId';
 import { gitClient } from '@/services/gitClient';
 import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from '../file-details/blamePagination';
@@ -37,22 +38,33 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
 
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
-  const [filesSourceHint, setFilesSourceHint] = useState<string | null>(null);
-  const [isMergeCommit, setIsMergeCommit] = useState(false);
-  const [files, setFiles] = useState<CommitFileDetail[]>([]);
-  const [commitDescription, setCommitDescription] = useState('');
+  const [overview, setOverview, hasOverview] = useResourceState('git', 'commitOverview', [repoPath, normalizedHash], EMPTY_COMMIT_OVERVIEW);
+  const { files, isMergeCommit, description: commitDescription } = overview;
+  const filesSourceHint = overview.filesFromMerge
+    ? t('generated.components.commitdetails.files_show_the_effective_changes_from_the_merged_branch_bd7570a6')
+    : null;
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileCommitHash, setSelectedFileCommitHash] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
 
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyEntries, setHistoryEntries] = useState<GitFileHistoryEntryDto[]>([]);
+  const [historyEntries, setHistoryEntries, hasHistory] = useResourceState<GitFileHistoryEntryDto[]>(
+    'git',
+    'getFileHistory',
+    [selectedFilePath, normalizedHash, 80, repoPath],
+    [],
+  );
 
   const [blameLoading, setBlameLoading] = useState(false);
   const [blameError, setBlameError] = useState<string | null>(null);
-  const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
-  const [blameHasMore, setBlameHasMore] = useState(false);
+  const {
+    lines: blameLines,
+    setLines: setBlameLines,
+    hasMore: blameHasMore,
+    setHasMore: setBlameHasMore,
+    hasData: hasBlame,
+  } = useBlamePreview(repoPath, selectedFilePath, normalizedHash);
 
   // Bumped whenever the inspected commit changes. Every async fetch captures the
   // current value and refuses to write state once it is stale, so a late
@@ -64,17 +76,10 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
   useLayoutEffect(() => {
     requestGenerationRef.current += 1;
     setLoadingFiles(false);
-    setFiles([]);
     setFilesError(null);
-    setFilesSourceHint(null);
-    setIsMergeCommit(false);
-    setCommitDescription('');
     setSelectedFilePath(null);
     setSelectedFileCommitHash(null);
     setActiveTab('history');
-    setHistoryEntries([]);
-    setBlameLines([]);
-    setBlameHasMore(false);
     setHistoryError(null);
     setBlameError(null);
   }, [normalizedHash, repoPath]);
@@ -82,94 +87,29 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
   useLayoutEffect(() => {
     fileRequestGenerationRef.current += 1;
     setHistoryLoading(false);
-    setHistoryEntries([]);
     setHistoryError(null);
     setBlameLoading(false);
-    setBlameLines([]);
-    setBlameHasMore(false);
     setBlameError(null);
   }, [normalizedHash, repoPath, selectedFileCommitHash, selectedFilePath]);
 
   useEffect(() => {
     if (!repoPath || !normalizedHash || !gitClient.isAvailable()) return;
-    const repoAtStart = repoPath;
-
     const generation = requestGenerationRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation;
-
-    const fetchDetails = async () => {
-      setLoadingFiles(true);
-      setFilesError(null);
-      setFilesSourceHint(null);
-      setIsMergeCommit(false);
-      setCommitDescription('');
-
-      try {
-        const parentsResult = await gitClient.runGitCommandForRepo(repoAtStart, 'show', '-s', '--format=%P', normalizedHash);
-        if (!isCurrent()) return;
-        const parents = parentsResult.success
-          ? String(parentsResult.data || '')
-              .trim()
-              .split(/\s+/)
-              .filter(Boolean)
-          : [];
-        const mergeCommit = parents.length > 1;
-        setIsMergeCommit(mergeCommit);
-
-        const messageResult = await gitClient.runGitCommandForRepo(repoAtStart, 'show', '-s', '--format=%B', normalizedHash);
-        if (!isCurrent()) return;
-        if (messageResult.success) {
-          setCommitDescription(extractCommitDescription(String(messageResult.data || '')));
-        }
-
-        const detailResult = await gitClient.runGitCommandForRepo(repoAtStart, 'commitDetails', normalizedHash);
-        if (!isCurrent()) return;
-        if (!detailResult.success) {
-          setFiles([]);
-          setFilesError(detailResult.error || t('generated.components.commitdetails.could_not_load_commit_details_cf1a30a2'));
-          return;
-        }
-
-        const directFiles = parseCommitDetails(String(detailResult.data || ''));
-        if (directFiles.length > 0) {
-          setFiles(directFiles);
-          return;
-        }
-
-        if (mergeCommit) {
-          const mergeRangeResult = await gitClient.runGitCommandForRepo(
-            repoAtStart,
-            'diff',
-            '--name-status',
-            '-M',
-            '-z',
-            `${normalizedHash}^1`,
-            normalizedHash,
-          );
-          if (!isCurrent()) return;
-          if (mergeRangeResult.success) {
-            const mergedBranchFiles = parseCommitDetails(String(mergeRangeResult.data || ''));
-            if (mergedBranchFiles.length > 0) {
-              setFiles(mergedBranchFiles);
-              setFilesSourceHint(t('generated.components.commitdetails.files_show_the_effective_changes_from_the_merged_branch_bd7570a6'));
-              return;
-            }
-          }
-        }
-
-        setFiles([]);
-      } catch (fetchError) {
-        if (!isCurrent()) return;
-        console.error(fetchError);
-        setFiles([]);
-        setFilesError(t('generated.components.commitdetails.could_not_load_commit_details_cf1a30a2'));
-      } finally {
-        if (isCurrent()) setLoadingFiles(false);
-      }
-    };
-
-    fetchDetails();
-  }, [normalizedHash, repoPath, t]);
+    setLoadingFiles(!hasOverview);
+    setFilesError(null);
+    void loadCommitOverview(repoPath, normalizedHash)
+      .then((result) => {
+        if (generation !== requestGenerationRef.current) return;
+        if (result.success) setOverview(result.data);
+        else setFilesError(result.error);
+      })
+      .catch((error: unknown) => {
+        if (generation === requestGenerationRef.current) setFilesError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (generation === requestGenerationRef.current) setLoadingFiles(false);
+      });
+  }, [normalizedHash, repoPath, setOverview, hasOverview]);
 
   const selectedFile = useMemo(
     () => (selectedFileCommitHash === normalizedHash ? (files.find((file) => file.path === selectedFilePath) ?? null) : null),
@@ -186,7 +126,7 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     const fetchHistory = async () => {
       if (activeTab !== 'history') return;
 
-      setHistoryLoading(true);
+      setHistoryLoading(!hasHistory);
       setHistoryError(null);
       try {
         const result = await gitClient.getFileHistory(selectedFile.path, normalizedHash, 80, repoPath);
@@ -194,13 +134,11 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
         if (result.success) {
           setHistoryEntries(result.data || []);
         } else {
-          setHistoryEntries([]);
           setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
         }
       } catch (fetchError) {
         if (!isCurrent()) return;
         console.error(fetchError);
-        setHistoryEntries([]);
         setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
       } finally {
         if (isCurrent()) setHistoryLoading(false);
@@ -208,7 +146,7 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     };
 
     fetchHistory();
-  }, [activeTab, normalizedHash, repoPath, selectedFile, t]);
+  }, [activeTab, normalizedHash, repoPath, selectedFile, t, setHistoryEntries, hasHistory]);
 
   useEffect(() => {
     if (!repoPath || !selectedFile || !gitClient.isAvailable()) return;
@@ -220,12 +158,11 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
       if (activeTab !== 'blame') return;
 
       if (isDeletedFile) {
-        setBlameLines([]);
         setBlameError(t('generated.components.commitdetails.blame_is_not_available_for_deleted_files_in_this_commit_81f42d37'));
         return;
       }
 
-      setBlameLoading(true);
+      setBlameLoading(!hasBlame);
       setBlameError(null);
       try {
         const result = await gitClient.getFileBlameRange(selectedFile.path, normalizedHash, 1, BLAME_LOOKAHEAD_COUNT, repoPath);
@@ -235,13 +172,11 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
           setBlameLines(page.lines);
           setBlameHasMore(page.hasMore);
         } else {
-          setBlameLines([]);
           setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
         }
       } catch (fetchError) {
         if (!isCurrent()) return;
         console.error(fetchError);
-        setBlameLines([]);
         setBlameError(t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
       } finally {
         if (isCurrent()) setBlameLoading(false);
@@ -249,7 +184,7 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     };
 
     fetchBlame();
-  }, [activeTab, normalizedHash, isDeletedFile, repoPath, selectedFile, t]);
+  }, [activeTab, normalizedHash, isDeletedFile, repoPath, selectedFile, t, setBlameLines, setBlameHasMore, hasBlame]);
 
   const loadMoreBlame = async () => {
     if (!repoPath || !selectedFile || blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
@@ -340,7 +275,7 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     blameError,
     blameHasMore,
     blameLines,
-    blameLoading,
+    blameLoading: blameLoading || Boolean(selectedFile && activeTab === 'blame' && !hasBlame && !blameError && !isDeletedFile),
     commitDescription,
     files,
     filesError,
@@ -350,11 +285,11 @@ export const useCommitDetailsData = ({ repoPath, hash, onOpenDiff }: Params) => 
     formatRelativeDate,
     historyEntries,
     historyError,
-    historyLoading,
+    historyLoading: historyLoading || Boolean(selectedFile && activeTab === 'history' && !hasHistory && !historyError),
     isDeletedFile,
     isMergeCommit,
     loadMoreBlame,
-    loadingFiles,
+    loadingFiles: loadingFiles || Boolean(normalizedHash && repoPath && !hasOverview && !filesError),
     normalizedHash,
     openSelectedFileDiff,
     selectedFile,

@@ -1,3 +1,5 @@
+import { queryClient } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
 import { JSDOM } from 'jsdom';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -97,6 +99,19 @@ describe('ProjectPlannerProvider', () => {
       setConfirmDialog,
     };
   };
+
+  it('shows a prepared project and its default selection before delayed IPC finishes', () => {
+    const project = createProject('prepared', 'C:\\repos\\prepared');
+    queryClient.setQueryData(resourceKey('planner', 'getData'), { success: true, data: { version: 1, projects: [project], items: [] } });
+    vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(plannerClient, 'getData').mockImplementation(() => new Promise(() => {}));
+    const provider = renderProvider(project.repoPath, 0, {}, true);
+    expect(provider.current.loading).toBe(false);
+    expect(provider.current.selectedProject?.id).toBe('prepared');
+    expect(provider.current.selectedProjectId).toBe('prepared');
+    expect(provider.setConfirmDialog).not.toHaveBeenCalled();
+    provider.unmount();
+  });
 
   it('keeps newer planner data when an older refresh finishes last', async () => {
     vi.spyOn(plannerClient, 'isAvailable').mockReturnValue(true);

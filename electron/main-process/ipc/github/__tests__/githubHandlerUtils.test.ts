@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { assertGithubAuthenticated, getGithubApiErrorDetails, normalizePrState, toErrorMessage } from '../githubHandlerUtils';
+import { assertGithubAuthenticated, getGithubApiErrorDetails, githubReadFailure, normalizePrState, toErrorMessage } from '../githubHandlerUtils';
 
 describe('githubHandlerUtils', () => {
   it('normalizes thrown values into user-facing messages', () => {
@@ -35,6 +35,32 @@ describe('githubHandlerUtils', () => {
       apiMessage: '',
       message: '',
     });
+  });
+
+  it.each([
+    { status: 429, headers: { 'retry-after': '12' }, wait: 12_000 },
+    { status: 403, headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '2000000090' }, wait: 90_000 },
+    { status: 403, message: 'Secondary rate limit', wait: 60_000 },
+    { status: 429, headers: { 'x-ratelimit-reset': '1' }, wait: 1000 },
+    { status: 403, message: 'Permission denied', wait: undefined },
+    { status: 401, wait: undefined },
+  ])('preserves rate-limit scheduling information: $status, $wait', ({ status, headers, message, wait }) => {
+    vi.spyOn(Date, 'now').mockReturnValue(2_000_000_000_000);
+    try {
+      const error = Object.assign(new Error(message || 'Request failed'), { status, response: { headers } });
+      expect(githubReadFailure(error, 'Fallback')).toEqual({
+        success: false,
+        status,
+        error: message || 'Request failed',
+        retryAt: wait === undefined ? undefined : 2_000_000_000_000 + wait,
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('does not invent a retry deadline for a network error without an HTTP response', () => {
+    expect(githubReadFailure(null, 'Offline')).toEqual({ success: false, error: 'Offline', status: null, retryAt: undefined });
   });
 
   it('normalizes PR state and authentication guards', () => {

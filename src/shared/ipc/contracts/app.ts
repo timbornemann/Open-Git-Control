@@ -1,3 +1,4 @@
+import type { AppBootstrapDto, PreviewSnapshot } from '../../cache/resource';
 import type { DiagnosticsReportDto, PlanningApiInfoDto, PlanningApiTokenLifetimeDto, UpdaterOneClickResultDto, UpdaterStatusDto } from '../../../types/appDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { FeedbackReportCapabilityDto, FeedbackReportInputDto, FeedbackReportSubmissionResultDto } from '../../../types/feedbackDtos';
@@ -13,6 +14,9 @@ export type BasicActionResultDto = {
 };
 
 export interface ElectronAppAPI {
+  cancelReadRequest: (requestId: string) => Promise<void>;
+  getBootstrap: () => Promise<AppBootstrapDto>;
+  savePreviews: (snapshots: PreviewSnapshot[]) => Promise<void>;
   openDirectory: () => Promise<DirectoryOpenResultDto | null>;
   selectDirectory: () => Promise<string | null>;
   selectFiles: () => Promise<string[] | null>;

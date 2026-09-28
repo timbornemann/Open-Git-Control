@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { gitClient } from '@/services/gitClient';
+import { useMemo } from 'react';
+import { useRepoOrigins } from '@/hooks/useRepoOrigins';
 
 export const toRepoIdentity = (remoteUrl: string): string | null => {
   const trimmed = (remoteUrl || '')
@@ -22,49 +22,13 @@ export const toRepoIdentity = (remoteUrl: string): string | null => {
 };
 
 export const useGithubRepoOriginMap = (openRepos: string[]): Map<string, string> => {
-  const [repoOriginByPath, setRepoOriginByPath] = useState<Record<string, string | null>>({});
-
-  useEffect(() => {
-    let active = true;
-
-    const loadOrigins = async () => {
-      if (!gitClient.isAvailable() || openRepos.length === 0) {
-        if (active) setRepoOriginByPath({});
-        return;
-      }
-
-      const entries = await Promise.all(
-        openRepos.map(async (repoPath) => {
-          try {
-            const result = await gitClient.getRepoOriginUrl(repoPath);
-            if (!result.success) return [repoPath, null] as const;
-            return [repoPath, toRepoIdentity(result.data || '')] as const;
-          } catch {
-            return [repoPath, null] as const;
-          }
-        }),
-      );
-
-      if (!active) return;
-      const next: Record<string, string | null> = {};
-      for (const [repoPath, identity] of entries) {
-        next[repoPath] = identity;
-      }
-      setRepoOriginByPath(next);
-    };
-
-    void loadOrigins();
-    return () => {
-      active = false;
-    };
-  }, [openRepos]);
-
+  const origins = useRepoOrigins(openRepos);
   return useMemo(() => {
     const map = new Map<string, string>();
-    for (const repoPath of openRepos) {
-      const identity = repoOriginByPath[repoPath];
-      if (identity) map.set(identity, repoPath);
+    for (const repo of openRepos) {
+      const identity = toRepoIdentity(origins[repo] || '');
+      if (identity) map.set(identity, repo);
     }
     return map;
-  }, [openRepos, repoOriginByPath]);
+  }, [openRepos, origins]);
 };

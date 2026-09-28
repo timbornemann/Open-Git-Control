@@ -1,3 +1,5 @@
+import type { ReadRequest } from '@/shared/cache/resource';
+import { cachedClient } from '@/data/clientCache';
 import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
@@ -17,7 +19,7 @@ import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronAiApi, requireElectronAppApi, requireElectronGithubApi } from './electronApi';
 
-export const githubClient = {
+export const githubClient = cachedClient('github', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
@@ -50,7 +52,7 @@ export const githubClient = {
     return requireElectronGithubApi().githubWebLogin();
   },
 
-  async getRepositories(params?: { page?: number; perPage?: number; search?: string }): Promise<IpcResult<GitHubRepositoryPageDto>> {
+  async getRepositories(params?: { page?: number; perPage?: number; search?: string; readRequest?: ReadRequest }): Promise<IpcResult<GitHubRepositoryPageDto>> {
     return requireElectronGithubApi().githubGetRepos(params);
   },
 
@@ -58,13 +60,7 @@ export const githubClient = {
     return requireElectronGithubApi().githubGetSavedAuthStatus();
   },
 
-  async loginWithSavedToken(): Promise<{
-    success: boolean;
-    authenticated: boolean;
-    username: string | null;
-    tokenPersisted?: boolean;
-    error?: string;
-  }> {
+  async loginWithSavedToken(): ReturnType<ElectronAPI['githubLoginWithSavedToken']> {
     return requireElectronGithubApi().githubLoginWithSavedToken();
   },
 
@@ -172,4 +168,4 @@ export const githubClient = {
   }): Promise<IpcResult<{ markdown: string; source: 'ai' | 'fallback'; warning?: string }>> {
     return requireElectronAiApi().aiGenerateReleaseNotes(params);
   },
-};
+});

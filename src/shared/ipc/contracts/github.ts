@@ -1,3 +1,4 @@
+import type { ReadRequest } from '../../cache/resource';
 import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
@@ -95,11 +96,12 @@ export interface ElectronGithubAPI {
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
   githubDevicePoll: (deviceCode: string) => Promise<IpcResult<DeviceFlowPollDto & { tokenPersisted?: boolean }>>;
   githubWebLogin: () => Promise<IpcResult<{ username: string | null; tokenPersisted?: boolean }>>;
-  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string }) => Promise<IpcResult<GitHubRepositoryPageDto>>;
+  githubGetRepos: (params?: { page?: number; perPage?: number; search?: string; readRequest?: ReadRequest }) => Promise<IpcResult<GitHubRepositoryPageDto>>;
   githubGetSavedAuthStatus: () => Promise<{ hasSavedToken: boolean; authenticated: boolean; username: string | null; oauthConfigured: boolean }>;
   githubLoginWithSavedToken: () => Promise<{
     success: boolean;
     authenticated: boolean;
+    authenticationRequired?: boolean;
     username: string | null;
     tokenPersisted?: boolean;
     error?: string;
@@ -113,6 +115,7 @@ export interface ElectronGithubAPI {
   githubForkRepo: (params: GitHubForkParamsDto) => Promise<IpcResult<GitHubRepositoryDto>>;
   githubGetRepository: (owner: string, repo: string) => Promise<IpcResult<GitHubRepositoryDetailsDto>>;
   githubGetBranches: (owner: string, repo: string) => Promise<IpcResult<string[]>>;
+  githubGetBranchesPage: (owner: string, repo: string, page: number, readRequest?: ReadRequest) => Promise<IpcResult<string[]>>;
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: CreatePullRequestParamsDto) => Promise<IpcResult<CreatePullRequestResultDto>>;
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;

@@ -1,3 +1,5 @@
+import { usePreloadIntent } from '@/data/usePreloadIntent';
+import { gitClient } from '@/services/gitClient';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle, ChevronDown, GitCommitHorizontal, GitMerge, History, MoreHorizontal, RefreshCw, Rocket } from 'lucide-react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
@@ -72,6 +74,7 @@ export const TopbarActions: React.FC<Props> = ({
   onOpenRunConsole,
   onOpenRunSettings,
 }) => {
+  const intent = usePreloadIntent();
   const { t } = useI18n();
   const normalizedAction = (activeActionLabel || '').toLowerCase();
   const isPullRunning = isGitActionRunning && normalizedAction.includes('pull');
@@ -369,7 +372,14 @@ export const TopbarActions: React.FC<Props> = ({
         onOpenConsole={onOpenRunConsole}
         onOpenSettings={onOpenRunSettings}
       />
-      <button className="icon-btn topbar-action-btn topbar-action-secondary" onClick={onOpenTimeline} disabled={!activeRepo || isTimelineLoading}>
+      <button
+        className="icon-btn topbar-action-btn topbar-action-secondary"
+        onClick={onOpenTimeline}
+        onMouseEnter={() => activeRepo && intent.hover(() => gitClient.getFileTimelineData(1500, activeRepo))}
+        onMouseLeave={intent.cancel}
+        onFocus={() => activeRepo && intent.focus(() => gitClient.getFileTimelineData(1500, activeRepo))}
+        disabled={!activeRepo || isTimelineLoading}
+      >
         <History size={16} className={isTimelineLoading ? 'spin' : ''} />
         <span className="topbar-action-label">{t('generated.components.topbar.topbaractions.timeline_b35c2fb1')}</span>
       </button>

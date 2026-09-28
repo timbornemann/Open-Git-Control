@@ -1,3 +1,7 @@
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, invalidateResources, withReadPriority } from '@/data/clientCache';
+import { updateResource } from '@/data/queryClient';
+import type { IpcResult } from '@/types/ipc';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { PlannerItem, PlannerItemInput, PlannerProject, PlannerProjectInput, ProjectPlannerData } from '@/types/projectPlanner';
 import type { ConfirmDialogState } from '@/app/state/contracts';
@@ -67,9 +71,18 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   children,
 }) => {
   const { t, tr } = useI18n();
-  const [data, setData] = useState<ProjectPlannerData>(EMPTY_DATA);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = useCachedResult<IpcResult<ProjectPlannerData>>(resourceKey('planner', 'getData'));
+  const data = cached.data?.success ? cached.data.data : EMPTY_DATA;
+  const [selection, setSelection] = useState<{ repo: string | null; id: string | null } | null>(null);
+  const setSelectedProjectId = useCallback((id: string | null) => setSelection({ repo: activeRepoRef.current, id }), []);
+  const requestedProjectId = selection?.repo === activeRepo ? selection.id : null;
+  const selectedProjectId =
+    data.projects.find((project) => project.id === requestedProjectId)?.id ||
+    data.projects.find((project) => activeRepo && project.repoPath && repoKey(project.repoPath) === repoKey(activeRepo))?.id ||
+    data.projects[0]?.id ||
+    null;
+  const [initialLoadFinished, setInitialLoadFinished] = useState(false);
+  const loading = !cached.data && !initialLoadFinished;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createProjectRequestId, setCreateProjectRequestId] = useState(0);
@@ -85,7 +98,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   useEffect(() => {
     refreshRequestGenerationRef.current += 1;
     setSelectedProjectId(null);
-  }, [activeRepo]);
+  }, [activeRepo, setSelectedProjectId]);
 
   const refreshData = useCallback(async (): Promise<boolean> => {
     const requestGeneration = refreshRequestGenerationRef.current + 1;
@@ -99,7 +112,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (!result.success) {
         throw new Error(result.error);
       }
-      setData(result.data);
+      updateResource(resourceKey('planner', 'getData'), result);
       setError(null);
       return true;
     } catch (refreshError) {
@@ -111,21 +124,21 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
+    invalidateResources('planner');
     await refreshData();
   }, [refreshData]);
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
       try {
-        await refresh();
+        await withReadPriority(refreshData, 'startup');
       } catch (error) {
         hostCallbacksRef.current.onToast(error instanceof Error ? error.message : String(error), true);
       } finally {
-        setLoading(false);
+        setInitialLoadFinished(true);
       }
     };
     void load();
-  }, [refresh]);
+  }, [refreshData]);
 
   useEffect(() => {
     if (!plannerClient.isAvailable()) return;
@@ -159,21 +172,9 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
     });
   }, [refresh, refreshSignal]);
 
-  useEffect(() => {
-    if (loading || selectedProjectId) return;
-    const activeProject = activeRepo ? data.projects.find((project) => project.repoPath && repoKey(project.repoPath) === repoKey(activeRepo)) : null;
-    setSelectedProjectId(activeProject?.id || data.projects[0]?.id || null);
-  }, [activeRepo, data.projects, loading, selectedProjectId]);
-
-  useEffect(() => {
-    if (!selectedProjectId) return;
-    if (!data.projects.some((project) => project.id === selectedProjectId)) {
-      setSelectedProjectId(data.projects[0]?.id || null);
-    }
-  }, [data.projects, selectedProjectId]);
-
   const runMutation = useCallback(
     async <T,>(operation: () => Promise<{ success: true; data: T } | { success: false; error: string }>): Promise<T | null> => {
+      refreshRequestGenerationRef.current += 1;
       setBusy(true);
       setError(null);
       try {
@@ -230,14 +231,14 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       }
       return true;
     },
-    [createRepositoryProject],
+    [createRepositoryProject, setSelectedProjectId],
   );
 
   useRepositoryProjectPrompt({
     activeRepo,
     plannerActive,
     projects: data.projects,
-    loading,
+    loading: loading || !initialLoadFinished,
     error,
     setConfirmDialog: hostCallbacksRef.current.setConfirmDialog,
     tr,
@@ -255,7 +256,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       if (project) setSelectedProjectId(project.id);
       return project;
     },
-    [runMutation],
+    [runMutation, setSelectedProjectId],
   );
 
   const updateProject = useCallback(
@@ -377,7 +378,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       }
       return true;
     },
-    [runMutation, tr],
+    [runMutation, tr, setSelectedProjectId],
   );
 
   const selectedProject = useMemo(() => data.projects.find((project) => project.id === selectedProjectId) || null, [data.projects, selectedProjectId]);
@@ -390,7 +391,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
         void hostCallbacksRef.current.onRepositorySelected(project.repoPath);
       }
     },
-    [activeRepo, data.projects],
+    [activeRepo, data.projects, setSelectedProjectId],
   );
 
   const requestProjectAction = useCallback(
@@ -399,7 +400,7 @@ export const ProjectPlannerProvider: React.FC<ProjectPlannerProviderProps> = ({
       setSelectedProjectId(projectId);
       setProjectActionRequest({ requestId: ++projectActionRequestIdRef.current, projectId, action });
     },
-    [data.projects],
+    [data.projects, setSelectedProjectId],
   );
 
   const requestCreateProject = useCallback(() => {

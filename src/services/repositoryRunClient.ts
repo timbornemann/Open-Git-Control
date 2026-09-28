@@ -1,7 +1,8 @@
+import { cachedClient } from '@/data/clientCache';
 import type { RepositoryRunActionId, RepositoryRunConfigDto, RepositoryRunEventDto } from '@/types/repositoryRun';
 import { getElectronApi, requireElectronApi } from './electronApi';
 
-export const repositoryRunClient = {
+export const repositoryRunClient = cachedClient('runs', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
@@ -29,4 +30,4 @@ export const repositoryRunClient = {
   onEvent(callback: (event: RepositoryRunEventDto) => void) {
     return requireElectronApi().runs.onRepositoryRunEvent(callback);
   },
-};
+});

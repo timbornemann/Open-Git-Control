@@ -1,3 +1,4 @@
+import type { PreviewSnapshot, ReadRequest } from '../../src/shared/cache/resource';
 import type { IpcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../../src/types/ipcContract';
 import type { ElectronAPI, ElectronFlatAPI } from '../../src/shared/ipc/contracts/electronApi';
@@ -72,6 +73,9 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    cancelReadRequest: (requestId: string) => ipcRenderer.invoke(IpcChannel.AppCancelRead, requestId),
+    getBootstrap: () => ipcRenderer.invoke(IpcChannel.AppBootstrap),
+    savePreviews: (snapshots: PreviewSnapshot[]) => ipcRenderer.invoke(IpcChannel.AppSavePreviews, snapshots),
     openDirectory: () => ipcRenderer.invoke(IpcChannel.DialogOpenDirectory),
     selectDirectory: () => ipcRenderer.invoke(IpcChannel.DialogSelectDirectory),
     selectFiles: () => ipcRenderer.invoke(IpcChannel.DialogSelectFiles),
@@ -331,6 +335,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       ipcRenderer.invoke(IpcChannel.GithubForkRepo, params),
     githubGetRepository: (owner: string, repo: string) => ipcRenderer.invoke(IpcChannel.GithubGetRepository, { owner, repo }),
     githubGetBranches: (owner: string, repo: string) => ipcRenderer.invoke(IpcChannel.GithubGetBranches, { owner, repo }),
+    githubGetBranchesPage: (owner: string, repo: string, page: number, readRequest?: ReadRequest) =>
+      ipcRenderer.invoke(IpcChannel.GithubGetBranchesPage, { owner, repo, page, readRequest }),
     githubGetPRs: (owner: string, repo: string, state: string) => ipcRenderer.invoke(IpcChannel.GithubGetPrs, owner, repo, state),
     githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubCreatePr, params),
@@ -458,6 +464,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       githubForkRepo: flatApi.githubForkRepo,
       githubGetRepository: flatApi.githubGetRepository,
       githubGetBranches: flatApi.githubGetBranches,
+      githubGetBranchesPage: flatApi.githubGetBranchesPage,
       githubGetPRs: flatApi.githubGetPRs,
       githubCreatePR: flatApi.githubCreatePR,
       githubCreateRelease: flatApi.githubCreateRelease,
@@ -493,6 +500,9 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       clearOpenAiApiKey: flatApi.clearOpenAiApiKey,
     },
     app: {
+      cancelReadRequest: flatApi.cancelReadRequest,
+      getBootstrap: flatApi.getBootstrap,
+      savePreviews: flatApi.savePreviews,
       openDirectory: flatApi.openDirectory,
       selectDirectory: flatApi.selectDirectory,
       selectFiles: flatApi.selectFiles,

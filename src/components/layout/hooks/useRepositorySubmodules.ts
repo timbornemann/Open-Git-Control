@@ -1,4 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, withReadPriority } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GitSubmoduleInfo } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { parseGitSubmoduleStatus } from '@/utils/gitParsing';
@@ -16,7 +19,9 @@ type Params = {
 };
 
 export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, setGitActionToast, runGitCommand }: Params) => {
-  const [submodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
+  const [loadedSubmodules, setSubmodules] = useState<GitSubmoduleInfo[]>([]);
+  const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'submoduleStatus']));
+  const submodules = useMemo(() => (cached.data?.success ? parseGitSubmoduleStatus(cached.data.data) : loadedSubmodules), [cached.data, loadedSubmodules]);
   const activeRepoRef = useRef(activeRepo);
   activeRepoRef.current = activeRepo;
   const { t } = useLanguageTranslations(language);
@@ -34,7 +39,7 @@ export const useRepositorySubmodules = ({ activeRepo, refreshTrigger, language, 
       }
 
       try {
-        const response = await gitClient.runGitCommandForRepo(activeRepo, 'submoduleStatus');
+        const response = await withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'submoduleStatus'), 'repository');
         if (cancelled) return;
         if (!response.success) {
           setSubmodules([]);

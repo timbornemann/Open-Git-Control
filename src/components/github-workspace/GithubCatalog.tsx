@@ -1,3 +1,6 @@
+import { usePreloadIntent } from '@/data/usePreloadIntent';
+import { preloadGithubRepository } from '@/data/preloading';
+import { DataPlaceholder } from '@/components/common/DataPlaceholder';
 import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, Download, LockKeyhole, Plus, Search, Star, FolderGit2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
@@ -12,15 +15,27 @@ type Props = {
   pinnedIds: Set<number>;
   online: boolean;
   loading: boolean;
-  loadedCount: number;
+  hasData?: boolean;
   onOpen: (repo: GitHubRepositoryDto) => void;
   onTogglePin: (repo: GitHubRepositoryDto) => void;
   onClone: (repo: GitHubRepositoryDto) => void;
   onCreate: () => void;
 };
 
-export const GithubCatalog: React.FC<Props> = ({ repos, localRepos, pinnedIds, online, loading, loadedCount, onOpen, onTogglePin, onClone, onCreate }) => {
+export const GithubCatalog: React.FC<Props> = ({
+  repos,
+  localRepos,
+  pinnedIds,
+  online,
+  loading,
+  hasData = repos.length > 0,
+  onOpen,
+  onTogglePin,
+  onClone,
+  onCreate,
+}) => {
   const { tr, locale } = useI18n();
+  const intent = usePreloadIntent();
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState<'all' | 'local' | 'remote'>('all');
   const [visibility, setVisibility] = useState<'all' | 'public' | 'private'>('all');
@@ -71,14 +86,14 @@ export const GithubCatalog: React.FC<Props> = ({ repos, localRepos, pinnedIds, o
       </div>
       <div className="github-workspace__results" role="status">
         {visible.length} {tr('von', 'of')} {repos.length} {tr('Repositories', 'repositories')}
-        {loading ? ` · ${tr('Lade', 'Loading')} ${loadedCount} …` : ''}
+        {loading && hasData ? ` · ${tr('Aktualisiere im Hintergrund …', 'Updating in background …')}` : ''}
       </div>
       {visible.length === 0 ? (
-        <div className="github-workspace__empty">
-          {loading
-            ? tr('Repositories werden geladen …', 'Loading repositories …')
-            : tr('Keine passenden Repositories gefunden.', 'No matching repositories found.')}
-        </div>
+        !hasData && loading ? (
+          <DataPlaceholder />
+        ) : (
+          <div className="github-workspace__empty">{tr('Keine passenden Repositories gefunden.', 'No matching repositories found.')}</div>
+        )
       ) : (
         <div className="github-workspace__grid">
           {visible.map((repo) => {
@@ -99,7 +114,25 @@ export const GithubCatalog: React.FC<Props> = ({ repos, localRepos, pinnedIds, o
                     <Star size={17} fill={pinnedIds.has(repo.id) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <button className="github-repo-card__main" onClick={() => onOpen(repo)}>
+                <button
+                  className="github-repo-card__main"
+                  onClick={() => onOpen(repo)}
+                  onMouseEnter={() =>
+                    online &&
+                    intent.hover(async () => {
+                      const [owner, name] = repo.fullName.split('/');
+                      preloadGithubRepository(owner, name);
+                    })
+                  }
+                  onMouseLeave={intent.cancel}
+                  onFocus={() =>
+                    online &&
+                    intent.focus(async () => {
+                      const [owner, name] = repo.fullName.split('/');
+                      preloadGithubRepository(owner, name);
+                    })
+                  }
+                >
                   <span className="github-repo-card__owner">{repo.fullName.split('/')[0]}</span>
                   <strong>{repo.name}</strong>
                   <span className="github-repo-card__description">{repo.description || tr('Keine Beschreibung vorhanden.', 'No description available.')}</span>

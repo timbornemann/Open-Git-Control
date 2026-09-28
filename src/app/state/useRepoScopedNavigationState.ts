@@ -1,3 +1,5 @@
+import { getActiveResourceRepository, invalidateResources } from '@/data/clientCache';
+import { gitMutationAffects } from '@/data/mutationEffects';
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppTabId, CommitNavigationRequest, ConfirmDialogState, InputDialogState } from './contracts';
 import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
@@ -55,6 +57,7 @@ export const useRepoScopedNavigationState = ({
   }, []);
 
   const triggerCommitRefresh = useCallback(() => {
+    invalidateResources('git', getActiveResourceRepository(), undefined, (key) => gitMutationAffects('createCommit', [], key));
     setCommitRefreshTrigger((prev) => prev + 1);
   }, []);
 

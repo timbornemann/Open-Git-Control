@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCachedResult } from '@/data/resourceHooks';
+import { resourceKey, withReadPriority } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
@@ -40,8 +43,24 @@ export const useRepositoryBranches = ({
   setConfirmDialog,
   setInputDialog,
 }: Params) => {
-  const [branches, setBranches] = useState<BranchInfo[]>([]);
-  const [currentBranch, setCurrentBranch] = useState('');
+  const [loadedBranches, setBranches] = useState<BranchInfo[]>([]);
+  const [loadedCurrentBranch, setCurrentBranch] = useState('');
+  const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'branch', '-a']));
+  const branches = useMemo<BranchInfo[]>(
+    () =>
+      cached.data?.success
+        ? cached.data.data
+            .split('\n')
+            .filter((line) => line.trim() && !line.includes(' -> '))
+            .map((line) => {
+              const name = line.replace('*', '').trim();
+              return { name, isHead: line.startsWith('*'), scope: name.startsWith('remotes/') ? 'remote' : 'local' };
+            })
+        : loadedBranches,
+    [cached.data, loadedBranches],
+  );
+  const cachedHead = branches.find((branch) => branch.isHead)?.name || '';
+  const currentBranch = cached.data?.success ? (/^\((HEAD detached|no branch)/i.test(cachedHead) ? '' : cachedHead) : loadedCurrentBranch;
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [branchContextMenu, setBranchContextMenu] = useState<BranchContextMenuState>(null);
   const { t, tr } = useLanguageTranslations(language);
@@ -73,7 +92,7 @@ export const useRepositoryBranches = ({
     let cancelled = false;
     const fetchBranches = async () => {
       try {
-        const { success, data } = await gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a');
+        const { success, data } = await withReadPriority(() => gitClient.runGitCommandForRepo(activeRepo, 'branch', '-a'), 'repository');
         if (cancelled) return;
         if (!success || !data) return;
 

@@ -80,6 +80,7 @@ describe('registerGithubHandlers fork flow', () => {
       authenticated: false,
       username: null,
       error: 'GitHub token validation timed out after 20 seconds.',
+      authenticationRequired: false,
     });
     expect(clearSavedGithubTokenSecurelyMock).not.toHaveBeenCalled();
     expect(githubService.logout).not.toHaveBeenCalled();
@@ -113,6 +114,7 @@ describe('registerGithubHandlers fork flow', () => {
       authenticated: false,
       username: null,
       error: 'Bad credentials',
+      authenticationRequired: true,
     });
     expect(clearSavedGithubTokenSecurelyMock).toHaveBeenCalledTimes(1);
     expect(githubService.logout).toHaveBeenCalledTimes(1);

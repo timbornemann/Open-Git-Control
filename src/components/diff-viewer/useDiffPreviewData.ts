@@ -1,3 +1,5 @@
+import { useResourceState } from '@/data/resourceHooks';
+import type { DiffPreviewDto } from '@/types/gitDtos';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { parseDiff } from '@/utils/diffParser';
@@ -25,8 +27,14 @@ const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
 export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: UseDiffPreviewDataParams) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [diffText, setDiffText] = useState('');
-  const [sourceTruncated, setSourceTruncated] = useState(false);
+  const [preview, setPreview, hasPreview] = useResourceState<DiffPreviewDto | null>(
+    'git',
+    'getDiffPreview',
+    [buildDiffPreviewArgs(request), { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath],
+    null,
+  );
+  const diffText = preview?.text || '';
+  const sourceTruncated = preview?.truncated || false;
   const requestGenerationRef = useRef(0);
 
   useLayoutEffect(() => {
@@ -37,16 +45,12 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
     if (!repoPath || !gitClient.isAvailable()) {
       setIsLoading(false);
       setError(null);
-      setDiffText('');
-      setSourceTruncated(false);
       return;
     }
 
     const fetchDiff = async () => {
-      setIsLoading(true);
+      setIsLoading(!hasPreview);
       setError(null);
-      setDiffText('');
-      setSourceTruncated(false);
 
       try {
         const result = await gitClient.getDiffPreview(
@@ -64,8 +68,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
           return;
         }
 
-        setDiffText(result.data.text);
-        setSourceTruncated(result.data.truncated);
+        setPreview(result.data);
       } catch (fetchError: unknown) {
         if (!isCurrentRequest()) return;
         console.error(fetchError);
@@ -83,7 +86,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
         requestGenerationRef.current += 1;
       }
     };
-  }, [refreshTrigger, repoPath, request, t]);
+  }, [refreshTrigger, repoPath, request, t, hasPreview, setPreview]);
 
   const looksBinaryByExt = useMemo(() => looksBinaryByExtension(request.path), [request.path]);
 
@@ -107,7 +110,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
   const canRenderText = !isBinaryDiff && !looksBinaryByExt;
 
   return {
-    isLoading,
+    isLoading: isLoading && !hasPreview,
     error,
     diffText,
     sourceTruncated,

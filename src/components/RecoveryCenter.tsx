@@ -1,3 +1,5 @@
+import { peekResource } from '@/data/clientCache';
+import type { IpcResult } from '@/types/ipc';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, GitBranch, GitCommitHorizontal, History, Loader2, RefreshCw, RotateCcw, Search } from 'lucide-react';
 import { Button, StatusBadge, TextField } from '@/components/ui';
@@ -25,9 +27,9 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({ repoPath, refres
   const { locale, t, tr } = useI18n();
   const setToast = useAppToastSetter();
   const loadSequenceRef = useRef(0);
-  const [loadedReflog, setLoadedReflog] = useState<{ repoPath: string | null; entries: GitReflogEntryDto[] }>({
-    repoPath: null,
-    entries: [],
+  const [loadedReflog, setLoadedReflog] = useState<{ repoPath: string | null; entries: GitReflogEntryDto[] }>(() => {
+    const cached = peekResource<IpcResult<string>>('git', 'runGitCommandForRepo', [repoPath, 'reflog', '300']);
+    return { repoPath: cached?.success ? repoPath : null, entries: cached?.success ? parseGitReflog(cached.data) : [] };
   });
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [filter, setFilter] = useState('');

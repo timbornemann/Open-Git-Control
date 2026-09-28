@@ -1,3 +1,4 @@
+import { cachedClient } from '@/data/clientCache';
 import type { GitCommandName } from '@/shared/ipc/gitCommands';
 import type { GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
 import type { IpcResult } from '@/types/ipc';
@@ -28,7 +29,7 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
-export const gitClient = {
+export const gitClient = cachedClient('git', {
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },
@@ -492,4 +493,4 @@ export const gitClient = {
   onCloneProgress(...args: Parameters<ElectronAPI['onCloneProgress']>): ReturnType<ElectronAPI['onCloneProgress']> {
     return requireElectronGitApi().onCloneProgress(...args);
   },
-};
+});

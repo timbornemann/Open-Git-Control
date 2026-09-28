@@ -13,3 +13,28 @@
 @import './styles/github-workspace-panels.css' layer(feature);
 @import './styles/conflict-resolver.css' layer(feature);
 @import './styles/recovery-center.css' layer(feature);
+
+.data-placeholder {
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.data-placeholder__row {
+  height: 64px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 6%, transparent);
+}
+.data-placeholder__row:first-child {
+  width: 62%;
+  height: 28px;
+  margin-bottom: 10px;
+}
+
+.data-refresh-error {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 8px 16px;
+}
