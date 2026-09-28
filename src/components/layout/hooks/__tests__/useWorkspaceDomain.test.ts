@@ -49,6 +49,7 @@ const renderWorkspace = (setConfirmDialog = vi.fn()) => {
     },
     unmount: () => act(() => root.unmount()),
     setInputDialog,
+    setGitActionToast,
   };
 };
 
@@ -206,6 +207,62 @@ describe('useWorkspaceDomain repository canonicalization', () => {
         expect.objectContaining({ id: 'programDescription', visible: expect.any(Function) }),
       ]),
     );
+    hook.unmount();
+  });
+
+  it('keeps the local overview open when the folder picker is cancelled or a repository switch is denied', async () => {
+    vi.spyOn(appClient, 'openDirectory').mockResolvedValueOnce(null).mockResolvedValueOnce({ path: 'C:/other-repository', isRepo: true });
+    const setRepoPath = vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/other-repository');
+    const hook = renderWorkspace();
+    await flushEffects();
+    act(() => hook.current.setActiveTab('localRepos'));
+
+    await act(async () => hook.current.handleOpenFolder());
+    expect(hook.current.activeTab).toBe('localRepos');
+    setActiveWorkingDirectoryNavigationGuard((_target, _proceed, cancel) => cancel?.());
+    await act(async () => hook.current.handleOpenFolder());
+    expect(hook.current.activeTab).toBe('localRepos');
+    expect(setRepoPath).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it('opens the repo tab after adding an existing repository and after successful Git initialization', async () => {
+    vi.spyOn(appClient, 'openDirectory')
+      .mockResolvedValueOnce({ path: 'C:/existing-repository', isRepo: true })
+      .mockResolvedValueOnce({ path: 'C:/new-repository', isRepo: false });
+    vi.spyOn(appClient, 'setRepoPath').mockImplementation(async (path) => path);
+    vi.spyOn(gitClient, 'gitInit').mockResolvedValue({ success: true, createdFiles: [] });
+    const hook = renderWorkspace();
+    await flushEffects();
+    act(() => hook.current.setActiveTab('localRepos'));
+
+    await act(async () => hook.current.handleOpenFolder());
+    expect(hook.current.activeTab).toBe('repo');
+    expect(hook.current.activeRepo).toBe('C:/existing-repository');
+
+    act(() => hook.current.setActiveTab('localRepos'));
+    await act(async () => hook.current.handleOpenFolder());
+    expect(hook.current.activeTab).toBe('localRepos');
+    const dialog = hook.setInputDialog.mock.lastCall?.[0];
+    await act(async () => dialog.onSubmit({ createReadme: 'false', license: 'none' }));
+    expect(gitClient.gitInit).toHaveBeenCalledWith('C:/new-repository', expect.objectContaining({ createReadme: false, license: 'none' }));
+    expect(hook.current.activeRepo).toBe('C:/new-repository');
+    expect(hook.current.activeTab).toBe('repo');
+    hook.unmount();
+  });
+
+  it('keeps initialization errors on the local overview', async () => {
+    vi.spyOn(appClient, 'openDirectory').mockResolvedValue({ path: 'C:/new-repository', isRepo: false });
+    vi.spyOn(gitClient, 'gitInit').mockResolvedValue({ success: false, error: 'Git init failed' });
+    const hook = renderWorkspace();
+    await flushEffects();
+    act(() => hook.current.setActiveTab('localRepos'));
+
+    await act(async () => hook.current.handleOpenFolder());
+    const dialog = hook.setInputDialog.mock.lastCall?.[0];
+    await act(async () => dialog.onSubmit({ createReadme: 'false', license: 'none' }));
+    expect(hook.current.activeTab).toBe('localRepos');
+    expect(hook.setGitActionToast).toHaveBeenCalledWith({ msg: 'Git init failed', isError: true });
     hook.unmount();
   });
 

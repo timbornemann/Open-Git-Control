@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, Github, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
+import { FolderGit2, GitBranch, Github, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
 import { useGitHubStore, useGitStore, useSettingsStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
@@ -51,7 +51,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
   const isGithubView = activeTab === 'github';
-  const isWorkspaceView = isPlannerView || isGithubView;
+  const isLocalReposView = activeTab === 'localRepos';
+  const isWorkspaceView = isPlannerView || isGithubView || isLocalReposView;
   const repositoryRunForActiveRepo = repositoryRun?.repoPath === activeRepo ? repositoryRun : null;
 
   return (
@@ -71,16 +72,18 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
             border: '1px solid var(--accent-primary-border)',
           }}
         >
-          {isGithubView ? <Github size={14} /> : <GitBranch size={14} />}
+          {isGithubView ? <Github size={14} /> : isLocalReposView ? <FolderGit2 size={14} /> : <GitBranch size={14} />}
         </div>
         <span className="topbar-repo-title">
           {isGithubView
             ? 'GitHub'
-            : isPlannerView
-              ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
-              : activeRepo
-                ? activeRepo.split(/[\\/]/).pop()
-                : 'Open-Git-Control'}
+            : isLocalReposView
+              ? t('sidebar.localRepos')
+              : isPlannerView
+                ? t('generated.components.layout.main.maintopbar.project_planning_71556778')
+                : activeRepo
+                  ? activeRepo.split(/[\\/]/).pop()
+                  : 'Open-Git-Control'}
         </span>
         {!isWorkspaceView && currentBranch && (
           <span className="topbar-chip topbar-chip-branch">

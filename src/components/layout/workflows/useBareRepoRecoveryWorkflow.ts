@@ -10,7 +10,7 @@ type Toast = { msg: string; isError: boolean };
 
 type WorkspaceBridge = {
   activeRepo: string | null;
-  addOpenRepo: (repoPath: string) => Promise<void>;
+  addOpenRepo: (repoPath: string) => Promise<boolean | void>;
   setActiveTab: (tab: AppTabId) => void;
 };
 

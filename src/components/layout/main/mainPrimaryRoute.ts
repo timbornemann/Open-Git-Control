@@ -3,7 +3,19 @@ import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 
 export type MainPrimaryRoute =
-  'planner' | 'settings' | 'release' | 'timeline' | 'runConsole' | 'githubGuide' | 'github' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
+  | 'localRepos'
+  | 'planner'
+  | 'settings'
+  | 'release'
+  | 'timeline'
+  | 'runConsole'
+  | 'githubGuide'
+  | 'github'
+  | 'recovery'
+  | 'conflict'
+  | 'diff'
+  | 'file'
+  | 'graph';
 
 type RouteParams = {
   activeConflictPath: string | null;
@@ -32,6 +44,7 @@ export const getMainPrimaryRoute = ({
   showTimeline,
   showRunConsole,
 }: RouteParams): MainPrimaryRoute => {
+  if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
   if (activeTab === 'repo' && showReleaseCreator) return 'release';
@@ -70,4 +83,4 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): stri
 };
 
 export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean =>
-  route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';
+  route !== 'localRepos' && route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';

@@ -105,8 +105,9 @@ const MainViewComponent: React.FC = () => {
   const isSettingsView = activeTab === 'settings';
   const isPlannerView = activeTab === 'planner';
   const isGithubView = activeTab === 'github';
+  const isLocalReposView = activeTab === 'localRepos';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
-  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isGithubView && !isReleaseView;
+  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isGithubView && !isLocalReposView && !isReleaseView;
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

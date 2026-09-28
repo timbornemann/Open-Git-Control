@@ -120,7 +120,9 @@ const App: React.FC = () => {
             activeRepo={state.activeRepo}
             plannerActive={state.activeTab === 'planner'}
             refreshSignal={state.plannerRefreshSignal}
-            onRepositorySelected={state.addOpenRepo}
+            onRepositorySelected={async (repoPath) => {
+              await state.addOpenRepo(repoPath);
+            }}
             onRepositoryMaterialized={async (repoPath) => {
               await state.addOpenRepo(repoPath);
               state.setActiveTab('planner');

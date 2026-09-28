@@ -1,0 +1,420 @@
+.pane-content:has(.local-repositories-view) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.local-repositories-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-darker);
+  color: var(--text-primary);
+}
+
+.local-repositories-view button,
+.local-repositories-view input,
+.local-repositories-view select {
+  font: inherit;
+}
+
+.local-repositories-view :is(button, input, select):focus-visible,
+.local-repos-sidebar button:focus-visible,
+.local-repositories-view__scroll:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.local-repositories-view__hero {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--bg-dark), var(--bg-darker));
+}
+
+.local-repositories-view__eyebrow {
+  color: var(--text-accent);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.local-repositories-view__hero h1 {
+  margin: 5px 0 3px;
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.local-repositories-view__hero p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.local-repositories-view__hero-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.local-repositories-view__hero-actions button,
+.local-repositories-view__empty button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.local-repositories-view__hero-actions button:first-child,
+.local-repositories-view__empty button {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--on-accent);
+}
+
+.local-repositories-view__hero-actions button:hover,
+.local-repositories-view__empty button:hover {
+  border-color: var(--accent-primary);
+}
+
+.local-repositories-view__toolbar {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  min-height: 50px;
+  padding: 0 16px 0 24px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+
+.local-repositories-view__search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding-right: 16px;
+  color: var(--text-secondary);
+}
+
+.local-repositories-view__search:focus-within {
+  color: var(--text-accent);
+}
+
+.local-repositories-view__search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 49px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.local-repositories-view__toolbar > button,
+.local-repositories-view__toolbar > select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.local-repositories-view__toolbar > button:hover,
+.local-repositories-view__toolbar > button.is-selected,
+.local-repositories-view__toolbar > select:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.local-repositories-view__toolbar > button.is-selected {
+  color: var(--text-accent);
+}
+
+.local-repositories-view__results {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  min-height: 39px;
+  padding: 10px 24px 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.03em;
+}
+
+.local-repositories-view__restoring {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.local-repositories-view__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.local-repositories-view__list {
+  margin: 0 24px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.local-repositories-view__row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(140px, 0.3fr) 30px 30px;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 10px 7px 10px 5px;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 2px solid transparent;
+  background: transparent;
+}
+
+.local-repositories-view__row:hover,
+.local-repositories-view__row:focus-within {
+  border-left-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.local-repositories-view__row.is-active {
+  border-left-color: var(--accent-primary);
+}
+
+.local-repositories-view__signet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--accent-primary-border);
+  border-radius: 4px;
+  background: var(--accent-primary-soft);
+  color: var(--text-accent);
+}
+
+.local-repositories-view__row-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.local-repositories-view__row-main:disabled {
+  cursor: wait;
+}
+
+.local-repositories-view__row-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.local-repositories-view__row-title strong {
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-repositories-view__row-title small {
+  flex: none;
+  color: var(--text-accent);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.local-repositories-view__path,
+.local-repositories-view__origin {
+  display: block;
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.71rem;
+}
+
+.local-repositories-view__path {
+  overflow-wrap: anywhere;
+}
+
+.local-repositories-view__origin {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-accent);
+  opacity: 0.8;
+}
+
+.local-repositories-view__last-opened {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+  white-space: nowrap;
+}
+
+.local-repositories-view__last-opened small {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+}
+
+.local-repositories-view__row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.local-repositories-view__row-action:hover {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+}
+
+.local-repositories-view__row-action.is-pinned {
+  color: var(--status-warning);
+}
+
+.local-repositories-view__empty,
+.local-repositories-view__placeholder {
+  margin: 0 24px;
+  padding: 42px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.local-repositories-view__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.local-repositories-view__empty button {
+  margin-top: 4px;
+}
+
+.local-repositories-view__placeholder {
+  display: grid;
+  gap: 1px;
+  padding: 0;
+}
+
+.local-repositories-view__placeholder span {
+  height: 78px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-hover) 40%, transparent);
+}
+
+.local-repository-context-menu {
+  width: min(260px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+@container main-view (max-width: 700px) {
+  .local-repositories-view__hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .local-repositories-view__toolbar {
+    flex-wrap: wrap;
+    padding: 0 16px;
+  }
+
+  .local-repositories-view__search {
+    flex-basis: 100%;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .local-repositories-view__toolbar > button {
+    min-height: 38px;
+    border-left: 0;
+  }
+
+  .local-repositories-view__row {
+    grid-template-columns: 34px minmax(0, 1fr) 30px 30px;
+  }
+
+  .local-repositories-view__last-opened {
+    display: none;
+  }
+}
+
+@container main-view (max-width: 460px) {
+  .local-repositories-view__hero-actions {
+    width: 100%;
+  }
+
+  .local-repositories-view__hero-actions button {
+    flex: 1;
+  }
+
+  .local-repositories-view__results {
+    flex-wrap: wrap;
+    padding-inline: 16px;
+  }
+
+  .local-repositories-view__list,
+  .local-repositories-view__empty,
+  .local-repositories-view__placeholder {
+    margin-inline: 16px;
+  }
+
+  .local-repositories-view__row {
+    gap: 7px;
+  }
+}

@@ -8,20 +8,12 @@ export const LocalReposSidebarContainer: React.FC = React.memo(() => {
 
   return (
     <LocalReposSidebarContent
-      openRepos={repository.openRepos}
+      count={repository.openRepos.length}
       isRestoringRepos={repository.isRestoringRepos}
-      repoMeta={repository.repoMeta}
-      repoSortBy={repository.repoSortBy}
       activeRepo={repository.activeRepo}
       onOpenFolder={repository.onOpenFolder}
       onCloneByUrl={repository.onCloneByUrl}
-      onSwitchRepo={repository.onSwitchRepo}
-      onCloseRepo={repository.onCloseRepo}
-      onSetRepoSortBy={repository.onSetRepoSortBy}
-      onToggleRepoPin={repository.onToggleRepoPin}
-      isRepoPanelCollapsed={ui.isRepoPanelCollapsed}
-      onToggleRepoPanelCollapsed={ui.onToggleRepoPanelCollapsed}
-      setActiveTab={ui.setActiveTab}
+      onOpenRepoTab={() => ui.setActiveTab('repo')}
     />
   );
 });

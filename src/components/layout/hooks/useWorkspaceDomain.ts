@@ -467,6 +467,7 @@ export const useWorkspaceDomain = ({
         setReposLoaded(true);
         onRepoActivated();
         triggerRefresh();
+        setActiveTab('repo');
       } else if (result && !result.isRepo) {
         const repositoryName = getRepositoryNameFromPath(result.path);
         setInputDialog({
@@ -567,6 +568,7 @@ export const useWorkspaceDomain = ({
                 isError: false,
               });
               triggerRefresh();
+              setActiveTab('repo');
             } else {
               setGitActionToast({
                 msg: initResult.error || t('generated.components.layout.hooks.useworkspacedomain.error_during_git_init_0313550f'),
@@ -578,20 +580,24 @@ export const useWorkspaceDomain = ({
       }
     } catch (err) {
       console.error(err);
+      setGitActionToast({
+        msg: err instanceof Error ? err.message : tr('Repository konnte nicht geöffnet werden.', 'Could not open the repository.'),
+        isError: true,
+      });
     }
   };
 
-  const addOpenRepo = async (repoPath: string) => {
-    if (!appClient.isAvailable()) return;
+  const addOpenRepo = async (repoPath: string): Promise<boolean> => {
+    if (!appClient.isAvailable()) return false;
     if (
       normalizeRepoPathKey(repoPath) !== normalizeRepoPathKey(activeRepoRef.current || '') &&
       !(await confirmWorkingDirectoryNavigation({ kind: 'repository', path: repoPath }))
     )
-      return;
+      return false;
     const operationId = ++repoOperationSequenceRef.current;
     setConfirmDialog(null);
     const canonicalRepoPath = await appClient.setRepoPath(repoPath);
-    if (repoOperationSequenceRef.current !== operationId) return;
+    if (repoOperationSequenceRef.current !== operationId) return false;
     migrateRepoPathToCanonical(repoPath, canonicalRepoPath);
     ensureRepoPresent(canonicalRepoPath);
     activeRepoRef.current = canonicalRepoPath;
@@ -599,6 +605,7 @@ export const useWorkspaceDomain = ({
     setReposLoaded(true);
     onRepoActivated();
     triggerRefresh();
+    return true;
   };
 
   const setRepoPins = (repoPaths: string[], pinned: boolean) => {

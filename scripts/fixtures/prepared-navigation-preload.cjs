@@ -7,7 +7,19 @@ const { DEFAULT_SETTINGS } = require('../../dist-electron/electron/settings.js')
 const scenario = process.env.OGC_NAV_SCENARIO || 'cached';
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = Date.now();
-const repositories = { repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' };
+const repositories =
+  scenario === 'local'
+    ? {
+        repos: Array.from({ length: 24 }, (_, index) => ({
+          path: index === 0 ? 'C:/Work/open-git-control' : index === 1 ? 'D:/Clients/Design-System' : `C:/Work/Project-${index + 1}`,
+          lastOpened: now - index * 3_600_000,
+          createdAt: now - (index + 1) * 90_000_000,
+          pinned: index % 5 === 0,
+        })),
+        activeRepo: 'C:/Work/open-git-control',
+        sortBy: 'lastOpenedDesc',
+      }
+    : { repos: [], activeRepo: null, sortBy: 'lastOpenedDesc' };
 const settings = { ...DEFAULT_SETTINGS, language: 'en', autoUpdateEnabled: false };
 const planner = {
   version: 1,
@@ -100,6 +112,25 @@ const invoke = async (channel, ...args) => {
       return true;
     case 'git:clearRepo':
       return true;
+    case 'git:setRepo':
+    case 'git:resolveRepoPath':
+      return args[0];
+    case 'git:repoOriginUrl':
+      return ok(args[0] === 'D:/Clients/Design-System' ? 'git@github.com:example/design-system.git' : 'https://github.com/example/open-git-control.git');
+    case 'git:commandForRepo':
+      return ok('');
+    case 'git:commitLogPage':
+      return ok({ raw: '', stats: {}, hasMore: false, repoPath: args[0].repoPath });
+    case 'git:workingTreeSnapshot':
+      return ok({ snapshotId: 'fixture-snapshot', repoPath: args[0], statusRaw: '', changeCount: 0, durationMs: 0, largeMode: false, isBare: false });
+    case 'git:workingTreeStats':
+      return ok({ snapshotId: 'fixture-snapshot', staged: { files: 0, additions: 0, deletions: 0 }, unstaged: { files: 0, additions: 0, deletions: 0 } });
+    case 'git:listWorkingDirectory':
+      return ok([]);
+    case 'git:readRepoFile':
+      return { success: false, error: 'ENOENT: not found' };
+    case 'repositoryRun:getConfig':
+      return { success: false, error: 'Preview fixture has no Git working tree.' };
     case 'github:getCatalogSnapshot':
       await wait(50);
       return ok(scenario === 'cold' ? null : catalog);

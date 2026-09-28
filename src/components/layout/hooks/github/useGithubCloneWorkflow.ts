@@ -5,7 +5,7 @@ import { gitClient } from '@/services/gitClient';
 import { deriveRepoNameFromCloneSource } from './githubCloneHelpers';
 
 type Params = {
-  onRepoCloned: (repoPath: string) => Promise<void>;
+  onRepoCloned: (repoPath: string) => Promise<boolean | void>;
   setActiveTab: (tab: 'localRepos' | 'repo' | 'github' | 'settings') => void;
   t: CatalogTranslateFn;
 };
@@ -54,7 +54,8 @@ export const useGithubCloneWorkflow = ({ onRepoCloned, setActiveTab, t }: Params
             ...prev,
             `SUCCESS: ${t('generated.components.layout.hooks.usegithubdomain.repository_cloned_successfully_to_667ce18e')}: ${result.repoPath}`,
           ]);
-          await onRepoCloned(result.repoPath);
+          const activated = await onRepoCloned(result.repoPath);
+          if (activated === false) return false;
           if (options.switchToRepoTab !== false) {
             setActiveTab('repo');
           }

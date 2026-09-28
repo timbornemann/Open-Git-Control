@@ -5,7 +5,7 @@ import { gitClient } from '@/services/gitClient';
 import { preload, resourceKey } from '@/data/clientCache';
 import { queryClient } from '@/data/queryClient';
 
-export function useRepoOrigins(repositories: string[]) {
+export function useCachedRepoOrigins(repositories: string[]) {
   const queries = useQueries(
     {
       queries: repositories.map((repo) => ({
@@ -16,10 +16,6 @@ export function useRepoOrigins(repositories: string[]) {
     },
     queryClient,
   );
-  useEffect(() => {
-    if (!gitClient.isAvailable()) return;
-    for (const repo of repositories) void preload(() => gitClient.getRepoOriginUrl(repo), 'startup');
-  }, [repositories]);
   const serialized = JSON.stringify(
     Object.fromEntries(
       repositories.map((repo, index) => {
@@ -29,4 +25,13 @@ export function useRepoOrigins(repositories: string[]) {
     ),
   );
   return useMemo(() => JSON.parse(serialized) as Record<string, string | null>, [serialized]);
+}
+
+export function useRepoOrigins(repositories: string[]) {
+  const origins = useCachedRepoOrigins(repositories);
+  useEffect(() => {
+    if (!gitClient.isAvailable()) return;
+    for (const repo of repositories) void preload(() => gitClient.getRepoOriginUrl(repo), 'startup');
+  }, [repositories]);
+  return origins;
 }

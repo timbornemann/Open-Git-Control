@@ -71,6 +71,12 @@ if (!process.versions.electron) {
     await wait(700);
     const github = '.activity-bar button[title="GitHub"]';
     const planner = '.activity-bar button:has(svg.lucide-list-todo)';
+    const local = '.activity-bar button[title="Local repositories"]';
+    const isLocalScenario = scenario === 'local';
+    const primaryTab = isLocalScenario ? local : github;
+    const primaryContent = isLocalScenario ? '.local-repositories-view__row' : '.github-repo-card';
+    const secondaryTab = isLocalScenario ? github : planner;
+    const secondaryContent = isLocalScenario ? '.github-repo-card' : '.planner-card';
     const warmup = [];
     if (scenario === 'cold') {
       await win.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(github)}).click()`);
@@ -80,15 +86,47 @@ if (!process.versions.electron) {
       );
       if (!shell) throw new Error('Cold startup must show a page shell while authentication is restoring.');
     }
-    await measure(win, github, '.github-repo-card', warmup);
-    await measure(win, planner, '.planner-card', warmup);
+    await measure(win, primaryTab, primaryContent, warmup);
+    await measure(win, secondaryTab, secondaryContent, warmup);
     const samples = [];
     for (let i = 0; i < 12; i++) {
-      await measure(win, github, '.github-repo-card', samples);
-      await measure(win, planner, '.planner-card', samples);
+      await measure(win, primaryTab, primaryContent, samples);
+      await measure(win, secondaryTab, secondaryContent, samples);
     }
     await wait(3100);
-    await measure(win, github, '.github-repo-card', samples);
+    await measure(win, primaryTab, primaryContent, samples);
+    let layout = null;
+    if (isLocalScenario) {
+      layout = await win.webContents.executeJavaScript(`(async () => {
+        const hero = document.querySelector('.local-repositories-view__hero');
+        const toolbar = document.querySelector('.local-repositories-view__toolbar');
+        const scroll = document.querySelector('.local-repositories-view__scroll');
+        const before = { hero: hero.getBoundingClientRect().top, toolbar: toolbar.getBoundingClientRect().top };
+        scroll.scrollTop = scroll.scrollHeight;
+        await new Promise(requestAnimationFrame);
+        return {
+          rows: document.querySelectorAll('.local-repositories-view__row').length,
+          listScrolled: scroll.scrollTop > 0,
+          headerStayed: Math.abs(hero.getBoundingClientRect().top - before.hero) < 1 && Math.abs(toolbar.getBoundingClientRect().top - before.toolbar) < 1,
+        };
+      })()`);
+      if (process.env.OGC_NAV_SCREENSHOT_DIR) {
+        await fs.mkdir(process.env.OGC_NAV_SCREENSHOT_DIR, { recursive: true });
+        for (const [label, width, height, theme] of [
+          ['wide-dark', 1440, 900, 'midnight-teal'],
+          ['narrow-dark', 640, 680, 'midnight-teal'],
+          ['wide-light', 1440, 900, 'porcelain-light'],
+          ['narrow-light', 640, 680, 'porcelain-light'],
+        ]) {
+          win.setSize(width, height);
+          await win.webContents.executeJavaScript(
+            `document.body.dataset.theme = ${JSON.stringify(theme)}; document.querySelector('.local-repositories-view__scroll').scrollTop = 0`,
+          );
+          await wait(120);
+          await fs.writeFile(path.join(process.env.OGC_NAV_SCREENSHOT_DIR, `local-repositories-${label}.png`), (await win.webContents.capturePage()).toPNG());
+        }
+      }
+    }
     const loginVisible = await win.webContents.executeJavaScript("Boolean(document.querySelector('.github-workspace__login'))");
     const timings = samples.map((sample) => sample.ms).sort((a, b) => a - b);
     const result = {
@@ -101,10 +139,17 @@ if (!process.versions.electron) {
       loginVisible,
       warmup,
       errors,
+      layout,
     };
     results.push(result);
     win.destroy();
-    if (result.maxMs >= 100 || result.placeholderFrames || loginVisible || errors.length)
+    if (
+      result.maxMs >= 100 ||
+      result.placeholderFrames ||
+      loginVisible ||
+      errors.length ||
+      (layout && (!layout.listScrolled || !layout.headerStayed || layout.rows !== 24))
+    )
       throw new Error(`Navigation acceptance failed: ${JSON.stringify(result)}`);
   };
 
@@ -112,7 +157,7 @@ if (!process.versions.electron) {
     temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'ogc-navigation-'));
     app.setPath('userData', temporary);
     await app.whenReady();
-    for (const scenario of ['cached', 'offline', 'cold']) await runScenario(scenario);
+    for (const scenario of process.env.OGC_NAV_ONLY ? [process.env.OGC_NAV_ONLY] : ['cached', 'offline', 'cold', 'local']) await runScenario(scenario);
     console.log(JSON.stringify({ production: true, delayedIpcMs: 3000, results }, null, 2));
     await cleanup();
     app.exit(0);

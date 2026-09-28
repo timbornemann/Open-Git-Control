@@ -15,6 +15,7 @@ import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
 import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
+import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 
 const CommitGraph = viewModules.repo.View;
 const DiffViewer = viewModules.diff.View;
@@ -90,6 +91,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
   const isGithubView = route === 'github';
+  const isLocalReposView = route === 'localRepos';
   const isReleaseView = route === 'release';
   const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
@@ -115,7 +117,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     <div
       className="pane"
       style={
-        isSettingsView || isPlannerView || isGithubView || isReleaseView || !showInspectorPane
+        isSettingsView || isPlannerView || isGithubView || isLocalReposView || isReleaseView || !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
@@ -156,7 +158,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isPlannerView ? (
+        {isLocalReposView ? (
+          <LocalRepositoriesView />
+        ) : isPlannerView ? (
           <React.Suspense fallback={lazyPaneFallback}>
             <ProjectPlannerView />
           </React.Suspense>

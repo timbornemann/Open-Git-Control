@@ -12,7 +12,7 @@ import { useGithubRepositoryPages } from './github/useGithubRepositoryPages';
 import { confirmWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 type Params = {
-  onRepoCloned: (repoPath: string) => Promise<void>;
+  onRepoCloned: (repoPath: string) => Promise<boolean | void>;
   setActiveTab: (tab: 'localRepos' | 'repo' | 'github' | 'settings') => void;
   language: AppLanguage;
   githubOauthClientId: string;

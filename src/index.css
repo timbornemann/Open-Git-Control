@@ -10,6 +10,9 @@
 @import './styles/stash-panel.css' layer(feature);
 @import './styles/github-panels.css' layer(feature);
 @import './styles/github-workspace.css' layer(feature);
+@import './styles/github-workspace-detail.css' layer(feature);
+@import './styles/local-repositories.css' layer(feature);
+@import './styles/local-repositories-sidebar.css' layer(feature);
 @import './styles/github-workspace-panels.css' layer(feature);
 @import './styles/conflict-resolver.css' layer(feature);
 @import './styles/recovery-center.css' layer(feature);
