@@ -57,6 +57,7 @@ export const GithubWorkspaceView: React.FC = () => {
   }, [github.isAuthenticated]);
 
   const online = github.isAuthenticated && !catalog.offline;
+  const showCatalog = !selected && (github.isAuthenticated || github.isAuthRestoring || github.isAuthenticationRequired === false || catalog.hasData);
   const togglePin = (repo: GitHubRepositoryDto) => {
     if (!online || !accountHost || !accountUser) return;
     const pinned = !pinnedIds.has(repo.id);
@@ -100,7 +101,7 @@ export const GithubWorkspaceView: React.FC = () => {
   };
 
   return (
-    <div className="github-workspace">
+    <div className={`github-workspace${showCatalog ? ' github-workspace--catalog' : ''}`}>
       {!github.isAuthenticated && !github.isAuthRestoring && github.isAuthenticationRequired !== false && (
         <div className="github-workspace__login">
           <GithubAuthContent
@@ -144,7 +145,7 @@ export const GithubWorkspaceView: React.FC = () => {
         </div>
       )}
       {!selected ? (
-        (github.isAuthenticated || github.isAuthRestoring || github.isAuthenticationRequired === false || catalog.hasData) && (
+        showCatalog && (
           <GithubCatalog
             repos={catalog.repos}
             localRepos={localRepos}

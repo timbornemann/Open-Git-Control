@@ -46,7 +46,7 @@ export const GithubCatalog: React.FC<Props> = ({
   );
 
   return (
-    <div className="github-workspace__inner">
+    <div className="github-workspace__inner github-workspace__inner--catalog">
       <div className="github-workspace__hero">
         <div>
           <span className="github-workspace__eyebrow">GITHUB WORKSPACE</span>
@@ -88,67 +88,71 @@ export const GithubCatalog: React.FC<Props> = ({
         {visible.length} {tr('von', 'of')} {repos.length} {tr('Repositories', 'repositories')}
         {loading && hasData ? ` · ${tr('Aktualisiere im Hintergrund …', 'Updating in background …')}` : ''}
       </div>
-      {visible.length === 0 ? (
-        !hasData && loading ? (
-          <DataPlaceholder />
+      <div className="github-workspace__repo-scroll" role="region" aria-label={tr('Repository-Liste', 'Repository list')} tabIndex={0}>
+        {visible.length === 0 ? (
+          !hasData && loading ? (
+            <DataPlaceholder />
+          ) : (
+            <div className="github-workspace__empty">{tr('Keine passenden Repositories gefunden.', 'No matching repositories found.')}</div>
+          )
         ) : (
-          <div className="github-workspace__empty">{tr('Keine passenden Repositories gefunden.', 'No matching repositories found.')}</div>
-        )
-      ) : (
-        <div className="github-workspace__grid">
-          {visible.map((repo) => {
-            const paths = localRepos.get(toRepoIdentity(repo.htmlUrl) || '') || [];
-            return (
-              <article className="github-repo-card" key={repo.id}>
-                <div className="github-repo-card__top">
+          <div className="github-workspace__grid">
+            {visible.map((repo) => {
+              const paths = localRepos.get(toRepoIdentity(repo.htmlUrl) || '') || [];
+              return (
+                <article className="github-repo-card" key={repo.id}>
                   <span className="github-repo-card__signet" aria-hidden="true">
-                    <FolderGit2 size={20} />
+                    <FolderGit2 size={18} />
                   </span>
                   <button
-                    className={`github-repo-card__pin${pinnedIds.has(repo.id) ? ' is-pinned' : ''}`}
-                    disabled={!online}
-                    onClick={() => onTogglePin(repo)}
-                    aria-label={pinnedIds.has(repo.id) ? tr('Pin entfernen', 'Remove pin') : tr('Repo anheften', 'Pin repository')}
-                    aria-pressed={pinnedIds.has(repo.id)}
+                    className="github-repo-card__main"
+                    onClick={() => onOpen(repo)}
+                    onMouseEnter={() =>
+                      online &&
+                      intent.hover(async () => {
+                        const [owner, name] = repo.fullName.split('/');
+                        preloadGithubRepository(owner, name);
+                      })
+                    }
+                    onMouseLeave={intent.cancel}
+                    onFocus={() =>
+                      online &&
+                      intent.focus(async () => {
+                        const [owner, name] = repo.fullName.split('/');
+                        preloadGithubRepository(owner, name);
+                      })
+                    }
                   >
-                    <Star size={17} fill={pinnedIds.has(repo.id) ? 'currentColor' : 'none'} />
+                    <span className="github-repo-card__identity">
+                      <span className="github-repo-card__owner">{repo.fullName.split('/')[0]}</span>
+                      <strong>{repo.name}</strong>
+                    </span>
+                    <span className="github-repo-card__description">
+                      {repo.description || tr('Keine Beschreibung vorhanden.', 'No description available.')}
+                    </span>
                   </button>
-                </div>
-                <button
-                  className="github-repo-card__main"
-                  onClick={() => onOpen(repo)}
-                  onMouseEnter={() =>
-                    online &&
-                    intent.hover(async () => {
-                      const [owner, name] = repo.fullName.split('/');
-                      preloadGithubRepository(owner, name);
-                    })
-                  }
-                  onMouseLeave={intent.cancel}
-                  onFocus={() =>
-                    online &&
-                    intent.focus(async () => {
-                      const [owner, name] = repo.fullName.split('/');
-                      preloadGithubRepository(owner, name);
-                    })
-                  }
-                >
-                  <span className="github-repo-card__owner">{repo.fullName.split('/')[0]}</span>
-                  <strong>{repo.name}</strong>
-                  <span className="github-repo-card__description">{repo.description || tr('Keine Beschreibung vorhanden.', 'No description available.')}</span>
-                </button>
-                <div className="github-repo-card__meta">
-                  <span>
-                    {repo.private ? <LockKeyhole size={13} /> : <span className="github-repo-card__public-dot" />}{' '}
-                    {repo.private ? tr('Privat', 'Private') : tr('Öffentlich', 'Public')}
+                  <div className="github-repo-card__meta">
+                    <span>
+                      {repo.private ? <LockKeyhole size={13} /> : <span className="github-repo-card__public-dot" />}{' '}
+                      {repo.private ? tr('Privat', 'Private') : tr('Öffentlich', 'Public')}
+                    </span>
+                    <span>
+                      <FolderGit2 size={13} /> {paths.length ? `${paths.length} ${tr('lokal', 'local')}` : tr('Nur Remote', 'Remote only')}
+                    </span>
+                  </div>
+                  <span className="github-repo-card__updated">
+                    {repo.updatedAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(repo.updatedAt)) : '—'}
                   </span>
-                  <span>
-                    <FolderGit2 size={13} /> {paths.length ? `${paths.length} ${tr('lokal', 'local')}` : tr('Nur Remote', 'Remote only')}
-                  </span>
-                </div>
-                <div className="github-repo-card__footer">
-                  <span>{repo.updatedAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(repo.updatedAt)) : '—'}</span>
-                  <div>
+                  <div className="github-repo-card__actions">
+                    <button
+                      className={`github-repo-card__pin${pinnedIds.has(repo.id) ? ' is-pinned' : ''}`}
+                      disabled={!online}
+                      onClick={() => onTogglePin(repo)}
+                      aria-label={pinnedIds.has(repo.id) ? tr('Pin entfernen', 'Remove pin') : tr('Repo anheften', 'Pin repository')}
+                      aria-pressed={pinnedIds.has(repo.id)}
+                    >
+                      <Star size={16} fill={pinnedIds.has(repo.id) ? 'currentColor' : 'none'} />
+                    </button>
                     {online && !paths.length && (
                       <button aria-label={tr(`${repo.name} klonen`, `Clone ${repo.name}`)} title={tr('Klonen', 'Clone')} onClick={() => onClone(repo)}>
                         <Download size={15} />
@@ -162,12 +166,12 @@ export const GithubCatalog: React.FC<Props> = ({
                       <ArrowUpRight size={16} />
                     </button>
                   </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
