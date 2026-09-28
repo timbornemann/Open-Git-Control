@@ -1,13 +1,14 @@
 import { usePreloadIntent } from '@/data/usePreloadIntent';
 import { preloadGithubRepository } from '@/data/preloading';
 import { DataPlaceholder } from '@/components/common/DataPlaceholder';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Download, LockKeyhole, Plus, Search, Star, FolderGit2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { GitHubRepositoryDto } from '@/types/githubDtos';
 import { githubClient } from '@/services/githubClient';
 import { toRepoIdentity } from '@/components/layout/sidebar/useGithubRepoOriginMap';
 import { selectGithubCatalogRepos } from './githubCatalogSelectors';
+import { GithubRepoContextMenu, type GithubRepoContextMenuState } from './GithubRepoContextMenu';
 
 type Props = {
   repos: GitHubRepositoryDto[];
@@ -17,6 +18,7 @@ type Props = {
   loading: boolean;
   hasData?: boolean;
   onOpen: (repo: GitHubRepositoryDto) => void;
+  onOpenLocalTab: (path: string) => void;
   onTogglePin: (repo: GitHubRepositoryDto) => void;
   onClone: (repo: GitHubRepositoryDto) => void;
   onCreate: () => void;
@@ -30,6 +32,7 @@ export const GithubCatalog: React.FC<Props> = ({
   loading,
   hasData = repos.length > 0,
   onOpen,
+  onOpenLocalTab,
   onTogglePin,
   onClone,
   onCreate,
@@ -40,10 +43,18 @@ export const GithubCatalog: React.FC<Props> = ({
   const [location, setLocation] = useState<'all' | 'local' | 'remote'>('all');
   const [visibility, setVisibility] = useState<'all' | 'public' | 'private'>('all');
   const [sort, setSort] = useState<'updated' | 'name'>('updated');
+  const [contextMenu, setContextMenu] = useState<GithubRepoContextMenuState | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const visible = useMemo(
     () => selectGithubCatalogRepos(repos, localRepos, pinnedIds, { search, location, visibility, sort, locale }),
     [repos, localRepos, pinnedIds, search, location, visibility, sort, locale],
   );
+  const menuRepo = contextMenu ? visible.find((repo) => repo.id === contextMenu.repo.id && repo.htmlUrl === contextMenu.repo.htmlUrl) : undefined;
+  const menuPaths = menuRepo ? localRepos.get(toRepoIdentity(menuRepo.htmlUrl) || '') || [] : [];
+
+  useEffect(() => {
+    if (contextMenu && !menuRepo) setContextMenu(null);
+  }, [contextMenu, menuRepo]);
 
   return (
     <div className="github-workspace__inner github-workspace__inner--catalog">
@@ -100,7 +111,15 @@ export const GithubCatalog: React.FC<Props> = ({
             {visible.map((repo) => {
               const paths = localRepos.get(toRepoIdentity(repo.htmlUrl) || '') || [];
               return (
-                <article className="github-repo-card" key={repo.id}>
+                <article
+                  className="github-repo-card"
+                  key={repo.id}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setContextMenu({ x: event.clientX, y: event.clientY, repo });
+                  }}
+                >
                   <span className="github-repo-card__signet" aria-hidden="true">
                     <FolderGit2 size={18} />
                   </span>
@@ -172,6 +191,19 @@ export const GithubCatalog: React.FC<Props> = ({
           </div>
         )}
       </div>
+      {contextMenu && menuRepo && (
+        <GithubRepoContextMenu
+          menu={contextMenu}
+          localPaths={menuPaths}
+          online={online}
+          pinned={pinnedIds.has(menuRepo.id)}
+          onClose={closeContextMenu}
+          onOpenDetails={onOpen}
+          onOpenLocalTab={onOpenLocalTab}
+          onClone={onClone}
+          onTogglePin={onTogglePin}
+        />
+      )}
     </div>
   );
 };

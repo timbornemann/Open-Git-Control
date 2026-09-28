@@ -41,6 +41,24 @@
   outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
 }
+.github-repo-context-menu {
+  width: min(260px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.github-repo-context-menu .repo-list-context-action > svg {
+  flex: none;
+}
+.github-repo-context-menu .repo-list-context-action > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.github-repo-context-menu .repo-list-context-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .github-workspace__hero,
 .github-detail__hero {
   display: flex;

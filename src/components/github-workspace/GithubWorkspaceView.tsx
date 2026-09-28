@@ -87,6 +87,20 @@ export const GithubWorkspaceView: React.FC = () => {
       .catch((caught) => setWarning(caught instanceof Error ? caught.message : String(caught)));
   };
 
+  const openLocalTab = async (path: string) => {
+    if (repository.activeRepo && normalizeRepoPathKey(path) === normalizeRepoPathKey(repository.activeRepo)) {
+      ui.setActiveTab('repo');
+      return;
+    }
+    try {
+      const activated = await repository.onSwitchRepo(path);
+      if (activated) ui.setActiveTab('repo');
+      else repository.onToast(tr('Repository-Wechsel abgebrochen.', 'Repository switch cancelled.'), true);
+    } catch (error) {
+      repository.onToast(error instanceof Error ? error.message : tr('Repository konnte nicht geöffnet werden.', 'Could not open repository.'), true);
+    }
+  };
+
   const onCreated = (result: { repository: GitHubRepositoryDto; brandedReadme: boolean; warning?: string }) => {
     setShowCreate(false);
     catalog.setRepos((current) => [result.repository, ...current.filter((repo) => repo.id !== result.repository.id)]);
@@ -154,6 +168,7 @@ export const GithubWorkspaceView: React.FC = () => {
             loading={catalog.loading || github.isAuthRestoring === true || (!catalog.hasData && !github.isAuthenticated)}
             hasData={catalog.hasData}
             onOpen={openRepository}
+            onOpenLocalTab={(path) => void openLocalTab(path)}
             onTogglePin={togglePin}
             onClone={(repo) => github.onClone(repo.cloneUrl, repo.name)}
             onCreate={() => setShowCreate(true)}
