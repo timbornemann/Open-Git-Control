@@ -13,7 +13,7 @@ describe('auto-commit safety and special Git entries', { timeout: 30000 }, () =>
     await repo.run(['add', '.']);
     const staged = await repo.run(['write-tree']);
     repo.write('base.txt', 'remaining\n');
-    repo.write('.git/hooks/pre-commit', '#!/bin/sh\nif test -e .git/ai-first-done; then exit 1; fi\ntouch .git/ai-first-done\n');
+    repo.writeHook('pre-commit', 'if test -e .git/ai-first-done; then exit 1; fi\ntouch .git/ai-first-done');
     const provider = vi.fn(repo.provider);
     const result = await repo.service(provider).runAutoCommit(repo.repoPath, policy, () => 'key');
     expect(result.outcome).toBe('partial');

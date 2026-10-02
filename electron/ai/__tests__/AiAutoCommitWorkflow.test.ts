@@ -7,9 +7,9 @@ import { cleanRepositories, repository } from './repositoryFixture';
 import { policy } from './autoCommitFixtures';
 
 describe('global auto-commit workflow with real Git', { timeout: 30000 }, () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
-    cleanRepositories();
+    await cleanRepositories();
   });
 
   it('commits the exact partial index first, then remaining changes, preserving later edits', async () => {
@@ -96,7 +96,7 @@ describe('global auto-commit workflow with real Git', { timeout: 30000 }, () => 
     const repo = await repository();
     const head = await repo.run(['rev-parse', 'HEAD']);
     repo.write('base.txt', 'changed\n');
-    repo.write('.git/hooks/pre-commit', '#!/bin/sh\necho attempt >> hook-attempts.txt\nexit 1\n');
+    repo.writeHook('pre-commit', 'echo attempt >> hook-attempts.txt\nexit 1');
     const provider = vi.fn(repo.provider);
     await expect(repo.service(provider).runAutoCommit(repo.repoPath, policy, () => 'key')).rejects.toThrow();
     expect(await repo.run(['rev-parse', 'HEAD'])).toBe(head);

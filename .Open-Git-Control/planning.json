@@ -105,10 +105,10 @@
       "title": "Rename commits",
       "description": "commitete commits bearbeitbar machen, also name und beschreibung, dann ein rebase machen lassen, so das alles richtig ist aber in der historie nur der neue geänderte korrigierte commit steht",
       "priority": "medium",
-      "status": "idea",
+      "status": "done",
       "tags": [],
       "createdAt": 1784044682733,
-      "updatedAt": 1784044682733
+      "updatedAt": 1790957499651
     },
     {
       "id": "253cfcc3-7ddb-4c16-a54d-7513c92b00ee",

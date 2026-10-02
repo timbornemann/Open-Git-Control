@@ -16,7 +16,18 @@ export async function repository(initial = true) {
     fs.mkdirSync(path.dirname(path.join(repoPath, file)), { recursive: true });
     fs.writeFileSync(path.join(repoPath, file), content);
   };
+  const writeHook = (name: string, script: string) => {
+    const file = path.join('.git', 'hooks', name);
+    write(file, `#!/bin/sh\n${script.trim().replace(/\r\n/g, '\n')}\n`);
+    // Git ignores non-executable hooks on Linux and macOS. chmod also handles
+    // an existing hook, for which writeFile's creation mode would be ignored.
+    fs.chmodSync(path.join(repoPath, file), 0o755);
+  };
   await run(['init']);
+  // Detached auto-maintenance can outlive a commit and recreate files in .git
+  // while afterEach removes this disposable repository.
+  await run(['config', 'maintenance.auto', 'false']);
+  await run(['config', 'gc.auto', '0']);
   await run(['config', 'user.name', 'Autocommit Test']);
   await run(['config', 'user.email', 'autocommit@example.test']);
   await run(['config', 'commit.gpgSign', 'false']);
@@ -39,9 +50,16 @@ export async function repository(initial = true) {
   };
   const service = (generateText = provider) => new AiService(git, { generateText } as AiProviderClient);
   const execute = () => service().runAutoCommit(repoPath, policy, () => 'test-key');
-  return { repoPath, git, run, write, service, execute, provider };
+  return { repoPath, git, run, write, writeHook, service, execute, provider };
 }
 
-export function cleanRepositories(): void {
-  for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+export async function cleanRepositories(): Promise<void> {
+  for (const root of [...roots]) {
+    const resolved = path.resolve(root);
+    if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('ogc-ai-global-')) {
+      throw new Error(`Refusing to remove a path outside the auto-commit test fixtures: ${resolved}`);
+    }
+    await fs.promises.rm(resolved, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    roots.splice(roots.indexOf(root), 1);
+  }
 }

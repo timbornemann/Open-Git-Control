@@ -16,6 +16,11 @@ vi.mock('electron', () => ({
   shell: { openPath: openPathMock, showItemInFolder: showItemInFolderMock },
 }));
 
+// These integration tests launch PowerShell and compile the native ACL helper
+// twice on Windows (creation and collision). Cold starts on busy CI runners
+// can exceed Vitest's five-second default; keep the larger budget scoped here.
+const entryCreationTestOptions = process.platform === 'win32' ? { timeout: 30_000 } : {};
+
 describe('registerGitFileHandlers repository path opening', () => {
   const handlers = new Map<string, (...args: any[]) => Promise<any>>();
   let repoPath = '';
@@ -77,7 +82,7 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(result).toMatchObject({ success: false, error: expect.stringContaining('repository-relative') });
   });
 
-  it('creates an empty file without overwriting an existing entry', async () => {
+  it('creates an empty file without overwriting an existing entry', entryCreationTestOptions, async () => {
     const firstResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFile)!({}, 'src/new-file.ts', repoPath);
 
     expect(firstResult).toEqual({ success: true, targetPath: 'src/new-file.ts' });
@@ -90,7 +95,7 @@ describe('registerGitFileHandlers repository path opening', () => {
     expect(fs.readFileSync(path.join(repoPath, 'src', 'new-file.ts'), 'utf8')).toBe('keep this content');
   });
 
-  it('creates a folder without overwriting an existing entry', async () => {
+  it('creates a folder without overwriting an existing entry', entryCreationTestOptions, async () => {
     const firstResult = await handlers.get(IpcChannel.GitCreateWorkingDirectoryFolder)!({}, 'src/new-folder', repoPath);
 
     expect(firstResult).toEqual({ success: true, targetPath: 'src/new-folder' });
