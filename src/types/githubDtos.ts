@@ -58,7 +58,31 @@ export interface GitHubCreateReleaseParamsDto {
   body?: string;
   draft?: boolean;
   prerelease?: boolean;
+  targetInspection?: { id: string; mode: 'remote' | 'push-local' };
 }
+
+export interface GitHubInspectReleaseTargetParamsDto {
+  owner: string;
+  repo: string;
+  repoPath: string;
+  tagName: string;
+  targetCommitish?: string;
+}
+
+export interface GitHubReleaseTargetDto {
+  inspectionId: string;
+  target: string;
+  targetBranch: string | null;
+  localSha: string | null;
+  remoteSha: string | null;
+  ahead: number;
+  behind: number;
+  canPush: boolean;
+  canReleaseRemote: boolean;
+  pushBlockedReason: string | null;
+}
+
+export type ReleaseSubmissionPhase = 'idle' | 'checking' | 'awaiting-decision' | 'pushing' | 'creating';
 
 export interface GitHubReleaseDto {
   id: number;

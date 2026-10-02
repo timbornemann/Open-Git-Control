@@ -202,6 +202,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               releaseForm={github.releaseForm}
               setReleaseForm={github.setReleaseForm}
               releaseSubmitting={github.releaseSubmitting}
+              releasePhase={github.releasePhase}
               onCreateRelease={github.onCreateRelease}
               pendingAssets={github.releasePendingAssets}
               onAddPendingAssets={github.onAddReleasePendingAssets}

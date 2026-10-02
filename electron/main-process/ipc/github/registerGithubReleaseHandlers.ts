@@ -1,3 +1,8 @@
+import { parseGithubRemoteTarget } from '../../../github/releaseTargetIdentity';
+import { normalizeReleaseRevision } from '../../../github/releaseTargetInspection';
+import { ReleaseTargetWorkflow } from '../../../github/ReleaseTargetWorkflow';
+import type { GitHubCreateReleaseParamsDto, GitHubInspectReleaseTargetParamsDto } from '../../../../src/types/githubDtos';
+import type { SecretScanPushGuard } from '../git/secretScanPushGuard';
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { GitService } from '../../../GitService';
 import type { GitHubService } from '../../../GitHubService';
@@ -12,6 +17,7 @@ type RegisterGithubReleaseHandlersDeps = {
   gitService: GitService;
   githubService: GitHubService;
   readSettingsWithMigration: () => AppSettings;
+  pushGuard?: SecretScanPushGuard;
 };
 
 type GithubRemoteTarget = { owner: string; repo: string };
@@ -44,52 +50,8 @@ const isValidReleaseTagName = (tagName: string): boolean => {
   );
 };
 
-function parseGithubRemoteTarget(remoteUrl: unknown, configuredHost: string, githubService: Pick<GitHubService, 'normalizeHost'>): GithubRemoteTarget | null {
-  const remote = String(remoteUrl || '').trim();
-  if (!remote) return null;
-
-  let remoteHost = '';
-  let remotePath = '';
-  try {
-    const parsed = new URL(remote);
-    remoteHost = parsed.host;
-    remotePath = parsed.pathname;
-  } catch {
-    const scpMatch = remote.match(/^(?:[^@\s]+@)?([^:\s]+):(.+)$/);
-    if (!scpMatch) return null;
-    remoteHost = scpMatch[1];
-    remotePath = scpMatch[2];
-  }
-
-  if (!remoteHost || /[^a-z0-9.\-:]/i.test(remoteHost)) return null;
-  if (githubService.normalizeHost(remoteHost) !== githubService.normalizeHost(configuredHost)) return null;
-  const segments = remotePath
-    .replace(/^\/+|\/+$/g, '')
-    .replace(/\.git$/i, '')
-    .split('/');
-  if (segments.length < 2 || segments.some((segment) => !segment)) return null;
-  try {
-    const owner = decodeURIComponent(segments[segments.length - 2]);
-    const repo = decodeURIComponent(segments[segments.length - 1]);
-    const invalidName = (value: string) =>
-      value.includes('/') || value.includes('\\') || /\s/.test(value) || [...value].some((character) => (character.codePointAt(0) ?? 0) < 0x20);
-    if ([owner, repo].some(invalidName)) return null;
-    return { owner, repo };
-  } catch {
-    return null;
-  }
-}
-
 function buildGithubRepositoryUrl(host: string, owner: string, repo: string): string {
   return `https://${host}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
-}
-
-function normalizeReleaseRevision(value: unknown, label: string): string {
-  const revision = String(value || '').trim();
-  if (!revision || revision.length > 255 || revision.startsWith('-') || /[\0\r\n]/.test(revision)) {
-    throw new Error(`Invalid ${label}.`);
-  }
-  return revision;
 }
 
 async function localCommitishExists(gitService: GitService, repoPath: string, commitish: string): Promise<boolean> {
@@ -104,52 +66,18 @@ async function localCommitishExists(gitService: GitService, repoPath: string, co
   }
 }
 
-async function resolveLocalCommitish(gitService: GitService, repoPath: string, commitish: string): Promise<string | null> {
-  try {
-    const resolved = await gitService.runCommandAtPath(repoPath, ['rev-parse', '--verify', '--quiet', `${commitish}^{commit}`]);
-    return resolved.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * GitHub can recreate a deleted remote tag without touching an older local
- * tag of the same name. Never let a release request silently create that
- * divergence: known local and remotely tracked tags must resolve to the
- * requested release target before GitHub is allowed to create the release.
- */
-async function validateReleaseTagTarget(gitService: GitService, repoPath: string, tagName: string, targetCommitish: unknown): Promise<string | null> {
-  const localTagCommit = await resolveLocalCommitish(gitService, repoPath, `refs/tags/${tagName}`);
-  const remoteTagCommit = await resolveLocalCommitish(gitService, repoPath, `refs/ogc/remote-tags/origin/${tagName}`);
-  if (!localTagCommit && !remoteTagCommit) return null;
-
-  const requestedTarget = String(targetCommitish || '').trim();
-  if (!requestedTarget) {
-    return 'A release target is required when the tag already exists locally or on the remote.';
-  }
-
-  let targetRevision: string;
-  try {
-    targetRevision = normalizeReleaseRevision(requestedTarget, 'release target');
-  } catch (error: unknown) {
-    return error instanceof Error ? error.message : 'Invalid release target.';
-  }
-  const targetCommit = await resolveLocalCommitish(gitService, repoPath, targetRevision);
-  if (!targetCommit) {
-    return 'The release target could not be resolved to a local commit.';
-  }
-  if (localTagCommit && targetCommit !== localTagCommit) {
-    return `Local tag "${tagName}" points to a different commit than the release target. Delete or move the local tag, or use a new tag name.`;
-  }
-  if (remoteTagCommit && targetCommit !== remoteTagCommit) {
-    return `Remote tag "${tagName}" points to a different commit than the release target. Refresh the repository and align the tag, or use a new tag name.`;
-  }
-
-  return null;
-}
-
-export function registerGithubReleaseHandlers({ gitService, githubService, readSettingsWithMigration }: RegisterGithubReleaseHandlersDeps): void {
+export function registerGithubReleaseHandlers({ gitService, githubService, readSettingsWithMigration, pushGuard }: RegisterGithubReleaseHandlersDeps): void {
+  const targets = new ReleaseTargetWorkflow({ gitService, githubService, getHost: () => readSettingsWithMigration().githubHost, pushGuard });
+  ipcMain.handle(IpcChannel.GithubInspectReleaseTarget, async (event: IpcMainInvokeEvent, params: GitHubInspectReleaseTargetParamsDto) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
+    try {
+      if (!params?.owner?.trim() || !params.repo?.trim() || !isValidReleaseTagName(params.tagName?.trim() || '')) throw new Error('Invalid release target.');
+      return { success: true, data: await targets.inspect(event, { ...params, owner: params.owner.trim(), repo: params.repo.trim() }) };
+    } catch (error) {
+      return { success: false, error: toErrorMessage(error, 'Release-Prüfung fehlgeschlagen.') };
+    }
+  });
   const releaseAuthorizationsBySender = new Map<number, Map<number, ReleaseAssetAuthorization>>();
   const cleanupRegisteredSenders = new Set<number>();
 
@@ -193,101 +121,80 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
     return authorization;
   };
 
-  ipcMain.handle(
-    IpcChannel.GithubCreateRelease,
-    async (
-      event: IpcMainInvokeEvent,
-      params: {
-        owner: string;
-        repo: string;
-        repoPath?: string;
-        tagName: string;
-        targetCommitish?: string;
-        releaseName: string;
-        body?: string;
-        draft?: boolean;
-        prerelease?: boolean;
-      },
-    ) => {
-      const authError = assertGithubAuthenticated(githubService);
-      if (authError) return authError;
+  ipcMain.handle(IpcChannel.GithubCreateRelease, async (event: IpcMainInvokeEvent, params: GitHubCreateReleaseParamsDto) => {
+    const authError = assertGithubAuthenticated(githubService);
+    if (authError) return authError;
 
-      const tagName = (params?.tagName || '').trim();
-      const releaseName = (params?.releaseName || '').trim();
+    const tagName = (params?.tagName || '').trim();
+    const releaseName = (params?.releaseName || '').trim();
 
-      if (!tagName) {
-        return { success: false, error: 'Tag-Name ist erforderlich.' };
+    if (!tagName) {
+      return { success: false, error: 'Tag-Name ist erforderlich.' };
+    }
+
+    if (!isValidReleaseTagName(tagName)) {
+      return { success: false, error: 'Invalid tag name.' };
+    }
+
+    if (!releaseName) {
+      return { success: false, error: 'Release-Name ist erforderlich.' };
+    }
+
+    const requestedRepoPath = String(params?.repoPath || '').trim();
+    if (!requestedRepoPath) {
+      return { success: false, error: 'Repository path is required.' };
+    }
+    let authorizedRepoPath: string;
+    try {
+      authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
+    }
+
+    try {
+      const originUrl = await gitService.getRepoOriginUrl(authorizedRepoPath);
+      // Origin resolution is asynchronous. Re-authorize immediately before
+      // the irreversible GitHub write so a repository switch during that
+      // read cannot validate a stale release request.
+      requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
+      const settings = readSettingsWithMigration();
+      const originTarget = parseGithubRemoteTarget(originUrl, settings.githubHost, githubService);
+      if (!originTarget) {
+        return { success: false, error: 'The active repository has no matching GitHub origin.' };
       }
-
-      if (!isValidReleaseTagName(tagName)) {
-        return { success: false, error: 'Invalid tag name.' };
+      if (
+        originTarget.owner.toLowerCase() !==
+          String(params.owner || '')
+            .trim()
+            .toLowerCase() ||
+        originTarget.repo.toLowerCase() !==
+          String(params.repo || '')
+            .trim()
+            .toLowerCase()
+      ) {
+        return { success: false, error: 'Release target does not match the active repository origin.' };
       }
+      requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
+      const currentAuthError = assertGithubAuthenticated(githubService);
+      if (currentAuthError) return currentAuthError;
 
-      if (!releaseName) {
-        return { success: false, error: 'Release-Name ist erforderlich.' };
-      }
-
-      const requestedRepoPath = String(params?.repoPath || '').trim();
-      if (!requestedRepoPath) {
-        return { success: false, error: 'Repository path is required.' };
-      }
-      let authorizedRepoPath: string;
-      try {
-        authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
-      } catch (error: unknown) {
-        return { success: false, error: error instanceof Error ? error.message : 'Repository path is required.' };
-      }
-
-      try {
-        const originUrl = await gitService.getRepoOriginUrl(authorizedRepoPath);
-        // Origin resolution is asynchronous. Re-authorize immediately before
-        // the irreversible GitHub write so a repository switch during that
-        // read cannot validate a stale release request.
-        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
-        const settings = readSettingsWithMigration();
-        const originTarget = parseGithubRemoteTarget(originUrl, settings.githubHost, githubService);
-        if (!originTarget) {
-          return { success: false, error: 'The active repository has no matching GitHub origin.' };
-        }
-        if (
-          originTarget.owner.toLowerCase() !==
-            String(params.owner || '')
-              .trim()
-              .toLowerCase() ||
-          originTarget.repo.toLowerCase() !==
-            String(params.repo || '')
-              .trim()
-              .toLowerCase()
-        ) {
-          return { success: false, error: 'Release target does not match the active repository origin.' };
-        }
-        const tagValidationError = await validateReleaseTagTarget(gitService, authorizedRepoPath, tagName, params.targetCommitish);
-        if (tagValidationError) {
-          return { success: false, error: tagValidationError };
-        }
-        // The local tag lookup above is asynchronous, so bind the irreversible
-        // GitHub write to the active repository once more immediately before it.
-        requireActiveRepositoryPath(authorizedRepoPath, gitService.getRepoPath(), IpcChannel.GithubCreateRelease);
-        const currentAuthError = assertGithubAuthenticated(githubService);
-        if (currentAuthError) return currentAuthError;
-
-        const release = await githubService.createRelease({
-          owner: originTarget.owner,
-          repo: originTarget.repo,
-          tagName,
-          targetCommitish: params.targetCommitish,
-          releaseName,
-          body: params.body,
-          draft: Boolean(params.draft),
-          prerelease: Boolean(params.prerelease),
-        });
-        rememberReleaseAuthorization(event, release.id, originTarget, authorizedRepoPath);
-        return { success: true, data: release };
-      } catch (error: unknown) {
-        return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
-      }
-    },
-  );
+      const release = await targets.create(event, {
+        ...params,
+        owner: originTarget.owner,
+        repo: originTarget.repo,
+        tagName,
+        targetCommitish: params.targetCommitish,
+        releaseName,
+        body: params.body,
+        draft: Boolean(params.draft),
+        prerelease: Boolean(params.prerelease),
+      });
+      rememberReleaseAuthorization(event, release.id, originTarget, authorizedRepoPath);
+      return { success: true, data: release };
+    } catch (error: unknown) {
+      return { success: false, error: toErrorMessage(error, 'Release konnte nicht erstellt werden.') };
+    }
+  });
 
   ipcMain.handle(
     IpcChannel.GithubUploadReleaseAsset,

@@ -12,6 +12,7 @@ import {
 } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 beforeEach(() => {
+  vi.spyOn(gitClient, 'onJobEvent').mockReturnValue(() => {});
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>');
   vi.stubGlobal('window', dom.window);
   vi.stubGlobal('document', dom.window.document);

@@ -37,6 +37,10 @@ export const gitClient = cachedClient('git', {
     return Boolean(getElectronApi());
   },
 
+  onJobEvent(...args: Parameters<ElectronAPI['onJobEvent']>): ReturnType<ElectronAPI['onJobEvent']> {
+    return requireElectronGitApi().onJobEvent(...args);
+  },
+
   onRepoUnavailable(callback: (payload: RepoUnavailablePayload) => void): () => void {
     return requireElectronGitApi().onRepoUnavailable(callback);
   },

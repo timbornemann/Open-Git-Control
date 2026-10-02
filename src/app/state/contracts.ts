@@ -7,6 +7,7 @@ import type {
   GitHubRepositoryDto,
   PullRequestCiDto,
   PullRequestDto,
+  ReleaseSubmissionPhase,
 } from '@/types/githubDtos';
 import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState, RepoOwnerRef } from '@/types/git';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
@@ -235,6 +236,7 @@ export type GithubStateContract = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
+  releasePhase?: ReleaseSubmissionPhase;
   releaseNotesGenerating: boolean;
   releaseError: string | null;
   releaseSuccess: GitHubReleaseDto | null;

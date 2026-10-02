@@ -21,7 +21,7 @@ import type {
   WorkingDirectorySearchRequestDto,
 } from '../../src/shared/ipc/contracts/git';
 import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
-import type { GitHubRepositoryDto } from '../../src/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, GitHubInspectReleaseTargetParamsDto, GitHubRepositoryDto } from '../../src/types/githubDtos';
 import { createRepositoryRunApi } from './createRepositoryRunApi';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
@@ -350,16 +350,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     githubGetPRs: (owner: string, repo: string, state: string) => ipcRenderer.invoke(IpcChannel.GithubGetPrs, owner, repo, state),
     githubCreatePR: (params: { owner: string; repo: string; title: string; body: string; head: string; base: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubCreatePr, params),
-    githubCreateRelease: (params: {
-      owner: string;
-      repo: string;
-      tagName: string;
-      targetCommitish?: string;
-      releaseName: string;
-      body?: string;
-      draft?: boolean;
-      prerelease?: boolean;
-    }) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
+    githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => ipcRenderer.invoke(IpcChannel.GithubCreateRelease, params),
+    githubInspectReleaseTarget: (params: GitHubInspectReleaseTargetParamsDto) => ipcRenderer.invoke(IpcChannel.GithubInspectReleaseTarget, params),
     githubUploadReleaseAsset: (params: { owner: string; repo: string; repoPath: string; releaseId: number; filePath: string; name?: string }) =>
       ipcRenderer.invoke(IpcChannel.GithubUploadReleaseAsset, params),
     githubGetReleaseContext: (params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }) =>
@@ -483,6 +475,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       githubGetPRs: flatApi.githubGetPRs,
       githubCreatePR: flatApi.githubCreatePR,
       githubCreateRelease: flatApi.githubCreateRelease,
+      githubInspectReleaseTarget: flatApi.githubInspectReleaseTarget,
       githubUploadReleaseAsset: flatApi.githubUploadReleaseAsset,
       githubGetReleaseContext: flatApi.githubGetReleaseContext,
       githubGetWorkflowRuns: flatApi.githubGetWorkflowRuns,

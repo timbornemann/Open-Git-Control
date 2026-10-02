@@ -100,6 +100,7 @@ type RepoSidebarContentProps = Pick<
   | 'releaseForm'
   | 'setReleaseForm'
   | 'releaseSubmitting'
+  | 'releasePhase'
   | 'onCreateRelease'
 > & {
   refreshTrigger: number;

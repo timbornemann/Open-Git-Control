@@ -50,6 +50,7 @@ type GithubConnectedContentProps = Pick<
   | 'releaseForm'
   | 'setReleaseForm'
   | 'releaseSubmitting'
+  | 'releasePhase'
   | 'releaseNotesGenerating'
   | 'onCreateRelease'
 >;
@@ -97,6 +98,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
+  releasePhase,
   releaseNotesGenerating,
   onCreateRelease,
 }) => {
@@ -173,6 +175,7 @@ export const GithubConnectedContent: React.FC<GithubConnectedContentProps> = ({
             releaseForm={releaseForm}
             setReleaseForm={setReleaseForm}
             releaseSubmitting={releaseSubmitting}
+            releasePhase={releasePhase}
             releaseNotesGenerating={releaseNotesGenerating}
             onCreateRelease={onCreateRelease}
           />

@@ -138,6 +138,16 @@ export class GitHubReleaseService {
     }
   }
 
+  async resolvePublishedCommit(owner: string, repo: string, ref: string, signal: AbortSignal): Promise<string | null> {
+    try {
+      const { data } = await this.getOctokit().rest.repos.getCommit({ owner, repo, ref, request: { signal } });
+      return data.sha;
+    } catch (error) {
+      if ((error as GithubApiErrorLike)?.status === 404) return null;
+      throw error;
+    }
+  }
+
   async uploadReleaseAsset(params: UploadReleaseAssetParams): Promise<{ id: number; name: string; browserDownloadUrl: string }> {
     const octokit = this.getOctokit();
     const owner = (params.owner || '').trim();

@@ -281,6 +281,7 @@ export const useAppState = () => {
 
   const {
     closeReleaseCreator,
+    releasePhase,
     generateReleaseNotesWithAI,
     handleCreateRelease,
     openReleaseCreator,
@@ -493,6 +494,7 @@ export const useAppState = () => {
     releaseForm,
     setReleaseForm,
     releaseSubmitting,
+    releasePhase,
     releaseError,
     releaseSuccess,
     showReleaseCreator,

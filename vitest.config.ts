@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { availableParallelism } from 'node:os';
 
 export default defineConfig({
   resolve: {
@@ -8,6 +9,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Real Git tests launch process trees. Large Windows worker pools can
+    // exhaust process-start capacity and time out otherwise healthy tests.
+    maxWorkers: process.platform === 'win32' ? Math.min(4, availableParallelism()) : undefined,
     setupFiles: ['src/data/testSetup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'src/**/__tests__/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
     coverage: {

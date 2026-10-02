@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto } from '@/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, ReleaseSubmissionPhase } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
@@ -17,6 +17,7 @@ type Props = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
+  releasePhase?: ReleaseSubmissionPhase;
   onCreateRelease: () => Promise<void>;
   pendingAssets: string[];
   onAddPendingAssets: () => Promise<void>;
@@ -37,6 +38,7 @@ export const ReleaseCreator: React.FC<Props> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
+  releasePhase,
   onCreateRelease,
   pendingAssets,
   onAddPendingAssets,
@@ -168,6 +170,7 @@ export const ReleaseCreator: React.FC<Props> = ({
               setReleaseForm={setReleaseForm}
               hasOwnerRepo={Boolean(ownerRepo)}
               releaseSubmitting={releaseSubmitting}
+              releasePhase={releasePhase}
               notesGenerating={notesGenerating}
               notesLanguage={notesLanguage}
               setNotesLanguage={setNotesLanguage}

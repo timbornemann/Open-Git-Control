@@ -95,6 +95,7 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
       releaseForm={github.releaseForm}
       setReleaseForm={github.setReleaseForm}
       releaseSubmitting={github.releaseSubmitting}
+      releasePhase={github.releasePhase}
       onCreateRelease={github.onCreateRelease}
       refreshTrigger={repository.refreshTrigger}
     />

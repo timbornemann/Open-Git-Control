@@ -4,6 +4,8 @@ import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
   GitHubCreateReleaseParamsDto,
+  GitHubInspectReleaseTargetParamsDto,
+  GitHubReleaseTargetDto,
   GitHubForkParamsDto,
   GitHubReleaseContextDto,
   GitHubReleaseDto,
@@ -150,6 +152,10 @@ export const githubClient = cachedClient('github', {
 
   async createRelease(params: GitHubCreateReleaseParamsDto): Promise<IpcResult<GitHubReleaseDto>> {
     return requireElectronGithubApi().githubCreateRelease(params);
+  },
+
+  async inspectReleaseTarget(params: GitHubInspectReleaseTargetParamsDto): Promise<IpcResult<GitHubReleaseTargetDto>> {
+    return requireElectronGithubApi().githubInspectReleaseTarget(params);
   },
 
   async uploadReleaseAsset(...args: Parameters<ElectronAPI['githubUploadReleaseAsset']>): ReturnType<ElectronAPI['githubUploadReleaseAsset']> {

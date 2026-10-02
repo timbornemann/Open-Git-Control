@@ -1,5 +1,6 @@
+import { ReleaseSubmitLabel } from '@/components/release-creator/ReleaseSubmitLabel';
 import { AlertCircle, Check, Sparkles } from 'lucide-react';
-import type { GitHubCreateReleaseParamsDto } from '@/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, ReleaseSubmissionPhase } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
@@ -10,6 +11,7 @@ type ReleaseNotesWorkbenchProps = {
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   hasOwnerRepo: boolean;
   releaseSubmitting: boolean;
+  releasePhase?: ReleaseSubmissionPhase;
   notesGenerating: boolean;
   notesLanguage: 'de' | 'en';
   setNotesLanguage: (value: 'de' | 'en') => void;
@@ -33,6 +35,7 @@ export const ReleaseNotesWorkbench = ({
   setReleaseForm,
   hasOwnerRepo,
   releaseSubmitting,
+  releasePhase,
   notesGenerating,
   notesLanguage,
   setNotesLanguage,
@@ -201,9 +204,7 @@ export const ReleaseNotesWorkbench = ({
 
             <button className="release-primary-btn" onClick={() => void onCreateRelease()} disabled={!canCreateRelease}>
               <Check size={14} />
-              {releaseSubmitting
-                ? t('generated.components.releasecreator.creating_release_8650d060')
-                : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
+              <ReleaseSubmitLabel submitting={releaseSubmitting} phase={releasePhase} />
             </button>
 
             <p className={`release-inline ${canCreateRelease ? 'release-inline--muted' : 'release-inline--warning'}`}>

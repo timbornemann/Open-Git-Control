@@ -170,6 +170,7 @@ const createGithubSlice = (
   releaseForm: state.releaseForm,
   setReleaseForm: state.setReleaseForm,
   releaseSubmitting: state.releaseSubmitting,
+  releasePhase: state.releasePhase,
   releaseError: state.releaseError,
   releaseSuccess: state.releaseSuccess,
   onCreateRelease: state.handleCreateRelease,

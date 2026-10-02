@@ -62,7 +62,7 @@ export function setupIPC({
   registerReadCancellation();
   registerBootstrapHandlers(githubService);
   registerDialogHandlers({ gitService });
-  registerGitHandlers({
+  const pushGuard = registerGitHandlers({
     gitService,
     secretScanService,
     commitStatsService,
@@ -82,7 +82,7 @@ export function setupIPC({
     secretScanService,
     repoJobRegistry,
   });
-  registerGithubHandlers({ gitService, githubService, readSettingsWithMigration });
+  registerGithubHandlers({ gitService, githubService, readSettingsWithMigration, pushGuard });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
   registerFeedbackHandlers({ githubService });
   registerExternalLinkHandlers();

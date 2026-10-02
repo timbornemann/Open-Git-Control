@@ -3,6 +3,8 @@ import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
   GitHubCreateReleaseParamsDto,
+  GitHubInspectReleaseTargetParamsDto,
+  GitHubReleaseTargetDto,
   GitHubForkParamsDto,
   GitHubReleaseAssetDto,
   GitHubReleaseContextDto,
@@ -119,6 +121,7 @@ export interface ElectronGithubAPI {
   githubGetPRs: (owner: string, repo: string, state: string) => Promise<IpcResult<PullRequestDto[]>>;
   githubCreatePR: (params: CreatePullRequestParamsDto) => Promise<IpcResult<CreatePullRequestResultDto>>;
   githubCreateRelease: (params: GitHubCreateReleaseParamsDto) => Promise<IpcResult<GitHubReleaseDto>>;
+  githubInspectReleaseTarget: (params: GitHubInspectReleaseTargetParamsDto) => Promise<IpcResult<GitHubReleaseTargetDto>>;
   githubUploadReleaseAsset: (params: GitHubUploadReleaseAssetParamsDto) => Promise<IpcResult<GitHubReleaseAssetDto>>;
   githubGetReleaseContext: (params: {
     owner: string;

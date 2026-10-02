@@ -82,6 +82,7 @@ export const enum IpcChannel {
   GithubCheckAuthStatus = 'github:checkAuthStatus',
   GithubCreatePr = 'github:createPR',
   GithubCreateRelease = 'github:createRelease',
+  GithubInspectReleaseTarget = 'github:inspectReleaseTarget',
   GithubCreateRepo = 'github:createRepo',
   GithubCreateRepoWithReadme = 'github:createRepoWithReadme',
   GithubGetCatalogSnapshot = 'github:getCatalogSnapshot',

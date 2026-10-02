@@ -221,6 +221,10 @@ export class GitHubService {
     return this.releases.createRelease(params);
   }
 
+  resolvePublishedReleaseCommit(owner: string, repo: string, ref: string, signal: AbortSignal): Promise<string | null> {
+    return this.releases.resolvePublishedCommit(owner, repo, ref, signal);
+  }
+
   uploadReleaseAsset(params: { owner: string; repo: string; releaseId: number; filePath: string; name?: string }) {
     return this.releases.uploadReleaseAsset(params);
   }

@@ -1,5 +1,6 @@
+import { ReleaseSubmitLabel } from '@/components/release-creator/ReleaseSubmitLabel';
 import React from 'react';
-import type { GitHubCreateReleaseParamsDto } from '@/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, ReleaseSubmissionPhase } from '@/types/githubDtos';
 import { useI18n } from '@/i18n';
 import { Button, Panel, TextField, Toolbar } from '@/components/ui';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
@@ -9,6 +10,7 @@ type ReleaseMiniFormProps = {
   releaseForm: GitHubCreateReleaseParamsDto;
   setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
   releaseSubmitting: boolean;
+  releasePhase?: ReleaseSubmissionPhase;
   releaseNotesGenerating: boolean;
   onCreateRelease: () => Promise<void>;
 };
@@ -18,6 +20,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
+  releasePhase,
   releaseNotesGenerating,
   onCreateRelease,
 }) => {
@@ -102,9 +105,7 @@ export const ReleaseMiniForm: React.FC<ReleaseMiniFormProps> = ({
           }}
           disabled={releaseSubmitDisabled}
         >
-          {releaseSubmitting
-            ? t('generated.components.layout.sidebar.githubconnectedcontent.creating_95b39ce8')
-            : t('generated.components.layout.sidebar.githubconnectedcontent.create_release_f0fffb84')}
+          <ReleaseSubmitLabel submitting={releaseSubmitting} phase={releasePhase} />
         </Button>
       </Toolbar>
     </Panel>

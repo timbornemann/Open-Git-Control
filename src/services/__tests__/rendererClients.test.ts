@@ -18,7 +18,6 @@ import { plannerClient } from '@/services/plannerClient';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
 
 type ApiBucket = Record<string, ReturnType<typeof vi.fn>>;
-
 type TestElectronApi = {
   ai: ApiBucket;
   app: ApiBucket;
@@ -264,6 +263,8 @@ describe('renderer service clients', () => {
     await expectDelegation(() => githubClient.getReleaseContext({ owner: 'octo', repo: 'hello' }), api.github.githubGetReleaseContext, [
       { owner: 'octo', repo: 'hello' },
     ]);
+    const releaseTarget = { owner: 'octo', repo: 'hello', repoPath: 'C:/repo', tagName: 'v1' };
+    await expectDelegation(() => githubClient.inspectReleaseTarget(releaseTarget), api.github.githubInspectReleaseTarget, [releaseTarget]);
     await expectDelegation(() => githubClient.createRelease({ owner: 'octo', repo: 'hello' } as any), api.github.githubCreateRelease, [
       { owner: 'octo', repo: 'hello' },
     ]);

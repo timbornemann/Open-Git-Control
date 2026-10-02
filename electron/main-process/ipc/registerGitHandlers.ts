@@ -16,7 +16,7 @@ import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { registerGitOperationStateHandler } from './git/registerGitOperationStateHandler';
 import { registerRepositoryActivityHandler } from './git/registerRepositoryActivityHandler';
 import { registerCommitMessageEditHandlers } from './git/registerCommitMessageEditHandlers';
-import { registerSecretScanPushGuard } from './git/secretScanPushGuard';
+import { registerSecretScanPushGuard, type SecretScanPushGuard } from './git/secretScanPushGuard';
 import { registerSecretScanCommitGuard } from './git/secretScanCommitGuard';
 import { emitJobEvent, sendToWebContents } from './jobEvents';
 import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
@@ -44,7 +44,7 @@ export function registerGitHandlers({
   readSettingsWithMigration,
   repoJobRegistry = defaultRepoJobRegistry,
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
-}: RegisterGitHandlersDeps): void {
+}: RegisterGitHandlersDeps): SecretScanPushGuard {
   const isCommitCommand = (commandName: unknown): boolean =>
     String(commandName || '')
       .trim()
@@ -491,4 +491,5 @@ export function registerGitHandlers({
       return { success: false, error: error.message };
     }
   });
+  return secretScanPushGuard;
 }

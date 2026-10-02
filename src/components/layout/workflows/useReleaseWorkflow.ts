@@ -1,7 +1,10 @@
-import { preload, peekResource } from '@/data/clientCache';
+import { preload, peekResource, getGithubCacheEpoch, subscribeGithubScope, invalidateResources } from '@/data/clientCache';
+import { gitMutationAffects } from '@/data/mutationEffects';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import type { IpcResult } from '@/types/ipc';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
+import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto, ReleaseSubmissionPhase } from '@/types/githubDtos';
+import { releaseTargetDialog } from './releaseTargetDialog';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
@@ -24,6 +27,8 @@ type ReleaseSubmissionSnapshot = {
   createParams: GitHubCreateReleaseParamsDto;
   pendingAssets: string[];
   fingerprint: string;
+  githubEpoch: number;
+  targetInspection?: GitHubCreateReleaseParamsDto['targetInspection'];
 };
 
 const buildReleaseCreateParams = (
@@ -113,6 +118,31 @@ export const useReleaseWorkflow = ({
   const releaseNotesGeneratingRef = useRef(releaseNotesGenerating);
   const releaseContextLoadingRef = useRef(false);
   const [releasePendingAssets, setReleasePendingAssets] = useState<string[]>([]);
+  const [releasePhase, setReleasePhase] = useState<ReleaseSubmissionPhase>('idle');
+  const submissionBusyRef = useRef(false);
+  const inspectionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!gitClient.isAvailable()) return;
+    return gitClient.onJobEvent((event) => {
+      if (event.operation !== 'github:createRelease' || event.id !== inspectionIdRef.current) return;
+      const phase = event.details?.releasePhase;
+      if (phase === 'checking' || phase === 'pushing' || phase === 'creating') setReleasePhase(phase);
+    });
+  }, []);
+
+  useEffect(
+    () =>
+      subscribeGithubScope(() => {
+        generationRef.current++;
+        submissionBusyRef.current = false;
+        inspectionIdRef.current = null;
+        setReleasePhase('idle');
+        setReleaseSubmitting(false);
+        setConfirmDialog(null);
+      }),
+    [setConfirmDialog, setReleaseSubmitting],
+  );
 
   const setReleaseContextError = useCallback(
     (message: string | null) => {
@@ -143,6 +173,9 @@ export const useReleaseWorkflow = ({
 
   useLayoutEffect(() => {
     activeRepoRef.current = activeRepo;
+    submissionBusyRef.current = false;
+    inspectionIdRef.current = null;
+    setReleasePhase('idle');
     generationRef.current += 1;
     refreshContextRequestRef.current += 1;
     releaseNotesGeneratingRef.current = false;
@@ -166,6 +199,17 @@ export const useReleaseWorkflow = ({
   const isCurrentGeneration = useCallback((generation: number, repoPath: string | null) => {
     return generation === generationRef.current && activeRepoRef.current === repoPath;
   }, []);
+
+  const isCurrentSubmission = useCallback(
+    (snapshot: ReleaseSubmissionSnapshot) => {
+      const owner = ownerRepoRef.current;
+      const repoPath = activeRepoRef.current;
+      if (!owner || !repoPath || !isCurrentGeneration(snapshot.generation, snapshot.repoPath) || snapshot.githubEpoch !== getGithubCacheEpoch()) return false;
+      const params = buildReleaseCreateParams(releaseFormRef.current, owner, currentBranchRef.current, repoPath);
+      return getReleaseSubmissionFingerprint(params, releasePendingAssetsRef.current) === snapshot.fingerprint;
+    },
+    [isCurrentGeneration],
+  );
 
   const setReleaseForm = useCallback(
     (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => {
@@ -313,18 +357,12 @@ export const useReleaseWorkflow = ({
 
   const handleCreateRelease = useCallback(
     async (confirmedEmptyReleaseNotes = false, confirmedSnapshot?: ReleaseSubmissionSnapshot) => {
-      if (confirmedSnapshot) {
-        const currentOwnerRepo = ownerRepoRef.current;
-        const currentRepoPath = activeRepoRef.current;
-        const currentParams =
-          currentOwnerRepo && currentRepoPath
-            ? buildReleaseCreateParams(releaseFormRef.current, currentOwnerRepo, currentBranchRef.current, currentRepoPath)
-            : null;
-        const currentFingerprint = currentParams ? getReleaseSubmissionFingerprint(currentParams, releasePendingAssetsRef.current) : null;
-        if (!isCurrentGeneration(confirmedSnapshot.generation, confirmedSnapshot.repoPath) || currentFingerprint !== confirmedSnapshot.fingerprint) {
-          setConfirmDialog(null);
-          return;
-        }
+      if (submissionBusyRef.current) return;
+      if (confirmedSnapshot && !isCurrentSubmission(confirmedSnapshot)) {
+        setConfirmDialog(null);
+        setReleaseSubmitting(false);
+        setReleasePhase('idle');
+        return;
       }
 
       if (!githubClient.isAvailable() || !isGithubAuthenticated || !ownerRepo) {
@@ -362,6 +400,8 @@ export const useReleaseWorkflow = ({
       }
 
       const showEmptyReleaseNotesConfirm = (snapshot: ReleaseSubmissionSnapshot) => {
+        submissionBusyRef.current = true;
+        let answered = false;
         const releaseMode = createParams.draft
           ? t('generated.components.layout.sidebar.repogithubactionscontent.draft_4fc4eecc')
           : t('generated.components.layout.workflows.usereleaseworkflow.published_adbe9c8a');
@@ -386,7 +426,14 @@ export const useReleaseWorkflow = ({
             ? t('generated.components.layout.workflows.usereleaseworkflow.create_without_notes_b0c349a2')
             : t('generated.components.layout.workflows.usereleaseworkflow.publish_without_notes_7e45885a'),
           onConfirm: async () => {
+            if (answered || !isCurrentGeneration(snapshot.generation, snapshot.repoPath)) return;
+            answered = true;
+            submissionBusyRef.current = false;
             await handleCreateRelease(true, snapshot);
+          },
+          onCancel: () => {
+            answered = true;
+            if (isCurrentGeneration(snapshot.generation, snapshot.repoPath)) submissionBusyRef.current = false;
           },
         });
       };
@@ -399,16 +446,28 @@ export const useReleaseWorkflow = ({
           createParams,
           pendingAssets: [...releasePendingAssets],
           fingerprint: getReleaseSubmissionFingerprint(createParams, releasePendingAssets),
+          githubEpoch: getGithubCacheEpoch(),
         };
         showEmptyReleaseNotesConfirm(snapshot);
         return;
       }
 
+      submissionBusyRef.current = true;
+      setReleasePhase('checking');
       setReleaseSubmitting(true);
       setReleaseError(null);
       setReleaseSuccess(null);
       const generation = confirmedSnapshot?.generation ?? generationRef.current;
       const pendingAssets = confirmedSnapshot?.pendingAssets || [...releasePendingAssets];
+      let awaitingDecision = false;
+      const snapshot: ReleaseSubmissionSnapshot = confirmedSnapshot || {
+        generation,
+        repoPath,
+        createParams,
+        pendingAssets,
+        fingerprint: getReleaseSubmissionFingerprint(createParams, pendingAssets),
+        githubEpoch: getGithubCacheEpoch(),
+      };
 
       // Uploads every pending asset to the created release. Returns false when
       // the repository switched mid-upload or an upload failed (both cases stop
@@ -446,8 +505,51 @@ export const useReleaseWorkflow = ({
           throw new Error(authorization.error || tr('Das zugehoerige Repository ist nicht mehr aktiv.', 'The associated repository is no longer active.'));
         }
 
-        const result = await githubClient.createRelease(createParams);
+        let targetInspection = snapshot.targetInspection;
+        if (!targetInspection) {
+          const inspection = await githubClient.inspectReleaseTarget({ ...createParams, repoPath });
+          if (!isCurrentSubmission(snapshot)) return;
+          if (!inspection.success) throw new Error(inspection.error);
+          const target = inspection.data;
+          inspectionIdRef.current = target.inspectionId;
+          if (target.ahead > 0) {
+            if (!target.canPush && !target.canReleaseRemote)
+              throw new Error(target.pushBlockedReason || tr('Kein gültiges Release-Ziel verfügbar.', 'No valid release target is available.'));
+            awaitingDecision = true;
+            setReleasePhase('awaiting-decision');
+            let answered = false;
+            const continueWith = async (mode: 'remote' | 'push-local') => {
+              if (answered || !isCurrentGeneration(generation, repoPath)) return;
+              answered = true;
+              submissionBusyRef.current = false;
+              await handleCreateRelease(true, { ...snapshot, targetInspection: { id: target.inspectionId, mode } });
+            };
+            setConfirmDialog(
+              releaseTargetDialog(target, `${createParams.owner}/${createParams.repo}`, tr, continueWith, () => {
+                if (answered) return;
+                answered = true;
+                if (!isCurrentGeneration(generation, repoPath)) return;
+                submissionBusyRef.current = false;
+                inspectionIdRef.current = null;
+                setReleasePhase('idle');
+                setReleaseSubmitting(false);
+              }),
+            );
+            return;
+          }
+          targetInspection = { id: target.inspectionId, mode: 'remote' };
+        }
+        inspectionIdRef.current = targetInspection.id;
+        if (!isCurrentSubmission(snapshot)) return;
+        const result = await githubClient.createRelease({ ...createParams, targetInspection }).finally(() => {
+          // The backend may have pushed even if release creation fails or this
+          // view closes. Invalidate the captured repo before refreshing its UI.
+          invalidateResources('git', normalizeRepoPathKey(repoPath), undefined, (key) => gitMutationAffects('push', [], key));
+        });
         if (!isCurrentGeneration(generation, repoPath)) return;
+        // A successful push remains published even when creating the release
+        // fails, so refresh repository state for both outcomes.
+        triggerRefresh();
 
         if (!result.success) {
           setReleaseError(getCreateReleaseErrorMessage(result.error || '', t));
@@ -461,7 +563,6 @@ export const useReleaseWorkflow = ({
           msg: tr(`Release ${result.data.tagName} erstellt.`, `Release ${result.data.tagName} created.`),
           isError: false,
         });
-        triggerRefresh();
         resetReleaseDraft({ clearContext: true, clearSuccess: false });
         await refreshReleaseContext(currentBranch || undefined);
       };
@@ -472,12 +573,16 @@ export const useReleaseWorkflow = ({
         if (!isCurrentGeneration(generation, repoPath)) return;
         setReleaseError(error?.message || t('generated.components.layout.workflows.usereleaseworkflow.could_not_create_release_7ed5aef0'));
       } finally {
-        if (isCurrentGeneration(generation, repoPath)) {
+        if (isCurrentGeneration(generation, repoPath) && !awaitingDecision) {
+          submissionBusyRef.current = false;
+          inspectionIdRef.current = null;
+          setReleasePhase('idle');
           setReleaseSubmitting(false);
         }
       }
     },
     [
+      isCurrentSubmission,
       isCurrentGeneration,
       currentBranch,
       isGithubAuthenticated,
@@ -649,6 +754,10 @@ export const useReleaseWorkflow = ({
   }, [resetReleaseDraft, setActiveTab, setReleaseSubmitting, setShowReleaseCreator]);
 
   const closeReleaseCreator = useCallback(() => {
+    submissionBusyRef.current = false;
+    inspectionIdRef.current = null;
+    setReleasePhase('idle');
+    setConfirmDialog(null);
     generationRef.current += 1;
     refreshContextRequestRef.current += 1;
     releaseNotesGeneratingRef.current = false;
@@ -657,7 +766,7 @@ export const useReleaseWorkflow = ({
     setReleaseNotesGenerating(false);
     setReleaseSubmitting(false);
     setShowReleaseCreator(false);
-  }, [setReleaseContextLoading, setReleaseNotesGenerating, setReleaseSubmitting, setShowReleaseCreator]);
+  }, [setConfirmDialog, setReleaseContextLoading, setReleaseNotesGenerating, setReleaseSubmitting, setShowReleaseCreator]);
 
   useEffect(() => {
     if (!showReleaseCreator) return;
@@ -665,6 +774,7 @@ export const useReleaseWorkflow = ({
   }, [showReleaseCreator, refreshReleaseContext]);
 
   return {
+    releasePhase,
     closeReleaseCreator,
     generateReleaseNotesWithAI,
     handleCreateRelease,
