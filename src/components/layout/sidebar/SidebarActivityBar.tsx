@@ -3,6 +3,7 @@ import { Settings, FolderOpen, FolderGit2, Github, ListTodo, PanelLeftClose, Pan
 import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
+import { RepositoryActivityRail } from './RepositoryActivityRail';
 
 type SidebarActivityBarProps = Pick<AppSidebarProps, 'activeTab' | 'setActiveTab'> & {
   isSidebarCollapsed: boolean;
@@ -41,7 +42,9 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       <button className={`icon-btn ${activeTab === 'github' ? 'active' : ''}`} onClick={() => activateTab('github')} title="GitHub">
         <Github size={22} />
       </button>
-      <div style={{ flex: 1 }} />
+      <div className="repository-activity-slot">
+        <RepositoryActivityRail />
+      </div>
       <UpdateNotification />
       <button className={`icon-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => activateTab('settings')} title={t('sidebar.settings')}>
         <Settings size={22} />

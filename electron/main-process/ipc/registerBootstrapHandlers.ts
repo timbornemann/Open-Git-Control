@@ -32,9 +32,13 @@ export function registerBootstrapHandlers(github: GitHubService) {
         .map((repo) => repoKey(repo.path)),
     );
     if (repositories.activeRepo) recent.add(repoKey(repositories.activeRepo));
+    const registered = new Set(repositories.repos.map((repo) => repoKey(repo.path)));
     const githubScope = githubCatalog ? `${githubCatalog.host}/${githubCatalog.username}`.toLowerCase() : null;
     const snapshots = await readPreviewCache((entry) =>
-      entry.key[1] === 'github' ? entry.key[2] === githubScope : entry.key[1] === 'planner' || recent.has(entry.key[2]),
+      entry.key[1] === 'github'
+        ? entry.key[2] === githubScope
+        : entry.key[1] === 'planner' ||
+          (entry.key[1] === 'git' && entry.key[3] === 'getRepositoryChangeSummary' ? registered.has(entry.key[2]) : recent.has(entry.key[2])),
     );
     const currentAccount = githubAccount();
     const currentScope = currentAccount ? `${currentAccount.host}/${currentAccount.username}`.toLowerCase() : null;

@@ -6,6 +6,8 @@ import type { WorkingTreeSnapshotDto, WorkingTreeStatsDto } from '@/types/gitDto
 import { gitClient } from '@/services/gitClient';
 import { parseGitStatusDetailed, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import { countStatusFiles, publishRepositoryActivity, markRepositoryActivityError } from '@/data/repositoryActivityCache';
+import { queryClient } from '@/data/queryClient';
 
 export type WorkingTreeState = {
   /** Repository that owns the currently exposed working-tree data. */
@@ -31,6 +33,13 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
   const snapshotRef = useRef<WorkingTreeSnapshotDto | null>(null);
   const statsRef = useRef<WorkingTreeStatsDto | null>(null);
 
+  useEffect(
+    () => () => {
+      generationRef.current += 1;
+    },
+    [],
+  );
+
   const refresh = useCallback(async () => {
     if (!repoPath || !gitClient.isAvailable()) return;
     const generation = generationRef.current;
@@ -49,12 +58,17 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
             setSnapshot(null);
             setDataRepoPath(repoPath);
             setStatus(parseGitStatusDetailed(quickStatus.data || ''));
+            publishRepositoryActivity(
+              repoPath,
+              countStatusFiles(quickStatus.data || ''),
+              queryClient.getQueryState(resourceKey('git', 'runGitCommandForRepo', [repoPath, 'statusPorcelain']))?.dataUpdatedAt || Date.now(),
+            );
             setStats(null);
           })
           .catch(() => undefined);
       }
 
-      const result = await gitClient.getWorkingTreeSnapshot(repoPath);
+      const result = await gitClient.getWorkingTreeSnapshot(repoPath).catch((error: unknown) => ({ success: false as const, error: String(error) }));
       if (generation !== generationRef.current) return;
       if (result.success && normalizeRepoPathKey(result.data.repoPath) === normalizeRepoPathKey(repoPath)) {
         const nextSnapshot = result.data;
@@ -73,6 +87,11 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
         setSnapshot(nextSnapshot);
         setDataRepoPath(nextSnapshot.repoPath);
         setStatus(parseGitStatusDetailed(nextSnapshot.statusRaw));
+        publishRepositoryActivity(
+          repoPath,
+          nextSnapshot.changeCount,
+          queryClient.getQueryState(resourceKey('git', 'getWorkingTreeSnapshot', [repoPath]))?.dataUpdatedAt || Date.now(),
+        );
         if (statsRef.current?.snapshotId !== nextSnapshot.snapshotId) {
           statsRef.current = null;
           setStats(null);
@@ -85,13 +104,24 @@ export const useWorkingTreeSnapshot = (repoPath: string | null, refreshTrigger?:
       }
 
       const quickStatus = quickStatusRequest ? await quickStatusRequest : null;
-      const fallback = quickStatus?.success ? quickStatus : await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain');
-      if (generation !== generationRef.current || !fallback.success) return;
+      const fallback = quickStatus?.success
+        ? quickStatus
+        : await gitClient.runGitCommandForRepo(repoPath, 'statusPorcelain').catch((error: unknown) => ({ success: false as const, error: String(error) }));
+      if (generation !== generationRef.current) return;
+      if (!fallback.success) {
+        markRepositoryActivityError(repoPath, fallback.error || 'Failed to read repository status.');
+        return;
+      }
       snapshotRef.current = null;
       statsRef.current = null;
       setSnapshot(null);
       setDataRepoPath(repoPath);
       setStatus(parseGitStatusDetailed(fallback.data || ''));
+      publishRepositoryActivity(
+        repoPath,
+        countStatusFiles(fallback.data || ''),
+        queryClient.getQueryState(resourceKey('git', 'runGitCommandForRepo', [repoPath, 'statusPorcelain']))?.dataUpdatedAt || Date.now(),
+      );
       setStats(null);
     };
 

@@ -19,7 +19,7 @@ import { SubmoduleService } from './git/SubmoduleService';
 export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
 export type { RepositoryFileDataUrl, RepositoryFileSource };
-const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'];
+const statusPorcelainArgs = (): string[] => ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none'];
 const statusPorcelainZArgs = (): string[] => [...statusPorcelainArgs(), '-z'];
 
 export class GitService {

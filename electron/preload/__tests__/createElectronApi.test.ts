@@ -3,6 +3,16 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('reads inactive repository summaries without reporting active-workspace failure or changing selection', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: false, error: '[REPO_UNAVAILABLE] Repository was deleted.' });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const listener = vi.fn();
+    api.git.onRepoUnavailable(listener);
+    const request = { requestId: 'summary-1', priority: 'speculative' as const };
+    await api.git.getRepositoryChangeSummary('C:/inactive', request);
+    expect(invoke).toHaveBeenCalledExactlyOnceWith(IpcChannel.GitRepositoryChangeSummary, 'C:/inactive', request);
+    expect(listener).not.toHaveBeenCalled();
+  });
   it('resolves a repository path without changing the tracked selection', async () => {
     const invoke = vi.fn((channel: IpcChannel) => {
       if (channel === IpcChannel.GitSetRepo) return Promise.resolve('C:/repo-a');

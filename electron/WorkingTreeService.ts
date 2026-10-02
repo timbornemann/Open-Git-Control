@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import type { GitService } from './GitService';
+import { parsePorcelainStatusZ } from '../src/shared/git/porcelainStatus';
 import { resolveExistingRepositoryPath, toLiteralPathspec } from './git/RepositoryPathSafety';
 
 export type WorkingTreeSnapshot = {
@@ -172,20 +173,11 @@ const quoteStatusPath = (filePath: string, force = false): string => {
 };
 
 const parseNulStatus = (statusOutput: string): StatusSample => {
-  const rawRecords = statusOutput.split('\0');
   const displayLines: string[] = [];
   const paths: string[] = [];
   let staged = false;
 
-  for (let index = 0; index < rawRecords.length; index += 1) {
-    const record = rawRecords[index];
-    if (!record || record.length < 3) continue;
-    const code = record.slice(0, 2);
-    const targetPath = record.slice(3);
-    if (!targetPath) continue;
-    const isRenameOrCopy = code.includes('R') || code.includes('C');
-    const sourcePath = isRenameOrCopy ? rawRecords[index + 1] : undefined;
-    if (isRenameOrCopy && index + 1 < rawRecords.length) index += 1;
+  for (const { code, path: targetPath, originalPath: sourcePath } of parsePorcelainStatusZ(statusOutput)) {
     paths.push(targetPath);
     if (code[0] !== ' ' && code[0] !== '?' && code[0] !== '!') staged = true;
     const displayPath = sourcePath ? `${quoteStatusPath(sourcePath, true)} -> ${quoteStatusPath(targetPath, true)}` : quoteStatusPath(targetPath);
@@ -197,7 +189,7 @@ const parseNulStatus = (statusOutput: string): StatusSample => {
     identity: statusOutput,
     paths,
     hasStagedChanges: staged,
-    changeCount: displayLines.length,
+    changeCount: new Set(paths).size,
   };
 };
 

@@ -14,6 +14,7 @@ import { handleGitCommand } from './gitCommandRouter';
 import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { registerGitOperationStateHandler } from './git/registerGitOperationStateHandler';
+import { registerRepositoryActivityHandler } from './git/registerRepositoryActivityHandler';
 import { registerSecretScanPushGuard } from './git/secretScanPushGuard';
 import { registerSecretScanCommitGuard } from './git/secretScanCommitGuard';
 import { emitJobEvent, sendToWebContents } from './jobEvents';
@@ -76,6 +77,7 @@ export function registerGitHandlers({
   registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
   registerGitFileHandlers({ gitService, readStoredRepoPaths });
   registerGitOperationStateHandler({ gitService });
+  registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
 
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {
     const requestedRepoPath = String(repoPath || '').trim();
@@ -400,8 +402,8 @@ export function registerGitHandlers({
       try {
         authorizedRepoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitRepoOriginUrl);
       } catch {
-        // Origin lookup is the sole read-only operation needed for inactive
-        // repositories in the sidebar. Authorize only exact, main-owned paths
+        // Origin lookup also supports inactive repositories in the sidebar.
+        // Authorize only exact, main-owned paths
         // from the persisted workspace list; never accept an arbitrary renderer
         // path and never extend this exception to mutations.
         const requestedKey = repositoryPathKey(requestedRepoPath);

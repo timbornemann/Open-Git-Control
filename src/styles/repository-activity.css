@@ -1,0 +1,88 @@
+.activity-bar > .icon-btn,
+.repository-activity-button {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+}
+
+.repository-activity-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding-block: 8px;
+}
+
+.repository-activity-slot::before,
+.repository-activity-slot::after {
+  content: '';
+  flex: 1 0 0;
+}
+
+.repository-activity-slot::after {
+  flex-grow: 4;
+}
+
+.repository-activity-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 38px;
+  min-height: 0;
+  max-height: 100%;
+  padding-block: 10px;
+  border-block: 1px solid var(--border-color);
+}
+
+.repository-activity-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  max-height: 222px;
+  flex: 0 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.repository-activity-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.repository-activity-button {
+  position: relative;
+  font-family: var(--font-mono);
+}
+
+.repository-activity-initial {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.repository-activity-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 2px;
+  min-width: 12px;
+  font-size: 9px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--bg-darker);
+}
+
+.repository-activity-button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.repository-activity-button[aria-disabled='true'] {
+  cursor: progress;
+}

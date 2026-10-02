@@ -29,7 +29,7 @@ export const MAX_SNAPSHOT_BYTES = 4 * 1024 * 1024;
 // An explicit allowlist: file contents, editor buffers, credentials and logs are
 // never accepted by the persistent preview store.
 const persistentOperations: Partial<Record<ResourceDomain, readonly string[]>> = {
-  git: ['getCommitLogPage', 'getWorkingTreeSnapshot', 'listWorkingDirectory', 'getRepoOriginUrl', 'command'],
+  git: ['getCommitLogPage', 'getWorkingTreeSnapshot', 'getRepositoryChangeSummary', 'listWorkingDirectory', 'getRepoOriginUrl', 'command'],
   github: ['catalog', 'getRepository', 'getBranches', 'getPullRequests', 'getWorkflowRunsPage', 'getReleaseContext'],
   planner: ['getData'],
   runs: ['getConfig'],

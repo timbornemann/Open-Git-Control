@@ -5,6 +5,7 @@ import type { IpcResult } from '@/types/ipc';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
+import { workingTreeReads } from './workingTreeReads';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -372,13 +373,7 @@ export const gitClient = cachedClient('git', {
     return requireElectronGitApi().onCommitStats(...args);
   },
 
-  async getWorkingTreeSnapshot(...args: Parameters<ElectronAPI['getWorkingTreeSnapshot']>): ReturnType<ElectronAPI['getWorkingTreeSnapshot']> {
-    return requireElectronGitApi().getWorkingTreeSnapshot(...args);
-  },
-
-  async getWorkingTreeStats(...args: Parameters<ElectronAPI['getWorkingTreeStats']>): ReturnType<ElectronAPI['getWorkingTreeStats']> {
-    return requireElectronGitApi().getWorkingTreeStats(...args);
-  },
+  ...workingTreeReads,
 
   async getSequencerState(...args: Parameters<ElectronAPI['getSequencerState']>): ReturnType<ElectronAPI['getSequencerState']> {
     return requireElectronGitApi().getSequencerState(...args);

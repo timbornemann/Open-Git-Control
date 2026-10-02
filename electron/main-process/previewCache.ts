@@ -4,6 +4,7 @@ import * as path from 'path';
 import { createHash } from 'crypto';
 import { DISK_CACHE_BYTES, MAX_SNAPSHOT_BYTES, MEMORY_CACHE_BYTES, isPreviewSnapshot, type PreviewSnapshot } from '../../src/shared/cache/resource';
 import { isSecureStorageAvailable } from './secureStore';
+import { repositoryPathKey } from './activeRepositoryAuthorization';
 
 const cacheDirectory = () => path.join(app.getPath('userData'), 'preview-cache-v1');
 let writeQueue = Promise.resolve();
@@ -50,6 +51,22 @@ const validRunConfig = (data: unknown) =>
   Array.isArray(data.templates) &&
   (data.config === null || (object(data.config) && data.config.version === 1 && object(data.config.actions)));
 
+const validRepositorySummary = (data: unknown, key: PreviewSnapshot['key']) =>
+  key[1] === 'git' &&
+  key.length === 4 &&
+  object(data) &&
+  Object.keys(data).length === 3 &&
+  typeof data.repoPath === 'string' &&
+  data.repoPath.length > 0 &&
+  data.repoPath.length <= 4096 &&
+  repositoryPathKey(data.repoPath) === repositoryPathKey(key[2]) &&
+  Number.isSafeInteger(data.changeCount) &&
+  Number(data.changeCount) >= 0 &&
+  typeof data.checkedAt === 'number' &&
+  Number.isFinite(data.checkedAt) &&
+  data.checkedAt > 0 &&
+  data.checkedAt <= Date.now() + 60_000;
+
 /** Validate the allowed DTO shape as well as the envelope, so damaged files
  * cannot install malformed arrays/objects in a view. */
 export function validatePreview(value: unknown): value is PreviewSnapshot {
@@ -65,6 +82,8 @@ export function validatePreview(value: unknown): value is PreviewSnapshot {
       return object(data) && typeof data.raw === 'string' && typeof data.hasMore === 'boolean';
     case 'getWorkingTreeSnapshot':
       return object(data) && typeof data.repoPath === 'string' && typeof data.snapshotId === 'string' && typeof data.statusRaw === 'string';
+    case 'getRepositoryChangeSummary':
+      return validRepositorySummary(data, value.key);
     case 'getRepoOriginUrl':
       return typeof data === 'string' || data === null;
     case 'command':

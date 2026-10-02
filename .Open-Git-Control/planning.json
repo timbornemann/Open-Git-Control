@@ -182,10 +182,10 @@
       "title": "Graph lädt nicht",
       "description": "Ab und zu kommt es dazu, das wenn man vom todos zum graphen wechselt kommt es manchmal dazu, das der graph in eienr endlos lade schleife hängen bleibt, es muss nicht nru unbedings om welches kommen, sondern passiert auch mancham alders, utersuche und behebe diesen bug, das der graph den verlauf nicht lädt die aktuellenb änderunegn werden dann trozdem im staging seitenfenster angezeigt, die daten währen also theoretisch da",
       "priority": "high",
-      "status": "bug",
+      "status": "done",
       "tags": [],
       "createdAt": 1789246060213,
-      "updatedAt": 1789246060213
+      "updatedAt": 1790937408648
     },
     {
       "id": "438886dc-bc20-4ec9-abc0-337ffed4d9f5",

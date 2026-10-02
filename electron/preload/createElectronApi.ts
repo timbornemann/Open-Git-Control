@@ -125,6 +125,9 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitWorkingTreeStats, snapshotId, repoPath)
         : invokeGitOperation('status', IpcChannel.GitWorkingTreeStats, snapshotId),
+    // Background inspection must not trigger active-workspace recovery dialogs.
+    getRepositoryChangeSummary: (repoPath: string, readRequest?: ReadRequest) =>
+      ipcRenderer.invoke(IpcChannel.GitRepositoryChangeSummary, repoPath, readRequest),
     getSequencerState: (repoPath?: string) =>
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'status', IpcChannel.GitSequencerState, repoPath)
@@ -396,6 +399,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       requestCommitStats: flatApi.requestCommitStats,
       onCommitStats: flatApi.onCommitStats,
       getWorkingTreeSnapshot: flatApi.getWorkingTreeSnapshot,
+      getRepositoryChangeSummary: flatApi.getRepositoryChangeSummary,
       getWorkingTreeStats: flatApi.getWorkingTreeStats,
       getSequencerState: flatApi.getSequencerState,
       stagePaths: flatApi.stagePaths,

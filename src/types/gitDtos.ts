@@ -70,6 +70,12 @@ export interface WorkingTreeSnapshotDto {
   isBare: boolean;
 }
 
+export interface RepositoryChangeSummaryDto {
+  repoPath: string;
+  changeCount: number;
+  checkedAt: number;
+}
+
 export interface WorkingTreeStatsDto {
   snapshotId: string;
   staged: CommitStatsDto;

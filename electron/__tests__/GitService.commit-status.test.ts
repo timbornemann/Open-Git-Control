@@ -171,7 +171,11 @@ describe('GitService status and stash helpers', () => {
     try {
       await expect(service.getStatusPorcelain()).resolves.toBe(' M \u00e4.txt');
 
-      expect(runner).toHaveBeenCalledWith('git', ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'], expect.any(Object));
+      expect(runner).toHaveBeenCalledWith(
+        'git',
+        ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none'],
+        expect.any(Object),
+      );
     } finally {
       fs.rmSync(repoDir, { recursive: true, force: true });
     }

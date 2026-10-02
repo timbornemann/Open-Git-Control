@@ -12,6 +12,7 @@ import type {
   MarkdownPreviewFileDto,
   RepoFileDataUrlDto,
   RepositoryFileSourceDto,
+  RepositoryChangeSummaryDto,
   SecretScanResultDto,
   WorkingTreeSnapshotDto,
   WorkingTreeStatsDto,
@@ -220,6 +221,7 @@ export interface ElectronGitAPI {
   requestCommitStats: (hashes: string[], priority?: CommitStatsPriorityDto, repoPath?: string) => Promise<IpcResult<CommitStatsRequestResultDto>>;
   onCommitStats: (callback: (update: CommitStatsUpdateDto) => void) => () => void;
   getWorkingTreeSnapshot: (repoPath?: string) => Promise<IpcResult<WorkingTreeSnapshotDto>>;
+  getRepositoryChangeSummary: (repoPath: string, readRequest?: ReadRequest) => Promise<IpcResult<RepositoryChangeSummaryDto>>;
   getWorkingTreeStats: (snapshotId: string, repoPath?: string) => Promise<IpcResult<WorkingTreeStatsDto>>;
   getSequencerState: (repoPath?: string) => Promise<IpcResult<GitSequencerStateDto>>;
   stagePaths: (paths: string[], repoPath?: string) => Promise<IpcResult<string>>;

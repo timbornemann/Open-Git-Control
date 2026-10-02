@@ -35,6 +35,29 @@ afterEach(async () => {
 });
 
 describe('persistent preview cache', () => {
+  it('persists bounded repository summaries and rejects malformed or mismatched counts', async () => {
+    const entry: PreviewSnapshot = {
+      ...preview(),
+      key: ['resource', 'git', '/repo', 'getRepositoryChangeSummary'],
+      data: { success: true, data: { repoPath: '/repo', changeCount: 12, checkedAt: Date.now() } },
+    };
+    expect(validatePreview(entry)).toBe(true);
+    await savePreviewCache([entry], () => true);
+    expect(await readPreviewCache(() => true)).toEqual([entry]);
+    for (const changes of [
+      { changeCount: -1 },
+      { changeCount: 1.5 },
+      { changeCount: Infinity },
+      { repoPath: '/other' },
+      { checkedAt: NaN },
+      { checkedAt: Date.now() + 120_000 },
+      { logs: 'not allowed' },
+    ]) {
+      expect(validatePreview({ ...entry, data: { success: true, data: { repoPath: '/repo', changeCount: 12, checkedAt: Date.now(), ...changes } } })).toBe(
+        false,
+      );
+    }
+  });
   it('restores a successful empty result across store reads', async () => {
     const entry = preview();
     await savePreviewCache([entry], () => true);

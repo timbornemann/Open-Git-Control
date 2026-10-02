@@ -84,15 +84,18 @@ export async function readResource<T>(
     priority?: ReadPriority;
     force?: boolean;
     scheduled?: boolean;
+    automaticRefresh?: boolean;
   } = {},
 ): Promise<T> {
   const state = queryClient.getQueryState<T>(key);
   touched.set(hashKey(key), Date.now());
   const staleTime = options.staleTime ?? 30_000;
-  readers.set(hashKey(key), {
-    staleTime,
-    refresh: () => readResource(key, read, { ...options, force: options.force || queryClient.getQueryState(key)?.status === 'error', priority: 'visible' }),
-  });
+  if (options.automaticRefresh === false) readers.delete(hashKey(key));
+  else
+    readers.set(hashKey(key), {
+      staleTime,
+      refresh: () => readResource(key, read, { ...options, force: options.force || queryClient.getQueryState(key)?.status === 'error', priority: 'visible' }),
+    });
   if (!options.priority || options.priority === 'visible') backgroundQueue.promote(hashKey(key));
   if (!options.force && state?.data !== undefined && !state.isInvalidated && Date.now() - state.dataUpdatedAt < staleTime) cacheDiagnostics.hits++;
   else cacheDiagnostics.misses++;
