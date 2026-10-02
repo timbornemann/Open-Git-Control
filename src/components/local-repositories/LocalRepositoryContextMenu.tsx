@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, Copy, FolderGit2, FolderOpen, Pin, PinOff, X } from 'lucide-react';
+import { ArrowUpRight, Copy, FolderGit2, FolderOpen, Pin, PinOff, Settings2, X } from 'lucide-react';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
@@ -16,13 +16,14 @@ type Props = {
   pinned: boolean;
   onClose: () => void;
   onOpenRepoTab: (path: string) => void;
+  onOpenRunConfig: (path: string) => void;
   onTogglePin: (path: string) => void;
   onRemove: (path: string) => void;
 };
 
 const MENU_MARGIN = 8;
 
-export const LocalRepositoryContextMenu: React.FC<Props> = ({ menu, origin, pinned, onClose, onOpenRepoTab, onTogglePin, onRemove }) => {
+export const LocalRepositoryContextMenu: React.FC<Props> = ({ menu, origin, pinned, onClose, onOpenRepoTab, onOpenRunConfig, onTogglePin, onRemove }) => {
   const { tr } = useI18n();
   const showToast = useAppToast();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,9 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({ menu, origin, pinn
         </div>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRepoTab(menu.path))}>
           <FolderGit2 size={14} /> {tr('Repo-Tab öffnen', 'Open repository tab')}
+        </button>
+        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRunConfig(menu.path))}>
+          <Settings2 size={14} /> {tr('Run-Konfiguration', 'Run configuration')}
         </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void openFolder())}>
           <FolderOpen size={14} /> {tr('Im Dateimanager öffnen', 'Open in file manager')}

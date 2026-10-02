@@ -1,7 +1,7 @@
 import React from 'react';
 import { FolderGit2, GitBranch, Github, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
-import { useGitHubStore, useGitStore, useSettingsStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
+import { useGitHubStore, useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 
 type MainTopbarProps = {
@@ -23,7 +23,8 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
 }) => {
   const activeTab = useUIStore((state) => state.activeTab);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
-  const onSelectSettingsTab = useSettingsStore((state) => state.onSelectSettingsTab);
+  const onOpenRunConfig = useUIStore((state) => state.onOpenRunConfig);
+  const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const branches = useGitStore((state) => state.branches);
   const currentBranch = useGitStore((state) => state.currentBranch);
@@ -124,26 +125,40 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
             onPushTags={onPushTags}
             onPushSetUpstream={onPushSetUpstream}
             onMergeBranch={onMergeBranch}
-            onStageCommit={onStageCommit}
-            onOpenReleaseCreator={onOpenReleaseCreator}
-            onOpenTimeline={onOpenTimeline}
+            onStageCommit={() => {
+              onCloseRunConfig();
+              onStageCommit();
+            }}
+            onOpenReleaseCreator={() => {
+              onCloseRunConfig();
+              onOpenReleaseCreator();
+            }}
+            onOpenTimeline={() => {
+              onCloseRunConfig();
+              onOpenTimeline();
+            }}
             isTimelineLoading={isTimelineLoading}
             repositoryRun={repositoryRunForActiveRepo}
             activeRunConfig={activeRunConfig}
             hasUnreadRepositoryRunResult={hasUnreadRepositoryRunResult}
             onStartRepositoryRun={async (action) => {
               const started = await onStartRepositoryRun(action);
-              if (started) setActiveTab('repo');
+              if (started) {
+                onCloseRunConfig();
+                setActiveTab('repo');
+              }
               return started;
             }}
             onStopRepositoryRun={onStopRepositoryRun}
             onOpenRunConsole={() => {
+              onCloseRunConfig();
               setActiveTab('repo');
               onOpenRunConsole();
             }}
             onOpenRunSettings={() => {
-              onSelectSettingsTab('run');
-              setActiveTab('settings');
+              if (!activeRepo) return;
+              setActiveTab('repo');
+              onOpenRunConfig();
             }}
           />
         )}

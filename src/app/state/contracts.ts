@@ -12,7 +12,7 @@ import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState, RepoOwnerRef } from
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 
 export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
-export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'run' | 'system';
+export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
 export type SettingsUpdateResult = { success: true; settings: AppSettingsDto } | { success: false; error: string };
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
 

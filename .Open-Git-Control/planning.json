@@ -197,6 +197,17 @@
       "tags": [],
       "createdAt": 1789910060278,
       "updatedAt": 1789910060278
+    },
+    {
+      "id": "1d5a7dd6-7062-4447-8093-c29c36e83066",
+      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
+      "title": "Run configuration",
+      "description": "in der Run configuration, wenn man save klickt verschindet die komplette ui und man kann nichts machen außer die anwendung neu starten, zudem soll die run  konfiguration nicht mher in den allgemienen einstellungen liegen sonden",
+      "priority": "urgent",
+      "status": "bug",
+      "tags": [],
+      "createdAt": 1790781074903,
+      "updatedAt": 1790931709369
     }
   ]
 }

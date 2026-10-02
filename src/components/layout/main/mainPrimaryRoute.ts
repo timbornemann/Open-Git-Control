@@ -6,6 +6,7 @@ export type MainPrimaryRoute =
   | 'localRepos'
   | 'planner'
   | 'settings'
+  | 'runConfig'
   | 'release'
   | 'timeline'
   | 'runConsole'
@@ -28,6 +29,7 @@ type RouteParams = {
   showReleaseCreator: boolean;
   showTimeline: boolean;
   showRunConsole: boolean;
+  showRunConfig?: boolean;
 };
 
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -43,10 +45,12 @@ export const getMainPrimaryRoute = ({
   showReleaseCreator,
   showTimeline,
   showRunConsole,
+  showRunConfig,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
+  if (activeTab === 'repo' && showRunConfig) return 'runConfig';
   if (activeTab === 'repo' && showReleaseCreator) return 'release';
   if (activeTab === 'repo' && showTimeline) return 'timeline';
   if (activeTab === 'repo' && showRunConsole) return 'runConsole';
@@ -59,10 +63,12 @@ export const getMainPrimaryRoute = ({
   return 'graph';
 };
 
-export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate): string => {
+export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (de: string, en: string) => string): string => {
   switch (route) {
     case 'settings':
       return t('generated.components.layout.main.mainprimarypane.settings_c6256784');
+    case 'runConfig':
+      return tr('Run-Konfiguration', 'Run configuration');
     case 'release':
       return t('generated.components.layout.main.mainprimarypane.release_creator_e28377be');
     case 'timeline':

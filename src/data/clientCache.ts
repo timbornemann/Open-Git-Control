@@ -198,7 +198,10 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
           updateResource(resourceKey('app', method), property === 'setStoredRepos' ? args[0] : value);
         } else if (domain === 'github') invalidateResources(domain, scope, undefined, (key) => githubMutationAffects(property, args, key));
         else if (domain === 'runs') {
-          if (property === 'saveConfig') updateResource(resourceKey('runs', 'getConfig', [args[0]]), value);
+          // saveConfig returns only the config. getConfig holds the full state,
+          // including availableActions used by the topbar. Never put the
+          // mutation response into that read cache.
+          if (property === 'saveConfig') invalidateResources('runs', normalizeRepoPathKey(String(args[0])), ['getConfig']);
           else if (property === 'start') updateResource(resourceKey('runs', 'getState'), value);
           else invalidateResources('runs', 'application', ['getState']);
         }

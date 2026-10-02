@@ -14,6 +14,8 @@ import { APPLICATION_OPEN_STAGING_COMMIT_EVENT } from '@/utils/layoutPreferences
 const MainViewComponent: React.FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const isRunConfigOpen = useUIStore((state) => state.isRunConfigOpen);
+  const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const refreshTrigger = useGitStore((state) => state.refreshTrigger);
   const setSelectedCommit = useGitStore((state) => state.setSelectedCommit);
@@ -88,9 +90,10 @@ const MainViewComponent: React.FC = () => {
   }, [showReleaseCreator, setShowTimeline]);
 
   const handleRepositoryStagingOpen = React.useCallback(() => {
+    onCloseRunConfig();
     setShowTimeline(false);
     handleStageCommitOpen();
-  }, [handleStageCommitOpen, setShowTimeline]);
+  }, [handleStageCommitOpen, onCloseRunConfig, setShowTimeline]);
 
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
@@ -107,7 +110,8 @@ const MainViewComponent: React.FC = () => {
   const isGithubView = activeTab === 'github';
   const isLocalReposView = activeTab === 'localRepos';
   const isReleaseView = activeTab === 'repo' && showReleaseCreator;
-  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isGithubView && !isLocalReposView && !isReleaseView;
+  const canShowInspectorPane =
+    !isSettingsView && !isPlannerView && !isGithubView && !isLocalReposView && !isReleaseView && !(activeTab === 'repo' && isRunConfigOpen);
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

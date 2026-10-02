@@ -86,7 +86,7 @@ export const RepositoryRunMenuItems: React.FC<MenuItemsProps> = ({
       )}
       {hasCompletedRun && <div className="topbar-dropdown-sep" />}
       {REPOSITORY_RUN_ACTION_IDS.map((action) => {
-        const configured = Boolean(activeRunConfig?.availableActions[action]);
+        const configured = Boolean(activeRunConfig?.availableActions?.[action]);
         return (
           <button key={action} className="topbar-dropdown-item" disabled={!configured} onClick={() => runAction(action)}>
             <span className="topbar-dropdown-item-label">{actionLabels[action]}</span>
@@ -136,7 +136,7 @@ export const RepositoryRunMenu: React.FC<Props> = ({
       <button
         className={`icon-btn topbar-action-btn topbar-action-btn-sync topbar-split-main${resultStatus ? ` topbar-run-result--${resultStatus}` : ''}`}
         onClick={() => (isRunning || hasUnreadResult ? onOpenConsole() : runAction('run'))}
-        disabled={!activeRepo || (!isRunning && !hasUnreadResult && !activeRunConfig?.availableActions.run)}
+        disabled={!activeRepo || (!isRunning && !hasUnreadResult && !activeRunConfig?.availableActions?.run)}
         title={
           isRunning
             ? tr('Laufende Konsole öffnen', 'Open running console')

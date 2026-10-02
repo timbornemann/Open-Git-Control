@@ -22,6 +22,9 @@ export type { CommitNavigationRequest } from '@/app/state/contracts';
 export type BaseUIContextValue = SidebarCoreState & {
   onClearGithubAuthHelpMethod: () => void;
   onResetLayout: () => void;
+  isRunConfigOpen: boolean;
+  onOpenRunConfig: () => void;
+  onCloseRunConfig: () => void;
 };
 
 export type SettingsContextValue = SettingsStateContract;

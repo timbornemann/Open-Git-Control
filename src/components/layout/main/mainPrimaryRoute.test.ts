@@ -18,4 +18,10 @@ describe('local repository primary route', () => {
     expect(getMainPrimaryRoute({ ...base, activeConflictPath: 'conflicted.txt', showTimeline: true })).toBe('localRepos');
     expect(hasMainPrimaryHeader('localRepos')).toBe(false);
   });
+
+  it('shows run configuration as a repository subpage with its own header', () => {
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'repo', showRunConfig: true, showRunConsole: true })).toBe('runConfig');
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRunConfig: true })).toBe('settings');
+    expect(hasMainPrimaryHeader('runConfig')).toBe(true);
+  });
 });

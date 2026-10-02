@@ -99,7 +99,10 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   onToast: (message, isError) => state.setGitActionToast({ msg: message, isError }),
   showSecondaryHistory: state.settings.showSecondaryHistory,
   onMergeBranch: state.handleMergeBranch,
-  onOpenRepoWorkspace: () => state.setActiveTab('repo'),
+  onOpenRepoWorkspace: () => {
+    state.onCloseRunConfig();
+    state.setActiveTab('repo');
+  },
 });
 
 const createGithubSlice = (
@@ -301,7 +304,13 @@ const createUiSlice = ({
   uiState,
 }: Pick<CreateAppStateSlicesValueParams, 'state' | 'setSelectedGithubAuthHelpMethod' | 'resetLayout' | 'uiState'>): UIContextValue => ({
   activeTab: state.activeTab,
-  setActiveTab: state.setActiveTab,
+  setActiveTab: (tab) => {
+    if (tab !== 'repo') state.onCloseRunConfig();
+    state.setActiveTab(tab);
+  },
+  isRunConfigOpen: state.isRunConfigOpen,
+  onOpenRunConfig: state.onOpenRunConfig,
+  onCloseRunConfig: state.onCloseRunConfig,
   onClearGithubAuthHelpMethod: () => setSelectedGithubAuthHelpMethod(null),
   onResetLayout: resetLayout,
   isRepoPanelCollapsed: state.isRepoPanelCollapsed,

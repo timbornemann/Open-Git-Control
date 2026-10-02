@@ -22,6 +22,7 @@ import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
+  const [isRunConfigOpen, setRunConfigOpen] = useState(false);
 
   const {
     showCreatePR,
@@ -115,6 +116,11 @@ export const useAppState = () => {
     setReleaseNotesGenerating,
   });
 
+  const resetRepositoryView = useCallback(() => {
+    resetRepoScopedUi();
+    setRunConfigOpen(false);
+  }, [resetRepoScopedUi]);
+
   const { jobs, clearJobs } = useGitJobEvents();
 
   const workspace = useWorkspaceDomain({
@@ -122,8 +128,8 @@ export const useAppState = () => {
     setConfirmDialog,
     setInputDialog,
     setGitActionToast,
-    onRepoActivated: resetRepoScopedUi,
-    onNoActiveRepo: resetRepoScopedUi,
+    onRepoActivated: resetRepositoryView,
+    onNoActiveRepo: resetRepositoryView,
     language: settings.language,
   });
   const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh });
@@ -338,6 +344,9 @@ export const useAppState = () => {
   return {
     activeTab: workspace.activeTab,
     setActiveTab: workspace.setActiveTab,
+    isRunConfigOpen,
+    onOpenRunConfig: () => setRunConfigOpen(true),
+    onCloseRunConfig: () => setRunConfigOpen(false),
     openRepos: workspace.openRepos,
     isRestoringRepos: workspace.isRestoringRepos,
     repoMeta: workspace.repoMeta,

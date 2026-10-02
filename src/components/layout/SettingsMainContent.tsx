@@ -12,7 +12,6 @@ import {
   SettingsJobsSection,
   SettingsReleaseNotesCard,
   SettingsSecuritySection,
-  SettingsRunSection,
   SettingsUpdatesSection,
 } from './settings/SettingsSections';
 import { useSettingsPanelModel } from './settings/useSettingsPanelModel';
@@ -47,12 +46,6 @@ export const SettingsMainContent: React.FC<SettingsMainContentProps> = ({ settin
         )}
 
         {activeTab === 'security' && <SettingsSecuritySection settings={settings} onUpdateSettings={onUpdateSettings} variant="main" />}
-
-        {activeTab === 'run' && (
-          <div className="settings-grid">
-            <SettingsRunSection />
-          </div>
-        )}
 
         {activeTab === 'system' && (
           <div className="settings-grid">

@@ -1,3 +1,33 @@
+.pane-content:has(.repository-run-config-view) {
+  min-height: 0;
+  overflow: hidden;
+}
+.repository-run-config-view {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  padding: 18px 24px 32px;
+  background: var(--bg-darker);
+}
+.repository-run-config-view--empty {
+  color: var(--text-secondary);
+}
+.repository-run-config-view__eyebrow {
+  color: var(--text-accent);
+  font: 700 0.65rem var(--font-mono);
+  letter-spacing: 0.1em;
+}
+.repository-run-config-view .settings-card-header-row h3 {
+  margin: 5px 0 3px;
+  font-size: 1.15rem;
+}
+.repository-run-config-view__repo-path {
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-subtle);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
 .settings-card.repository-run-settings {
   display: flex;
   flex-direction: column;
@@ -6,6 +36,9 @@
   width: 100%;
   padding: 4px 0 8px;
   border-top: 0;
+}
+.settings-card.repository-run-settings.repository-run-config-view {
+  padding: 18px 24px 32px;
 }
 .settings-card.repository-run-settings > * {
   grid-column: auto;
@@ -117,6 +150,18 @@
     grid-template-columns: 1fr;
   }
   .repository-run-settings__step-title {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 680px) {
+  .settings-card.repository-run-settings.repository-run-config-view {
+    padding: 14px;
+  }
+  .repository-run-settings .settings-card-header-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .repository-run-settings .settings-inline-actions {
     flex-wrap: wrap;
   }
 }

@@ -23,6 +23,8 @@ describe('LocalRepositoriesView', () => {
   let root: Root;
   let repository: RepositoryContextValue;
   let setActiveTab: ReturnType<typeof vi.fn>;
+  let onOpenRunConfig: ReturnType<typeof vi.fn>;
+  let onCloseRunConfig: ReturnType<typeof vi.fn>;
   let toast: ReturnType<typeof vi.fn<(message: string, isError: boolean) => void>>;
 
   const render = async () => {
@@ -40,6 +42,8 @@ describe('LocalRepositoriesView', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     setActiveTab = vi.fn();
+    onOpenRunConfig = vi.fn();
+    onCloseRunConfig = vi.fn();
     toast = vi.fn<(message: string, isError: boolean) => void>();
     repository = {
       openRepos: [first, second],
@@ -58,7 +62,7 @@ describe('LocalRepositoriesView', () => {
       onCloneByUrl: vi.fn(),
     } as unknown as RepositoryContextValue;
     vi.mocked(useRepositoryContext).mockReturnValue(repository);
-    vi.mocked(useUIContext).mockReturnValue({ setActiveTab } as unknown as UIContextValue);
+    vi.mocked(useUIContext).mockReturnValue({ setActiveTab, onOpenRunConfig, onCloseRunConfig } as unknown as UIContextValue);
     vi.mocked(useCachedRepoOrigins).mockReturnValue({ [first]: 'https://github.com/team/alpha.git', [second]: 'git@github.com:team/Beta.git' });
     vi.mocked(useAppToast).mockReturnValue(toast);
   });
@@ -95,6 +99,27 @@ describe('LocalRepositoriesView', () => {
     expect(toast).toHaveBeenCalledWith('Unavailable', true);
     await click(row);
     expect(setActiveTab).toHaveBeenCalledWith('repo');
+    expect(onCloseRunConfig).toHaveBeenCalledOnce();
+  });
+
+  it('opens run configuration only after the selected repository is activated', async () => {
+    vi.mocked(repository.onSwitchRepo).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await render();
+    const row = host.querySelectorAll('.local-repositories-view__row')[1];
+    const openRunConfig = async () => {
+      await act(async () => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 })));
+      await click(
+        Array.from(document.querySelectorAll<HTMLButtonElement>('.repo-list-context-action')).find((item) => item.textContent?.includes('Run-Konfiguration')) ||
+          null,
+      );
+    };
+    await openRunConfig();
+    expect(repository.onSwitchRepo).toHaveBeenCalledWith(second);
+    expect(onOpenRunConfig).not.toHaveBeenCalled();
+    expect(setActiveTab).not.toHaveBeenCalled();
+    await openRunConfig();
+    expect(setActiveTab).toHaveBeenCalledWith('repo');
+    expect(onOpenRunConfig).toHaveBeenCalledOnce();
   });
 
   it('filters by path and pin, keeps sort persistence, and isolates row controls', async () => {

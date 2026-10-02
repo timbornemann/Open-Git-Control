@@ -16,6 +16,7 @@ import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from '
 import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
+import { RepositoryRunConfigView } from '@/components/repository-run/RepositoryRunConfigView';
 
 const CommitGraph = viewModules.repo.View;
 const DiffViewer = viewModules.diff.View;
@@ -69,7 +70,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const repository = useRepositoryContext();
   const github = useGithubContext();
   const workflow = useWorkflowContext();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const [workingDirectoryCloseRequest, setWorkingDirectoryCloseRequest] = React.useState<(() => void) | null>(null);
   const handleWorkingDirectoryCloseRequestChange = React.useCallback((request: (() => void) | null) => {
     setWorkingDirectoryCloseRequest(() => request);
@@ -86,6 +87,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showReleaseCreator: github.showReleaseCreator,
     showTimeline,
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
+    showRunConfig: ui.isRunConfigOpen,
   });
   const showGithubGuide = route === 'githubGuide';
   const isSettingsView = route === 'settings';
@@ -95,7 +97,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isReleaseView = route === 'release';
   const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
-  const primaryPaneTitle = getMainPrimaryTitle(route, t);
+  const isRunConfigView = route === 'runConfig';
+  const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
   const lazyPaneFallback = (
     <div
@@ -117,7 +120,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     <div
       className="pane"
       style={
-        isSettingsView || isPlannerView || isGithubView || isLocalReposView || isReleaseView || !showInspectorPane
+        isSettingsView || isPlannerView || isGithubView || isLocalReposView || isReleaseView || isRunConfigView || !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
@@ -125,7 +128,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isReleaseView ? (
+          {isSettingsView ? null : isRunConfigView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRunConfig}>
+              {tr('Zurück zum Repository', 'Back to repository')}
+            </button>
+          ) : isReleaseView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={github.onCloseReleaseCreator}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
@@ -158,7 +165,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isLocalReposView ? (
+        {isRunConfigView ? (
+          <RepositoryRunConfigView key={repository.activeRepo ?? ''} />
+        ) : isLocalReposView ? (
           <LocalRepositoriesView />
         ) : isPlannerView ? (
           <React.Suspense fallback={lazyPaneFallback}>

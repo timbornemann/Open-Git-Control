@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Copy, Plus, Save, Trash2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import { useRepositoryContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useRepositoryContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import {
   REPOSITORY_RUN_ACTION_IDS,
   createEmptyRepositoryRunConfig,
@@ -81,12 +81,10 @@ const createStep = (label: string): RepositoryRunStepDto => ({
   linux: { shell: 'bash', command: '' },
 });
 
-export const SettingsRunSection: React.FC = () => {
-  const { openRepos, activeRepo, onToast } = useRepositoryContext();
+export const RepositoryRunConfigView: React.FC = () => {
+  const { activeRepo: selectedRepo, onToast } = useRepositoryContext();
   const workflow = useWorkflowContext();
-  const { setConfirmDialog } = useUIContext();
   const { language, tr } = useI18n();
-  const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [config, setConfig] = useState<RepositoryRunConfigDto | null>(null);
   const [persistedConfig, setPersistedConfig] = useState<RepositoryRunConfigDto | null>(null);
   const [configRepositoryPath, setConfigRepositoryPath] = useState<string | null>(null);
@@ -96,24 +94,11 @@ export const SettingsRunSection: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copyingAgentPrompt, setCopyingAgentPrompt] = useState(false);
-  const repositories = useMemo(() => Array.from(new Set(openRepos)), [openRepos]);
   const configIsDirty = useMemo(() => config !== null && JSON.stringify(config) !== JSON.stringify(persistedConfig), [config, persistedConfig]);
-  const selectedRepositoryIsOpen = repositories.includes(selectedRepo);
   const selectedRepoRef = useRef(selectedRepo);
   const loadRequestIdRef = useRef(0);
   const saveRequestIdRef = useRef(0);
   selectedRepoRef.current = selectedRepo;
-
-  useEffect(() => {
-    if (selectedRepo && repositories.includes(selectedRepo)) return;
-    // A repository can be closed outside this view. Preserve its dirty draft,
-    // but never leave the selector pointing at a repository that is no longer
-    // open.
-    if (selectedRepo && configIsDirty && config && configRepositoryPath === selectedRepo) {
-      writeRunConfigDraft(selectedRepo, { config, persistedConfig });
-    }
-    setSelectedRepo(activeRepo && repositories.includes(activeRepo) ? activeRepo : repositories[0] || '');
-  }, [activeRepo, config, configIsDirty, configRepositoryPath, persistedConfig, repositories, selectedRepo]);
 
   useEffect(() => {
     const repoPath = selectedRepo;
@@ -231,72 +216,33 @@ export const SettingsRunSection: React.FC = () => {
     }
   };
 
-  const selectRepository = (nextRepo: string) => {
-    if (!nextRepo || nextRepo === selectedRepo) return;
-    if (!configIsDirty) {
-      setSelectedRepo(nextRepo);
-      return;
-    }
-
-    setConfirmDialog({
-      variant: 'confirm',
-      title: tr('Ungespeicherte Run-Konfiguration verwerfen?', 'Discard unsaved run configuration?'),
-      message: tr(
-        'Die aktuelle Run-Konfiguration enthaelt ungespeicherte Aenderungen. Beim Repositorywechsel werden diese verworfen.',
-        'The current run configuration contains unsaved changes. Switching repositories will discard them.',
-      ),
-      contextItems: [
-        { label: tr('Aktuelles Repository', 'Current repository'), value: selectedRepo },
-        { label: tr('Neues Repository', 'New repository'), value: nextRepo },
-      ],
-      irreversible: false,
-      consequences: tr('Die ungespeicherten Befehle und Schritte gehen verloren.', 'The unsaved commands and steps will be lost.'),
-      confirmLabel: tr('Aenderungen verwerfen', 'Discard changes'),
-      onConfirm: () => {
-        clearRunConfigDraft(selectedRepo);
-        setSelectedRepo(nextRepo);
-      },
-    });
-  };
-
-  if (!repositories.length)
+  if (!selectedRepo)
     return (
-      <section className="settings-card">
-        <h3>{tr('Run-Konfiguration', 'Run configuration')}</h3>
+      <section className="repository-run-config-view repository-run-config-view--empty">
         <p>{tr('Öffne zuerst ein lokales Repository.', 'Open a local repository first.')}</p>
       </section>
     );
 
   return (
-    <section className="settings-card settings-card-full repository-run-settings">
+    <section className="settings-card settings-card-full repository-run-settings repository-run-config-view">
       <div className="settings-card-header-row">
         <div>
-          <h3>{tr('Run-Konfiguration', 'Run configuration')}</h3>
+          <span className="repository-run-config-view__eyebrow">REPOSITORY / RUN</span>
+          <h3 title={selectedRepo}>{selectedRepo.split(/[\\/]/).pop()}</h3>
           <p className="settings-hint">{tr('Versionierte Befehle in .Open-Git-Control/run.json', 'Versioned commands in .Open-Git-Control/run.json')}</p>
         </div>
         <div className="settings-inline-actions">
           <button className="staging-tool-btn" onClick={() => void copyAgentPrompt()} disabled={!selectedRepo || copyingAgentPrompt}>
             <Copy size={13} /> {copyingAgentPrompt ? tr('Kopiere...', 'Copying...') : tr('KI-Agent-Prompt kopieren', 'Copy AI agent prompt')}
           </button>
-          <button
-            className="staging-tool-btn"
-            onClick={() => void save()}
-            disabled={!config || !selectedRepositoryIsOpen || configRepositoryPath !== selectedRepo || loading || saving}
-          >
+          <button className="staging-tool-btn" onClick={() => void save()} disabled={!config || configRepositoryPath !== selectedRepo || loading || saving}>
             <Save size={13} /> {saving ? tr('Speichern…', 'Saving…') : tr('Speichern', 'Save')}
           </button>
         </div>
       </div>
-      <label className="settings-field">
-        <span>{tr('Repository', 'Repository')}</span>
-        <select value={selectedRepo} onChange={(event) => selectRepository(event.target.value)}>
-          {repositories.map((repoPath) => (
-            <option key={repoPath} value={repoPath}>
-              {repoPath}
-            </option>
-          ))}
-        </select>
-      </label>
+      <p className="repository-run-config-view__repo-path" title={selectedRepo}>
+        {selectedRepo}
+      </p>
       {configIsDirty && <p className="settings-hint repository-run-settings__dirty">{tr('Ungespeicherte Aenderungen', 'Unsaved changes')}</p>}
       {configPath && <p className="settings-hint repository-run-settings__path">{configPath}</p>}
       {loadError && <div className="settings-danger repository-run-settings__error">{loadError}</div>}

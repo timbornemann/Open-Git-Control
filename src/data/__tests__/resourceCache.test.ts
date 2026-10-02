@@ -136,6 +136,32 @@ describe('shared resource cache', () => {
     expect(read).toHaveBeenCalledTimes(2);
   });
 
+  it('does not replace the run configuration state with the save response', async () => {
+    const repoPath = '/run-config-cache-test';
+    setActiveResourceRepository(repoPath);
+    const key = resourceKey('runs', 'getConfig', [repoPath]);
+    const config = { version: 1, actions: { run: { steps: [] }, test: { steps: [] }, format: { steps: [] }, start: { steps: [] }, build: { steps: [] } } };
+    const state = {
+      exists: true,
+      config,
+      configPath: `${repoPath}/.Open-Git-Control/run.json`,
+      availableActions: { run: false, test: false, format: false, start: false, build: false },
+      templates: [],
+    };
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce({ success: true, data: state })
+      .mockResolvedValueOnce({ success: true, data: { ...state, exists: true } });
+    const client = cachedClient('runs', { getConfig, saveConfig: async () => ({ success: true, data: config }) });
+    await client.getConfig(repoPath);
+    await client.saveConfig(repoPath);
+    expect(queryClient.getQueryData(key)).toEqual({ success: true, data: state });
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    await client.getConfig(repoPath);
+    expect(getConfig).toHaveBeenCalledTimes(2);
+    expect((queryClient.getQueryData(key) as { data: typeof state }).data.availableActions).toEqual(state.availableActions);
+  });
+
   it('invalidates staging data without discarding branches, history, or other repositories', async () => {
     setActiveResourceRepository('/repo-a');
     const status = resourceKey('git', 'getWorkingTreeSnapshot', ['/repo-a']);
