@@ -11,6 +11,16 @@ afterEach(async () => {
 });
 
 describe('release target publication with real Git', { timeout: 30_000 }, () => {
+  it('uses the canonical active path when the repository was opened through a directory alias', async () => {
+    const r = await releaseRepository({ usePathAlias: true });
+    expect(r.params.repoPath).toBe(r.gitService.getRepoPath());
+    expect(r.repo).toBe(r.gitService.getRepoPath());
+    const sha = await r.commit('unpublished through an alias');
+    await r.create('push-local');
+    expect(await r.run(['rev-parse', 'main'], r.remote)).toBe(sha);
+    expect(r.createRelease).toHaveBeenCalledWith(expect.objectContaining({ targetCommitish: sha }));
+  });
+
   it('pins a synchronized release to the verified remote SHA', async () => {
     const r = await releaseRepository();
     const state = await r.workflow.inspect(r.event, r.params);
@@ -108,12 +118,13 @@ describe('release target publication with real Git', { timeout: 30_000 }, () => 
     if (failure === 'secret') r.pushGuard.requirePushSecretScanApproval.mockResolvedValue({ success: false, error: 'Secret detected' });
     if (failure === 'hook') {
       const hook = path.join(r.repo, '.git', 'hooks', 'pre-push');
-      fs.writeFileSync(hook, '#!/bin/sh\nexit 1\n');
+      fs.writeFileSync(hook, '#!/bin/sh\necho release-test-hook-rejected >&2\nexit 1\n');
       fs.chmodSync(hook, 0o755);
     }
     const release = failure === 'busy' ? beginCommitProtection(r.repo) : null;
+    const reason = { secret: 'Secret detected', hook: 'release-test-hook-rejected', busy: 'Schreiboperation' }[failure];
     try {
-      await expect(r.create('push-local')).rejects.toThrow();
+      await expect(r.create('push-local')).rejects.toThrow(reason);
     } finally {
       release?.();
     }
@@ -205,7 +216,8 @@ describe('release target publication with real Git', { timeout: 30_000 }, () => 
       r.githubService.getAuthenticationGeneration.mockReturnValue(2);
       return null;
     });
-    await expect(r.create('push-local')).rejects.toThrow();
+    await expect(r.create('push-local')).rejects.toThrow('Release-Zustand');
+    expect(r.pushGuard.requirePushSecretScanApproval).toHaveBeenCalledOnce();
     expect(r.createRelease).not.toHaveBeenCalled();
     expect(await r.run(['rev-parse', 'main'], r.remote)).toBe(r.initial);
   });

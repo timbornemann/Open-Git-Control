@@ -20,8 +20,18 @@ concurrency:
 
 jobs:
   quality:
-    name: Build and Test
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Build and Test
+          - os: windows-latest
+            name: Build and Test (Windows)
+          - os: macos-latest
+            name: Build and Test (macOS)
 
     steps:
       - name: Checkout

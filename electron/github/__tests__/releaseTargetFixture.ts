@@ -12,12 +12,17 @@ import { repoJobRegistry } from '../../main-process/repoJobRegistry';
 
 const execute = promisify(execFile);
 const roots: string[] = [];
-export async function releaseRepository() {
+export async function releaseRepository(options: { usePathAlias?: boolean } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-release-target-'));
   roots.push(root);
-  const repo = path.join(root, 'local');
+  let repo = path.join(root, 'local');
   const remote = path.join(root, 'remote.git');
   fs.mkdirSync(repo);
+  if (options.usePathAlias) {
+    const alias = path.join(root, 'linked-local');
+    fs.symlinkSync(repo, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    repo = alias;
+  }
   const run = async (args: string[], cwd = repo) => (await execute('git', args, { cwd, windowsHide: true })).stdout.trim();
   await run(['init', '--initial-branch=main']);
   await run(['config', 'user.name', 'Release Test']);
@@ -40,6 +45,11 @@ export async function releaseRepository() {
   await run(['remote', 'add', 'origin', url]);
   const gitService = new GitService();
   gitService.setRepoPath(repo);
+  // Match the path returned to the renderer after activation. Git resolves
+  // macOS /var aliases, Windows short temp paths and directory links here.
+  const activeRepo = gitService.getRepoPath();
+  if (!activeRepo) throw new Error('Fixture repository was not activated.');
+  repo = activeRepo;
   repoJobRegistry.cancelForRepoChange(repo);
   // Exercise the actual Git runner/scheduler against a local bare remote while
   // retaining a real GitHub identity at the authorization boundary.
