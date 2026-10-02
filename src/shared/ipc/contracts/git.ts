@@ -21,6 +21,13 @@ import type { GitCommandName } from '../gitCommands';
 import type { GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { LicenseTemplateId } from '../../licenseTemplates';
+import type {
+  CommitMessageEditRequest,
+  CommitMessageEditInspection,
+  RewordCommitMessageRequest,
+  CommitMessageEditResult,
+  CommitMessageEditBackup,
+} from '../commitMessageEdit';
 
 export type RepoUnavailablePayloadDto = {
   repoPath: string;
@@ -212,6 +219,10 @@ export type OpenRepositoryPathResultDto = {
 };
 
 export interface ElectronGitAPI {
+  inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
+  rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult>>;
+  getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;
+  cancelCommitMessageEdit: (operationId: string) => Promise<boolean>;
   setRepoPath: (repoPath: string) => Promise<string>;
   clearRepoPath: () => Promise<boolean>;
   runGitCommand: (command: GitCommandName, ...args: string[]) => Promise<GitCommandResultDto>;

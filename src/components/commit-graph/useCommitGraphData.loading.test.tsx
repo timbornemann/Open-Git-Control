@@ -10,6 +10,9 @@ import { computeGraphLayout } from '@/utils/graphLayout';
 import { parseGitLog } from '@/utils/gitParsing';
 import { getGraphCacheKey, storeGraphCache } from './commitGraphDataCache';
 import { useCommitGraphData } from './useCommitGraphData';
+import { refreshRewrittenHistory } from '@/data/commitMessageEdit';
+import { hydratePreviews, queryClient } from '@/data/queryClient';
+import { resourceKey } from '@/data/clientCache';
 
 const repoPath = 'C:/graph-loading-repo';
 const hash = 'a'.repeat(40);
@@ -237,6 +240,49 @@ describe('commit graph loading lifecycle', () => {
     });
     expect(graph.loading).toBe(false);
     expect(host.textContent).toContain('Saved commit');
+  });
+
+  it('replaces old history after a reword and rejects late reads and restored snapshots', async () => {
+    const oldPage = deferred<typeof page>();
+    const newHash = 'f'.repeat(40);
+    const newRaw = raw.split(hash).join(newHash).replace('Saved commit', 'Corrected commit');
+    vi.spyOn(gitClient, 'getCommitLogPage')
+      .mockReturnValueOnce(oldPage.promise)
+      .mockResolvedValue({ ...page, data: { ...page.data, raw: newRaw, stats: { [newHash]: stats } } });
+    storeGraphCache(getGraphCacheKey(repoPath, false), commits, false, computeGraphLayout(commits));
+    await render();
+    expect(host.textContent).toContain('Saved commit');
+    await act(async () => {
+      await refreshRewrittenHistory(repoPath);
+    });
+    expect(host.textContent).toContain('Corrected commit');
+    expect(graph.layout?.nodes.map((node) => node.commit.hash)).toEqual([newHash]);
+    await act(async () => {
+      oldPage.resolve(page);
+    });
+    expect(graph.layout?.nodes.map((node) => node.commit.hash)).toEqual([newHash]);
+    const key = resourceKey('git', 'getCommitLogPage', [{ repoPath, limit: 100, offset: 0, scope: 'head' }]);
+    hydratePreviews([{ key, data: page, savedAt: 1, complete: true, sourceRevision: hash, version: 1 }], Date.now());
+    expect(queryClient.getQueryData(key)).not.toEqual(page);
+  });
+
+  it('ignores an old worker layout finishing after the rewritten history was loaded', async () => {
+    const oldLayout = deferred<ReturnType<typeof computeGraphLayout>>();
+    const newHash = 'e'.repeat(40);
+    const newPage = { ...page, data: { ...page.data, raw: raw.split(hash).join(newHash).replace('Saved commit', 'Rewritten commit') } };
+    vi.spyOn(graphLayout, 'prepareGraphLayout')
+      .mockReturnValueOnce(oldLayout.promise)
+      .mockResolvedValue(computeGraphLayout(parseGitLog(newPage.data.raw).map((commit) => ({ ...commit, stats, statsState: 'ready' as const }))));
+    vi.spyOn(gitClient, 'getCommitLogPage').mockResolvedValueOnce(page).mockResolvedValue(newPage);
+    await render();
+    await act(async () => {
+      await refreshRewrittenHistory(repoPath);
+    });
+    await act(async () => {
+      oldLayout.resolve(computeGraphLayout(commits));
+    });
+    expect(graph.layout?.nodes.map((node) => node.commit.hash)).toEqual([newHash]);
+    expect(graph.loading).toBe(false);
   });
 
   it('cancels a scheduled retry when the graph view is left', async () => {

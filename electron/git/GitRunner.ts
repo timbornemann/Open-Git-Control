@@ -5,6 +5,8 @@ import { GitProcessExecutor } from './GitProcessExecutor';
 import { assertRepoPathAvailable } from './GitRepositoryPath';
 import { GitRepositoryProbe } from './GitRepositoryProbe';
 import { GitSpawnOperations } from './GitSpawnOperations';
+import type { CommitEditGit } from './CommitEditGit';
+import { runCommitEditProcess } from './CommitEditProcess';
 import {
   defaultExecFileAsyncRunner,
   type DiffPreviewResult,
@@ -177,6 +179,44 @@ export class GitRunner {
         signal: options.signal,
         coalesceKey: kind === 'polling' ? (options.coalesceKey ?? args.join('\0')) : undefined,
       },
+    );
+  }
+
+  /** Keep inspection, isolated rewriting and ref publication in one write lane. */
+  withExclusiveWrite<T>(repoPath: string, command: string, work: (git: CommitEditGit) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    return this.schedule(
+      repoPath,
+      'write',
+      command,
+      async (activeSignal) => {
+        const uninterrupted = new AbortController().signal;
+        const git: CommitEditGit = {
+          run: (cwd, args, options = {}) => {
+            const commandSignal = options.ignoreAbort ? undefined : (options.signal ?? activeSignal);
+            commandSignal?.throwIfAborted();
+            return runCommitEditProcess(cwd, args, commandSignal, options.envOverrides);
+          },
+          buffer: (cwd, args) => {
+            activeSignal.throwIfAborted();
+            return this.spawnOperations.runBuffer(
+              cwd,
+              args,
+              {
+                maxBytes: 20 * 1024 * 1024,
+                tooLargeMessage: 'Commit data is too large.',
+                envOverrides: { GIT_NO_REPLACE_OBJECTS: '1' },
+              },
+              activeSignal,
+            );
+          },
+          input: (cwd, args, input, ignoreAbort = false) => {
+            if (!ignoreAbort) activeSignal.throwIfAborted();
+            return this.spawnOperations.runWithInput(cwd, args, input, ignoreAbort ? uninterrupted : activeSignal);
+          },
+        };
+        return work(git);
+      },
+      { signal },
     );
   }
 

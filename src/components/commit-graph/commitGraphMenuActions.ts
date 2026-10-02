@@ -19,6 +19,7 @@ type BuildCommitMenuActionsParams = {
   setToast: (toast: ToastMessage | null) => void;
   refreshCommits: () => Promise<void> | void;
   refreshWorkingTreeStatus: () => Promise<void> | void;
+  onEditCommitMessage?: (hash: string) => void;
   t: CatalogTranslateFn;
   tr: TranslateFn;
 };
@@ -36,6 +37,7 @@ export const buildCommitMenuActions = ({
   setToast,
   refreshCommits,
   refreshWorkingTreeStatus,
+  onEditCommitMessage,
   t,
   tr,
 }: BuildCommitMenuActionsParams): MenuAction[] => [
@@ -62,4 +64,7 @@ export const buildCommitMenuActions = ({
     refreshWorkingTreeStatus,
     tr,
   }),
+  ...(onEditCommitMessage
+    ? [{ label: tr('Commit-Nachricht bearbeiten …', 'Edit commit message …'), icon: '✎', separator: true, action: () => onEditCommitMessage(node.commit.hash) }]
+    : []),
 ];

@@ -15,6 +15,7 @@ import { registerGitFileHandlers } from './git/registerGitFileHandlers';
 import { registerGitHistoryHandlers } from './git/registerGitHistoryHandlers';
 import { registerGitOperationStateHandler } from './git/registerGitOperationStateHandler';
 import { registerRepositoryActivityHandler } from './git/registerRepositoryActivityHandler';
+import { registerCommitMessageEditHandlers } from './git/registerCommitMessageEditHandlers';
 import { registerSecretScanPushGuard } from './git/secretScanPushGuard';
 import { registerSecretScanCommitGuard } from './git/secretScanCommitGuard';
 import { emitJobEvent, sendToWebContents } from './jobEvents';
@@ -22,6 +23,7 @@ import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { readStoreData } from '../repoStore';
 import { normalizeRepositoryInitializationOptions, scaffoldInitializedRepository } from '../../git/RepositoryScaffolding';
+import { repositoryCommonDirectory } from '../../git/RepositoryCommonDirectory';
 
 type RegisterGitHandlersDeps = {
   gitService: GitService;
@@ -43,8 +45,8 @@ export function registerGitHandlers({
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
 }: RegisterGitHandlersDeps): void {
   const commitProtectionLocks = new Set<string>();
-  const COMMIT_PROTECTION_BUSY_ERROR = 'A secret scan is already protecting a commit. Wait for it to finish before changing repository state.';
-  const commitProtectionKey = (repoPath: string) => repositoryPathKey(repoPath);
+  const COMMIT_PROTECTION_BUSY_ERROR = 'A protected commit operation is running. Wait for it to finish before changing repository state.';
+  const commitProtectionKey = (repoPath: string) => repositoryPathKey(repositoryCommonDirectory(repoPath) || repoPath);
   const beginCommitProtection = (repoPath: string): (() => void) | null => {
     const key = commitProtectionKey(repoPath);
     if (commitProtectionLocks.has(key)) return null;
@@ -75,9 +77,10 @@ export function registerGitHandlers({
   });
 
   registerGitHistoryHandlers({ gitService, commitStatsService, workingTreeService });
-  registerGitFileHandlers({ gitService, readStoredRepoPaths });
+  registerGitFileHandlers({ gitService, readStoredRepoPaths, ensureWriteAllowed: ensureCommitProtectionIsIdle });
   registerGitOperationStateHandler({ gitService });
   registerRepositoryActivityHandler({ gitService, readStoredRepoPaths });
+  const commitMessageEdits = registerCommitMessageEditHandlers({ gitService, repoJobRegistry, beginCommitProtection, ensureCommitProtectionIsIdle });
 
   ipcMain.handle(IpcChannel.GitResolveRepoPath, async (_event: any, repoPath: string) => {
     const requestedRepoPath = String(repoPath || '').trim();
@@ -93,6 +96,7 @@ export function registerGitHandlers({
     gitService.setRepoPath(requestedRepoPath);
     const activeRepoPath = gitService.getRepoPath() || requestedRepoPath;
     repoJobRegistry.cancelForRepoChange(activeRepoPath);
+    await commitMessageEdits.recover(activeRepoPath);
     secretScanPushGuard.abortActiveScan();
     secretScanCommitGuard.clearApprovals();
     commitStatsService.setActiveRepo(activeRepoPath);

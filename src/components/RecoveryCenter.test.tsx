@@ -49,6 +49,7 @@ describe('RecoveryCenter', () => {
     root = createRoot(host);
     setToastMock.mockReset();
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'getCommitMessageEditBackups').mockResolvedValue({ success: true, data: [] });
   });
 
   afterEach(() => {
@@ -97,6 +98,17 @@ describe('RecoveryCenter', () => {
     expect(host.querySelector('.recovery-center__selection h2')?.textContent).toBe('second restore point');
     expect(host.querySelector('.recovery-center__selection-meta code')?.textContent).toBe('HEAD@{1}');
     expect(historyItems[1]?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('shows durable message backups even when their reflog position has expired', async () => {
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '' });
+    vi.mocked(gitClient.getCommitMessageEditBackups).mockResolvedValue({
+      success: true,
+      data: [{ ref: 'refs/ogc/commit-reword/saved', hash: 'c'.repeat(40), branch: 'refs/heads/main', createdAt: Date.now() }],
+    });
+    await renderCenter();
+    expect(host.textContent).toContain('Message backup');
+    expect(host.querySelector('.recovery-center__selection-meta code')?.textContent).toBe('refs/ogc/commit-reword/saved');
   });
 
   it('validates the inline branch name and creates the recovery branch from the selected commit', async () => {

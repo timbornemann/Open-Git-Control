@@ -13,6 +13,7 @@ type WorkingDirectoryPathResolver = (repoPath: string, value: unknown, label: st
 type RegisterWorkingDirectoryToolsHandlersDeps = {
   gitService: GitService;
   workingDirectoryPath: WorkingDirectoryPathResolver;
+  ensureWriteAllowed?: (repoPath: string) => void;
 };
 
 type ResolvedMove = {
@@ -195,13 +196,18 @@ const collectZipEntries = (sourcePath: string, archivePath: string, entries: Zip
   }
 };
 
-export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath }: RegisterWorkingDirectoryToolsHandlersDeps): void {
+export function registerWorkingDirectoryToolsHandlers({
+  gitService,
+  workingDirectoryPath,
+  ensureWriteAllowed = () => {},
+}: RegisterWorkingDirectoryToolsHandlersDeps): void {
   registerWorkingDirectorySearchHandlers({ gitService });
   ipcMain.handle(
     IpcChannel.GitApplyWorkingDirectoryMoves,
     async (_event: unknown, params: { moves?: unknown; createParentFolders?: unknown } = {}, requestedRepoPath?: unknown) => {
       try {
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitApplyWorkingDirectoryMoves);
+        ensureWriteAllowed(repoPath);
         applyMoves(repoPath, params.moves, params.createParentFolders === true, workingDirectoryPath);
         return { success: true };
       } catch (error: unknown) {
@@ -257,6 +263,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
   ipcMain.handle(IpcChannel.GitDeleteEmptyWorkingDirectoryFolders, async (_event: unknown, rawFolderPaths: unknown, requestedRepoPath?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteEmptyWorkingDirectoryFolders);
+      ensureWriteAllowed(repoPath);
       if (!Array.isArray(rawFolderPaths) || rawFolderPaths.length === 0) throw new Error('At least one empty folder is required.');
       const paths = rawFolderPaths.map((relativePath) => workingDirectoryPath(repoPath, relativePath, 'Folder path'));
       for (const folderPath of paths.sort((left, right) => right.length - left.length)) deleteEmptyFolderTree(folderPath);
@@ -272,6 +279,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
       let temporaryPath: string | null = null;
       try {
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
+        ensureWriteAllowed(repoPath);
         if (!Array.isArray(params.sourcePaths) || params.sourcePaths.length === 0) throw new Error('At least one archive source is required.');
         const sourcePaths = params.sourcePaths.map((sourcePath) => workingDirectoryPath(repoPath, sourcePath, 'Archive source'));
         const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Archive path', true);
@@ -294,6 +302,7 @@ export function registerWorkingDirectoryToolsHandlers({ gitService, workingDirec
         temporaryPath = temporarySibling(targetPath, 'archive');
         await createZipArchive(temporaryPath, entries);
         requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), IpcChannel.GitCreateWorkingDirectoryArchive);
+        ensureWriteAllowed(repoPath);
         fs.renameSync(temporaryPath, targetPath);
         temporaryPath = null;
         return { success: true, targetPath: asPath(params.targetPath) };

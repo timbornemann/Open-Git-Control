@@ -1,6 +1,7 @@
 import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferredFrame, cancelDeferredRetry } from './commitGraphRequestUtils';
 import { useCachedResult } from '@/data/resourceHooks';
-import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { historyRevision, subscribeHistoryRevision } from '@/data/historyRevision';
 import type { GraphLayout } from '@/utils/graphLayout';
 import { isRepoUnavailableError, parseGitLog, type GitStatusDetailed } from '@/utils/gitParsing';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -46,6 +47,8 @@ export const useCommitGraphData = ({
   onRefreshWorkingTree,
 }: Params) => {
   const graphScopeKey = getGraphCacheKey(repoPath || '', showSecondaryHistory);
+  const revision = useSyncExternalStore(subscribeHistoryRevision, () => historyRevision(repoPath || ''));
+  const lastRevisionRef = useRef(revision);
   useCachedResult(graphQueryKey(graphScopeKey));
   const cachedAtMount = repoPath ? getGraphCacheEntry(repoPath, showSecondaryHistory) : undefined;
   const [layout, setLayout] = useState<GraphLayout | null>(() => cachedAtMount?.layout || null);
@@ -68,13 +71,14 @@ export const useCommitGraphData = ({
   const pendingRefreshAfterAppendRef = useRef<RefreshMode | null>(null);
   const lastRepoPathRef = useRef<string | null>(null);
   const lastSecondaryHistoryRef = useRef(showSecondaryHistory);
-  const layoutBelongsToRepository = lastRepoPathRef.current === repoPath && lastSecondaryHistoryRef.current === showSecondaryHistory;
+  const layoutBelongsToRepository =
+    lastRepoPathRef.current === repoPath && lastSecondaryHistoryRef.current === showSecondaryHistory && lastRevisionRef.current === revision;
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
   const requestGenerationRef = useRef(0);
   const abortRetryTimeoutRef = useRef<number | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
-  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '', graphScopeKey);
+  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '', `${graphScopeKey}\0${revision}`);
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
     externalWorkingTreeStatus,
@@ -117,6 +121,7 @@ export const useCommitGraphData = ({
       const requestedLimitRaw = isAppend ? LOG_PAGE_SIZE : isQuick ? QUICK_REFRESH_LIMIT : LOG_PAGE_SIZE;
       const requestedLimit = Math.max(1, Math.min(requestedLimitRaw, LOG_MAX_LIMIT));
       const requestGeneration = ++requestGenerationRef.current;
+      const requestRevision = historyRevision(repoPath);
       let retryScheduled = false;
       cancelDeferredRetry(abortRetryTimeoutRef);
       setLoadError(null);
@@ -172,7 +177,7 @@ export const useCommitGraphData = ({
           offset,
           scope,
         });
-        if (requestGeneration !== requestGenerationRef.current) return;
+        if (requestGeneration !== requestGenerationRef.current || requestRevision !== historyRevision(repoPath)) return;
         if (result.success) {
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
@@ -261,10 +266,12 @@ export const useCommitGraphData = ({
     }
 
     const repoChanged = lastRepoPathRef.current !== repoPath;
+    const historyRewritten = lastRevisionRef.current !== revision;
+    lastRevisionRef.current = revision;
     const historyModeChanged = lastSecondaryHistoryRef.current !== showSecondaryHistory;
     lastRepoPathRef.current = repoPath;
     lastSecondaryHistoryRef.current = showSecondaryHistory;
-    if (repoChanged || historyModeChanged) {
+    if (repoChanged || historyModeChanged || historyRewritten) {
       requestGenerationRef.current += 1;
       cancelDeferredRetry(abortRetryTimeoutRef);
       // Drop previous-repo state immediately to avoid transient sync refreshes
@@ -304,7 +311,7 @@ export const useCommitGraphData = ({
 
     void refreshCommits(mode);
     void refreshWorkingTreeStatus();
-  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout, clearWorkingTreeStatus]);
+  }, [refreshCommits, refreshWorkingTreeStatus, refreshTrigger, repoPath, showSecondaryHistory, updateLayout, clearWorkingTreeStatus, revision]);
 
   useLayoutEffect(() => {
     if (layoutRef.current || !cachedAtMount?.layout) return;

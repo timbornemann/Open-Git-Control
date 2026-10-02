@@ -73,6 +73,13 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    inspectCommitMessageEdit: (request: Parameters<ElectronAPI['inspectCommitMessageEdit']>[0]) =>
+      invokeGitOperationForRepo(request.repoPath, 'inspectCommitMessageEdit', IpcChannel.GitInspectCommitMessageEdit, request),
+    rewordCommitMessage: (request: Parameters<ElectronAPI['rewordCommitMessage']>[0]) =>
+      invokeGitOperationForRepo(request.repoPath, 'rewordCommitMessage', IpcChannel.GitRewordCommitMessage, request),
+    getCommitMessageEditBackups: (repoPath: string) =>
+      invokeGitOperationForRepo(repoPath, 'getCommitMessageEditBackups', IpcChannel.GitCommitMessageEditBackups, repoPath),
+    cancelCommitMessageEdit: (operationId: string) => ipcRenderer.invoke(IpcChannel.GitCancelCommitMessageEdit, operationId),
     cancelReadRequest: (requestId: string) => ipcRenderer.invoke(IpcChannel.AppCancelRead, requestId),
     getBootstrap: () => ipcRenderer.invoke(IpcChannel.AppBootstrap),
     savePreviews: (snapshots: PreviewSnapshot[]) => ipcRenderer.invoke(IpcChannel.AppSavePreviews, snapshots),
@@ -407,6 +414,10 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getFileBlameRange: flatApi.getFileBlameRange,
       onRepoUnavailable: flatApi.onRepoUnavailable,
       startInteractiveRebase: flatApi.startInteractiveRebase,
+      inspectCommitMessageEdit: flatApi.inspectCommitMessageEdit,
+      rewordCommitMessage: flatApi.rewordCommitMessage,
+      getCommitMessageEditBackups: flatApi.getCommitMessageEditBackups,
+      cancelCommitMessageEdit: flatApi.cancelCommitMessageEdit,
       applyPatch: flatApi.applyPatch,
       getStashes: flatApi.getStashes,
       gitStashBranch: flatApi.gitStashBranch,

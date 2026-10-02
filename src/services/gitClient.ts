@@ -6,6 +6,7 @@ import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
 import { workingTreeReads } from './workingTreeReads';
+import { commitMessageEdits } from './commitMessageEdits';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -31,6 +32,7 @@ const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
 
 export const gitClient = cachedClient('git', {
+  ...commitMessageEdits,
   isAvailable(): boolean {
     return Boolean(getElectronApi());
   },

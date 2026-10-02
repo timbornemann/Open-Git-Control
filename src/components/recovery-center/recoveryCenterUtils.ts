@@ -1,6 +1,16 @@
 import type { AppSettingsDto } from '@/types/appDtos';
 import type { GitReflogEntryDto } from '@/types/git';
 import { formatDateTime } from '@/utils/dateTime';
+import type { CommitMessageEditBackup } from '@/shared/ipc/commitMessageEdit';
+
+export const messageBackupEntries = (backups: CommitMessageEditBackup[], label: string): GitReflogEntryDto[] =>
+  backups.map((backup) => ({
+    hash: backup.hash,
+    abbrevHash: backup.hash.slice(0, 7),
+    selector: backup.ref,
+    subject: `${label}: ${backup.branch.replace(/^refs\/heads\//, '')}`,
+    date: new Date(backup.createdAt).toISOString(),
+  }));
 
 export type RecoveryCenterProps = {
   repoPath: string | null;

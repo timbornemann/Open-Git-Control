@@ -102,7 +102,7 @@ const executeLog: GitCommandExecutor = (context) => {
   const includeAll = context.args[1] !== 'head';
   const offset = Number(context.args[2]) || 0;
   const args = ['log', '--topo-order', '-z', `-${limit}`, `--skip=${offset}`, `--pretty=format:${STRUCTURED_LOG_FORMAT}`, '--date=iso'];
-  if (includeAll) args.splice(1, 0, '--exclude=refs/ogc/remote-tags/*', '--all');
+  if (includeAll) args.splice(1, 0, '--exclude=refs/ogc/*', '--all');
   return runInContext(context, args);
 };
 

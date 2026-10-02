@@ -21,6 +21,7 @@ import { registerWorkingDirectoryPreviewHandler } from './workingDirectoryPrevie
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
   readStoredRepoPaths?: () => string[];
+  ensureWriteAllowed?: (repoPath: string) => void;
 };
 
 const REPOSITORY_FILE_SOURCES = new Set<RepositoryFileSource>(['unstaged', 'staged', 'commit']);
@@ -145,7 +146,7 @@ const openWithSystemChooser = async (targetPath: string): Promise<void> => {
   });
 };
 
-export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () => [] }: RegisterGitFileHandlersDeps): void {
+export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () => [], ensureWriteAllowed = () => {} }: RegisterGitFileHandlersDeps): void {
   const workingDirectoryPath = (repoPath: string, value: unknown, label: string, allowMissing = false) => {
     const relativePath = asRepositoryFilePath(value);
     if (!relativePath) throw new Error(`${label} is required.`);
@@ -181,8 +182,8 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   });
 
   registerWorkingDirectoryFileInfoHandler({ gitService, workingDirectoryPath });
-  registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath });
-  registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath });
+  registerWorkingDirectoryFileCreationHandler({ gitService, workingDirectoryPath, ensureWriteAllowed });
+  registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath, ensureWriteAllowed });
   registerWorkingDirectoryPreviewHandler(gitService, workingDirectoryPath);
 
   const mutateWorkingDirectory =
@@ -194,6 +195,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
           gitService.getRepoPath(),
           operation === 'move' ? IpcChannel.GitMoveWorkingDirectoryEntry : IpcChannel.GitCopyWorkingDirectoryEntry,
         );
+        ensureWriteAllowed(repoPath);
         const sourcePath = workingDirectoryPath(repoPath, params.sourcePath, 'Source path');
         const targetPath = workingDirectoryPath(repoPath, params.targetPath, 'Target path', true);
         if (sourcePath === targetPath || targetPath.startsWith(`${sourcePath}${path.sep}`)) throw new Error('A directory cannot be placed inside itself.');
@@ -234,6 +236,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   ipcMain.handle(IpcChannel.GitDeleteWorkingDirectoryEntry, async (_event: unknown, filePath: unknown, requestedRepoPath?: unknown) => {
     try {
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteWorkingDirectoryEntry);
+      ensureWriteAllowed(repoPath);
       fs.rmSync(workingDirectoryPath(repoPath, filePath, 'File path'), { recursive: true, force: false });
       return { success: true };
     } catch (error: unknown) {
@@ -313,6 +316,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
         }
 
         const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitWriteRepoFile);
+        ensureWriteAllowed(repoPath);
         const encoding =
           typeof requestedEncoding === 'string' && TEXT_ENCODINGS.has(requestedEncoding as RepositoryTextEncoding)
             ? (requestedEncoding as RepositoryTextEncoding)
@@ -334,6 +338,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       }
 
       const repoPath = requireActiveRepositoryPath(requestedRepoPath, gitService.getRepoPath(), IpcChannel.GitDeleteRepoFile);
+      ensureWriteAllowed(repoPath);
       await gitService.files.deleteRepoFileAtPath(repoPath, repositoryFilePath);
       return { success: true };
     } catch (error: unknown) {
@@ -445,6 +450,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
       // before any filesystem read or write so a repository switch cannot
       // apply this operation to a repository the user has left.
       requireActiveRepositoryPath(selectedRepo, gitService.getRepoPath(), IpcChannel.GitAddIgnoreRule);
+      ensureWriteAllowed(selectedRepo);
       const { targetPath: gitignorePath, content: existing, mode } = readIgnoreFileSafely(repoRoot);
       const existingRules = new Set(existing.split(/\r?\n/).filter((line) => line.length > 0));
 

@@ -37,7 +37,9 @@ const buildActions = (
   let inputDialog: InputDialogState | null = null;
   const runGitAction = vi.fn();
   const setToast = vi.fn();
+  const editMessage = vi.fn();
   const actions = buildCommitMenuActions({
+    repoPath: 'C:/repo',
     node: targetNode,
     branches,
     currentBranch: 'main',
@@ -53,6 +55,7 @@ const buildActions = (
     setToast,
     refreshCommits: vi.fn(),
     refreshWorkingTreeStatus: vi.fn(),
+    onEditCommitMessage: editMessage,
     t: (key, variables) => translateFromCatalog(language, key, variables),
     tr: (deText, enText) => trByLanguage(language, deText, enText),
   });
@@ -61,12 +64,20 @@ const buildActions = (
     actions,
     runGitAction,
     setToast,
+    editMessage,
     getConfirmDialog: () => confirmDialog,
     getInputDialog: () => inputDialog,
   };
 };
 
 describe('commit graph menu localization', () => {
+  it('opens the asynchronous message editor for the selected full hash', () => {
+    const result = buildActions('de');
+    result.actions.find((action) => action.label === 'Commit-Nachricht bearbeiten …')?.action();
+    expect(result.editMessage).toHaveBeenCalledExactlyOnceWith(HASH);
+    expect(result.runGitAction).not.toHaveBeenCalled();
+    expect(result.getInputDialog()).toBeNull();
+  });
   it('uses English for menu items, success messages and all destructive dialogs', () => {
     const result = buildActions('en');
     const labels = result.actions.map((action) => action.label);

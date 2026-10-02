@@ -1,4 +1,5 @@
 import { prepareGraphLayout } from '@/data/graphLayout';
+import { historyRevision } from '@/data/historyRevision';
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { type GraphLayout } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
@@ -21,11 +22,12 @@ export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLay
     async (commits: GitCommit[]) => {
       if (currentScope.current !== scopeKey) return;
       const request = ++generation.current;
+      const revision = historyRevision(repoPath);
       try {
         const layout = await prepareGraphLayout(repoPath, commits);
-        if (generation.current !== request) return;
+        if (generation.current !== request || historyRevision(repoPath) !== revision) return;
         setLayout((current) => {
-          if (generation.current !== request) return current;
+          if (generation.current !== request || historyRevision(repoPath) !== revision) return current;
           if (!current) return layout;
           const currentByHash = new Map(current.nodes.map((node) => [node.commit.hash, node.commit]));
           const nodes = layout.nodes.map((node) => {

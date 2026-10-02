@@ -92,7 +92,7 @@ export class HistoryService {
       // detect conflicts safely. Local tags are the canonical UI truth, so
       // internal tracking refs must neither add commits to the graph nor
       // create a second visible tag with the same name.
-      args.splice(1, 0, '--exclude=refs/ogc/remote-tags/*', '--all');
+      args.splice(1, 0, '--exclude=refs/ogc/*', '--all');
     }
 
     return this.execute(args, repoPath, signal);

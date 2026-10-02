@@ -33,6 +33,7 @@ export { buildGraphHighlightData, findCommitIndexByNavigationTarget } from './co
 interface CommitGraphProps {
   repoPath: string | null;
   onSelectCommit?: (hash: string | null) => void;
+  onEditCommitMessage?: (hash: string) => void;
   selectedHash?: string | null;
   navigationRequest?: { hash: string; requestId: number } | null;
   onNavigationRequestHandled?: (requestId: number) => void;
@@ -56,6 +57,7 @@ interface CommitGraphProps {
 export const CommitGraph: React.FC<CommitGraphProps> = ({
   repoPath,
   onSelectCommit,
+  onEditCommitMessage,
   selectedHash,
   navigationRequest,
   onNavigationRequestHandled,
@@ -279,6 +281,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
         setToast,
         refreshCommits,
         refreshWorkingTreeStatus,
+        onEditCommitMessage,
         t,
         tr,
       }),
@@ -289,6 +292,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
       reachableFromHead,
       refreshCommits,
       refreshWorkingTreeStatus,
+      onEditCommitMessage,
       repoPath,
       runGitAction,
       setConfirmDialog,

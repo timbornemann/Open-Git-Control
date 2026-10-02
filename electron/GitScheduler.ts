@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { repositoryCommonDirectory, physicalPathKey } from './git/RepositoryCommonDirectory';
 
 export type GitJobKind = 'write' | 'interactive' | 'polling' | 'background' | 'network' | 'network-read';
 
@@ -65,7 +66,7 @@ export class GitScheduler {
     options: { coalesceKey?: string; signal?: AbortSignal } = {},
   ): Promise<T> {
     const state = this.getState(repoPath);
-    const coalesceKey = kind === 'polling' ? options.coalesceKey || command : null;
+    const coalesceKey = kind === 'polling' ? `${physicalPathKey(repoPath)}\0${options.coalesceKey || command}` : null;
     if (coalesceKey) {
       const existing = state.coalesced.get(coalesceKey);
       if (existing) return existing as Promise<T>;
@@ -149,7 +150,7 @@ export class GitScheduler {
 
     let resolved: string;
     try {
-      resolved = fs.realpathSync.native(repoPath);
+      resolved = repositoryCommonDirectory(repoPath) || fs.realpathSync.native(repoPath);
     } catch {
       // The path may not exist yet (e.g. clone target); fall back to a
       // lexical normalization which still collapses trailing separators.

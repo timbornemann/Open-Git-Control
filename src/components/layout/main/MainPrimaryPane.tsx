@@ -17,6 +17,7 @@ import { WorkingDirectoryFileViewer } from '@/components/working-directory/Worki
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 import { RepositoryRunConfigView } from '@/components/repository-run/RepositoryRunConfigView';
+import { useCommitMessageEditor } from '@/components/commit-graph/useCommitMessageEditor';
 
 const CommitGraph = viewModules.repo.View;
 const DiffViewer = viewModules.diff.View;
@@ -70,6 +71,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const repository = useRepositoryContext();
   const github = useGithubContext();
   const workflow = useWorkflowContext();
+  const commitEditor = useCommitMessageEditor(repository.activeRepo, repository.selectedCommit, repository.onNavigateToCommit, repository.triggerRefresh);
   const { t, tr } = useI18n();
   const [workingDirectoryCloseRequest, setWorkingDirectoryCloseRequest] = React.useState<(() => void) | null>(null);
   const handleWorkingDirectoryCloseRequestChange = React.useCallback((request: (() => void) | null) => {
@@ -125,6 +127,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
     >
+      {commitEditor.dialog}
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
@@ -262,6 +265,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 navigationRequest={repository.commitNavigationRequest}
                 onNavigationRequestHandled={repository.onCommitNavigationRequestHandled}
                 onSelectCommit={handleSelectCommitDirect}
+                onEditCommitMessage={commitEditor.open}
                 refreshTrigger={repository.refreshTrigger}
                 commitRefreshTrigger={repository.commitRefreshTrigger}
                 showSecondaryHistory={repository.showSecondaryHistory}

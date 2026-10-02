@@ -3,6 +3,29 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes typed message editing and cancellation in both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const request = {
+      repoPath: 'C:/repo',
+      commitHash: 'a'.repeat(40),
+      expectedHead: 'b'.repeat(40),
+      expectedBranch: 'refs/heads/main',
+      title: 'Title',
+      description: '',
+      operationId: 'op',
+    };
+    await api.git.inspectCommitMessageEdit(request);
+    await api.rewordCommitMessage(request);
+    await api.git.getCommitMessageEditBackups(request.repoPath);
+    await api.cancelCommitMessageEdit(request.operationId);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.GitInspectCommitMessageEdit, request],
+      [IpcChannel.GitRewordCommitMessage, request],
+      [IpcChannel.GitCommitMessageEditBackups, request.repoPath],
+      [IpcChannel.GitCancelCommitMessageEdit, request.operationId],
+    ]);
+  });
   it('reads inactive repository summaries without reporting active-workspace failure or changing selection', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: false, error: '[REPO_UNAVAILABLE] Repository was deleted.' });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

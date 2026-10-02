@@ -13,6 +13,7 @@ import { validateBranchName } from '@/utils/gitRefValidation';
 import { DangerConfirm } from './DangerConfirm';
 import {
   filterRecoveryEntries,
+  messageBackupEntries,
   formatRecoveryDate,
   getRecoveryLoadViewState,
   getRecoveryEntryKey,
@@ -54,7 +55,7 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({ repoPath, refres
     setIsLoading(true);
     setLoadError(null);
     try {
-      const result = await gitClient.runGitCommandForRepo(repoPath, 'reflog', '300');
+      const [result, backups] = await Promise.all([gitClient.runGitCommandForRepo(repoPath, 'reflog', '300'), gitClient.getCommitMessageEditBackups(repoPath)]);
       if (requestId !== loadSequenceRef.current) return;
 
       if (!result.success) {
@@ -64,7 +65,10 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({ repoPath, refres
         return;
       }
 
-      const parsed = parseGitReflog(String(result.data || ''));
+      if (!backups.success) setLoadError(backups.error);
+      const parsed = messageBackupEntries(backups.success ? backups.data : [], tr('Nachrichten-Sicherung', 'Message backup')).concat(
+        parseGitReflog(String(result.data || '')),
+      );
       setLoadedReflog({ repoPath, entries: parsed });
       setSelectedKey((current) => selectLoadedRecoveryKey(current, parsed));
     } catch (error: unknown) {

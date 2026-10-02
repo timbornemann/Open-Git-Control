@@ -1,6 +1,7 @@
 import { QueryClient, hashKey, notifyManager } from '@tanstack/react-query';
 import { MEMORY_CACHE_BYTES, type PreviewSnapshot, type ResourceKey, type ReadPriority } from '@/shared/cache/resource';
 import { backgroundQueue } from './backgroundQueue';
+import { historyChangedAt } from './historyRevision';
 
 notifyManager.setScheduler(queueMicrotask);
 
@@ -156,6 +157,7 @@ export function updateResource<T>(key: ResourceKey, updater: T | ((old: T | unde
 
 export function hydratePreviews(snapshots: PreviewSnapshot[], startedAt: number) {
   for (const snapshot of snapshots) {
+    if (snapshot.key[1] === 'git' && snapshot.savedAt <= historyChangedAt(String(snapshot.key[2]))) continue;
     const current = queryClient.getQueryState(snapshot.key);
     if (
       current &&
