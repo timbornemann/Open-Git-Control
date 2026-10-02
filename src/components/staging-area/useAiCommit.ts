@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ToastMessage } from '@/types/git';
-import type { AiAutoCommitResultDto } from '@/types/aiDtos';
+import type { AiAutoCommitGroupDto, AiAutoCommitResultDto } from '@/types/aiDtos';
 import { useI18n } from '@/i18n';
 import { aiClient } from '@/services/aiClient';
 import type { GitStatusWithConflicts } from './types';
@@ -51,16 +51,27 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
   const [aiGroupSize, setAiGroupSize] = useState<number | null>(null);
   const [aiTotalCommits, setAiTotalCommits] = useState<number | null>(null);
   const [isAiMessageGenerating, setIsAiMessageGenerating] = useState(false);
+  const [aiGroups, setAiGroups] = useState<AiAutoCommitGroupDto[]>([]);
 
   const aiStartLockRef = useRef(false);
   const cancelRequestedRef = useRef(false);
   const lastKnownStatusRef = useRef<AiJobStatus>('idle');
   const lastEventTimestampRef = useRef(0);
   const lastRefreshAtRef = useRef(0);
+  const lastNotifiedCommitCountRef = useRef(0);
   const aiTotalFilesRef = useRef<number | null>(null);
   const terminalClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repoPathRef = useRef<string | null>(repoPath);
   const runGenerationRef = useRef(0);
+
+  const refreshHistory = useCallback(
+    (count: number | null) => {
+      if (!count || count === lastNotifiedCommitCountRef.current) return;
+      lastNotifiedCommitCountRef.current = count;
+      (onCommitsCreated || onRepoChanged)?.();
+    },
+    [onCommitsCreated, onRepoChanged],
+  );
 
   const clearTerminalClearTimer = useCallback(() => {
     if (!terminalClearTimerRef.current) return;
@@ -119,6 +130,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       const groupId = asNumber(details.groupId);
       const groupSize = asNumber(details.groupSize);
       const totalCommits = asNumber(details.totalCommits);
+      if (Array.isArray(details.groups)) setAiGroups(details.groups as AiAutoCommitGroupDto[]);
 
       if (phase) setAiPhase(phase);
       if (mode) setAiMode(mode);
@@ -133,12 +145,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
           setAiProcessedFiles(derivedProcessed);
         }
       }
-      if (processedFiles !== null) {
-        const shouldPreferExplicit = phase === 'done' || aiTotalFilesRef.current === null;
-        if (shouldPreferExplicit) {
-          setAiProcessedFiles(processedFiles);
-        }
-      }
+      if (processedFiles !== null) setAiProcessedFiles(processedFiles);
       if (groupId !== null) setAiGroupId(groupId);
       if (groupSize !== null) setAiGroupSize(groupSize);
       if (totalCommits !== null) setAiTotalCommits(totalCommits);
@@ -171,10 +178,11 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
 
         lastRefreshAtRef.current = Date.now();
         void refresh();
+        refreshHistory(totalCommits);
         scheduleTerminalClear();
       }
     },
-    [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, t],
+    [clearTerminalClearTimer, maybeRefresh, refresh, scheduleTerminalClear, t, refreshHistory],
   );
 
   useEffect(() => {
@@ -183,9 +191,11 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
     cancelRequestedRef.current = false;
     aiStartLockRef.current = false;
     lastEventTimestampRef.current = 0;
+    lastNotifiedCommitCountRef.current = 0;
     setIsAiCommitting(false);
     setIsAiJobRunning(false);
     setIsAiMessageGenerating(false);
+    setAiGroups([]);
     clearTerminalClearTimer();
     resetAiProgressUi();
   }, [clearTerminalClearTimer, repoPath, resetAiProgressUi]);
@@ -250,8 +260,11 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       const commits = data.commits || [];
       const warnings = data.warnings || [];
       const diagnostics = data.diagnostics || [];
+      if (data.groups) setAiGroups(data.groups);
 
-      if (commits.length === 0) {
+      if (data.outcome === 'partial' || data.outcome === 'cancelled') {
+        setToast({ msg: data.summary, isError: data.outcome === 'partial' });
+      } else if (commits.length === 0) {
         setToast({
           msg: data.summary || t('generated.components.staging_area.useaicommit.ai_did_not_create_commits_fa18e8e4'),
           isError: false,
@@ -265,20 +278,24 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       if (diagnostics.length > 0) {
         console.info('AI Auto-Commit diagnostics:', diagnostics);
       }
+      if (data.metrics) console.info('AI Auto-Commit timings:', data.metrics);
 
-      if (onCommitsCreated) onCommitsCreated();
-      else if (onRepoChanged) onRepoChanged();
+      refreshHistory(commits.length);
       await refresh();
 
       if (!['done', 'failed', 'cancelled'].includes(lastKnownStatusRef.current)) {
-        lastKnownStatusRef.current = 'done';
-        setAiPhase('done');
+        const terminal = data.outcome === 'partial' ? 'failed' : data.outcome === 'cancelled' ? 'cancelled' : 'done';
+        lastKnownStatusRef.current = terminal;
+        setAiPhase(terminal);
         setAiProgressMessage(data.summary || t('generated.components.staging_area.useaicommit.ai_auto_commit_completed_671832fb'));
       }
+      setAiProcessedFiles(data.processedFiles);
+      setAiRemainingFiles(data.remainingFiles);
+      setAiTotalCommits(commits.length);
       setIsAiJobRunning(false);
       scheduleTerminalClear();
     },
-    [onCommitsCreated, onRepoChanged, refresh, scheduleTerminalClear, setToast, t, tr],
+    [refreshHistory, refresh, scheduleTerminalClear, setToast, t, tr],
   );
 
   const handleAiAutoCommit = useCallback(async () => {
@@ -291,7 +308,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
       return;
     }
 
-    const totalFiles = status.staged.length + status.unstaged.length + status.untracked.length;
+    const totalFiles = new Set([...status.staged, ...status.unstaged, ...status.untracked].map((file) => file.path)).size;
     if (totalFiles === 0) {
       setToast({ msg: t('generated.components.staging_area.useaicommit.no_changes_available_for_ai_auto_commit_b9e2c2bc'), isError: true });
       return;
@@ -303,6 +320,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
     lastKnownStatusRef.current = 'start';
     lastEventTimestampRef.current = Date.now() - 1;
     lastRefreshAtRef.current = 0;
+    lastNotifiedCommitCountRef.current = 0;
     aiTotalFilesRef.current = totalFiles;
 
     setAiPhase('snapshot');
@@ -311,6 +329,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
     setAiGroupId(null);
     setAiGroupSize(null);
     setAiTotalCommits(null);
+    setAiGroups([]);
     setAiProcessedFiles(0);
     setAiRemainingFiles(totalFiles);
     setAiProgressMessage(t('generated.components.staging_area.useaicommit.ai_is_starting_e50f32f8'));
@@ -321,8 +340,6 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
     try {
       const result = await aiClient.runAutoCommit({ repoPath });
       if (generation !== runGenerationRef.current || repoPathRef.current !== repoPath) return;
-      if (cancelRequestedRef.current) return;
-
       if (!result.success) {
         const errorMessage = result.error || t('generated.components.staging_area.useaicommit.ai_auto_commit_failed_f42b2375');
         await handleAiRunFailure(errorMessage);
@@ -429,6 +446,7 @@ export const useAiCommit = ({ repoPath, status, setToast, refresh, onRepoChanged
     aiGroupId,
     aiGroupSize,
     aiTotalCommits,
+    aiGroups,
     handleAiAutoCommit,
     handleCancelAiAutoCommit,
     generateCommitMessageFromNotes,

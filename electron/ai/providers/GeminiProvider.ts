@@ -98,14 +98,17 @@ export class GeminiProvider implements AiProvider {
       },
       timeoutMs,
       shouldCancel,
+      async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Gemini Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
+        }
+
+        return response.json();
+      },
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Gemini Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as {
+    const data = response as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>;
     };
 

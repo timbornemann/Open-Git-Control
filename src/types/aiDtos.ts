@@ -1,5 +1,5 @@
 export type GitJobStatus = 'start' | 'progress' | 'done' | 'failed' | 'cancelled';
-export type GitJobPhaseDto = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
+export type GitJobPhaseDto = 'snapshot' | 'context' | 'grouping' | 'validating' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
 
 export type AiProviderDto = 'ollama' | 'gemini' | 'openai';
 export type AiCommitMessageStyleDto = 'conventional' | 'plain' | 'detailed';
@@ -35,6 +35,10 @@ export interface AiAutoCommitCommitDto {
 }
 
 export interface AiAutoCommitResultDto {
+  outcome?: 'complete' | 'partial' | 'cancelled';
+  error?: string;
+  groups?: AiAutoCommitGroupDto[];
+  metrics?: { snapshotMs: number; contextMs: number; aiMs: number; gitMs: number; providerCalls: number; contextCacheHits: number; contextBytes: number };
   commits: AiAutoCommitCommitDto[];
   summary: string;
   turns: number;
@@ -50,6 +54,19 @@ export interface AiAutoCommitResultDto {
   };
   warnings: string[];
   diagnostics: string[];
+}
+
+export interface AiAutoCommitGroupDto {
+  id: string;
+  source: 'staged' | 'worktree';
+  changeIds: string[];
+  paths: string[];
+  title: string;
+  description: string;
+  rationale: string;
+  messageSource: 'ai' | 'fallback';
+  status: 'pending' | 'committed';
+  hash?: string;
 }
 
 export interface AiConnectionResultDto {

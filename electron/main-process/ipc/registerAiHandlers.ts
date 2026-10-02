@@ -9,6 +9,7 @@ import type { JobEventPayload } from './jobEvents';
 import { emitJobEvent } from './jobEvents';
 import { IpcChannel } from '../../../src/types/ipcContract';
 import { requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
+import { beginCommitProtection, COMMIT_PROTECTION_BUSY_ERROR } from '../RepositoryCommitProtection';
 
 type RegisterAiHandlersDeps = {
   aiService: AiService;
@@ -94,6 +95,8 @@ export function registerAiHandlers({
       return { success: false, error: message };
     }
 
+    const releaseProtection = beginCommitProtection(repoPath);
+    if (!releaseProtection) return { success: false, error: COMMIT_PROTECTION_BUSY_ERROR };
     const jobId = createJobId('git-aiAutoCommit');
     const repoJob = repoJobRegistry.begin(repoPath);
     currentAiAutoCommitJob = { id: jobId, repoPath: repoJob.repoPath, generation: repoJob.generation, cancelRequested: false };
@@ -130,7 +133,8 @@ export function registerAiHandlers({
         () => repoJob.signal.aborted || (currentAiAutoCommitJob?.id === jobId && currentAiAutoCommitJob.cancelRequested),
         getOpenAiApiKeyFromSecureStore,
         {
-          beforeCommit: async (privateIndexPath) => {
+          beforeCommit: async (privateIndexPath, baseTree) => {
+            repoJob.ensureActive();
             if (!settings.secretScanBeforeCommitEnabled) return;
             const scan = await secretScanService.scanStagedDiffs({
               repoPath: repoJob.repoPath,
@@ -138,6 +142,7 @@ export function registerAiHandlers({
               allowlistText: settings.secretScanAllowlist,
               signal: repoJob.signal,
               envOverrides: { GIT_INDEX_FILE: privateIndexPath, GIT_OPTIONAL_LOCKS: '0' },
+              stagedBaseTree: baseTree,
             });
             if (scan.findings.length > 0) {
               throw new Error('Potential secrets were detected in the AI commit snapshot. Remove them or configure an explicit allowlist before committing.');
@@ -145,15 +150,17 @@ export function registerAiHandlers({
           },
         },
       );
-      repoJob.ensureActive();
-
+      const terminalStatus = result.outcome === 'cancelled' ? 'cancelled' : result.outcome === 'partial' ? 'failed' : 'done';
       emitAiAutoCommitEvent(webContents, {
         id: jobId,
         operation: IpcChannel.GitAiAutoCommit,
-        status: 'done',
+        status: terminalStatus,
         message: result.summary || 'KI Auto-Commit abgeschlossen.',
         details: {
-          phase: 'done',
+          phase: terminalStatus,
+          groups: result.groups,
+          outcome: result.outcome,
+          metrics: result.metrics,
           mode: result.modeTransitions[result.modeTransitions.length - 1] || 'normal',
           repoPath: repoJob.repoPath,
           generation: repoJob.generation,
@@ -184,6 +191,7 @@ export function registerAiHandlers({
 
       return { success: false, error: wasCancelled ? cancelMessage : message };
     } finally {
+      releaseProtection();
       repoJob.complete();
       if (currentAiAutoCommitJob?.id === jobId) {
         currentAiAutoCommitJob = null;

@@ -1,4 +1,5 @@
 import { useI18n } from '@/i18n';
+import { AiCommitPlan } from './AiCommitPlan';
 import type { GitStatusWithConflicts } from './types';
 import type { useAiCommit } from './useAiCommit';
 import type { useCommitForm } from './useCommitForm';
@@ -44,9 +45,22 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
   openAiCommitMessageDialog,
 }) => {
   const { t, tr } = useI18n();
+  const phaseLabels: Record<string, string> = {
+    snapshot: tr('Änderungen erfassen', 'Capturing changes'),
+    context: tr('Kontext analysieren', 'Analyzing context'),
+    grouping: tr('Commits planen', 'Planning commits'),
+    validating: tr('Commit-Plan prüfen', 'Validating commit plan'),
+    committing: tr('Commits erstellen', 'Creating commits'),
+    retry: tr('Plan korrigieren', 'Correcting plan'),
+    fallback: tr('Ersatz-Commits vorbereiten', 'Preparing fallback commits'),
+    done: tr('Abgeschlossen', 'Completed'),
+    failed: tr('Gestoppt', 'Stopped'),
+    cancelled: tr('Abgebrochen', 'Cancelled'),
+  };
 
   return (
     <div className="staging-commit-area">
+      <AiCommitPlan groups={aiCommit.aiGroups} />
       <textarea
         className="staging-commit-input"
         placeholder={
@@ -104,7 +118,7 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
         </label>
         <div style={{ flex: 1 }} />
         {aiCommit.aiProgressMessage && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: '220px', maxWidth: '420px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0, maxWidth: '100%' }}>
             <span
               style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               title={aiCommit.aiProgressMessage}
@@ -113,10 +127,9 @@ export const StagingCommitPanel: React.FC<StagingCommitPanelProps> = ({
             </span>
             <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
               {[
-                `${t('generated.components.staging_area.stagingcommitpanel.phase_d4e0da46')}: ${aiCommit.aiPhase}`,
-                `${t('generated.components.staging_area.stagingcommitpanel.mode_56610d60')}: ${aiCommit.aiMode}`,
+                phaseLabels[aiCommit.aiPhase],
                 aiCommit.aiGroupId !== null ? `${t('generated.components.staging_area.stagingcommitpanel.group_a3309056')}: ${aiCommit.aiGroupId}` : null,
-                aiCommit.aiGroupSize !== null ? `${t('generated.components.staging_area.stagingcommitpanel.batch_feec543c')}: ${aiCommit.aiGroupSize}` : null,
+                aiCommit.aiGroupSize !== null ? `${aiCommit.aiGroupSize} ${aiCommit.aiGroupSize === 1 ? tr('Datei', 'file') : tr('Dateien', 'files')}` : null,
               ]
                 .filter(Boolean)
                 .join(' | ')}

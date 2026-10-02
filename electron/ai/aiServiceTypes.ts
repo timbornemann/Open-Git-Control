@@ -1,4 +1,5 @@
 import type { FileChangeType } from './gitStatusSnapshot';
+import type { AutoCommitGroupResult, AutoCommitMetrics } from './AutoCommitPlanTypes';
 
 export type SnapshotFile = {
   path: string;
@@ -41,7 +42,7 @@ export type CommitMessageCapable = {
   commitWithMessage: (message: CommitMessage) => Promise<string>;
 };
 
-export type ProgressPhase = 'snapshot' | 'grouping' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed';
+export type ProgressPhase = 'snapshot' | 'context' | 'grouping' | 'validating' | 'committing' | 'retry' | 'fallback' | 'done' | 'failed' | 'cancelled';
 export type ProgressMode = 'normal' | 'retry' | 'fallback';
 export type AutoCommitStrategy = 'standard' | 'large-hybrid';
 
@@ -53,6 +54,10 @@ export type AiProgressUpdate = {
 };
 
 export type AiAutoCommitResult = {
+  outcome?: 'complete' | 'partial' | 'cancelled';
+  error?: string;
+  groups?: AutoCommitGroupResult[];
+  metrics?: AutoCommitMetrics;
   commits: AiCommit[];
   summary: string;
   turns: number;

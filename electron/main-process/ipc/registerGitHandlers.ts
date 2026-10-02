@@ -23,7 +23,8 @@ import { normalizeInteractiveRebaseTodo } from '../../git/RebaseService';
 import { repositoryPathKey, requireActiveRepositoryPath } from '../activeRepositoryAuthorization';
 import { readStoreData } from '../repoStore';
 import { normalizeRepositoryInitializationOptions, scaffoldInitializedRepository } from '../../git/RepositoryScaffolding';
-import { repositoryCommonDirectory } from '../../git/RepositoryCommonDirectory';
+import { beginCommitProtection, ensureCommitProtectionIsIdle, COMMIT_PROTECTION_BUSY_ERROR } from '../RepositoryCommitProtection';
+import { recoverAutoCommitAtPath } from '../../ai/AutoCommitJournal';
 
 type RegisterGitHandlersDeps = {
   gitService: GitService;
@@ -44,18 +45,6 @@ export function registerGitHandlers({
   repoJobRegistry = defaultRepoJobRegistry,
   readStoredRepoPaths = () => readStoreData().repos.map((repo) => repo.path),
 }: RegisterGitHandlersDeps): void {
-  const commitProtectionLocks = new Set<string>();
-  const COMMIT_PROTECTION_BUSY_ERROR = 'A protected commit operation is running. Wait for it to finish before changing repository state.';
-  const commitProtectionKey = (repoPath: string) => repositoryPathKey(repositoryCommonDirectory(repoPath) || repoPath);
-  const beginCommitProtection = (repoPath: string): (() => void) | null => {
-    const key = commitProtectionKey(repoPath);
-    if (commitProtectionLocks.has(key)) return null;
-    commitProtectionLocks.add(key);
-    return () => commitProtectionLocks.delete(key);
-  };
-  const ensureCommitProtectionIsIdle = (repoPath: string): void => {
-    if (commitProtectionLocks.has(commitProtectionKey(repoPath))) throw new Error(COMMIT_PROTECTION_BUSY_ERROR);
-  };
   const isCommitCommand = (commandName: unknown): boolean =>
     String(commandName || '')
       .trim()
@@ -97,6 +86,27 @@ export function registerGitHandlers({
     const activeRepoPath = gitService.getRepoPath() || requestedRepoPath;
     repoJobRegistry.cancelForRepoChange(activeRepoPath);
     await commitMessageEdits.recover(activeRepoPath);
+    try {
+      const recovered = await recoverAutoCommitAtPath(gitService, activeRepoPath);
+      if (recovered)
+        emitJobEvent(_event.sender, {
+          id: createJobId('ai-recovery'),
+          operation: IpcChannel.GitAiAutoCommit,
+          status: 'done',
+          message: 'Interrupted AI commit recovered. No additional commit was created.',
+          details: { repoPath: activeRepoPath, phase: 'done' },
+          timestamp: Date.now(),
+        });
+    } catch (error) {
+      emitJobEvent(_event.sender, {
+        id: createJobId('ai-recovery'),
+        operation: IpcChannel.GitAiAutoCommit,
+        status: 'failed',
+        message: error instanceof Error ? error.message : 'AI commit recovery needs inspection.',
+        details: { repoPath: activeRepoPath, phase: 'failed' },
+        timestamp: Date.now(),
+      });
+    }
     secretScanPushGuard.abortActiveScan();
     secretScanCommitGuard.clearApprovals();
     commitStatsService.setActiveRepo(activeRepoPath);

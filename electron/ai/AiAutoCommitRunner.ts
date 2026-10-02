@@ -5,7 +5,7 @@ import { AiAutoCommitRunSession } from './AiAutoCommitRunSession';
 import type { AiAutoCommitResult, AiProgressUpdate } from './aiServiceTypes';
 
 export type AiAutoCommitRunOptions = {
-  beforeCommit?: (privateIndexPath: string) => Promise<void>;
+  beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>;
 };
 
 export class AiAutoCommitRunner {

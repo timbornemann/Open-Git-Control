@@ -132,14 +132,17 @@ export class OpenAiProvider implements AiProvider {
       },
       timeoutMs,
       shouldCancel,
+      async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`OpenAI Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
+        }
+
+        return response.json();
+      },
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`OpenAI Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as {
+    const data = response as {
       choices?: Array<{ message?: { content?: unknown } }>;
     };
     return safeString(data.choices?.[0]?.message?.content).trim();

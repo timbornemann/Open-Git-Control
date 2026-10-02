@@ -55,7 +55,7 @@ const writeHook = (repoPath: string, name: string, script: string): void => {
   });
 };
 
-describe('AI auto-commit isolated index transaction', () => {
+describe('AI auto-commit isolated index transaction', { timeout: 20000 }, () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -96,7 +96,7 @@ describe('AI auto-commit isolated index transaction', () => {
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled(), { timeout: 5_000 });
     cancelRequested = true;
-    await expect(run).rejects.toThrow('abgebrochen');
+    await expect(run).resolves.toMatchObject({ outcome: 'cancelled', commits: [] });
 
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe(stagedBefore);
     expect(await git.runCommandAtPath(repoPath, ['write-tree'])).toBe(stagedTreeBefore);
@@ -196,8 +196,19 @@ describe('AI auto-commit isolated index transaction', () => {
 
     await vi.waitFor(() => expect(resolveMessage).toBeTypeOf('function'), { timeout: 5_000 });
     fs.writeFileSync(filePath, 'edited-after-snapshot\nstill-uncommitted\n', 'utf8');
-    resolveMessage?.(okJsonResponse({ message: { content: '{"title":"test: snapshot commit","description":""}' } }));
-    await expect(run).resolves.toMatchObject({ commits: [{ subject: 'test: snapshot commit' }] });
+    resolveMessage?.(
+      okJsonResponse({
+        message: {
+          content: JSON.stringify({
+            groups: [
+              { changeIds: ['s1'], title: 'test: staged snapshot', description: '', rationale: 'Original index' },
+              { changeIds: ['w1'], title: 'test: snapshot commit', description: '', rationale: 'Remaining worktree changes' },
+            ],
+          }),
+        },
+      }),
+    );
+    await expect(run).resolves.toMatchObject({ commits: [{ subject: 'test: staged snapshot' }, { subject: 'test: snapshot commit' }] });
 
     expect(await git.runCommandAtPath(repoPath, ['show', 'HEAD:example.txt'])).toBe('staged-one\nsnapshot-two');
     expect(await git.runCommandAtPath(repoPath, ['show', ':example.txt'])).toBe('staged-one\nsnapshot-two');

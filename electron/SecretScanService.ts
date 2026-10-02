@@ -287,6 +287,14 @@ function sanitizeContextLine(line: string): string {
   }, replacedQuotedValues);
 }
 
+/** Redact detected credentials in AI context while retaining ordinary code literals. */
+export function redactAiContext(text: string): string {
+  return SECRET_PATTERNS.reduce(
+    (value, pattern) => value.replace(new RegExp(pattern.regex.source, `${pattern.regex.flags.replace('g', '')}g`), '[REDACTED_SECRET]'),
+    text,
+  );
+}
+
 function decodeGitQuotedPath(rawPath: string): string | null {
   const value = rawPath.trim();
   if (!value) return null;
@@ -370,6 +378,7 @@ export class SecretScanService {
     includePushHistory?: boolean;
     /** Internal-only Git environment overrides, used for private AI indexes. */
     envOverrides?: NodeJS.ProcessEnv;
+    stagedBaseTree?: string;
   }): Promise<SecretScanResult> {
     const strictness = options.strictness;
     const allowlistRules = parseAllowlist(options.allowlistText || '');
@@ -627,7 +636,11 @@ export class SecretScanService {
       }
     };
 
-    await streamDiff(['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0'], 'staged');
+    if (options.stagedBaseTree && !/^[0-9a-f]{40,64}$/.test(options.stagedBaseTree)) throw new Error('Invalid scan base tree.');
+    await streamDiff(
+      ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', ...(options.stagedBaseTree ? [options.stagedBaseTree] : [])],
+      'staged',
+    );
     if (options.includePushHistory !== false) {
       await scanPushSourceCommits();
       await scanTagCommits();
@@ -661,6 +674,7 @@ export class SecretScanService {
     signal?: AbortSignal;
     onProgress?: (checkedLines: number) => void;
     envOverrides?: NodeJS.ProcessEnv;
+    stagedBaseTree?: string;
   }): Promise<SecretScanResult> {
     return this.scanPushDiffs({ ...options, includePushHistory: false });
   }

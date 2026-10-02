@@ -4,5 +4,5 @@ import type { GitRunOptions } from './GitProcessTypes';
 export type CommitEditGit = {
   run: (repoPath: string, args: string[], options?: GitRunOptions & { ignoreAbort?: boolean }) => Promise<string>;
   buffer: (repoPath: string, args: string[]) => Promise<Buffer>;
-  input: (repoPath: string, args: string[], input: string, ignoreAbort?: boolean) => Promise<string>;
+  input: (repoPath: string, args: string[], input: string, ignoreAbort?: boolean, envOverrides?: NodeJS.ProcessEnv) => Promise<string>;
 };

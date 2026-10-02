@@ -209,9 +209,9 @@ export class GitRunner {
               activeSignal,
             );
           },
-          input: (cwd, args, input, ignoreAbort = false) => {
+          input: (cwd, args, input, ignoreAbort = false, envOverrides) => {
             if (!ignoreAbort) activeSignal.throwIfAborted();
-            return this.spawnOperations.runWithInput(cwd, args, input, ignoreAbort ? uninterrupted : activeSignal);
+            return this.spawnOperations.runWithInput(cwd, args, input, ignoreAbort ? uninterrupted : activeSignal, envOverrides);
           },
         };
         return work(git);

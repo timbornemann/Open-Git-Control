@@ -25,6 +25,7 @@ export type GitRunOptions = {
 };
 
 export type GitBufferRunOptions = {
+  input?: string | Buffer;
   maxBytes: number;
   tooLargeMessage: string;
   requestedKind?: GitJobKind;

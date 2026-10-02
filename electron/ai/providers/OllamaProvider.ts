@@ -76,14 +76,17 @@ export class OllamaProvider implements AiProvider {
       },
       timeoutMs,
       shouldCancel,
+      async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Ollama Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
+        }
+
+        return response.json();
+      },
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama Anfrage fehlgeschlagen (${response.status}): ${text || response.statusText}`);
-    }
-
-    const data = (await response.json()) as { message?: { content?: unknown } };
+    const data = response as { message?: { content?: unknown } };
     return safeString(data.message?.content).trim();
   }
 }

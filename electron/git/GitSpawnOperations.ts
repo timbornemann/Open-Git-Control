@@ -12,7 +12,7 @@ export class GitSpawnOperations {
     return new Promise<Buffer>((resolve, reject) => {
       const proc = spawn('git', args, {
         cwd: repoPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
         env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
       });
       const chunks: Buffer[] = [];
@@ -22,8 +22,12 @@ export class GitSpawnOperations {
 
       const abort = () => proc.kill();
       signal.addEventListener('abort', abort, { once: true });
+      if (options.input !== undefined) {
+        proc.stdin?.on('error', () => {});
+        proc.stdin?.end(options.input);
+      }
 
-      proc.stdout.on('data', (chunk: Buffer) => {
+      proc.stdout!.on('data', (chunk: Buffer) => {
         capturedBytes += chunk.length;
         if (capturedBytes > options.maxBytes) {
           tooLarge = true;
@@ -32,7 +36,7 @@ export class GitSpawnOperations {
         }
         chunks.push(chunk);
       });
-      proc.stderr.on('data', (chunk: Buffer) => {
+      proc.stderr!.on('data', (chunk: Buffer) => {
         if (stderr.length < 64 * 1024) stderr += chunk.toString('utf8');
       });
       proc.on('error', reject);
@@ -55,9 +59,14 @@ export class GitSpawnOperations {
     });
   }
 
-  runWithInput(repoPath: string, args: string[], input: string | Buffer, signal: AbortSignal): Promise<string> {
+  runWithInput(repoPath: string, args: string[], input: string | Buffer, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] });
+      const proc = spawn('git', args, {
+        cwd: repoPath,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: envOverrides ? { ...process.env, ...envOverrides } : process.env,
+      });
       let stdout = '';
       let stderr = '';
       const abort = () => proc.kill();

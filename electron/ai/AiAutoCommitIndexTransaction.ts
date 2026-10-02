@@ -1,24 +1,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createHash } from 'crypto';
 import type { GitService } from '../GitService';
 import { cleanupPrivateTempDir, createPrivateTempDir, writePrivateTempFile } from '../git/PrivateTempFiles';
 import { toLiteralPathspec } from '../git/RepositoryPathSafety';
 import type { CommitMessage, SnapshotFile } from './aiServiceTypes';
 import type { StatusEntry } from './gitStatusSnapshot';
+import type { AutoCommitChange, AutoCommitSnapshot, ChangeSource } from './AutoCommitPlanTypes';
+import { assertAutoCommitState, readSnapshotChanges } from './AutoCommitSnapshot';
+import { rollbackAutoCommitRef } from './AutoCommitRefRecovery';
+import { AutoCommitJournal } from './AutoCommitJournal';
+import { acquireRealIndexLock, fingerprintIndex, restoreIndexPaths } from './AutoCommitPrivateIndex';
+import type { CommitEditGit } from '../git/CommitEditGit';
 
 type EnvironmentGitService = GitService & {
   runCommandAtPathWithEnv?: (repoPath: string, args: string[], envOverrides: NodeJS.ProcessEnv) => Promise<string>;
 };
-
-type ReflogEntry = {
-  hash: string;
-  subject: string;
-};
-
-type RollbackOutcome = 'unchanged' | 'rolled-back' | 'unsafe';
-
-const REFLOG_SCAN_LIMIT = 256;
 
 const removeIfPresent = (filePath: string): void => {
   try {
@@ -51,11 +47,19 @@ export class AiAutoCommitIndexTransaction {
   private committablePaths: Set<string> | null = null;
   private nonCommittableSubmodulePaths = new Set<string>();
   private initialized = false;
+  private initialStagedTree = '';
+  private initialHeadTree = '';
+  private initialHead: string | null = null;
+  private initialBranch: string | null = null;
+  private exclusiveGit?: CommitEditGit;
+  private journal?: AutoCommitJournal;
+  private changeMaps: Partial<Record<ChangeSource, Map<string, AutoCommitChange>>> = {};
 
   constructor(
     gitService: GitService,
     private readonly repoPath: string,
-    private readonly beforeCommit?: (privateIndexPath: string) => Promise<void>,
+    private readonly beforeCommit?: (privateIndexPath: string, baseTree?: string) => Promise<void>,
+    private readonly options: { signoff?: boolean; ensureActive?: () => void; signal?: AbortSignal } = {},
   ) {
     this.git = gitService as EnvironmentGitService;
     this.tempDir = createPrivateTempDir('ogc-ai-index-');
@@ -71,26 +75,68 @@ export class AiAutoCommitIndexTransaction {
   }
 
   async initialize(entries: StatusEntry[]): Promise<void> {
-    if (!this.supported) return;
-    if (this.initialized) throw new Error('AI index transaction was already initialized.');
+    if (!this.supported) throw new Error('AI Auto-Commit requires isolated Git index support.');
+    return this.exclusive(() => this.initializeSnapshot(entries));
+  }
 
+  private async initializeSnapshot(entries: StatusEntry[]): Promise<void> {
+    if (this.initialized) throw new Error('AI index transaction was already initialized.');
+    this.options.ensureActive?.();
+    await assertAutoCommitState((args) => this.run(args));
     this.expectedHead = await this.readHead();
     this.expectedHeadRef = await this.readHeadRef();
     this.realIndexPath = await this.resolveRealIndexPath();
+    this.journal = new AutoCommitJournal(this.realIndexPath);
+    if (await this.journal.recover((args) => this.run(args))) {
+      throw new Error('Interrupted AI commit recovered. Inspect the repository, then start a new run if needed. No additional commit was created.');
+    }
     const realIndexState = await this.readRealIndexState();
     this.expectedRealIndexTree = realIndexState.tree;
     this.expectedRealIndexFingerprint = realIndexState.fingerprint;
-
     await this.initializePrivateIndex(this.snapshotIndexPath, this.expectedHead);
-    const affectedPaths = this.collectStatusPaths(entries);
-    if (affectedPaths.length === 0) throw new Error('No files are available for the AI snapshot.');
-    const pathspecFile = this.writePathspecFile('snapshot.paths', affectedPaths);
-    await this.runWithIndex(this.snapshotIndexPath, ['add', '-A', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul']);
+    this.initialHeadTree = (await this.runWithIndex(this.snapshotIndexPath, ['write-tree'])).trim();
+    this.initialStagedTree = realIndexState.tree;
+    this.initialHead = this.expectedHead;
+    this.initialBranch = this.expectedHeadRef;
+    await this.initializePrivateIndex(path.join(this.tempDir, 'staged.index'), this.initialStagedTree);
+    await this.initializePrivateIndex(this.snapshotIndexPath, this.initialStagedTree);
+    const affectedPaths = this.collectStatusPaths(entries.filter((entry) => entry.y !== ' '));
+    if (affectedPaths.length) {
+      const pathspecFile = this.writePathspecFile('snapshot.paths', affectedPaths);
+      await this.runWithIndex(this.snapshotIndexPath, ['add', '-A', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul']);
+    }
     this.snapshotTree = (await this.runWithIndex(this.snapshotIndexPath, ['write-tree'])).trim();
     if (!this.snapshotTree) throw new Error('AI working-tree snapshot could not be created.');
     this.committablePaths = await this.readSnapshotChangedPaths();
     this.nonCommittableSubmodulePaths = await this.readNonCommittableSubmodulePaths(entries);
     this.initialized = true;
+    if (
+      (await this.readHead()) !== this.expectedHead ||
+      (await this.readHeadRef()) !== this.expectedHeadRef ||
+      (await this.readRealIndexState()).fingerprint !== this.expectedRealIndexFingerprint
+    )
+      throw new Error('Repository changed during snapshot capture.');
+    this.options.ensureActive?.();
+  }
+
+  async getSnapshot(): Promise<AutoCommitSnapshot> {
+    if (!this.initialized || !this.snapshotTree) throw new Error('AI snapshot is unavailable.');
+    const staged = await readSnapshotChanges((args) => this.run(args), this.initialHeadTree, this.initialStagedTree, 'staged');
+    const worktree = await readSnapshotChanges((args) => this.run(args), this.initialStagedTree, this.snapshotTree, 'worktree');
+    this.changeMaps = { staged: new Map(staged.map((change) => [change.path, change])), worktree: new Map(worktree.map((change) => [change.path, change])) };
+    return {
+      head: this.initialHead,
+      branch: this.initialBranch,
+      headTree: this.initialHeadTree,
+      stagedTree: this.initialStagedTree,
+      worktreeTree: this.snapshotTree,
+      stagedIndexPath: path.join(this.tempDir, 'staged.index'),
+      worktreeIndexPath: this.snapshotIndexPath,
+      changes: [...staged, ...worktree],
+      skippedPaths: [...this.nonCommittableSubmodulePaths].filter(
+        (file) => !staged.some((change) => change.path === file) && !worktree.some((change) => change.path === file),
+      ),
+    };
   }
 
   isStatusEntryCommittable(entry: StatusEntry): boolean {
@@ -102,7 +148,7 @@ export class AiAutoCommitIndexTransaction {
     return [...this.nonCommittableSubmodulePaths];
   }
 
-  async commit(batchFiles: SnapshotFile[], message: CommitMessage): Promise<string> {
+  async commit(batchFiles: Array<Pick<SnapshotFile, 'path' | 'originalPath'>>, message: CommitMessage, source: ChangeSource = 'worktree'): Promise<string> {
     if (!this.supported || !this.initialized || !this.snapshotTree || !this.realIndexPath || !this.expectedRealIndexTree) {
       throw new Error('AI index transaction is not initialized.');
     }
@@ -114,12 +160,29 @@ export class AiAutoCommitIndexTransaction {
     const pathspecFile = this.writePathspecFile(`batch-${Date.now()}-${Math.random().toString(16).slice(2)}.paths`, affectedPaths);
     await this.initializePrivateIndex(batchIndexPath, this.expectedHead);
     const baseTree = (await this.runWithIndex(batchIndexPath, ['write-tree'])).trim();
-    await this.restorePathsFromTree(batchIndexPath, this.snapshotTree, affectedPaths, pathspecFile);
+    const changes = batchFiles.map((file) => this.changeMaps[source]?.get(file.path));
+    const updates = changes.every((change): change is AutoCommitChange => Boolean(change)) ? changes : undefined;
+    if (updates) await this.applySnapshotEntries(batchIndexPath, updates);
+    else await this.restorePathsFromTree(batchIndexPath, source === 'staged' ? this.initialStagedTree : this.snapshotTree, affectedPaths, pathspecFile);
     const expectedCommitTree = (await this.runWithIndex(batchIndexPath, ['write-tree'])).trim();
+    if (source === 'staged' && expectedCommitTree !== this.initialStagedTree) throw new Error('The staged commit must match the complete original index.');
     if (expectedCommitTree === baseTree) {
       throw new Error('AI commit batch contains no changes that can be committed in the parent repository.');
     }
-    await this.beforeCommit?.(batchIndexPath);
+    await this.beforeCommit?.(batchIndexPath, baseTree);
+    return this.exclusive(() => this.publishBatch(batchIndexPath, pathspecFile, affectedPaths, expectedCommitTree, message, updates));
+  }
+
+  private async publishBatch(
+    batchIndexPath: string,
+    pathspecFile: string,
+    affectedPaths: string[],
+    expectedCommitTree: string,
+    message: CommitMessage,
+    updates?: AutoCommitChange[],
+  ): Promise<string> {
+    this.options.ensureActive?.();
+    await assertAutoCommitState((args) => this.run(args));
 
     const currentHead = await this.readHead();
     const currentHeadRef = await this.readHeadRef();
@@ -127,12 +190,13 @@ export class AiAutoCommitIndexTransaction {
       throw new Error('Repository HEAD changed while AI Auto-Commit was running. No commit was created.');
     }
 
-    const indexLockPath = `${this.realIndexPath}.lock`;
-    this.acquireRealIndexLock(indexLockPath);
+    const indexLockPath = `${this.realIndexPath!}.lock`;
+    acquireRealIndexLock(indexLockPath);
     const targetRef = this.expectedHeadRef || 'HEAD';
     const reflogAction = `open-git-control-ai-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     let commitAttempted = false;
     let commitFinalized = false;
+    let preserveRecovery = false;
     try {
       const realIndexExisted = await this.seedLockedIndex(indexLockPath);
       const currentIndexFingerprint = realIndexExisted ? await this.fingerprintIndex(indexLockPath) : null;
@@ -146,7 +210,8 @@ export class AiAutoCommitIndexTransaction {
 
       // Prepare the exact real-index state that should become visible after a
       // successful commit. It remains in index.lock until the commit is proven.
-      await this.restorePathsFromTree(indexLockPath, expectedCommitTree, affectedPaths, pathspecFile);
+      if (updates) await this.applySnapshotEntries(indexLockPath, updates);
+      else await this.restorePathsFromTree(indexLockPath, expectedCommitTree, affectedPaths, pathspecFile);
       const nextRealIndexTree = (await this.runWithIndex(indexLockPath, ['write-tree'])).trim();
       const nextRealIndexFingerprint = await this.fingerprintIndex(indexLockPath);
 
@@ -165,8 +230,14 @@ export class AiAutoCommitIndexTransaction {
       // started from those hooks. It lets failure recovery distinguish our
       // entire commit chain from an unrelated ref update. Enabling reflogs for
       // this command also covers repositories that disabled them globally.
+      this.options.ensureActive?.();
+      this.journal!.prepare({ head: this.expectedHead, ref: this.expectedHeadRef, tree: expectedCommitTree, action: reflogAction });
       commitAttempted = true;
-      await this.runWithIndex(batchIndexPath, ['-c', 'core.logAllRefUpdates=true', 'commit', '-F', messageFile], { GIT_REFLOG_ACTION: reflogAction });
+      const args = ['-c', 'core.logAllRefUpdates=true', 'commit', '--cleanup=verbatim', ...(this.options.signoff ? ['--signoff'] : []), '-F', messageFile];
+      await this.exclusiveGit!.run(this.repoPath, args, {
+        signal: this.options.signal,
+        envOverrides: { GIT_INDEX_FILE: batchIndexPath, GIT_REFLOG_ACTION: reflogAction },
+      });
 
       const createdHeadRef = await this.readHeadRef();
       const createdHead = await this.readTransactionRefValue(targetRef);
@@ -194,7 +265,7 @@ export class AiAutoCommitIndexTransaction {
       }
 
       try {
-        fs.renameSync(indexLockPath, this.realIndexPath);
+        fs.renameSync(indexLockPath, this.realIndexPath!);
       } catch (error) {
         throw new Error(`AI commit index could not be finalized: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -206,8 +277,11 @@ export class AiAutoCommitIndexTransaction {
       return createdHead;
     } catch (error: unknown) {
       if (commitAttempted && !commitFinalized) {
-        const rollbackOutcome = await this.rollbackOwnedRefChanges(targetRef, reflogAction).catch(() => 'unsafe' as const);
+        const rollbackOutcome = await rollbackAutoCommitRef((args) => this.run(args), targetRef, this.expectedHead, reflogAction).catch(
+          () => 'unsafe' as const,
+        );
         if (rollbackOutcome === 'unsafe') {
+          preserveRecovery = true;
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(
             `${message} The repository ref was not rewritten because a concurrent non-AI ref update was detected; no foreign commit was removed.`,
@@ -218,6 +292,14 @@ export class AiAutoCommitIndexTransaction {
     } finally {
       // On every failure before promotion, removing index.lock exposes the
       // exact original index again. After promotion this path no longer exists.
+      if (!preserveRecovery) {
+        try {
+          this.journal?.clear();
+        } catch {
+          // The durable commit must still be reported. A leftover journal is
+          // recognized on recovery; it prevents any following commit here.
+        }
+      }
       removeIfPresent(indexLockPath);
       removeIfPresent(`${indexLockPath}.lock`);
       removeIfPresent(batchIndexPath);
@@ -232,12 +314,16 @@ export class AiAutoCommitIndexTransaction {
   private collectStatusPaths(entries: StatusEntry[]): string[] {
     return [
       ...new Set(
-        entries.flatMap((entry) => [entry.path, entry.originalPath].filter((value): value is string => typeof value === 'string' && value.length > 0)),
+        entries.flatMap((entry) =>
+          [entry.path, entry.y === 'R' || entry.y === 'C' ? entry.originalPath : undefined].filter(
+            (value): value is string => typeof value === 'string' && value.length > 0,
+          ),
+        ),
       ),
     ];
   }
 
-  private collectSnapshotPaths(files: SnapshotFile[]): string[] {
+  private collectSnapshotPaths(files: Array<Pick<SnapshotFile, 'path' | 'originalPath'>>): string[] {
     return [
       ...new Set(files.flatMap((file) => [file.path, file.originalPath].filter((value): value is string => typeof value === 'string' && value.length > 0))),
     ];
@@ -270,33 +356,15 @@ export class AiAutoCommitIndexTransaction {
     return filePath;
   }
 
-  private async restorePathsFromTree(indexPath: string, sourceTree: string, paths: string[], pathspecFile: string): Promise<void> {
-    const existingRaw = await this.runWithIndex(indexPath, [
-      'ls-tree',
-      '-r',
-      '-z',
-      '--name-only',
-      sourceTree,
-      '--',
-      ...paths.map((filePath) => toLiteralPathspec(filePath)),
-    ]);
-    const existingPaths = existingRaw.split('\0').filter(Boolean);
-    const existingSet = new Set(existingPaths);
-    const absentPaths = paths.filter((filePath) => !existingSet.has(filePath));
-
-    if (existingPaths.length > 0) {
-      const existingPathspecFile = this.writePathspecFile(`${path.basename(pathspecFile)}.existing`, existingPaths);
-      await this.runWithIndex(indexPath, [
-        'restore',
-        `--source=${sourceTree}`,
-        '--staged',
-        `--pathspec-from-file=${existingPathspecFile}`,
-        '--pathspec-file-nul',
-      ]);
-    }
-    if (absentPaths.length > 0) {
-      await this.runWithIndex(indexPath, ['rm', '--cached', '-f', '--ignore-unmatch', '--', ...absentPaths.map((filePath) => toLiteralPathspec(filePath))]);
-    }
+  private restorePathsFromTree(index: string, tree: string, paths: string[], file: string): Promise<void> {
+    return restoreIndexPaths(
+      (target, args) => this.runWithIndex(target, args),
+      (name, values) => this.writePathspecFile(name, values),
+      index,
+      tree,
+      paths,
+      file,
+    );
   }
 
   private async initializePrivateIndex(indexPath: string, head: string | null): Promise<void> {
@@ -317,18 +385,6 @@ export class AiAutoCommitIndexTransaction {
     }
     fs.copyFileSync(emptyIndex, indexLockPath);
     return false;
-  }
-
-  private acquireRealIndexLock(indexLockPath: string): void {
-    fs.mkdirSync(path.dirname(indexLockPath), { recursive: true });
-    let descriptor: number | null = null;
-    try {
-      descriptor = fs.openSync(indexLockPath, 'wx', 0o600);
-    } catch (error) {
-      throw new Error(`Git index is busy. AI Auto-Commit did not modify it: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      if (descriptor !== null) fs.closeSync(descriptor);
-    }
   }
 
   private async resolveRealIndexPath(): Promise<string> {
@@ -352,13 +408,8 @@ export class AiAutoCommitIndexTransaction {
     return { tree: (await this.runWithIndex(emptyIndex, ['write-tree'])).trim(), fingerprint: null };
   }
 
-  private async fingerprintIndex(indexPath: string): Promise<string> {
-    // Index stat/cache-tree/fsmonitor extensions may be refreshed by harmless
-    // status polling. Hash only durable staged entries and user-controlled
-    // flags so those refreshes do not abort a multi-batch AI run.
-    const stagedEntries = await this.runWithIndex(indexPath, ['ls-files', '--stage', '-z']);
-    const entryFlags = await this.runWithIndex(indexPath, ['ls-files', '-v', '-z']);
-    return createHash('sha256').update(stagedEntries).update('\0').update(entryFlags).digest('hex');
+  private fingerprintIndex(index: string): Promise<string> {
+    return fingerprintIndex((target, args) => this.runWithIndex(target, args), index);
   }
 
   private async readHead(): Promise<string | null> {
@@ -398,74 +449,50 @@ export class AiAutoCommitIndexTransaction {
     }
   }
 
-  private async readReflog(ref: string): Promise<ReflogEntry[] | null> {
-    try {
-      const raw = await this.run(['reflog', 'show', `--max-count=${REFLOG_SCAN_LIMIT}`, '--format=%H%x00%gs', ref]);
-      if (!raw) return [];
-      return raw.split(/\r?\n/).flatMap((line) => {
-        const separator = line.indexOf('\0');
-        if (separator <= 0) return [];
-        const hash = line.slice(0, separator).trim();
-        if (!hash) return [];
-        return [{ hash, subject: line.slice(separator + 1) }];
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  private async rollbackOwnedRefChanges(targetRef: string, reflogAction: string): Promise<RollbackOutcome> {
-    if (targetRef === 'HEAD' && (await this.readHeadRef()) !== null) {
-      // The original detached HEAD was replaced. Its AI commit is now
-      // unreachable, while HEAD refers to someone else's branch.
-      return 'unchanged';
-    }
-
-    const currentHead = await this.readTransactionRefValue(targetRef);
-    if (currentHead === this.expectedHead) return 'unchanged';
-    if (!currentHead) return this.expectedHead ? 'unsafe' : 'unchanged';
-
-    const entries = await this.readReflog(targetRef);
-    const ownsEntry = (entry: ReflogEntry): boolean => entry.subject === reflogAction || entry.subject.startsWith(`${reflogAction}:`);
-    if (!entries || entries.length === 0 || entries[0].hash !== currentHead || !ownsEntry(entries[0])) {
-      return 'unsafe';
-    }
-
-    const ownedEntries: ReflogEntry[] = [];
-    for (const entry of entries) {
-      if (!ownsEntry(entry)) break;
-      ownedEntries.push(entry);
-    }
-    if (ownedEntries.length === REFLOG_SCAN_LIMIT) return 'unsafe';
-
-    // If an unrelated commit landed after ours, it is the newest unowned
-    // reflog entry and recovery deliberately refuses to rewrite it. The oldest
-    // nonce-bearing entry is the commit made by this transaction (or by a
-    // failing pre-commit hook); its first parent is therefore the safe boundary
-    // even when a later hook amended/replaced that commit rather than extending
-    // it as a strict first-parent chain.
-    const oldestParents = await this.readCommitParents(ownedEntries[ownedEntries.length - 1].hash);
-    const rollbackTarget = oldestParents[0] || null;
-
-    const updateArgs = targetRef === 'HEAD' ? ['update-ref', '--no-deref'] : ['update-ref'];
-    if (rollbackTarget) {
-      await this.run([...updateArgs, '-m', 'rollback failed AI auto-commit', targetRef, rollbackTarget, currentHead]);
-    } else {
-      await this.run([...updateArgs, '-d', targetRef, currentHead]);
-    }
-    return 'rolled-back';
-  }
-
   private async run(args: string[]): Promise<string> {
+    if (this.exclusiveGit) return this.exclusiveGit.run(this.repoPath, args, { ignoreAbort: true });
     return this.git.runCommandAtPath(this.repoPath, args);
+  }
+
+  private async applySnapshotEntries(index: string, changes: AutoCommitChange[]): Promise<void> {
+    // Hashes and paths originate in the immutable Git diff. Deletions go first
+    // to handle file/directory replacements. NUL input preserves every pathname.
+    const deletions = changes.flatMap((change) => [
+      ...(change.status.startsWith('R') && change.originalPath ? [`0 ${'0'.repeat(change.newBlob.length)}\t${change.originalPath}\0`] : []),
+      ...(change.newMode === '000000' ? [`0 ${change.newBlob}\t${change.path}\0`] : []),
+    ]);
+    const additions = changes.filter((change) => change.newMode !== '000000').map((change) => `${change.newMode} ${change.newBlob}\t${change.path}\0`);
+    const input = [...deletions, ...additions].join('');
+    const envOverrides = { GIT_INDEX_FILE: index, GIT_OPTIONAL_LOCKS: '0' };
+    if (this.exclusiveGit) await this.exclusiveGit.input(this.repoPath, ['update-index', '-z', '--index-info'], input, true, envOverrides);
+    else
+      await this.git.runner.runBuffer(this.repoPath, ['update-index', '-z', '--index-info'], {
+        input,
+        envOverrides,
+        maxBytes: 64 * 1024,
+        tooLargeMessage: 'Git index update output exceeded its limit.',
+      });
   }
 
   private async runWithIndex(indexPath: string, args: string[], envOverrides: NodeJS.ProcessEnv = {}): Promise<string> {
     if (!this.git.runCommandAtPathWithEnv) throw new Error('Environment-isolated Git commands are unavailable.');
-    return this.git.runCommandAtPathWithEnv(this.repoPath, args, {
+    const env = {
       GIT_INDEX_FILE: indexPath,
       GIT_OPTIONAL_LOCKS: '0',
       ...envOverrides,
+    };
+    if (this.exclusiveGit) return this.exclusiveGit.run(this.repoPath, args, { ignoreAbort: true, envOverrides: env });
+    return this.git.runCommandAtPathWithEnv(this.repoPath, args, env);
+  }
+
+  private async exclusive<T>(work: () => Promise<T>): Promise<T> {
+    return this.git.runner.withExclusiveWrite(this.repoPath, 'AI commit transaction', async (git) => {
+      this.exclusiveGit = git;
+      try {
+        return await work();
+      } finally {
+        this.exclusiveGit = undefined;
+      }
     });
   }
 }

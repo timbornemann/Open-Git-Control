@@ -5,6 +5,7 @@ import type { AppSettings } from '../settings';
 import { sanitizeRemoteUrl } from './parsing';
 import type { UpdaterStatusPayload } from './updaterManager';
 import { repositoryPathKey } from './activeRepositoryAuthorization';
+import { getAutoCommitDiagnostics } from '../ai/AutoCommitDiagnostics';
 
 type BuildDiagnosticsReportDependencies = {
   gitService: GitService;
@@ -89,6 +90,9 @@ export function buildDiagnosticsReportFactory(deps: BuildDiagnosticsReportDepend
     lines.push(`entries=${statsDiagnostics.length}`);
     lines.push(`cacheHits=${statsDiagnostics.filter((entry) => entry.cacheHit).length}`);
     lines.push(`aborted=${statsDiagnostics.filter((entry) => entry.aborted).length}`);
+    lines.push('');
+    lines.push('[AI Auto-Commit]');
+    for (const entry of getAutoCommitDiagnostics(activeRepo)) lines.push(JSON.stringify(entry));
 
     if (activeRepo) {
       lines.push('');

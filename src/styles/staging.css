@@ -230,6 +230,57 @@
   gap: 6px;
 }
 
+.ai-commit-plan {
+  border-block: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  padding-block: 6px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  max-height: 240px;
+  overflow: auto;
+}
+.ai-commit-plan summary {
+  cursor: pointer;
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+.ai-commit-plan summary:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+.ai-commit-plan ol {
+  padding-left: 22px;
+  margin: 6px 0 0;
+}
+.ai-commit-plan ol > li {
+  border-top: 1px solid var(--border-color);
+  padding-block: 4px;
+}
+.ai-commit-plan-meta {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  margin-top: 3px;
+}
+.ai-commit-plan-meta strong {
+  color: var(--status-warning);
+  font-weight: 500;
+}
+.ai-commit-plan-done {
+  color: var(--status-success);
+}
+.ai-commit-plan p,
+.ai-commit-plan pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.ai-commit-plan ul {
+  padding-left: 18px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .staging-commit-input {
   width: 100%;
   min-height: 52px;
