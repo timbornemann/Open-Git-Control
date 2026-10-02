@@ -1,2 +1,14 @@
 @import './commit-graph/part-01.css';
 @import './commit-graph/part-02.css';
+
+.commit-graph-refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}

@@ -10,6 +10,7 @@ import { CommitGraphSvg } from './CommitGraphSvg';
 import { ForensicSearchPanel, type ForensicSearchType } from './ForensicSearchPanel';
 import { GRAPH_PADDING, LANE_WIDTH, ROW_HEIGHT } from './commitGraphConstants';
 import { EmptyState } from '@/components/EmptyState';
+import { CommitGraphLoadError } from './CommitGraphLoadError';
 import { buildGraphHighlightData } from './commitGraphRefs';
 import { useCommitGraphDialogs } from './useCommitGraphDialogs';
 import { useCommitGraphSearch } from './useCommitGraphSearch';
@@ -96,17 +97,27 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     resetForensicStateRef.current();
   }, []);
   const logContainerRef = useRef<HTMLDivElement>(null);
-  const { layout, workingTreeStatus, loading, loadingMore, hasMoreCommits, refreshCommits, loadMoreCommits, refreshWorkingTreeStatus, requestCommitStats } =
-    useCommitGraphData({
-      repoPath,
-      showSecondaryHistory,
-      refreshTrigger,
-      commitRefreshTrigger,
-      logContainerRef,
-      onRepoCleared: handleRepoCleared,
-      externalWorkingTreeStatus,
-      onRefreshWorkingTree,
-    });
+  const {
+    layout,
+    workingTreeStatus,
+    loading,
+    loadingMore,
+    loadError,
+    hasMoreCommits,
+    refreshCommits,
+    loadMoreCommits,
+    refreshWorkingTreeStatus,
+    requestCommitStats,
+  } = useCommitGraphData({
+    repoPath,
+    showSecondaryHistory,
+    refreshTrigger,
+    commitRefreshTrigger,
+    logContainerRef,
+    onRepoCleared: handleRepoCleared,
+    externalWorkingTreeStatus,
+    onRefreshWorkingTree,
+  });
   const { scrollTop, containerHeight, scrollToCommitIndex } = useCommitGraphViewport({
     logContainerRef,
     layout,
@@ -309,6 +320,9 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
     );
   }
   if (!layout || layout.nodes.length === 0) {
+    if (loadError) {
+      return <CommitGraphLoadError error={loadError} onRetry={() => void refreshCommits('reset')} />;
+    }
     return (
       <EmptyState
         title={t('generated.components.commit_graph.commitgraph.no_commits_found_c43024aa')}
@@ -336,6 +350,7 @@ export const CommitGraph: React.FC<CommitGraphProps> = ({
 
   return (
     <>
+      {loadError && <CommitGraphLoadError error={loadError} hasLayout onRetry={() => void refreshCommits('sync')} />}
       <CommitSearchToolbar
         activeSearchPanel={activeSearchPanel}
         onActiveSearchPanelChange={(mode) => {

@@ -4,25 +4,28 @@ import { type GraphLayout } from '@/utils/graphLayout';
 import type { GitCommit } from '@/utils/gitParsing';
 import { mergeCommitStatsUpdate } from './mergeCommitStatsUpdate';
 
-export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLayout | null>>, repoPath = '') => {
+export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLayout | null>>, repoPath = '', scopeKey = repoPath) => {
   const generation = useRef(0);
-  const currentRepo = useRef(repoPath);
-  if (currentRepo.current !== repoPath) {
-    currentRepo.current = repoPath;
+  const currentScope = useRef(scopeKey);
+  if (currentScope.current !== scopeKey) {
+    currentScope.current = scopeKey;
     generation.current++;
   }
   useEffect(
     () => () => {
       generation.current++;
     },
-    [repoPath],
+    [],
   );
   return useCallback(
-    (commits: GitCommit[]) => {
+    async (commits: GitCommit[]) => {
+      if (currentScope.current !== scopeKey) return;
       const request = ++generation.current;
-      void prepareGraphLayout(repoPath, commits).then((layout) => {
+      try {
+        const layout = await prepareGraphLayout(repoPath, commits);
         if (generation.current !== request) return;
         setLayout((current) => {
+          if (generation.current !== request) return current;
           if (!current) return layout;
           const currentByHash = new Map(current.nodes.map((node) => [node.commit.hash, node.commit]));
           const nodes = layout.nodes.map((node) => {
@@ -32,8 +35,12 @@ export const useGraphLayoutEngine = (setLayout: Dispatch<SetStateAction<GraphLay
           });
           return { ...layout, nodes };
         });
-      });
+      } catch (error) {
+        // The owner handles current failures alongside history-read errors.
+        // Results from a previous repository/view no longer own any UI state.
+        if (generation.current === request) throw error;
+      }
     },
-    [repoPath, setLayout],
+    [repoPath, scopeKey, setLayout],
   );
 };

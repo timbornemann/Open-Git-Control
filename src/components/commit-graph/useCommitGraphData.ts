@@ -1,4 +1,4 @@
-import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferredFrame } from './commitGraphRequestUtils';
+import { errorMessage, isGitOperationAborted, requestDeferredFrame, cancelDeferredFrame, cancelDeferredRetry } from './commitGraphRequestUtils';
 import { useCachedResult } from '@/data/resourceHooks';
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GraphLayout } from '@/utils/graphLayout';
@@ -45,13 +45,18 @@ export const useCommitGraphData = ({
   externalWorkingTreeStatus,
   onRefreshWorkingTree,
 }: Params) => {
-  useCachedResult(graphQueryKey(getGraphCacheKey(repoPath || '', showSecondaryHistory)));
+  const graphScopeKey = getGraphCacheKey(repoPath || '', showSecondaryHistory);
+  useCachedResult(graphQueryKey(graphScopeKey));
   const cachedAtMount = repoPath ? getGraphCacheEntry(repoPath, showSecondaryHistory) : undefined;
   const [layout, setLayout] = useState<GraphLayout | null>(() => cachedAtMount?.layout || null);
   const [commitCount, setCommitCount] = useState(() => cachedAtMount?.commits.length || 0);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [hasMoreCommits, setHasMoreCommits] = useState(cachedAtMount?.hasMore ?? true);
+  // A restored/worker layout can arrive while the live request is still pending.
+  // Once it is usable, no request's loading flag may hide it.
+  const isInitialLoading = loading && !layout;
 
   const commitCountRef = useRef(0);
   const layoutRef = useRef<GraphLayout | null>(cachedAtMount?.layout || null);
@@ -67,10 +72,9 @@ export const useCommitGraphData = ({
   const lastCommitRefreshTriggerRef = useRef(commitRefreshTrigger);
   const forceScrollToTopOnNextResetRef = useRef(false);
   const requestGenerationRef = useRef(0);
-  const abortRetryCountRef = useRef(0);
   const abortRetryTimeoutRef = useRef<number | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
-  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '');
+  const updateLayout = useGraphLayoutEngine(setLayout, repoPath || '', graphScopeKey);
   const { workingTreeStatus, refreshWorkingTreeStatus, clearWorkingTreeStatus } = useCommitGraphWorkingTreeStatus({
     repoPath,
     externalWorkingTreeStatus,
@@ -84,10 +88,7 @@ export const useCommitGraphData = ({
   useEffect(
     () => () => {
       requestGenerationRef.current += 1;
-      if (abortRetryTimeoutRef.current !== null) {
-        window.clearTimeout(abortRetryTimeoutRef.current);
-        abortRetryTimeoutRef.current = null;
-      }
+      cancelDeferredRetry(abortRetryTimeoutRef);
       if (scrollRestoreFrameRef.current !== null) {
         cancelDeferredFrame(scrollRestoreFrameRef.current);
         scrollRestoreFrameRef.current = null;
@@ -97,7 +98,7 @@ export const useCommitGraphData = ({
   );
 
   const refreshCommits = useCallback(
-    async (mode: RefreshMode = 'reset') => {
+    async (mode: RefreshMode = 'reset', retryAttempt = 0) => {
       if (!repoPath || !gitClient.isAvailable()) return;
 
       const isAppend = mode === 'append';
@@ -111,29 +112,56 @@ export const useCommitGraphData = ({
         return;
       }
 
-      const shouldShowLoadingState = !layoutRef.current;
       const scrollContainer = logContainerRef.current?.parentElement ?? null;
       const forceTopOnRefresh = !isAppend && forceScrollToTopOnNextResetRef.current;
       const requestedLimitRaw = isAppend ? LOG_PAGE_SIZE : isQuick ? QUICK_REFRESH_LIMIT : LOG_PAGE_SIZE;
       const requestedLimit = Math.max(1, Math.min(requestedLimitRaw, LOG_MAX_LIMIT));
       const requestGeneration = ++requestGenerationRef.current;
+      let retryScheduled = false;
+      cancelDeferredRetry(abortRetryTimeoutRef);
+      setLoadError(null);
+      // Loading belongs to the latest request, independently of whether the
+      // graph's scroll container is mounted yet.
+      if (isAppend) {
+        appendInFlightRef.current = true;
+        setLoadingMore(true);
+      } else {
+        setLoading(!layoutRef.current);
+      }
 
       if ((isAppend || isSync || isQuick) && scrollContainer) {
         pendingScrollTopRef.current = forceTopOnRefresh || isQuick ? 0 : scrollContainer.scrollTop;
         pendingScrollHeightRef.current = isSync && !forceTopOnRefresh ? scrollContainer.scrollHeight : null;
         pendingScrollModeRef.current = forceTopOnRefresh ? 'reset' : isAppend ? 'append' : isQuick ? 'quick' : 'sync';
-        if (isAppend) {
-          appendInFlightRef.current = true;
-          setLoadingMore(true);
-        }
       } else {
         pendingScrollTopRef.current = forceTopOnRefresh ? 0 : scrollContainer ? scrollContainer.scrollTop : null;
         pendingScrollHeightRef.current = null;
         pendingScrollModeRef.current = 'reset';
-        if (shouldShowLoadingState) {
-          setLoading(true);
-        }
       }
+
+      const handleFailure = (error: unknown) => {
+        if (isGitOperationAborted(error) && retryAttempt < 2) {
+          retryScheduled = true;
+          abortRetryTimeoutRef.current = window.setTimeout(
+            () => {
+              abortRetryTimeoutRef.current = null;
+              if (requestGeneration === requestGenerationRef.current) void refreshCommits(mode, retryAttempt + 1);
+            },
+            100 * (retryAttempt + 1),
+          );
+          return;
+        }
+        const message = errorMessage(error);
+        setLoadError(message || 'Failed to fetch commits.');
+        if (isRepoUnavailableError(message)) {
+          setLayout(null);
+          layoutRef.current = null;
+          setCommitCount(0);
+          commitCountRef.current = 0;
+          setHasMoreCommits(false);
+        }
+        console.error('Failed to fetch commits:', error);
+      };
 
       try {
         const scope = showSecondaryHistory ? 'all' : 'head';
@@ -146,7 +174,6 @@ export const useCommitGraphData = ({
         });
         if (requestGeneration !== requestGenerationRef.current) return;
         if (result.success) {
-          abortRetryCountRef.current = 0;
           const data = result.data;
           const parsedChunk = parseGitLog(data.raw || '').slice(0, requestedLimit);
           const visibleChunk = applyCachedStats(parsedChunk, data.stats || {});
@@ -159,7 +186,7 @@ export const useCommitGraphData = ({
             setCommitCount(nextCount);
             setHasMoreCommits(hasMore);
             storeGraphCache(cacheKey, merged, hasMore);
-            updateLayout(merged);
+            await updateLayout(merged);
           } else if (isQuick || isSync) {
             const existing = layoutRef.current?.nodes.map((node) => node.commit) ?? [];
             const merged = mergeQuickRefreshCommits(existing, visibleChunk);
@@ -167,55 +194,21 @@ export const useCommitGraphData = ({
             setCommitCount(merged.length);
             setHasMoreCommits(hasMore || merged.length > visibleChunk.length);
             storeGraphCache(cacheKey, merged, hasMore || merged.length > visibleChunk.length);
-            updateLayout(merged);
+            await updateLayout(merged);
           } else {
             const normalized = mergeUniqueCommits([], visibleChunk);
             commitCountRef.current = normalized.length;
             setCommitCount(normalized.length);
             setHasMoreCommits(hasMore);
             storeGraphCache(cacheKey, normalized, hasMore);
-            updateLayout(normalized);
+            await updateLayout(normalized);
           }
         } else {
-          if (isGitOperationAborted(result.error) && abortRetryCountRef.current < 2) {
-            abortRetryCountRef.current += 1;
-            abortRetryTimeoutRef.current = window.setTimeout(() => {
-              abortRetryTimeoutRef.current = null;
-              if (requestGeneration === requestGenerationRef.current) {
-                void refreshCommits(mode);
-              }
-            }, 100);
-            return;
-          }
-          if (isRepoUnavailableError(String(result.error || ''))) {
-            setLayout(null);
-            setCommitCount(0);
-            commitCountRef.current = 0;
-            setHasMoreCommits(false);
-            return;
-          }
-          console.error('Failed to fetch commits:', result.error);
+          handleFailure(result.error);
         }
       } catch (e: unknown) {
         if (requestGeneration !== requestGenerationRef.current) return;
-        if (isGitOperationAborted(e) && abortRetryCountRef.current < 2) {
-          abortRetryCountRef.current += 1;
-          abortRetryTimeoutRef.current = window.setTimeout(() => {
-            abortRetryTimeoutRef.current = null;
-            if (requestGeneration === requestGenerationRef.current) {
-              void refreshCommits(mode);
-            }
-          }, 100);
-          return;
-        }
-        if (isRepoUnavailableError(errorMessage(e))) {
-          setLayout(null);
-          setCommitCount(0);
-          commitCountRef.current = 0;
-          setHasMoreCommits(false);
-          return;
-        }
-        console.error(e);
+        handleFailure(e);
       } finally {
         if (requestGeneration === requestGenerationRef.current) {
           if (isAppend) {
@@ -225,10 +218,10 @@ export const useCommitGraphData = ({
               const pendingMode = pendingRefreshAfterAppendRef.current;
               pendingRefreshAfterAppendRef.current = null;
               queueMicrotask(() => {
-                void refreshCommits(pendingMode);
+                if (requestGeneration === requestGenerationRef.current) void refreshCommits(pendingMode);
               });
             }
-          } else if (shouldShowLoadingState) {
+          } else if (!retryScheduled) {
             setLoading(false);
           }
         }
@@ -238,22 +231,19 @@ export const useCommitGraphData = ({
   );
 
   const loadMoreCommits = useCallback(async () => {
-    if (loading || loadingMore || appendInFlightRef.current || !hasMoreCommits) return;
+    if (isInitialLoading || loadingMore || appendInFlightRef.current || !hasMoreCommits) return;
     await refreshCommits('append');
-  }, [hasMoreCommits, loading, loadingMore, refreshCommits]);
+  }, [hasMoreCommits, isInitialLoading, loadingMore, refreshCommits]);
 
   useLayoutEffect(() => {
     if (!repoPath) {
       requestGenerationRef.current += 1;
-      abortRetryCountRef.current = 0;
-      if (abortRetryTimeoutRef.current !== null) {
-        window.clearTimeout(abortRetryTimeoutRef.current);
-        abortRetryTimeoutRef.current = null;
-      }
+      cancelDeferredRetry(abortRetryTimeoutRef);
       setLayout(null);
       setCommitCount(0);
       setLoading(false);
       setLoadingMore(false);
+      setLoadError(null);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
       clearWorkingTreeStatus();
@@ -276,11 +266,7 @@ export const useCommitGraphData = ({
     lastSecondaryHistoryRef.current = showSecondaryHistory;
     if (repoChanged || historyModeChanged) {
       requestGenerationRef.current += 1;
-      abortRetryCountRef.current = 0;
-      if (abortRetryTimeoutRef.current !== null) {
-        window.clearTimeout(abortRetryTimeoutRef.current);
-        abortRetryTimeoutRef.current = null;
-      }
+      cancelDeferredRetry(abortRetryTimeoutRef);
       // Drop previous-repo state immediately to avoid transient sync refreshes
       // restoring stale scroll positions while the new repo is loading.
       setLayout(null);
@@ -288,6 +274,7 @@ export const useCommitGraphData = ({
       setCommitCount(0);
       setLoading(false);
       setLoadingMore(false);
+      setLoadError(null);
       commitCountRef.current = 0;
       setHasMoreCommits(true);
       clearWorkingTreeStatus();
@@ -305,7 +292,11 @@ export const useCommitGraphData = ({
         if (cached.layout) {
           setLayout(cached.layout);
           layoutRef.current = cached.layout;
-        } else updateLayout(cached.commits);
+        } else {
+          // The live refresh below owns retry/error handling. Preparing the
+          // preview must not leave an unhandled rejection if it is superseded.
+          void updateLayout(cached.commits).catch(() => {});
+        }
       }
     }
 
@@ -394,7 +385,7 @@ export const useCommitGraphData = ({
 
   useCommitGraphAutoLoad({
     logContainerRef,
-    loading,
+    loading: isInitialLoading,
     loadingMore,
     hasMoreCommits,
     loadMoreCommits,
@@ -487,8 +478,9 @@ export const useCommitGraphData = ({
     layout,
     commitCount,
     workingTreeStatus,
-    loading,
+    loading: isInitialLoading,
     loadingMore,
+    loadError,
     hasMoreCommits,
     refreshCommits,
     loadMoreCommits,
