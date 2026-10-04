@@ -16,7 +16,7 @@ import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
 import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
 import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRepositoryTodoDialog';
-import { openRemoteTransferDialog } from './components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from './components/hosting/remoteTransferDialogState';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -42,7 +42,7 @@ const App: React.FC = () => {
   useGlobalKeyboardShortcuts({
     setActiveTab: state.setActiveTab,
     onFetch: () => {
-      if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'fetch' });
+      if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'fetch' });
     },
     onOpenCommandPalette: () => setIsPaletteOpen(true),
     onOpenQuickTodo: () => {

@@ -36,13 +36,13 @@ Current latest release: [v2.2.1](https://github.com/timbornemann/Open-Git-Contro
 
 The badge and latest release page stay current automatically. The direct binary links below are versioned by GitHub asset name and are refreshed by the release workflow after a new stable release is published.
 
-| Platform | Package | Direct GitHub download |
-| --- | --- | --- |
-| Windows x64 | NSIS installer `.exe` | [Open-Git-Control-2.2.1-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-win-x64.exe) |
-| Linux x64 | AppImage | [Open-Git-Control-2.2.1-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-x86_64.AppImage) |
-| Linux amd64 | Debian package `.deb` | [Open-Git-Control-2.2.1-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-amd64.deb) |
-| macOS x64 | Disk image `.dmg` | [Open-Git-Control-2.2.1-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.dmg) |
-| macOS x64 | Zip archive | [Open-Git-Control-2.2.1-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.zip) |
+| Platform    | Package               | Direct GitHub download                                                                                                                                                 |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64 | NSIS installer `.exe` | [Open-Git-Control-2.2.1-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-win-x64.exe)                     |
+| Linux x64   | AppImage              | [Open-Git-Control-2.2.1-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-x86_64.AppImage) |
+| Linux amd64 | Debian package `.deb` | [Open-Git-Control-2.2.1-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-amd64.deb)             |
+| macOS x64   | Disk image `.dmg`     | [Open-Git-Control-2.2.1-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.dmg)                     |
+| macOS x64   | Zip archive           | [Open-Git-Control-2.2.1-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.zip)                     |
 
 The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata for the auto-updater. Most users should download one of the installers above.
 
@@ -142,7 +142,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - fetch error
 - Add, remove, rename, and update remote URLs.
 - Set upstream for the current branch.
-- Recover from inaccessible endpoints by inspecting their URLs, accounts and permissions in Remotes & transfers.
+- Recover from inaccessible endpoints by inspecting their URLs, accounts and permissions in Remote configuration.
 - Create lightweight or annotated tags.
 - Search, select, delete, and push tags.
 - Show recursive submodule status.
@@ -159,9 +159,10 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - pull with rebase
   - no-fast-forward pull
   - fast-forward-only pull
-- Review a push to one or several selected remotes, with destination branches and explicitly selected tags.
+- Push directly to an unambiguous or remembered selection of remotes; choose destinations on first use when several remotes exist.
+- Configure independent Fetch, Pull and Push selection modes on the repository's Remote configuration page.
 - Confirm force-with-lease against each destination's inspected revision.
-- Set upstream explicitly in Remotes & transfers.
+- Set upstream explicitly in Remote configuration.
 - Inspect results and retry unsuccessful destinations with the reviewed commit.
 - Run repository-specific Run, Test, Format, Start, and Build workflows.
 - Open the codebase timeline.
@@ -316,7 +317,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 The shared **Hosting** area manages several servers and accounts simultaneously. Native Git works with any compatible remote; adapters add catalogs, repository creation, forks, PRs/MRs, CI and publication for GitHub, Forgejo, GitLab, Bitbucket Cloud and Bitbucket Data Center. Capabilities follow the actual provider API and repository permissions. See [Hosting setup, OAuth, endpoint selection and feature differences](Docs/HOSTING.md).
 
-Select one fetch/pull source, independent push targets, and one hosting target for each local repository. Push profiles can publish the same reviewed commit to a private Forgejo server and a GitHub backup while preserving upstream tracking. Existing multiple push URLs are retained. Partial successes remain visible and retries address unsuccessful destinations.
+Select independent fetch and pull sources, push targets, and one hosting target for each local repository in **Remote configuration**. A single remote starts normal transfers directly. With several remotes, choose once and save the selection, or ask every time, independently for Fetch, Pull and Push. Push profiles can publish the same checked commit to a private Forgejo server and a GitHub backup while preserving upstream tracking. Existing multiple push URLs are retained. Partial successes remain visible and retries address unsuccessful destinations.
 
 If the installed Git cannot isolate individual push URLs, a normal push publishes all URLs of that named remote as a group. Force, targeted retries and different explicit hosting accounts within such a group require separate named remotes or a Git update.
 
@@ -611,12 +612,12 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 ### Standard local Git workflow
 
-1. Open Fetch or Pull from the topbar and select the source remote, branch and pull strategy.
+1. Use Fetch or Pull from the topbar. A single or remembered source starts directly; otherwise choose the source and whether to remember it.
 2. Create or switch a branch.
 3. Review changed files in the working directory.
 4. Open diffs, stage files or hunks, and optionally stash work.
 5. Create a commit with title and description.
-6. Open Push, select destinations/branches and any tags, review the captured revision, and confirm the push. Set upstream separately if needed.
+6. Use Push to publish the current branch directly to the single or remembered destination selection. Choose targets on first use with several remotes. Use the separate tag action to publish tags; Force and secret findings still require approval. Set upstream separately if needed.
 7. Inspect each destination's result; retry unsuccessful targets against the reviewed revision.
 
 ### Resolve conflicts
@@ -631,14 +632,14 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 ### Hosting pull / merge request flow
 
 1. Add the provider account in Hosting → Accounts & servers and sign in with a token or its configured browser login.
-2. Select the hosting account and endpoint under Remotes & transfers.
+2. Select the hosting account and endpoint under Remote configuration.
 3. Open PR / MR from the repo sidebar and choose the explicit source and target repositories.
 4. Inspect request checks and the provider's CI view.
 5. Open, copy or check out the request; merge with an available method after reviewing its head commit.
 
 ### Release flow
 
-1. Choose the repository's hosting endpoint in Remotes & transfers, then open Release from the topbar or the Hosting repository view.
+1. Choose the repository's hosting endpoint in Remote configuration, then open Release from the topbar or the Hosting repository view.
 2. Enter a target branch, tag or commit and inspect the selected endpoint.
 3. If the local revision is missing remotely, use the reviewed Push workflow first, then inspect the endpoint again.
 4. Choose or suggest a version tag; adjust the release name and Markdown notes, optionally generating AI notes.
@@ -890,7 +891,7 @@ Expected release assets:
 ### No pull / merge requests are visible
 
 - Sign in to the relevant provider account and check repository/change-request permissions.
-- Select the intended hosting repository and account in Remotes & transfers; bind SSH aliases through the repository web URL.
+- Select the intended hosting repository and account in Remote configuration; bind SSH aliases through the repository web URL.
 - Refresh the repository and PR/MR view. The Git remote may have any name.
 
 ### Commit or push is blocked by secret scan

@@ -17,13 +17,24 @@ type Props = {
   onClose: () => void;
   onOpenRepoTab: (path: string) => void;
   onOpenRunConfig: (path: string) => void;
+  onOpenRemoteConfig: (path: string) => void;
   onTogglePin: (path: string) => void;
   onRemove: (path: string) => void;
 };
 
 const MENU_MARGIN = 8;
 
-export const LocalRepositoryContextMenu: React.FC<Props> = ({ menu, origin, pinned, onClose, onOpenRepoTab, onOpenRunConfig, onTogglePin, onRemove }) => {
+export const LocalRepositoryContextMenu: React.FC<Props> = ({
+  menu,
+  origin,
+  pinned,
+  onClose,
+  onOpenRepoTab,
+  onOpenRunConfig,
+  onOpenRemoteConfig,
+  onTogglePin,
+  onRemove,
+}) => {
   const { tr } = useI18n();
   const showToast = useAppToast();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -107,6 +118,9 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({ menu, origin, pinn
         </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRunConfig(menu.path))}>
           <Settings2 size={14} /> {tr('Run-Konfiguration', 'Run configuration')}
+        </button>
+        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onOpenRemoteConfig(menu.path))}>
+          <Settings2 size={14} /> {tr('Remote-Konfiguration', 'Remote configuration')}
         </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => void openFolder())}>
           <FolderOpen size={14} /> {tr('Im Dateimanager öffnen', 'Open in file manager')}

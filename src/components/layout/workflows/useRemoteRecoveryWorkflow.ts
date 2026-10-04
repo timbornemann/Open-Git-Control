@@ -8,7 +8,7 @@ import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';
 import { useBareRepoRecoveryWorkflow } from './useBareRepoRecoveryWorkflow';
 import { useInitialCommitRecoveryWorkflow } from './useInitialCommitRecoveryWorkflow';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -66,7 +66,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       if (!repoPath) return;
       setGitActionToast({ msg: compactGitError(failureMessage) || 'Configure a remote and select its hosting account.', isError: true });
       workspace.setActiveTab('repo');
-      openRemoteTransferDialog({ repoPath, mode: 'remotes' });
+      requestRemoteTransfer({ repoPath, mode: 'remotes' });
     },
     [setGitActionToast, workspace],
   );
@@ -144,7 +144,7 @@ export const useRemoteRecoveryWorkflow = ({ workspace, settings, triggerRefresh,
       }
 
       workspace.setActiveTab('repo');
-      openRemoteTransferDialog({ repoPath: repoAtStart, mode: 'remotes' });
+      requestRemoteTransfer({ repoPath: repoAtStart, mode: 'remotes' });
       setGitActionToast({
         msg: tr(
           'Noch kein Remote eingerichtet. Ein Git-Ziel hinzufügen und das Konto auswählen.',

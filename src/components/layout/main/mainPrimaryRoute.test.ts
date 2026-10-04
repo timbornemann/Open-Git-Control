@@ -21,4 +21,11 @@ describe('local repository primary route', () => {
     expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRunConfig: true })).toBe('settings');
     expect(hasMainPrimaryHeader('runConfig')).toBe(true);
   });
+  it('shows remote configuration before repository detail panes and keeps non-repository navigation independent', () => {
+    expect(
+      getMainPrimaryRoute({ ...base, activeTab: 'repo', showRemoteConfig: true, showRunConfig: true, showTimeline: true, activeConflictPath: 'file' }),
+    ).toBe('remoteConfig');
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRemoteConfig: true })).toBe('settings');
+    expect(hasMainPrimaryHeader('remoteConfig')).toBe(true);
+  });
 });

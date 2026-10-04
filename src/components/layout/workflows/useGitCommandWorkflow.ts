@@ -13,7 +13,7 @@ import { type RunGitCommandOptions } from '@/components/layout/state/appStateSha
 import { useGitCommandGuardWorkflow } from './useGitCommandGuardWorkflow';
 import { useGitSyncRecoveryWorkflow, type GitCommandRunner } from './useGitSyncRecoveryWorkflow';
 import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -226,11 +226,11 @@ export const useGitCommandWorkflow = ({
         const missingUpstream = isMissingUpstreamPushError(errorMessage);
         if (!isStillActiveRepo()) return false;
         if (missingUpstream) {
-          openRemoteTransferDialog({ repoPath: repoAtStart, mode: 'push' });
+          requestRemoteTransfer({ repoPath: repoAtStart, mode: 'push' });
           setGitActionToast({
             msg: tr(
-              'Push benötigt eine Zielauswahl. Remote und Zielbranch im Push-Dialog auswählen; Upstream bei Bedarf ausdrücklich setzen.',
-              'Select the remote and destination branch in the push dialog. Set an upstream explicitly if needed.',
+              'Push verwendet die Remote-Konfiguration. Ein Upstream kann dort bei Bedarf ausdrücklich gesetzt werden.',
+              'Push uses the remote configuration. Set an upstream explicitly there if needed.',
             ),
             isError: true,
           });

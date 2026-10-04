@@ -5,6 +5,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRepositoryRemoteSync } from '@/components/layout/hooks/useRepositoryRemoteSync';
 import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
+import type { GitRemoteSnapshotDto } from '@/types/remoteTransfers';
+import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+
+const privateSnapshot = (repoPath: string, otherRemote: string): GitRemoteSnapshotDto => ({
+  repoPath,
+  branch: 'main',
+  upstream: { remote: otherRemote, branch: 'main' },
+  defaultPushRemote: otherRemote,
+  supportsPushUrlIsolation: true,
+  remotes: [
+    { name: 'private', fetchUrls: ['https://forgejo.example/team/private.git'], pushUrls: ['https://forgejo.example/team/private.git'] },
+    { name: otherRemote, fetchUrls: ['https://github.com/team/private.git'], pushUrls: ['https://github.com/team/private.git'] },
+  ],
+});
 
 type HookRender<T> = {
   readonly current: T;
@@ -221,7 +235,13 @@ describe('useRepositoryRemoteSync', () => {
       success: true,
       data: command === 'status' ? '# branch.head main\n# branch.upstream backup/main\n# branch.ab +0 -0\n' : '',
     }));
-    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? { fetchRemote: 'private' } : { output: '' }));
+    const snapshot = privateSnapshot('C:/repos/mirrored', 'backup');
+    const preferences = rememberRemoteTransferSelection('fetch', snapshot, {}, { selectedRemoteNames: ['private'] }, 'remember');
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => {
+      if (operation === 'getPreferences') return preferences;
+      if (operation === 'getRemotes') return snapshot;
+      return { output: '' };
+    });
     const triggerRefresh = vi.fn();
     const setGitActionToast = vi.fn();
     const setActiveGitActionLabel = vi.fn();
@@ -263,8 +283,11 @@ describe('useRepositoryRemoteSync', () => {
     const commands = vi
       .spyOn(gitClient, 'runGitCommandForRepo')
       .mockResolvedValue({ success: true, data: '# branch.head main\n# branch.upstream origin/main\n' });
+    const snapshot = privateSnapshot('C:/repos/private', 'origin');
+    const preferences = rememberRemoteTransferSelection('fetch', snapshot, {}, { selectedRemoteNames: ['private'] }, 'remember');
     vi.mocked(transferClient.request).mockImplementation(async (operation) => {
-      if (operation === 'getPreferences') return { fetchRemote: 'private' };
+      if (operation === 'getPreferences') return preferences;
+      if (operation === 'getRemotes') return snapshot;
       throw new Error('The account bound to this private endpoint is not authenticated.');
     });
     const triggerRefresh = vi.fn();
@@ -301,6 +324,79 @@ describe('useRepositoryRemoteSync', () => {
     expect(hook.current.remoteSync.lastFetchError).toContain('not authenticated');
     expect(hook.current.lastFetchedRemote).toBeNull();
     expect(triggerRefresh).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it.each(['ask', undefined] as const)('uses Git tracking in the background when the fetch mode is %s', async (mode) => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repo, command) => ({
+      success: true,
+      data: command === 'status' ? '# branch.head main\n# branch.upstream backup/main\n' : '',
+    }));
+    vi.mocked(transferClient.request).mockImplementation(async (operation) =>
+      operation === 'getPreferences' ? { fetchRemote: 'private', selectionModes: mode ? { fetch: mode } : undefined } : { output: '' },
+    );
+    const input = {
+      activeRepo: 'C:/repos/mirrored',
+      refreshTrigger: 0,
+      triggerRefresh: vi.fn(),
+      autoFetchIntervalMs: 60_000,
+      language: 'en' as const,
+      hasAnyRemote: true,
+      remotes: [
+        { name: 'private', url: 'https://forgejo.example/team/private.git' },
+        { name: 'backup', url: 'https://github.com/team/private.git' },
+      ],
+      setGitActionToast: vi.fn(),
+      setActiveGitActionLabel: vi.fn(),
+      isGitActionRunningRef: { current: false },
+    };
+    const hook = renderHook(() => useRepositoryRemoteSync(input));
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(transferClient.request).toHaveBeenCalledWith('fetch', { repoPath: 'C:/repos/mirrored', remote: 'backup' });
+    expect(hook.current.lastFetchedRemote).toBe('backup');
+    expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => operation === 'setPreferences')).toBe(false);
+    hook.unmount();
+  });
+
+  it('pauses an invalid remembered background source instead of fetching its backup', async () => {
+    vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
+    vi.spyOn(gitClient, 'runGitCommandForRepo').mockResolvedValue({ success: true, data: '# branch.head main\n# branch.upstream backup/main\n' });
+    const snapshot = privateSnapshot('C:/repos/mirrored', 'backup');
+    const preferences = rememberRemoteTransferSelection('fetch', snapshot, {}, { selectedRemoteNames: ['private'] }, 'remember');
+    const changed = {
+      ...snapshot,
+      remotes: snapshot.remotes.map((remote) => (remote.name === 'private' ? { ...remote, fetchUrls: ['https://other.example/team/private.git'] } : remote)),
+    };
+    vi.mocked(transferClient.request).mockImplementation(async (operation) => (operation === 'getPreferences' ? preferences : changed));
+    const input = {
+      activeRepo: 'C:/repos/mirrored',
+      refreshTrigger: 0,
+      triggerRefresh: vi.fn(),
+      autoFetchIntervalMs: 60_000,
+      language: 'en' as const,
+      hasAnyRemote: true,
+      remotes: [
+        { name: 'private', url: 'https://other.example/team/private.git' },
+        { name: 'backup', url: 'https://github.com/team/private.git' },
+      ],
+      setGitActionToast: vi.fn(),
+      setActiveGitActionLabel: vi.fn(),
+      isGitActionRunningRef: { current: false },
+    };
+    const hook = renderHook(() => useRepositoryRemoteSync(input));
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => operation === 'fetch')).toBe(false);
+    expect(hook.current.remoteSync.lastFetchError).toContain('Check the remote configuration');
+    expect(hook.current.lastFetchedRemote).toBeNull();
     hook.unmount();
   });
 });

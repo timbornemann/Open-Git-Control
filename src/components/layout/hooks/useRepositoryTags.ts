@@ -10,9 +10,10 @@ import type { ConfirmDialogState, InputDialogState } from '@/components/layout/l
 import { buildCreateTagDialog, buildDeleteTagDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { gitWorkflowCommands } from '../workflows/gitWorkflowCommands';
 import { transferClient } from '@/services/hostingClient';
+import { getBackgroundFetchRemote } from '@/utils/remoteTransferSelection';
 
 type Params = {
   activeRepo: string | null;
@@ -73,7 +74,12 @@ export const useRepositoryTags = ({
       try {
         const preferences = await transferClient.request('getPreferences', { repoPath: activeRepo }).catch(() => null);
         if (cancelled) return;
-        const source = preferences?.fetchRemote || trackedRemoteName;
+        let source = trackedRemoteName;
+        if (preferences?.selectionModes?.fetch === 'remember') {
+          const snapshot = await transferClient.request('getRemotes', { repoPath: activeRepo });
+          if (cancelled) return;
+          source = getBackgroundFetchRemote(snapshot, preferences) ?? null;
+        }
         const [byVersion, referenceStatus] = await withReadPriority(
           () =>
             Promise.all([
@@ -188,7 +194,7 @@ export const useRepositoryTags = ({
 
   const handlePushTags = async () => {
     if (!activeRepo) return;
-    openRemoteTransferDialog({ repoPath: activeRepo, mode: 'push' });
+    requestRemoteTransfer({ repoPath: activeRepo, mode: 'push', tagNames: tags, selectTags: true });
   };
 
   return {

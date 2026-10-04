@@ -19,6 +19,7 @@ type Props = {
   task: ReturnType<typeof useHostingTask>;
   reload: () => Promise<void>;
   invalidatePlan: () => void;
+  unbind?: (name: string, url: string) => void;
 };
 export function RemoteEndpointEditor({
   repoPath,
@@ -34,6 +35,7 @@ export function RemoteEndpointEditor({
   task,
   reload,
   invalidatePlan,
+  unbind,
 }: Props) {
   const { tr } = useI18n();
   const [newName, setNewName] = useState('');
@@ -52,6 +54,7 @@ export function RemoteEndpointEditor({
             ))}
             <div className="hosting-actions">
               <button
+                disabled={task.busy}
                 onClick={() => {
                   const value = window.prompt(tr('Neuer Remote-Name', 'New remote name'), r.name);
                   if (value) edit('rename', r.name, value);
@@ -60,6 +63,7 @@ export function RemoteEndpointEditor({
                 {tr('Umbenennen', 'Rename')}
               </button>
               <button
+                disabled={task.busy}
                 onClick={() => {
                   const value = window.prompt('Fetch URL', r.fetchUrls[0]);
                   if (value) edit('set-url', r.name, value);
@@ -67,7 +71,9 @@ export function RemoteEndpointEditor({
               >
                 URL
               </button>
-              <button onClick={() => edit('remove', r.name)}>{tr('Entfernen', 'Remove')}</button>
+              <button disabled={task.busy} onClick={() => edit('remove', r.name)}>
+                {tr('Entfernen', 'Remove')}
+              </button>
             </div>
             <details>
               <summary>{tr('Push-URLs bearbeiten', 'Edit push URLs')}</summary>
@@ -95,10 +101,10 @@ export function RemoteEndpointEditor({
             </details>
             <label>
               {tr('Hosting-Konto zuordnen', 'Bind hosting account')}
-              <select value={bindingConnection} onChange={(event) => setBindingConnection(event.target.value)}>
+              <select disabled={task.busy} value={bindingConnection} onChange={(event) => setBindingConnection(event.target.value)}>
                 <option value="">{tr('Konto auswählen', 'Select account')}</option>
                 {connections
-                  .filter((c) => c.authenticated)
+                  .filter((c) => c.authenticated || c.hasCredentials)
                   .map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label} · {c.username}
@@ -138,6 +144,11 @@ export function RemoteEndpointEditor({
                   >
                     {tr('Konto diesem Endpunkt zuordnen', 'Bind account to this endpoint')}
                   </button>
+                  {binding && unbind && (
+                    <button disabled={task.busy} onClick={() => unbind(r.name, endpointUrl)}>
+                      {tr('Kontobindung entfernen', 'Remove account binding')}
+                    </button>
+                  )}
                 </div>
               );
             })}

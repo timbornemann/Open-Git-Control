@@ -31,6 +31,7 @@ type Props = {
   onStopRepositoryRun: () => Promise<boolean>;
   onOpenRunConsole: () => void;
   onOpenRunSettings: () => void;
+  onOpenRemoteConfig?: () => void;
 };
 
 export const TopbarMoreMenu: React.FC<Props> = ({
@@ -53,8 +54,9 @@ export const TopbarMoreMenu: React.FC<Props> = ({
   onStopRepositoryRun,
   onOpenRunConsole,
   onOpenRunSettings,
+  onOpenRemoteConfig,
 }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
 
   if (view === 'moreMerge') {
     return (
@@ -120,6 +122,16 @@ export const TopbarMoreMenu: React.FC<Props> = ({
       </button>
       <button className="topbar-dropdown-item" data-topbar-more-run onClick={() => setView('moreRun')} disabled={!activeRepo}>
         <span className="topbar-dropdown-item-label">Run</span>
+      </button>
+      <button
+        className="topbar-dropdown-item"
+        onClick={() => {
+          setView(null);
+          onOpenRemoteConfig?.();
+        }}
+        disabled={!activeRepo || !onOpenRemoteConfig}
+      >
+        <span className="topbar-dropdown-item-label">{tr('Remote-Konfiguration', 'Remote configuration')}</span>
       </button>
       <button
         className="topbar-dropdown-item"

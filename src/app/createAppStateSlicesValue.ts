@@ -89,6 +89,7 @@ const createRepositorySlice = (state: AppState, tr: (deText: string, enText: str
   onMergeBranch: state.handleMergeBranch,
   onOpenRepoWorkspace: () => {
     state.onCloseRunConfig();
+    state.onCloseRemoteConfig();
     state.setActiveTab('repo');
   },
 });
@@ -202,12 +203,18 @@ const createWorkflowSlice = (state: AppState, t: Translate, tr: (deText: string,
 const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlicesValueParams, 'state' | 'resetLayout' | 'uiState'>): UIContextValue => ({
   activeTab: state.activeTab,
   setActiveTab: (tab) => {
-    if (tab !== 'repo') state.onCloseRunConfig();
+    if (tab !== 'repo') {
+      state.onCloseRunConfig();
+      state.onCloseRemoteConfig();
+    }
     state.setActiveTab(tab);
   },
   isRunConfigOpen: state.isRunConfigOpen,
   onOpenRunConfig: state.onOpenRunConfig,
   onCloseRunConfig: state.onCloseRunConfig,
+  isRemoteConfigOpen: state.isRemoteConfigOpen,
+  onOpenRemoteConfig: state.onOpenRemoteConfig,
+  onCloseRemoteConfig: state.onCloseRemoteConfig,
   onResetLayout: resetLayout,
   isRepoPanelCollapsed: state.isRepoPanelCollapsed,
   onToggleRepoPanelCollapsed: state.toggleRepoPanelCollapsed,

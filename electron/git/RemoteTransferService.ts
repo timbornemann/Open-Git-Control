@@ -16,8 +16,11 @@ import { reconcileRemotePreferences } from './reconcileRemotePreferences';
 import { assertGroupedCredentialChoices, runGroupedRemotePush } from './groupedRemotePush';
 import {
   gitConfigurationEnvironment,
+  isolatedPushEnvironment,
   normalizeRemotePreferences,
+  referencedRemotePreferenceNames,
   normalizeTargetBranches,
+  resolvePushTargetUrls,
   refName,
   remoteName,
   remoteUrl,
@@ -112,13 +115,7 @@ export class RemoteTransferService {
     const preferences = normalizeRemotePreferences(input);
     const snapshot = await this.getRemotes(repoPath);
     const names = new Set(snapshot.remotes.map((remote) => remote.name));
-    const selected = [
-      preferences.hostingRemote,
-      preferences.fetchRemote,
-      ...(preferences.pushRemotes ?? []),
-      ...(preferences.profiles?.flatMap((profile) => profile.remoteNames) ?? []),
-      ...(preferences.bindings?.map((binding) => binding.remoteName) ?? []),
-    ].filter(Boolean);
+    const selected = referencedRemotePreferenceNames(preferences);
     if (selected.some((name) => !names.has(name!))) throw new Error('Remote preferences reference an unknown remote.');
     for (const binding of preferences.bindings ?? []) {
       const remote = snapshot.remotes.find((candidate) => candidate.name === binding.remoteName)!;
@@ -262,6 +259,7 @@ export class RemoteTransferService {
     );
     const snapshot = await this.getRemotes(repoPath);
     if (!Array.isArray(input.remoteNames) || !input.remoteNames.length || input.remoteNames.length > 32) throw new Error('Select at least one push remote.');
+    const targetUrls = resolvePushTargetUrls(input.targetUrls, snapshot, input.remoteNames);
     const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
     if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
     if (!snapshot.branch) throw new Error('Select a local branch before pushing.');
@@ -285,7 +283,7 @@ export class RemoteTransferService {
       if (!remote) throw new Error('Unknown push remote.');
       const grouped = remote.pushUrls.length > 1 && !snapshot.supportsPushUrlIsolation;
       if (grouped && input.force) throw new Error('Force-with-lease requires isolated push URLs. Update Git or configure separate named remotes.');
-      for (const value of [...new Set(remote.pushUrls)]) {
+      for (const value of targetUrls[name]) {
         const url = remoteUrl(value);
         const target: GitPushTargetDto = { id: digest([id, name, url]).slice(0, 32), remoteName: name, url, destinationRef: targetDestinationRef, sourceOid };
         if (grouped) target.grouped = true;
@@ -337,6 +335,8 @@ export class RemoteTransferService {
     )
       throw new Error('Push plan expired or belongs to another repository or window. Create a new push plan.');
     if (plan.fingerprint !== (await this.fingerprint(repoPath))) throw new Error('Remote configuration or account bindings changed. Create a new push plan.');
+    if ((await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD'])) !== plan.dto.branch)
+      throw new Error('The current branch changed. Create a new push plan.');
     if (this.getCredentialGeneration && Object.entries(plan.credentialGenerations).some(([id, generation]) => this.getCredentialGeneration!(id) !== generation))
       throw new Error('Hosting authentication changed. Review the push with the current account again.');
     for (const ref of plan.refs) await this.git.run(repoPath, ['cat-file', '-e', ref.sourceOid]);
@@ -393,12 +393,7 @@ export class RemoteTransferService {
     context: RemoteTransferContext,
     retry: boolean,
   ): Promise<GitPushTargetResultDto> {
-    const entries: [string, string][] = [
-      ['push.followTags', 'false'],
-      [`remote.${target.remoteName}.mirror`, 'false'],
-    ];
-    if (this.isolationSupported) entries.push([`remote.${target.remoteName}.pushurl`, ''], [`remote.${target.remoteName}.pushurl`, target.url]);
-    const base = gitConfigurationEnvironment(entries);
+    const base = isolatedPushEnvironment(target.remoteName, target.url, this.isolationSupported === true);
     let refs = plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: target.destinationRef } : ref));
     if (retry) {
       const actual = await this.advertised(repoPath, target, refs, context);
@@ -459,9 +454,11 @@ export class RemoteTransferService {
         continue;
       }
       context.onProgress?.(`Pushing ${target.remoteName}: ${target.url}`);
+      let contextValidated = false;
       try {
         context.ensureActive();
         await this.validatePlan(repoPath, plan.dto.id, context);
+        contextValidated = true;
         if (target.grouped) {
           const group = plan.dto.targets.filter((candidate) => candidate.remoteName === target.remoteName);
           const outcomes = await runGroupedRemotePush(this.git, this.credentials, repoPath, plan, group, context, (candidate, refs) =>
@@ -471,10 +468,14 @@ export class RemoteTransferService {
           outcomes.forEach((outcome) => context.onProgress?.(`${outcome.status}: ${outcome.remoteName} → ${outcome.destinationRef} (${outcome.url})`));
         } else targets.push(await this.pushTarget(repoPath, plan, target, context, Boolean(selected)));
       } catch (error) {
-        cancelled = context.signal?.aborted === true;
+        cancelled = !contextValidated || context.signal?.aborted === true;
         const failed = {
           ...target,
-          status: cancelled || (error instanceof Error && error.name === 'AbortError') ? ('unknown' as const) : ('failed' as const),
+          status: !contextValidated
+            ? ('skipped' as const)
+            : cancelled || (error instanceof Error && error.name === 'AbortError')
+              ? ('unknown' as const)
+              : ('failed' as const),
           message: redactGitSensitiveText(error instanceof Error ? error.message : 'Push failed.'),
         };
         if (target.grouped)

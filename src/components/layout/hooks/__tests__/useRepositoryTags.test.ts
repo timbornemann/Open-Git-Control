@@ -6,6 +6,20 @@ import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
 import { TAG_REFERENCE_STATUS_FORMAT } from '@/utils/tagConflicts';
 import { useRepositoryTags } from '../useRepositoryTags';
+import { rememberRemoteTransferSelection } from '@/utils/remoteTransferSelection';
+import type { GitRemoteSnapshotDto } from '@/types/remoteTransfers';
+
+const snapshot: GitRemoteSnapshotDto = {
+  repoPath: '/repo/mixed',
+  branch: 'main',
+  upstream: { remote: 'backup', branch: 'main' },
+  defaultPushRemote: 'backup',
+  supportsPushUrlIsolation: true,
+  remotes: [
+    { name: 'private', fetchUrls: ['https://forgejo.example/alice/demo.git'], pushUrls: ['https://forgejo.example/alice/demo.git'] },
+    { name: 'backup', fetchUrls: ['https://github.com/alice/demo.git'], pushUrls: ['https://github.com/alice/demo.git'] },
+  ],
+};
 
 vi.mock('@/data/resourceHooks', () => ({ useCachedResult: () => ({}) }));
 
@@ -41,7 +55,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   root = createRoot(document.createElement('div'));
   vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
-  vi.spyOn(transferClient, 'request').mockResolvedValue({ fetchRemote: 'private' });
+  const preferences = rememberRemoteTransferSelection('fetch', snapshot, {}, { selectedRemoteNames: ['private'] }, 'remember');
+  vi.spyOn(transferClient, 'request').mockImplementation(async (operation) => (operation === 'getRemotes' ? snapshot : preferences));
   vi.spyOn(gitClient, 'runGitCommandForRepo').mockImplementation(async (_repo, operation) => ({
     success: true,
     data: operation === 'tag' ? 'release\n' : `refs/tags/release\0${'a'.repeat(40)}\0\nrefs/ogc/remote-tags/private/release\0${'b'.repeat(40)}\0`,

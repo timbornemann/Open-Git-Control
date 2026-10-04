@@ -1,0 +1,93 @@
+.remote-configuration {
+  max-width: none;
+  box-sizing: border-box;
+}
+.remote-configuration__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.remote-configuration__heading h1 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+.remote-configuration__heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.remote-configuration__notice {
+  color: var(--text-secondary);
+  max-width: 90ch;
+}
+.remote-configuration__section {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+.remote-configuration__section h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+.remote-configuration__section p {
+  max-width: 100ch;
+  color: var(--text-secondary);
+}
+.remote-configuration__rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+.remote-configuration fieldset {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+}
+.remote-configuration label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+}
+.remote-configuration label.hosting-checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+.remote-configuration legend {
+  padding: 0 5px;
+  font-weight: 600;
+}
+.remote-configuration input:not([type='checkbox']),
+.remote-configuration select,
+.remote-configuration textarea {
+  max-width: 100%;
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-darker);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.remote-configuration .hosting-actions button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+}
+.remote-configuration .hosting-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .remote-configuration__section {
+    padding: 12px;
+  }
+  .remote-configuration {
+    padding: 12px;
+  }
+}

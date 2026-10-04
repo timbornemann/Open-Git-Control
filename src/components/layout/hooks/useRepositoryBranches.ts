@@ -13,7 +13,7 @@ import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildMergeBranch
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
 import { transferClient } from '@/services/hostingClient';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 
 type Params = {
   activeRepo: string | null;
@@ -162,7 +162,23 @@ export const useRepositoryBranches = ({
     try {
       const snapshot = await transferClient.request('getRemotes', { repoPath: repoAtStart });
       if (activeRepoRef.current !== repoAtStart) return;
-      if (snapshot.remotes.length) openRemoteTransferDialog({ repoPath: repoAtStart, mode: 'push', destinationBranch: name });
+      if (snapshot.remotes.length)
+        setConfirmDialog({
+          variant: 'confirm',
+          title: tr('Branch veröffentlichen', 'Publish branch'),
+          message: tr(`Branch „${name}“ wurde lokal erstellt. Jetzt veröffentlichen?`, `Branch "${name}" was created locally. Publish it now?`),
+          contextItems: [{ label: 'Branch', value: name }],
+          irreversible: false,
+          consequences: tr(
+            'Die Push-Ziele folgen der Remote-Konfiguration. Der Upstream bleibt unverändert.',
+            'Push targets follow the remote configuration. Upstream tracking stays unchanged.',
+          ),
+          confirmLabel: tr('Branch veröffentlichen', 'Publish branch'),
+          onConfirm: () => {
+            if (activeRepoRef.current !== repoAtStart) return;
+            requestRemoteTransfer({ repoPath: repoAtStart, mode: 'push', destinationBranch: name, expectedBranch: name });
+          },
+        });
     } catch {
       // The local branch remains usable; publication can be opened from Push.
     }

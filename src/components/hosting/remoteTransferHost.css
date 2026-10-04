@@ -1,0 +1,16 @@
+.remote-transfer-progress {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1100;
+  width: min(420px, calc(100vw - 40px));
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  box-shadow: 0 6px 24px #0004;
+}
+.remote-transfer-progress > strong {
+  display: block;
+  margin-bottom: 8px;
+}

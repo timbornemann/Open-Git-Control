@@ -15,6 +15,7 @@ import { WorkingDirectoryFileViewer } from '@/components/working-directory/Worki
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 import { RepositoryRunConfigView } from '@/components/repository-run/RepositoryRunConfigView';
+import { RemoteConfigurationView } from '@/components/hosting/RemoteConfigurationView';
 import { useCommitMessageEditor } from '@/components/commit-graph/useCommitMessageEditor';
 
 const CommitGraph = viewModules.repo.View;
@@ -83,6 +84,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showTimeline,
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
     showRunConfig: ui.isRunConfigOpen,
+    showRemoteConfig: ui.isRemoteConfigOpen,
   });
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
@@ -91,6 +93,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
   const isRunConfigView = route === 'runConfig';
+  const isRemoteConfigView = route === 'remoteConfig';
   const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
   const lazyPaneFallback = (
@@ -113,7 +116,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     <div
       className="pane"
       style={
-        isSettingsView || isPlannerView || isHostingView || isLocalReposView || isRunConfigView || !showInspectorPane
+        isSettingsView || isPlannerView || isHostingView || isLocalReposView || isRunConfigView || isRemoteConfigView || !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
@@ -122,8 +125,8 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isRunConfigView ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRunConfig}>
+          {isSettingsView ? null : isRunConfigView || isRemoteConfigView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={isRemoteConfigView ? ui.onCloseRemoteConfig : ui.onCloseRunConfig}>
               {tr('Zurück zum Repository', 'Back to repository')}
             </button>
           ) : isTimelineView ? (
@@ -151,7 +154,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isRunConfigView ? (
+        {isRemoteConfigView ? (
+          <RemoteConfigurationView key={repository.activeRepo ?? ''} repoPath={repository.activeRepo} />
+        ) : isRunConfigView ? (
           <RepositoryRunConfigView key={repository.activeRepo ?? ''} />
         ) : isLocalReposView ? (
           <LocalRepositoriesView />

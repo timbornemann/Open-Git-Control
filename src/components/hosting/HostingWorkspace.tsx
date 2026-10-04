@@ -6,7 +6,6 @@ import { useI18n } from '@/i18n';
 import type { HostedRepository, HostingPage, HostingProvider } from '@/types/hostingDtos';
 import { HostingConnections } from './HostingConnections';
 import { HostingRepositoryDetail } from './HostingRepositoryDetail';
-import { RemoteTransferPanel } from './RemoteTransferPanel';
 import { hostedRepositoryKey, providerLabels, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
 import './hosting.css';
@@ -23,6 +22,7 @@ export function HostingWorkspace() {
   const openRepos = useGitStore((s) => s.openRepos);
   const onSwitchRepo = useGitStore((s) => s.onSwitchRepo);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const onOpenRemoteConfig = useUIStore((s) => s.onOpenRemoteConfig);
   const clones = useLocalHostingRepositories(openRepos, connections, revision);
   const onOpenRepo = useGitStore((s) => s.onAddRepo);
   const task = useHostingTask(`${state.connectionFilter}/${state.revision}/${activeRepo ?? ''}`);
@@ -168,16 +168,15 @@ export function HostingWorkspace() {
         <button aria-pressed={state.section === 'connections'} onClick={() => state.navigate('connections')}>
           {tr('Konten & Server', 'Accounts & servers')}
         </button>
-        {activeRepo && (
-          <button aria-pressed={state.section === 'remotes'} onClick={() => state.navigate('remotes')}>
-            {tr('Remotes & Übertragungen', 'Remotes & transfers')}
-          </button>
-        )}
+        {activeRepo && <button onClick={onOpenRemoteConfig}>{tr('Remote-Konfiguration', 'Remote configuration')}</button>}
       </nav>
       {state.section === 'connections' ? (
         <HostingConnections />
       ) : state.section === 'remotes' && activeRepo ? (
-        <RemoteTransferPanel key={activeRepo} repoPath={activeRepo} mode="remotes" />
+        <section className="hosting-empty">
+          <p>{tr('Remote-Einstellungen gehören zum lokalen Repository.', 'Remote settings belong to the local repository.')}</p>
+          <button onClick={onOpenRemoteConfig}>{tr('Remote-Konfiguration öffnen', 'Open remote configuration')}</button>
+        </section>
       ) : (
         <>
           <div className="hosting-filters">

@@ -7,7 +7,7 @@ import { RepositoryLicensePanel } from '@/components/sidebar/RepositoryLicensePa
 import { HostingSidebar } from '@/components/hosting/HostingSidebar';
 import { gitClient } from '@/services/gitClient';
 import { useI18n } from '@/i18n';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 
 export const RepoSidebarContainer: React.FC = React.memo(() => {
   const ui = useUIContext();
@@ -39,7 +39,7 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
         tags={repository.tags}
         tagConflicts={repository.tagConflicts}
         onCreateTag={repository.onCreateTag}
-        onPushTags={() => openRemoteTransferDialog({ repoPath: repository.activeRepo!, mode: 'push' })}
+        onPushTags={() => requestRemoteTransfer({ repoPath: repository.activeRepo!, mode: 'push', tagNames: repository.tags, selectTags: true })}
         onDeleteTag={repository.onDeleteTag}
         onSelectTag={repository.onSelectTag}
         collapsed={ui.isTagPanelCollapsed}

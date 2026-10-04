@@ -37,6 +37,7 @@ type Props = {
   onStopRepositoryRun: () => Promise<boolean>;
   onOpenRunConsole: () => void;
   onOpenRunSettings: () => void;
+  onOpenRemoteConfig?: () => void;
 };
 
 type SplitOption = {
@@ -73,6 +74,7 @@ export const TopbarActions: React.FC<Props> = ({
   onStopRepositoryRun,
   onOpenRunConsole,
   onOpenRunSettings,
+  onOpenRemoteConfig,
 }) => {
   const intent = usePreloadIntent();
   const { t } = useI18n();
@@ -422,6 +424,7 @@ export const TopbarActions: React.FC<Props> = ({
             onStopRepositoryRun={onStopRepositoryRun}
             onOpenRunConsole={onOpenRunConsole}
             onOpenRunSettings={onOpenRunSettings}
+            onOpenRemoteConfig={onOpenRemoteConfig}
           />
         )}
       </div>

@@ -32,15 +32,19 @@ export const LocalRepositoriesView: React.FC = () => {
     { value: 'createdAtAsc', label: t('generated.components.sidebar.repolist.created_old_new_2f916185') },
   ];
 
-  const openRepoTab = async (path: string, showRunConfig = false) => {
+  const openRepoTab = async (path: string, config?: 'run' | 'remote') => {
     if (switchingPath) return;
     setSwitchingPath(path);
     try {
       const activated = await repository.onSwitchRepo(path);
       if (activated) {
         ui.setActiveTab('repo');
-        if (showRunConfig) ui.onOpenRunConfig();
-        else ui.onCloseRunConfig();
+        if (config === 'run') ui.onOpenRunConfig();
+        else if (config === 'remote') ui.onOpenRemoteConfig();
+        else {
+          ui.onCloseRunConfig();
+          ui.onCloseRemoteConfig();
+        }
       }
     } catch (error) {
       showToast(error instanceof Error ? error.message : tr('Repository konnte nicht geöffnet werden.', 'Could not open the repository.'), true);
@@ -196,7 +200,8 @@ export const LocalRepositoriesView: React.FC = () => {
           pinned={Boolean(repository.repoMeta[menuPath]?.pinned)}
           onClose={closeMenu}
           onOpenRepoTab={(path) => void openRepoTab(path)}
-          onOpenRunConfig={(path) => void openRepoTab(path, true)}
+          onOpenRunConfig={(path) => void openRepoTab(path, 'run')}
+          onOpenRemoteConfig={(path) => void openRepoTab(path, 'remote')}
           onTogglePin={repository.onToggleRepoPin}
           onRemove={repository.onCloseRepo}
         />

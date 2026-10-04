@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { RemoteSyncState } from '@/types/git';
+import type { RemotePreferences } from '@/types/remoteTransfers';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { getLocale } from '@/i18nCore';
 import { parseBranchSyncFromPorcelainV2 } from '@/utils/gitParsing';
@@ -7,6 +8,8 @@ import { parseTagReferenceStatus, remoteTagTrackingRefPrefix, TAG_REFERENCE_STAT
 import { formatTime } from '@/utils/dateTime';
 import { gitClient } from '@/services/gitClient';
 import { transferClient } from '@/services/hostingClient';
+import { getBackgroundFetchRemote } from '@/utils/remoteTransferSelection';
+import { useRemoteTransferState } from '@/components/hosting/remoteTransferState';
 import type { RemoteStatusInfo } from '@/components/layout/layoutTypes';
 import type { GitActionToast, RepositoryRemote } from './repositoryDomainTypes';
 
@@ -59,7 +62,8 @@ export const useRepositoryRemoteSync = ({
   const remoteNames = useMemo(() => (remoteNamesKey ? remoteNamesKey.split('\0') : []), [remoteNamesKey]);
 
   // Choose which remote to auto-fetch, independent of any fixed "origin" name:
-  // prefer the saved fetch source, then the current branch's tracking remote,
+  // Explicitly remembered choices are checked against a fresh snapshot below.
+  // Otherwise prefer the current branch's tracking remote,
   // then a remote named "origin",
   // then the sole remote if there is exactly one. Never fetch "--all", so a
   // single unreachable remote cannot produce an ambiguous multi-remote failure.
@@ -73,6 +77,15 @@ export const useRepositoryRemoteSync = ({
       return null;
     },
     [remoteNames],
+  );
+
+  const resolveConfiguredFetchRemote = useCallback(
+    async (repoPath: string, statusText: string, preferences: RemotePreferences) => {
+      if (preferences.selectionModes?.fetch !== 'remember') return resolveFetchRemote(statusText);
+      const snapshot = await transferClient.request('getRemotes', { repoPath });
+      return getBackgroundFetchRemote(snapshot, preferences) ?? null;
+    },
+    [resolveFetchRemote],
   );
 
   useLayoutEffect(() => {
@@ -137,7 +150,7 @@ export const useRepositoryRemoteSync = ({
       // rather than guessing. `false` is a confirmed local-only repository and
       // is handled inside the try block below instead of being a no-op.
       if (!gitClient.isAvailable() || !activeRepo || hasAnyRemote === null) return false;
-      if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current) return false;
+      if (isRemoteFetchRunningRef.current || isGitActionRunningRef.current || useRemoteTransferState.getState().busy) return false;
       const repoAtStart = activeRepo;
       const fetchRunId = remoteFetchRunIdRef.current + 1;
       remoteFetchRunIdRef.current = fetchRunId;
@@ -169,11 +182,23 @@ export const useRepositoryRemoteSync = ({
           transferClient.request('getPreferences', { repoPath: repoAtStart }),
         ]);
         if (activeRepoRef.current !== repoAtStart) return false;
-        const fetchRemote = resolveFetchRemote(statusResult.success ? String(statusResult.data || '') : '', preferences.fetchRemote);
+        const fetchRemote = await resolveConfiguredFetchRemote(repoAtStart, statusResult.success ? String(statusResult.data || '') : '', preferences);
+        if (activeRepoRef.current !== repoAtStart) return false;
         if (!fetchRemote) {
           // No unambiguous remote to fetch from (e.g. several remotes and no
           // tracking branch); leave the last known state untouched.
-          setRemoteSync((prev) => ({ ...prev, isFetching: false }));
+          setRemoteSync((prev) => ({
+            ...prev,
+            isFetching: false,
+            ...(preferences.selectionModes?.fetch === 'remember'
+              ? {
+                  lastFetchError: tr(
+                    'Gespeicherte Fetch-Quelle ist ungültig. Remote-Konfiguration prüfen.',
+                    'The saved fetch source is invalid. Check the remote configuration.',
+                  ),
+                }
+              : {}),
+          }));
           return false;
         }
 
@@ -249,7 +274,18 @@ export const useRepositoryRemoteSync = ({
         }
       }
     },
-    [activeRepo, hasAnyRemote, resolveFetchRemote, isGitActionRunningRef, setActiveGitActionLabel, setGitActionToast, setRemoteSync, t, tr, triggerRefresh],
+    [
+      activeRepo,
+      hasAnyRemote,
+      resolveConfiguredFetchRemote,
+      isGitActionRunningRef,
+      setActiveGitActionLabel,
+      setGitActionToast,
+      setRemoteSync,
+      t,
+      tr,
+      triggerRefresh,
+    ],
   );
 
   useEffect(() => {

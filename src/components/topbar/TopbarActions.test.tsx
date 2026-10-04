@@ -9,11 +9,13 @@ import { TopbarActions } from './TopbarActions';
 describe('TopbarActions', () => {
   let root: Root | null = null;
   const onStartRepositoryRun = vi.fn<() => Promise<boolean>>();
+  const onOpenRemoteConfig = vi.fn();
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     document.body.innerHTML = '<div id="root"></div>';
     onStartRepositoryRun.mockReset().mockResolvedValue(true);
+    onOpenRemoteConfig.mockReset();
   });
 
   afterEach(() => {
@@ -61,12 +63,25 @@ describe('TopbarActions', () => {
             onStopRepositoryRun: vi.fn().mockResolvedValue(true),
             onOpenRunConsole: vi.fn(),
             onOpenRunSettings: vi.fn(),
+            onOpenRemoteConfig,
           }),
         }),
       );
       await Promise.resolve();
     });
   };
+
+  it('opens the repository remote configuration from More without starting a transfer', async () => {
+    await renderActions();
+    await act(async () => document.querySelector<HTMLButtonElement>('.topbar-more-toggle')?.click());
+    const remote = [...document.querySelectorAll<HTMLButtonElement>('.topbar-dropdown-item')].find((button) =>
+      button.textContent?.includes('Remote configuration'),
+    );
+    expect(remote).toBeTruthy();
+    await act(async () => remote?.click());
+    expect(onOpenRemoteConfig).toHaveBeenCalledOnce();
+    expect(document.querySelector('.topbar-more-dropdown')).toBeNull();
+  });
 
   it('provides the complete Run menu from More when compact actions are active', async () => {
     await renderActions();

@@ -25,6 +25,8 @@ describe('LocalRepositoriesView', () => {
   let setActiveTab: ReturnType<typeof vi.fn>;
   let onOpenRunConfig: ReturnType<typeof vi.fn>;
   let onCloseRunConfig: ReturnType<typeof vi.fn>;
+  let onOpenRemoteConfig: ReturnType<typeof vi.fn>;
+  let onCloseRemoteConfig: ReturnType<typeof vi.fn>;
   let toast: ReturnType<typeof vi.fn<(message: string, isError: boolean) => void>>;
 
   const render = async () => {
@@ -44,6 +46,8 @@ describe('LocalRepositoriesView', () => {
     setActiveTab = vi.fn();
     onOpenRunConfig = vi.fn();
     onCloseRunConfig = vi.fn();
+    onOpenRemoteConfig = vi.fn();
+    onCloseRemoteConfig = vi.fn();
     toast = vi.fn<(message: string, isError: boolean) => void>();
     repository = {
       openRepos: [first, second],
@@ -62,7 +66,13 @@ describe('LocalRepositoriesView', () => {
       onCloneByUrl: vi.fn(),
     } as unknown as RepositoryContextValue;
     vi.mocked(useRepositoryContext).mockReturnValue(repository);
-    vi.mocked(useUIContext).mockReturnValue({ setActiveTab, onOpenRunConfig, onCloseRunConfig } as unknown as UIContextValue);
+    vi.mocked(useUIContext).mockReturnValue({
+      setActiveTab,
+      onOpenRunConfig,
+      onCloseRunConfig,
+      onOpenRemoteConfig,
+      onCloseRemoteConfig,
+    } as unknown as UIContextValue);
     vi.mocked(useCachedRepoOrigins).mockReturnValue({ [first]: 'https://github.com/team/alpha.git', [second]: 'git@github.com:team/Beta.git' });
     vi.mocked(useAppToast).mockReturnValue(toast);
   });
@@ -187,5 +197,19 @@ describe('LocalRepositoriesView', () => {
     await click(actions[1]);
     expect(repository.onOpenFolder).toHaveBeenCalledTimes(1);
     expect(repository.onCloneByUrl).toHaveBeenCalledTimes(1);
+  });
+  it('opens remote configuration only after the selected repository is activated', async () => {
+    await render();
+    const row = host.querySelectorAll('.local-repositories-view__row')[1];
+    await act(async () => row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 60 })));
+    await click(
+      Array.from(document.querySelectorAll<HTMLButtonElement>('.repo-list-context-action')).find((button) =>
+        button.textContent?.includes('Remote-Konfiguration'),
+      ) ?? null,
+    );
+    expect(repository.onSwitchRepo).toHaveBeenCalledWith(second);
+    expect(setActiveTab).toHaveBeenCalledWith('repo');
+    expect(onOpenRemoteConfig).toHaveBeenCalledOnce();
+    expect(onOpenRunConfig).not.toHaveBeenCalled();
   });
 });

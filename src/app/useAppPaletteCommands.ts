@@ -4,7 +4,7 @@ import type { useAppState } from '@/components/layout/useAppState';
 import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import type { TranslationVariables } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { requestRemoteTransfer } from '@/components/hosting/remoteTransferDialogState';
 import { useHostingState } from '@/components/hosting/hostingState';
 
 type AppState = ReturnType<typeof useAppState>;
@@ -49,11 +49,21 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         action: () => state.setActiveTab('settings'),
       },
       {
+        id: 'remote-configuration',
+        label: state.settings.language === 'en' ? 'Remote configuration' : 'Remote-Konfiguration',
+        keywords: ['remote', 'configuration', 'push', 'pull', 'fetch', 'konfiguration'],
+        action: () => {
+          if (!state.activeRepo) return;
+          state.setActiveTab('repo');
+          state.onOpenRemoteConfig();
+        },
+      },
+      {
         id: 'fetch',
         label: t('generated.app.fetch_refresh_remote_88270faa'),
         keywords: ['fetch', 'remote', 'sync'],
         action: () => {
-          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'fetch' });
+          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'fetch' });
         },
       },
       {
@@ -61,7 +71,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: t('generated.app.pull_8c55fb85'),
         keywords: ['pull', 'download'],
         action: () => {
-          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'pull' });
+          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull' });
         },
       },
       {
@@ -69,7 +79,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: t('generated.app.pull_rebase_5d462c6a'),
         keywords: ['pull', 'rebase'],
         action: () => {
-          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'rebase' });
+          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'rebase' });
         },
       },
       {
@@ -77,7 +87,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: t('generated.app.push_61ad6264'),
         keywords: ['push', 'upload'],
         action: () => {
-          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'push' });
+          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'push' });
         },
       },
       {
@@ -85,7 +95,7 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: t('generated.app.push_force_with_lease_f7c67bfe'),
         keywords: ['push', 'force'],
         action: () => {
-          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'push', force: true });
+          if (state.activeRepo) requestRemoteTransfer({ repoPath: state.activeRepo, mode: 'push', force: true });
         },
       },
       {
@@ -189,8 +199,9 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         label: t('generated.app.add_remote_3a4267c1'),
         keywords: ['remote', 'add', 'hinzufuegen'],
         action: () => {
-          useHostingState.getState().navigate('remotes');
-          state.setActiveTab('hosting');
+          if (!state.activeRepo) return;
+          state.setActiveTab('repo');
+          state.onOpenRemoteConfig();
         },
       },
     ],

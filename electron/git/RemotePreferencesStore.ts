@@ -6,22 +6,31 @@ import { repositoryPathKey } from '../main-process/activeRepositoryAuthorization
 import { writeTextFileAtomically } from '../main-process/atomicFile';
 import { normalizeRemotePreferences } from './remoteTransferValidation';
 
-type Store = { version: 1; repositories: Record<string, RemotePreferences> };
+type Store = { version: 2; repositories: Record<string, RemotePreferences> };
 
 export class RemotePreferencesStore {
   constructor(private readonly filePath: () => string = () => path.join(app.getPath('userData'), 'repository-remotes.json')) {}
 
   private readStore(): Store {
     try {
-      const input = JSON.parse(fs.readFileSync(this.filePath(), 'utf8')) as Store;
-      if (input.version !== 1 || !input.repositories || typeof input.repositories !== 'object' || Array.isArray(input.repositories))
+      const input = JSON.parse(fs.readFileSync(this.filePath(), 'utf8')) as { version: number; repositories: Record<string, RemotePreferences> };
+      if (![1, 2].includes(input.version) || !input.repositories || typeof input.repositories !== 'object' || Array.isArray(input.repositories))
         throw new Error('Unsupported store.');
       const repositories: Record<string, RemotePreferences> = Object.create(null);
-      for (const [key, value] of Object.entries(input.repositories)) repositories[key] = normalizeRemotePreferences(value);
-      return { version: 1, repositories };
+      for (const [key, value] of Object.entries(input.repositories)) {
+        const preferences = normalizeRemotePreferences(value);
+        if (input.version === 1) {
+          delete preferences.selectionModes;
+          delete preferences.selectionSnapshots;
+        }
+        repositories[key] = preferences;
+      }
+      const store: Store = { version: 2, repositories };
+      if (input.version === 1) writeTextFileAtomically(this.filePath(), `${JSON.stringify(store, null, 2)}\n`);
+      return store;
     } catch (error) {
       if (fs.existsSync(this.filePath())) throw new Error('Remote preferences could not be read. The existing file was preserved.', { cause: error });
-      return { version: 1, repositories: Object.create(null) };
+      return { version: 2, repositories: Object.create(null) };
     }
   }
 

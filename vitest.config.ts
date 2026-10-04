@@ -19,6 +19,7 @@ export default defineConfig({
       reporter: ['text', 'html'],
       include: [
         'src/utils/**/*.ts',
+        'src/shared/git/remoteTransferSelection.ts',
         'src/hooks/**/*.{ts,tsx}',
         'src/contexts/**/*.{ts,tsx}',
         'src/components/layout/hooks/**/*.{ts,tsx}',
@@ -31,6 +32,7 @@ export default defineConfig({
         'electron/git/Remote*.ts',
         'electron/git/remote*.ts',
         'electron/git/reconcileRemotePreferences.ts',
+        'electron/git/groupedRemotePush.ts',
         'electron/main-process/**/*.ts',
       ],
       exclude: ['**/*.d.ts', '**/__tests__/**', '**/*.test.{ts,tsx}', 'electron/main.ts', 'electron/preload.ts'],

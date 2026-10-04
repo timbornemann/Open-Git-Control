@@ -16,6 +16,8 @@ const MainViewComponent: React.FC = () => {
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const isRunConfigOpen = useUIStore((state) => state.isRunConfigOpen);
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
+  const isRemoteConfigOpen = useUIStore((state) => state.isRemoteConfigOpen);
+  const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const refreshTrigger = useGitStore((state) => state.refreshTrigger);
   const setSelectedCommit = useGitStore((state) => state.setSelectedCommit);
@@ -83,9 +85,10 @@ const MainViewComponent: React.FC = () => {
 
   const handleRepositoryStagingOpen = React.useCallback(() => {
     onCloseRunConfig();
+    onCloseRemoteConfig();
     setShowTimeline(false);
     handleStageCommitOpen();
-  }, [handleStageCommitOpen, onCloseRunConfig, setShowTimeline]);
+  }, [handleStageCommitOpen, onCloseRunConfig, onCloseRemoteConfig, setShowTimeline]);
 
   React.useEffect(() => {
     const handleOpenStagingCommit = () => {
@@ -101,7 +104,8 @@ const MainViewComponent: React.FC = () => {
   const isPlannerView = activeTab === 'planner';
   const isHostingView = activeTab === 'github' || activeTab === 'hosting';
   const isLocalReposView = activeTab === 'localRepos';
-  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isHostingView && !isLocalReposView && !(activeTab === 'repo' && isRunConfigOpen);
+  const canShowInspectorPane =
+    !isSettingsView && !isPlannerView && !isHostingView && !isLocalReposView && !(activeTab === 'repo' && (isRunConfigOpen || isRemoteConfigOpen));
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

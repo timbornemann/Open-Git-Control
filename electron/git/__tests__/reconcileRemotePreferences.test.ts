@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GitRemoteSnapshotDto, RemotePreferences } from '../../../src/types/remoteTransfers';
 import { reconcileRemotePreferences } from '../reconcileRemotePreferences';
+import { rememberRemoteTransferSelection, resolveRemoteTransferSelection } from '../../../src/shared/git/remoteTransferSelection';
 
 describe('remote preference reconciliation', () => {
   const identity = { connectionId: 'forgejo-account', repositoryId: '1', fullPath: 'team/private' };
@@ -37,5 +38,38 @@ describe('remote preference reconciliation', () => {
     expect(removed.profiles![0].targetBranches).toEqual({});
     expect(removed.hostingRepository).toBeUndefined();
     expect(removed.fetchRemote).toBeUndefined();
+  });
+  it('preserves remembered selection identity on rename, including separate pull and local branch mappings', () => {
+    let prefs = preferences();
+    const current = snapshot();
+    prefs = rememberRemoteTransferSelection('fetch', current, prefs, { selectedRemoteNames: ['private'] }, 'remember');
+    prefs = rememberRemoteTransferSelection('pull', current, prefs, { selectedRemoteNames: ['private'], branch: 'trunk' }, 'remember');
+    prefs = rememberRemoteTransferSelection('push', current, prefs, { selectedRemoteNames: ['private'], targetBranches: { private: 'archive' } }, 'remember');
+    const next = snapshot('forgejo');
+    const renamed = reconcileRemotePreferences(prefs, { action: 'rename', name: 'private', newName: 'forgejo' }, next);
+    expect(renamed.pullRemote).toBe('forgejo');
+    expect(renamed.pullBranches).toEqual({ main: 'trunk' });
+    expect(renamed.pushBranches).toEqual({ main: { forgejo: 'archive' } });
+    for (const action of ['fetch', 'pull', 'push'] as const) expect(resolveRemoteTransferSelection(action, next, renamed).state).toBe('ready');
+  });
+  it('invalidates the complete multi-target choice after removing a target rather than auto-pushing the survivor', () => {
+    const current = snapshot();
+    current.remotes.push({ name: 'backup', fetchUrls: ['https://backup.test/repo.git'], pushUrls: ['https://backup.test/repo.git'] });
+    const prefs = rememberRemoteTransferSelection('push', current, preferences(), { selectedRemoteNames: ['private', 'backup'] }, 'remember');
+    const next = snapshot();
+    const removed = reconcileRemotePreferences(prefs, { action: 'remove', name: 'backup' }, next);
+    expect(removed.pushRemotes).toEqual(['private']);
+    expect(resolveRemoteTransferSelection('push', next, removed)).toMatchObject({ state: 'choose', reason: 'selection-invalid' });
+  });
+  it('invalidates only affected operation identities when a push URL changes', () => {
+    let prefs = preferences();
+    const current = snapshot();
+    prefs = rememberRemoteTransferSelection('fetch', current, prefs, { selectedRemoteNames: ['private'] }, 'remember');
+    prefs = rememberRemoteTransferSelection('push', current, prefs, { selectedRemoteNames: ['private'] }, 'remember');
+    const next = snapshot();
+    next.remotes[0].pushUrls = ['https://github.com/team/other.git'];
+    const updated = reconcileRemotePreferences(prefs, { action: 'set-url', name: 'private', pushUrls: next.remotes[0].pushUrls }, next);
+    expect(resolveRemoteTransferSelection('fetch', next, updated).state).toBe('ready');
+    expect(resolveRemoteTransferSelection('push', next, updated).reason).toBe('selection-invalid');
   });
 });

@@ -36,13 +36,13 @@ Aktuell neuestes Release: [v2.2.1](https://github.com/timbornemann/Open-Git-Cont
 
 Badge und Latest-Release-Seite bleiben automatisch aktuell. Die direkten Binary-Links unten sind durch die GitHub-Asset-Namen versioniert und werden vom Release-Workflow nach einem neuen stabilen Release aktualisiert.
 
-| Plattform | Paket | Direkter GitHub-Download |
-| --- | --- | --- |
-| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-2.2.1-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-win-x64.exe) |
-| Linux x64 | AppImage | [Open-Git-Control-2.2.1-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-x86_64.AppImage) |
-| Linux amd64 | Debian-Paket `.deb` | [Open-Git-Control-2.2.1-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-amd64.deb) |
-| macOS x64 | Disk Image `.dmg` | [Open-Git-Control-2.2.1-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.dmg) |
-| macOS x64 | Zip-Archiv | [Open-Git-Control-2.2.1-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.zip) |
+| Plattform   | Paket                 | Direkter GitHub-Download                                                                                                                                               |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64 | NSIS Installer `.exe` | [Open-Git-Control-2.2.1-win-x64.exe](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-win-x64.exe)                     |
+| Linux x64   | AppImage              | [Open-Git-Control-2.2.1-linux-x86_64.AppImage](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-x86_64.AppImage) |
+| Linux amd64 | Debian-Paket `.deb`   | [Open-Git-Control-2.2.1-linux-amd64.deb](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-linux-amd64.deb)             |
+| macOS x64   | Disk Image `.dmg`     | [Open-Git-Control-2.2.1-mac-x64.dmg](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.dmg)                     |
+| macOS x64   | Zip-Archiv            | [Open-Git-Control-2.2.1-mac-x64.zip](https://github.com/timbornemann/Open-Git-Control/releases/download/v2.2.1/Open-Git-Control-2.2.1-mac-x64.zip)                     |
 
 Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadaten fuer den Auto-Updater. Normale Nutzer sollten einen der Installer oben herunterladen.
 
@@ -142,7 +142,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Fetch-Fehler
 - Remotes hinzufuegen, entfernen, umbenennen und URLs aktualisieren.
 - Upstream fuer den aktuellen Branch setzen.
-- Bei nicht erreichbaren Endpunkten URL, Konto und Berechtigungen unter Remotes & Übertragungen prüfen.
+- Bei nicht erreichbaren Endpunkten URL, Konto und Berechtigungen unter Remote-Konfiguration prüfen.
 - Lightweight oder annotated Tags erstellen.
 - Tags suchen, auswaehlen, loeschen und pushen.
 - Rekursiven Submodule-Status anzeigen.
@@ -159,9 +159,10 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Pull mit Rebase
   - No-fast-forward-Pull
   - Fast-forward-only-Pull
-- Push zu einem oder mehreren ausgewählten Remotes mit Zielbranches und ausdrücklich ausgewählten Tags prüfen.
+- Direkt zu einem eindeutigen oder gespeicherten Remote-Ziel pushen; bei mehreren Remotes die Ziele beim ersten Aufruf auswählen.
+- Auswahlmodi für Fetch, Pull und Push unabhängig auf der Repository-Seite Remote-Konfiguration einstellen.
 - Force-with-lease gegen den geprüften Stand jedes Endpunkts bestätigen.
-- Upstream ausdrücklich unter Remotes & Übertragungen setzen.
+- Upstream ausdrücklich unter Remote-Konfiguration setzen.
 - Ergebnisse je Ziel prüfen und erfolglose Ziele mit dem geprüften Commit erneut versuchen.
 - Repository-spezifische Run-, Test-, Format-, Start- und Build-Workflows starten.
 - Codebase Timeline oeffnen.
@@ -316,7 +317,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 Der gemeinsame **Hosting**-Bereich verwaltet mehrere Server und Konten gleichzeitig. Native Git-Funktionen bleiben mit jedem passenden Git-Server nutzbar. Adapter ergänzen Repository-Kataloge, Erstellen, Forks, PRs/MRs, CI und Veröffentlichungen für GitHub, Forgejo, GitLab sowie Bitbucket Cloud und Data Center. Verfügbare Aktionen richten sich nach API, Serverversion und Repository-Berechtigungen. Die [Hosting-Dokumentation](Docs/HOSTING.md) beschreibt Anmeldung, OAuth, Endpunktauswahl und Anbieterunterschiede.
 
-Für jedes lokale Repository werden Pull-Quelle, Push-Ziele und Hosting-Ziel unabhängig gewählt. Ein Push-Profil kann denselben geprüften Commit auf einen privaten Forgejo-Server und ein GitHub-Backup veröffentlichen. Das Upstream-Tracking bleibt erhalten. Teil-Erfolge werden angezeigt; Wiederholungen prüfen und adressieren nur erfolglose Ziele. Bestehende mehrere Push-URLs werden erhalten.
+Für jedes lokale Repository werden Fetch-Quelle, Pull-Quelle, Push-Ziele und Hosting-Ziel unabhängig in der **Remote-Konfiguration** gewählt. Ein einzelnes Remote startet normale Transfers direkt. Bei mehreren Remotes kann die Auswahl gespeichert oder jedes Mal abgefragt werden, getrennt für Fetch, Pull und Push. Ein Push-Profil kann denselben geprüften Commit auf einen privaten Forgejo-Server und ein GitHub-Backup veröffentlichen. Das Upstream-Tracking bleibt erhalten. Teil-Erfolge werden angezeigt; Wiederholungen prüfen und adressieren nur erfolglose Ziele. Bestehende mehrere Push-URLs werden erhalten.
 
 Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ein normaler Push alle URLs dieses benannten Remote als Gruppe. Force, gezielte Wiederholung und unterschiedliche ausdrücklich zugeordnete Hosting-Konten innerhalb einer solchen Gruppe benötigen getrennte benannte Remotes oder ein Git-Update.
 
@@ -611,12 +612,12 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 
 ### Standard-Lokalworkflow
 
-1. Fetch oder Pull in der Topbar öffnen und Quell-Remote, Branch und Pull-Modus auswählen.
+1. Fetch oder Pull in der Topbar starten. Eine einzelne oder gespeicherte Quelle wird direkt verwendet; sonst Quelle und Auswahlmodus festlegen.
 2. Branch erstellen oder wechseln.
 3. Geaenderte Dateien im Working Directory pruefen.
 4. Diffs oeffnen, Dateien oder Hunks stagen und bei Bedarf stashen.
 5. Commit mit Titel und Beschreibung erstellen.
-6. Push öffnen, Ziele/Branches und gewünschte Tags wählen, den erfassten Stand prüfen und den Push bestätigen. Upstream bei Bedarf separat setzen.
+6. Den aktuellen Branch mit Push direkt auf die einzelnen oder gespeicherten Ziele veröffentlichen. Bei mehreren Remotes die Ziele beim ersten Aufruf wählen. Tags über die separate Tag-Aktion veröffentlichen; Force und Secret-Treffer weiterhin bestätigen. Upstream bei Bedarf separat setzen.
 7. Ergebnisse je Ziel prüfen; erfolglose Ziele mit dem geprüften Stand erneut versuchen.
 
 ### Konflikte loesen
@@ -631,14 +632,14 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
 ### Hosting-Flow für Pull / Merge Requests
 
 1. Anbieter-Konto unter Hosting → Konten & Server hinzufügen und mit Token oder konfigurierter Browser-Anmeldung anmelden.
-2. Konto und Hosting-Endpunkt unter Remotes & Übertragungen auswählen.
+2. Konto und Hosting-Endpunkt unter Remote-Konfiguration auswählen.
 3. PR / MR aus der Repo-Sidebar öffnen und Quell- sowie Zielrepository ausdrücklich auswählen.
 4. Request-Checks und die CI-Ansicht des Anbieters prüfen.
 5. Request öffnen, kopieren oder auschecken; nach Prüfung des Head-Commits mit einer verfügbaren Methode mergen.
 
 ### Release Flow
 
-1. Hosting-Endpunkt des Repositorys unter Remotes & Übertragungen auswählen, dann Release in der Topbar oder Hosting-Repository-Ansicht öffnen.
+1. Hosting-Endpunkt des Repositorys unter Remote-Konfiguration auswählen, dann Release in der Topbar oder Hosting-Repository-Ansicht öffnen.
 2. Zielbranch, Tag oder Commit eintragen und den ausgewählten Endpunkt prüfen.
 3. Fehlt der lokale Stand auf dem Server, zuerst den geprüften Push-Workflow verwenden und den Endpunkt erneut prüfen.
 4. Versionstag wählen oder vorschlagen lassen; Release-Name und Markdown-Notes anpassen, optional mit KI erzeugen.
@@ -890,7 +891,7 @@ Erwartete Release Assets:
 ### Keine Pull / Merge Requests sichtbar
 
 - Beim passenden Anbieter-Konto anmelden und Repository-/Request-Berechtigungen prüfen.
-- Gewünschtes Hosting-Repository und Konto unter Remotes & Übertragungen auswählen; SSH-Aliase über die Repository-Web-URL zuordnen.
+- Gewünschtes Hosting-Repository und Konto unter Remote-Konfiguration auswählen; SSH-Aliase über die Repository-Web-URL zuordnen.
 - Repository und PR-/MR-Ansicht aktualisieren. Der Git-Remote darf beliebig heißen.
 
 ### Commit oder Push wird vom Secret-Scan blockiert

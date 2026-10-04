@@ -6,7 +6,8 @@ import { useI18n } from '@/i18n';
 import type { HostedRepository, HostingCapabilities, HostingCreateRelease, HostingPage, HostingRelease, HostingReleaseTarget } from '@/types/hostingDtos';
 import { hostedRepositoryKey, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
-import { RemoteTransferPanel } from './RemoteTransferPanel';
+import { requestRemoteTransfer } from './remoteTransferDialogState';
+import { resolveReleasePushTarget } from './releasePushTarget';
 import { HostingNotesOptions } from './HostingNotesOptions';
 import { HostingReleaseFiles } from './HostingReleaseFiles';
 import { HostingReleaseList } from './HostingReleaseList';
@@ -20,11 +21,13 @@ export function HostingReleases({
   capabilities,
   repoPath,
   remoteName,
+  endpointUrl,
 }: {
   repository: HostedRepository;
   capabilities: HostingCapabilities;
   repoPath: string | null;
   remoteName: string;
+  endpointUrl?: string;
 }) {
   const { tr } = useI18n();
   const revision = useHostingState((s) => s.revision);
@@ -46,14 +49,12 @@ export function HostingReleases({
   const [created, setCreated] = useState<HostingRelease | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [uploaded, setUploaded] = useState<string[]>([]);
-  const [showPush, setShowPush] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     setInspection(null);
     setCreated(null);
     setFiles([]);
     setUploaded([]);
-    setShowPush(false);
     setMessage('');
   }, [repoPath, remoteName]);
   const reload = useCallback(() => hostingClient.request('releases', { repository: repository.ref }), [repository]);
@@ -298,12 +299,27 @@ export function HostingReleases({
             setInspection(null);
           }}
           onTransfer={() => {
-            setShowPush(true);
-            setInspection(null);
+            if (!repoPath || !remoteName || !inspection.localSha) return;
+            const branch = target.replace(/^refs\/heads\//, '');
+            const sourceOid = inspection.localSha;
+            void task.run(
+              () => resolveReleasePushTarget(repoPath, remoteName, repository.ref, endpointUrl),
+              (constrainedTargetUrls) => {
+                requestRemoteTransfer({
+                  repoPath,
+                  mode: 'push',
+                  constrainedRemoteNames: [remoteName],
+                  constrainedTargetUrls,
+                  destinationBranch: branch,
+                  expectedBranch: branch,
+                  expectedSourceOid: sourceOid,
+                });
+                setInspection(null);
+              },
+            );
           }}
         />
       )}
-      {showPush && repoPath && <RemoteTransferPanel key={repoPath} repoPath={repoPath} mode="push" onClose={() => setShowPush(false)} />}
       {created && capabilities.releaseAssets && (
         <div className="hosting-card">
           <h3>{capabilities.releases === 'downloads' ? 'Downloads' : tr('Release-Dateien', 'Release assets')}</h3>

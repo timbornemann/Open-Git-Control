@@ -18,7 +18,7 @@ Credentials are stored with Electron's OS encryption. If secure storage is unava
 
 Grant only the features you intend to use. Repository reading, writing, change requests, CI and releases can require separate scopes. Bitbucket Cloud catalog discovery requires workspace access in addition to account and repository reading (`read:workspace:bitbucket`, `read:user:bitbucket`, `read:repository:bitbucket` for API tokens; `account` and `repository` for OAuth). OAuth client secrets are supplied locally by the user; the application distributes no shared secret.
 
-For HTTPS transfers, a temporary Git credential helper asks a Main-process broker for credentials bound to the selected account and endpoint. Credentials are neither written into remote URLs nor passed as Git command arguments. SSH URLs and existing system credentials remain usable. Configure SSH aliases by manually binding the actual remote URL to a repository web URL in **Remotes & transfers**.
+For HTTPS transfers, a temporary Git credential helper asks a Main-process broker for credentials bound to the selected account and endpoint. Credentials are neither written into remote URLs nor passed as Git command arguments. SSH URLs and existing system credentials remain usable. Configure SSH aliases by manually binding the actual remote URL to a repository web URL in **Remote configuration**.
 
 ## Repositories with several endpoints
 
@@ -26,11 +26,17 @@ Add backup servers as separate named remotes, for example `forgejo` and `github-
 
 Each local repository has independent selections:
 
-1. **Fetch / pull source:** one remote and one branch. A one-time pull does not change tracking. Use **Set as upstream** to change it explicitly.
+1. **Fetch and pull sources:** separate source selections. Pull uses one remote and one branch. A one-time pull does not change tracking. Use **Set as upstream** to change it explicitly.
 2. **Push targets:** select remotes, optional target branches, and explicit tags. Save the selection as a push profile. Backup pushes leave upstream tracking intact.
 3. **Hosting target:** select the account and repository used for PRs/MRs, CI and releases. Ambiguous accounts and SSH aliases require an explicit binding.
 
-Review a push before execution. The immutable plan captures the source commit, selected tags, destination refs, endpoint configuration and account generations. Targets execute sequentially. A failed server does not prevent other selected targets from running; cancellation or a changed context stops the remaining targets. Results show partial success. Retry checks actual endpoint refs and addresses unsuccessful targets only. Successful pushes are never rolled back. Force-with-lease checks each endpoint's own expected commit. Secret-scan approval belongs to the full reviewed plan.
+With one remote, normal Push, Pull and Fetch start directly. With several remotes, the first manual operation asks for its source or destinations and whether to **Save and run** or **Ask every time**. These modes are independent for Fetch, Pull and Push and belong to the local repository. Changed URLs, removed destinations or changed account bindings require a new selection. Ordinary pushes include no tags; use the explicit tag action to publish tags. Force-with-lease and secret-scan findings still require approval.
+
+Open **Remote configuration** from the repository actions menu, local repository context menu or command palette. Edit sources, branch mappings, push profiles, selection modes, remote URLs and hosting/credential bindings there. Preferences are applied with **Save**; unsaved drafts stay separate for each repository during the app session. Opening or saving this page never starts a transfer. Settings are local to the app and are not written into a versioned repository file.
+
+Pull uses the selected source's tracking branch when applicable, otherwise the current branch name. Explicitly different destination branches belong to their local branch, so changing branches does not reuse an unrelated fixed target. Automatic background Fetch never asks: it uses a valid remembered Fetch source, or the existing Git default when the mode is Ask every time or no decision exists. An invalid remembered source pauses background Fetch until corrected.
+
+Before every push the immutable plan captures the source commit, selected tags, destination refs, endpoint configuration and account generations. Normal pushes proceed after the configured secret checks without another summary confirmation. Targets execute sequentially. A failed server does not prevent other selected targets from running; cancellation or a changed context stops the remaining targets. Results show partial success. Retry checks actual endpoint refs and addresses unsuccessful targets only. Successful pushes are never rolled back. Force-with-lease checks each endpoint's own expected commit. Secret-scan approval belongs to the full reviewed plan.
 
 Git installations supporting process-local `pushurl` reset allow individual destinations of an existing multi-URL remote to be addressed while retaining its remote name and hooks. The app probes this capability without changing Git configuration. Older Git versions can perform normal grouped pushes followed by per-endpoint verification; targeted retries and force pushes require separate named remotes. A group using several explicitly selected hosting accounts also requires separate named remotes on those Git versions. SSH and system credentials remain available for grouped pushes.
 
@@ -47,9 +53,11 @@ Git installations supporting process-local `pushurl` reset allow individual dest
 
 Unavailable APIs, disabled CI, missing permissions and unreachable servers are reported separately. Lists support pagination. Logs are rendered as bounded plain text; large logs link back to the provider. Artifact and asset transfers have a 512 MiB limit. Merge methods follow repository/server configuration, and a merge checks the reviewed head SHA (and Data Center's version).
 
-Release inspection verifies only the selected endpoint. Publish its already available commit, or push the local revision through the reviewed push workflow and inspect again. Local or remote tags pointing to another commit block publication. GitLab uploads become release asset links; Bitbucket Downloads are separate files. AI release notes and local Markdown export are available regardless of native release support.
+Release inspection verifies only the selected endpoint. Publish its already available commit, or push the checked-out release branch to that endpoint and inspect again. Release transfers keep their explicit destination and do not use a general backup profile. Local or remote tags pointing to another commit block publication. GitLab uploads become release asset links; Bitbucket Downloads are separate files. AI release notes and local Markdown export are available regardless of native release support.
 
 ## Migration and project services
+
+Remote preferences migrate atomically to version 2. Existing sources, push profiles and account bindings remain available as suggestions; several remotes require an explicit selection mode before normal transfers can start directly. Git configuration is preserved.
 
 Migration imports legacy GitHub credentials and settings into a versioned hosting connection. A legacy token without a host is assigned only to GitHub.com. Catalogs and pins are matched to the verified server/account identity. Existing Git configuration is not rewritten. App updates and Open-Git-Control feedback remain attached to this project's GitHub.com repository, independently of the active hosting target. The local Planning API gains no hosting or Git write permissions.
 

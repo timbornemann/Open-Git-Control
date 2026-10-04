@@ -2,50 +2,47 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GitRemoteSnapshotDto } from '@/types/remoteTransfers';
-import { RemoteTransferPanel } from './RemoteTransferPanel';
+import type { GitRemoteSnapshotDto, RemotePreferences } from '@/types/remoteTransfers';
+import { RemoteTransferHost } from './RemoteTransferHost';
+import { requestRemoteTransfer, useRemoteTransferDialogState } from './remoteTransferDialogState';
+import { initialRemoteTransferState, useRemoteTransferState } from './remoteTransferState';
 
-const mocked = vi.hoisted(() => ({ request: vi.fn(), hostingRequest: vi.fn(), refresh: vi.fn(), command: vi.fn() }));
-vi.mock('@/services/hostingClient', () => ({
-  transferClient: { request: mocked.request },
-  hostingClient: { request: mocked.hostingRequest },
+const mocked = vi.hoisted(() => ({
+  request: vi.fn(),
+  refresh: vi.fn(),
+  toast: vi.fn(),
+  command: vi.fn(),
+  openConfig: vi.fn(),
+  setTab: vi.fn(),
+  connections: [],
 }));
+vi.mock('@/services/hostingClient', () => ({ transferClient: { request: mocked.request } }));
 vi.mock('@/services/gitClient', () => ({ gitClient: { cancelSecretScan: vi.fn(), runGitCommandForRepo: mocked.command } }));
-vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en }) }));
+vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en, t: (key: string) => key }) }));
 vi.mock('@/contexts/AppStateContext', () => ({
-  useGitStore: (select: (state: unknown) => unknown) => select({ tags: [], triggerRefresh: mocked.refresh }),
+  useGitStore: (select: (state: unknown) => unknown) => select(repository),
   useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { secretScanBeforePushEnabled: false } }),
-  useUIStore: (select: (state: unknown) => unknown) => select({ setActiveTab: vi.fn() }),
+  useUIStore: (select: (state: unknown) => unknown) => select({ setActiveTab: mocked.setTab }),
   useWorkflowStore: (select: (state: unknown) => unknown) => select({ jobs: [] }),
 }));
-vi.mock('./hostingState', () => ({
-  useHostingState: () => ({
-    connections: [{ id: 'forgejo-account', authenticated: true, label: 'Personal Forgejo', username: 'alice' }],
-    refresh: mocked.refresh,
-  }),
-}));
-
+vi.mock('./hostingState', () => ({ useHostingState: (select: (state: unknown) => unknown) => select({ connections: mocked.connections }) }));
 let root: Root;
 let container: HTMLDivElement;
-function snapshot(repoPath: string, branch = 'main'): GitRemoteSnapshotDto {
-  return {
-    repoPath,
-    branch,
-    upstream: { remote: 'forgejo', branch },
-    defaultPushRemote: 'forgejo',
-    supportsPushUrlIsolation: true,
-    remotes: [
-      { name: 'forgejo', fetchUrls: ['git@private-alias:alice/project.git'], pushUrls: ['git@private-alias:alice/project.git'] },
-      { name: 'backup', fetchUrls: ['https://github.com/alice/project.git'], pushUrls: ['https://github.com/alice/project.git'] },
-    ],
-  };
-}
+let preferences: RemotePreferences;
+let repository: { activeRepo: string; currentBranch: string; tags: string[]; triggerRefresh: typeof mocked.refresh; onToast: typeof mocked.toast };
+let snapshot: GitRemoteSnapshotDto;
 async function settle() {
-  for (let index = 0; index < 8; index++) await Promise.resolve();
+  for (let index = 0; index < 40; index++) await Promise.resolve();
 }
-async function render(repoPath: string, mode: 'remotes' | 'pull' | 'fetch' = 'remotes') {
+async function render() {
   await act(async () => {
-    root.render(createElement(RemoteTransferPanel, { repoPath, mode }));
+    root.render(createElement(RemoteTransferHost, { onOpenConfiguration: mocked.openConfig }));
+    await settle();
+  });
+}
+async function start(mode: 'push' | 'pull' | 'fetch', extra: object = {}) {
+  await act(async () => {
+    requestRemoteTransfer({ repoPath: repository.activeRepo, mode, ...extra });
     await settle();
   });
 }
@@ -69,13 +66,33 @@ async function select(label: string, value: string) {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
-  mocked.request.mockImplementation(async (operation: string, input: { repoPath: string; preferences?: unknown }) => {
-    if (operation === 'getRemotes') return snapshot(input.repoPath);
-    if (operation === 'getPreferences') return {};
-    if (operation === 'setPreferences') return input.preferences;
+  useRemoteTransferState.setState(initialRemoteTransferState());
+  useRemoteTransferDialogState.getState().close();
+  preferences = {};
+  repository = { activeRepo: '/repo', currentBranch: 'main', tags: ['v1', 'v2'], triggerRefresh: mocked.refresh, onToast: mocked.toast };
+  snapshot = {
+    repoPath: '/repo',
+    branch: 'main',
+    upstream: { remote: 'forgejo', branch: 'tracking-main' },
+    defaultPushRemote: 'forgejo',
+    supportsPushUrlIsolation: true,
+    remotes: [
+      { name: 'forgejo', fetchUrls: ['forgejo'], pushUrls: ['forgejo'] },
+      { name: 'backup', fetchUrls: ['github'], pushUrls: ['github'] },
+    ],
+  };
+  mocked.request.mockImplementation(async (operation: string, input: { preferences?: RemotePreferences }) => {
+    if (operation === 'getRemotes') return structuredClone(snapshot);
+    if (operation === 'getPreferences') return structuredClone(preferences);
+    if (operation === 'setPreferences') {
+      preferences = structuredClone(input.preferences!);
+      return preferences;
+    }
+    if (operation === 'planPush')
+      return { id: 'plan', repoPath: '/repo', sourceOid: 'a'.repeat(40), branch: 'main', tagNames: [], force: false, secretScanArgs: [], targets: [] };
+    if (operation === 'executePush') return { id: 'batch', planId: 'plan', repoPath: '/repo', sourceOid: 'a'.repeat(40), state: 'success', targets: [] };
     return { output: 'ok' };
   });
-  mocked.hostingRequest.mockResolvedValue({ ref: { connectionId: 'forgejo-account', repositoryId: '42', fullPath: 'alice/project' } });
   mocked.command.mockResolvedValue({ success: true, data: '' });
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -87,91 +104,166 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('remote transfer pane destination isolation', () => {
-  it('manually fetches branches and tags from the same selected source and adopts only missing tags', async () => {
-    mocked.command.mockImplementation(async (_repo: string, operation: string) => ({
-      success: true,
-      data:
-        operation === 'forEachRef'
-          ? `refs/tags/conflict\0${'a'.repeat(40)}\0\nrefs/ogc/remote-tags/backup/conflict\0${'b'.repeat(40)}\0\nrefs/ogc/remote-tags/backup/missing\0${'c'.repeat(40)}\0`
-          : '',
-    }));
-    await render('/repo/mixed', 'fetch');
-    await select('Fetch/pull remote', 'backup');
-    await click('Fetch');
-
+describe('remote transfer host and selection UI', () => {
+  it('executes a sole-remote fetch without opening a dialog', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    await render();
+    await start('fetch');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(mocked.request.mock.calls.filter(([operation]) => operation === 'fetch').map(([, input]) => input)).toEqual([
-      { repoPath: '/repo/mixed', remote: 'backup' },
-      { repoPath: '/repo/mixed', remote: 'backup', tagsOnly: true },
+      { repoPath: '/repo', remote: 'forgejo' },
+      { repoPath: '/repo', remote: 'forgejo', tagsOnly: true },
     ]);
-    expect(mocked.command.mock.calls.filter(([, operation]) => operation === 'adoptRemoteTag')).toEqual([
-      ['/repo/mixed', 'adoptRemoteTag', 'backup', 'missing'],
-    ]);
-    expect(mocked.refresh).toHaveBeenCalled();
+    expect(mocked.toast).toHaveBeenCalledWith('Fetch from forgejo completed.', false);
   });
-
-  it('discards an earlier repository snapshot after switching repositories', async () => {
-    let finishEarlier!: (value: GitRemoteSnapshotDto) => void;
-    mocked.request.mockImplementation(async (operation: string, input: { repoPath: string }) => {
-      if (operation === 'getRemotes' && input.repoPath === '/repo/first')
-        return new Promise((resolve) => {
-          finishEarlier = resolve;
-        });
-      if (operation === 'getRemotes') return snapshot(input.repoPath, 'second-branch');
-      return {};
-    });
-    await render('/repo/first');
-    await render('/repo/second');
+  it('offers independent remember and ask choices, and executes a remembered selection without a new dialog', async () => {
+    await render();
+    await start('fetch');
+    expect(container.textContent).toContain('Save and execute');
+    expect(container.textContent).toContain('Ask every time');
+    await select('Fetch remote', 'backup');
+    await click('Save and execute');
+    expect(preferences.selectionModes).toEqual({ fetch: 'remember' });
+    expect(preferences.fetchRemote).toBe('backup');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await start('fetch');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await start('pull');
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+  it('resets the pull branch when switching away from its tracking source', async () => {
+    await render();
+    await start('pull');
+    expect(container.querySelector('input')?.value).toBe('tracking-main');
+    await select('Pull remote', 'backup');
+    expect(container.querySelector('input')?.value).toBe('main');
+    await click('Ask every time');
+    expect(mocked.request).toHaveBeenCalledWith('pull', { repoPath: '/repo', remote: 'backup', branch: 'main', mode: 'default' });
+    expect(preferences.selectionModes).toEqual({ pull: 'ask' });
+    await start('pull');
+    expect(container.textContent).toContain('Ask every time');
+  });
+  it('opens configuration without initiating a transfer from its link', async () => {
+    await render();
+    await start('push');
+    await click('Open remote configuration');
+    expect(mocked.openConfig).toHaveBeenCalledWith('/repo');
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'planPush')).toBe(false);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+  it('keeps progress and cancellation outside the selection dialog', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    let finish!: (result: unknown) => void;
+    const original = mocked.request.getMockImplementation()!;
+    mocked.request.mockImplementation((operation, input) =>
+      operation === 'executePush'
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : original(operation, input),
+    );
+    await render();
+    await start('push');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelector('aside[role="status"]')).not.toBeNull();
+    await click('Cancel');
     await act(async () => {
-      finishEarlier(snapshot('/repo/first', 'first-branch'));
+      finish({ id: 'batch', planId: 'plan', repoPath: '/repo', sourceOid: 'a'.repeat(40), state: 'cancelled', targets: [] });
       await settle();
     });
-    expect(container.textContent).toContain('/repo/second');
-    expect(container.textContent).toContain('second-branch');
-    expect(container.textContent).not.toContain('first-branch');
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(mocked.request).toHaveBeenCalledWith('cancel', { repoPath: '/repo' });
+    expect(container.textContent).toContain('Push result: cancelled');
   });
-
-  it('uses a web URL only for resolution and persists the actual SSH endpoint binding', async () => {
-    await render('/repo/private');
-    await select('Bind hosting account', 'forgejo-account');
-    vi.spyOn(window, 'prompt').mockReturnValue('https://forgejo.example/alice/project');
-    await click('Bind account to this endpoint');
-    expect(mocked.hostingRequest).toHaveBeenCalledWith('resolveRepository', {
-      connectionId: 'forgejo-account',
-      url: 'https://forgejo.example/alice/project',
+  it('discards an earlier snapshot after switching repository', async () => {
+    let finish!: (result: GitRemoteSnapshotDto) => void;
+    const original = mocked.request.getMockImplementation()!;
+    mocked.request.mockImplementation((operation, input) =>
+      operation === 'getRemotes'
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : original(operation, input),
+    );
+    await render();
+    await start('fetch');
+    repository = { ...repository, activeRepo: '/other', currentBranch: 'other-main' };
+    await render();
+    await act(async () => {
+      finish(snapshot);
+      await settle();
     });
-    const stored = mocked.request.mock.calls.find(([operation]) => operation === 'setPreferences')?.[1];
-    expect(stored.preferences.bindings).toEqual([
-      {
-        remoteName: 'forgejo',
-        url: 'git@private-alias:alice/project.git',
-        repository: { connectionId: 'forgejo-account', repositoryId: '42', fullPath: 'alice/project' },
-        credentialMode: 'hosting',
-      },
-    ]);
-    await select('Git authentication for this endpoint', 'system');
-    const changed = mocked.request.mock.calls.filter(([operation]) => operation === 'setPreferences').at(-1)?.[1];
-    expect(changed.preferences.bindings[0]).toEqual({ ...stored.preferences.bindings[0], credentialMode: 'system' });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'fetch')).toBe(false);
+    expect(mocked.toast).not.toHaveBeenCalled();
   });
-
-  it('retries a failed pull against its original source despite a changed source selection', async () => {
-    let pullCount = 0;
-    const previous = mocked.request.getMockImplementation()!;
-    mocked.request.mockImplementation(async (operation: string, input: { repoPath: string }) => {
-      if (operation === 'pull' && pullCount++ === 0) throw new Error('Local changes would be overwritten.');
-      return previous(operation, input);
+  it('keeps ordinary pushes free of tag controls while explicit tag pushes show them', async () => {
+    await render();
+    await start('push');
+    expect(container.textContent).not.toContain('Explicitly select tags');
+    await click('Close');
+    snapshot.remotes = [snapshot.remotes[0]];
+    await start('push', { selectTags: true, tagNames: ['v1'] });
+    expect(container.textContent).toContain('Explicitly select tags');
+    const tag = [...container.querySelectorAll('label')].find((label) => label.textContent === 'v1')?.querySelector('input');
+    expect(tag?.checked).toBe(true);
+  });
+  it('keeps the failed pull available while opening the workspace to resolve conflicts', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    const original = mocked.request.getMockImplementation()!;
+    let pulls = 0;
+    mocked.request.mockImplementation(async (operation, input) => {
+      if (operation === 'pull' && pulls++ === 0) throw new Error('Resolve conflicts first');
+      return original(operation, input);
     });
-    await render('/repo/mixed', 'pull');
-    await click('Pull');
-    expect(container.textContent).toContain('Local changes would be overwritten.');
-    await select('Fetch/pull remote', 'backup');
+    await render();
+    await start('pull', { pullMode: 'rebase' });
+    await click('Open workspace');
+    expect(mocked.setTab).toHaveBeenCalledWith('repo');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await click('Resume pull');
     await click('Retry this pull source');
-    const calls = mocked.request.mock.calls.filter(([operation]) => operation === 'pull').map(([, input]) => input);
-    expect(calls).toEqual([
-      { repoPath: '/repo/mixed', remote: 'forgejo', branch: 'main', mode: 'default' },
-      { repoPath: '/repo/mixed', remote: 'forgejo', branch: 'main', mode: 'default' },
+    expect(mocked.request.mock.calls.filter(([operation]) => operation === 'pull').map(([, input]) => input)).toEqual([
+      { repoPath: '/repo', remote: 'forgejo', branch: 'tracking-main', mode: 'rebase' },
+      { repoPath: '/repo', remote: 'forgejo', branch: 'tracking-main', mode: 'rebase' },
     ]);
-    expect(container.textContent).toContain('Pull from forgejo/main completed.');
+  });
+  it('explains a detached checkout and provides a way back to the workspace', async () => {
+    snapshot.branch = '';
+    snapshot.upstream = null;
+    repository.currentBranch = '';
+    await render();
+    await start('push');
+    expect(container.textContent).toContain('Check out a local branch');
+    await click('Open workspace');
+    expect(mocked.setTab).toHaveBeenCalledWith('repo');
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'planPush')).toBe(false);
+  });
+  it('stores the selected profile with its branch targets before executing it', async () => {
+    preferences = {
+      activeProfileId: 'primary',
+      profiles: [
+        { id: 'primary', name: 'Primary', remoteNames: ['forgejo'] },
+        { id: 'mirror', name: 'Mirror', remoteNames: ['backup'], targetBranches: { backup: 'mirror-main' } },
+      ],
+    };
+    await render();
+    await start('push');
+    await select('Push profile', 'mirror');
+    await click('Save and execute');
+    expect(preferences.activeProfileId).toBe('mirror');
+    expect(preferences.pushRemotes).toEqual(['backup']);
+    expect(preferences.pushBranches).toEqual({ main: { backup: 'mirror-main' } });
+    expect(mocked.request).toHaveBeenCalledWith('planPush', expect.objectContaining({ remoteNames: ['backup'], targetBranches: { backup: 'mirror-main' } }));
+  });
+  it('keeps force confirmation explicit and invalidates it on a branch switch', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    await render();
+    await start('push', { force: true });
+    expect(container.textContent).toContain('Confirm force with lease');
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'executePush')).toBe(false);
+    repository = { ...repository, currentBranch: 'other' };
+    await render();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'executePush')).toBe(false);
   });
 });

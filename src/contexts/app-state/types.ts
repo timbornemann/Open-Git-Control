@@ -20,6 +20,9 @@ export type BaseUIContextValue = SidebarCoreState & {
   isRunConfigOpen: boolean;
   onOpenRunConfig: () => void;
   onCloseRunConfig: () => void;
+  isRemoteConfigOpen: boolean;
+  onOpenRemoteConfig: () => void;
+  onCloseRemoteConfig: () => void;
 };
 
 export type SettingsContextValue = SettingsStateContract;

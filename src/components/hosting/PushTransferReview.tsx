@@ -63,7 +63,9 @@ export function PushTransferReview({
       ))}
       <button disabled={busy || scan?.historyScanIncomplete === true} onClick={() => executePush(Boolean(scan?.findings.length))}>
         {scan?.findings.length
-          ? tr('Treffer geprüft: trotzdem auf diese Ziele pushen', 'Matches reviewed: push to these targets anyway')
+          ? force
+            ? tr('Treffer geprüft & Force-with-lease bestätigen', 'Matches reviewed & confirm force with lease')
+            : tr('Treffer geprüft: trotzdem auf diese Ziele pushen', 'Matches reviewed: push to these targets anyway')
           : force
             ? tr('Force-with-lease bestätigen', 'Confirm force with lease')
             : tr('Auf diese Ziele pushen', 'Push to these targets')}

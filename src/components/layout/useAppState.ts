@@ -18,6 +18,7 @@ import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
   const [isRunConfigOpen, setRunConfigOpen] = useState(false);
+  const [isRemoteConfigOpen, setRemoteConfigOpen] = useState(false);
 
   const {
     toast: gitActionToast,
@@ -65,6 +66,7 @@ export const useAppState = () => {
   const resetRepositoryView = useCallback(() => {
     resetRepoScopedUi();
     setRunConfigOpen(false);
+    setRemoteConfigOpen(false);
   }, [resetRepoScopedUi]);
 
   const { jobs, clearJobs } = useGitJobEvents();
@@ -167,8 +169,18 @@ export const useAppState = () => {
     activeTab: workspace.activeTab,
     setActiveTab: workspace.setActiveTab,
     isRunConfigOpen,
-    onOpenRunConfig: () => setRunConfigOpen(true),
+    onOpenRunConfig: () => {
+      setRemoteConfigOpen(false);
+      setRunConfigOpen(true);
+    },
     onCloseRunConfig: () => setRunConfigOpen(false),
+    isRemoteConfigOpen,
+    onOpenRemoteConfig: () => {
+      setRunConfigOpen(false);
+      setRemoteConfigOpen(true);
+      workspace.setActiveTab('repo');
+    },
+    onCloseRemoteConfig: () => setRemoteConfigOpen(false),
     openRepos: workspace.openRepos,
     isRestoringRepos: workspace.isRestoringRepos,
     repoMeta: workspace.repoMeta,

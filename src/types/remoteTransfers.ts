@@ -28,11 +28,21 @@ export interface GitPushProfile {
   targetBranches?: Record<string, string>;
   tagNames?: string[];
 }
+export type RemoteTransferAction = 'fetch' | 'pull' | 'push';
+export type RemoteSelectionMode = 'remember' | 'ask';
+export interface RemoteSelectionSnapshot {
+  remotes: Array<{ name: string; urls: string[]; bindings: RepositoryEndpoint[] }>;
+}
 export interface RemotePreferences {
   hostingRemote?: string;
   hostingRepository?: HostedRepositoryRef;
   bindings?: RepositoryEndpoint[];
   fetchRemote?: string;
+  pullRemote?: string;
+  selectionModes?: Partial<Record<RemoteTransferAction, RemoteSelectionMode>>;
+  selectionSnapshots?: Partial<Record<RemoteTransferAction, RemoteSelectionSnapshot>>;
+  pullBranches?: Record<string, string>;
+  pushBranches?: Record<string, Record<string, string>>;
   pushRemotes?: string[];
   profiles?: GitPushProfile[];
   activeProfileId?: string;
@@ -84,6 +94,7 @@ export interface RemoteTransferOperations {
       remoteNames: string[];
       destinationBranch?: string;
       targetBranches?: Record<string, string>;
+      targetUrls?: Record<string, string[]>;
       tagNames?: string[];
       force?: boolean;
     };

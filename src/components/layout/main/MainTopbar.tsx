@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { FolderGit2, GitBranch, Globe, PanelRightClose, PanelRightOpen, RefreshCw } from 'lucide-react';
 import { TopbarActions } from '@/components/topbar/TopbarActions';
 import { useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
-import { RemoteTransferPanel } from '@/components/hosting/RemoteTransferPanel';
-import { useRemoteTransferDialogState, type RemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
-import { DialogFrame } from '@/components/DialogFrame';
+import { RemoteTransferHost } from '@/components/hosting/RemoteTransferHost';
+import { requestRemoteTransfer, type RemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { useRemoteTransferState } from '@/components/hosting/remoteTransferState';
 import { useRepositoryHosting } from '@/components/hosting/useRepositoryHosting';
 import { useHostingState } from '@/components/hosting/hostingState';
 
@@ -30,25 +30,24 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const onOpenRunConfig = useUIStore((state) => state.onOpenRunConfig);
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
+  const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
+  const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const branches = useGitStore((state) => state.branches);
+  const tags = useGitStore((state) => state.tags);
   const currentBranch = useGitStore((state) => state.currentBranch);
   const remoteSync = useGitStore((state) => state.remoteSync);
   const remoteStatus = useGitStore((state) => state.remoteStatus);
   const onMergeBranch = useGitStore((state) => state.onMergeBranch);
   const isGitActionRunning = useWorkflowStore((state) => state.isGitActionRunning);
+  const isTransferRunning = useRemoteTransferState((state) => state.busy);
   const activeGitActionLabel = useWorkflowStore((state) => state.activeGitActionLabel);
-  const transferDialog = useRemoteTransferDialogState((state) => state.dialog);
-  const openTransfer = useRemoteTransferDialogState((state) => state.open);
-  const closeTransfer = useRemoteTransferDialogState((state) => state.close);
   const showTransfer = (mode: RemoteTransferDialog['mode'], extra: Partial<RemoteTransferDialog> = {}) => {
     if (!activeRepo) return;
     onCloseRunConfig();
-    openTransfer({ repoPath: activeRepo, mode, ...extra });
+    onCloseRemoteConfig();
+    requestRemoteTransfer({ repoPath: activeRepo, mode, ...extra });
   };
-  useEffect(() => {
-    if (transferDialog && transferDialog.repoPath !== activeRepo) closeTransfer();
-  }, [activeRepo, transferDialog, closeTransfer]);
   const repositoryRun = useWorkflowStore((state) => state.repositoryRun);
   const activeRunConfig = useWorkflowStore((state) => state.activeRunConfig);
   const hasUnreadRepositoryRunResult = useWorkflowStore((state) => state.hasUnreadRepositoryRunResult);
@@ -58,7 +57,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const hostingTarget = useRepositoryHosting(activeRepo);
   const selectHostedRepository = useHostingState((state) => state.select);
   const navigateHosting = useHostingState((state) => state.navigate);
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
   const isGithubView = activeTab === 'github' || activeTab === 'hosting';
   const isLocalReposView = activeTab === 'localRepos';
@@ -122,7 +121,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               activeRepo={activeRepo}
               branches={branches}
               currentBranch={currentBranch}
-              isGitActionRunning={isGitActionRunning}
+              isGitActionRunning={isGitActionRunning || isTransferRunning}
               isFetching={remoteSync.isFetching}
               activeActionLabel={activeGitActionLabel}
               onFetch={() => showTransfer('fetch')}
@@ -132,11 +131,12 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               onPullNoFf={() => showTransfer('pull', { pullMode: 'no-ff' })}
               onPush={() => showTransfer('push')}
               onPushForceWithLease={() => showTransfer('push', { force: true })}
-              onPushTags={() => showTransfer('push')}
+              onPushTags={() => showTransfer('push', { tagNames: tags, selectTags: true })}
               onPushSetUpstream={() => showTransfer('remotes')}
               onMergeBranch={onMergeBranch}
               onStageCommit={() => {
                 onCloseRunConfig();
+                onCloseRemoteConfig();
                 onStageCommit();
               }}
               onOpenReleaseCreator={() => {
@@ -151,6 +151,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
               }}
               onOpenTimeline={() => {
                 onCloseRunConfig();
+                onCloseRemoteConfig();
                 onOpenTimeline();
               }}
               isTimelineLoading={isTimelineLoading}
@@ -176,6 +177,7 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 setActiveTab('repo');
                 onOpenRunConfig();
               }}
+              onOpenRemoteConfig={onOpenRemoteConfig}
             />
           )}
           {canShowInspectorPane && (
@@ -198,21 +200,11 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
           )}
         </div>
       </div>
-      {transferDialog && activeRepo === transferDialog.repoPath && (
-        <DialogFrame
-          open
-          title={tr('Remotes & Übertragungen', 'Remotes & transfers')}
-          onClose={closeTransfer}
-          cancelLabel={tr('Schließen', 'Close')}
-          closeOnBackdrop={false}
-        >
-          <RemoteTransferPanel
-            key={`${transferDialog.repoPath}:${transferDialog.mode}:${transferDialog.force}:${transferDialog.pullMode}:${transferDialog.destinationBranch}`}
-            {...transferDialog}
-            onClose={closeTransfer}
-          />
-        </DialogFrame>
-      )}
+      <RemoteTransferHost
+        onOpenConfiguration={(repoPath) => {
+          if (repoPath === activeRepo) onOpenRemoteConfig();
+        }}
+      />
     </>
   );
 };

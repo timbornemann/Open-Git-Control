@@ -108,6 +108,85 @@ describe('RemoteTransferService with real Git', () => {
     expect(plan.secretScanArgs[1]).toContain(plan.id);
   }, 20_000);
 
+  it('publishes an explicit hosting endpoint without touching another native push URL or Git configuration', async () => {
+    const f = fixture();
+    const selected = f.bare('selected-release');
+    const backup = f.bare('unselected-backup');
+    git(f.repo, 'remote', 'add', 'origin', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', backup);
+    const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'], targetUrls: { origin: [selected] } }, f.context);
+    expect(plan.targets).toHaveLength(1);
+    expect(plan.targets[0]).toMatchObject({ remoteName: 'origin', url: selected });
+    expect((await f.service.executePush(f.repo, plan.id, f.context)).state).toBe('success');
+    expect(f.ref(selected)).toBe(f.initial);
+    expect(git(f.repo, `--git-dir=${backup}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+    expect(git(f.repo, 'config', '--get-all', 'remote.origin.pushurl').split(/\r?\n/)).toEqual([selected, backup]);
+  }, 20_000);
+
+  it('rejects foreign, empty and unselected remote URL constraints before publishing', async () => {
+    const f = fixture();
+    const selected = f.bare('registered');
+    const other = f.bare('foreign');
+    git(f.repo, 'remote', 'add', 'origin', selected);
+    const invalidSelections: Array<Record<string, string[]>> = [{ origin: [other] }, { origin: [] }, { other: [selected] }];
+    for (const targetUrls of invalidSelections)
+      await expect(f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'], targetUrls }, f.context)).rejects.toThrow();
+    expect(git(f.repo, `--git-dir=${selected}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+    expect(f.context.authorizePush).not.toHaveBeenCalled();
+  });
+
+  it('requires separate remotes for explicit endpoint subsets when native Git cannot isolate push URLs', async () => {
+    const f = fixture();
+    const selected = f.bare('older-selected');
+    const backup = f.bare('older-backup');
+    git(f.repo, 'remote', 'add', 'origin', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', backup);
+    const { service, pushCommands } = olderGitService(f);
+    await expect(service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'], targetUrls: { origin: [selected] } }, f.context)).rejects.toThrow(
+      'separate named remotes',
+    );
+    expect(pushCommands).toHaveLength(0);
+    const complete = await service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'], targetUrls: { origin: [selected, backup] } }, f.context);
+    expect(complete.targets).toHaveLength(2);
+    expect(complete.targets.every((target) => target.grouped)).toBe(true);
+  });
+
+  it('rejects a branch switch before execution even when the source commit has not moved', async () => {
+    const f = fixture();
+    const destination = f.bare('branch-guard');
+    git(f.repo, 'remote', 'add', 'origin', destination);
+    const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'] }, f.context);
+    git(f.repo, 'checkout', '-b', 'another');
+    expect(git(f.repo, 'rev-parse', 'HEAD')).toBe(plan.sourceOid);
+    await expect(f.service.executePush(f.repo, plan.id, f.context)).rejects.toThrow('current branch changed');
+    expect(f.context.authorizePush).not.toHaveBeenCalled();
+    expect(git(f.repo, `--git-dir=${destination}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+  });
+
+  it('preserves the completed endpoint and stops remaining targets after a branch switch during a batch', async () => {
+    const f = fixture();
+    const first = f.bare('branch-first');
+    const remaining = f.bare('branch-remaining');
+    git(f.repo, 'remote', 'add', 'origin', first);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', first);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', remaining);
+    const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'] }, f.context);
+    const context = {
+      ...f.context,
+      onProgress: (message: string) => {
+        if (message.startsWith('success:')) git(f.repo, 'checkout', '-b', 'another');
+      },
+    };
+    const result = await f.service.executePush(f.repo, plan.id, context);
+    expect(result.state).toBe('cancelled');
+    expect(result.targets.map((target) => target.status)).toEqual(['success', 'skipped']);
+    expect(result.targets[1].message).toContain('current branch changed');
+    expect(f.ref(first)).toBe(f.initial);
+    expect(git(f.repo, `--git-dir=${remaining}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+  }, 20_000);
+
   it('reports partial success and retries only the failed endpoint with the original snapshot', async () => {
     const f = fixture();
     const a = f.bare('available');
