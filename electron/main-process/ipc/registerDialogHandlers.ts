@@ -42,13 +42,17 @@ export function registerDialogHandlers({ gitService }: RegisterDialogHandlersDep
     return { path: repositoryPath, isRepo };
   });
 
-  ipcMain.handle(IpcChannel.DialogSelectDirectory, async () => {
+  ipcMain.handle(IpcChannel.DialogSelectDirectory, async (event) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Zielordner fuer Clone auswaehlen',
     });
     if (canceled) return null;
-    return filePaths[0];
+    const selectedPath = filePaths[0];
+    if (!selectedPath) return null;
+    ensureGrantCleanup(event.sender);
+    grantSelectedProjectParentDirectory(event.sender.id, selectedPath);
+    return selectedPath;
   });
 
   ipcMain.handle(IpcChannel.DialogSelectProjectParentDirectory, async (event) => {

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useSyncExternalStore, type SetStateAction } from 'react';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GithubCatalogSnapshotDto, GitHubRepositoryDto } from '@/types/githubDtos';
-import { GITHUB_CATALOG_REFRESH_EVENT } from '@/components/layout/sidebar/containers/GithubSidebarContainer';
 import { getGithubResourceScope, setGithubResourceScope, subscribeGithubScope } from '@/data/clientCache';
 import { catalogKey, fetchGithubCatalog, restoreGithubCatalog } from '@/data/githubCatalog';
 import { useCachedResult } from '@/data/resourceHooks';
 import { updateResource } from '@/data/queryClient';
 import type { ReadPriority } from '@/shared/cache/resource';
+
+const GITHUB_CATALOG_REFRESH_EVENT = 'ogc:github-catalog-refresh';
 
 export function useGithubCatalog(isAuthenticated: boolean, username: string | null, host?: string, priority: ReadPriority = 'visible') {
   const sharedScope = useSyncExternalStore(subscribeGithubScope, getGithubResourceScope);

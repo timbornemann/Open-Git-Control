@@ -11,7 +11,7 @@ import { useInitialCommitRecoveryWorkflow } from '@/components/layout/workflows/
 import { useRepoUnavailableWorkflow } from '@/components/layout/workflows/useRepoUnavailableWorkflow';
 import { useRemoteRecoveryWorkflow } from '@/components/layout/workflows/useRemoteRecoveryWorkflow';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { useRemoteTransferDialogState } from '@/components/hosting/remoteTransferDialogState';
 import { plannerClient } from '@/services/plannerClient';
 import { appClient } from '@/services/appClient';
 
@@ -64,7 +64,6 @@ afterEach(() => {
 
 describe('workflow hooks', () => {
   it('keeps origin unchanged and requires confirmation before opening 404 recovery', async () => {
-    vi.spyOn(githubClient, 'checkAuthStatus').mockResolvedValue({ authenticated: true, username: 'octocat' });
     const removeRemote = vi.spyOn(gitClient, 'removeRemote').mockResolvedValue({ success: true, data: '' });
     const setActiveTab = vi.fn();
     const setConfirmDialog = vi.fn();
@@ -94,7 +93,7 @@ describe('workflow hooks', () => {
 
     expect(handled).toBe(true);
     expect(removeRemote).not.toHaveBeenCalled();
-    expect(hook.current.forceGithubRepoCreationPrompt).toBe(false);
+    expect(useRemoteTransferDialogState.getState().dialog).toBeNull();
     expect(setActiveTab).not.toHaveBeenCalled();
     const dialog = setConfirmDialog.mock.calls[0]?.[0] as ConfirmDialogState;
     expect(dialog).toEqual(
@@ -110,7 +109,7 @@ describe('workflow hooks', () => {
     });
 
     expect(removeRemote).not.toHaveBeenCalled();
-    expect(hook.current.forceGithubRepoCreationPrompt).toBe(true);
+    expect(useRemoteTransferDialogState.getState().dialog).toEqual({ repoPath: workspace.activeRepo, mode: 'remotes' });
     expect(setActiveTab).toHaveBeenCalledWith('repo');
     hook.unmount();
   });

@@ -7,7 +7,6 @@ export type {
   ElectronAppAPI,
   ElectronFlatAPI,
   ElectronGitAPI,
-  ElectronGithubAPI,
   ElectronPlannerAPI,
   ElectronReleaseNotesAPI,
   ElectronReposAPI,

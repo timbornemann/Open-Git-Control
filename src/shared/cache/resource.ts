@@ -1,5 +1,4 @@
 import type { AppSettingsDto, StoredRepoData } from '../../types/appDtos';
-import type { GithubCatalogSnapshotDto } from '../../types/githubDtos';
 
 export type ResourceDomain = 'git' | 'github' | 'planner' | 'app' | 'runs';
 export type ResourceKey = readonly ['resource', ResourceDomain, string, string, ...unknown[]];
@@ -19,7 +18,6 @@ export interface AppBootstrapDto {
   settings: AppSettingsDto;
   repositories: StoredRepoData;
   snapshots: PreviewSnapshot[];
-  githubCatalog: GithubCatalogSnapshotDto | null;
 }
 
 export const MEMORY_CACHE_BYTES = 64 * 1024 * 1024;
@@ -30,7 +28,6 @@ export const MAX_SNAPSHOT_BYTES = 4 * 1024 * 1024;
 // never accepted by the persistent preview store.
 const persistentOperations: Partial<Record<ResourceDomain, readonly string[]>> = {
   git: ['getCommitLogPage', 'getWorkingTreeSnapshot', 'getRepositoryChangeSummary', 'listWorkingDirectory', 'getRepoOriginUrl', 'command'],
-  github: ['catalog', 'getRepository', 'getBranches', 'getPullRequests', 'getWorkflowRunsPage', 'getReleaseContext'],
   planner: ['getData'],
   runs: ['getConfig'],
 };

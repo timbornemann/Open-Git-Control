@@ -1,5 +1,5 @@
 import { cancellableRead } from './ipcRead';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GithubCatalogSnapshotDto, GitHubRepositoryDto } from '@/types/githubDtos';
 import type { ResourceKey, ReadPriority } from '@/shared/cache/resource';
 import { hashKey } from '@tanstack/react-query';

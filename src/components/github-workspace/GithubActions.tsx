@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, Ban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Workflow } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useUIContext } from '@/contexts/AppStateContext';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GithubWorkflowJobDto, GithubWorkflowRunDto } from '@/types/githubDtos';
 
 type Props = { owner: string; repo: string };

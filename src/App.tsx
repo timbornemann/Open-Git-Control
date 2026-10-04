@@ -16,6 +16,7 @@ import { createAppStateSlicesValue } from './app/createAppStateSlicesValue';
 import { useAppPaletteCommands } from './app/useAppPaletteCommands';
 import { FeedbackReportProvider } from './contexts/FeedbackReportContext';
 import { QuickRepositoryTodoDialog } from './components/project-planner/QuickRepositoryTodoDialog';
+import { openRemoteTransferDialog } from './components/hosting/remoteTransferDialogState';
 
 const App: React.FC = () => {
   const state = useAppState();
@@ -25,7 +26,6 @@ const App: React.FC = () => {
     (key: string, variables?: TranslationVariables) => translateFromCatalog(state.settings.language, key, variables),
     [state.settings.language],
   );
-  const [selectedGithubAuthHelpMethod, setSelectedGithubAuthHelpMethod] = useState<'pat' | 'device' | 'web' | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('general');
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [quickTodoRequestId, setQuickTodoRequestId] = useState(0);
@@ -41,7 +41,9 @@ const App: React.FC = () => {
 
   useGlobalKeyboardShortcuts({
     setActiveTab: state.setActiveTab,
-    onFetch: () => state.refreshRemoteState(true),
+    onFetch: () => {
+      if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'fetch' });
+    },
     onOpenCommandPalette: () => setIsPaletteOpen(true),
     onOpenQuickTodo: () => {
       if (state.activeTab === 'repo' && state.activeRepo) {
@@ -83,8 +85,6 @@ const App: React.FC = () => {
 
   const appStateSlices = createAppStateSlicesValue({
     state,
-    selectedGithubAuthHelpMethod,
-    setSelectedGithubAuthHelpMethod,
     settingsTab,
     setSettingsTab,
     resetLayout,

@@ -694,6 +694,7 @@ export class SecretScanService {
     const currentBranch = await read(['symbolic-ref', '--quiet', '--short', 'HEAD']);
     const remote =
       explicitRemote ||
+      (currentBranch ? await read(['config', '--get', `branch.${currentBranch}.pushRemote`]) : '') ||
       (await read(['config', '--get', 'remote.pushDefault'])) ||
       (currentBranch ? await read(['config', '--get', `branch.${currentBranch}.remote`]) : '') ||
       'origin';

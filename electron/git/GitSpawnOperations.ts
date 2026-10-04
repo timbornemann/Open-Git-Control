@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { StringDecoder } from 'string_decoder';
-import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult } from './GitProcessTypes';
+import type { DiffPreviewResult, GitBufferRunOptions, GitCloneProgressResult, GitTransferOptions } from './GitProcessTypes';
 import { createAbortError } from './GitProcessTypes';
 import { redactGitSensitiveText } from './GitErrorFormatter';
 
@@ -236,9 +236,9 @@ export class GitSpawnOperations {
     });
   }
 
-  streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal): Promise<string> {
+  streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal: AbortSignal, envOverrides?: NodeJS.ProcessEnv): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'] });
+      const proc = spawn('git', args, { cwd: repoPath, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...envOverrides } });
       const stdoutPending = { value: '' };
       const stderrPending = { value: '' };
       let stdout = '';
@@ -302,7 +302,8 @@ export class GitSpawnOperations {
     });
   }
 
-  cloneWithProgress(cloneUrl: string, repoPath: string, onProgress: (line: string) => void): Promise<GitCloneProgressResult> {
+  cloneWithProgress(cloneUrl: string, repoPath: string, onProgress: (line: string) => void, options: GitTransferOptions = {}): Promise<GitCloneProgressResult> {
+    if (options.signal?.aborted) return Promise.resolve({ success: false, error: 'Git clone was aborted.' });
     return new Promise((resolve) => {
       const progressTail: string[] = [];
       let settled = false;
@@ -324,7 +325,12 @@ export class GitSpawnOperations {
       };
       const proc = spawn('git', ['clone', '--progress', '--', cloneUrl, repoPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: { ...process.env, ...options.envOverrides },
       });
+      const abort = () => proc.kill();
+      options.signal?.addEventListener('abort', abort, { once: true });
+      if (options.signal?.aborted) abort();
       const failForOversizedProgress = () => {
         if (settled) return;
         settled = true;
@@ -338,10 +344,15 @@ export class GitSpawnOperations {
       proc.stdout.on('data', (data: Buffer) => stdoutProgress.write(data));
 
       proc.on('close', (code) => {
+        options.signal?.removeEventListener('abort', abort);
         if (settled) return;
         settled = true;
         stderrProgress.end();
         stdoutProgress.end();
+        if (options.signal?.aborted) {
+          resolve({ success: false, error: 'Git clone was aborted.' });
+          return;
+        }
         if (code === 0) {
           resolve({ success: true });
           return;
@@ -355,6 +366,7 @@ export class GitSpawnOperations {
       });
 
       proc.on('error', (err) => {
+        options.signal?.removeEventListener('abort', abort);
         if (settled) return;
         settled = true;
         stderrProgress.end();

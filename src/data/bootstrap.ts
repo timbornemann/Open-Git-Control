@@ -2,7 +2,7 @@ import { preloadViewModules } from './viewModules';
 import { getElectronApi } from '@/services/electronApi';
 import { isPersistentResource, MAX_SNAPSHOT_BYTES, type PreviewSnapshot } from '@/shared/cache/resource';
 import { hydratePreviews, queryClient, refreshVisibleResources } from './queryClient';
-import { resourceKey, setGithubResourceScope, getGithubResourceScope, getGithubCacheEpoch } from './clientCache';
+import { resourceKey } from './clientCache';
 import { backgroundQueue } from './backgroundQueue';
 import { prepareRestoredGraphs } from './preloading';
 
@@ -14,7 +14,6 @@ export function startDataRuntime() {
   void preloadViewModules();
   const api = getElectronApi()?.app;
   const startedAt = Date.now();
-  const githubEpoch = getGithubCacheEpoch();
   bootstrapPromise = api
     ?.getBootstrap?.()
     .then((result) => {
@@ -25,28 +24,8 @@ export function startDataRuntime() {
         const key = resourceKey('app', name);
         if (!queryClient.getQueryState(key)?.dataUpdatedAt) queryClient.setQueryData(key, value);
       }
-      if (
-        result.githubCatalog &&
-        (githubEpoch === getGithubCacheEpoch() || getGithubResourceScope() === `${result.githubCatalog.host}/${result.githubCatalog.username}`.toLowerCase())
-      ) {
-        const catalog = result.githubCatalog;
-        setGithubResourceScope(catalog.host, catalog.username);
-        hydratePreviews(
-          [
-            {
-              version: 1,
-              key: resourceKey('github', 'catalog'),
-              savedAt: Date.parse(catalog.savedAt),
-              sourceRevision: catalog.savedAt,
-              complete: !catalog.refreshRequired,
-              data: catalog,
-            },
-          ],
-          startedAt,
-        );
-      }
       hydratePreviews(
-        result.snapshots.filter((entry) => entry.key[1] !== 'github' || entry.key[2] === getGithubResourceScope()),
+        result.snapshots.filter((entry) => entry.key[1] !== 'github'),
         startedAt,
       );
       void prepareRestoredGraphs(result.snapshots).catch(() => {});

@@ -36,7 +36,16 @@ export type GitBufferRunOptions = {
 export type GitInputRunOptions = {
   requestedKind?: GitJobKind;
   commandName?: string;
+  envOverrides?: NodeJS.ProcessEnv;
 };
+
+export type GitTransferOptions = {
+  envOverrides?: NodeJS.ProcessEnv;
+  signal?: AbortSignal;
+};
+
+/** Non-zero exits still carry porcelain records for independently published refs. */
+export type GitProcessResult = { stdout: string; stderr: string; exitCode: number };
 
 export type DiffPreviewResult = {
   text: string;

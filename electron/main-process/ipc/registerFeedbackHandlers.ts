@@ -7,6 +7,8 @@ import { prepareFeedbackReport, redactFeedbackText } from '../feedback/feedbackR
 
 type RegisterFeedbackHandlersDeps = {
   githubService: GitHubService;
+  hasPublicGithubConnection?: () => boolean;
+  createPublicGithubSession?: () => Promise<{ client: GitHubService; dispose: () => void } | null>;
 };
 
 const capabilityFor = (githubService: GitHubService): FeedbackReportCapabilityDto => {
@@ -15,8 +17,14 @@ const capabilityFor = (githubService: GitHubService): FeedbackReportCapabilityDt
   return { directSubmissionAvailable: true, reason: null };
 };
 
-export function registerFeedbackHandlers({ githubService }: RegisterFeedbackHandlersDeps): void {
-  ipcMain.handle(IpcChannel.FeedbackGetCapability, async () => capabilityFor(githubService));
+export function registerFeedbackHandlers({ githubService, hasPublicGithubConnection, createPublicGithubSession }: RegisterFeedbackHandlersDeps): void {
+  const capability = (): FeedbackReportCapabilityDto =>
+    hasPublicGithubConnection
+      ? hasPublicGithubConnection()
+        ? { directSubmissionAvailable: true, reason: null }
+        : { directSubmissionAvailable: false, reason: 'not-authenticated' }
+      : capabilityFor(githubService);
+  ipcMain.handle(IpcChannel.FeedbackGetCapability, async () => capability());
 
   ipcMain.handle(IpcChannel.FeedbackSubmit, async (_event: unknown, input: FeedbackReportInputDto): Promise<FeedbackReportSubmissionResultDto> => {
     let prepared: ReturnType<typeof prepareFeedbackReport>;
@@ -29,19 +37,23 @@ export function registerFeedbackHandlers({ githubService }: RegisterFeedbackHand
       return { success: false, code: 'VALIDATION_FAILED', error: error instanceof Error ? redactFeedbackText(error.message) : 'Invalid feedback report.' };
     }
 
-    const capability = capabilityFor(githubService);
-    if (!capability.directSubmissionAvailable) {
+    const available = capability();
+    if (!available.directSubmissionAvailable) {
       return {
         success: false,
         code: 'DIRECT_UNAVAILABLE',
-        error: capability.reason === 'wrong-host' ? 'Direct reports require a GitHub.com session.' : 'Direct reports require GitHub authentication.',
+        error: available.reason === 'wrong-host' ? 'Direct reports require a GitHub.com session.' : 'Direct reports require GitHub authentication.',
         ...(prepared.fallbackUrl ? { fallbackUrl: prepared.fallbackUrl } : {}),
       };
     }
 
-    const createIssue = () => githubService.createFeedbackIssue(prepared.title, prepared.body, prepared.label);
+    let session: Awaited<ReturnType<NonNullable<typeof createPublicGithubSession>>> = null;
     try {
-      const issue = await createIssue();
+      session = (await createPublicGithubSession?.()) || null;
+      if (createPublicGithubSession && !session) throw new Error('Sign in to a GitHub.com connection before submitting feedback.');
+      const client = session?.client || githubService;
+      if (!capabilityFor(client).directSubmissionAvailable) throw new Error('Sign in to a GitHub.com connection before submitting feedback.');
+      const issue = await client.createFeedbackIssue(prepared.title, prepared.body, prepared.label);
       return { success: true, data: { issueNumber: issue.number, htmlUrl: issue.htmlUrl, deduplicated: false } };
     } catch (error: unknown) {
       return {
@@ -50,6 +62,8 @@ export function registerFeedbackHandlers({ githubService }: RegisterFeedbackHand
         error: error instanceof Error ? redactFeedbackText(error.message) : 'GitHub issue could not be created.',
         ...(prepared.fallbackUrl ? { fallbackUrl: prepared.fallbackUrl } : {}),
       };
+    } finally {
+      session?.dispose();
     }
   });
 }

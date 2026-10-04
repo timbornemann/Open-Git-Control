@@ -1,7 +1,7 @@
 import { useCachedResult } from '@/data/resourceHooks';
 import { resourceKey, withReadPriority } from '@/data/clientCache';
 import type { IpcResult } from '@/types/ipc';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BranchInfo, GitMergeMode } from '@/types/git';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { normalizeBranchRefForMerge } from '@/utils/gitParsing';
@@ -12,6 +12,8 @@ import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } fro
 import { buildDeleteBranchDialog, buildForceDeleteBranchDialog, buildMergeBranchDialog, buildRenameBranchDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
+import { transferClient } from '@/services/hostingClient';
+import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 
 type Params = {
   activeRepo: string | null;
@@ -35,7 +37,6 @@ const mergeModeArgs = (mode: GitMergeMode): string[] => {
 export const useRepositoryBranches = ({
   activeRepo,
   refreshTrigger,
-  hasRemoteOrigin,
   language,
   setGitActionToast,
   runGitCommand,
@@ -44,6 +45,7 @@ export const useRepositoryBranches = ({
   setInputDialog,
 }: Params) => {
   const [loadedBranches, setBranches] = useState<BranchInfo[]>([]);
+  const activeRepoRef = useRef(activeRepo);
   const [loadedCurrentBranch, setCurrentBranch] = useState('');
   const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'branch', '-a']));
   const branches = useMemo<BranchInfo[]>(
@@ -76,6 +78,7 @@ export const useRepositoryBranches = ({
   );
 
   useLayoutEffect(() => {
+    activeRepoRef.current = activeRepo;
     setBranches([]);
     setCurrentBranch('');
     setIsCreatingBranch(false);
@@ -155,14 +158,14 @@ export const useRepositoryBranches = ({
     const created = await runGitCommand(gitClient.buildCreateBranchArgs(name), tr(`Branch "${name}" erstellt.`, `Created branch "${name}".`), undefined, {
       expectedRepoPath: repoAtStart,
     });
-    if (!created || !hasRemoteOrigin) return;
-
-    await runGitCommand(
-      gitClient.buildPushCurrentBranchArgs({ remote: 'origin', ref: name, setUpstream: true }),
-      tr(`Branch "${name}" erstellt, auf origin veroeffentlicht und Upstream gesetzt.`, `Created branch "${name}", pushed to origin, and set upstream.`),
-      tr(`Neuer Branch "${name}" wird auf origin veroeffentlicht...`, `Publishing new branch "${name}" to origin...`),
-      { expectedRepoPath: repoAtStart },
-    );
+    if (!created || activeRepoRef.current !== repoAtStart) return;
+    try {
+      const snapshot = await transferClient.request('getRemotes', { repoPath: repoAtStart });
+      if (activeRepoRef.current !== repoAtStart) return;
+      if (snapshot.remotes.length) openRemoteTransferDialog({ repoPath: repoAtStart, mode: 'push', destinationBranch: name });
+    } catch {
+      // The local branch remains usable; publication can be opened from Push.
+    }
   };
 
   const handleDeleteBranch = async (branchName: string) => {

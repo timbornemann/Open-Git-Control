@@ -20,7 +20,6 @@ const renderInspector = (initialRepo: string | null) => {
       onAutoOpenConflictResolverConsumed,
       setSelectedCommit,
       onOpenRepoWorkspace: vi.fn(),
-      onCloseReleaseCreator: vi.fn(),
     });
     return null;
   };

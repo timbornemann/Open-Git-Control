@@ -1,4 +1,5 @@
-import type { ReadRequest } from '../../cache/resource';
+/** Internal contract retained for retired GitHub hook/cache regression fixtures. Never exposed by production preload. */
+import type { ReadRequest } from '../../shared/cache/resource';
 import type {
   DeviceFlowPollDto,
   DeviceFlowStartDto,
@@ -21,9 +22,8 @@ import type {
   GithubWorkflowJobsPageDto,
   PullRequestDto,
   PullRequestMergeMethodDto,
-  ReleaseCommitDto,
-} from '../../../types/githubDtos';
-import type { IpcResult } from '../../../types/ipc';
+} from '../../types/githubDtos';
+import type { IpcResult } from '../../types/ipc';
 
 export type CreatePullRequestParamsDto = {
   owner: string;
@@ -39,17 +39,6 @@ export type CreatePullRequestResultDto = {
   title: string;
   htmlUrl: string;
   state: string;
-};
-
-export type ReleaseNotesGenerationParamsDto = {
-  tagName: string;
-  releaseName: string;
-  lastReleaseTag?: string | null;
-  commits: ReleaseCommitDto[];
-  repositoryHtmlUrl?: string | null;
-  language: 'de' | 'en';
-  versionBump: 'major' | 'minor' | 'patch';
-  hints?: string[];
 };
 
 export type WorkflowRunsRequestDto = {
@@ -92,7 +81,7 @@ export type GithubAuthResultDto = {
   error?: string;
 };
 
-export interface ElectronGithubAPI {
+export interface LegacyGithubAPI {
   githubAuth: (token: string, host?: string) => Promise<GithubAuthResultDto>;
   githubCancelAuth: () => Promise<{ success: true }>;
   githubDeviceStart: () => Promise<IpcResult<DeviceFlowStartDto>>;
@@ -136,8 +125,4 @@ export interface ElectronGithubAPI {
   githubCancelWorkflowRun: (owner: string, repo: string, runId: number) => Promise<IpcResult<true>>;
   githubGetStatusChecks: (params: StatusChecksRequestDto) => Promise<IpcResult<GithubStatusChecksDto>>;
   githubMergePR: (params: MergePullRequestParamsDto) => Promise<IpcResult<MergePullRequestResultDto>>;
-}
-
-export interface ElectronReleaseNotesAPI {
-  aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => Promise<IpcResult<{ markdown: string; source: 'ai' | 'fallback'; warning?: string }>>;
 }

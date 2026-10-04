@@ -15,6 +15,7 @@ import { RepositoryFiles, type RepositoryFileDataUrl, type RepositoryFileSource 
 import type { RepositoryTextEncoding } from './git/RepositoryFileEncoding';
 import { StashService } from './git/StashService';
 import { SubmoduleService } from './git/SubmoduleService';
+import type { GitTransferOptions } from './git/GitProcessTypes';
 
 export type { CommitStats, FileTimelineCommit };
 export type { DiffPreviewResult };
@@ -572,8 +573,14 @@ export class GitService {
   /**
    * Klont ein Repository mit Fortschrittsanzeige
    */
-  cloneRepo(cloneUrl: string, targetDir: string, onProgress: (line: string) => void, targetName?: string): Promise<CloneRepositoryResult> {
-    return this.cloneService.cloneRepo(cloneUrl, targetDir, onProgress, targetName);
+  cloneRepo(
+    cloneUrl: string,
+    targetDir: string,
+    onProgress: (line: string) => void,
+    targetName?: string,
+    options: GitTransferOptions = {},
+  ): Promise<CloneRepositoryResult> {
+    return this.cloneService.cloneRepo(cloneUrl, targetDir, onProgress, targetName, options);
   }
 }
 

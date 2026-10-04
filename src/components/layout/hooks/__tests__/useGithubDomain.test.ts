@@ -3,7 +3,7 @@ import { StrictMode, act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appClient } from '@/services/appClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { useGithubDomain } from '../useGithubDomain';
 
 type GithubDomain = ReturnType<typeof useGithubDomain>;

@@ -1,21 +1,13 @@
 import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import type {
-  AppStateSlicesValue,
-  GithubContextValue,
-  RepositoryContextValue,
-  SettingsContextValue,
-  UIContextValue,
-  WorkflowContextValue,
-} from './app-state/types';
+import type { AppStateSlicesValue, RepositoryContextValue, SettingsContextValue, UIContextValue, WorkflowContextValue } from './app-state/types';
 
 export type {
   AppStateSlicesValue,
   AppStateUIState,
   BaseUIContextValue,
   CommitNavigationRequest,
-  GithubContextValue,
   RepositoryContextValue,
   SettingsContextValue,
   UIContextValue,
@@ -34,12 +26,11 @@ type AppStateFunctionCache = Record<AppStateSliceKey, SliceFunctionCache>;
 
 const AppStateStoreContext = createContext<AppStateStore | null>(null);
 
-const appStateSliceKeys: AppStateSliceKey[] = ['settings', 'repository', 'github', 'workflow', 'ui'];
+const appStateSliceKeys: AppStateSliceKey[] = ['settings', 'repository', 'workflow', 'ui'];
 
 const createAppStateFunctionCache = (): AppStateFunctionCache => ({
   settings: { refs: new Map(), wrappers: new Map() },
   repository: { refs: new Map(), wrappers: new Map() },
-  github: { refs: new Map(), wrappers: new Map() },
   workflow: { refs: new Map(), wrappers: new Map() },
   ui: { refs: new Map(), wrappers: new Map() },
 });
@@ -73,7 +64,6 @@ const materializeSlice = <T extends Record<string, unknown>>(slice: T, cache: Sl
 const materializeAppStateSlices = (value: AppStateSlicesValue, cache: AppStateFunctionCache): AppStateSlicesValue => ({
   settings: materializeSlice(value.settings as unknown as Record<string, unknown>, cache.settings) as SettingsContextValue,
   repository: materializeSlice(value.repository as unknown as Record<string, unknown>, cache.repository) as RepositoryContextValue,
-  github: materializeSlice(value.github as unknown as Record<string, unknown>, cache.github) as GithubContextValue,
   workflow: materializeSlice(value.workflow as unknown as Record<string, unknown>, cache.workflow) as WorkflowContextValue,
   ui: materializeSlice(value.ui as unknown as Record<string, unknown>, cache.ui) as UIContextValue,
 });
@@ -120,7 +110,6 @@ const useAppStateSelector = <T,>(selector: (state: AppStateSlicesValue) => T, ho
 export const useSettingsStore = <T,>(selector: (state: SettingsContextValue) => T): T =>
   useAppStateSelector((state) => selector(state.settings), 'useSettingsStore');
 export const useGitStore = <T,>(selector: (state: RepositoryContextValue) => T): T => useAppStateSelector((state) => selector(state.repository), 'useGitStore');
-export const useGitHubStore = <T,>(selector: (state: GithubContextValue) => T): T => useAppStateSelector((state) => selector(state.github), 'useGitHubStore');
 export const useWorkflowStore = <T,>(selector: (state: WorkflowContextValue) => T): T =>
   useAppStateSelector((state) => selector(state.workflow), 'useWorkflowStore');
 export const useUIStore = <T,>(selector: (state: UIContextValue) => T): T => useAppStateSelector((state) => selector(state.ui), 'useUIStore');
@@ -131,7 +120,6 @@ export const useOptionalRepositoryContext = () => {
   const store = useContext(AppStateStoreContext);
   return store?.getState().repository ?? null;
 };
-export const useGithubContext = () => useGitHubStore((state) => state);
 export const useWorkflowContext = () => useWorkflowStore((state) => state);
 export const useUIContext = () => useUIStore((state) => state);
 export const useOptionalUIContext = () => {

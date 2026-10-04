@@ -18,24 +18,10 @@ afterEach(() => {
 });
 
 describe('useRepoScopedNavigationState', () => {
-  it('clears repository-bound dialogs, PR drafts, and release drafts together', () => {
+  it('clears repository-bound dialogs when resetting repository navigation', () => {
     const setters = {
       setConfirmDialog: vi.fn(),
       setInputDialog: vi.fn(),
-      setShowCreatePR: vi.fn(),
-      setNewPRTitle: vi.fn(),
-      setNewPRBody: vi.fn(),
-      setNewPRHead: vi.fn(),
-      setNewPRBase: vi.fn(),
-      setShowReleaseCreator: vi.fn(),
-      setReleaseFormState: vi.fn(),
-      setReleaseSubmitting: vi.fn(),
-      setReleaseError: vi.fn(),
-      setReleaseSuccess: vi.fn(),
-      setReleaseContextLoading: vi.fn(),
-      setReleaseContext: vi.fn(),
-      setReleaseContextError: vi.fn(),
-      setReleaseNotesGenerating: vi.fn(),
     };
 
     let hook: ReturnType<typeof useRepoScopedNavigationState> | null = null;
@@ -58,30 +44,6 @@ describe('useRepoScopedNavigationState', () => {
 
     expect(setters.setConfirmDialog).toHaveBeenCalledWith(null);
     expect(setters.setInputDialog).toHaveBeenCalledWith(null);
-    expect(setters.setShowCreatePR).toHaveBeenCalledWith(false);
-    expect(setters.setNewPRTitle).toHaveBeenCalledWith('');
-    expect(setters.setNewPRBody).toHaveBeenCalledWith('');
-    expect(setters.setNewPRHead).toHaveBeenCalledWith('');
-    expect(setters.setNewPRBase).toHaveBeenCalledWith('main');
-    expect(setters.setShowReleaseCreator).toHaveBeenCalledWith(false);
-    expect(setters.setReleaseFormState).toHaveBeenCalledWith({
-      owner: '',
-      repo: '',
-      tagName: '',
-      targetCommitish: '',
-      releaseName: '',
-      body: '',
-      draft: false,
-      prerelease: false,
-    });
-    expect(setters.setReleaseSubmitting).toHaveBeenCalledWith(false);
-    expect(setters.setReleaseError).toHaveBeenCalledWith(null);
-    expect(setters.setReleaseSuccess).toHaveBeenCalledWith(null);
-    expect(setters.setReleaseContextLoading).toHaveBeenCalledWith(false);
-    expect(setters.setReleaseContext).toHaveBeenCalledWith(null);
-    expect(setters.setReleaseContextError).toHaveBeenCalledWith(null);
-    expect(setters.setReleaseNotesGenerating).toHaveBeenCalledWith(false);
-
     act(() => {
       root.unmount();
     });

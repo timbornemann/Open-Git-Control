@@ -96,4 +96,34 @@ describe('GitSpawnOperations stream limits', () => {
     await expect(operation).resolves.toEqual({ success: false, error: 'Git clone progress line exceeded the 1 MB limit.' });
     expect(process.kill).toHaveBeenCalledTimes(1);
   });
+
+  it('passes scoped credential environment to streamed transfers and clone and stops clone on cancellation', async () => {
+    const transferProcess = new FakeGitProcess();
+    spawnMock.mockReturnValue(transferProcess);
+    const signal = new AbortController();
+    const stream = new GitSpawnOperations().streamOutput('/repo', ['fetch', 'origin'], vi.fn(), signal.signal, { OGC_OPERATION_SESSION: 'opaque-session' });
+    expect(spawnMock.mock.calls[0][2].env.OGC_OPERATION_SESSION).toBe('opaque-session');
+    transferProcess.emit('close', 0);
+    await expect(stream).resolves.toBe('');
+    const cloneProcess = new FakeGitProcess();
+    spawnMock.mockReturnValue(cloneProcess);
+    const clone = new GitSpawnOperations().cloneWithProgress('https://example.test/repo.git', '/target', vi.fn(), {
+      envOverrides: { OGC_OPERATION_SESSION: 'second-session' },
+      signal: signal.signal,
+    });
+    expect(spawnMock.mock.calls[1][2].env.OGC_OPERATION_SESSION).toBe('second-session');
+    signal.abort();
+    expect(cloneProcess.kill).toHaveBeenCalledTimes(1);
+    cloneProcess.emit('close', 0);
+    await expect(clone).resolves.toEqual({ success: false, error: 'Git clone was aborted.' });
+  });
+
+  it('does not start a clone when the account or operation was already cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      new GitSpawnOperations().cloneWithProgress('https://example.test/repo.git', '/target', vi.fn(), { signal: controller.signal }),
+    ).resolves.toEqual({ success: false, error: 'Git clone was aborted.' });
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
 });

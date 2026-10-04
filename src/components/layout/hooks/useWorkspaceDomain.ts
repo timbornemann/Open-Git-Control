@@ -3,9 +3,7 @@ import type { RepoSortByDto } from '@/types/appDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
-import { toRepoIdentity } from '@/components/layout/sidebar/useGithubRepoOriginMap';
-import { setGithubRepoPinned } from '@/components/github-workspace/githubPinStore';
+import { toRepositoryRemoteIdentity } from '@/utils/repositoryRemoteIdentity';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import type { AppTabId, InputDialogState } from '@/app/state/contracts';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -635,13 +633,13 @@ export const useWorkspaceDomain = ({
     if (!gitClient.isAvailable()) return;
     void (async () => {
       const origin = await gitClient.getRepoOriginUrl(repoPath);
-      const identity = origin.success ? toRepoIdentity(origin.data || '') : null;
+      const identity = origin.success ? toRepositoryRemoteIdentity(origin.data || '') : null;
       if (!identity) return;
       const entries = await Promise.all(
         openReposRef.current.map(async (path) => {
           try {
             const result = await gitClient.getRepoOriginUrl(path);
-            return { path, identity: result.success ? toRepoIdentity(result.data || '') : null };
+            return { path, identity: result.success ? toRepositoryRemoteIdentity(result.data || '') : null };
           } catch {
             return { path, identity: null };
           }
@@ -651,11 +649,6 @@ export const useWorkspaceDomain = ({
         entries.filter((entry) => entry.identity === identity).map((entry) => entry.path),
         pinned,
       );
-      if (!githubClient.isAvailable()) return;
-      const snapshot = await githubClient.getCatalogSnapshot();
-      if (!snapshot.success || !snapshot.data) return;
-      const remote = snapshot.data.repos.find((repo) => toRepoIdentity(repo.htmlUrl) === identity);
-      if (remote) setGithubRepoPinned(snapshot.data.host, snapshot.data.username, remote.id, pinned);
     })();
   };
 

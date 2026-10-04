@@ -4,7 +4,7 @@ import { ArrowUpRight, Copy, Download, FolderGit2, FolderOpen, Info, Star } from
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GitHubRepositoryDto } from '@/types/githubDtos';
 import { copyTextToClipboard } from '@/utils/clipboard';
 

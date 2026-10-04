@@ -26,10 +26,9 @@ describe('useMainViewTimeline dirty-editor navigation', () => {
     vi.spyOn(gitClient, 'getFileTimelineData').mockResolvedValue({ success: true, data: [] });
     const setRepoTab = vi.fn();
     const setActiveTab = vi.fn((tab: AppTabId) => requestWorkingDirectoryNavigation({ kind: 'view', label: tab }, () => setRepoTab(tab)));
-    const closeRelease = vi.fn();
     let current: ReturnType<typeof useMainViewTimeline> | null = null;
     const Harness = () => {
-      current = useMainViewTimeline({ activeRepo: 'C:/repo', setActiveTab, onCloseReleaseCreator: closeRelease, t: (key) => key });
+      current = useMainViewTimeline({ activeRepo: 'C:/repo', setActiveTab, t: (key) => key });
       return null;
     };
     const root = createRoot(document.getElementById('root')!);

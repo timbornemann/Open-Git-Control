@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { vi } from 'vitest';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { DEFAULT_RELEASE_NOTES_OPTIONS } from '@/types/releaseNotes';
 import type { GitHubReleaseTargetDto } from '@/types/githubDtos';
 import type { GitJobEventDto } from '@/types/aiDtos';

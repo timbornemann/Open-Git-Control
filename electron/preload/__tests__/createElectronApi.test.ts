@@ -3,6 +3,13 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('uses explicit hosting accounts and exposes no retired GitHub namespace or flat methods', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true, data: { items: [], nextCursor: null } });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    expect(Object.keys(api).filter((name) => name.startsWith('github'))).toEqual([]);
+    await api.hosting.hostingRequest('repositories', { connectionId: 'forgejo-account' });
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.HostingRequest, 'repositories', { connectionId: 'forgejo-account' });
+  });
   it('exposes typed message editing and cancellation in both API namespaces', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

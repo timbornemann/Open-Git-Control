@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GitRunner } from './GitRunner';
+import type { GitTransferOptions } from './GitProcessTypes';
 
 export type CloneRepositoryResult = {
   success: boolean;
@@ -68,7 +69,13 @@ export class CloneService {
     return repoPath;
   }
 
-  cloneRepo(cloneUrl: string, targetDir: string, onProgress: (line: string) => void, targetName?: string): Promise<CloneRepositoryResult> {
+  cloneRepo(
+    cloneUrl: string,
+    targetDir: string,
+    onProgress: (line: string) => void,
+    targetName?: string,
+    options: GitTransferOptions = {},
+  ): Promise<CloneRepositoryResult> {
     return new Promise((resolve) => {
       let repoPath = '';
       let normalizedCloneUrl = '';
@@ -93,13 +100,16 @@ export class CloneService {
         return;
       }
 
-      void this.gitRunner.cloneWithProgress(normalizedCloneUrl, repoPath, onProgress).then((result) => {
-        resolve({
-          success: result.success,
-          repoPath,
-          error: result.error,
-        });
-      });
+      void this.gitRunner
+        .cloneWithProgress(normalizedCloneUrl, repoPath, onProgress, options)
+        .then((result) => {
+          resolve({
+            success: result.success,
+            repoPath,
+            error: result.error,
+          });
+        })
+        .catch((error: unknown) => resolve({ success: false, repoPath, error: error instanceof Error ? error.message : 'Clone failed.' }));
     });
   }
 }

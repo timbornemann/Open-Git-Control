@@ -29,7 +29,7 @@ export const useGlobalKeyboardShortcuts = ({ setActiveTab, onFetch, onOpenComman
 
       // Keep the established Ctrl+1..4 mapping; the planner is available on Ctrl+5.
       if (!e.shiftKey && !e.altKey) {
-        const tabs: AppTabId[] = ['localRepos', 'repo', 'github', 'settings', 'planner'];
+        const tabs: AppTabId[] = ['localRepos', 'repo', 'hosting', 'settings', 'planner'];
         const idx = parseInt(e.key, 10) - 1;
         if (idx >= 0 && idx < tabs.length) {
           e.preventDefault();

@@ -3,7 +3,6 @@ import type {
   BranchContextMenuState,
   CommitNavigationRequest,
   ConfirmDialogState,
-  GithubStateContract,
   InputDialogState,
   RepositoryStateContract,
   RunGitCommandOptions,
@@ -11,16 +10,12 @@ import type {
   SidebarCoreState,
   WorkflowStateContract,
 } from '@/app/state/contracts';
-import type { GitHubReleaseContextDto } from '@/types/githubDtos';
 import type { GitMergeMode } from '@/types/git';
-import type { ReleaseNotesOptions } from '@/types/releaseNotes';
-import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 import type { RepositoryRunActionId } from '@/types/repositoryRun';
 
 export type { CommitNavigationRequest } from '@/app/state/contracts';
 
 export type BaseUIContextValue = SidebarCoreState & {
-  onClearGithubAuthHelpMethod: () => void;
   onResetLayout: () => void;
   isRunConfigOpen: boolean;
   onOpenRunConfig: () => void;
@@ -43,22 +38,6 @@ export type RepositoryContextValue = RepositoryStateContract & {
   showSecondaryHistory: boolean;
   onMergeBranch: (branchName: string, mode: GitMergeMode) => void;
   onOpenRepoWorkspace: () => void;
-};
-
-export type GithubContextValue = GithubStateContract & {
-  showReleaseCreator: boolean;
-  onOpenReleaseCreator: () => void;
-  onCloseReleaseCreator: () => void;
-  releaseContextLoading: boolean;
-  releaseContextError: string | null;
-  releaseContext: GitHubReleaseContextDto | null;
-  onRefreshReleaseContext: () => Promise<void>;
-  onGenerateReleaseNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
-  releaseNotesGenerating: boolean;
-  releaseNotesLanguage: 'de' | 'en';
-  setReleaseNotesLanguage: (value: 'de' | 'en') => void;
-  releaseNotesOptions: ReleaseNotesOptions;
-  setReleaseNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
 };
 
 export type WorkflowContextValue = WorkflowStateContract & {
@@ -108,7 +87,6 @@ export type UIContextValue = BaseUIContextValue & {
 export type AppStateSlicesValue = {
   settings: SettingsContextValue;
   repository: RepositoryContextValue;
-  github: GithubContextValue;
   workflow: WorkflowContextValue;
   ui: UIContextValue;
 };

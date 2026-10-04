@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appClient } from '../appClient';
-import { githubClient } from '../githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { queryClient } from '@/data/queryClient';
 import { resourceKey } from '@/data/clientCache';
 import type { UpdaterStatusDto } from '@/types/appDtos';
@@ -62,13 +62,18 @@ describe('preloading client integration', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it('reuses branch data with the compatible unpaged preload API', async () => {
+  it('preserves the internal legacy branch-cache regression without a production preload contract', async () => {
     const read = vi.fn().mockResolvedValue({ success: true, data: ['main', 'feature'] });
     vi.stubGlobal('window', { electronAPI: { github: { githubGetBranches: read } } });
     expect(await githubClient.getBranches('octocat', 'repo')).toEqual({ success: true, data: ['main', 'feature'] });
     expect(await githubClient.getBranches('octocat', 'repo')).toEqual({ success: true, data: ['main', 'feature'] });
     expect(read).toHaveBeenCalledOnce();
     expect(read).toHaveBeenCalledWith('octocat', 'repo');
+  });
+
+  it('cannot reuse a legacy account through the neutral production hosting namespace', () => {
+    vi.stubGlobal('window', { electronAPI: { hosting: { request: vi.fn() } } });
+    expect(githubClient.isAvailable()).toBe(false);
   });
 
   it('adds local cache diagnostics without masking a main-process failure', async () => {

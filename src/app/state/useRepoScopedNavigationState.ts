@@ -2,45 +2,13 @@ import { getActiveResourceRepository, invalidateResources } from '@/data/clientC
 import { gitMutationAffects } from '@/data/mutationEffects';
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AppTabId, CommitNavigationRequest, ConfirmDialogState, InputDialogState } from './contracts';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, GitHubReleaseDto } from '@/types/githubDtos';
 
 type UseRepoScopedNavigationStateParams = {
   setConfirmDialog: Dispatch<SetStateAction<ConfirmDialogState | null>>;
   setInputDialog: Dispatch<SetStateAction<InputDialogState | null>>;
-  setShowCreatePR: Dispatch<SetStateAction<boolean>>;
-  setNewPRTitle: Dispatch<SetStateAction<string>>;
-  setNewPRBody: Dispatch<SetStateAction<string>>;
-  setNewPRHead: Dispatch<SetStateAction<string>>;
-  setNewPRBase: Dispatch<SetStateAction<string>>;
-  setShowReleaseCreator: Dispatch<SetStateAction<boolean>>;
-  setReleaseFormState: Dispatch<SetStateAction<GitHubCreateReleaseParamsDto>>;
-  setReleaseSubmitting: Dispatch<SetStateAction<boolean>>;
-  setReleaseError: Dispatch<SetStateAction<string | null>>;
-  setReleaseSuccess: Dispatch<SetStateAction<GitHubReleaseDto | null>>;
-  setReleaseContextLoading: Dispatch<SetStateAction<boolean>>;
-  setReleaseContext: Dispatch<SetStateAction<GitHubReleaseContextDto | null>>;
-  setReleaseContextError: Dispatch<SetStateAction<string | null>>;
-  setReleaseNotesGenerating: Dispatch<SetStateAction<boolean>>;
 };
 
-export const useRepoScopedNavigationState = ({
-  setConfirmDialog,
-  setInputDialog,
-  setShowCreatePR,
-  setNewPRTitle,
-  setNewPRBody,
-  setNewPRHead,
-  setNewPRBase,
-  setShowReleaseCreator,
-  setReleaseFormState,
-  setReleaseSubmitting,
-  setReleaseError,
-  setReleaseSuccess,
-  setReleaseContextLoading,
-  setReleaseContext,
-  setReleaseContextError,
-  setReleaseNotesGenerating,
-}: UseRepoScopedNavigationStateParams) => {
+export const useRepoScopedNavigationState = ({ setConfirmDialog, setInputDialog }: UseRepoScopedNavigationStateParams) => {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [commitNavigationRequest, setCommitNavigationRequest] = useState<CommitNavigationRequest | null>(null);
   const commitNavigationSequenceRef = useRef(0);
@@ -74,64 +42,20 @@ export const useRepoScopedNavigationState = ({
     // mutating repo B later.
     setConfirmDialog(null);
     setInputDialog(null);
-    setShowCreatePR(false);
-    setNewPRTitle('');
-    setNewPRBody('');
-    setNewPRHead('');
-    setNewPRBase('main');
-    setShowReleaseCreator(false);
-    setReleaseFormState({
-      owner: '',
-      repo: '',
-      tagName: '',
-      targetCommitish: '',
-      releaseName: '',
-      body: '',
-      draft: false,
-      prerelease: false,
+  }, [setConfirmDialog, setInputDialog]);
+
+  const navigateToCommit = useCallback((hash: string, setActiveTab: (tab: AppTabId) => void) => {
+    const normalizedHash = String(hash || '').trim();
+    if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
+
+    setActiveTab('repo');
+    setSelectedCommit(normalizedHash);
+    commitNavigationSequenceRef.current += 1;
+    setCommitNavigationRequest({
+      hash: normalizedHash,
+      requestId: commitNavigationSequenceRef.current,
     });
-    setReleaseSubmitting(false);
-    setReleaseError(null);
-    setReleaseSuccess(null);
-    setReleaseContextLoading(false);
-    setReleaseContext(null);
-    setReleaseContextError(null);
-    setReleaseNotesGenerating(false);
-  }, [
-    setConfirmDialog,
-    setInputDialog,
-    setNewPRBase,
-    setNewPRBody,
-    setNewPRHead,
-    setNewPRTitle,
-    setReleaseContext,
-    setReleaseContextError,
-    setReleaseContextLoading,
-    setReleaseError,
-    setReleaseFormState,
-    setReleaseNotesGenerating,
-    setReleaseSubmitting,
-    setReleaseSuccess,
-    setShowCreatePR,
-    setShowReleaseCreator,
-  ]);
-
-  const navigateToCommit = useCallback(
-    (hash: string, setActiveTab: (tab: AppTabId) => void) => {
-      const normalizedHash = String(hash || '').trim();
-      if (!/^[0-9a-f]{7,64}$/i.test(normalizedHash)) return;
-
-      setActiveTab('repo');
-      setShowReleaseCreator(false);
-      setSelectedCommit(normalizedHash);
-      commitNavigationSequenceRef.current += 1;
-      setCommitNavigationRequest({
-        hash: normalizedHash,
-        requestId: commitNavigationSequenceRef.current,
-      });
-    },
-    [setShowReleaseCreator],
-  );
+  }, []);
 
   return {
     selectedCommit,

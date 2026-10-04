@@ -102,3 +102,18 @@ export async function runGithubCliOneClickLogin(githubHost?: string | null, sign
 
   return { accessToken: token };
 }
+
+/** Inspect the CLI's current identity without returning or adopting its token. */
+export async function inspectGithubCliLogin(githubHost?: string | null, signal?: AbortSignal): Promise<{ username: string; host: string }> {
+  const host = normalizeGithubHost(githubHost);
+  await runGithubCliOneClickLogin(host, signal);
+  try {
+    const { stdout } = await runGhCommand(['api', 'user', '--hostname', host], GITHUB_CLI_TOKEN_TIMEOUT_MS, signal);
+    const user = JSON.parse(stdout) as { login?: unknown; id?: unknown };
+    if (typeof user.login !== 'string' || !user.login || !user.id) throw new Error('Identity missing.');
+    return { username: user.login, host };
+  } catch {
+    throwIfAborted(signal);
+    throw new Error(`The GitHub CLI account for ${host} could not be verified. Sign in through the browser device flow instead.`);
+  }
+}

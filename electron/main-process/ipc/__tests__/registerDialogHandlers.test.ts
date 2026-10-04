@@ -98,8 +98,13 @@ describe('registerDialogHandlers', () => {
     const openResult = await openDirectoryHandler!();
     expect(openResult).toEqual({ path: 'D:/tmp/not-a-repo', isRepo: false });
 
-    const selectResult = await selectDirectoryHandler!();
+    let onCloneDestroyed: (() => void) | undefined;
+    const cloneSender = { id: 23, once: vi.fn((_event: string, callback: () => void) => (onCloneDestroyed = callback)) };
+    const selectResult = await selectDirectoryHandler!({ sender: cloneSender });
     expect(selectResult).toBe('D:/tmp/clone-target');
+    expect(grantSelectedProjectParentDirectoryMock).toHaveBeenCalledWith(23, 'D:/tmp/clone-target');
+    onCloneDestroyed?.();
+    expect(clearSelectedFileGrantsMock).toHaveBeenCalledWith(23);
     expect(showOpenDialogMock).toHaveBeenLastCalledWith({
       properties: ['openDirectory'],
       title: 'Zielordner fuer Clone auswaehlen',

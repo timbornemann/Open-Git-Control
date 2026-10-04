@@ -98,19 +98,34 @@ describe('persistent preview cache', () => {
     await expect(fs.stat(files[0])).rejects.toThrow();
     expect(await readPreviewCache(() => true)).toHaveLength(2);
   });
-  it('encrypts GitHub metadata and never writes private data without OS encryption', async () => {
+  it('never persists retired GitHub metadata, even with encryption and a granted account scope', async () => {
     const entry: PreviewSnapshot = {
       ...preview(),
       key: ['resource', 'github', 'github.com/alice', 'getRepository', 'alice', 'private'],
       data: { success: true, data: { owner: 'alice', repo: 'private', fork: false, parent: null, defaultBranch: 'main', fullName: 'alice/private' } },
     };
-    await savePreviewCache([entry], () => true);
+    const authorize = vi.fn(() => true);
+    expect(validatePreview(entry)).toBe(false);
+    await savePreviewCache([entry], authorize);
     const file = path.join(state.directory, 'preview-cache-v1', `${createHash('sha256').update(JSON.stringify(entry.key)).digest('hex')}.json`);
-    expect(await fs.readFile(file, 'utf8')).not.toContain('alice/private');
-    expect(await readPreviewCache(() => true)).toEqual([entry]);
+    await expect(fs.stat(file)).rejects.toThrow();
+    expect(await readPreviewCache(authorize)).toEqual([]);
+    expect(authorize).not.toHaveBeenCalled();
     state.encrypted = false;
     const denied = { ...entry, key: [...entry.key, 'uncached'] as PreviewSnapshot['key'] };
-    await savePreviewCache([denied], () => true);
-    expect((await fs.readdir(path.dirname(file))).length).toBe(1);
+    await savePreviewCache([denied], authorize);
+    expect(await fs.readdir(path.dirname(file))).toEqual([]);
+    expect(authorize).not.toHaveBeenCalled();
+
+    // Existing private cache files from the retired API cannot become visible
+    // after account logout or when a different hosting connection is selected.
+    for (const encrypted of [true, false]) {
+      state.encrypted = true;
+      const raw = JSON.stringify(entry);
+      await fs.writeFile(file, encrypted ? JSON.stringify({ encrypted: Buffer.from(raw.split('').reverse().join('')).toString('base64') }) : raw);
+      expect(await readPreviewCache(authorize)).toEqual([]);
+      await expect(fs.stat(file)).rejects.toThrow();
+    }
+    expect(authorize).not.toHaveBeenCalled();
   });
 });

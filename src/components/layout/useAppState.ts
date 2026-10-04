@@ -1,20 +1,15 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useToastQueue } from '@/hooks/useToastQueue';
 import { useDialogControllers } from './hooks/useDialogControllers';
 import { useWorkspaceDomain } from './hooks/useWorkspaceDomain';
 import { useRepositoryDomain } from './hooks/useRepositoryDomain';
-import { useGithubDomain } from './hooks/useGithubDomain';
-import { usePullRequests } from '@/hooks/usePullRequests';
-import { githubClient } from '@/services/githubClient';
 import { useSidebarCollapseState } from './state/useSidebarCollapseState';
-import { usePrAndReleaseState } from './state/usePrAndReleaseState';
 import { useBranchTrackingWorkflow } from './workflows/useBranchTrackingWorkflow';
 import { useConflictResolverWorkflow } from './workflows/useConflictResolverWorkflow';
 import { useGitCommandWorkflow } from './workflows/useGitCommandWorkflow';
-import { usePullRequestWorkflow } from './workflows/usePullRequestWorkflow';
 import { useRepoUnavailableWorkflow } from './workflows/useRepoUnavailableWorkflow';
 import { useRepositoryCreationWorkflow } from './workflows/useRepositoryCreationWorkflow';
-import { useReleaseWorkflow } from './workflows/useReleaseWorkflow';
+import { useRepositoryCloneWorkflow } from './hooks/useRepositoryCloneWorkflow';
 import { useGitJobEvents } from '@/app/state/useGitJobEvents';
 import { useRepoScopedNavigationState } from '@/app/state/useRepoScopedNavigationState';
 import { useSettingsState } from '@/app/state/useSettingsState';
@@ -23,41 +18,6 @@ import { useRepositoryRun } from '@/app/state/useRepositoryRun';
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
   const [isRunConfigOpen, setRunConfigOpen] = useState(false);
-
-  const {
-    showCreatePR,
-    setShowCreatePR,
-    newPRTitle,
-    setNewPRTitle,
-    newPRBody,
-    setNewPRBody,
-    newPRHead,
-    setNewPRHead,
-    newPRBase,
-    setNewPRBase,
-    releaseForm,
-    setReleaseFormState,
-    releaseSubmitting,
-    setReleaseSubmitting,
-    releaseError,
-    setReleaseError,
-    releaseSuccess,
-    setReleaseSuccess,
-    showReleaseCreator,
-    setShowReleaseCreator,
-    releaseContextLoading,
-    setReleaseContextLoading,
-    releaseContextError,
-    setReleaseContextError,
-    releaseContext,
-    setReleaseContext,
-    releaseNotesGenerating,
-    setReleaseNotesGenerating,
-    releaseNotesLanguage,
-    setReleaseNotesLanguage,
-    releaseNotesOptions,
-    setReleaseNotesOptions,
-  } = usePrAndReleaseState();
 
   const {
     toast: gitActionToast,
@@ -100,20 +60,6 @@ export const useAppState = () => {
   } = useRepoScopedNavigationState({
     setConfirmDialog,
     setInputDialog,
-    setShowCreatePR,
-    setNewPRTitle,
-    setNewPRBody,
-    setNewPRHead,
-    setNewPRBase,
-    setShowReleaseCreator,
-    setReleaseFormState,
-    setReleaseSubmitting,
-    setReleaseError,
-    setReleaseSuccess,
-    setReleaseContextLoading,
-    setReleaseContext,
-    setReleaseContextError,
-    setReleaseNotesGenerating,
   });
 
   const resetRepositoryView = useCallback(() => {
@@ -133,24 +79,7 @@ export const useAppState = () => {
     language: settings.language,
   });
   const repositoryRun = useRepositoryRun({ activeRepo: workspace.activeRepo, triggerRefresh });
-  const {
-    activeGitActionLabel,
-    activeGitCommand,
-    connectError,
-    createGithubRepoAndConnect,
-    forceGithubRepoCreationPrompt,
-    isConnectingGithubRepo,
-    isGitActionRunning,
-    isGitActionRunningRef,
-    newRepoDescription,
-    newRepoName,
-    newRepoPrivate,
-    runGitCommand,
-    setActiveGitActionLabel,
-    setNewRepoDescription,
-    setNewRepoName,
-    setNewRepoPrivate,
-  } = useGitCommandWorkflow({
+  const { activeGitActionLabel, activeGitCommand, isGitActionRunning, isGitActionRunningRef, runGitCommand, setActiveGitActionLabel } = useGitCommandWorkflow({
     workspace: {
       activeRepo: workspace.activeRepo,
       addOpenRepo: workspace.addOpenRepo,
@@ -213,127 +142,19 @@ export const useAppState = () => {
     onNavigateToCommit: navigateToCommit,
   });
 
-  const github = useGithubDomain({
+  const clone = useRepositoryCloneWorkflow({
     onRepoCloned: workspace.addOpenRepo,
     setActiveTab: workspace.setActiveTab,
-    language: settings.language,
-    githubOauthClientId: settings.githubOauthClientId,
-    githubHost: settings.githubHost,
-    onError: (message) => setGitActionToast({ msg: message, isError: true }),
+    t,
   });
-
-  const { handleCloneByUrl, handleForkByUrl } = useRepositoryCreationWorkflow({
-    github,
-    workspace,
-    settings,
+  const { handleCloneByUrl } = useRepositoryCreationWorkflow({
+    cloneRepository: clone.cloneRepository,
     setInputDialog,
     setGitActionToast,
     t,
     tr,
   });
 
-  const handlePullRequestCreated = useCallback(
-    (number: number) => {
-      setGitActionToast({ msg: tr(`PR #${number} erstellt.`, `Created PR #${number}.`), isError: false });
-      setShowCreatePR(false);
-      setNewPRTitle('');
-      setNewPRBody('');
-      triggerRefresh();
-    },
-    [setGitActionToast, setNewPRBody, setNewPRTitle, setShowCreatePR, tr, triggerRefresh],
-  );
-
-  const handlePullRequestError = useCallback(
-    (message: string) => {
-      setGitActionToast({ msg: message, isError: true });
-    },
-    [setGitActionToast],
-  );
-
-  const pullRequestDomain = usePullRequests({
-    activeRepo: workspace.activeRepo,
-    isAuthenticated: github.isAuthenticated,
-    refreshTrigger,
-    language: settings.language,
-    githubHost: settings.githubHost,
-    onCreated: handlePullRequestCreated,
-    onError: handlePullRequestError,
-  });
-
-  useLayoutEffect(() => {
-    setNewPRBase(pullRequestDomain.prDefaultBranch);
-  }, [pullRequestDomain.prDefaultBranch, setNewPRBase]);
-
-  const releaseOwnerRepo = useMemo(() => {
-    const scope = pullRequestDomain.prOwnerRepo;
-    if (!scope) return null;
-    return scope.headOwner ? { owner: scope.headOwner, repo: scope.headRepo || scope.repo } : { owner: scope.owner, repo: scope.repo };
-  }, [pullRequestDomain.prOwnerRepo]);
-
-  const handleCreateGithubRepoForCurrent = async () => {
-    if (!githubClient.isAvailable() || !workspace.activeRepo) return;
-    if (!github.isAuthenticated) {
-      setGitActionToast({ msg: t('generated.components.layout.useappstate.please_connect_github_first_github_tab_68715c85'), isError: true });
-      return;
-    }
-    await createGithubRepoAndConnect({ replaceOriginIfExists: true, pushAfterConnect: true });
-  };
-
-  const {
-    closeReleaseCreator,
-    releasePhase,
-    generateReleaseNotesWithAI,
-    handleCreateRelease,
-    openReleaseCreator,
-    refreshReleaseContext,
-    setReleaseForm,
-    releasePendingAssets,
-    addReleasePendingAssets,
-    removeReleasePendingAsset,
-  } = useReleaseWorkflow({
-    activeRepo: workspace.activeRepo,
-    isGithubAuthenticated: github.isAuthenticated,
-    ownerRepo: releaseOwnerRepo,
-    currentBranch: repository.currentBranch,
-    releaseForm,
-    setReleaseFormState,
-    releaseContext,
-    setReleaseContext,
-    setReleaseContextError,
-    setReleaseContextLoading,
-    setReleaseError,
-    setReleaseSuccess,
-    setReleaseSubmitting,
-    showReleaseCreator,
-    setShowReleaseCreator,
-    releaseNotesGenerating,
-    setReleaseNotesGenerating,
-    releaseNotesLanguage,
-    releaseNotesOptions,
-    setConfirmDialog,
-    setGitActionToast,
-    setActiveTab: workspace.setActiveTab,
-    triggerRefresh,
-    language: settings.language,
-  });
-  const { handleCheckoutPR, handleCopyPRUrl, handleCreatePR, handleMergePR, handleOpenPR } = usePullRequestWorkflow({
-    activeRepo: workspace.activeRepo,
-    githubHost: settings.githubHost,
-    ownerRepo: pullRequestDomain.prOwnerRepo,
-    createPullRequest: pullRequestDomain.createPR,
-    currentBranch: repository.currentBranch,
-    newPRTitle,
-    newPRBody,
-    newPRHead,
-    newPRBase,
-    runGitCommand,
-    refreshRemoteState: repository.refreshRemoteState,
-    confirmDangerousOps: settings.confirmDangerousOps,
-    setConfirmDialog,
-    setGitActionToast,
-    triggerRefresh,
-    language: settings.language,
-  });
   const { handleCheckoutRemoteBranch, handleSetUpstreamForCurrentBranch } = useBranchTrackingWorkflow({
     activeRepo: workspace.activeRepo,
     currentBranch: repository.currentBranch,
@@ -401,7 +222,6 @@ export const useAppState = () => {
     remotes: repository.remotes,
     submodules: repository.submodules,
     hasRemoteOrigin: repository.hasRemoteOrigin,
-    forceGithubRepoCreationPrompt,
     remoteSync: repository.remoteSync,
     remoteStatus: repository.remoteStatus,
     refreshRemoteState: repository.refreshRemoteState,
@@ -428,96 +248,13 @@ export const useAppState = () => {
     handleSetUpstreamForCurrentBranch,
     handleCheckoutRemoteBranch,
 
-    isAuthRestoring: github.isAuthRestoring,
-    isAuthenticationRequired: github.isAuthenticationRequired,
-    onRetryAuthentication: github.retrySavedAuthentication,
-    isAuthenticated: github.isAuthenticated,
-    githubUser: github.githubUser,
-    githubRepos: github.githubRepos,
-    githubReposHasMore: github.githubReposHasMore,
-    isLoadingGithubRepos: github.isLoadingRepos,
-    isLoadingMoreGithubRepos: github.isLoadingMoreRepos,
-    loadMoreGithubRepos: () => {
-      void github.loadMoreRepos();
-    },
-    refreshGithubRepos: (search?: string) => {
-      void github.refreshRepos(search);
-    },
-    tokenInput: github.tokenInput,
-    setTokenInput: github.setTokenInput,
-    isAuthenticating: github.isAuthenticating,
-    authError: github.authError,
-    setAuthError: github.setAuthError,
-    handleTokenLogin: github.handleTokenLogin,
-    oauthConfigured: github.oauthConfigured,
-    deviceFlow: github.deviceFlow,
-    isDeviceFlowRunning: github.isDeviceFlowRunning,
-    deviceFlowError: github.deviceFlowError,
-    handleStartDeviceFlowLogin: github.handleStartDeviceFlowLogin,
-    handleCancelAuthentication: github.handleCancelAuthentication,
-    handleCancelDeviceFlow: github.handleCancelDeviceFlow,
-    isWebFlowRunning: github.isWebFlowRunning,
-    webFlowError: github.webFlowError,
-    handleStartWebFlowLogin: github.handleStartWebFlowLogin,
-    handleLogout: github.handleLogout,
-
-    isCloning: github.isCloning,
-    setIsCloning: github.setIsCloning,
-    closeCloneProgress: github.closeCloneProgress,
-    cloneLog: github.cloneLog,
-    cloneRepoName: github.cloneRepoName,
-    cloneFinished: github.cloneFinished,
-    cloneError: github.cloneError,
-    handleClone: github.handleClone,
+    isCloning: clone.isCloning,
+    closeCloneProgress: clone.closeCloneProgress,
+    cloneLog: clone.cloneLog,
+    cloneRepoName: clone.cloneRepoName,
+    cloneFinished: clone.cloneFinished,
+    cloneError: clone.cloneError,
     handleCloneByUrl,
-    handleForkByUrl,
-
-    prOwnerRepo: pullRequestDomain.prOwnerRepo,
-    prFilter: pullRequestDomain.prFilter,
-    setPrFilter: pullRequestDomain.setPrFilter,
-    prLoading: pullRequestDomain.prLoading,
-    prHasLoaded: pullRequestDomain.prHasLoaded,
-    prError: pullRequestDomain.prError,
-    pullRequests: pullRequestDomain.pullRequests,
-    prCiByNumber: pullRequestDomain.prCiByNumber,
-    showCreatePR,
-    setShowCreatePR,
-    newPRTitle,
-    setNewPRTitle,
-    newPRBody,
-    setNewPRBody,
-    newPRHead,
-    setNewPRHead,
-    newPRBase,
-    setNewPRBase,
-    handleCreatePR,
-    releaseForm,
-    setReleaseForm,
-    releaseSubmitting,
-    releasePhase,
-    releaseError,
-    releaseSuccess,
-    showReleaseCreator,
-    openReleaseCreator,
-    closeReleaseCreator,
-    releaseContextLoading,
-    releaseContextError,
-    releaseContext,
-    refreshReleaseContext,
-    releaseNotesGenerating,
-    generateReleaseNotesWithAI,
-    releaseNotesLanguage,
-    setReleaseNotesLanguage,
-    releaseNotesOptions,
-    setReleaseNotesOptions,
-    handleCreateRelease,
-    releasePendingAssets,
-    addReleasePendingAssets,
-    removeReleasePendingAsset,
-    handleOpenPR,
-    handleCopyPRUrl,
-    handleCheckoutPR,
-    handleMergePR,
 
     settings,
     handleUpdateSettings,
@@ -526,16 +263,6 @@ export const useAppState = () => {
     jobs,
     clearJobs,
     ...repositoryRun,
-
-    isConnectingGithubRepo,
-    connectError,
-    newRepoName,
-    setNewRepoName,
-    newRepoDescription,
-    setNewRepoDescription,
-    newRepoPrivate,
-    setNewRepoPrivate,
-    handleCreateGithubRepoForCurrent,
 
     confirmDialog,
     setConfirmDialog,

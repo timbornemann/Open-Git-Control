@@ -13,8 +13,11 @@ export function useAppPreloading(activeRepo: string | null, openRepos: string[],
     const prepared =
       tab in viewModules &&
       viewModules[tab as keyof typeof viewModules].isReady() &&
-      (tab === 'github'
-        ? queryClient.getQueryData(resourceKey('github', 'catalog')) !== undefined
+      (tab === 'hosting'
+        ? queryClient
+            .getQueryCache()
+            .getAll()
+            .some((entry) => entry.queryKey[0] === 'hosting')
         : tab === 'planner'
           ? queryClient.getQueryData(resourceKey('planner', 'getData')) !== undefined
           : true);

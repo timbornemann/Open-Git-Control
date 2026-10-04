@@ -1,105 +1,59 @@
 import React from 'react';
-import { useGithubContext, useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
-import { RepoSidebarContent } from '@/components/layout/sidebar/RepoSidebarContent';
+import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
+import { BranchPanel } from '@/components/sidebar/BranchPanel';
+import { TagPanel } from '@/components/sidebar/TagPanel';
+import { SubmodulePanel } from '@/components/sidebar/SubmodulePanel';
+import { RepositoryLicensePanel } from '@/components/sidebar/RepositoryLicensePanel';
+import { HostingSidebar } from '@/components/hosting/HostingSidebar';
+import { gitClient } from '@/services/gitClient';
+import { useI18n } from '@/i18n';
+import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 
 export const RepoSidebarContainer: React.FC = React.memo(() => {
   const ui = useUIContext();
   const repository = useRepositoryContext();
-  const github = useGithubContext();
-
+  const { tr } = useI18n();
+  if (!repository.activeRepo) return <button onClick={() => ui.setActiveTab('localRepos')}>{tr('Lokales Repository öffnen', 'Open local repository')}</button>;
   return (
-    <RepoSidebarContent
-      activeRepo={repository.activeRepo}
-      setActiveTab={ui.setActiveTab}
-      branches={repository.branches}
-      isCreatingBranch={repository.isCreatingBranch}
-      onSetCreatingBranch={repository.onSetCreatingBranch}
-      onCreateBranch={repository.onCreateBranch}
-      onCheckoutBranch={repository.onCheckoutBranch}
-      onSetBranchContextMenu={repository.onSetBranchContextMenu}
-      isBranchPanelCollapsed={ui.isBranchPanelCollapsed}
-      onToggleBranchPanelCollapsed={ui.onToggleBranchPanelCollapsed}
-      tags={repository.tags}
-      tagConflicts={repository.tagConflicts}
-      onCreateTag={repository.onCreateTag}
-      onPushTags={repository.onPushTags}
-      onDeleteTag={repository.onDeleteTag}
-      onSelectTag={repository.onSelectTag}
-      isTagPanelCollapsed={ui.isTagPanelCollapsed}
-      onToggleTagPanelCollapsed={ui.onToggleTagPanelCollapsed}
-      remotes={repository.remotes}
-      remoteSync={repository.remoteSync}
-      remoteStatus={repository.remoteStatus}
-      onAddRemote={repository.onAddRemote}
-      onRemoveRemote={repository.onRemoveRemote}
-      onRenameRemote={repository.onRenameRemote}
-      onSetRemoteUrl={repository.onSetRemoteUrl}
-      onRefreshRemote={repository.onRefreshRemote}
-      onSetUpstreamForCurrentBranch={repository.onSetUpstreamForCurrentBranch}
-      isRemotePanelCollapsed={ui.isRemotePanelCollapsed}
-      onToggleRemotePanelCollapsed={ui.onToggleRemotePanelCollapsed}
-      submodules={repository.submodules}
-      onSubmoduleInitUpdate={repository.onSubmoduleInitUpdate}
-      onSubmoduleSync={repository.onSubmoduleSync}
-      onOpenSubmodule={repository.onOpenSubmodule}
-      isSubmodulePanelCollapsed={ui.isSubmodulePanelCollapsed}
-      onToggleSubmodulePanelCollapsed={ui.onToggleSubmodulePanelCollapsed}
-      hasRemoteOrigin={repository.hasRemoteOrigin}
-      forceGithubRepoCreationPrompt={repository.forceGithubRepoCreationPrompt}
-      isConnectingGithubRepo={repository.isConnectingGithubRepo}
-      newRepoName={repository.newRepoName}
-      setNewRepoName={repository.setNewRepoName}
-      newRepoDescription={repository.newRepoDescription}
-      setNewRepoDescription={repository.setNewRepoDescription}
-      newRepoPrivate={repository.newRepoPrivate}
-      setNewRepoPrivate={repository.setNewRepoPrivate}
-      onCreateGithubRepoForCurrent={repository.onCreateGithubRepoForCurrent}
-      isAuthenticated={github.isAuthenticated}
-      githubUser={github.githubUser}
-      githubRepos={github.githubRepos}
-      githubReposHasMore={github.githubReposHasMore}
-      isLoadingGithubRepos={github.isLoadingGithubRepos}
-      isLoadingMoreGithubRepos={github.isLoadingMoreGithubRepos}
-      loadMoreGithubRepos={github.loadMoreGithubRepos}
-      refreshGithubRepos={github.refreshGithubRepos}
-      onLogout={github.onLogout}
-      onClone={github.onClone}
-      isCloning={github.isCloning}
-      openRepos={repository.openRepos}
-      onSwitchRepo={repository.onSwitchRepo}
-      prOwnerRepo={github.prOwnerRepo}
-      prFilter={github.prFilter}
-      setPrFilter={github.setPrFilter}
-      prLoading={github.prLoading}
-      prHasLoaded={github.prHasLoaded}
-      prError={github.prError}
-      pullRequests={github.pullRequests}
-      prCiByNumber={github.prCiByNumber}
-      onOpenPR={github.onOpenPR}
-      onCopyPRUrl={github.onCopyPRUrl}
-      onCheckoutPR={github.onCheckoutPR}
-      onMergePR={github.onMergePR}
-      showCreatePR={github.showCreatePR}
-      setShowCreatePR={github.setShowCreatePR}
-      currentBranch={repository.currentBranch}
-      setNewPRHead={github.setNewPRHead}
-      newPRTitle={github.newPRTitle}
-      setNewPRTitle={github.setNewPRTitle}
-      newPRBody={github.newPRBody}
-      setNewPRBody={github.setNewPRBody}
-      newPRHead={github.newPRHead}
-      setNewPRHeadInput={github.setNewPRHeadInput}
-      newPRBase={github.newPRBase}
-      setNewPRBase={github.setNewPRBase}
-      onCreatePR={github.onCreatePR}
-      releaseForm={github.releaseForm}
-      setReleaseForm={github.setReleaseForm}
-      releaseSubmitting={github.releaseSubmitting}
-      releasePhase={github.releasePhase}
-      onCreateRelease={github.onCreateRelease}
-      refreshTrigger={repository.refreshTrigger}
-    />
+    <div className="repo-cockpit">
+      <div className="repo-cockpit-header">
+        <strong>{repository.activeRepo.split(/[\\/]/).pop()}</strong>
+        <small className="repo-cockpit-path">{repository.activeRepo}</small>
+        <button className="staging-tool-btn" onClick={() => void gitClient.openRepositoryPath({ action: 'open', repoPath: repository.activeRepo! })}>
+          {tr('Projektordner öffnen', 'Open project folder')}
+        </button>
+      </div>
+      <HostingSidebar local />
+      <RepositoryLicensePanel repoPath={repository.activeRepo} />
+      <BranchPanel
+        branches={repository.branches}
+        isCreatingBranch={repository.isCreatingBranch}
+        onSetCreatingBranch={repository.onSetCreatingBranch}
+        onCreateBranch={repository.onCreateBranch}
+        onCheckoutBranch={repository.onCheckoutBranch}
+        onSetBranchContextMenu={repository.onSetBranchContextMenu}
+        collapsed={ui.isBranchPanelCollapsed}
+        onToggleCollapsed={ui.onToggleBranchPanelCollapsed}
+      />
+      <TagPanel
+        tags={repository.tags}
+        tagConflicts={repository.tagConflicts}
+        onCreateTag={repository.onCreateTag}
+        onPushTags={() => openRemoteTransferDialog({ repoPath: repository.activeRepo!, mode: 'push' })}
+        onDeleteTag={repository.onDeleteTag}
+        onSelectTag={repository.onSelectTag}
+        collapsed={ui.isTagPanelCollapsed}
+        onToggleCollapsed={ui.onToggleTagPanelCollapsed}
+      />
+      <SubmodulePanel
+        submodules={repository.submodules}
+        onInitUpdate={repository.onSubmoduleInitUpdate}
+        onSync={repository.onSubmoduleSync}
+        onOpenSubmodule={repository.onOpenSubmodule}
+        collapsed={ui.isSubmodulePanelCollapsed}
+        onToggleCollapsed={ui.onToggleSubmodulePanelCollapsed}
+      />
+    </div>
   );
 });
-
 RepoSidebarContainer.displayName = 'RepoSidebarContainer';

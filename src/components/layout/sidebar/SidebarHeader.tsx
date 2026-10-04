@@ -17,8 +17,8 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ activeTab, activeR
             ? t('sidebar.currentRepository')
             : activeTab === 'planner'
               ? t('sidebar.planner')
-              : activeTab === 'github'
-                ? 'GitHub'
+              : activeTab === 'github' || activeTab === 'hosting'
+                ? 'Hosting'
                 : t('sidebar.settings')}
       </span>
       <div className="sidebar-header-actions">

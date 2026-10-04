@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RELEASE_NOTES_OPTIONS } from '@/types/releaseNotes';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { useReleaseWorkflow } from '../useReleaseWorkflow';
 import {
   resetWorkingDirectoryNavigationGuardForTests,

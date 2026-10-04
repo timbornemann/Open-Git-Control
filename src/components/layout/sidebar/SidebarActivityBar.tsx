@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Settings, FolderOpen, FolderGit2, Github, ListTodo, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Settings, FolderOpen, FolderGit2, Globe, ListTodo, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { AppSidebarProps } from './AppSidebar.types';
 import { useI18n } from '@/i18n';
 import { UpdateNotification } from './UpdateNotification';
@@ -39,8 +39,12 @@ export const SidebarActivityBar: React.FC<SidebarActivityBarProps> = ({ activeTa
       <button className={`icon-btn ${activeTab === 'planner' ? 'active' : ''}`} onClick={() => activateTab('planner')} title={t('sidebar.planner')}>
         <ListTodo size={22} />
       </button>
-      <button className={`icon-btn ${activeTab === 'github' ? 'active' : ''}`} onClick={() => activateTab('github')} title="GitHub">
-        <Github size={22} />
+      <button
+        className={`icon-btn ${activeTab === 'hosting' || activeTab === 'github' ? 'active' : ''}`}
+        onClick={() => activateTab('hosting')}
+        title="Hosting"
+      >
+        <Globe size={22} />
       </button>
       <div className="repository-activity-slot">
         <RepositoryActivityRail />

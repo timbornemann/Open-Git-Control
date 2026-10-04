@@ -16,9 +16,6 @@ const createAppStateValue = (params: { language?: 'de' | 'en'; onFetch?: () => v
     repository: {
       activeRepo: 'D:/repo',
     },
-    github: {
-      isAuthenticated: false,
-    },
     workflow: {
       isGitActionRunning: false,
       activeGitActionLabel: null,

@@ -3,7 +3,6 @@ import type {
   ElectronAiAPI,
   ElectronAppAPI,
   ElectronGitAPI,
-  ElectronGithubAPI,
   ElectronPlannerAPI,
   ElectronReposAPI,
   ElectronSettingsAPI,
@@ -24,10 +23,6 @@ export const requireElectronApi = (): ElectronAPI => {
 
 export const requireElectronGitApi = (): ElectronGitAPI => {
   return requireElectronApi().git;
-};
-
-export const requireElectronGithubApi = (): ElectronGithubAPI => {
-  return requireElectronApi().github;
 };
 
 export const requireElectronPlannerApi = (): ElectronPlannerAPI => {

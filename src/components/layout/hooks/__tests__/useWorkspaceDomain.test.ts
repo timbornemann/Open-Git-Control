@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWorkspaceDomain } from '@/components/layout/hooks/useWorkspaceDomain';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import {
   resetWorkingDirectoryNavigationGuardForTests,
   setActiveWorkingDirectoryNavigationGuard,
@@ -96,7 +96,7 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     hook.unmount();
   });
 
-  it('synchronizes a local favorite across clones and the GitHub pin setting', async () => {
+  it('synchronizes a local favorite across clones without requiring a GitHub account', async () => {
     vi.spyOn(appClient, 'getStoredRepos').mockResolvedValue({
       repos: [
         { path: 'C:/repo-a', lastOpened: 2, pinned: false, createdAt: 1 },
@@ -107,26 +107,9 @@ describe('useWorkspaceDomain repository canonicalization', () => {
     });
     vi.spyOn(appClient, 'setRepoPath').mockResolvedValue('C:/repo-a');
     vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'git@github.com:alice/demo.git' });
+    vi.spyOn(gitClient, 'getRepoOriginUrl').mockResolvedValue({ success: true, data: 'git@forge.example:alice/demo.git' });
     vi.spyOn(githubClient, 'isAvailable').mockReturnValue(true);
-    vi.spyOn(githubClient, 'getCatalogSnapshot').mockResolvedValue({
-      success: true,
-      data: {
-        host: 'github.com',
-        username: 'alice',
-        savedAt: '2026-01-01T00:00:00Z',
-        repos: [
-          {
-            id: 42,
-            name: 'demo',
-            fullName: 'alice/demo',
-            private: true,
-            cloneUrl: 'https://github.com/alice/demo.git',
-            htmlUrl: 'https://github.com/alice/demo',
-          },
-        ],
-      },
-    });
+    const githubCatalog = vi.spyOn(githubClient, 'getCatalogSnapshot');
     const values = new Map<string, string>();
     vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) || null, setItem: (key: string, value: string) => values.set(key, value) });
     const hook = renderWorkspace();
@@ -135,11 +118,11 @@ describe('useWorkspaceDomain repository canonicalization', () => {
 
     act(() => hook.current.toggleRepoPin('C:/repo-a'));
     await vi.waitFor(() => expect(hook.current.repoMeta['C:/repo-b']?.pinned).toBe(true));
-    await vi.waitFor(() => expect(values.get('ogc.githubPins.v1:github.com:alice')).toBe('[42]'));
+    expect(githubCatalog).not.toHaveBeenCalled();
 
     act(() => hook.current.toggleRepoPin('C:/repo-b'));
     await vi.waitFor(() => expect(hook.current.repoMeta['C:/repo-a']?.pinned).toBe(false));
-    await vi.waitFor(() => expect(values.get('ogc.githubPins.v1:github.com:alice')).toBe('[]'));
+    expect(githubCatalog).not.toHaveBeenCalled();
     hook.unmount();
   });
 

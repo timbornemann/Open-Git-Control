@@ -1,3 +1,4 @@
+import { requireLegacyGithubApi } from '@/legacy/github/electronApi';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { aiClient } from '@/services/aiClient';
 import { appClient } from '@/services/appClient';
@@ -7,13 +8,12 @@ import {
   requireElectronApi,
   requireElectronAppApi,
   requireElectronGitApi,
-  requireElectronGithubApi,
   requireElectronPlannerApi,
   requireElectronReposApi,
   requireElectronSettingsApi,
 } from '@/services/electronApi';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { plannerClient } from '@/services/plannerClient';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
 
@@ -89,7 +89,7 @@ describe('electronApi accessors', () => {
     expect(getElectronApi()).toBe(api);
     expect(requireElectronApi()).toBe(api);
     expect(requireElectronGitApi()).toBe(api.git);
-    expect(requireElectronGithubApi()).toBe(api.github);
+    expect(requireLegacyGithubApi()).toBe(api.github);
     expect(requireElectronPlannerApi()).toBe(api.planner);
     expect(requireElectronSettingsApi()).toBe(api.settings);
     expect(requireElectronAppApi()).toBe(api.app);

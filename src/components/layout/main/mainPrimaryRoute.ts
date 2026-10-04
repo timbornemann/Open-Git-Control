@@ -3,30 +3,14 @@ import type { TranslationVariables } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 
 export type MainPrimaryRoute =
-  | 'localRepos'
-  | 'planner'
-  | 'settings'
-  | 'runConfig'
-  | 'release'
-  | 'timeline'
-  | 'runConsole'
-  | 'githubGuide'
-  | 'github'
-  | 'recovery'
-  | 'conflict'
-  | 'diff'
-  | 'file'
-  | 'graph';
+  'localRepos' | 'planner' | 'settings' | 'runConfig' | 'timeline' | 'runConsole' | 'hosting' | 'recovery' | 'conflict' | 'diff' | 'file' | 'graph';
 
 type RouteParams = {
   activeConflictPath: string | null;
   activeDiffRequest: DiffRequest | null;
   workingDirectoryFilePath?: string | null;
   activeTab: AppTabId;
-  isAuthenticated: boolean;
-  selectedGithubAuthHelpMethod: unknown;
   showRecoveryCenter: boolean;
-  showReleaseCreator: boolean;
   showTimeline: boolean;
   showRunConsole: boolean;
   showRunConfig?: boolean;
@@ -39,10 +23,7 @@ export const getMainPrimaryRoute = ({
   activeDiffRequest,
   workingDirectoryFilePath,
   activeTab,
-  isAuthenticated,
-  selectedGithubAuthHelpMethod,
   showRecoveryCenter,
-  showReleaseCreator,
   showTimeline,
   showRunConsole,
   showRunConfig,
@@ -51,11 +32,9 @@ export const getMainPrimaryRoute = ({
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
   if (activeTab === 'repo' && showRunConfig) return 'runConfig';
-  if (activeTab === 'repo' && showReleaseCreator) return 'release';
   if (activeTab === 'repo' && showTimeline) return 'timeline';
   if (activeTab === 'repo' && showRunConsole) return 'runConsole';
-  if (activeTab === 'github' && !isAuthenticated && Boolean(selectedGithubAuthHelpMethod)) return 'githubGuide';
-  if (activeTab === 'github') return 'github';
+  if (activeTab === 'hosting' || activeTab === 'github') return 'hosting';
   if (showRecoveryCenter) return 'recovery';
   if (activeConflictPath) return 'conflict';
   if (activeDiffRequest) return 'diff';
@@ -69,12 +48,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
       return t('generated.components.layout.main.mainprimarypane.settings_c6256784');
     case 'runConfig':
       return tr('Run-Konfiguration', 'Run configuration');
-    case 'release':
-      return t('generated.components.layout.main.mainprimarypane.release_creator_e28377be');
     case 'timeline':
       return t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25');
-    case 'githubGuide':
-      return t('generated.components.layout.main.mainprimarypane.github_login_guide_c2a55182');
     case 'recovery':
       return t('generated.components.layout.main.mainprimarypane.recovery_center_0adebec8');
     case 'conflict':
@@ -89,4 +64,4 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
 };
 
 export const hasMainPrimaryHeader = (route: MainPrimaryRoute): boolean =>
-  route !== 'localRepos' && route !== 'planner' && route !== 'github' && route !== 'graph' && route !== 'runConsole';
+  route !== 'localRepos' && route !== 'planner' && route !== 'hosting' && route !== 'graph' && route !== 'runConsole';

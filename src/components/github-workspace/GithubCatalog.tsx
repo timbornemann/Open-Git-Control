@@ -1,11 +1,11 @@
 import { usePreloadIntent } from '@/data/usePreloadIntent';
-import { preloadGithubRepository } from '@/data/preloading';
+import { preloadGithubRepository } from '@/legacy/github/preloading';
 import { DataPlaceholder } from '@/components/common/DataPlaceholder';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Download, LockKeyhole, Plus, Search, Star, FolderGit2 } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import type { GitHubRepositoryDto } from '@/types/githubDtos';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { toRepoIdentity } from '@/components/layout/sidebar/useGithubRepoOriginMap';
 import { selectGithubCatalogRepos } from './githubCatalogSelectors';
 import { GithubRepoContextMenu, type GithubRepoContextMenuState } from './GithubRepoContextMenu';

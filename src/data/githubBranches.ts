@@ -1,14 +1,14 @@
 import { hashKey } from '@tanstack/react-query';
-import { getElectronApi } from '@/services/electronApi';
+import { getLegacyGithubApi, requireLegacyGithubApi } from '@/legacy/github/electronApi';
 import type { ReadPriority, ResourceKey } from '@/shared/cache/resource';
 import { backgroundQueue } from './backgroundQueue';
 import { cancellableRead } from './ipcRead';
 import { checked } from './queryClient';
 
-export const supportsBranchPages = () => typeof getElectronApi()?.github.githubGetBranchesPage === 'function';
+export const supportsBranchPages = () => typeof getLegacyGithubApi()?.githubGetBranchesPage === 'function';
 
 export async function readGithubBranches(key: ResourceKey, owner: string, repo: string, signal: AbortSignal, priority: ReadPriority) {
-  const api = getElectronApi()!.github;
+  const api = requireLegacyGithubApi();
   const branches: string[] = [];
   for (let page = 1; page <= 100; page++) {
     const result = checked(

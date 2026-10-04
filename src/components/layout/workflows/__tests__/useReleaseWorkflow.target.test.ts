@@ -4,7 +4,7 @@ import { releaseWorkflowFixture } from './releaseWorkflowFixture';
 import { invalidateGithubCacheEpoch, resourceKey } from '@/data/clientCache';
 import { queryClient } from '@/data/queryClient';
 import { appClient } from '@/services/appClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 
 let fixture: Awaited<ReturnType<typeof releaseWorkflowFixture>>;
 afterEach(() => {

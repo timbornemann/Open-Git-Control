@@ -1,10 +1,10 @@
 import { useResourceState } from '@/data/resourceHooks';
-import { preloadGithubRepository } from '@/data/preloading';
+import { preloadGithubRepository } from '@/legacy/github/preloading';
 /* eslint-disable complexity -- repository detail coordinates the three intentionally distinct tabs. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Download, FolderGit2, GitPullRequest, LockKeyhole, Workflow } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GitHubRepositoryDetailsDto, GitHubRepositoryDto } from '@/types/githubDtos';
 import { toRepoIdentity } from '@/components/layout/sidebar/useGithubRepoOriginMap';
 import { normalizeRepoPathKey } from '@/utils/repoPath';

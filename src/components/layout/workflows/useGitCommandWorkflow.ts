@@ -10,10 +10,10 @@ import { parseGitHubPushProtectionFailure } from '@/utils/githubPushProtection';
 import type { AppTabId } from '@/app/state/contracts';
 import type { ConfirmDialogState } from '@/components/layout/layoutTypes';
 import { type RunGitCommandOptions } from '@/components/layout/state/appStateShared';
-import { gitWorkflowCommands } from './gitWorkflowCommands';
 import { useGitCommandGuardWorkflow } from './useGitCommandGuardWorkflow';
 import { useGitSyncRecoveryWorkflow, type GitCommandRunner } from './useGitSyncRecoveryWorkflow';
 import { useRemoteRecoveryWorkflow } from './useRemoteRecoveryWorkflow';
+import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 
 type Toast = { msg: string; isError: boolean };
 
@@ -62,30 +62,14 @@ export const useGitCommandWorkflow = ({
 
   const { t, tr } = useLanguageTranslations(settings.language as AppLanguage);
 
-  const {
-    connectError,
-    createGithubRepoAndConnect,
-    ensureInitialCommitForPush,
-    forceGithubRepoCreationPrompt,
-    isConnectingGithubRepo,
-    maybeHandlePushWithoutOrigin,
-    maybeRecoverRemoteSetup,
-    newRepoDescription,
-    newRepoName,
-    newRepoPrivate,
-    requestInitialCommitConfirmationIfNeeded,
-    setConnectError,
-    setForceGithubRepoCreationPrompt,
-    setNewRepoDescription,
-    setNewRepoName,
-    setNewRepoPrivate,
-  } = useRemoteRecoveryWorkflow({
-    workspace,
-    settings,
-    triggerRefresh,
-    setConfirmDialog,
-    setGitActionToast,
-  });
+  const { ensureInitialCommitForPush, maybeHandlePushWithoutOrigin, maybeRecoverRemoteSetup, requestInitialCommitConfirmationIfNeeded } =
+    useRemoteRecoveryWorkflow({
+      workspace,
+      settings,
+      triggerRefresh,
+      setConfirmDialog,
+      setGitActionToast,
+    });
 
   const { maybeHandleSyncMismatchFailure, runRemoteAheadQuickFix } = useGitSyncRecoveryWorkflow({
     runGitCommandRef,
@@ -128,28 +112,6 @@ export const useGitCommandWorkflow = ({
       };
 
       const command = args[0] as GitCommandNameDto;
-      const tryAutoSetUpstreamPush = async (failureMessage: unknown): Promise<boolean> => {
-        if (command !== 'push' || options?.skipAutoSetUpstreamOnPushFailure || !isMissingUpstreamPushError(failureMessage)) {
-          return false;
-        }
-
-        const fallbackArgs = gitClient.buildPushCurrentBranchArgs({
-          extraArgs: args.slice(1),
-          remote: 'origin',
-          ref: 'HEAD',
-          setUpstream: true,
-        });
-        const fallbackSuccess = await runGitCommand(
-          fallbackArgs,
-          t('generated.components.layout.workflows.usegitcommandworkflow.pushed_branch_and_set_upstream_486b4c06'),
-          t('generated.components.layout.workflows.usegitcommandworkflow.running_push_with_upstream_c4d07a1f'),
-          { ...options, skipAutoSetUpstreamOnPushFailure: true },
-          true,
-        );
-        if (!isStillActiveRepo()) return false;
-        return fallbackSuccess;
-      };
-
       // This central recovery path deliberately routes every known Git failure.
       // eslint-disable-next-line complexity
       const recoverFromGitCommandFailure = async (failureMessage: unknown, fallbackErrorMessage?: string): Promise<boolean> => {
@@ -192,9 +154,7 @@ export const useGitCommandWorkflow = ({
             return false;
           }
 
-          const argsWithUpstream = args.some((arg) => arg === '-u' || arg === '--set-upstream')
-            ? args
-            : gitWorkflowCommands.pushCurrentBranch({ remote: 'origin', ref: 'HEAD', setUpstream: true });
+          const argsWithUpstream = args;
 
           return runGitCommand(
             argsWithUpstream,
@@ -264,15 +224,13 @@ export const useGitCommandWorkflow = ({
         }
 
         const missingUpstream = isMissingUpstreamPushError(errorMessage);
-        if (await tryAutoSetUpstreamPush(errorMessage)) {
-          return true;
-        }
         if (!isStillActiveRepo()) return false;
         if (missingUpstream) {
+          openRemoteTransferDialog({ repoPath: repoAtStart, mode: 'push' });
           setGitActionToast({
             msg: tr(
-              'Push fehlgeschlagen: Upstream konnte nicht automatisch gesetzt werden. Bitte Upstream manuell setzen und erneut pushen.',
-              'Push failed: could not set upstream automatically. Please set upstream manually and push again.',
+              'Push benötigt eine Zielauswahl. Remote und Zielbranch im Push-Dialog auswählen; Upstream bei Bedarf ausdrücklich setzen.',
+              'Select the remote and destination branch in the push dialog. Set an upstream explicitly if needed.',
             ),
             isError: true,
           });
@@ -381,10 +339,6 @@ export const useGitCommandWorkflow = ({
         const r = await gitClient.runGitCommandForRepo(repoAtStart, command, ...args.slice(1));
         if (!isStillActiveRepo()) return false;
         if (r.success) {
-          if (forceGithubRepoCreationPrompt && (command === 'push' || command === 'pull' || command === 'fetch')) {
-            setForceGithubRepoCreationPrompt(false);
-            setConnectError(null);
-          }
           setGitActionToast({ msg: successMsg, isError: false });
           triggerRefresh();
           return true;
@@ -405,16 +359,13 @@ export const useGitCommandWorkflow = ({
     },
     [
       ensureInitialCommitForPush,
-      forceGithubRepoCreationPrompt,
       maybeHandlePushWithoutOrigin,
       maybeHandleSyncMismatchFailure,
       maybeRecoverRemoteSetup,
       requestInitialCommitConfirmationIfNeeded,
       runGitCommandGuards,
-      setConnectError,
       setConfirmDialog,
       setConflictResolverPath,
-      setForceGithubRepoCreationPrompt,
       setGitActionToast,
       t,
       triggerRefresh,
@@ -428,20 +379,9 @@ export const useGitCommandWorkflow = ({
   return {
     activeGitActionLabel,
     activeGitCommand,
-    connectError,
-    createGithubRepoAndConnect,
-    forceGithubRepoCreationPrompt,
-    isConnectingGithubRepo,
     isGitActionRunning,
     isGitActionRunningRef,
-    newRepoDescription,
-    newRepoName,
-    newRepoPrivate,
     runGitCommand,
     setActiveGitActionLabel,
-    setConnectError,
-    setNewRepoDescription,
-    setNewRepoName,
-    setNewRepoPrivate,
   };
 };

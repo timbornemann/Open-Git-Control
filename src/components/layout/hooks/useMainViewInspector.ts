@@ -25,7 +25,6 @@ type Params = {
   setSelectedCommit: (hash: string | null) => void;
   activeRepo: string | null;
   onOpenRepoWorkspace: () => void;
-  onCloseReleaseCreator: () => void;
   commitNavigationRequest?: { hash: string; requestId: number } | null;
   onNavigateToCommit?: (hash: string) => void;
 };
@@ -44,7 +43,6 @@ export const useMainViewInspector = ({
   setSelectedCommit,
   activeRepo,
   onOpenRepoWorkspace,
-  onCloseReleaseCreator,
   commitNavigationRequest,
   onNavigateToCommit,
 }: Params) => {
@@ -97,7 +95,6 @@ export const useMainViewInspector = ({
     handledNavigationRequestIdRef.current = request.requestId;
 
     onOpenRepoWorkspace();
-    onCloseReleaseCreator();
     setActiveDiffRequest(null);
     setActiveConflictPath(null);
     setShowRecoveryCenter(false);
@@ -109,7 +106,7 @@ export const useMainViewInspector = ({
       setCommitHistoryStack([]);
     }
     setSelectedCommit(request.hash);
-  }, [commitNavigationRequest, onCloseReleaseCreator, onOpenRepoWorkspace, setSelectedCommit]);
+  }, [commitNavigationRequest, onOpenRepoWorkspace, setSelectedCommit]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'recovery center' }, () => {
@@ -276,14 +273,13 @@ export const useMainViewInspector = ({
   const handleStageCommitOpen = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'staging and commit' }, () => {
       onOpenRepoWorkspace();
-      onCloseReleaseCreator();
       setActiveDiffRequest(null);
       setActiveConflictPath(null);
       setShowRecoveryCenter(false);
       setWorkingDirectoryFile(null);
       handleSelectCommitDirect(null);
     });
-  }, [handleSelectCommitDirect, onCloseReleaseCreator, onOpenRepoWorkspace]);
+  }, [handleSelectCommitDirect, onOpenRepoWorkspace]);
 
   return {
     activeDiffRequest,

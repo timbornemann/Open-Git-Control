@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, einen Working-Directory-Dateibaum mit Editor, Diff-Ansicht, Konfliktloesung, GitHub Pull Requests, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge, Repository-Run-Workflows und optionale KI-Unterstuetzung in einer lokalen Anwendung.
+Open-Git-Control ist ein freier, quelloffener Desktop-Git-Client fuer Windows, macOS und Linux. Die App kombiniert visuellen Commit-Graph, Staging, einen Working-Directory-Dateibaum mit Editor, Diff-Ansicht, Konfliktloesung, Hosting mit Pull/Merge Requests und CI, Releases, Projektplanung, Secret-Scanning, Recovery-Werkzeuge, Repository-Run-Workflows und optionale KI-Unterstuetzung in einer lokalen Anwendung.
 
 Sprache: **Deutsch** | English version: [README.md](README.md)
 
@@ -18,7 +18,8 @@ Open-Git-Control ist fuer dich interessant, wenn dir ein sehr kleiner Git-Client
 - Git-Operationen laufen lokal gegen deine Repositories
 - Visueller Commit-Graph mit Branch-, Tag-, Merge-, Reset-, Rebase-, Cherry-Pick-, Revert- und Recovery-Aktionen
 - Staging, Stash, Hunk-Diffs, Datei-Historie, Blame und Konfliktloesung in einem Workflow
-- GitHub-Login, Repository-Klonen/Forken, Pull Requests, CI-Status, Workflows und Release-Publishing
+- Konten von GitHub, Forgejo, GitLab, Bitbucket Cloud und Data Center, Repository-Kataloge, Klonen/Forken, PRs/MRs, CI und anbieterspezifische Veröffentlichungen
+- Unabhängige Pull-Quellen, Hosting-Ziele und gespeicherte Push-Profile für mehrere Endpunkte mit einzelnen Ergebnissen
 - Projektplanung mit lokaler REST- und MCP-aehnlicher API fuer agentengestuetzte Arbeit
 - Working-Directory-Dateibaum mit sicheren In-App-Dateivorschauen und Bearbeitung sowie System-Dateiaktionen bei Bedarf
 - Repository-spezifische Run-Workflows fuer Tests, Formatieren, Starten und Bauen mit Live-Konsole
@@ -48,7 +49,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 ## Voraussetzungen
 
 - Git muss installiert und im `PATH` verfuegbar sein.
-- GitHub CLI (`gh`) ist optional und nur fuer die One-click-GitHub-Login-Methode erforderlich.
+- GitHub CLI (`gh`) ist optional und nur zum Importieren einer bestehenden GitHub-CLI-Anmeldung erforderlich.
 - Ollama, ein Gemini API Key oder ein OpenAI API Key ist optional und nur fuer KI-Funktionen erforderlich.
 - Entwicklung aus dem Quellcode benoetigt Node.js und npm. CI nutzt aktuell Node.js 20.
 
@@ -128,7 +129,8 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - No-fast-forward-Merge
   - Squash-Merge
   - Fast-forward-only-Merge
-- Alle Remotes mit Pruning und Tags fetchen.
+- Fetch-/Pull-Remote unabhängig von Push-Zielen auswählen; Fetch entfernt veraltete Remote-Branches.
+- Remote-Tags getrennt verfolgen und vorhandene lokale Tags bei abweichenden Ziel-Commits erhalten.
 - Auto-Fetch in konfigurierbarem Intervall und Refresh, wenn die App wieder sichtbar wird.
 - Remote-Zustaende anzeigen:
   - kein Remote konfiguriert
@@ -140,7 +142,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Fetch-Fehler
 - Remotes hinzufuegen, entfernen, umbenennen und URLs aktualisieren.
 - Upstream fuer den aktuellen Branch setzen.
-- Fehlende GitHub-Remotes behandeln, indem ungueltige `origin`-Mappings entfernt und Repositories wieder lokal/offline genutzt werden.
+- Bei nicht erreichbaren Endpunkten URL, Konto und Berechtigungen unter Remotes & Übertragungen prüfen.
 - Lightweight oder annotated Tags erstellen.
 - Tags suchen, auswaehlen, loeschen und pushen.
 - Rekursiven Submodule-Status anzeigen.
@@ -150,18 +152,17 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 ### Topbar-Git-Aktionen
 
-- Fetch.
+- Fetch vom ausdrücklich ausgewählten Remote.
 - Ausgewaehlten Branch mit waehlbarem Merge-Modus mergen.
 - Pull mit:
   - Standard-Pull
   - Pull mit Rebase
   - No-fast-forward-Pull
   - Fast-forward-only-Pull
-- Push mit:
-  - Standard-Push
-  - Upstream setzen (`-u`)
-  - Force-with-lease
-  - Tags pushen
+- Push zu einem oder mehreren ausgewählten Remotes mit Zielbranches und ausdrücklich ausgewählten Tags prüfen.
+- Force-with-lease gegen den geprüften Stand jedes Endpunkts bestätigen.
+- Upstream ausdrücklich unter Remotes & Übertragungen setzen.
+- Ergebnisse je Ziel prüfen und erfolglose Ziele mit dem geprüften Commit erneut versuchen.
 - Repository-spezifische Run-, Test-, Format-, Start- und Build-Workflows starten.
 - Codebase Timeline oeffnen.
 - Release Creator oeffnen.
@@ -311,55 +312,40 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Rebase fortsetzen oder abbrechen.
 - Commits verhindern, solange ungeloeste Konflikte vorhanden sind.
 
-### GitHub Integration
+### Hosting-Integration
 
-- Authentifizierung mit:
-  - Personal Access Token
-  - OAuth Device Flow
-  - One-click Login ueber GitHub CLI (`gh`)
-- Reconnect aus gespeicherter GitHub Session.
-- Logout und gespeicherte Auth entfernen.
-- GitHub OAuth Client ID fuer Device Flow konfigurieren.
-- GitHub Host fuer GitHub-Enterprise-aehnliche Hosts konfigurieren.
-- GitHub-Repositories mit Suche, Pagination und Refresh listen.
-- Erkennen, ob GitHub-Repositories lokal bereits geklont sind.
-- GitHub-Repositories mit Progress Modal klonen.
-- Beliebige HTTP-, HTTPS- oder SSH-Git-Remote-URL klonen.
-- GitHub-Repository per URL forken und Fork lokal klonen.
-- Neues GitHub-Repository aus lokalem Repo ohne `origin` erstellen.
-- Erstelltes GitHub-Repo als `origin` verbinden.
-- Ungueltiges Remote Mapping ersetzen, wenn das Upstream-Repository nicht mehr existiert.
+Der gemeinsame **Hosting**-Bereich verwaltet mehrere Server und Konten gleichzeitig. Native Git-Funktionen bleiben mit jedem passenden Git-Server nutzbar. Adapter ergänzen Repository-Kataloge, Erstellen, Forks, PRs/MRs, CI und Veröffentlichungen für GitHub, Forgejo, GitLab sowie Bitbucket Cloud und Data Center. Verfügbare Aktionen richten sich nach API, Serverversion und Repository-Berechtigungen. Die [Hosting-Dokumentation](Docs/HOSTING.md) beschreibt Anmeldung, OAuth, Endpunktauswahl und Anbieterunterschiede.
+
+Für jedes lokale Repository werden Pull-Quelle, Push-Ziele und Hosting-Ziel unabhängig gewählt. Ein Push-Profil kann denselben geprüften Commit auf einen privaten Forgejo-Server und ein GitHub-Backup veröffentlichen. Das Upstream-Tracking bleibt erhalten. Teil-Erfolge werden angezeigt; Wiederholungen prüfen und adressieren nur erfolglose Ziele. Bestehende mehrere Push-URLs werden erhalten.
+
+Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ein normaler Push alle URLs dieses benannten Remote als Gruppe. Force, gezielte Wiederholung und unterschiedliche ausdrücklich zugeordnete Hosting-Konten innerhalb einer solchen Gruppe benötigen getrennte benannte Remotes oder ein Git-Update.
+
+- Verbindungen unter **Hosting → Konten & Server** hinzufügen, einschließlich eigener Server-URLs und Installationspfade.
+- Mit Token oder pro Verbindung konfiguriertem Browser-OAuth anmelden. GitHub unterstützt außerdem Device Flow und CLI-Import nach Prüfung des angebotenen Kontos.
+- Gespeicherte Konten erneut verbinden, abmelden oder Verbindungen entfernen.
+- Repository-Kataloge durchsuchen, seitenweise laden und aktualisieren; passende lokale Klone erkennen.
+- Katalog-Repositories mit ausgewähltem Konto und Fortschrittsanzeige klonen oder direkt eine Git-URL verwenden.
+- Repositories erstellen oder forken, wenn der Anbieter dies unterstützt, und mit einem ausdrücklich gewählten lokalen Remote-Namen verbinden.
+- Tatsächliche Fetch-/Push-URLs ihrem Hosting-Konto zuordnen. Bei SSH-Aliasen löst eine Repository-Web-URL die Identität auf; die SSH-Remote-URL bleibt erhalten.
+- Für die Git-Anmeldung je Endpunkt zwischen zugeordnetem Hosting-Konto und vorhandenen System-/SSH-Zugangsdaten wählen.
 
 ### Pull Requests, CI und Workflows
 
-- Pull-Request-Liste fuer das aktive GitHub-Repository.
-- PRs nach open, closed oder all filtern.
-- Pull Requests mit Titel, Body, Head Branch und Base Branch erstellen.
-- PRs im Browser oeffnen.
-- PR-URLs kopieren.
-- PR-Branches lokal auschecken.
-- PRs mergen mit:
-  - Merge Commit
-  - Squash
-  - Rebase
-- CI-Auswertung pro PR:
-  - success
-  - failure
-  - pending
-  - neutral
-  - unknown
-- Workflow Runs und Status Checks anzeigen.
-- Aktuelle GitHub Actions Workflow Runs fuer den aktuellen Branch anzeigen.
-- Workflow Runs filtern und im Browser oeffnen.
+- PR-/MR-Listen und Checks verwenden das ausdrücklich gewählte Hosting-Ziel und Konto.
+- Nach Status filtern, Requests mit ausdrücklich gewählten Quell-/Zielrepositories und Branches erstellen sowie URLs öffnen oder kopieren.
+- Requests lokal auschecken und mit vom Repository unterstützten Methoden mergen: Merge Commit, Squash oder Rebase.
+- GitHub-/Forgejo-Actions, GitLab-Pipelines, Bitbucket-Cloud-Pipelines oder Data-Center-Buildstatus anzeigen.
+- Jobs/Schritte, begrenzte Logs und Artefakte prüfen; Runs starten, abbrechen oder wiederholen, soweit API und Berechtigungen dies unterstützen.
+- Nicht unterstützte CI-Aktionen zeigen ihre Verfügbarkeit und bei Bedarf einen Link zur Anbieter-Webseite.
 
 ### Release Creator
 
 - Eigene Release-Ansicht aus der Topbar.
-- GitHub Release Context lesen:
+- Release-Kontext des ausdrücklich ausgewählten Endpunkts lesen:
   - Repository URL
   - bestehende Tags
   - letzter Release-Tag
-  - Commits seit letztem Release
+  - Commits ab optionalem Start-Tag/Ref für Release-Notes
   - Ziel-Branch oder Commit
 - Naechstes SemVer-Tag vorschlagen.
 - Version bump waehlen:
@@ -382,7 +368,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Breaking-Changes-Sektion
   - automatische Commit-Liste anhaengen
   - Commit Hashes anzeigen
-- Release direkt auf GitHub veroeffentlichen.
+- Native Releases auf GitHub, Forgejo und GitLab veröffentlichen; Tags & Downloads auf Bitbucket Cloud sowie Tags/lokale Notes auf Data Center verwalten. Draft und Prerelease erscheinen nur bei Unterstützung.
 
 ### Projektplanung
 
@@ -478,7 +464,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - `update_todo`
   - `move_todo`
   - `delete_todo`
-- Git- und GitHub-Operationen werden bewusst nicht ueber die lokale API oder MCP-Oberflaeche exportiert.
+- Git- und Hosting-Operationen werden bewusst nicht ueber die lokale API oder MCP-Oberflaeche exportiert.
 
 ### KI-Unterstuetzung
 
@@ -533,7 +519,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - `regex:...`
   - freier Text
   - Kommentarzeilen mit `#`
-- GitHub Token, Gemini Key und persistenter Planning-API-Token werden OS-verschluesselt ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
+- Hosting-Zugangsdaten, KI-Schlüssel und persistente Planning-API-Token werden OS-verschluesselt ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
 - Wenn OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
 
 ### Settings, Updates und Job Center
@@ -560,7 +546,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
   - Mono Dark Green
   - Mono Light Green
 - Integrations Settings:
-  - GitHub OAuth Client ID
+  - Hosting-Konten, Server-/API-URLs, Token und OAuth-Konfiguration je Verbindung
 - KI & MCP Settings:
   - KI Provider
   - KI Modell
@@ -625,12 +611,13 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 
 ### Standard-Lokalworkflow
 
-1. Fetch oder Pull aus der Topbar.
+1. Fetch oder Pull in der Topbar öffnen und Quell-Remote, Branch und Pull-Modus auswählen.
 2. Branch erstellen oder wechseln.
 3. Geaenderte Dateien im Working Directory pruefen.
 4. Diffs oeffnen, Dateien oder Hunks stagen und bei Bedarf stashen.
 5. Commit mit Titel und Beschreibung erstellen.
-6. Push, Upstream setzen, Tags pushen oder Force-with-lease nutzen, wenn noetig.
+6. Push öffnen, Ziele/Branches und gewünschte Tags wählen, den erfassten Stand prüfen und den Push bestätigen. Upstream bei Bedarf separat setzen.
+7. Ergebnisse je Ziel prüfen; erfolglose Ziele mit dem geprüften Stand erneut versuchen.
 
 ### Konflikte loesen
 
@@ -641,22 +628,22 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 5. Speichern und Dateien als resolved markieren.
 6. Merge/Rebase im Resolver fortsetzen oder abbrechen.
 
-### GitHub Pull Request Flow
+### Hosting-Flow für Pull / Merge Requests
 
-1. Per PAT, Device Flow oder GitHub CLI One-click Login anmelden.
-2. Sicherstellen, dass `origin` auf ein GitHub-Repository zeigt.
-3. Pull Request aus der Repo-Sidebar erstellen.
-4. PR-CI und Workflow-Status pruefen.
-5. PR oeffnen, kopieren, auschecken, mergen, squashen oder rebasen.
+1. Anbieter-Konto unter Hosting → Konten & Server hinzufügen und mit Token oder konfigurierter Browser-Anmeldung anmelden.
+2. Konto und Hosting-Endpunkt unter Remotes & Übertragungen auswählen.
+3. PR / MR aus der Repo-Sidebar öffnen und Quell- sowie Zielrepository ausdrücklich auswählen.
+4. Request-Checks und die CI-Ansicht des Anbieters prüfen.
+5. Request öffnen, kopieren oder auschecken; nach Prüfung des Head-Commits mit einer verfügbaren Methode mergen.
 
 ### Release Flow
 
-1. Release aus der Topbar oeffnen.
-2. Release Context aktualisieren.
-3. Major, Minor oder Patch waehlen.
-4. Tag, Release-Name, Target und Markdown Body anpassen.
-5. Optional KI-Release-Notes generieren.
-6. Als normales Release, Draft oder Prerelease veroeffentlichen.
+1. Hosting-Endpunkt des Repositorys unter Remotes & Übertragungen auswählen, dann Release in der Topbar oder Hosting-Repository-Ansicht öffnen.
+2. Zielbranch, Tag oder Commit eintragen und den ausgewählten Endpunkt prüfen.
+3. Fehlt der lokale Stand auf dem Server, zuerst den geprüften Push-Workflow verwenden und den Endpunkt erneut prüfen.
+4. Versionstag wählen oder vorschlagen lassen; Release-Name und Markdown-Notes anpassen, optional mit KI erzeugen.
+5. Geprüften Remote-Stand veröffentlichen. Draft, Prerelease und Release-Dateien erscheinen nur bei Unterstützung.
+6. Auf Bitbucket Cloud Tags und Downloads getrennt verwalten; auf Data Center Tags und kopierte/exportierte lokale Notes verwenden.
 
 ### Recovery Flow
 
@@ -672,7 +659,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 3. Externen Agenten mit MCP-URL oder REST-Endpunkten konfigurieren.
 4. Agent nach `get_next_todos` oder `GET /api/agent/next` fragen.
 5. Agent Planungseintraege erstellen oder verschieben lassen.
-6. Git- und GitHub-Arbeit in der Desktop-App behalten.
+6. Git- und Hosting-Arbeit in der Desktop-App behalten.
 
 ## Lokale Planning API und MCP
 
@@ -876,9 +863,9 @@ Erwartete Release Assets:
 - Planning-Projekte und Planning-Items werden lokal gespeichert.
 - Die Planning API bindet an `127.0.0.1`.
 - Token-geschuetzte Planning-API-Endpunkte sind fuer lokale Prozesse auf derselben Maschine gedacht.
-- GitHub Token, Gemini Key und persistenter Planning-API-Token werden mit OS-gestuetzter Verschluesselung ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
+- Hosting-Zugangsdaten, KI-Schlüssel und persistente Planning-API-Token werden mit OS-gestuetzter Verschluesselung ueber Electron `safeStorage` gespeichert, wenn verfuegbar.
 - Wenn OS-Verschluesselung nicht verfuegbar ist, werden Secrets nicht persistent gespeichert.
-- Die lokale API stellt nur Planungsdaten bereit; sie exportiert keine Git- oder GitHub-Aktionen.
+- Die lokale API stellt nur Planungsdaten bereit; sie exportiert keine Git- oder Hosting-Aktionen.
 
 ## Troubleshooting
 
@@ -888,22 +875,23 @@ Erwartete Release Assets:
 - Terminal oder PC neu starten.
 - Mit `git --version` pruefen.
 
-### GitHub One-click Login funktioniert nicht
+### GitHub-CLI-Anmeldung lässt sich nicht importieren
 
 - GitHub CLI von [cli.github.com](https://cli.github.com/) installieren.
 - Mit `gh --version` pruefen.
-- PAT oder Device Flow nutzen, wenn GitHub CLI nicht verwendet werden soll.
+- Prüfen, ob die CLI am konfigurierten Host angemeldet ist; den angebotenen Nutzernamen vor dem Import prüfen.
+- Token oder Device Flow nutzen, wenn GitHub CLI nicht verwendet werden soll.
 
 ### Device Flow funktioniert nicht
 
-- GitHub OAuth Client ID in Settings -> Integrations setzen.
-- Alternativ `GITHUB_OAUTH_CLIENT_ID` vor dem App-Start setzen.
+- GitHub-Verbindung unter Hosting → Konten & Server bearbeiten und ihre OAuth Client ID eintragen.
+- Device Flow für diese OAuth-Anwendung aktivieren und den angezeigten Code vor Ablauf im Browser bestätigen.
 
-### Keine Pull Requests sichtbar
+### Keine Pull / Merge Requests sichtbar
 
-- Sicherstellen, dass `origin` auf ein GitHub-Repository zeigt.
-- Im GitHub-Tab anmelden.
-- Repository und PR-Panel aktualisieren.
+- Beim passenden Anbieter-Konto anmelden und Repository-/Request-Berechtigungen prüfen.
+- Gewünschtes Hosting-Repository und Konto unter Remotes & Übertragungen auswählen; SSH-Aliase über die Repository-Web-URL zuordnen.
+- Repository und PR-/MR-Ansicht aktualisieren. Der Git-Remote darf beliebig heißen.
 
 ### Commit oder Push wird vom Secret-Scan blockiert
 

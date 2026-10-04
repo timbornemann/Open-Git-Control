@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/i18n';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GithubCreateRepositoryWithReadmeDto } from '@/types/githubDtos';
 
 type Props = {

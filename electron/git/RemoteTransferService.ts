@@ -1,0 +1,498 @@
+import { randomUUID } from 'crypto';
+import type {
+  GitRemoteSnapshotDto,
+  GitPushBatchDto,
+  GitPushPlanDto,
+  GitPushTargetDto,
+  GitPushTargetResultDto,
+  RemoteMutation,
+  RemotePreferences,
+  RemoteTransferOperations,
+} from '../../src/types/remoteTransfers';
+import type { GitProcessResult } from './GitProcessTypes';
+import { redactGitSensitiveText } from './GitErrorFormatter';
+import { RemotePreferencesStore } from './RemotePreferencesStore';
+import { reconcileRemotePreferences } from './reconcileRemotePreferences';
+import { assertGroupedCredentialChoices, runGroupedRemotePush } from './groupedRemotePush';
+import {
+  gitConfigurationEnvironment,
+  normalizeRemotePreferences,
+  normalizeTargetBranches,
+  refName,
+  remoteName,
+  remoteUrl,
+  remoteFetchArguments,
+} from './remoteTransferValidation';
+import { batchState, parseAdvertisedRefs, pushResult, type PublishedRef } from './remotePushResults';
+import { repositoryPathKey } from '../main-process/activeRepositoryAuthorization';
+
+export type { CredentialEnvironmentFactory, RemoteTransferContext } from './remoteTransferModels';
+import {
+  digest,
+  boundCredentialGenerations,
+  pruneTransfers,
+  lines,
+  displayUrl,
+  PLAN_LIFETIME,
+  type CredentialEnvironmentFactory,
+  type RemoteTransferContext,
+  type StoredPlan,
+  type StoredBatch,
+  type Runner,
+} from './remoteTransferModels';
+
+/** Named Git remotes retain hooks and transport configuration; accounts bind to individual URLs. */
+export class RemoteTransferService {
+  private readonly plans = new Map<string, StoredPlan>();
+  private readonly batches = new Map<string, StoredBatch>();
+  private readonly activePlans = new Set<string>();
+  private isolationSupported: boolean | undefined;
+
+  constructor(
+    private readonly git: Runner,
+    private readonly preferences = new RemotePreferencesStore(),
+    private readonly credentials?: CredentialEnvironmentFactory,
+    private readonly getCredentialGeneration?: (connectionId: string) => number,
+  ) {}
+
+  private async optional(repoPath: string, args: string[]): Promise<string> {
+    const result = await this.git.runResult(repoPath, args);
+    return result.exitCode === 0 ? result.stdout.trim() : '';
+  }
+
+  private async isolationCapability(repoPath: string): Promise<boolean> {
+    if (this.isolationSupported !== undefined) return this.isolationSupported;
+    // `remote get-url` requires a remote defined in repository config, even
+    // when runtime configuration contains a complete synthetic remote.
+    const name = lines(await this.git.run(repoPath, ['remote']))[0];
+    if (!name) return false;
+    const expected = 'https://ogc.invalid/probe-second.git';
+    const envOverrides = gitConfigurationEnvironment([
+      [`remote.${name}.url`, 'https://ogc.invalid/probe.git'],
+      [`remote.${name}.pushurl`, 'https://ogc.invalid/probe-first.git'],
+      [`remote.${name}.pushurl`, ''],
+      [`remote.${name}.pushurl`, expected],
+    ]);
+    const result = await this.git.runResult(repoPath, ['remote', 'get-url', '--push', '--all', name], { envOverrides });
+    this.isolationSupported = result.exitCode === 0 && result.stdout.trim() === expected;
+    return this.isolationSupported;
+  }
+
+  async getRemotes(repoPath: string): Promise<GitRemoteSnapshotDto> {
+    const names = lines(await this.git.run(repoPath, ['remote']));
+    const remotes = [];
+    for (const name of names) {
+      const fetchUrls = lines(await this.git.run(repoPath, ['remote', 'get-url', '--all', name]));
+      const pushUrls = lines(await this.git.run(repoPath, ['remote', 'get-url', '--push', '--all', name]));
+      remotes.push({ name, fetchUrls: fetchUrls.map(displayUrl), pushUrls: pushUrls.map(displayUrl) });
+    }
+    const branch = await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
+    const upstreamRemote = branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.remote`]) : '';
+    const upstreamRef = branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.merge`]) : '';
+    const preferred =
+      (branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.pushRemote`]) : '') ||
+      (await this.optional(repoPath, ['config', '--get', 'remote.pushDefault'])) ||
+      upstreamRemote ||
+      (names.includes('origin') ? 'origin' : names.length === 1 ? names[0] : '');
+    return {
+      repoPath,
+      branch,
+      upstream: upstreamRemote && upstreamRef ? { remote: upstreamRemote, branch: upstreamRef.replace(/^refs\/heads\//, '') } : null,
+      defaultPushRemote: preferred || null,
+      remotes,
+      supportsPushUrlIsolation: await this.isolationCapability(repoPath),
+    };
+  }
+
+  getPreferences(repoPath: string): RemotePreferences {
+    return this.preferences.read(repoPath);
+  }
+
+  async setPreferences(repoPath: string, input: RemotePreferences, context?: RemoteTransferContext): Promise<RemotePreferences> {
+    const preferences = normalizeRemotePreferences(input);
+    const snapshot = await this.getRemotes(repoPath);
+    const names = new Set(snapshot.remotes.map((remote) => remote.name));
+    const selected = [
+      preferences.hostingRemote,
+      preferences.fetchRemote,
+      ...(preferences.pushRemotes ?? []),
+      ...(preferences.profiles?.flatMap((profile) => profile.remoteNames) ?? []),
+      ...(preferences.bindings?.map((binding) => binding.remoteName) ?? []),
+    ].filter(Boolean);
+    if (selected.some((name) => !names.has(name!))) throw new Error('Remote preferences reference an unknown remote.');
+    for (const binding of preferences.bindings ?? []) {
+      const remote = snapshot.remotes.find((candidate) => candidate.name === binding.remoteName)!;
+      if (![...remote.fetchUrls, ...remote.pushUrls].includes(binding.url)) throw new Error('Account binding URL no longer matches this remote.');
+    }
+    context?.ensureActive();
+    return this.preferences.write(repoPath, preferences);
+  }
+
+  async editRemote(repoPath: string, mutation: RemoteMutation, context: RemoteTransferContext): Promise<GitRemoteSnapshotDto> {
+    context.ensureActive();
+    const name = remoteName(mutation.name);
+    const snapshot = await this.getRemotes(repoPath);
+    this.getPreferences(repoPath);
+    if (mutation.action !== 'add' && !snapshot.remotes.some((remote) => remote.name === name)) throw new Error('Unknown remote.');
+    const urls = mutation.pushUrls === undefined ? undefined : mutation.pushUrls.map(remoteUrl);
+    if ((mutation.action === 'remove' || mutation.action === 'rename') && urls) throw new Error('Push URLs cannot accompany removal or renaming.');
+    if (urls && (urls.length > 16 || new Set(urls).size !== urls.length)) throw new Error('Invalid push URL list.');
+    if (mutation.action === 'add') await this.git.run(repoPath, ['remote', 'add', name, remoteUrl(mutation.url)], { signal: context.signal });
+    else if (mutation.action === 'remove') await this.git.run(repoPath, ['remote', 'remove', name], { signal: context.signal });
+    else if (mutation.action === 'rename') await this.git.run(repoPath, ['remote', 'rename', name, remoteName(mutation.newName)], { signal: context.signal });
+    else if (mutation.action === 'set-url') {
+      if (mutation.url !== undefined) await this.git.run(repoPath, ['remote', 'set-url', name, remoteUrl(mutation.url)], { signal: context.signal });
+      else if (!urls) throw new Error('Remote URL is required.');
+    } else throw new Error('Unsupported remote mutation.');
+    if (urls && ['add', 'set-url'].includes(mutation.action)) {
+      const cleared = await this.git.runResult(repoPath, ['config', '--local', '--unset-all', `remote.${name}.pushurl`], { signal: context.signal });
+      if (![0, 5].includes(cleared.exitCode)) throw new Error('Push URLs could not be updated.');
+      for (const url of urls) await this.git.run(repoPath, ['config', '--local', '--add', `remote.${name}.pushurl`, url], { signal: context.signal });
+    }
+    const updated = await this.getRemotes(repoPath);
+    const preferences = this.getPreferences(repoPath);
+    context.ensureActive();
+    this.preferences.write(repoPath, reconcileRemotePreferences(preferences, mutation, updated));
+    context.ensureActive();
+    return updated;
+  }
+
+  private async selectedRemote(repoPath: string, name: string) {
+    const snapshot = await this.getRemotes(repoPath);
+    const remote = snapshot.remotes.find((candidate) => candidate.name === remoteName(name));
+    if (!remote) throw new Error('Unknown remote.');
+    return remote;
+  }
+
+  private connectionId(repoPath: string, name: string, url: string): string | null {
+    const binding = this.getPreferences(repoPath).bindings?.find((binding) => binding.remoteName === name && binding.url === url);
+    return binding?.credentialMode === 'system' ? null : (binding?.repository?.connectionId ?? null);
+  }
+
+  private async withCredentials<T>(
+    repoPath: string,
+    name: string,
+    url: string,
+    context: RemoteTransferContext,
+    environment: NodeJS.ProcessEnv,
+    work: (env: NodeJS.ProcessEnv, signal?: AbortSignal) => Promise<T>,
+    connectionId?: string | null,
+    expectedGeneration?: number,
+  ): Promise<T> {
+    remoteUrl(url);
+    context.ensureActive();
+    const scope = await this.credentials?.({
+      connectionId: connectionId === undefined ? this.connectionId(repoPath, name, url) : connectionId,
+      urls: [url],
+      signal: context.signal,
+      envOverrides: environment,
+      expectedGeneration,
+    });
+    try {
+      const signal = scope?.signal ? AbortSignal.any([...(context.signal ? [context.signal] : []), scope.signal]) : context.signal;
+      return await work(scope?.envOverrides ?? environment, signal);
+    } finally {
+      await scope?.dispose();
+    }
+  }
+
+  async fetch(repoPath: string, name: string, context: RemoteTransferContext, tagsOnly = false): Promise<{ output: string }> {
+    const remote = await this.selectedRemote(repoPath, name);
+    const url = remoteUrl(remote.fetchUrls[0]);
+    const output = await this.withCredentials(repoPath, name, url, context, {}, (envOverrides, signal) =>
+      this.git.streamOutput(repoPath, remoteFetchArguments(name, tagsOnly), context.onProgress ?? (() => {}), signal, {
+        envOverrides,
+      }),
+    );
+    context.ensureActive();
+    return { output: redactGitSensitiveText(output) };
+  }
+
+  async pull(repoPath: string, input: RemoteTransferOperations['pull']['input'], context: RemoteTransferContext): Promise<{ output: string }> {
+    const remote = await this.selectedRemote(repoPath, input.remote);
+    await this.checkRef(repoPath, `refs/heads/${refName(input.branch)}`);
+    const flags: Record<string, string[]> = { default: [], rebase: ['--rebase'], 'no-ff': ['--no-ff'], 'ff-only': ['--ff-only'] };
+    if (!Object.hasOwn(flags, input.mode)) throw new Error('Unsupported pull strategy.');
+    const output = await this.withCredentials(repoPath, input.remote, remoteUrl(remote.fetchUrls[0]), context, {}, (envOverrides, signal) =>
+      this.git.streamOutput(
+        repoPath,
+        ['pull', ...flags[input.mode], '--no-recurse-submodules', '--', input.remote, input.branch],
+        context.onProgress ?? (() => {}),
+        signal,
+        { envOverrides },
+      ),
+    );
+    context.ensureActive();
+    return { output: redactGitSensitiveText(output) };
+  }
+
+  async setUpstream(repoPath: string, name: string, branch: string, context: RemoteTransferContext): Promise<true> {
+    await this.selectedRemote(repoPath, name);
+    await this.checkRef(repoPath, `refs/heads/${refName(branch)}`);
+    const localBranch = await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
+    if (!localBranch) throw new Error('Select a local branch before setting its upstream.');
+    await this.git.run(repoPath, ['branch', `--set-upstream-to=${name}/${branch}`, '--', localBranch], { signal: context.signal });
+    context.ensureActive();
+    return true;
+  }
+
+  private async checkRef(repoPath: string, ref: string): Promise<void> {
+    await this.git.run(repoPath, ['check-ref-format', ref]);
+  }
+
+  private async fingerprint(repoPath: string): Promise<string> {
+    const config = await this.git.run(repoPath, ['config', '--null', '--list']);
+    return digest([config, this.getPreferences(repoPath)]);
+  }
+
+  private async advertised(repoPath: string, target: GitPushTargetDto, refs: PublishedRef[], context: RemoteTransferContext): Promise<Map<string, string>> {
+    const output = await this.withCredentials(repoPath, target.remoteName, target.url, context, {}, (envOverrides, signal) =>
+      this.git.run(repoPath, ['ls-remote', '--refs', '--', target.url, ...refs.map((ref) => ref.destinationRef)], { envOverrides, signal }),
+    );
+    return parseAdvertisedRefs(output);
+  }
+
+  async planPush(repoPath: string, input: RemoteTransferOperations['planPush']['input'], context: RemoteTransferContext): Promise<GitPushPlanDto> {
+    pruneTransfers(this.plans, this.batches);
+    const initialFingerprint = await this.fingerprint(repoPath);
+    const credentialGenerations = Object.fromEntries(
+      (this.getPreferences(repoPath).bindings ?? [])
+        .filter((binding) => binding.repository && binding.credentialMode !== 'system')
+        .map((binding) => [binding.repository!.connectionId, this.getCredentialGeneration?.(binding.repository!.connectionId) ?? 0]),
+    );
+    const snapshot = await this.getRemotes(repoPath);
+    if (!Array.isArray(input.remoteNames) || !input.remoteNames.length || input.remoteNames.length > 32) throw new Error('Select at least one push remote.');
+    const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
+    if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
+    if (!snapshot.branch) throw new Error('Select a local branch before pushing.');
+    const destinationRef = `refs/heads/${refName(input.destinationBranch ?? snapshot.branch)}`;
+    await this.checkRef(repoPath, destinationRef);
+    const sourceOid = (await this.git.run(repoPath, ['rev-parse', '--verify', `refs/heads/${snapshot.branch}^{commit}`])).trim();
+    const tagNames = [...new Set(input.tagNames ?? [])];
+    if (!Array.isArray(input.tagNames ?? []) || tagNames.length > 64) throw new Error('Invalid selected tags.');
+    const refs: PublishedRef[] = [{ sourceOid, destinationRef }];
+    for (const name of tagNames) {
+      const tagRef = `refs/tags/${refName(name)}`;
+      await this.checkRef(repoPath, tagRef);
+      refs.push({ sourceOid: (await this.git.run(repoPath, ['rev-parse', '--verify', tagRef])).trim(), destinationRef: tagRef });
+    }
+    const id = randomUUID();
+    const targets: GitPushTargetDto[] = [];
+    for (const name of [...new Set(input.remoteNames.map(remoteName))]) {
+      const targetDestinationRef = targetBranches[name] ? `refs/heads/${targetBranches[name]}` : destinationRef;
+      await this.checkRef(repoPath, targetDestinationRef);
+      const remote = snapshot.remotes.find((candidate) => candidate.name === name);
+      if (!remote) throw new Error('Unknown push remote.');
+      const grouped = remote.pushUrls.length > 1 && !snapshot.supportsPushUrlIsolation;
+      if (grouped && input.force) throw new Error('Force-with-lease requires isolated push URLs. Update Git or configure separate named remotes.');
+      for (const value of [...new Set(remote.pushUrls)]) {
+        const url = remoteUrl(value);
+        const target: GitPushTargetDto = { id: digest([id, name, url]).slice(0, 32), remoteName: name, url, destinationRef: targetDestinationRef, sourceOid };
+        if (grouped) target.grouped = true;
+        if (input.force)
+          target.leaseOid =
+            (await this.advertised(repoPath, target, [{ sourceOid, destinationRef: targetDestinationRef }], context)).get(targetDestinationRef) ?? null;
+        targets.push(target);
+      }
+    }
+    if (!targets.length || targets.length > 64) throw new Error('Invalid push endpoint count.');
+    const marker = `__ogc_transfer_scan_${id}__`;
+    const dto: GitPushPlanDto = {
+      id,
+      repoPath,
+      sourceOid,
+      branch: snapshot.branch,
+      tagNames,
+      force: input.force === true,
+      targets,
+      secretScanArgs: ['push', marker, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`)],
+    };
+    const fingerprint = await this.fingerprint(repoPath);
+    if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');
+    context.ensureActive();
+    const connections = Object.fromEntries(targets.map((target) => [target.id, this.connectionId(repoPath, target.remoteName, target.url)]));
+    assertGroupedCredentialChoices(targets, connections);
+    this.plans.set(id, {
+      dto,
+      refs,
+      fingerprint,
+      ownerId: context.ownerId,
+      generation: context.generation,
+      expiresAt: Date.now() + PLAN_LIFETIME,
+      executed: false,
+      connections,
+      credentialGenerations: boundCredentialGenerations(connections, credentialGenerations),
+    });
+    return structuredClone(dto);
+  }
+
+  private async validatePlan(repoPath: string, id: string, context: RemoteTransferContext): Promise<StoredPlan> {
+    pruneTransfers(this.plans, this.batches);
+    const plan = this.plans.get(id);
+    if (
+      !plan ||
+      repositoryPathKey(plan.dto.repoPath) !== repositoryPathKey(repoPath) ||
+      plan.ownerId !== context.ownerId ||
+      plan.generation !== context.generation
+    )
+      throw new Error('Push plan expired or belongs to another repository or window. Create a new push plan.');
+    if (plan.fingerprint !== (await this.fingerprint(repoPath))) throw new Error('Remote configuration or account bindings changed. Create a new push plan.');
+    if (this.getCredentialGeneration && Object.entries(plan.credentialGenerations).some(([id, generation]) => this.getCredentialGeneration!(id) !== generation))
+      throw new Error('Hosting authentication changed. Review the push with the current account again.');
+    for (const ref of plan.refs) await this.git.run(repoPath, ['cat-file', '-e', ref.sourceOid]);
+    context.ensureActive();
+    return plan;
+  }
+
+  async executePush(repoPath: string, planId: string, context: RemoteTransferContext): Promise<GitPushBatchDto> {
+    const plan = await this.validatePlan(repoPath, planId, context);
+    if (plan.executed || this.activePlans.has(planId))
+      throw new Error('This push plan was already executed or is running. Retry its failed endpoints instead.');
+    this.activePlans.add(planId);
+    try {
+      await context.authorizePush?.(plan.dto.secretScanArgs);
+      await this.validatePlan(repoPath, planId, context);
+      plan.executed = true;
+      return await this.runBatch(repoPath, plan, context);
+    } finally {
+      this.activePlans.delete(planId);
+    }
+  }
+
+  async retryPush(repoPath: string, batchId: string, targetIds: string[] | undefined, context: RemoteTransferContext): Promise<GitPushBatchDto> {
+    const batch = this.batches.get(batchId);
+    if (!batch) throw new Error('Push result expired. Create a new push plan.');
+    const plan = await this.validatePlan(repoPath, batch.plan.dto.id, context);
+    if (this.activePlans.has(plan.dto.id)) throw new Error('This push plan is already running.');
+    if (targetIds && (!Array.isArray(targetIds) || targetIds.some((id) => !batch.dto.targets.some((target) => target.id === id))))
+      throw new Error('Unknown retry endpoint.');
+    const retry = batch.dto.targets.filter((target) => !['success', 'up-to-date'].includes(target.status) && (!targetIds || targetIds.includes(target.id)));
+    if (retry.some((target) => target.grouped))
+      throw new Error('Targeted retry requires isolated push URLs. Use separate named remotes or create a new normal grouped push plan.');
+    if (!retry.length) return structuredClone(batch.dto);
+    this.activePlans.add(plan.dto.id);
+    try {
+      await context.authorizePush?.(plan.dto.secretScanArgs);
+      await this.validatePlan(repoPath, plan.dto.id, context);
+      return await this.runBatch(
+        repoPath,
+        plan,
+        context,
+        retry.map((target) => target.id),
+        batch.dto.targets,
+      );
+    } finally {
+      this.activePlans.delete(plan.dto.id);
+    }
+  }
+
+  private async pushTarget(
+    repoPath: string,
+    plan: StoredPlan,
+    target: GitPushTargetDto,
+    context: RemoteTransferContext,
+    retry: boolean,
+  ): Promise<GitPushTargetResultDto> {
+    const entries: [string, string][] = [
+      ['push.followTags', 'false'],
+      [`remote.${target.remoteName}.mirror`, 'false'],
+    ];
+    if (this.isolationSupported) entries.push([`remote.${target.remoteName}.pushurl`, ''], [`remote.${target.remoteName}.pushurl`, target.url]);
+    const base = gitConfigurationEnvironment(entries);
+    let refs = plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: target.destinationRef } : ref));
+    if (retry) {
+      const actual = await this.advertised(repoPath, target, refs, context);
+      refs = refs.filter((ref) => actual.get(ref.destinationRef) !== ref.sourceOid);
+      if (!refs.length) return { ...target, status: 'up-to-date', message: 'All planned refs are already present on this endpoint.' };
+      if (
+        plan.dto.force &&
+        actual.get(target.destinationRef) !== (target.leaseOid ?? undefined) &&
+        refs.some((ref) => ref.destinationRef === target.destinationRef)
+      )
+        return {
+          ...target,
+          status: 'rejected',
+          message: 'The destination changed after the force-with-lease plan. Create a new plan to inspect its current state.',
+        };
+    }
+    return this.withCredentials(
+      repoPath,
+      target.remoteName,
+      target.url,
+      context,
+      base,
+      async (envOverrides, signal) => {
+        const effective = await this.git.run(repoPath, ['remote', 'get-url', '--push', '--all', target.remoteName], { envOverrides, signal });
+        if (lines(effective).length !== 1 || effective.trim() !== target.url)
+          throw new Error('Git URL rewriting changed the planned push endpoint. Configure distinct named remotes.');
+        const args = ['push', '--porcelain', '--no-follow-tags', '--recurse-submodules=no'];
+        if (plan.dto.force) args.push(`--force-with-lease=${target.destinationRef}:${target.leaseOid ?? ''}`);
+        args.push('--', target.remoteName, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`));
+        const result: GitProcessResult = await this.git.runResult(repoPath, args, { envOverrides, signal });
+        context.ensureActive();
+        return pushResult(target, result);
+      },
+      plan.connections[target.id],
+      plan.connections[target.id] ? plan.credentialGenerations[plan.connections[target.id]!] : undefined,
+    );
+  }
+
+  private async runBatch(
+    repoPath: string,
+    plan: StoredPlan,
+    context: RemoteTransferContext,
+    selected?: string[],
+    previous?: GitPushTargetResultDto[],
+  ): Promise<GitPushBatchDto> {
+    const targets: GitPushTargetResultDto[] = [];
+    const completedGroups = new Set<string>();
+    let cancelled = false;
+    for (const target of plan.dto.targets) {
+      if (target.grouped && completedGroups.has(target.remoteName)) continue;
+      if (selected && !selected.includes(target.id)) {
+        targets.push(previous!.find((result) => result.id === target.id)!);
+        continue;
+      }
+      if (cancelled || context.signal?.aborted) {
+        cancelled = true;
+        targets.push({ ...target, status: 'skipped', message: 'Transfer was cancelled before this endpoint started.' });
+        continue;
+      }
+      context.onProgress?.(`Pushing ${target.remoteName}: ${target.url}`);
+      try {
+        context.ensureActive();
+        await this.validatePlan(repoPath, plan.dto.id, context);
+        if (target.grouped) {
+          const group = plan.dto.targets.filter((candidate) => candidate.remoteName === target.remoteName);
+          const outcomes = await runGroupedRemotePush(this.git, this.credentials, repoPath, plan, group, context, (candidate, refs) =>
+            this.advertised(repoPath, candidate, refs, context),
+          );
+          targets.push(...outcomes);
+          outcomes.forEach((outcome) => context.onProgress?.(`${outcome.status}: ${outcome.remoteName} → ${outcome.destinationRef} (${outcome.url})`));
+        } else targets.push(await this.pushTarget(repoPath, plan, target, context, Boolean(selected)));
+      } catch (error) {
+        cancelled = context.signal?.aborted === true;
+        const failed = {
+          ...target,
+          status: cancelled || (error instanceof Error && error.name === 'AbortError') ? ('unknown' as const) : ('failed' as const),
+          message: redactGitSensitiveText(error instanceof Error ? error.message : 'Push failed.'),
+        };
+        if (target.grouped)
+          targets.push(...plan.dto.targets.filter((candidate) => candidate.remoteName === target.remoteName).map((candidate) => ({ ...failed, ...candidate })));
+        else targets.push(failed);
+      }
+      if (target.grouped) completedGroups.add(target.remoteName);
+      if (!target.grouped) context.onProgress?.(`${targets.at(-1)!.status}: ${target.remoteName} → ${target.destinationRef} (${target.url})`);
+    }
+    const dto: GitPushBatchDto = {
+      id: randomUUID(),
+      planId: plan.dto.id,
+      repoPath,
+      sourceOid: plan.dto.sourceOid,
+      state: batchState(targets, cancelled || context.signal?.aborted === true),
+      targets,
+    };
+    this.batches.set(dto.id, { dto, plan });
+    return structuredClone(dto);
+  }
+}

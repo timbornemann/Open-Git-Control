@@ -3,6 +3,23 @@ import { SecretScanService } from '../SecretScanService';
 import { createGitServiceMock } from './secretScanTestUtils';
 
 describe('SecretScanService push source selection', () => {
+  it('honors branch.pushRemote before remote.pushDefault when choosing configured push sources', async () => {
+    const runCommandAtPath = vi.fn(
+      async (_repoPath: string, args: string[]) =>
+        ({
+          'symbolic-ref --quiet --short HEAD': 'main',
+          remote: 'forgejo\ngithub',
+          'config --get branch.main.pushRemote': 'forgejo',
+          'config --get remote.pushDefault': 'github',
+          'config --get-all remote.forgejo.push': 'refs/heads/private:refs/heads/private',
+        })[args.join(' ')] ?? '',
+    );
+    const service = new SecretScanService(createGitServiceMock({}));
+    (service as unknown as { gitService: { runCommandAtPath: typeof runCommandAtPath } }).gitService.runCommandAtPath = runCommandAtPath;
+    await service.scanPushDiffs({ repoPath: '/tmp/repo', strictness: 'low', allowlistText: '', pushArgs: [] });
+    expect(runCommandAtPath).toHaveBeenCalledWith('/tmp/repo', ['config', '--get-all', 'remote.forgejo.push']);
+    expect(runCommandAtPath).not.toHaveBeenCalledWith('/tmp/repo', ['config', '--get-all', 'remote.github.push']);
+  });
   it('falls back to HEAD instead of blocking a push when an explicit source cannot be enumerated', async () => {
     const commitHash = 'd'.repeat(40);
     const diff = ['diff --git a/.env b/.env', '+++ b/.env', '@@ -0,0 +1 @@', '+AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF'].join('\n');

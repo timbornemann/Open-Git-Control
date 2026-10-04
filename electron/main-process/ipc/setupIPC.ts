@@ -12,7 +12,6 @@ import { registerAiHandlers } from './registerAiHandlers';
 import { registerDiagnosticsHandlers } from './registerDiagnosticsHandlers';
 import { registerDialogHandlers } from './registerDialogHandlers';
 import { registerGitHandlers } from './registerGitHandlers';
-import { registerGithubHandlers } from './registerGithubHandlers';
 import { registerRepoSettingsHandlers } from './registerRepoSettingsHandlers';
 import { registerProjectPlannerHandlers } from './registerProjectPlannerHandlers';
 import { registerUpdaterHandlers } from './registerUpdaterHandlers';
@@ -23,6 +22,9 @@ import { RepositoryRunService } from '../RepositoryRunService';
 import { registerRepositoryRunHandlers } from './registerRepositoryRunHandlers';
 import { readStoreData } from '../repoStore';
 import { registerFeedbackHandlers } from './registerFeedbackHandlers';
+import { registerHostingHandlers } from '../../hosting/registerHostingHandlers';
+import { hostingService } from '../../hosting/HostingService';
+import { registerRemoteTransferHandlers } from './registerRemoteTransferHandlers';
 
 type SetupIpcDeps = {
   gitService: GitService;
@@ -60,7 +62,7 @@ export function setupIPC({
   const repositoryRunConfigService = new RepositoryRunConfigService();
   const repositoryRunService = new RepositoryRunService(repositoryRunConfigService);
   registerReadCancellation();
-  registerBootstrapHandlers(githubService);
+  registerBootstrapHandlers();
   registerDialogHandlers({ gitService });
   const pushGuard = registerGitHandlers({
     gitService,
@@ -82,9 +84,30 @@ export function setupIPC({
     secretScanService,
     repoJobRegistry,
   });
-  registerGithubHandlers({ gitService, githubService, readSettingsWithMigration, pushGuard });
+  registerHostingHandlers({ gitService, pushGuard });
+  registerRemoteTransferHandlers({
+    gitService,
+    pushGuard,
+    getCredentialGeneration: (id) => hostingService.generation(id),
+    createCredentialEnvironment: (request) => {
+      if (!request.connectionId) return Promise.resolve({ envOverrides: request.envOverrides || {}, signal: request.signal, dispose: () => {} });
+      if (!request.urls.some((url) => url.startsWith('https://'))) {
+        const connectionSignal = hostingService.getConnectionSignal(request.connectionId);
+        return Promise.resolve({
+          envOverrides: request.envOverrides || {},
+          signal: request.signal ? AbortSignal.any([request.signal, connectionSignal]) : connectionSignal,
+          dispose: () => {},
+        });
+      }
+      return hostingService.createGitCredentialEnvironment({ ...request, connectionId: request.connectionId });
+    },
+  });
   registerDiagnosticsHandlers({ buildDiagnosticsReport });
-  registerFeedbackHandlers({ githubService });
+  registerFeedbackHandlers({
+    githubService,
+    hasPublicGithubConnection: () => hostingService.hasGithubInfrastructureConnection(),
+    createPublicGithubSession: () => hostingService.createGithubInfrastructureSession(),
+  });
   registerExternalLinkHandlers();
   registerRepositoryRunHandlers({
     configService: repositoryRunConfigService,

@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
-Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, a working-directory file browser and editor, diff inspection, conflict resolution, GitHub pull requests, releases, project planning, secret scanning, recovery tools, repository run workflows, and optional AI assistance in one local-first application.
+Open-Git-Control is a free, open-source desktop Git client for Windows, macOS, and Linux. It combines a visual commit graph, staging, a working-directory file browser and editor, diff inspection, conflict resolution, hosting-provider pull/merge requests, releases, project planning, secret scanning, recovery tools, repository run workflows, and optional AI assistance in one local-first application.
 
 Language: **English** | Deutsche Version: [README.de.md](README.de.md)
 
@@ -18,7 +18,8 @@ Use Open-Git-Control when you want more than a minimal Git GUI, but still want a
 - Git operations run locally against your repositories
 - Visual commit graph with branch, tag, merge, reset, rebase, cherry-pick, revert, and recovery actions
 - Staging, stash, hunk-based diffs, file history, blame, and conflict resolution in one workflow
-- GitHub authentication, repository cloning/forking, pull requests, CI status, workflows, and release publishing
+- GitHub, Forgejo, GitLab, Bitbucket Cloud and Data Center accounts, repository catalogs, cloning/forking, PRs/MRs, CI and provider-specific publishing
+- Independent pull sources, hosting targets, and saved multi-endpoint push profiles with per-target results
 - Project planning board with local REST and MCP-style API for agent-assisted work
 - Working-directory tree with safe in-app file previews and editing, plus native file-system actions when needed
 - Per-repository Run workflows for test, format, start, and build commands with a live console
@@ -48,7 +49,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 ## Requirements
 
 - Git must be installed and available in your `PATH`.
-- GitHub CLI (`gh`) is optional and only required for the one-click GitHub login method.
+- GitHub CLI (`gh`) is optional and only required to import an existing GitHub CLI login.
 - Ollama, a Gemini API key, or an OpenAI API key is optional and only required for AI features.
 - Development from source requires Node.js and npm. CI currently uses Node.js 20.
 
@@ -128,7 +129,8 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - no-fast-forward merge
   - squash merge
   - fast-forward-only merge
-- Fetch all remotes with pruning and tags.
+- Select a fetch/pull remote independently of push destinations; fetch prunes stale remote branches.
+- Track remote tags separately and preserve existing local tags when their targets differ.
 - Auto-fetch on a configurable interval and refresh when the app becomes visible again.
 - Show remote health states:
   - no remote configured
@@ -140,7 +142,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - fetch error
 - Add, remove, rename, and update remote URLs.
 - Set upstream for the current branch.
-- Handle missing GitHub remotes by removing invalid `origin` mappings and returning the repo to local/offline mode.
+- Recover from inaccessible endpoints by inspecting their URLs, accounts and permissions in Remotes & transfers.
 - Create lightweight or annotated tags.
 - Search, select, delete, and push tags.
 - Show recursive submodule status.
@@ -150,18 +152,17 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 ### Topbar Git Actions
 
-- Fetch.
+- Fetch from an explicitly selected remote.
 - Merge selected branch with selectable merge mode.
 - Pull with:
   - default pull
   - pull with rebase
   - no-fast-forward pull
   - fast-forward-only pull
-- Push with:
-  - default push
-  - set upstream (`-u`)
-  - force-with-lease
-  - push tags
+- Review a push to one or several selected remotes, with destination branches and explicitly selected tags.
+- Confirm force-with-lease against each destination's inspected revision.
+- Set upstream explicitly in Remotes & transfers.
+- Inspect results and retry unsuccessful destinations with the reviewed commit.
 - Run repository-specific Run, Test, Format, Start, and Build workflows.
 - Open the codebase timeline.
 - Open the release creator.
@@ -311,55 +312,40 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Continue or abort rebase.
 - Prevent commits while unresolved conflicts remain.
 
-### GitHub Integration
+### Hosting integration
 
-- Authenticate with:
-  - Personal Access Token
-  - OAuth Device Flow
-  - one-click login through GitHub CLI (`gh`)
-- Reconnect from saved GitHub session.
-- Log out and clear saved auth.
-- Configure GitHub OAuth Client ID for Device Flow.
-- Configure GitHub host for GitHub Enterprise style hosts.
-- List GitHub repositories with search, pagination, and refresh.
-- Detect whether GitHub repositories are already cloned locally.
-- Clone GitHub repositories with progress modal.
-- Clone any HTTP, HTTPS, or SSH Git remote URL.
-- Fork a GitHub repository by URL and clone the fork locally.
-- Create a new GitHub repository from a local repo without `origin`.
-- Connect the created GitHub repo as `origin`.
-- Replace invalid remote mapping when the upstream repository no longer exists.
+The shared **Hosting** area manages several servers and accounts simultaneously. Native Git works with any compatible remote; adapters add catalogs, repository creation, forks, PRs/MRs, CI and publication for GitHub, Forgejo, GitLab, Bitbucket Cloud and Bitbucket Data Center. Capabilities follow the actual provider API and repository permissions. See [Hosting setup, OAuth, endpoint selection and feature differences](Docs/HOSTING.md).
+
+Select one fetch/pull source, independent push targets, and one hosting target for each local repository. Push profiles can publish the same reviewed commit to a private Forgejo server and a GitHub backup while preserving upstream tracking. Existing multiple push URLs are retained. Partial successes remain visible and retries address unsuccessful destinations.
+
+If the installed Git cannot isolate individual push URLs, a normal push publishes all URLs of that named remote as a group. Force, targeted retries and different explicit hosting accounts within such a group require separate named remotes or a Git update.
+
+- Add provider connections in **Hosting → Accounts & servers**, including self-hosted server URLs and installation base paths.
+- Sign in with a token or browser OAuth configured for that connection. GitHub also supports Device Flow and importing a CLI login after verifying its account.
+- Reconnect to saved accounts, sign out, or remove a connection.
+- Search and page repository catalogs, refresh them, and see matching local clones.
+- Clone a catalog repository with the selected account and progress feedback, or clone a Git URL directly.
+- Create or fork a repository where the provider supports it and connect it with an explicitly named local remote.
+- Bind each actual fetch/push URL to its hosting account. For SSH aliases, enter a repository web URL to resolve the identity while keeping the SSH remote URL.
+- Choose the bound hosting account or existing system/SSH credentials separately for Git authentication at each endpoint.
 
 ### Pull Requests, CI, and Workflows
 
-- Pull request list for the active GitHub repository.
-- Filter PRs by open, closed, or all.
-- Create pull requests with title, body, head branch, and base branch.
-- Open PRs in the browser.
-- Copy PR URLs.
-- Check out PR branches locally.
-- Merge PRs with:
-  - merge commit
-  - squash
-  - rebase
-- CI evaluation per PR:
-  - success
-  - failure
-  - pending
-  - neutral
-  - unknown
-- Show workflow runs and status checks.
-- Show recent GitHub Actions workflow runs for the current branch.
-- Filter workflow runs and open them in the browser.
+- PR/MR lists and checks use the explicitly selected hosting target and account.
+- Filter requests by state, create them with explicit source and target repositories/branches, and open or copy their URLs.
+- Check out a request locally and merge with methods supported by the repository: merge commit, squash or rebase.
+- View GitHub/Forgejo Actions, GitLab Pipelines, Bitbucket Cloud Pipelines, or Data Center build statuses.
+- Inspect jobs/steps, bounded logs and artifacts; start, cancel or retry runs where the provider API and permissions support them.
+- Unsupported CI actions display their availability and link to the provider website where appropriate.
 
 ### Release Creator
 
 - Dedicated release view from the topbar.
-- Reads GitHub release context:
+- Reads release context from the explicitly selected endpoint:
   - repository URL
   - existing tags
   - latest release tag
-  - commits since latest release
+  - commits from an optional starting tag/ref for release notes
   - target branch or commit
 - Suggests the next semantic version tag.
 - Choose version bump:
@@ -382,7 +368,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - breaking changes section
   - append automatic commit list
   - show commit hashes
-- Publish the release directly to GitHub.
+- Publish native releases on GitHub, Forgejo and GitLab; manage Tags & Downloads on Bitbucket Cloud, and tags/local notes on Data Center. Draft and prerelease options appear only where supported.
 
 ### Project Planning
 
@@ -478,7 +464,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - `update_todo`
   - `move_todo`
   - `delete_todo`
-- Git and GitHub operations are deliberately not exposed through the local API or MCP surface.
+- Git and hosting operations are deliberately not exposed through the local API or MCP surface.
 
 ### AI Assistance
 
@@ -533,7 +519,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - `regex:...`
   - plain text
   - comment lines with `#`
-- GitHub token, Gemini key, and persistent Planning API token are stored OS-encrypted through Electron `safeStorage` when available.
+- Hosting credentials, AI keys and persistent Planning API tokens are stored OS-encrypted through Electron `safeStorage` when available.
 - If OS encryption is unavailable, secrets are not stored persistently.
 
 ### Settings, Updates, and Job Center
@@ -560,7 +546,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - Mono Dark Green
   - Mono Light Green
 - Integrations settings:
-  - GitHub OAuth Client ID
+  - hosting accounts, server/API URLs, tokens and per-connection OAuth configuration
 - AI & MCP settings:
   - AI provider
   - AI model
@@ -625,12 +611,13 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 
 ### Standard local Git workflow
 
-1. Fetch or pull from the topbar.
+1. Open Fetch or Pull from the topbar and select the source remote, branch and pull strategy.
 2. Create or switch a branch.
 3. Review changed files in the working directory.
 4. Open diffs, stage files or hunks, and optionally stash work.
 5. Create a commit with title and description.
-6. Push, set upstream, push tags, or force-with-lease when needed.
+6. Open Push, select destinations/branches and any tags, review the captured revision, and confirm the push. Set upstream separately if needed.
+7. Inspect each destination's result; retry unsuccessful targets against the reviewed revision.
 
 ### Resolve conflicts
 
@@ -641,22 +628,22 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 5. Save and mark files as resolved.
 6. Continue or abort merge/rebase from the resolver.
 
-### GitHub pull request flow
+### Hosting pull / merge request flow
 
-1. Sign in through PAT, Device Flow, or GitHub CLI one-click login.
-2. Make sure `origin` points to a GitHub repository.
-3. Create a pull request from the repo sidebar.
-4. Inspect PR CI and workflow status.
-5. Open, copy, checkout, merge, squash, or rebase the PR.
+1. Add the provider account in Hosting → Accounts & servers and sign in with a token or its configured browser login.
+2. Select the hosting account and endpoint under Remotes & transfers.
+3. Open PR / MR from the repo sidebar and choose the explicit source and target repositories.
+4. Inspect request checks and the provider's CI view.
+5. Open, copy or check out the request; merge with an available method after reviewing its head commit.
 
 ### Release flow
 
-1. Open Release from the topbar.
-2. Refresh release context.
-3. Pick major, minor, or patch.
-4. Adjust tag, release name, target, and Markdown body.
-5. Optionally generate AI release notes.
-6. Publish as a normal release, draft, or prerelease.
+1. Choose the repository's hosting endpoint in Remotes & transfers, then open Release from the topbar or the Hosting repository view.
+2. Enter a target branch, tag or commit and inspect the selected endpoint.
+3. If the local revision is missing remotely, use the reviewed Push workflow first, then inspect the endpoint again.
+4. Choose or suggest a version tag; adjust the release name and Markdown notes, optionally generating AI notes.
+5. Publish the inspected remote revision. Draft, prerelease and asset options appear only where supported.
+6. For Bitbucket Cloud, manage tags and Downloads separately; for Data Center, use tags and copy/export local notes.
 
 ### Recovery flow
 
@@ -672,7 +659,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 3. Configure an external agent with the MCP URL or REST endpoints.
 4. Ask the agent for `get_next_todos` or `GET /api/agent/next`.
 5. Let the agent create or move planning items.
-6. Keep Git and GitHub operations inside the desktop app.
+6. Keep Git and hosting operations inside the desktop app.
 
 ## Local Planning API and MCP
 
@@ -876,9 +863,9 @@ Expected release assets:
 - Planning projects and planning items are stored locally.
 - The Planning API binds to `127.0.0.1`.
 - Planning API token-protected endpoints are intended for local processes on the same machine.
-- GitHub token, Gemini key, and persistent Planning API token are stored with OS-backed encryption through Electron `safeStorage` when available.
+- Hosting credentials, AI keys and persistent Planning API tokens are stored with OS-backed encryption through Electron `safeStorage` when available.
 - If OS encryption is unavailable, secrets are not persisted.
-- The local API exposes planning data only; it does not expose Git or GitHub actions.
+- The local API exposes planning data only; it does not expose Git or hosting actions.
 
 ## Troubleshooting
 
@@ -888,22 +875,23 @@ Expected release assets:
 - Restart your terminal or computer.
 - Verify with `git --version`.
 
-### GitHub one-click login does not work
+### GitHub CLI login import does not work
 
 - Install GitHub CLI from [cli.github.com](https://cli.github.com/).
 - Verify with `gh --version`.
-- Use PAT or Device Flow if you do not want to use GitHub CLI.
+- Confirm that the CLI is signed in to the configured host and inspect the offered username before importing it.
+- Use a token or Device Flow if you do not want to use GitHub CLI.
 
 ### Device Flow does not work
 
-- Set a GitHub OAuth Client ID in Settings -> Integrations.
-- Alternatively set `GITHUB_OAUTH_CLIENT_ID` before starting the app.
+- Edit the GitHub connection under Hosting → Accounts & servers and set its OAuth Client ID.
+- Enable Device Flow for that OAuth application and complete the displayed code in the browser before it expires.
 
-### No pull requests are visible
+### No pull / merge requests are visible
 
-- Make sure `origin` points to a GitHub repository.
-- Sign in to GitHub in the GitHub tab.
-- Refresh the repository and PR panel.
+- Sign in to the relevant provider account and check repository/change-request permissions.
+- Select the intended hosting repository and account in Remotes & transfers; bind SSH aliases through the repository web URL.
+- Refresh the repository and PR/MR view. The Git remote may have any name.
 
 ### Commit or push is blocked by secret scan
 

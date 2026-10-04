@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DeviceFlowPollDto, DeviceFlowStartDto } from '@/types/githubDtos';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { useGithubCloneWorkflow } from './github/useGithubCloneWorkflow';
 import { useGithubRepositoryPages } from './github/useGithubRepositoryPages';
 import { confirmWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';

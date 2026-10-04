@@ -80,4 +80,63 @@ describe('registerFeedbackHandlers', () => {
     });
     expect(createFeedbackIssue).toHaveBeenCalledWith(expect.stringMatching(/^\[Bug\]:/), expect.stringContaining('## Actual behavior'), 'bug');
   });
+
+  it('uses an independent GitHub.com account while the legacy session is Enterprise', async () => {
+    const legacyCreate = vi.fn();
+    const publicCreate = vi.fn().mockResolvedValue({ number: 18, htmlUrl: 'https://github.com/timbornemann/Open-Git-Control/issues/18' });
+    const dispose = vi.fn();
+    registerFeedbackHandlers({
+      githubService: {
+        isAuthenticated: () => true,
+        normalizeHost: (value: string) => value,
+        getHost: () => 'enterprise.test',
+        createFeedbackIssue: legacyCreate,
+      } as any,
+      hasPublicGithubConnection: () => true,
+      createPublicGithubSession: async () => ({
+        client: { isAuthenticated: () => true, normalizeHost: (value: string) => value, getHost: () => 'github.com', createFeedbackIssue: publicCreate } as any,
+        dispose,
+      }),
+    });
+    expect(await handlers.get('feedback:getCapability')!({})).toEqual({ directSubmissionAvailable: true, reason: null });
+    expect(await handlers.get('feedback:submit')!({}, bugReport)).toMatchObject({ success: true, data: { issueNumber: 18 } });
+    expect(publicCreate).toHaveBeenCalledOnce();
+    expect(legacyCreate).not.toHaveBeenCalled();
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it('does not silently use another account when the selected public account fails validation', async () => {
+    const legacyCreate = vi.fn();
+    registerFeedbackHandlers({
+      githubService: {
+        isAuthenticated: () => true,
+        normalizeHost: (value: string) => value,
+        getHost: () => 'github.com',
+        createFeedbackIssue: legacyCreate,
+      } as any,
+      hasPublicGithubConnection: () => true,
+      createPublicGithubSession: async () => {
+        throw new Error('The account changed.');
+      },
+    });
+    expect(await handlers.get('feedback:submit')!({}, bugReport)).toMatchObject({ success: false, code: 'GITHUB_FAILED' });
+    expect(legacyCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not revive an old legacy session after all public registry accounts logged out', async () => {
+    const legacyCreate = vi.fn();
+    registerFeedbackHandlers({
+      githubService: {
+        isAuthenticated: () => true,
+        normalizeHost: (value: string) => value,
+        getHost: () => 'github.com',
+        createFeedbackIssue: legacyCreate,
+      } as any,
+      hasPublicGithubConnection: () => false,
+      createPublicGithubSession: async () => null,
+    });
+    expect(await handlers.get('feedback:getCapability')!({})).toEqual({ directSubmissionAvailable: false, reason: 'not-authenticated' });
+    expect(await handlers.get('feedback:submit')!({}, bugReport)).toMatchObject({ success: false, code: 'DIRECT_UNAVAILABLE' });
+    expect(legacyCreate).not.toHaveBeenCalled();
+  });
 });

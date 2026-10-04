@@ -8,7 +8,7 @@ import { releaseTargetDialog } from './releaseTargetDialog';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { RepoOwnerRef } from '@/types/git';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';

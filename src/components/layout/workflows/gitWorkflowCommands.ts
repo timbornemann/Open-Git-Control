@@ -36,4 +36,7 @@ export const gitWorkflowCommands = {
   adoptRemoteTag(remote: string, tagName: string): GitCommandArgs {
     return ['fetch', remote, '--no-tags', '--quiet', `+refs/tags/${tagName}:refs/tags/${tagName}`];
   },
+  adoptTrackedRemoteTag(remote: string, tagName: string): GitCommandArgs {
+    return ['adoptRemoteTag', remote, tagName];
+  },
 };

@@ -1,0 +1,204 @@
+.hosting-workspace {
+  padding: 20px;
+  overflow: auto;
+  height: 100%;
+  color: var(--text-primary);
+}
+.hosting-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.hosting-heading h1,
+.hosting-heading h2 {
+  margin: 0 0 6px;
+}
+.hosting-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.hosting-workspace button,
+.hosting-transfers button,
+.hosting-connections button,
+.hosting-sidebar button {
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  cursor: pointer;
+}
+.hosting-workspace button:hover,
+.hosting-transfers button:hover,
+.hosting-connections button:hover {
+  background: var(--bg-tertiary);
+}
+.hosting-workspace button:disabled,
+.hosting-transfers button:disabled,
+.hosting-connections button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hosting-workspace button[aria-pressed='true'],
+.hosting-transfers button[aria-pressed='true'] {
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+.hosting-tabs,
+.hosting-actions,
+.hosting-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.hosting-filters input {
+  flex: 1;
+  min-width: 180px;
+}
+.hosting-content {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.5fr);
+  gap: 20px;
+}
+.hosting-content:not(:has(.hosting-detail)) {
+  grid-template-columns: 1fr;
+}
+.hosting-card {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.hosting-card.selected {
+  border-color: var(--accent-primary);
+}
+.hosting-card h3 {
+  margin: 0 0 8px;
+}
+.hosting-card small,
+.hosting-checkbox small,
+.hosting-job small,
+.hosting-run small {
+  display: block;
+  color: var(--text-secondary);
+  margin: 4px 0;
+}
+.hosting-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.hosting-repository-title {
+  font-weight: 600;
+  font-size: 1rem;
+  text-align: left;
+}
+.hosting-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+.hosting-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.85rem;
+}
+.hosting-form input,
+.hosting-form select,
+.hosting-form textarea,
+.hosting-filters input,
+.hosting-filters select,
+.hosting-actions input,
+.hosting-actions select,
+.hosting-ci > input {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.hosting-form textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+.hosting-form .hosting-checkbox {
+  flex-direction: row;
+  align-items: center;
+}
+.hosting-checkbox input {
+  flex: none;
+}
+.hosting-transfers {
+  padding: 16px;
+}
+.hosting-error {
+  color: var(--danger-color, #f87171);
+  white-space: pre-wrap;
+  border-left: 3px solid currentColor;
+  padding-left: 10px;
+}
+.hosting-empty {
+  padding: 30px;
+  text-align: center;
+}
+.hosting-run {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 8px 0;
+}
+.hosting-job {
+  padding: 10px;
+  margin: 8px 0;
+  border-left: 2px solid var(--border-color);
+}
+.hosting-log {
+  max-height: 440px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-primary);
+  padding: 12px;
+  font-family: monospace;
+  font-size: 12px;
+}
+.hosting-notes {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+.hosting-detail {
+  min-width: 0;
+}
+.hosting-sidebar {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hosting-sidebar select {
+  max-width: 100%;
+  padding: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+@media (max-width: 1050px) {
+  .hosting-content {
+    grid-template-columns: 1fr;
+  }
+  .hosting-detail {
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+  }
+}

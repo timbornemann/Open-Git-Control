@@ -4,6 +4,8 @@ import type { useAppState } from '@/components/layout/useAppState';
 import { buildCherryPickAbortDialog, buildMergeAbortDialog, buildRebaseAbortDialog } from '@/components/staging-area/conflictAbortDialogs';
 import type { TranslationVariables } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
+import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
+import { useHostingState } from '@/components/hosting/hostingState';
 
 type AppState = ReturnType<typeof useAppState>;
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -35,10 +37,10 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         action: () => state.setActiveTab('planner'),
       },
       {
-        id: 'tab-github',
-        label: t('generated.components.layout.settingsmaincontent.github_6d98f785'),
-        keywords: ['github', 'pr', 'pull request'],
-        action: () => state.setActiveTab('github'),
+        id: 'tab-hosting',
+        label: 'Hosting',
+        keywords: ['github', 'forgejo', 'gitlab', 'bitbucket', 'hosting', 'pr', 'mr', 'pipelines'],
+        action: () => state.setActiveTab('hosting'),
       },
       {
         id: 'tab-settings',
@@ -50,31 +52,41 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         id: 'fetch',
         label: t('generated.app.fetch_refresh_remote_88270faa'),
         keywords: ['fetch', 'remote', 'sync'],
-        action: () => state.refreshRemoteState(true),
+        action: () => {
+          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'fetch' });
+        },
       },
       {
         id: 'pull',
         label: t('generated.app.pull_8c55fb85'),
         keywords: ['pull', 'download'],
-        action: () => state.runGitCommand(gitClient.buildPullArgs(), t('generated.app.pull_completed_successfully_a760cd36')),
+        action: () => {
+          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'pull' });
+        },
       },
       {
         id: 'pull-rebase',
         label: t('generated.app.pull_rebase_5d462c6a'),
         keywords: ['pull', 'rebase'],
-        action: () => state.runGitCommand(gitClient.buildPullRebaseArgs(), t('generated.app.pull_with_rebase_completed_a6e6129f')),
+        action: () => {
+          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'pull', pullMode: 'rebase' });
+        },
       },
       {
         id: 'push',
         label: t('generated.app.push_61ad6264'),
         keywords: ['push', 'upload'],
-        action: () => state.runGitCommand(gitClient.buildPushArgs(), t('generated.app.push_completed_successfully_edf8c1c9')),
+        action: () => {
+          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'push' });
+        },
       },
       {
         id: 'push-force',
         label: t('generated.app.push_force_with_lease_f7c67bfe'),
         keywords: ['push', 'force'],
-        action: () => state.runGitCommand(gitClient.buildPushArgs(['--force-with-lease']), t('generated.app.force_push_completed_1f9d562e')),
+        action: () => {
+          if (state.activeRepo) openRemoteTransferDialog({ repoPath: state.activeRepo, mode: 'push', force: true });
+        },
       },
       {
         id: 'branch-create',
@@ -165,17 +177,20 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
       },
       {
         id: 'fork-url',
-        label: t('generated.app.fork_github_repository_from_url_6e2cc177'),
-        keywords: ['fork', 'github', 'url'],
-        action: () => state.handleForkByUrl(),
+        label: 'Fork · Hosting',
+        keywords: ['fork', 'github', 'forgejo', 'gitlab', 'bitbucket'],
+        action: () => {
+          useHostingState.getState().navigate('repositories');
+          state.setActiveTab('hosting');
+        },
       },
       {
         id: 'add-remote',
         label: t('generated.app.add_remote_3a4267c1'),
         keywords: ['remote', 'add', 'hinzufuegen'],
         action: () => {
-          state.setActiveTab('repo');
-          state.handleAddRemote();
+          useHostingState.getState().navigate('remotes');
+          state.setActiveTab('hosting');
         },
       },
     ],

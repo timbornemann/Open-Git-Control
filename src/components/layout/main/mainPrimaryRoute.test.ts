@@ -5,10 +5,7 @@ const base = {
   activeConflictPath: null,
   activeDiffRequest: null,
   activeTab: 'localRepos' as const,
-  isAuthenticated: false,
-  selectedGithubAuthHelpMethod: null,
   showRecoveryCenter: false,
-  showReleaseCreator: false,
   showTimeline: false,
   showRunConsole: false,
 };

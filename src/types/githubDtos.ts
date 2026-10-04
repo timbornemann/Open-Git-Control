@@ -1,3 +1,4 @@
+import type { ReleaseCommitDto } from './releaseNotes';
 export interface GitHubRepositoryDto {
   id: number;
   name: string;
@@ -92,15 +93,6 @@ export interface GitHubReleaseDto {
   draft: boolean;
   prerelease: boolean;
   publishedAt: string | null;
-}
-
-export interface ReleaseCommitDto {
-  hash: string;
-  shortHash: string;
-  subject: string;
-  author: string;
-  date: string;
-  htmlUrl?: string | null;
 }
 
 export interface GitHubReleaseContextDto {
@@ -232,15 +224,4 @@ export interface PullRequestCiDto {
 
 export type PullRequestMergeMethodDto = 'merge' | 'squash' | 'rebase';
 
-export interface DeviceFlowStartDto {
-  deviceCode: string;
-  userCode: string;
-  verificationUri: string;
-  expiresIn: number;
-  interval: number;
-}
-
-export type DeviceFlowPollDto =
-  | { status: 'pending'; interval: number | null }
-  | { status: 'error'; error: string; errorDescription: string | null }
-  | { status: 'success'; username: string | null; tokenPersisted?: boolean };
+export type { DeviceFlowStartDto, DeviceFlowPollDto } from './hostingDtos';

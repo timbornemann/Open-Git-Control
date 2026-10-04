@@ -1,7 +1,7 @@
 import React from 'react';
 import { useUIStore } from '@/contexts/AppStateContext';
 import { ProjectPlannerSidebarContent } from '@/components/project-planner/ProjectPlannerSidebarContent';
-import { GithubSidebarContainer } from './GithubSidebarContainer';
+import { HostingSidebar } from '@/components/hosting/HostingSidebar';
 import { LocalReposSidebarContainer } from './LocalReposSidebarContainer';
 import { RepoSidebarContainer } from './RepoSidebarContainer';
 import { SettingsSidebarNav } from './SettingsSidebarNav';
@@ -14,7 +14,7 @@ export const SidebarContentRouter: React.FC = React.memo(() => {
       {activeTab === 'localRepos' && <LocalReposSidebarContainer />}
       {activeTab === 'repo' && <RepoSidebarContainer />}
       {activeTab === 'planner' && <ProjectPlannerSidebarContent />}
-      {activeTab === 'github' && <GithubSidebarContainer />}
+      {(activeTab === 'github' || activeTab === 'hosting') && <HostingSidebar />}
       {activeTab === 'settings' && <SettingsSidebarNav />}
     </div>
   );

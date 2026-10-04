@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { GithubCatalogSnapshotDto } from '@/types/githubDtos';
 import { catalogKey, clearGithubCatalogSession, restoreGithubCatalog } from '../githubCatalog';
 import { getGithubResourceScope, setGithubResourceScope } from '../clientCache';

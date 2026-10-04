@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGitHubStore, useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
+import { useGitStore, useUIStore, useWorkflowStore } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import { useWorkingTreeSnapshot } from '@/hooks/useWorkingTreeSnapshot';
 import { useMainViewInspector } from './hooks/useMainViewInspector';
@@ -22,8 +22,6 @@ const MainViewComponent: React.FC = () => {
   const onOpenRepoWorkspace = useGitStore((state) => state.onOpenRepoWorkspace);
   const commitNavigationRequest = useGitStore((state) => state.commitNavigationRequest);
   const onNavigateToCommit = useGitStore((state) => state.onNavigateToCommit);
-  const showReleaseCreator = useGitHubStore((state) => state.showReleaseCreator);
-  const onCloseReleaseCreator = useGitHubStore((state) => state.onCloseReleaseCreator);
   const autoOpenConflictResolverPath = useWorkflowStore((state) => state.autoOpenConflictResolverPath);
   const onAutoOpenConflictResolverConsumed = useWorkflowStore((state) => state.onAutoOpenConflictResolverConsumed);
   const { t } = useI18n();
@@ -60,7 +58,6 @@ const MainViewComponent: React.FC = () => {
     setSelectedCommit,
     activeRepo,
     onOpenRepoWorkspace,
-    onCloseReleaseCreator,
     commitNavigationRequest,
     onNavigateToCommit,
   });
@@ -81,13 +78,8 @@ const MainViewComponent: React.FC = () => {
   const { showTimeline, setShowTimeline, isTimelineLoading, timelineCommits, openTimeline } = useMainViewTimeline({
     activeRepo,
     setActiveTab,
-    onCloseReleaseCreator,
     t,
   });
-
-  React.useEffect(() => {
-    if (showReleaseCreator) setShowTimeline(false);
-  }, [showReleaseCreator, setShowTimeline]);
 
   const handleRepositoryStagingOpen = React.useCallback(() => {
     onCloseRunConfig();
@@ -107,11 +99,9 @@ const MainViewComponent: React.FC = () => {
 
   const isSettingsView = activeTab === 'settings';
   const isPlannerView = activeTab === 'planner';
-  const isGithubView = activeTab === 'github';
+  const isHostingView = activeTab === 'github' || activeTab === 'hosting';
   const isLocalReposView = activeTab === 'localRepos';
-  const isReleaseView = activeTab === 'repo' && showReleaseCreator;
-  const canShowInspectorPane =
-    !isSettingsView && !isPlannerView && !isGithubView && !isLocalReposView && !isReleaseView && !(activeTab === 'repo' && isRunConfigOpen);
+  const canShowInspectorPane = !isSettingsView && !isPlannerView && !isHostingView && !isLocalReposView && !(activeTab === 'repo' && isRunConfigOpen);
   const showInspectorPane = canShowInspectorPane && isInspectorPaneVisible;
 
   return (

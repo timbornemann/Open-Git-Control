@@ -1,7 +1,7 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { useLanguageTranslations, type AppLanguage } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { parsePrOwnerRepoFromRemote } from '@/hooks/usePullRequests';
 import type { RepoOwnerRef } from '@/types/git';
 import type { RunGitCommandOptions } from '@/components/layout/state/appStateShared';

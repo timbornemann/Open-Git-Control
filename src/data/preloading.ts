@@ -2,7 +2,6 @@ import { prepareGraphLayout } from './graphLayout';
 import { parseGitLog } from '@/utils/gitParsing';
 import { applyCachedStats, storeGraphCache, getGraphCacheKey, graphQueryKey } from '@/components/commit-graph/commitGraphDataCache';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
 import { repositoryRunClient } from '@/services/repositoryRunClient';
 import { getActiveResourceRepository, preload, resourceKey } from './clientCache';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
@@ -70,11 +69,4 @@ export function preloadRepository(repoPath: string, showSecondaryHistory: boolea
     () => repositoryRunClient.getConfig(repoPath),
   ];
   for (const read of reads) void preload(read, 'repository');
-}
-
-export function preloadGithubRepository(owner: string, repo: string) {
-  void preload(() => githubClient.getRepository(owner, repo), 'repository');
-  void preload(() => githubClient.getPullRequests(owner, repo, 'open'));
-  void preload(() => githubClient.getWorkflowRunsPage({ owner, repo, page: 1, perPage: 20 }));
-  void preload(() => githubClient.getBranches(owner, repo));
 }

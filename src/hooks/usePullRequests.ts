@@ -2,7 +2,7 @@
 import type { CiBadgeStateDto, GithubStatusChecksDto, GithubWorkflowRunDto, PullRequestCiDto, PullRequestDto } from '@/types/githubDtos';
 import { createLanguageTranslations, type AppLanguage } from '@/i18nCore';
 import { gitClient } from '@/services/gitClient';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import type { RepoOwnerRef } from '@/types/git';
 
 type CreatePRInput = {

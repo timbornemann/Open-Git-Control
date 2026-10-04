@@ -1,3 +1,26 @@
+/** Provider-independent commit information used to generate release notes. */
+export interface ReleaseCommitDto {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
+  htmlUrl?: string | null;
+}
+
+export type ReleaseNotesGenerationParamsDto = {
+  tagName: string;
+  releaseName: string;
+  lastReleaseTag?: string | null;
+  commits: ReleaseCommitDto[];
+  repositoryHtmlUrl?: string | null;
+  language: 'de' | 'en';
+  versionBump: 'major' | 'minor' | 'patch';
+  hints?: string[];
+};
+
+export type ReleaseNotesGenerationResultDto = { markdown: string; source: 'ai' | 'fallback'; warning?: string };
+
 export type ReleaseNotesOptions = {
   omitMergeCommits: boolean;
   preferGroupedSections: boolean;

@@ -1,3 +1,5 @@
+/** Retired GitHub renderer client, retained for internal regression coverage only. */
+import type { ReleaseCommitDto } from '@/types/releaseNotes';
 import type { ReadRequest } from '@/shared/cache/resource';
 import { cachedClient } from '@/data/clientCache';
 import type {
@@ -15,15 +17,15 @@ import type {
   GithubWorkflowRunDto,
   PullRequestDto,
   PullRequestMergeMethodDto,
-  ReleaseCommitDto,
 } from '@/types/githubDtos';
 import type { IpcResult } from '@/types/ipc';
-import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
-import { getElectronApi, requireElectronAiApi, requireElectronAppApi, requireElectronGithubApi } from './electronApi';
+import type { LegacyGithubAPI } from './contracts';
+import { requireElectronAiApi, requireElectronAppApi } from '@/services/electronApi';
+import { getLegacyGithubApi, requireLegacyGithubApi } from './electronApi';
 
 export const githubClient = cachedClient('github', {
   isAvailable(): boolean {
-    return Boolean(getElectronApi());
+    return Boolean(getLegacyGithubApi());
   },
 
   async openExternalUrl(url: string): Promise<{ success: boolean; error?: string }> {
@@ -31,79 +33,79 @@ export const githubClient = cachedClient('github', {
   },
 
   async checkAuthStatus(): Promise<{ authenticated: boolean; username: string | null }> {
-    return requireElectronGithubApi().githubCheckAuthStatus();
+    return requireLegacyGithubApi().githubCheckAuthStatus();
   },
 
   async auth(token: string, host?: string): Promise<{ success: boolean; tokenPersisted?: boolean; error?: string }> {
-    return requireElectronGithubApi().githubAuth(token, host);
+    return requireLegacyGithubApi().githubAuth(token, host);
   },
 
-  async cancelAuth(): ReturnType<ElectronAPI['githubCancelAuth']> {
-    return requireElectronGithubApi().githubCancelAuth();
+  async cancelAuth(): ReturnType<LegacyGithubAPI['githubCancelAuth']> {
+    return requireLegacyGithubApi().githubCancelAuth();
   },
 
   async deviceStart(): Promise<IpcResult<DeviceFlowStartDto>> {
-    return requireElectronGithubApi().githubDeviceStart();
+    return requireLegacyGithubApi().githubDeviceStart();
   },
 
   async devicePoll(deviceCode: string): Promise<IpcResult<DeviceFlowPollDto>> {
-    return requireElectronGithubApi().githubDevicePoll(deviceCode);
+    return requireLegacyGithubApi().githubDevicePoll(deviceCode);
   },
 
   async webLogin(): Promise<IpcResult<{ username: string | null; tokenPersisted?: boolean }>> {
-    return requireElectronGithubApi().githubWebLogin();
+    return requireLegacyGithubApi().githubWebLogin();
   },
 
   async getRepositories(params?: { page?: number; perPage?: number; search?: string; readRequest?: ReadRequest }): Promise<IpcResult<GitHubRepositoryPageDto>> {
-    return requireElectronGithubApi().githubGetRepos(params);
+    return requireLegacyGithubApi().githubGetRepos(params);
   },
 
-  async getSavedAuthStatus(): ReturnType<ElectronAPI['githubGetSavedAuthStatus']> {
-    return requireElectronGithubApi().githubGetSavedAuthStatus();
+  async getSavedAuthStatus(): ReturnType<LegacyGithubAPI['githubGetSavedAuthStatus']> {
+    return requireLegacyGithubApi().githubGetSavedAuthStatus();
   },
 
-  async loginWithSavedToken(): ReturnType<ElectronAPI['githubLoginWithSavedToken']> {
-    return requireElectronGithubApi().githubLoginWithSavedToken();
+  async loginWithSavedToken(): ReturnType<LegacyGithubAPI['githubLoginWithSavedToken']> {
+    return requireLegacyGithubApi().githubLoginWithSavedToken();
   },
 
-  async logout(): ReturnType<ElectronAPI['githubLogout']> {
-    return requireElectronGithubApi().githubLogout();
+  async logout(): ReturnType<LegacyGithubAPI['githubLogout']> {
+    return requireLegacyGithubApi().githubLogout();
   },
 
   async createRepository(name: string, description: string, isPrivate: boolean): Promise<IpcResult<GitHubRepositoryDto>> {
-    return requireElectronGithubApi().githubCreateRepo(name, description, isPrivate);
+    return requireLegacyGithubApi().githubCreateRepo(name, description, isPrivate);
   },
 
   async createRepositoryWithReadme(name: string, description: string, isPrivate: boolean) {
-    return requireElectronGithubApi().githubCreateRepoWithReadme(name, description, isPrivate);
+    return requireLegacyGithubApi().githubCreateRepoWithReadme(name, description, isPrivate);
   },
 
   async getCatalogSnapshot() {
-    return requireElectronGithubApi().githubGetCatalogSnapshot();
+    return requireLegacyGithubApi().githubGetCatalogSnapshot();
   },
 
   async saveCatalogSnapshot(repos: GitHubRepositoryDto[]) {
-    return requireElectronGithubApi().githubSaveCatalogSnapshot(repos);
+    return requireLegacyGithubApi().githubSaveCatalogSnapshot(repos);
   },
 
   async forkRepository(params: GitHubForkParamsDto): Promise<IpcResult<GitHubRepositoryDto>> {
-    return requireElectronGithubApi().githubForkRepo(params);
+    return requireLegacyGithubApi().githubForkRepo(params);
   },
 
   async getRepository(owner: string, repo: string) {
-    return requireElectronGithubApi().githubGetRepository(owner, repo);
+    return requireLegacyGithubApi().githubGetRepository(owner, repo);
   },
 
   async getBranches(owner: string, repo: string) {
-    return requireElectronGithubApi().githubGetBranches(owner, repo);
+    return requireLegacyGithubApi().githubGetBranches(owner, repo);
   },
 
   async getPullRequests(owner: string, repo: string, state: string): Promise<IpcResult<PullRequestDto[]>> {
-    return requireElectronGithubApi().githubGetPRs(owner, repo, state);
+    return requireLegacyGithubApi().githubGetPRs(owner, repo, state);
   },
 
-  async createPullRequest(...args: Parameters<ElectronAPI['githubCreatePR']>): ReturnType<ElectronAPI['githubCreatePR']> {
-    return requireElectronGithubApi().githubCreatePR(...args);
+  async createPullRequest(...args: Parameters<LegacyGithubAPI['githubCreatePR']>): ReturnType<LegacyGithubAPI['githubCreatePR']> {
+    return requireLegacyGithubApi().githubCreatePR(...args);
   },
 
   async getWorkflowRuns(params: {
@@ -113,27 +115,27 @@ export const githubClient = cachedClient('github', {
     headSha?: string;
     perPage?: number;
   }): Promise<IpcResult<GithubWorkflowRunDto[]>> {
-    return requireElectronGithubApi().githubGetWorkflowRuns(params);
+    return requireLegacyGithubApi().githubGetWorkflowRuns(params);
   },
 
   async getWorkflowRunsPage(params: { owner: string; repo: string; branch?: string; status?: string; page?: number; perPage?: number }) {
-    return requireElectronGithubApi().githubGetWorkflowRunsPage(params);
+    return requireLegacyGithubApi().githubGetWorkflowRunsPage(params);
   },
 
   async getWorkflowJobsPage(params: { owner: string; repo: string; runId: number; page?: number; perPage?: number }) {
-    return requireElectronGithubApi().githubGetWorkflowJobsPage(params);
+    return requireLegacyGithubApi().githubGetWorkflowJobsPage(params);
   },
 
   async rerunFailedJobs(owner: string, repo: string, runId: number) {
-    return requireElectronGithubApi().githubRerunFailedJobs(owner, repo, runId);
+    return requireLegacyGithubApi().githubRerunFailedJobs(owner, repo, runId);
   },
 
   async cancelWorkflowRun(owner: string, repo: string, runId: number) {
-    return requireElectronGithubApi().githubCancelWorkflowRun(owner, repo, runId);
+    return requireLegacyGithubApi().githubCancelWorkflowRun(owner, repo, runId);
   },
 
   async getStatusChecks(params: { owner: string; repo: string; ref: string }): Promise<IpcResult<GithubStatusChecksDto>> {
-    return requireElectronGithubApi().githubGetStatusChecks(params);
+    return requireLegacyGithubApi().githubGetStatusChecks(params);
   },
 
   async mergePullRequest(params: {
@@ -143,23 +145,23 @@ export const githubClient = cachedClient('github', {
     mergeMethod: PullRequestMergeMethodDto;
     expectedHeadSha?: string;
   }): Promise<IpcResult<{ sha: string; merged: boolean; message: string }>> {
-    return requireElectronGithubApi().githubMergePR(params);
+    return requireLegacyGithubApi().githubMergePR(params);
   },
 
   async getReleaseContext(params: { owner: string; repo: string; targetCommitish?: string; repoPath?: string }): Promise<IpcResult<GitHubReleaseContextDto>> {
-    return requireElectronGithubApi().githubGetReleaseContext(params);
+    return requireLegacyGithubApi().githubGetReleaseContext(params);
   },
 
   async createRelease(params: GitHubCreateReleaseParamsDto): Promise<IpcResult<GitHubReleaseDto>> {
-    return requireElectronGithubApi().githubCreateRelease(params);
+    return requireLegacyGithubApi().githubCreateRelease(params);
   },
 
   async inspectReleaseTarget(params: GitHubInspectReleaseTargetParamsDto): Promise<IpcResult<GitHubReleaseTargetDto>> {
-    return requireElectronGithubApi().githubInspectReleaseTarget(params);
+    return requireLegacyGithubApi().githubInspectReleaseTarget(params);
   },
 
-  async uploadReleaseAsset(...args: Parameters<ElectronAPI['githubUploadReleaseAsset']>): ReturnType<ElectronAPI['githubUploadReleaseAsset']> {
-    return requireElectronGithubApi().githubUploadReleaseAsset(...args);
+  async uploadReleaseAsset(...args: Parameters<LegacyGithubAPI['githubUploadReleaseAsset']>): ReturnType<LegacyGithubAPI['githubUploadReleaseAsset']> {
+    return requireLegacyGithubApi().githubUploadReleaseAsset(...args);
   },
 
   async generateReleaseNotes(params: {

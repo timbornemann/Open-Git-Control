@@ -1,5 +1,6 @@
 import { createRepoUnavailableErrorMessage, isRepoUnavailableError } from '../../src/shared/git/errors';
 import { readGitProcessErrorText } from './GitProcessTypes';
+import { redactHostingSecrets } from '../hosting/hostingRedaction';
 
 export const EXPECTED_NON_FATAL_GIT_ERROR_NAME = 'ExpectedNonFatalGitError';
 
@@ -8,7 +9,7 @@ export const isMissingOriginGitError = (error: unknown): boolean =>
 
 /** Redacts credentials before a Git failure reaches logs or the renderer. */
 export const redactGitSensitiveText = (value: unknown): string => {
-  let text = String(value ?? '');
+  let text = redactHostingSecrets(String(value ?? ''));
 
   // Strip every HTTP(S) user-info component. User names are not useful in an
   // error message, and retaining them risks retaining a token-only credential.
@@ -22,7 +23,7 @@ export const redactGitSensitiveText = (value: unknown): string => {
   text = text.replace(/\b(?:github_pat_[a-z0-9_-]+|gh[a-z]+_[a-z0-9_-]+|glpat-[a-z0-9_-]+|sk-[a-z0-9_-]+)\b/gi, '[REDACTED]');
   text = text.replace(/\b(bearer|token|basic)\s+[a-z0-9._~+\/=:-]{8,}\b/gi, '$1 [REDACTED]');
 
-  return text;
+  return redactHostingSecrets(text);
 };
 
 export class GitErrorFormatter {

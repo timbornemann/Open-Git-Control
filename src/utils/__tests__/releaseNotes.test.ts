@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReleaseCommitDto } from '@/types/githubDtos';
+import type { ReleaseCommitDto } from '@/types/releaseNotes';
 import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes, isLikelyMergeCommit } from '@/utils/releaseNotes';
 
 type TestOptions = {

@@ -1,18 +1,9 @@
 import type { AppSettingsDto, RepoSortByDto } from '@/types/appDtos';
 import type { GitJobEventDto } from '@/types/aiDtos';
-import type {
-  DeviceFlowStartDto,
-  GitHubCreateReleaseParamsDto,
-  GitHubReleaseDto,
-  GitHubRepositoryDto,
-  PullRequestCiDto,
-  PullRequestDto,
-  ReleaseSubmissionPhase,
-} from '@/types/githubDtos';
-import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState, RepoOwnerRef } from '@/types/git';
+import type { BranchInfo, GitSubmoduleInfo, RemoteSyncState } from '@/types/git';
 import type { RepositoryRunActionId, RepositoryRunConfigStateDto, RepositoryRunStateDto } from '@/types/repositoryRun';
 
-export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'github' | 'settings';
+export type AppTabId = 'localRepos' | 'repo' | 'planner' | 'hosting' | 'github' | 'settings';
 export type SettingsTabId = 'general' | 'integrations' | 'api' | 'security' | 'system';
 export type SettingsUpdateResult = { success: true; settings: AppSettingsDto } | { success: false; error: string };
 export type GithubAuthHelpMethod = 'pat' | 'device' | 'web' | null;
@@ -134,6 +125,7 @@ export type RepositoryStateContract = {
   onOpenFolder: () => void;
   onCloneByUrl: () => void;
   onSwitchRepo: (repoPath: string) => Promise<boolean>;
+  onAddRepo: (repoPath: string) => Promise<boolean>;
   onCloseRepo: (repoPath: string) => void;
   remoteSync: RemoteSyncState;
   onRefreshRemoteQuick: () => void;
@@ -163,87 +155,6 @@ export type RepositoryStateContract = {
   onSubmoduleSync: () => void;
   onOpenSubmodule: (submodulePath: string) => void;
   hasRemoteOrigin: boolean | null;
-  forceGithubRepoCreationPrompt: boolean;
-  isConnectingGithubRepo: boolean;
-  connectError: string | null;
-  newRepoName: string;
-  setNewRepoName: (value: string) => void;
-  newRepoDescription: string;
-  setNewRepoDescription: (value: string) => void;
-  newRepoPrivate: boolean;
-  setNewRepoPrivate: (value: boolean) => void;
-  onCreateGithubRepoForCurrent: () => void;
-};
-
-export type GithubStateContract = {
-  isAuthRestoring?: boolean;
-  isAuthenticationRequired?: boolean;
-  onRetryAuthentication?: () => void;
-  isAuthenticated: boolean;
-  tokenInput: string;
-  setTokenInput: (value: string) => void;
-  isAuthenticating: boolean;
-  authError: string | null;
-  setAuthError: (value: string | null) => void;
-  onTokenLogin: () => void;
-  oauthConfigured: boolean;
-  deviceFlow: DeviceFlowStartDto | null;
-  isDeviceFlowRunning: boolean;
-  deviceFlowError: string | null;
-  onStartDeviceFlowLogin: () => void;
-  onCancelAuthentication: () => void;
-  onCancelDeviceFlow: () => void;
-  isWebFlowRunning: boolean;
-  webFlowError: string | null;
-  onStartWebFlowLogin: () => void;
-  selectedGithubAuthHelpMethod: GithubAuthHelpMethod;
-  onSelectGithubAuthHelpMethod: (method: GithubAuthHelpMethod) => void;
-  githubUser: string | null;
-  githubRepos: GitHubRepositoryDto[];
-  githubReposHasMore: boolean;
-  isLoadingGithubRepos: boolean;
-  isLoadingMoreGithubRepos: boolean;
-  loadMoreGithubRepos: () => void;
-  refreshGithubRepos: (search?: string) => void;
-  onLogout: () => void;
-  onClone: (cloneUrl: string, repoName: string) => void;
-  onForkByUrl: () => void;
-  isCloning: boolean;
-  prOwnerRepo: RepoOwnerRef | null;
-  prFilter: 'open' | 'closed' | 'all';
-  setPrFilter: (value: 'open' | 'closed' | 'all') => void;
-  prLoading: boolean;
-  prHasLoaded: boolean;
-  prError: string | null;
-  pullRequests: PullRequestDto[];
-  prCiByNumber: Record<number, PullRequestCiDto>;
-  onOpenPR: (url: string) => void;
-  onCopyPRUrl: (url: string) => void;
-  onCheckoutPR: (prNumber: number, headRef: string) => Promise<void>;
-  onMergePR: (prNumber: number, mergeMethod?: 'merge' | 'squash' | 'rebase') => Promise<void>;
-  showCreatePR: boolean;
-  setShowCreatePR: (value: boolean) => void;
-  setNewPRHead: (value: string) => void;
-  newPRTitle: string;
-  setNewPRTitle: (value: string) => void;
-  newPRBody: string;
-  setNewPRBody: (value: string) => void;
-  newPRHead: string;
-  setNewPRHeadInput: (value: string) => void;
-  newPRBase: string;
-  setNewPRBase: (value: string) => void;
-  onCreatePR: () => void;
-  releaseForm: GitHubCreateReleaseParamsDto;
-  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
-  releaseSubmitting: boolean;
-  releasePhase?: ReleaseSubmissionPhase;
-  releaseNotesGenerating: boolean;
-  releaseError: string | null;
-  releaseSuccess: GitHubReleaseDto | null;
-  onCreateRelease: () => Promise<void>;
-  releasePendingAssets: string[];
-  onAddReleasePendingAssets: () => Promise<void>;
-  onRemoveReleasePendingAsset: (filePath: string) => void;
 };
 
 export type WorkflowStateContract = {

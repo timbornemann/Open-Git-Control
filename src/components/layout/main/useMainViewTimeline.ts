@@ -8,11 +8,10 @@ import { confirmWorkingDirectoryNavigation, runWorkingDirectoryNavigationAction 
 type UseMainViewTimelineParams = {
   activeRepo: string | null;
   setActiveTab: (tab: AppTabId) => void;
-  onCloseReleaseCreator: () => void;
   t: CatalogTranslateFn;
 };
 
-export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCreator, t }: UseMainViewTimelineParams) => {
+export const useMainViewTimeline = ({ activeRepo, setActiveTab, t }: UseMainViewTimelineParams) => {
   const [showTimeline, setShowTimeline] = useState(false);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [timelineCommits, setTimelineCommits] = useState<FileTimelineCommitDto[]>([]);
@@ -37,7 +36,6 @@ export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCr
         if (requestGenerationRef.current !== generation || activeRepoRef.current !== repoAtStart) return;
         runWorkingDirectoryNavigationAction(() => {
           setTimelineCommits([...result.data].reverse());
-          onCloseReleaseCreator();
           setActiveTab('repo');
           setShowTimeline(true);
         });
@@ -50,7 +48,7 @@ export const useMainViewTimeline = ({ activeRepo, setActiveTab, onCloseReleaseCr
     } finally {
       if (requestGenerationRef.current === generation && activeRepoRef.current === repoAtStart) setIsTimelineLoading(false);
     }
-  }, [activeRepo, onCloseReleaseCreator, setActiveTab, t]);
+  }, [activeRepo, setActiveTab, t]);
 
   // Layout timing closes the render-to-effect window in which a stale promise
   // could otherwise navigate the newly selected repository.

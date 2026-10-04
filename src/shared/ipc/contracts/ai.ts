@@ -1,6 +1,10 @@
 import type { AiAutoCommitResultDto, AiConnectionResultDto, AiGeneratedCommitMessageDto, GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
-import type { ElectronReleaseNotesAPI } from './github';
+import type { ReleaseNotesGenerationParamsDto, ReleaseNotesGenerationResultDto } from '../../../types/releaseNotes';
+
+export interface ElectronReleaseNotesAPI {
+  aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => Promise<IpcResult<ReleaseNotesGenerationResultDto>>;
+}
 
 export interface ElectronAiAPI extends ElectronReleaseNotesAPI {
   aiTestConnection: () => Promise<IpcResult<AiConnectionResultDto>>;

@@ -10,7 +10,9 @@ import type { ConfirmDialogState, InputDialogState } from '@/components/layout/l
 import { buildCreateTagDialog, buildDeleteTagDialog } from './repositoryDomainDialogs';
 import type { GitActionToast } from './repositoryDomainTypes';
 import type { RunGitCommandOptions } from '@/app/state/contracts';
+import { openRemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 import { gitWorkflowCommands } from '../workflows/gitWorkflowCommands';
+import { transferClient } from '@/services/hostingClient';
 
 type Params = {
   activeRepo: string | null;
@@ -47,6 +49,7 @@ export const useRepositoryTags = ({
   const cached = useCachedResult<IpcResult<string>>(resourceKey('git', 'runGitCommandForRepo', [activeRepo, 'tag', '-l', '--sort=-v:refname']));
   const tags = useMemo(() => (cached.data?.success ? parseTags(cached.data.data) : loadedTags), [cached.data, loadedTags]);
   const [tagConflicts, setTagConflicts] = useState<string[]>([]);
+  const [tagRemoteName, setTagRemoteName] = useState<string | null>(null);
   const { t, tr } = useLanguageTranslations(language);
   const activeRepoRef = useRef<string | null>(activeRepo);
 
@@ -54,37 +57,37 @@ export const useRepositoryTags = ({
     activeRepoRef.current = activeRepo;
     setTags([]);
     setTagConflicts([]);
+    setTagRemoteName(null);
   }, [activeRepo]);
 
   useEffect(() => {
     if (!activeRepo || !gitClient.isAvailable()) {
       setTags([]);
       setTagConflicts([]);
+      setTagRemoteName(null);
       return;
     }
 
     let cancelled = false;
     const fetchTags = async () => {
       try {
+        const preferences = await transferClient.request('getPreferences', { repoPath: activeRepo }).catch(() => null);
+        if (cancelled) return;
+        const source = preferences?.fetchRemote || trackedRemoteName;
         const [byVersion, referenceStatus] = await withReadPriority(
           () =>
             Promise.all([
               gitClient.runGitCommandForRepo(activeRepo, 'tag', '-l', '--sort=-v:refname'),
-              trackedRemoteName
-                ? gitClient.runGitCommandForRepo(
-                    activeRepo,
-                    'forEachRef',
-                    TAG_REFERENCE_STATUS_FORMAT,
-                    'refs/tags',
-                    remoteTagTrackingRefPrefix(trackedRemoteName),
-                  )
+              source
+                ? gitClient.runGitCommandForRepo(activeRepo, 'forEachRef', TAG_REFERENCE_STATUS_FORMAT, 'refs/tags', remoteTagTrackingRefPrefix(source))
                 : Promise.resolve(null),
             ]),
           'repository',
         );
         if (cancelled) return;
+        setTagRemoteName(source);
         setTags(byVersion.success ? parseTags(byVersion.data) : []);
-        setTagConflicts(referenceStatus?.success ? parseConflictingTagNames(referenceStatus.data, trackedRemoteName) : []);
+        setTagConflicts(referenceStatus?.success ? parseConflictingTagNames(referenceStatus.data, source) : []);
       } catch {
         if (cancelled) return;
         setTags([]);
@@ -124,7 +127,7 @@ export const useRepositoryTags = ({
   const handleDeleteTag = async (tagName: string) => {
     const repoAtDialogOpen = activeRepo;
     if (!repoAtDialogOpen) return;
-    const adoptsTrackedRemoteTag = Boolean(trackedRemoteName && tagConflicts.includes(tagName));
+    const adoptsTrackedRemoteTag = Boolean(tagRemoteName && tagConflicts.includes(tagName));
     setConfirmDialog(
       buildDeleteTagDialog({
         tagName,
@@ -134,13 +137,13 @@ export const useRepositoryTags = ({
           const deleted = await runGitCommand(gitClient.buildDeleteTagArgs(tagName), tr(`Tag "${tagName}" gelöscht.`, `Deleted tag "${tagName}".`), undefined, {
             expectedRepoPath: repoAtDialogOpen,
           });
-          if (!deleted || !adoptsTrackedRemoteTag || !trackedRemoteName) return;
+          if (!deleted || !adoptsTrackedRemoteTag || !tagRemoteName) return;
 
           // The user explicitly chose to remove the conflicting local tag.
-          // Fetching this one remote ref preserves annotated-tag metadata and
-          // makes the now-unambiguous remote tag the single local tag.
+          // Adopt the inspected tracking ref locally, retaining annotated-tag
+          // metadata without an unscoped network fetch.
           await runGitCommand(
-            gitWorkflowCommands.adoptRemoteTag(trackedRemoteName, tagName),
+            gitWorkflowCommands.adoptTrackedRemoteTag(tagRemoteName, tagName),
             tr(`Remote-Tag "${tagName}" lokal übernommen.`, `Remote tag "${tagName}" adopted locally.`),
             undefined,
             { expectedRepoPath: repoAtDialogOpen },
@@ -185,9 +188,7 @@ export const useRepositoryTags = ({
 
   const handlePushTags = async () => {
     if (!activeRepo) return;
-    await runGitCommand(gitClient.buildPushTagsArgs(), t('generated.components.layout.hooks.userepositorydomain.pushed_tags_d74ebef5'), undefined, {
-      expectedRepoPath: activeRepo,
-    });
+    openRemoteTransferDialog({ repoPath: activeRepo, mode: 'push' });
   };
 
   return {

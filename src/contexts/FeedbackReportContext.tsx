@@ -1,6 +1,7 @@
 import React from 'react';
 import { FeedbackReportDialog, type FeedbackDialogRequest } from '@/components/feedback/FeedbackReportDialog';
-import { useGitHubStore, useSettingsStore, useUIStore } from '@/contexts/AppStateContext';
+import { useUIStore } from '@/contexts/AppStateContext';
+import { useHostingState } from '@/components/hosting/hostingState';
 import { appClient } from '@/services/appClient';
 import type { FeedbackReportAreaDto, FeedbackReportCapabilityDto, FeedbackReportCategoryDto } from '@/types/feedbackDtos';
 
@@ -26,8 +27,7 @@ const areaForTab = (tab: string): FeedbackReportAreaDto => {
 
 export const FeedbackReportProvider = ({ children }: { children: React.ReactNode }) => {
   const activeTab = useUIStore((state) => state.activeTab);
-  const githubHost = useSettingsStore((state) => state.settings.githubHost);
-  const githubAuthenticated = useGitHubStore((state) => state.isAuthenticated);
+  const hostingConnections = useHostingState((state) => state.connections);
   const appDialogOpen = useUIStore((state) => Boolean(state.confirmDialog || state.inputDialog));
   const [capability, setCapability] = React.useState<FeedbackReportCapabilityDto | null>(null);
   const [dialogRequest, setDialogRequest] = React.useState<FeedbackDialogRequest | null>(null);
@@ -48,7 +48,7 @@ export const FeedbackReportProvider = ({ children }: { children: React.ReactNode
 
   React.useEffect(() => {
     void refreshCapability();
-  }, [githubAuthenticated, githubHost, refreshCapability]);
+  }, [hostingConnections, refreshCapability]);
 
   const setToastStatus = React.useCallback((id: number, status: FeedbackToastStatus) => {
     setToastStatuses((current) => ({ ...current, [id]: status }));

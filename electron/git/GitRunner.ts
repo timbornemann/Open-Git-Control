@@ -16,6 +16,8 @@ import {
   type GitExecFileOptions,
   type GitInputRunOptions,
   type GitRunOptions,
+  type GitProcessResult,
+  type GitTransferOptions,
 } from './GitProcessTypes';
 
 export {
@@ -182,6 +184,23 @@ export class GitRunner {
     );
   }
 
+  async runResult(repoPath: string, args: string[], options: GitRunOptions = {}): Promise<GitProcessResult> {
+    this.assertRepoPathAvailable(repoPath);
+    return this.schedule(
+      repoPath,
+      this.classifyCommand(args, options.requestedKind),
+      args[0] || 'git',
+      (signal) =>
+        this.processExecutor.runResult(repoPath, args, {
+          cwd: repoPath,
+          maxBuffer: 8 * 1024 * 1024,
+          env: { ...process.env, ...options.envOverrides },
+          signal,
+        }),
+      { signal: options.signal },
+    );
+  }
+
   /** Keep inspection, isolated rewriting and ref publication in one write lane. */
   withExclusiveWrite<T>(repoPath: string, command: string, work: (git: CommitEditGit) => Promise<T>, signal?: AbortSignal): Promise<T> {
     return this.schedule(
@@ -237,7 +256,9 @@ export class GitRunner {
   async runWithInput(repoPath: string, args: string[], input: string | Buffer, options: GitInputRunOptions = {}): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
     const kind = this.classifyCommand(args, options.requestedKind);
-    return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) => this.spawnOperations.runWithInput(repoPath, args, input, signal));
+    return this.schedule(repoPath, kind, options.commandName ?? args[0] ?? 'git', (signal) =>
+      this.spawnOperations.runWithInput(repoPath, args, input, signal, options.envOverrides),
+    );
   }
 
   async getDiffPreview(repoPath: string, args: string[], limits: { maxBytes?: number; maxLines?: number } = {}): Promise<DiffPreviewResult> {
@@ -267,16 +288,28 @@ export class GitRunner {
     );
   }
 
-  async streamOutput(repoPath: string, args: string[], onLine: (line: string) => void, signal?: AbortSignal): Promise<string> {
+  async streamOutput(
+    repoPath: string,
+    args: string[],
+    onLine: (line: string) => void,
+    signal?: AbortSignal,
+    options: GitTransferOptions = {},
+  ): Promise<string> {
     this.assertRepoPathAvailable(repoPath);
     const kind = this.classifyCommand(args);
-    return this.schedule(repoPath, kind, args[0] || 'stream', (schedulerSignal) => this.spawnOperations.streamOutput(repoPath, args, onLine, schedulerSignal), {
-      signal,
-    });
+    return this.schedule(
+      repoPath,
+      kind,
+      args[0] || 'stream',
+      (schedulerSignal) => this.spawnOperations.streamOutput(repoPath, args, onLine, schedulerSignal, options.envOverrides),
+      {
+        signal: signal ?? options.signal,
+      },
+    );
   }
 
-  cloneWithProgress(cloneUrl: string, repoPath: string, onProgress: (line: string) => void): Promise<GitCloneProgressResult> {
-    return this.spawnOperations.cloneWithProgress(cloneUrl, repoPath, onProgress);
+  cloneWithProgress(cloneUrl: string, repoPath: string, onProgress: (line: string) => void, options: GitTransferOptions = {}): Promise<GitCloneProgressResult> {
+    return this.spawnOperations.cloneWithProgress(cloneUrl, repoPath, onProgress, options);
   }
 
   schedule<T>(

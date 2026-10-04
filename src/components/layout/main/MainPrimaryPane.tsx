@@ -3,15 +3,13 @@ import { viewModules } from '@/data/viewModules';
 import React from 'react';
 import { RecoveryCenter } from '@/components/RecoveryCenter';
 import { StagingArea } from '@/components/staging-area';
-import { useGithubContext, useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
+import { useRepositoryContext, useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
 import { useI18n } from '@/i18n';
 import type { DiffRequest } from '@/types/diff';
 import type { WorkingDirectoryNavigationGuard } from '@/components/layout/hooks/useMainViewInspector';
 import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
-import { GithubAuthGuide } from './GithubAuthGuide';
-import type { GithubAuthHelpMethod } from '@/app/state/contracts';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
 import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
@@ -23,8 +21,7 @@ const CommitGraph = viewModules.repo.View;
 const DiffViewer = viewModules.diff.View;
 const FileTimelineView = viewModules.timeline.View;
 const ProjectPlannerView = viewModules.planner.View;
-const GithubWorkspaceView = viewModules.github.View;
-const ReleaseCreator = viewModules.release.View;
+const HostingWorkspaceView = viewModules.hosting.View;
 const SettingsMainContent = viewModules.settings.View;
 
 type MainPrimaryPaneProps = {
@@ -69,7 +66,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const ui = useUIContext();
   const settingsState = useSettingsContext();
   const repository = useRepositoryContext();
-  const github = useGithubContext();
   const workflow = useWorkflowContext();
   const commitEditor = useCommitMessageEditor(repository.activeRepo, repository.selectedCommit, repository.onNavigateToCommit, repository.triggerRefresh);
   const { t, tr } = useI18n();
@@ -83,20 +79,15 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     activeDiffRequest,
     workingDirectoryFilePath,
     activeTab: ui.activeTab,
-    isAuthenticated: github.isAuthenticated,
-    selectedGithubAuthHelpMethod: github.selectedGithubAuthHelpMethod,
     showRecoveryCenter,
-    showReleaseCreator: github.showReleaseCreator,
     showTimeline,
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
     showRunConfig: ui.isRunConfigOpen,
   });
-  const showGithubGuide = route === 'githubGuide';
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
-  const isGithubView = route === 'github';
+  const isHostingView = route === 'hosting';
   const isLocalReposView = route === 'localRepos';
-  const isReleaseView = route === 'release';
   const isTimelineView = route === 'timeline';
   const isRunConsoleView = route === 'runConsole';
   const isRunConfigView = route === 'runConfig';
@@ -122,7 +113,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     <div
       className="pane"
       style={
-        isSettingsView || isPlannerView || isGithubView || isLocalReposView || isReleaseView || isRunConfigView || !showInspectorPane
+        isSettingsView || isPlannerView || isHostingView || isLocalReposView || isRunConfigView || !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
@@ -135,17 +126,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseRunConfig}>
               {tr('Zurück zum Repository', 'Back to repository')}
             </button>
-          ) : isReleaseView ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={github.onCloseReleaseCreator}>
-              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
-            </button>
           ) : isTimelineView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowTimeline(false)}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
-            </button>
-          ) : showGithubGuide ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={ui.onClearGithubAuthHelpMethod}>
-              {t('generated.components.layout.main.maininspectorpane.back_c5e2bc76')}
             </button>
           ) : showRecoveryCenter ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
@@ -176,9 +159,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           <React.Suspense fallback={lazyPaneFallback}>
             <ProjectPlannerView />
           </React.Suspense>
-        ) : isGithubView ? (
+        ) : isHostingView ? (
           <React.Suspense fallback={lazyPaneFallback}>
-            <GithubWorkspaceView />
+            <HostingWorkspaceView />
           </React.Suspense>
         ) : isSettingsView ? (
           <React.Suspense fallback={lazyPaneFallback}>
@@ -189,33 +172,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               onClearJobs={workflow.onClearJobs}
               activeTab={settingsState.settingsTab}
               onResetLayout={ui.onResetLayout}
-            />
-          </React.Suspense>
-        ) : isReleaseView ? (
-          <React.Suspense fallback={lazyPaneFallback}>
-            <ReleaseCreator
-              ownerRepo={
-                github.prOwnerRepo?.headOwner
-                  ? { owner: github.prOwnerRepo.headOwner, repo: github.prOwnerRepo.headRepo || github.prOwnerRepo.repo }
-                  : github.prOwnerRepo
-              }
-              releaseForm={github.releaseForm}
-              setReleaseForm={github.setReleaseForm}
-              releaseSubmitting={github.releaseSubmitting}
-              releasePhase={github.releasePhase}
-              onCreateRelease={github.onCreateRelease}
-              pendingAssets={github.releasePendingAssets}
-              onAddPendingAssets={github.onAddReleasePendingAssets}
-              onRemovePendingAsset={github.onRemoveReleasePendingAsset}
-              contextLoading={github.releaseContextLoading}
-              context={github.releaseContext}
-              onRefreshContext={github.onRefreshReleaseContext}
-              onGenerateNotes={github.onGenerateReleaseNotes}
-              notesGenerating={github.releaseNotesGenerating}
-              notesLanguage={github.releaseNotesLanguage}
-              setNotesLanguage={github.setReleaseNotesLanguage}
-              notesOptions={github.releaseNotesOptions}
-              setNotesOptions={github.setReleaseNotesOptions}
             />
           </React.Suspense>
         ) : isTimelineView ? (
@@ -249,7 +205,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             workingTreeStats={workingTree.stats}
             onRefreshWorkingTree={workingTree.refresh}
           />
-        ) : activeDiffRequest || (!showGithubGuide && !showRecoveryCenter) ? (
+        ) : activeDiffRequest || !showRecoveryCenter ? (
           <React.Suspense fallback={lazyPaneFallback}>
             <div
               aria-hidden={activeDiffRequest ? true : undefined}
@@ -296,8 +252,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               />
             )}
           </React.Suspense>
-        ) : showGithubGuide ? (
-          <GithubAuthGuide method={github.selectedGithubAuthHelpMethod as Exclude<GithubAuthHelpMethod, null>} onClose={ui.onClearGithubAuthHelpMethod} />
         ) : showRecoveryCenter ? (
           <RecoveryCenter
             repoPath={repository.activeRepo}

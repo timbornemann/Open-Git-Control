@@ -1,8 +1,8 @@
 import { createRepoUnavailableErrorMessage } from '../../src/shared/git/errors';
-import { GitErrorFormatter } from './GitErrorFormatter';
+import { GitErrorFormatter, redactGitSensitiveText } from './GitErrorFormatter';
 import { GitIndexLockRecovery, INDEX_LOCK_RETRY_MAX_ATTEMPTS } from './GitIndexLockRecovery';
 import { isRepoPathAccessible } from './GitRepositoryPath';
-import type { ExecFileAsyncRunner, GitExecFileOptions } from './GitProcessTypes';
+import type { ExecFileAsyncRunner, GitExecFileOptions, GitProcessResult } from './GitProcessTypes';
 import { createAbortError, readGitProcessErrorText } from './GitProcessTypes';
 
 export class GitProcessExecutor {
@@ -11,6 +11,22 @@ export class GitProcessExecutor {
     private readonly lockRecovery: GitIndexLockRecovery = new GitIndexLockRecovery(),
     private readonly errorFormatter: GitErrorFormatter = new GitErrorFormatter(),
   ) {}
+
+  async runResult(repoPath: string, args: string[], options: GitExecFileOptions): Promise<GitProcessResult> {
+    try {
+      const result = await this.execFileAsyncRunner('git', args, options);
+      return { ...result, exitCode: 0 };
+    } catch (error: unknown) {
+      if (options.signal?.aborted || readGitProcessErrorText(error, 'name') === 'AbortError') throw createAbortError('Git operation was aborted.');
+      const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
+      if (typeof code !== 'number') throw this.errorFormatter.normalizeGitError(error, args);
+      return {
+        exitCode: code,
+        stdout: redactGitSensitiveText(readGitProcessErrorText(error, 'stdout')),
+        stderr: redactGitSensitiveText(readGitProcessErrorText(error, 'stderr')),
+      };
+    }
+  }
 
   async run(repoPath: string, args: string[], execOptions: GitExecFileOptions): Promise<string> {
     let retryAttempt = 0;

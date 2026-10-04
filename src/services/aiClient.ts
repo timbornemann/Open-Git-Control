@@ -30,6 +30,10 @@ export const aiClient = {
     return requireElectronAiApi().aiGenerateCommitMessage(...args);
   },
 
+  async generateReleaseNotes(...args: Parameters<ElectronAPI['aiGenerateReleaseNotes']>): ReturnType<ElectronAPI['aiGenerateReleaseNotes']> {
+    return requireElectronAiApi().aiGenerateReleaseNotes(...args);
+  },
+
   onJobEvent(...args: Parameters<ElectronAPI['onJobEvent']>): ReturnType<ElectronAPI['onJobEvent']> {
     return requireElectronAiApi().onJobEvent(...args);
   },

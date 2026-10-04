@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, GitMerge, GitPullRequest, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { useSettingsContext, useUIContext, useWorkflowContext } from '@/contexts/AppStateContext';
-import { githubClient } from '@/services/githubClient';
+import { githubClient } from '@/legacy/github/githubClient';
 import { gitClient } from '@/services/gitClient';
 import type { PullRequestDto } from '@/types/githubDtos';
 

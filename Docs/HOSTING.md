@@ -1,0 +1,63 @@
+# Hosting, accounts and Git endpoints
+
+Open-Git-Control separates native Git transport from hosting APIs. The Hosting area supports GitHub (including Enterprise), Forgejo, GitLab.com and self-managed GitLab, Bitbucket Cloud, and Bitbucket Data Center. Several accounts and servers can stay connected at the same time. Other Git servers remain usable through their Git URLs.
+
+## Connect an account
+
+Open **Hosting → Accounts & servers**, choose a provider, and enter the server URL, including any port or installation base path. Add a descriptive name to distinguish accounts on the same server. An API URL override supports installations with a separate API address. Authenticate with a token, or configure your own OAuth application for browser login.
+
+Credentials are stored with Electron's OS encryption. If secure storage is unavailable, credentials remain in memory for this app session. Tokens and OAuth client secrets are never returned to the renderer after authentication. Account logout invalidates pending operations, refreshes, caches and Git credential sessions for that account.
+
+| Provider              | Browser login configuration                                                                                                                          | Token / Git authentication                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| GitHub                | OAuth client ID with Device Flow enabled; enter the displayed code in the browser. `gh` login can also be imported after checking its username.      | PAT; GitHub account username for HTTPS Git.                                                                     |
+| Forgejo               | Public OAuth application, registered loopback callback, PKCE S256.                                                                                   | Personal token; actual account username for Git.                                                                |
+| GitLab                | Public OAuth application, exact registered callback, PKCE S256.                                                                                      | Personal token or OAuth token; `oauth2` username for Git OAuth.                                                 |
+| Bitbucket Cloud       | Your own OAuth consumer key and secret with the configured callback.                                                                                 | Scoped API token; Git uses `x-bitbucket-api-token-auth`, OAuth uses `x-token-auth`. App passwords are obsolete. |
+| Bitbucket Data Center | Administrator-created incoming application link and your own client credentials. HTTP desktop callbacks require an explicit administrator allowance. | Personal access token and account username; token login remains available when desktop OAuth is unavailable.    |
+
+Grant only the features you intend to use. Repository reading, writing, change requests, CI and releases can require separate scopes. Bitbucket Cloud catalog discovery requires workspace access in addition to account and repository reading (`read:workspace:bitbucket`, `read:user:bitbucket`, `read:repository:bitbucket` for API tokens; `account` and `repository` for OAuth). OAuth client secrets are supplied locally by the user; the application distributes no shared secret.
+
+For HTTPS transfers, a temporary Git credential helper asks a Main-process broker for credentials bound to the selected account and endpoint. Credentials are neither written into remote URLs nor passed as Git command arguments. SSH URLs and existing system credentials remain usable. Configure SSH aliases by manually binding the actual remote URL to a repository web URL in **Remotes & transfers**.
+
+## Repositories with several endpoints
+
+Add backup servers as separate named remotes, for example `forgejo` and `github-backup`. Existing multiple `pushurl` values are preserved and shown. Fetch URLs and push URLs are managed separately. Repository paths and IDs belong to their connection; equal names or numeric IDs on different servers do not refer to the same repository.
+
+Each local repository has independent selections:
+
+1. **Fetch / pull source:** one remote and one branch. A one-time pull does not change tracking. Use **Set as upstream** to change it explicitly.
+2. **Push targets:** select remotes, optional target branches, and explicit tags. Save the selection as a push profile. Backup pushes leave upstream tracking intact.
+3. **Hosting target:** select the account and repository used for PRs/MRs, CI and releases. Ambiguous accounts and SSH aliases require an explicit binding.
+
+Review a push before execution. The immutable plan captures the source commit, selected tags, destination refs, endpoint configuration and account generations. Targets execute sequentially. A failed server does not prevent other selected targets from running; cancellation or a changed context stops the remaining targets. Results show partial success. Retry checks actual endpoint refs and addresses unsuccessful targets only. Successful pushes are never rolled back. Force-with-lease checks each endpoint's own expected commit. Secret-scan approval belongs to the full reviewed plan.
+
+Git installations supporting process-local `pushurl` reset allow individual destinations of an existing multi-URL remote to be addressed while retaining its remote name and hooks. The app probes this capability without changing Git configuration. Older Git versions can perform normal grouped pushes followed by per-endpoint verification; targeted retries and force pushes require separate named remotes. A group using several explicitly selected hosting accounts also requires separate named remotes on those Git versions. SSH and system credentials remain available for grouped pushes.
+
+## Feature differences
+
+| Provider              | CI                                                                                                                                                                                     | Publication                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| GitHub                | Actions, jobs, steps, logs, artifacts, dispatch, cancellation, rerun.                                                                                                                  | Native releases, drafts, prereleases, assets.                            |
+| Forgejo 15            | Actions runs and manual dispatch; additional CI details link to the website.                                                                                                           | Native releases, drafts, prereleases, assets.                            |
+| Forgejo 16            | Adds jobs, logs, artifacts and cancellation. The public API has no rerun operation.                                                                                                    | Native releases, drafts, prereleases, assets.                            |
+| GitLab                | Pipelines, jobs, traces, artifacts, dispatch, cancellation, retry. `job:<id>` starts an existing manual job; a pipeline start creates a new pipeline. Inputs are sent as CI variables. | Releases and asset links. Draft and prerelease fields are unavailable.   |
+| Bitbucket Cloud       | Pipelines, steps, logs, start and stop. A new start is a new run. Artifacts are accessed through the provider website.                                                                 | Tags and separate Downloads files; native releases are unavailable.      |
+| Bitbucket Data Center | External build statuses and build links. CI controls require a separate CI-system connector.                                                                                           | Tags and local release notes; native release publication is unavailable. |
+
+Unavailable APIs, disabled CI, missing permissions and unreachable servers are reported separately. Lists support pagination. Logs are rendered as bounded plain text; large logs link back to the provider. Artifact and asset transfers have a 512 MiB limit. Merge methods follow repository/server configuration, and a merge checks the reviewed head SHA (and Data Center's version).
+
+Release inspection verifies only the selected endpoint. Publish its already available commit, or push the local revision through the reviewed push workflow and inspect again. Local or remote tags pointing to another commit block publication. GitLab uploads become release asset links; Bitbucket Downloads are separate files. AI release notes and local Markdown export are available regardless of native release support.
+
+## Migration and project services
+
+Migration imports legacy GitHub credentials and settings into a versioned hosting connection. A legacy token without a host is assigned only to GitHub.com. Catalogs and pins are matched to the verified server/account identity. Existing Git configuration is not rewritten. App updates and Open-Git-Control feedback remain attached to this project's GitHub.com repository, independently of the active hosting target. The local Planning API gains no hosting or Git write permissions.
+
+## API references
+
+- [GitHub Actions](https://docs.github.com/en/rest/actions/workflow-runs)
+- [Forgejo 16](https://forgejo.org/2026-07-release-v16-0/) and [OAuth](https://forgejo.org/docs/latest/user/authentication/oauth2-provider/)
+- [GitLab pipelines](https://docs.gitlab.com/api/pipelines/), [jobs](https://docs.gitlab.com/api/jobs/), [releases](https://docs.gitlab.com/api/releases/), [OAuth](https://docs.gitlab.com/api/oauth2/)
+- [Bitbucket Cloud pipelines](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pipelines/), [downloads](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-downloads/), [OAuth](https://developer.atlassian.com/cloud/bitbucket/rest/intro/)
+- [Bitbucket Data Center CI](https://confluence.atlassian.com/bitbucketserver104/integrated-ci-cd-1822592123.html) and [OAuth](https://confluence.atlassian.com/bitbucketserver/bitbucket-oauth-2-0-provider-api-1108483661.html)
+- [Git remotes](https://git-scm.com/docs/git-remote)
