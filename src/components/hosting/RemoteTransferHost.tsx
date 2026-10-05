@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useGitStore, useSettingsStore, useUIStore } from '@/contexts/AppStateContext';
 import { DialogFrame } from '@/components/DialogFrame';
+import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/i18n';
 import { useHostingState } from './hostingState';
 import { useRemoteTransferDialogState } from './remoteTransferDialogState';
@@ -8,6 +9,7 @@ import { useRemoteTransferState } from './remoteTransferState';
 import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
 import { RemoteTransferPanel } from './RemoteTransferPanel';
 import { RemoteTransferProgress } from './RemoteTransferProgress';
+import './hosting.css';
 import './remoteTransferHost.css';
 
 /** Mounted once regardless of the selected repository subpage. */
@@ -61,18 +63,27 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
     <>
       {state.busy && state.intent && (
         <aside className="remote-transfer-progress" role="status">
-          <strong>
-            {title} · {tr('Operation läuft …', 'Operation running …')}
-          </strong>
+          <div className="remote-transfer-progress__heading">
+            <span className="clone-spinner" aria-hidden="true" />
+            <div>
+              <strong>{title}</strong>
+              <span className="remote-transfer-progress__subtitle">{tr('Operation läuft …', 'Operation running …')}</span>
+            </div>
+          </div>
+          <p className="remote-transfer-progress__repository" title={state.intent.repoPath}>
+            {state.intent.repoPath}
+          </p>
           <RemoteTransferProgress repoPath={state.intent.repoPath} />
-          <button onClick={() => coordinator.cancel()}>{tr('Abbrechen', 'Cancel')}</button>
+          <div className="remote-transfer-progress__actions">
+            <Button onClick={() => coordinator.cancel()}>{tr('Abbrechen', 'Cancel')}</Button>
+          </div>
         </aside>
       )}
       {state.phase === 'result' && !state.resultVisible && (
         <aside className="remote-transfer-progress" aria-live="polite">
-          <button onClick={() => coordinator.showResult()}>
+          <Button onClick={() => coordinator.showResult()}>
             {state.failedPull ? tr('Pull wiederaufnehmen', 'Resume pull') : tr('Übertragungsergebnis öffnen', 'Open transfer result')}
-          </button>
+          </Button>
         </aside>
       )}
       <DialogFrame open={modal} title={title} closeOnBackdrop={false} onClose={() => coordinator.close()} cancelLabel={tr('Schließen', 'Close')}>
