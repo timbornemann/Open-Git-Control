@@ -2,6 +2,8 @@ import { app, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { installExternalWindowHandler } from './externalLinks';
+import { readSettings } from './settingsStore';
+import { installTextContextMenu } from './textContextMenu';
 import { installMainWindowStatePersistence, readMainWindowState } from './windowState';
 
 function resolveExistingFile(candidates: string[]): string | undefined {
@@ -45,6 +47,7 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
       webSecurity: true,
       allowRunningInsecureContent: false,
       webviewTag: false,
+      spellcheck: true,
     },
   });
   installMainWindowStatePersistence(win);
@@ -55,6 +58,7 @@ export function createMainWindow(isDev: boolean, appDisplayName: string, mainPro
   win.setMenuBarVisibility(false);
   win.removeMenu();
   installExternalWindowHandler(win);
+  installTextContextMenu(win, () => readSettings().language);
 
   if (isDev) {
     win.loadURL('http://localhost:5173');

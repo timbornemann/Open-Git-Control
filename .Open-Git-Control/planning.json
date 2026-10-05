@@ -100,28 +100,6 @@
       "updatedAt": 1784044499627
     },
     {
-      "id": "30555d76-9e45-4fee-8e08-0f7f36cf42b4",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Rename commits",
-      "description": "commitete commits bearbeitbar machen, also name und beschreibung, dann ein rebase machen lassen, so das alles richtig ist aber in der historie nur der neue geänderte korrigierte commit steht",
-      "priority": "medium",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1784044682733,
-      "updatedAt": 1790957499651
-    },
-    {
-      "id": "253cfcc3-7ddb-4c16-a54d-7513c92b00ee",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "GitLab & Bitbucket",
-      "description": "weitere dienste außer github unterstützen wie GitLab & Bitbucket oder Forgejo",
-      "priority": "medium",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1784044824675,
-      "updatedAt": 1791194354142
-    },
-    {
       "id": "bb1dcde3-552a-4bf3-b18a-8108194673f6",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Repository Analytics Dashboard",
@@ -177,17 +155,6 @@
       "updatedAt": 1785856977969
     },
     {
-      "id": "ba455ae0-676c-471e-8c1c-2557f3c32a83",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Graph lädt nicht",
-      "description": "Ab und zu kommt es dazu, das wenn man vom todos zum graphen wechselt kommt es manchmal dazu, das der graph in eienr endlos lade schleife hängen bleibt, es muss nicht nru unbedings om welches kommen, sondern passiert auch mancham alders, utersuche und behebe diesen bug, das der graph den verlauf nicht lädt die aktuellenb änderunegn werden dann trozdem im staging seitenfenster angezeigt, die daten währen also theoretisch da",
-      "priority": "high",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1789246060213,
-      "updatedAt": 1790937408648
-    },
-    {
       "id": "438886dc-bc20-4ec9-abc0-337ffed4d9f5",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Git LFS",
@@ -197,39 +164,6 @@
       "tags": [],
       "createdAt": 1789910060278,
       "updatedAt": 1789910060278
-    },
-    {
-      "id": "1d5a7dd6-7062-4447-8093-c29c36e83066",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Run configuration",
-      "description": "in der Run configuration, wenn man save klickt verschindet die komplette ui und man kann nichts machen außer die anwendung neu starten, zudem soll die run  konfiguration nicht mher in den allgemienen einstellungen liegen sonden",
-      "priority": "urgent",
-      "status": "done",
-      "tags": [],
-      "createdAt": 1790781074903,
-      "updatedAt": 1790935918772
-    },
-    {
-      "id": "800dc019-03cd-44f2-99e4-389116918052",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Repo Seitenleiste",
-      "description": "Repo Seitenleiste: In den jeweiligen repos soll nach den projekt logos oder icosn gesucht werden indem nach standard namen wie \"logo.png\" oder anderen bild dateien die logo oder icon im namen tragen das bild soll sich open git controll dann per pfad merken und nutzen könenn wenn er verfügbar ist anstelle der ersten beiden buchstaben",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791194914896,
-      "updatedAt": 1791194914896
-    },
-    {
-      "id": "0e34d463-dd2d-47a6-b48c-fe2a4166c70e",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Textfelder native autokorrektur",
-      "description": "Textfelder native autokorrektur, rechtschreibfehler werdne in vielen feldern zwar engezeigt, aber das normale rechtklick menü ist deaktiviert, dadruch entfällt aber auch die möglichkeit die rechtschreib vorschläge auszuwählen um sienen text zu verbessern. da soll ein eigenes rechsklich menü kommen damit man die rechtschreib fehelr korrigieren kann wie gewohnt",
-      "priority": "medium",
-      "status": "bug",
-      "tags": [],
-      "createdAt": 1791195044507,
-      "updatedAt": 1791195044507
     }
   ]
 }
