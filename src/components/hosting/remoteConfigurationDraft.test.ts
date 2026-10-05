@@ -62,3 +62,18 @@ it('saves identity choices without inventing branch mappings or saving normal-tr
   expect(result.profiles?.[0].tagNames).toBeUndefined();
   expect(result).not.toHaveProperty('force');
 });
+
+it('remembers the Git default when the user enables saved selection without manually selecting a source or targets', () => {
+  const modes = { fetch: 'remember', pull: 'remember', push: 'remember' } as const;
+  const current = { ...before, upstream: { remote: 'private', branch: 'trunk' } };
+  const saved = stampRemoteConfiguration(current, { selectionModes: modes });
+  expect(saved).toMatchObject({ fetchRemote: 'private', pullRemote: 'private', pushRemotes: ['private'], selectionModes: modes });
+  expect(saved.selectionSnapshots?.push?.remotes[0].name).toBe('private');
+  expect(saved.pullBranches).toBeUndefined();
+  expect(saved.pushBranches).toBeUndefined();
+});
+
+it('rejects an empty remembered push selection on multiple remotes instead of saving unusable rules', () => {
+  const current = { ...before, remotes: [...before.remotes, { ...before.remotes[0], name: 'backup' }] };
+  expect(() => stampRemoteConfiguration(current, { selectionModes: { push: 'remember' }, pushRemotes: [] })).toThrow('Select push targets');
+});

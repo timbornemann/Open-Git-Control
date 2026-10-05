@@ -13,8 +13,11 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
       binding.repository?.fullPath === preferences.hostingRepository?.fullPath,
   );
   return (
-    <section className="remote-configuration__section">
-      <h2>{tr('Hosting-Ziel', 'Hosting target')}</h2>
+    <details className="remote-configuration__section remote-configuration__advanced">
+      <summary>
+        {tr('Hosting für PRs, CI und Releases (optional)', 'Hosting for PRs, CI and releases (optional)')}
+        {preferences.hostingRemote ? ` · ${preferences.hostingRemote}` : ''}
+      </summary>
       <p>
         {tr(
           'Dieses Ziel bestimmt, welches Konto und Repository für Change Requests, CI und Releases verwendet wird. Übertragungsziele bleiben unabhängig davon.',
@@ -49,7 +52,14 @@ export function RemoteConfigurationHosting({ preferences, connections, update, d
           ))}
         </select>
       </label>
-      {!bindings.length && <p>{tr('Zuerst unten einem Endpunkt ein Hosting-Konto zuordnen.', 'Bind a hosting account to an endpoint below first.')}</p>}
-    </section>
+      {!bindings.length && (
+        <p>
+          {tr(
+            'Für diese Funktionen kannst du unter „Verbundene Remotes“ ein Hosting-Konto zuordnen. Für normale Git-Übertragungen ist das nicht nötig.',
+            'For these features, bind a hosting account under Connected remotes. Normal Git transfers do not require this.',
+          )}
+        </p>
+      )}
+    </details>
   );
 }

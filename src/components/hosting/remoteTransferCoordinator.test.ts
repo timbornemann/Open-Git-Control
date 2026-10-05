@@ -50,7 +50,7 @@ beforeEach(() => {
     branch: 'main',
     tagNames: [],
     force: false,
-    secretScanArgs: ['push', 'plan:plan'],
+    secretScanArgs: ['__ogc_transfer_scan_plan__', `${'a'.repeat(40)}:refs/heads/main`],
     targets: [
       { id: 'origin-target', remoteName: 'origin', url: snapshot.remotes[0].pushUrls[0], destinationRef: 'refs/heads/main', sourceOid: 'a'.repeat(40) },
     ],
@@ -178,6 +178,19 @@ describe('shared remote transfer coordinator', () => {
     await coordinator.approve();
     expect(useRemoteTransferState.getState().phase).toBe('review');
     expect(actionCalls('executePush')).toHaveLength(0);
+  });
+  it('rebuilds and scans a fresh plan when retrying an incomplete initial scan', async () => {
+    mocked.scan.mockResolvedValueOnce({ success: true, data: { ...cleanScan, historyScanIncomplete: true } });
+    await coordinator.start({ repoPath: '/repo', mode: 'push' });
+    const previousPlan = plan;
+    plan = { ...plan, id: 'fresh-plan', secretScanArgs: ['__ogc_transfer_scan_fresh-plan__', `${plan.sourceOid}:refs/heads/main`] };
+    batch = { ...batch, planId: plan.id };
+    await coordinator.retryScan();
+    expect(actionCalls('planPush')).toHaveLength(2);
+    expect(mocked.scan.mock.calls.map(([input]) => input.pushArgs)).toEqual([previousPlan.secretScanArgs, plan.secretScanArgs]);
+    expect(actionCalls('executePush')).toEqual([{ repoPath: '/repo', planId: 'fresh-plan' }]);
+    expect(mocked.approve).not.toHaveBeenCalled();
+    expect(useRemoteTransferState.getState().phase).toBe('idle');
   });
   it('keeps explicit release targets apart from the normal profile and checks the inspected source OID', async () => {
     snapshot.remotes.push({ name: 'backup', fetchUrls: ['backup'], pushUrls: ['backup'] });

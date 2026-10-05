@@ -81,6 +81,7 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
           tags={tags}
           choose={(selection, mode) => void coordinator.choose(selection, mode)}
           approve={() => void coordinator.approve()}
+          retryScan={() => void coordinator.retryScan()}
           retryPush={() => void coordinator.retryPush()}
           retryPull={() => void coordinator.retryPull()}
           openWorkspace={() => {

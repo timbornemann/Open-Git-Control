@@ -303,7 +303,7 @@ export class RemoteTransferService {
       tagNames,
       force: input.force === true,
       targets,
-      secretScanArgs: ['push', marker, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`)],
+      secretScanArgs: [marker, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`)],
     };
     const fingerprint = await this.fingerprint(repoPath);
     if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');

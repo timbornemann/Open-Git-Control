@@ -42,6 +42,51 @@
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 14px;
 }
+.remote-configuration__rules p {
+  margin-top: 0;
+  min-height: 2.5em;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.remote-configuration__rules small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.remote-configuration__destination {
+  overflow-wrap: anywhere;
+}
+.remote-configuration__destination strong {
+  color: var(--text-primary);
+}
+.remote-configuration__destination small {
+  margin-top: 6px;
+  white-space: pre-line;
+}
+.remote-configuration__advanced {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+.remote-configuration__advanced summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.remote-configuration__advanced[open] > summary {
+  margin-bottom: 16px;
+}
+.remote-configuration__advanced summary:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+.remote-configuration .hosting-actions .remote-configuration__save {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--on-accent);
+}
 .remote-configuration fieldset {
   min-width: 0;
   border: 1px solid var(--border-color);
@@ -82,6 +127,11 @@
 .remote-configuration .hosting-card small {
   display: block;
   overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .remote-configuration__rules {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 600px) {
   .remote-configuration__section {

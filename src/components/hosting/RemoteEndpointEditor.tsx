@@ -69,7 +69,7 @@ export function RemoteEndpointEditor({
                   if (value) edit('set-url', r.name, value);
                 }}
               >
-                URL
+                {tr('Fetch-URL ändern', 'Change fetch URL')}
               </button>
               <button disabled={task.busy} onClick={() => edit('remove', r.name)}>
                 {tr('Entfernen', 'Remove')}
@@ -99,85 +99,102 @@ export function RemoteEndpointEditor({
                 <button disabled={task.busy}>{tr('Push-URLs speichern', 'Save push URLs')}</button>
               </form>
             </details>
-            <label>
-              {tr('Hosting-Konto zuordnen', 'Bind hosting account')}
-              <select disabled={task.busy} value={bindingConnection} onChange={(event) => setBindingConnection(event.target.value)}>
-                <option value="">{tr('Konto auswählen', 'Select account')}</option>
-                {connections
-                  .filter((c) => c.authenticated || c.hasCredentials)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label} · {c.username}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {[...new Set([...r.fetchUrls, ...r.pushUrls])].map((endpointUrl) => {
-              const binding = preferences.bindings?.find((candidate) => candidate.remoteName === r.name && candidate.url === endpointUrl);
-              return (
-                <div key={endpointUrl}>
-                  <small>{endpointUrl}</small>
-                  <small>
-                    {preferences.bindings?.find((binding) => binding.remoteName === r.name && binding.url === endpointUrl)?.repository?.connectionId ??
-                      tr('Native Git-Anmeldung', 'Native Git authentication')}
-                  </small>
-                  <label>
-                    {tr('Git-Anmeldung für diesen Endpunkt', 'Git authentication for this endpoint')}
-                    <select
-                      value={binding?.credentialMode ?? (binding?.repository ? 'hosting' : 'system')}
-                      disabled={task.busy || !binding?.repository}
-                      onChange={(event) => setCredentialMode(r.name, endpointUrl, event.target.value as 'hosting' | 'system')}
+            <details className="remote-configuration__advanced">
+              <summary>{tr('Anmeldung und Hosting-Konto (optional)', 'Authentication and hosting account (optional)')}</summary>
+              <p>
+                {tr(
+                  'SSH und bereits gespeicherte Git-Zugangsdaten werden automatisch verwendet. Ein Hosting-Konto ist nur erforderlich, wenn du dessen Anmeldung oder weitere Hosting-Funktionen nutzen möchtest.',
+                  'SSH and existing Git credentials are used automatically. Bind a hosting account when you want to use its credentials or additional hosting features.',
+                )}
+              </p>
+              <label>
+                {tr('Hosting-Konto zuordnen', 'Bind hosting account')}
+                <select disabled={task.busy} value={bindingConnection} onChange={(event) => setBindingConnection(event.target.value)}>
+                  <option value="">{tr('Konto auswählen', 'Select account')}</option>
+                  {connections
+                    .filter((c) => c.authenticated || c.hasCredentials)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label} · {c.username}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              {[...new Set([...r.fetchUrls, ...r.pushUrls])].map((endpointUrl) => {
+                const binding = preferences.bindings?.find((candidate) => candidate.remoteName === r.name && candidate.url === endpointUrl);
+                return (
+                  <div key={endpointUrl}>
+                    <small>{endpointUrl}</small>
+                    <small>
+                      {connections.find((connection) => connection.id === binding?.repository?.connectionId)?.label ??
+                        tr('Git-Anmeldung verwenden', 'Use Git credentials')}
+                    </small>
+                    <label>
+                      {tr('Git-Anmeldung für diesen Endpunkt', 'Git authentication for this endpoint')}
+                      <select
+                        value={binding?.credentialMode ?? (binding?.repository ? 'hosting' : 'system')}
+                        disabled={task.busy || !binding?.repository}
+                        onChange={(event) => setCredentialMode(r.name, endpointUrl, event.target.value as 'hosting' | 'system')}
+                      >
+                        <option value="hosting">{tr('Zugeordnetes Hosting-Konto', 'Bound hosting account')}</option>
+                        <option value="system">{tr('SSH / gespeicherte Git-Anmeldung', 'SSH / saved Git credentials')}</option>
+                      </select>
+                    </label>
+                    <button
+                      disabled={task.busy || !bindingConnection}
+                      onClick={() => {
+                        const url = window.prompt(
+                          tr('Repository-Web-URL zum Auflösen des ausgewählten Endpunkts', 'Repository web URL to resolve the selected endpoint'),
+                          endpointUrl,
+                        );
+                        if (url) bind(r.name, endpointUrl, url);
+                      }}
                     >
-                      <option value="hosting">{tr('Zugeordnetes Hosting-Konto', 'Bound hosting account')}</option>
-                      <option value="system">{tr('SSH / gespeicherte Git-Anmeldung', 'SSH / saved Git credentials')}</option>
-                    </select>
-                  </label>
-                  <button
-                    disabled={task.busy || !bindingConnection}
-                    onClick={() => {
-                      const url = window.prompt(
-                        tr('Repository-Web-URL zum Auflösen des ausgewählten Endpunkts', 'Repository web URL to resolve the selected endpoint'),
-                        endpointUrl,
-                      );
-                      if (url) bind(r.name, endpointUrl, url);
-                    }}
-                  >
-                    {tr('Konto diesem Endpunkt zuordnen', 'Bind account to this endpoint')}
-                  </button>
-                  {binding && unbind && (
-                    <button disabled={task.busy} onClick={() => unbind(r.name, endpointUrl)}>
-                      {tr('Kontobindung entfernen', 'Remove account binding')}
+                      {tr('Konto diesem Endpunkt zuordnen', 'Bind account to this endpoint')}
                     </button>
-                  )}
-                </div>
-              );
-            })}
+                    {binding && unbind && (
+                      <button disabled={task.busy} onClick={() => unbind(r.name, endpointUrl)}>
+                        {tr('Kontobindung entfernen', 'Remove account binding')}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </details>
           </article>
         ))}
       </div>
-      <form
-        className="hosting-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void task.run(async () => {
-            await request('editRemote', { repoPath, mutation: { action: 'add', name: newName, url: newUrl } });
-            setNewName('');
-            setNewUrl('');
-            await reload();
-          });
-        }}
-      >
-        <h3>{tr('Remote hinzufügen', 'Add remote')}</h3>
-        <label>
-          {tr('Name', 'Name')}
-          <input required value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="forgejo" />
-        </label>
-        <label>
-          URL
-          <input required value={newUrl} onChange={(event) => setNewUrl(event.target.value)} placeholder="git@server:namespace/repository.git" />
-        </label>
-        <button disabled={task.busy}>{tr('Hinzufügen', 'Add')}</button>
-      </form>
+      <details className="remote-configuration__advanced" open={snapshot.remotes.length === 0}>
+        <summary>{tr('Weiteres Remote hinzufügen', 'Add another remote')}</summary>
+        <form
+          className="hosting-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void task.run(async () => {
+              await request('editRemote', { repoPath, mutation: { action: 'add', name: newName, url: newUrl } });
+              setNewName('');
+              setNewUrl('');
+              await reload();
+            });
+          }}
+        >
+          <p>
+            {tr(
+              'Gib dem neuen Ziel einen Namen, zum Beispiel „backup“, und füge seine Git-URL ein.',
+              'Name the new destination, for example "backup", and enter its Git URL.',
+            )}
+          </p>
+          <label>
+            {tr('Name', 'Name')}
+            <input required value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="backup" />
+          </label>
+          <label>
+            URL
+            <input required value={newUrl} onChange={(event) => setNewUrl(event.target.value)} placeholder="git@server:namespace/repository.git" />
+          </label>
+          <button disabled={task.busy}>{tr('Hinzufügen', 'Add')}</button>
+        </form>
+      </details>
     </>
   );
 }

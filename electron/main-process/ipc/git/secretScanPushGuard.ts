@@ -179,7 +179,7 @@ export function registerSecretScanPushGuard({
       }
 
       const findingCount = result.findings.length;
-      if (params.recordRendererScan && Array.isArray(params.pushArgs) && stateFingerprintAfter) {
+      if (params.recordRendererScan && Array.isArray(params.pushArgs) && stateFingerprintAfter && !result.historyScanIncomplete) {
         const scanRecord: CompletedRendererScan = {
           repoKey: repositoryPathKey(repoJob.repoPath),
           argsKey: pushArgsKey(params.pushArgs),
@@ -269,6 +269,8 @@ export function registerSecretScanPushGuard({
       pushArgs: rawArgs,
     });
     if (!scanResult.success || !scanResult.data) return scanResult as { success: false; error: string };
+    if (scanResult.data.historyScanIncomplete)
+      return { success: false, error: 'The push history could not be fully scanned. Run the secret scan again before pushing.' };
     if (scanResult.data.findings.length === 0) return null;
 
     try {

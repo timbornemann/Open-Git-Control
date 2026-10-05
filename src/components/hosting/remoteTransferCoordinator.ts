@@ -235,6 +235,20 @@ export class RemoteTransferCoordinator {
       await this.execute();
     });
   }
+  async retryScan() {
+    if (this.state.busy || !this.state.intent || !this.state.plan) return;
+    this.cancelled = false;
+    this.set({ phase: 'preparing', busy: true, scan: null, error: '' });
+    await this.run(async () => {
+      await this.verifyTargets();
+      if (this.state.retrying) {
+        await this.scanPlan();
+        await this.executeOrReview();
+      } else {
+        await this.preparePush();
+      }
+    });
+  }
   private async execute() {
     await this.verifyTargets();
     const { intent, plan, batch, retrying } = this.state;

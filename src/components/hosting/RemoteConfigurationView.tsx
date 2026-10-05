@@ -23,7 +23,7 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
             <RotateCcw size={14} />
             {tr('Entwurf verwerfen', 'Discard draft')}
           </button>
-          <button type="button" disabled={editor.task.busy || !editor.snapshot} onClick={editor.save}>
+          <button className="remote-configuration__save" type="button" disabled={editor.task.busy || !editor.snapshot} onClick={editor.save}>
             <Save size={14} />
             {tr('Speichern', 'Save')}
           </button>
@@ -31,8 +31,8 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
       </header>
       <p className="remote-configuration__notice">
         {tr(
-          'Auswahlregeln und Kontobindungen werden erst mit „Speichern“ übernommen. Entwürfe bleiben in dieser Sitzung für dieses Repository erhalten.',
-          'Selection rules and account bindings take effect when saved. Drafts remain available for this repository during this session.',
+          'Diese Einstellungen sind optional. „Speichern“ übernimmt deine Auswahl lokal für dieses Repository und startet keine Übertragung.',
+          'These settings are optional. Save applies your choices locally to this repository without starting a transfer.',
         )}
       </p>
       {editor.dirty && <p role="status">{tr('Ungespeicherter Entwurf', 'Unsaved draft')}</p>}
@@ -42,20 +42,21 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
             {tr('Aktueller Branch', 'Current branch')}: <strong>{editor.snapshot.branch || 'HEAD'}</strong> · Upstream:{' '}
             {editor.snapshot.upstream ? `${editor.snapshot.upstream.remote}/${editor.snapshot.upstream.branch}` : '—'}
           </p>
-          <RemoteConfigurationSelection
-            snapshot={editor.snapshot}
-            preferences={editor.preferences}
-            update={editor.update}
-            disabled={editor.task.busy}
-            setUpstream={editor.setUpstream}
-          />
-          <RemoteConfigurationHosting preferences={editor.preferences} connections={editor.connections} update={editor.update} disabled={editor.task.busy} />
+          {editor.snapshot.remotes.length > 0 && (
+            <RemoteConfigurationSelection
+              snapshot={editor.snapshot}
+              preferences={editor.preferences}
+              update={editor.update}
+              disabled={editor.task.busy}
+              setUpstream={editor.setUpstream}
+            />
+          )}
           <section className="remote-configuration__section">
-            <h2>{tr('Remotes und Endpunkte', 'Remotes and endpoints')}</h2>
+            <h2>{tr('Verbundene Remotes', 'Connected remotes')}</h2>
             <p>
               {tr(
-                'Remote hinzufügen, umbenennen, entfernen und URLs ändern sind ausdrückliche Git-Aktionen und werden sofort angewendet. Der Entwurf wird an die gültigen Endpunkte angepasst.',
-                'Adding, renaming, removing remotes and changing URLs are explicit Git actions and apply immediately. The draft is adjusted to the valid endpoints.',
+                'Ein Remote ist eine Verbindung zu einem Repository auf einem Server. Hier kannst du zum Beispiel ein zusätzliches Backup verbinden. Änderungen an Namen und URLs gelten sofort.',
+                'A remote connects this repository to a repository on a server. Add another connection here, for example for a backup. Name and URL changes apply immediately.',
               )}
             </p>
             <RemoteEndpointEditor
@@ -85,6 +86,7 @@ export function RemoteConfigurationView({ repoPath }: { repoPath: string | null 
               }}
             />
           </section>
+          <RemoteConfigurationHosting preferences={editor.preferences} connections={editor.connections} update={editor.update} disabled={editor.task.busy} />
         </>
       )}
       {editor.task.busy && <p role="status">{tr('Laden …', 'Loading …')}</p>}

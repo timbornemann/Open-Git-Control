@@ -66,6 +66,48 @@ const click = async (label: string) => {
   await act(async () => button.click());
 };
 
+it('shows automatic transfers for a sole remote and keeps optional settings collapsed without starting a transfer', async () => {
+  const original = vi.mocked(transferClient.request).getMockImplementation()!;
+  vi.mocked(transferClient.request).mockImplementation(async (operation, input) => {
+    if (operation === 'getRemotes') {
+      const current = snapshot('C:/repo');
+      current.remotes = [current.remotes[1]];
+      return current;
+    }
+    return original(operation, input);
+  });
+  await render();
+  expect(host.textContent).toContain('All three actions start directly; no setup is required here.');
+  expect(host.querySelector('select[aria-label="push selection mode"]')).toBeNull();
+  expect(host.querySelector('select[aria-label="Pull source"]')).toBeNull();
+  expect(host.querySelector('details.remote-configuration__advanced')?.hasAttribute('open')).toBe(false);
+  expect([...host.querySelectorAll('.remote-configuration__destination')].map((element) => element.textContent)).toEqual([
+    'backuphttps://github.com/team/repo.git',
+    'backup/main',
+    'backup/mainhttps://github.com/team/repo.git',
+  ]);
+  await click('Save');
+  expect(vi.mocked(transferClient.request).mock.calls.some(([operation]) => ['fetch', 'pull', 'planPush', 'executePush'].includes(operation))).toBe(false);
+});
+
+it('saves inferred Git sources and push targets when using saved selections without changing the suggested defaults', async () => {
+  await render();
+  await select('fetch selection mode', 'remember');
+  await select('pull selection mode', 'remember');
+  await select('push selection mode', 'remember');
+  await click('Save');
+  expect(persisted['C:/repo']).toMatchObject({
+    fetchRemote: 'backup',
+    pullRemote: 'backup',
+    pushRemotes: ['backup'],
+    selectionModes: { fetch: 'remember', pull: 'remember', push: 'remember' },
+    selectionSnapshots: { push: { remotes: [{ name: 'backup' }] } },
+  });
+  expect(persisted['C:/repo'].pullBranches).toBeUndefined();
+  expect(persisted['C:/repo'].pushBranches).toBeUndefined();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
 it('opens and edits a draft without transferring or persisting, then saves independent selections with current identities', async () => {
   await render();
   await select('Fetch source', 'private');

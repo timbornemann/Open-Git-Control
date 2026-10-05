@@ -58,6 +58,7 @@ export interface GitPushTargetDto {
 }
 export interface GitPushPlanDto {
   id: string;
+  /** Push operands without the subcommand: plan marker followed by captured OID refspecs. */
   secretScanArgs: string[];
   repoPath: string;
   sourceOid: string;

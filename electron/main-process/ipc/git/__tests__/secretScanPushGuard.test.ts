@@ -145,6 +145,18 @@ describe('secret scan push state binding', () => {
     });
   });
 
+  it.each([{ findings: [] }, { findings: findingsResult.findings }])('never authorizes an incomplete scan, with findings $findings', async ({ findings }) => {
+    const incomplete = { ...findingsResult, findings, historyScanIncomplete: true };
+    const harness = createHarness(vi.fn().mockResolvedValue(incomplete));
+    const args = ['origin', 'main'];
+    await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: args });
+    expect(await handlers.get('git:approveSecretScanPush')!(harness.event, args, 'C:/repo')).toEqual({ success: false });
+    expect(await harness.guard.requirePushSecretScanApproval(harness.event, args, 'C:/repo')).toMatchObject({
+      success: false,
+      error: expect.stringContaining('could not be fully scanned'),
+    });
+  });
+
   it('redacts fingerprint command errors instead of returning embedded credentials', async () => {
     const harness = createHarness(vi.fn().mockResolvedValue(findingsResult));
     harness.runCommandAtPath.mockRejectedValueOnce(new Error('fatal: https://user:plain-secret@example.test/repo.git failed'));

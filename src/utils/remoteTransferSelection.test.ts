@@ -33,6 +33,15 @@ describe('remote transfer selection', () => {
     });
   });
 
+  it.each(['fetch', 'pull', 'push'] as const)('does not require configuring %s when a sole remote has an unstamped selection mode', (action) => {
+    const preferences: RemotePreferences = { selectionModes: { [action]: 'remember' } };
+    expect(resolveRemoteTransferSelection(action, snapshot(['origin']), preferences)).toMatchObject({
+      state: 'ready',
+      reason: 'single-remote',
+      selectedRemoteNames: ['origin'],
+    });
+  });
+
   it.each(['fetch', 'pull', 'push'] as const)('asks for %s on multiple remotes until that action is remembered', (action) => {
     expect(resolveRemoteTransferSelection(action, snapshot(), {})).toMatchObject({ state: 'choose', reason: 'first-choice' });
     const preferences = remember(action);

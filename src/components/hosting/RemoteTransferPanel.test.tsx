@@ -12,16 +12,21 @@ const mocked = vi.hoisted(() => ({
   refresh: vi.fn(),
   toast: vi.fn(),
   command: vi.fn(),
+  scan: vi.fn(),
+  approve: vi.fn(),
+  scanEnabled: false,
   openConfig: vi.fn(),
   setTab: vi.fn(),
   connections: [],
 }));
 vi.mock('@/services/hostingClient', () => ({ transferClient: { request: mocked.request } }));
-vi.mock('@/services/gitClient', () => ({ gitClient: { cancelSecretScan: vi.fn(), runGitCommandForRepo: mocked.command } }));
+vi.mock('@/services/gitClient', () => ({
+  gitClient: { cancelSecretScan: vi.fn(), runGitCommandForRepo: mocked.command, scanPushSecrets: mocked.scan, approveSecretScanPush: mocked.approve },
+}));
 vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en, t: (key: string) => key }) }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (select: (state: unknown) => unknown) => select(repository),
-  useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { secretScanBeforePushEnabled: false } }),
+  useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { secretScanBeforePushEnabled: mocked.scanEnabled } }),
   useUIStore: (select: (state: unknown) => unknown) => select({ setActiveTab: mocked.setTab }),
   useWorkflowStore: (select: (state: unknown) => unknown) => select({ jobs: [] }),
 }));
@@ -69,6 +74,12 @@ beforeEach(() => {
   useRemoteTransferState.setState(initialRemoteTransferState());
   useRemoteTransferDialogState.getState().close();
   preferences = {};
+  mocked.scanEnabled = false;
+  mocked.scan.mockResolvedValue({
+    success: true,
+    data: { scanned: true, strictness: 'balanced', findings: [], notes: [], stats: { checkedLines: 1, stagedLines: 0, toPushLines: 1, tagLines: 0 } },
+  });
+  mocked.approve.mockResolvedValue({ success: true, data: true });
   repository = { activeRepo: '/repo', currentBranch: 'main', tags: ['v1', 'v2'], triggerRefresh: mocked.refresh, onToast: mocked.toast };
   snapshot = {
     repoPath: '/repo',
@@ -89,7 +100,16 @@ beforeEach(() => {
       return preferences;
     }
     if (operation === 'planPush')
-      return { id: 'plan', repoPath: '/repo', sourceOid: 'a'.repeat(40), branch: 'main', tagNames: [], force: false, secretScanArgs: [], targets: [] };
+      return {
+        id: 'plan',
+        repoPath: '/repo',
+        sourceOid: 'a'.repeat(40),
+        branch: 'main',
+        tagNames: [],
+        force: false,
+        secretScanArgs: ['__ogc_transfer_scan_plan__', `${'a'.repeat(40)}:refs/heads/main`],
+        targets: [],
+      };
     if (operation === 'executePush') return { id: 'batch', planId: 'plan', repoPath: '/repo', sourceOid: 'a'.repeat(40), state: 'success', targets: [] };
     return { output: 'ok' };
   });
@@ -105,6 +125,45 @@ afterEach(() => {
 });
 
 describe('remote transfer host and selection UI', () => {
+  it('pushes with scanning enabled and pulls a sole remote without any configuration or dialog', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    mocked.scanEnabled = true;
+    await render();
+    await start('push');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocked.scan).toHaveBeenCalledWith({ repoPath: '/repo', pushArgs: ['__ogc_transfer_scan_plan__', `${'a'.repeat(40)}:refs/heads/main`] });
+    expect(mocked.request.mock.calls.filter(([operation]) => operation === 'executePush')).toHaveLength(1);
+    expect(mocked.approve).not.toHaveBeenCalled();
+    await start('pull');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocked.request).toHaveBeenCalledWith('pull', { repoPath: '/repo', remote: 'forgejo', branch: 'tracking-main', mode: 'default' });
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'setPreferences')).toBe(false);
+  });
+  it('explains incomplete scans and lets the user retry without changing remote settings', async () => {
+    snapshot.remotes = [snapshot.remotes[0]];
+    mocked.scanEnabled = true;
+    mocked.scan.mockResolvedValueOnce({
+      success: true,
+      data: {
+        scanned: true,
+        strictness: 'balanced',
+        findings: [],
+        notes: ['History could not be read.'],
+        historyScanIncomplete: true,
+        stats: { checkedLines: 0, stagedLines: 0, toPushLines: 0, tagLines: 0 },
+      },
+    });
+    await render();
+    await start('push');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Nothing has been pushed yet');
+    expect([...container.querySelectorAll('button')].find((button) => button.textContent === 'Push to these targets')?.disabled).toBe(true);
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'executePush')).toBe(false);
+    await click('Retry check');
+    expect(mocked.scan).toHaveBeenCalledTimes(2);
+    expect(mocked.request.mock.calls.filter(([operation]) => operation === 'executePush')).toHaveLength(1);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocked.request.mock.calls.some(([operation]) => operation === 'setPreferences')).toBe(false);
+  });
   it('executes a sole-remote fetch without opening a dialog', async () => {
     snapshot.remotes = [snapshot.remotes[0]];
     await render();

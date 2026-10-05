@@ -10,6 +10,7 @@ export function PushTransferReview({
   force,
   busy,
   executePush,
+  retryScan,
 }: {
   plan: GitPushPlanDto;
   batch: GitPushBatchDto | null;
@@ -18,12 +19,15 @@ export function PushTransferReview({
   force: boolean;
   busy: boolean;
   executePush: (approve?: boolean) => void;
+  retryScan: () => void;
 }) {
   const { tr } = useI18n();
   return (
     <div className="hosting-card">
       <strong>{reviewingRetry ? tr('Geprüfte Wiederholung', 'Reviewed retry') : tr('Geprüfter Push-Plan', 'Reviewed push plan')}</strong>
-      <code>{plan.sourceOid}</code>
+      <p>
+        {tr('Quellbranch', 'Source branch')}: <strong>{plan.branch}</strong> · <code title={plan.sourceOid}>{plan.sourceOid.slice(0, 12)}</code>
+      </p>
       {plan.targets
         .filter(
           (target) =>
@@ -58,9 +62,27 @@ export function PushTransferReview({
           </ul>
         </>
       ) : null}
-      {scan?.notes.map((note) => (
-        <p key={note}>{note}</p>
-      ))}
+      {scan?.historyScanIncomplete && (
+        <p className="hosting-error" role="alert">
+          {tr(
+            'Die Push-Historie konnte nicht vollständig auf Secrets geprüft werden. Der Push wurde noch nicht ausgeführt. Starte die Prüfung erneut; bei einem weiteren Fehler stehen die Einzelheiten unter „Prüfdetails“.',
+            'The push history could not be fully checked for secrets. Nothing has been pushed yet. Retry the check; if it fails again, see Check details.',
+          )}
+        </p>
+      )}
+      {scan?.notes.length ? (
+        <details>
+          <summary>{tr('Prüfdetails', 'Check details')}</summary>
+          {scan.notes.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </details>
+      ) : null}
+      {scan?.historyScanIncomplete && (
+        <button disabled={busy} onClick={retryScan}>
+          {tr('Erneut prüfen', 'Retry check')}
+        </button>
+      )}
       <button disabled={busy || scan?.historyScanIncomplete === true} onClick={() => executePush(Boolean(scan?.findings.length))}>
         {scan?.findings.length
           ? force

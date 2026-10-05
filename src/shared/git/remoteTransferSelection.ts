@@ -119,11 +119,11 @@ export function resolveRemoteTransferSelection(
   if (action !== 'fetch' && !snapshot.branch) return result('configure', 'no-branch');
   const mode = preferences.selectionModes?.[action];
   if (preferences.selectionSnapshots?.[action] && !isRemoteSelectionValid(action, snapshot, preferences)) return result('choose', 'selection-invalid');
-  if (mode === 'remember' && !isRemoteSelectionValid(action, snapshot, preferences)) return result('choose', 'selection-invalid');
   if (snapshot.remotes.length === 1) {
     if (action === 'push' && mode === undefined) defaults.targetBranches = { [snapshot.remotes[0].name]: snapshot.branch };
     return result('ready', 'single-remote');
   }
+  if (mode === 'remember' && !isRemoteSelectionValid(action, snapshot, preferences)) return result('choose', 'selection-invalid');
   if (mode === 'remember') return result('ready', 'remembered');
   return result('choose', mode === 'ask' ? 'always-ask' : 'first-choice');
 }

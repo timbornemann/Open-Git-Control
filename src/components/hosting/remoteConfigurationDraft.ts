@@ -92,13 +92,15 @@ export function rebaseRemoteConfigurationDraft(before: GitRemoteSnapshotDto, aft
 export function stampRemoteConfiguration(snapshot: GitRemoteSnapshotDto, preferences: RemotePreferences): RemotePreferences {
   let next = { ...preferences };
   for (const action of ['fetch', 'pull', 'push'] satisfies RemoteTransferAction[]) {
-    const names =
+    const defaults = getRemoteTransferDefaults(action, snapshot, preferences);
+    const configuredNames =
       action === 'push'
         ? (preferences.pushRemotes ?? [])
         : [action === 'fetch' ? preferences.fetchRemote : preferences.pullRemote].filter((name): name is string => Boolean(name));
     const mode = preferences.selectionModes?.[action] ?? 'ask';
+    const names = configuredNames.length ? configuredNames : mode === 'remember' ? defaults.selectedRemoteNames : [];
+    if (mode === 'remember' && !names.length) throw new Error(`Select ${action === 'push' ? 'push targets' : `a ${action} source`} before saving.`);
     if (names.length) {
-      const defaults = getRemoteTransferDefaults(action, snapshot, preferences);
       next = rememberRemoteTransferSelection(
         action,
         snapshot,

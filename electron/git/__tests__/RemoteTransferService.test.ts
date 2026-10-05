@@ -105,7 +105,7 @@ describe('RemoteTransferService with real Git', () => {
     expect(fs.readFileSync(hookOutput, 'utf8').trim().split(/\r?\n/)).toEqual(['origin', 'origin']);
     expect(git(f.repo, 'config', '--get-all', 'remote.origin.pushurl').split(/\r?\n/)).toEqual([a, b]);
     expect(f.context.authorizePush).toHaveBeenCalledWith(plan.secretScanArgs);
-    expect(plan.secretScanArgs[1]).toContain(plan.id);
+    expect(plan.secretScanArgs[0]).toContain(plan.id);
   }, 20_000);
 
   it('publishes an explicit hosting endpoint without touching another native push URL or Git configuration', async () => {
