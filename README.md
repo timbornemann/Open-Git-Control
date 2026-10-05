@@ -110,6 +110,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Keep a persistent repository workspace with recent repositories, favorites, active repository, and sorting.
 - Restore stored repositories without an empty-state flash: the active repository is prepared first while the remaining entries are validated in the background.
 - Search and sort local repositories by last opened date, name, creation date, ascending, or descending order.
+- Recognize repositories by locally discovered icons and logos in the sidebar and repository list. Right-click a repository and choose **Repository logo** to select another image, use initials, or search again. Small thumbnails and preferences are cached locally across restarts; original images and repository configuration stay unchanged.
 - Pin repositories, close repositories, and switch between known repositories quickly.
 - Detect unavailable repositories and handle missing repository paths gracefully.
 - Reveal a repository folder directly from Local Repositories or the active repository header.

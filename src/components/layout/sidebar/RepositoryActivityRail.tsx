@@ -4,6 +4,8 @@ import { useRepositoryActivity } from '@/hooks/useRepositoryActivity';
 import { useAppToast } from '@/hooks/useAppToast';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useI18n } from '@/i18n';
+import { RepositoryIcon } from '@/components/repository-icon/RepositoryIcon';
+import { useRepositoryIconMenu } from '@/components/repository-icon/RepositoryIconMenu';
 
 export function RepositoryActivityRail() {
   const repositories = useGitStore((state) => state.openRepos);
@@ -17,6 +19,7 @@ export function RepositoryActivityRail() {
   const toast = useAppToast();
   const switching = useRef(false);
   const [busy, setBusy] = useState(false);
+  const logoMenu = useRepositoryIconMenu();
 
   const openRepository = async (path: string) => {
     if (switching.current) return;
@@ -56,11 +59,11 @@ export function RepositoryActivityRail() {
               aria-current={active ? 'true' : undefined}
               aria-disabled={busy}
               onClick={() => void openRepository(entry.path)}
+              onContextMenu={(event) => logoMenu.open(event, entry.path)}
+              onKeyDown={(event) => logoMenu.keyboard(event, entry.path)}
               onFocus={(event) => event.currentTarget.scrollIntoView?.({ block: 'nearest' })}
             >
-              <span className="repository-activity-initial" aria-hidden="true">
-                {Array.from(entry.name).slice(0, 2).join('').toLocaleUpperCase(locale)}
-              </span>
+              <RepositoryIcon repoPath={entry.path} name={entry.name} />
               <span className="repository-activity-count" aria-hidden="true">
                 {entry.changeCount}
               </span>
@@ -68,6 +71,7 @@ export function RepositoryActivityRail() {
           );
         })}
       </div>
+      {logoMenu.menu}
     </div>
   );
 }

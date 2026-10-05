@@ -110,6 +110,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Persistenter Repository-Workspace mit zuletzt genutzten Repositories, Favoriten, aktivem Repo und Sortierung.
 - Gespeicherte Repositories ohne leeren Zwischenzustand wiederherstellen: das aktive Repository wird zuerst vorbereitet, waehrend die restlichen Eintraege im Hintergrund validiert werden.
 - Lokale Repositories suchen und nach zuletzt geoeffnet, Name, Erstellzeit, aufsteigend oder absteigend sortieren.
+- Repositories anhand lokal gefundener Icons und Logos in Seitenleiste und Repository-Liste erkennen. Über das Kontextmenü **Repository-Logo** lässt sich ein anderes Bild auswählen, auf Buchstaben umstellen oder erneut suchen. Kleine Vorschaubilder und Einstellungen bleiben lokal über Neustarts erhalten; Originalbilder und Repository-Konfiguration bleiben unverändert.
 - Repositories anpinnen, schliessen und schnell zwischen bekannten Repositories wechseln.
 - Nicht verfuegbare Repositories erkennen und fehlende Pfade sauber behandeln.
 - Repository-Ordner direkt aus Local Repositories oder dem Header des aktiven Repositories im Dateisystem anzeigen.

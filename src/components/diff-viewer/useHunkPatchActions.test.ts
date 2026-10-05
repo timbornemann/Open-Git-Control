@@ -41,6 +41,7 @@ describe('useHunkPatchActions', () => {
 
     expect(onRepoChanged).toHaveBeenCalledTimes(1);
     expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(onApplied).toHaveBeenCalledWith('stage');
     act(() => root.unmount());
   });
 
@@ -108,6 +109,7 @@ describe('useHunkPatchActions', () => {
     expect(gitClient.applyPatch).toHaveBeenCalledTimes(2);
     expect(vi.mocked(gitClient.applyPatch).mock.calls[1]?.[0]).toContain('@@ -20,6 +20,8 @@');
     expect(onApplied).toHaveBeenCalledTimes(1);
+    expect(onApplied).toHaveBeenCalledWith('stage');
     expect(onError).not.toHaveBeenCalled();
     act(() => root.unmount());
   });

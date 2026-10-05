@@ -24,6 +24,7 @@ import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
 import { createRepositoryRunApi } from './createRepositoryRunApi';
 import { createHostingApi } from './createHostingApi';
 import { createRepositoryFileApi } from './createRepositoryFileApi';
+import { createRepositoryIconApi } from './createRepositoryIconApi';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -74,6 +75,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
   };
 
   const flatApi = {
+    ...createRepositoryIconApi(ipcRenderer),
     ...createHostingApi(ipcRenderer),
     inspectCommitMessageEdit: (request: Parameters<ElectronAPI['inspectCommitMessageEdit']>[0]) =>
       invokeGitOperationForRepo(request.repoPath, 'inspectCommitMessageEdit', IpcChannel.GitInspectCommitMessageEdit, request),
@@ -469,6 +471,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       onJobEvent: flatApi.onJobEvent,
     },
     repos: {
+      ...createRepositoryIconApi(ipcRenderer),
       getStoredRepos: flatApi.getStoredRepos,
       setStoredRepos: flatApi.setStoredRepos,
       resolveRepoPath: flatApi.resolveRepoPath,

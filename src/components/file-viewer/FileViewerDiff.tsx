@@ -8,12 +8,21 @@ import { DiffContentPane } from '@/components/diff-viewer/DiffContentPane';
 import { DiffToolbar } from '@/components/diff-viewer/DiffToolbar';
 import { useDiffBlame } from '@/components/diff-viewer/useDiffBlame';
 import { useDiffPreviewData } from '@/components/diff-viewer/useDiffPreviewData';
-import { useHunkPatchActions } from '@/components/diff-viewer/useHunkPatchActions';
+import { useHunkPatchActions, type HunkPatchOperation } from '@/components/diff-viewer/useHunkPatchActions';
+import { MAX_RENDER_CHARS, MAX_RENDER_LINES } from '@/components/diff-viewer/diffViewerConstants';
+import { gitClient } from '@/services/gitClient';
+import { freshRead } from '@/data/clientCache';
 import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { fileViewerIdentity } from './fileViewerRequest';
 
-type Props = { context: RepositoryFileContextDto; refreshTrigger: number; onRepoChanged?: () => void; onNavigateToCommit?: (hash: string) => void };
-export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavigateToCommit }: Props) {
+type Props = {
+  context: RepositoryFileContextDto;
+  refreshTrigger: number;
+  onRepoChanged?: () => void;
+  onNavigateToCommit?: (hash: string) => void;
+  onOpenStagedDiff: () => void;
+};
+export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavigateToCommit, onOpenStagedDiff }: Props) {
   const { t, tr } = useI18n();
   const { setConfirmDialog } = useUIContext();
   const showToast = useAppToast();
@@ -21,17 +30,51 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
   const request = useMemo<DiffRequest>(() => ({ path, source, commitHash }), [path, source, commitHash]);
   const [viewMode, setViewMode] = useState<DiffViewMode>('unified');
   const [activeHunkIndex, setActiveHunkIndex] = useState(0);
-  const [localRefresh, setLocalRefresh] = useState(0);
+  const [mutation, setMutation] = useState<{ refresh: number; stagedScope: { scope: string } | null }>({ refresh: 0, stagedScope: null });
+  const localRefresh = mutation.refresh;
   const hunkRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scope = fileViewerIdentity(context);
   const currentScope = useMemo(() => ({ scope }), [scope]);
   const scopeRef = useRef<typeof currentScope | null>(currentScope);
   scopeRef.current = currentScope;
+  const openStagedDiffRef = useRef(onOpenStagedDiff);
+  openStagedDiffRef.current = onOpenStagedDiff;
   const data = useDiffPreviewData({ repoPath, request, refreshTrigger: refreshTrigger + localRefresh, t });
   const blame = useDiffBlame({ repoPath, request, refreshTrigger: refreshTrigger + localRefresh });
   const reportError = useCallback((message: string) => showToast(message, true), [showToast]);
-  const applied = useCallback(() => setLocalRefresh((value) => value + 1), []);
+  const applied = useCallback(
+    (operation: HunkPatchOperation) => {
+      if (scopeRef.current !== currentScope) return;
+      setMutation((previous) => ({ refresh: previous.refresh + 1, stagedScope: source === 'unstaged' && operation === 'stage' ? currentScope : null }));
+    },
+    [source, currentScope],
+  );
   const { isHunkOperationRunning, applyHunk } = useHunkPatchActions({ repoPath, request, onRepoChanged, onApplied: applied, onError: reportError, t });
+  const pendingStage = mutation.stagedScope === currentScope;
+  useEffect(() => {
+    if (!pendingStage || scopeRef.current !== currentScope) return;
+    const finish = () =>
+      setMutation((previous) => (previous.refresh === localRefresh && previous.stagedScope === currentScope ? { ...previous, stagedScope: null } : previous));
+    const remaining = data.confirmedPreview;
+    if (data.error || remaining?.truncated || remaining?.text.trim()) {
+      finish();
+      return;
+    }
+    if (!remaining) return;
+    let active = true;
+    // Use the confirmed renderer read. A second forced working-diff read
+    // would cancel it through the shared query cache.
+    void freshRead(() => gitClient.getDiffPreview(['diff', '--cached', '--', path], { maxBytes: MAX_RENDER_CHARS, maxLines: MAX_RENDER_LINES }, repoPath))
+      .catch(() => null)
+      .then((staged) => {
+        if (!active || scopeRef.current !== currentScope) return;
+        if (staged?.success && staged.data.text.trim()) openStagedDiffRef.current();
+        finish();
+      });
+    return () => {
+      active = false;
+    };
+  }, [pendingStage, currentScope, localRefresh, data.confirmedPreview, data.error, repoPath, path]);
   useEffect(() => {
     setActiveHunkIndex(0);
     hunkRefs.current = [];
@@ -115,7 +158,7 @@ export function FileViewerDiff({ context, refreshTrigger, onRepoChanged, onNavig
         activeHunkIndex={activeHunkIndex}
         setHunkRef={setHunkRef}
         scrollToHunk={scrollToHunk}
-        isHunkOperationRunning={isHunkOperationRunning}
+        isHunkOperationRunning={isHunkOperationRunning || pendingStage}
         applyHunk={requestHunk}
         onRepoChanged={onRepoChanged}
         showBlame={blame.showBlame}

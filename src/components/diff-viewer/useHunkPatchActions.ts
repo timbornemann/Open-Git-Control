@@ -10,7 +10,7 @@ type UseHunkPatchActionsParams = {
   repoPath: string | null;
   request: Pick<DiffRequest, 'path' | 'source'>;
   onRepoChanged?: () => void;
-  onApplied?: () => void;
+  onApplied?: (operation: HunkPatchOperation) => void | Promise<void>;
   onError?: (message: string) => void;
   t: CatalogTranslateFn;
 };
@@ -64,7 +64,7 @@ export const useHunkPatchActions = ({ repoPath, request, onRepoChanged, onApplie
         if (generation !== generationRef.current || operationRef.current !== operationId) return;
         if (result.success) {
           onRepoChanged?.();
-          onApplied?.();
+          await onApplied?.(op);
         } else {
           // A previous hunk can have been staged while this displayed hunk was
           // still rendered. Its context is unchanged, but its old line offset
@@ -82,7 +82,7 @@ export const useHunkPatchActions = ({ repoPath, request, onRepoChanged, onApplie
             if (generation !== generationRef.current || operationRef.current !== operationId) return;
             if (retryResult.success) {
               onRepoChanged?.();
-              onApplied?.();
+              await onApplied?.(op);
               return;
             }
           }

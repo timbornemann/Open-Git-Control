@@ -1,6 +1,8 @@
 import React from 'react';
-import { Download, FolderGit2, FolderPlus } from 'lucide-react';
+import { Download, FolderPlus } from 'lucide-react';
 import { useI18n } from '@/i18n';
+import { RepositoryIcon } from '@/components/repository-icon/RepositoryIcon';
+import { useRepositoryIconMenu } from '@/components/repository-icon/RepositoryIconMenu';
 
 type Props = {
   activeRepo: string | null;
@@ -13,6 +15,7 @@ type Props = {
 
 export const LocalReposSidebarContent: React.FC<Props> = ({ activeRepo, count, isRestoringRepos, onOpenRepoTab, onOpenFolder, onCloneByUrl }) => {
   const { tr } = useI18n();
+  const logoMenu = useRepositoryIconMenu();
   const activeName = activeRepo?.split(/[\\/]/).filter(Boolean).pop() || activeRepo;
 
   return (
@@ -22,9 +25,16 @@ export const LocalReposSidebarContent: React.FC<Props> = ({ activeRepo, count, i
         <strong>{count}</strong>
       </div>
       {activeRepo ? (
-        <button type="button" className="local-repos-sidebar__active" onClick={onOpenRepoTab} title={activeRepo}>
-          <FolderGit2 size={17} />
-          <span>
+        <button
+          type="button"
+          className="local-repos-sidebar__active"
+          onClick={onOpenRepoTab}
+          title={activeRepo}
+          onContextMenu={(event) => logoMenu.open(event, activeRepo)}
+          onKeyDown={(event) => logoMenu.keyboard(event, activeRepo)}
+        >
+          <RepositoryIcon repoPath={activeRepo} name={activeName || activeRepo} size={26} />
+          <span className="local-repos-sidebar__active-label">
             <small>{tr('Aktives Repository', 'Active repository')}</small>
             <strong>{activeName}</strong>
             <em>{activeRepo}</em>
@@ -43,6 +53,7 @@ export const LocalReposSidebarContent: React.FC<Props> = ({ activeRepo, count, i
           <Download size={15} /> {tr('Per URL klonen', 'Clone from URL')}
         </button>
       </div>
+      {logoMenu.menu}
     </div>
   );
 };

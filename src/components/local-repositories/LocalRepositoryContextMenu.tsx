@@ -1,12 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpRight, Copy, FolderGit2, FolderOpen, Pin, PinOff, Settings2, X } from 'lucide-react';
+import { ArrowUpRight, Copy, FolderGit2, FolderOpen, Image, Pin, PinOff, Settings2, X } from 'lucide-react';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import { knownHttpRemote, repoName } from './localRepositorySelectors';
+import { openRepositoryIconDialog } from '@/components/repository-icon/repositoryIconDialogEvents';
 
 export type LocalRepositoryMenuState = { x: number; y: number; path: string };
 
@@ -134,6 +135,9 @@ export const LocalRepositoryContextMenu: React.FC<Props> = ({
           </button>
         )}
         <div className="repo-list-context-separator" role="separator" />
+        <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => openRepositoryIconDialog(menu.path))}>
+          <Image size={14} /> {tr('Repository-Logo …', 'Repository logo …')}
+        </button>
         <button type="button" role="menuitem" className="repo-list-context-action" onClick={() => run(() => onTogglePin(menu.path))}>
           {pinned ? <PinOff size={14} /> : <Pin size={14} />}
           {pinned ? tr('Pin entfernen', 'Remove pin') : tr('Repo anheften', 'Pin repository')}

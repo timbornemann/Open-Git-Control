@@ -25,6 +25,7 @@ export type FileViewerProps = {
   refreshTrigger?: number;
   onCloseRequestChange?: (request: (() => void) | null) => void;
   onNavigationGuardChange?: (guard: WorkingDirectoryNavigationGuard | null) => void;
+  onRequestChange?: (request: FileViewerRequest) => void;
 };
 export function FileViewer({
   request,
@@ -34,13 +35,16 @@ export function FileViewer({
   refreshTrigger = 0,
   onCloseRequestChange,
   onNavigationGuardChange,
+  onRequestChange,
 }: FileViewerProps) {
   const { tr } = useI18n();
   const showToast = useAppToast();
-  const { repoPath, path, source, commitHash } = request;
+  const [localRequest, setLocalRequest] = useState<{ original: FileViewerRequest; next: FileViewerRequest } | null>(null);
+  const activeRequest = !onRequestChange && localRequest?.original === request ? localRequest.next : request;
+  const { repoPath, path, source, commitHash } = activeRequest;
   const context = useMemo(() => repositoryFileContext({ repoPath, path, source, commitHash, startView: 'text' }), [repoPath, path, source, commitHash]);
   const identity = fileViewerIdentity(context);
-  const [tab, setTab] = useState<FileViewerTab>(request.startView);
+  const [tab, setTab] = useState<FileViewerTab>(activeRequest.startView);
   const [localRefresh, setLocalRefresh] = useState(0);
   const [showWhitespace, setShowWhitespace] = useState(false);
   const [selection, setSelection] = useState<TextSelection>({ from: 0, to: 0 });
@@ -64,10 +68,17 @@ export function FileViewer({
     onNavigationGuardChange,
   });
   useLayoutEffect(() => {
-    setTab(request.startView);
+    setTab(activeRequest.startView);
     setShowWhitespace(false);
     setSelection({ from: 0, to: 0 });
-  }, [identity, request.startView]);
+  }, [identity, activeRequest.startView]);
+  const openStagedDiff = () => {
+    const next: FileViewerRequest = { repoPath, path, source: 'staged', startView: 'diff' };
+    navigation.protectNavigation(() => {
+      if (onRequestChange) onRequestChange(next);
+      else setLocalRequest({ original: request, next });
+    });
+  };
   useEffect(() => {
     const { dirty, save } = document;
     const listener = (event: KeyboardEvent) => {
@@ -182,6 +193,7 @@ export function FileViewer({
         showWhitespace={showWhitespace}
         onSelectionChange={setSelection}
         onRepoChanged={refreshed}
+        onOpenStagedDiff={openStagedDiff}
         onNavigateToCommit={onNavigateToCommit ? (hash) => navigation.protectNavigation(() => onNavigateToCommit(hash)) : undefined}
       />
       {textFile && (

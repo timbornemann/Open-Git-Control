@@ -2,6 +2,7 @@ import React from 'react';
 import { SidebarActivityBar } from './sidebar/SidebarActivityBar';
 import { useUIStore } from '@/contexts/AppStateContext';
 import { SidebarContentRouter, SidebarHeaderContainer } from './sidebar/AppSidebarPanels';
+import { RepositoryIconDialogHost } from '@/components/repository-icon/RepositoryIconDialog';
 
 const AppSidebarComponent: React.FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
@@ -11,6 +12,7 @@ const AppSidebarComponent: React.FC = () => {
 
   return (
     <>
+      <RepositoryIconDialogHost />
       <SidebarActivityBar activeTab={activeTab} setActiveTab={setActiveTab} isSidebarCollapsed={isSidebarCollapsed} onToggleSidebar={onToggleSidebar} />
 
       {!isSidebarCollapsed && (

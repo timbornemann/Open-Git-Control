@@ -251,6 +251,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 onClose={closeInspector}
                 onRepoChanged={repository.triggerRefresh}
                 refreshTrigger={repository.refreshTrigger}
+                onRequestChange={({ path, source, commitHash }) => handleOpenDiff({ path, source, commitHash })}
                 onCloseRequestChange={handleWorkingDirectoryCloseRequestChange}
                 onNavigationGuardChange={onWorkingDirectoryNavigationGuardChange}
                 onNavigateToCommit={(hash) => {

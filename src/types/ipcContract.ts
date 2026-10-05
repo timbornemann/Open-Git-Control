@@ -1,6 +1,12 @@
 export const enum IpcChannel {
   HostingRequest = 'hosting:request',
   RemoteTransferRequest = 'git:remoteTransfer',
+  RepositoryIconGet = 'repos:icon:get',
+  RepositoryIconSource = 'repos:icon:source',
+  RepositoryIconChoice = 'repos:icon:choice',
+  RepositoryIconCache = 'repos:icon:cache',
+  RepositoryIconSelectFile = 'repos:icon:selectFile',
+  RepositoryIconChanged = 'repos:icon:changed',
   AiGenerateCommitMessage = 'ai:generateCommitMessage',
   AiGenerateReleaseNotes = 'ai:generateReleaseNotes',
   AiListModels = 'ai:listModels',

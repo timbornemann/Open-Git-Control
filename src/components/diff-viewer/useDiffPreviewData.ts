@@ -28,6 +28,9 @@ const buildDiffPreviewArgs = (request: DiffRequest): string[] => {
 export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: UseDiffPreviewDataParams) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ repoPath: string; request: DiffRequest; refreshTrigger: number | undefined; preview: DiffPreviewDto } | null>(
+    null,
+  );
   const [preview, setPreview, hasPreview] = useResourceState<DiffPreviewDto | null>(
     'git',
     'getDiffPreview',
@@ -72,6 +75,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
         }
 
         setPreview(result.data);
+        setConfirmed({ repoPath, request, refreshTrigger, preview: result.data });
       } catch (fetchError: unknown) {
         if (!isCurrentRequest()) return;
         console.error(fetchError);
@@ -125,5 +129,7 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
     looksBinaryByExt,
     isTooLarge,
     hunkCount: parsed.hunks.length,
+    confirmedPreview:
+      confirmed?.repoPath === repoPath && confirmed.request === request && confirmed.refreshTrigger === refreshTrigger ? confirmed.preview : null,
   };
 };

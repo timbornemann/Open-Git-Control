@@ -29,8 +29,19 @@ type Props = {
   onSelectionChange: (selection: TextSelection) => void;
   onRepoChanged?: () => void;
   onNavigateToCommit?: (hash: string) => void;
+  onOpenStagedDiff: () => void;
 };
-export function FileViewerContent({ context, tab, document, refreshTrigger, showWhitespace, onSelectionChange, onRepoChanged, onNavigateToCommit }: Props) {
+export function FileViewerContent({
+  context,
+  tab,
+  document,
+  refreshTrigger,
+  showWhitespace,
+  onSelectionChange,
+  onRepoChanged,
+  onNavigateToCommit,
+  onOpenStagedDiff,
+}: Props) {
   const { t, tr } = useI18n();
   const { path, repoPath } = context;
   const { preview, text, update, save, loading } = document;
@@ -45,7 +56,15 @@ export function FileViewerContent({ context, tab, document, refreshTrigger, show
   const history = useFileHistory(context, tab === 'history', refreshTrigger);
   const blame = useFileBlame(context, tab === 'blame', refreshTrigger);
   if (tab === 'diff')
-    return <FileViewerDiff context={context} refreshTrigger={refreshTrigger} onRepoChanged={onRepoChanged} onNavigateToCommit={onNavigateToCommit} />;
+    return (
+      <FileViewerDiff
+        context={context}
+        refreshTrigger={refreshTrigger}
+        onRepoChanged={onRepoChanged}
+        onNavigateToCommit={onNavigateToCommit}
+        onOpenStagedDiff={onOpenStagedDiff}
+      />
+    );
   if (tab === 'history')
     return (
       <div className="file-viewer-panel">

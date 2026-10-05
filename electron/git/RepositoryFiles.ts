@@ -7,6 +7,7 @@ import {
   resolveRepositoryPathForCreateWithoutSymlinks,
 } from './RepositoryPathSafety';
 import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile, type RepositoryTextEncoding } from './RepositoryFileEncoding';
+import { repositoryImageMimeType } from '../../src/shared/repositoryImageTypes';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
 
@@ -19,18 +20,6 @@ export type RepositoryFileDataUrl = {
 const MAX_MARKDOWN_PREVIEW_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_MARKDOWN_PREVIEW_ASSET_BYTES = 10 * 1024 * 1024;
 const COMMIT_HASH_RE = /^[0-9a-f]{7,64}$/i;
-const IMAGE_MIME_TYPES = new Map<string, string>([
-  ['apng', 'image/apng'],
-  ['avif', 'image/avif'],
-  ['bmp', 'image/bmp'],
-  ['gif', 'image/gif'],
-  ['ico', 'image/x-icon'],
-  ['jpeg', 'image/jpeg'],
-  ['jpg', 'image/jpeg'],
-  ['png', 'image/png'],
-  ['svg', 'image/svg+xml'],
-  ['webp', 'image/webp'],
-]);
 
 const writeRepositoryFileAtomically = (targetPath: string, contents: Buffer, mode: number, beforePublish?: () => void): void => {
   const temporaryPath = path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.ogc-write-${process.pid}-${randomUUID()}.tmp`);
@@ -188,10 +177,7 @@ export class RepositoryFiles {
   }
 
   private getImageMimeType(relativePath: string): string {
-    const fileName = relativePath.split('/').pop() || relativePath;
-    const lastDot = fileName.lastIndexOf('.');
-    const extension = lastDot >= 0 ? fileName.slice(lastDot + 1).toLowerCase() : '';
-    const mimeType = IMAGE_MIME_TYPES.get(extension);
+    const mimeType = repositoryImageMimeType(relativePath);
     if (!mimeType) {
       throw new Error('Only image assets can be loaded for Markdown preview.');
     }

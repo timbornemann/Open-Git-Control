@@ -7,6 +7,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { LocalRepositoryContextMenu, type LocalRepositoryMenuState } from './LocalRepositoryContextMenu';
 import { repoName, selectLocalRepositories } from './localRepositorySelectors';
+import { RepositoryIcon } from '@/components/repository-icon/RepositoryIcon';
 
 export const LocalRepositoriesView: React.FC = () => {
   const repository = useRepositoryContext();
@@ -125,7 +126,7 @@ export const LocalRepositoriesView: React.FC = () => {
                   }}
                 >
                   <span className="local-repositories-view__signet" aria-hidden="true">
-                    <FolderGit2 size={18} />
+                    <RepositoryIcon repoPath={path} name={name} size={30} />
                   </span>
                   <button type="button" className="local-repositories-view__row-main" onClick={() => void openRepoTab(path)} disabled={switchingPath !== null}>
                     <span className="local-repositories-view__row-title">

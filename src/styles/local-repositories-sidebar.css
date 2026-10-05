@@ -36,7 +36,7 @@
   background: var(--bg-hover);
 }
 
-.local-repos-sidebar__active span {
+.local-repos-sidebar__active-label {
   display: flex;
   flex-direction: column;
   gap: 3px;
