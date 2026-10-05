@@ -42,7 +42,7 @@ function preloadable<P extends object>(
 export const viewModules = {
   editor: preloadable(async () => ({ default: (await import('@/components/working-directory/WorkingDirectoryCodeEditor')).WorkingDirectoryCodeEditor })),
   repo: preloadable(async () => ({ default: (await import('@/components/commit-graph')).CommitGraph })),
-  diff: preloadable(async () => ({ default: (await import('@/components/diff-viewer')).DiffViewer })),
+  file: preloadable(async () => ({ default: (await import('@/components/file-viewer/FileViewer')).FileViewer })),
   timeline: preloadable(async () => ({ default: (await import('@/components/FileTimelineView')).FileTimelineView })),
   planner: preloadable(async () => ({ default: (await import('@/components/project-planner')).ProjectPlannerView })),
   hosting: preloadable(async () => ({ default: (await import('@/components/hosting/HostingWorkspace')).HostingWorkspace })),
@@ -50,7 +50,7 @@ export const viewModules = {
 };
 
 export async function preloadViewModules() {
-  for (const name of ['hosting', 'planner', 'repo', 'settings', 'diff', 'editor', 'timeline'] as const) {
+  for (const name of ['hosting', 'planner', 'repo', 'settings', 'file', 'editor', 'timeline'] as const) {
     if (document.visibilityState === 'hidden') return;
     await viewModules[name].preload().catch(() => {});
   }

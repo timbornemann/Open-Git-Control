@@ -22,6 +22,14 @@ import type { GitJobEventDto } from '../../../types/aiDtos';
 import type { IpcResult } from '../../../types/ipc';
 import type { LicenseTemplateId } from '../../licenseTemplates';
 import type {
+  RepositoryFilePreviewRequestDto,
+  RepositoryFilePreviewDto,
+  RepositoryFileContextDto,
+  RepositoryFileInfoDto,
+  SaveRepositoryFileRequestDto,
+  SaveRepositoryFileResultDto,
+} from '../repositoryFiles';
+import type {
   CommitMessageEditRequest,
   CommitMessageEditInspection,
   RewordCommitMessageRequest,
@@ -275,6 +283,9 @@ export interface ElectronGitAPI {
   createWorkingDirectoryFolder: (folderPath: string, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;
   getWorkingDirectoryFileInfo: (filePath: string, repoPath: string) => Promise<IpcResult<WorkingDirectoryFileInfoDto>>;
   getWorkingDirectoryPreview: (filePath: string, repoPath: string, allowLargeImage?: boolean) => Promise<IpcResult<WorkingDirectoryPreviewDto>>;
+  getRepositoryFilePreview: (request: RepositoryFilePreviewRequestDto) => Promise<IpcResult<RepositoryFilePreviewDto>>;
+  getRepositoryFileInfo: (request: RepositoryFileContextDto) => Promise<IpcResult<RepositoryFileInfoDto>>;
+  saveRepositoryFile: (request: SaveRepositoryFileRequestDto) => Promise<IpcResult<SaveRepositoryFileResultDto>>;
   searchWorkingDirectory: (request: WorkingDirectorySearchRequestDto, repoPath: string) => Promise<IpcResult<WorkingDirectorySearchResultDto>>;
   replaceWorkingDirectory: (request: WorkingDirectoryReplaceRequestDto, repoPath: string) => Promise<IpcResult<WorkingDirectoryReplaceResultDto>>;
   applyWorkingDirectoryMoves: (moves: WorkingDirectoryMoveDto[], createParentFolders: boolean, repoPath: string) => Promise<WorkingDirectoryMutationResultDto>;

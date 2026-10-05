@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { useUIContext } from '@/contexts/AppStateContext';
 import { useAppToast } from '@/hooks/useAppToast';
 import { useI18n } from '@/i18n';
 import { gitClient } from '@/services/gitClient';
 import type { TextFileEncodingDto, WorkingDirectoryFileInfoDto } from '@/shared/ipc/contracts/git';
+import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { copyTextToClipboard } from '@/utils/clipboard';
 import type { LineEnding } from '@/utils/lineEndings';
 import { compactTextToSingleLine, getJsonPathAtOffset } from './fileContentTransforms';
@@ -27,6 +28,8 @@ type Props = {
   onEncodingChange?: (encoding: TextFileEncodingDto) => void;
   onLineEndingChange?: (lineEnding: LineEnding) => void;
   onShowWhitespaceChange?: (show: boolean) => void;
+  context?: RepositoryFileContextDto;
+  readOnly?: boolean;
 };
 
 type FileHashes = NonNullable<WorkingDirectoryFileInfoDto['hashes']>;
@@ -44,6 +47,8 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   onEncodingChange = () => undefined,
   onLineEndingChange = () => undefined,
   onShowWhitespaceChange = () => undefined,
+  context,
+  readOnly = false,
 }) => {
   const { tr } = useI18n();
   const { setConfirmDialog, setInputDialog } = useUIContext();
@@ -51,11 +56,22 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const scope = JSON.stringify([repoPath, path, context?.source, context?.commitHash, text, encoding, lineEnding, readOnly]);
+  const currentScope = useMemo(() => ({ scope }), [scope]);
+  const scopeRef = useRef<typeof currentScope | null>(currentScope);
+  scopeRef.current = currentScope;
+  const isCurrent = () => scopeRef.current === currentScope;
+  useLayoutEffect(() => {
+    scopeRef.current = currentScope;
+    return () => {
+      if (scopeRef.current === currentScope) scopeRef.current = null;
+    };
+  }, [currentScope]);
 
   useEffect(() => {
     setOpen(false);
     setActiveGroup(null);
-  }, [path]);
+  }, [path, repoPath, context?.source, context?.commitHash]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,8 +98,10 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   };
 
   const applyTransform = (transform: (source: string) => string | Promise<string>, successMessage: string) => {
+    if (readOnly || !isCurrent()) return;
     closeMenu();
     const commit = (transformed: string) => {
+      if (!isCurrent()) return;
       if (transformed === text) {
         showToast(tr('Keine Änderung erforderlich.', 'No change was needed.'), false);
         return;
@@ -92,6 +110,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       showToast(successMessage, false);
     };
     const reportError = (error: unknown) => {
+      if (!isCurrent()) return;
       showToast(error instanceof Error ? error.message : tr('Datei konnte nicht verarbeitet werden.', 'Could not process the file.'), true);
     };
     try {
@@ -104,6 +123,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   };
 
   const applySelectionTransform = (transform: (source: string) => string, successMessage: string) => {
+    if (readOnly || !isCurrent()) return;
     const target = selectedTextOrDocument(text, selection);
     closeMenu();
     try {
@@ -128,6 +148,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       consequences: tr('Die Änderung bleibt bis zum Speichern im Editor.', 'The change remains in the editor until saved.'),
       confirmLabel: tr('Anwenden', 'Apply'),
       onSubmit: (values) => {
+        if (readOnly || !isCurrent()) return;
         onChange(addToLines(text, values.prefix || '', values.suffix || ''));
         showToast(tr('Präfix/Suffix ergänzt.', 'Prefix/suffix added.'), false);
       },
@@ -156,6 +177,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       ),
       confirmLabel: tr('Komprimieren', 'Compact'),
       onConfirm: () => {
+        if (readOnly || !isCurrent()) return;
         onChange(compacted);
         showToast(tr('Text komprimiert.', 'Text compacted.'), false);
       },
@@ -175,6 +197,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       onSubmit: async (values) => {
         try {
           const errors = await validateJsonWithSchema(text, values.schema || '');
+          if (!isCurrent()) return;
           if (errors.length === 0) {
             showToast(tr('JSON entspricht dem Schema.', 'JSON matches the schema.'), false);
             return;
@@ -190,6 +213,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
             onConfirm: () => undefined,
           });
         } catch (error: unknown) {
+          if (!isCurrent()) return;
           showToast(error instanceof Error ? error.message : tr('Validierung fehlgeschlagen.', 'Validation failed.'), true);
         }
       },
@@ -213,9 +237,15 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   };
 
   const loadSavedHashes = async (): Promise<FileHashes | null> => {
-    const result = await gitClient.getWorkingDirectoryFileInfo(path, repoPath);
+    const result = context ? await gitClient.getRepositoryFileInfo(context) : await gitClient.getWorkingDirectoryFileInfo(path, repoPath);
+    if (!isCurrent()) return null;
     if (!result.success || !result.data?.hashes) {
-      showToast(result.data?.hashError || result.error || tr('Hashwerte konnten nicht berechnet werden.', 'Could not calculate hashes.'), true);
+      showToast(
+        ('hashError' in (result.data || {}) ? (result.data as WorkingDirectoryFileInfoDto).hashError : undefined) ||
+          result.error ||
+          tr('Hashwerte konnten nicht berechnet werden.', 'Could not calculate hashes.'),
+        true,
+      );
       return null;
     }
     return result.data.hashes;
@@ -245,7 +275,9 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
     setConfirmDialog({
       variant: 'confirm',
       title: tr('Hashwerte der gespeicherten Datei', 'Hashes of the saved file'),
-      message: tr('Die Werte beziehen sich auf die aktuellen Bytes auf dem Datenträger.', 'These values refer to the current bytes on disk.'),
+      message: context
+        ? tr('Die Werte beziehen sich auf die ausgewählte gespeicherte Version.', 'These values refer to the selected saved version.')
+        : tr('Die Werte beziehen sich auf die aktuellen Bytes auf dem Datenträger.', 'These values refer to the current bytes on disk.'),
       contextItems: [
         { label: 'SHA-256', value: hashes.sha256 },
         { label: 'SHA-1', value: hashes.sha1 },
@@ -262,6 +294,7 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
   };
 
   const setTargetEncoding = (target: TextFileEncodingDto) => {
+    if (readOnly || !isCurrent()) return;
     closeMenu();
     if (target === 'latin1' && [...text].some((character) => (character.codePointAt(0) || 0) > 0xff)) {
       showToast(tr('Der Text enthält Zeichen, die Latin-1 nicht darstellen kann.', 'The text contains characters that Latin-1 cannot represent.'), true);
@@ -291,13 +324,16 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
       closeMenu();
       try {
         await validateYamlText(text);
+        if (!isCurrent()) return;
         showToast(tr('YAML ist gültig.', 'YAML is valid.'), false);
       } catch (error: unknown) {
+        if (!isCurrent()) return;
         showToast(error instanceof Error ? error.message : tr('YAML ist ungültig.', 'YAML is invalid.'), true);
       }
     },
     setTargetEncoding,
     setTargetLineEnding: (target) => {
+      if (readOnly || !isCurrent()) return;
       closeMenu();
       onLineEndingChange(target);
     },
@@ -308,7 +344,17 @@ export const WorkingDirectoryFileTools: React.FC<Props> = ({
     showHashes: () => void showHashes(),
     copyHash: (algorithm) => void copySavedHashes(algorithm),
     copyAllHashes: () => void copySavedHashes(),
-  });
+  }).map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      disabled:
+        readOnly &&
+        !['whitespace', 'json-path', 'json-schema', 'yaml-validate', 'show-hashes', 'copy-sha256', 'copy-sha1', 'copy-md5', 'copy-all-hashes'].includes(
+          item.id,
+        ),
+    })),
+  }));
 
   return (
     <div className="working-file-tools" ref={hostRef}>

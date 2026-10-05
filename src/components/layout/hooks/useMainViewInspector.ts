@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
 import { extractGitObjectId } from '@/utils/gitObjectId';
+import { fileViewerIdentity, fileViewerRequestFromDiff, fileViewerRequestFromWorkingFile } from '@/components/file-viewer/fileViewerRequest';
 import {
   requestWorkingDirectoryNavigation,
   setActiveWorkingDirectoryNavigationGuard,
@@ -46,7 +47,12 @@ export const useMainViewInspector = ({
   commitNavigationRequest,
   onNavigateToCommit,
 }: Params) => {
-  const [activeDiffRequest, setActiveDiffRequest] = useState<DiffRequest | null>(null);
+  const [diffSelection, setDiffSelection] = useState<{ request: DiffRequest; repoPath: string } | null>(null);
+  const activeDiffRequest = diffSelection?.repoPath === activeRepo ? diffSelection.request : null;
+  const setActiveDiffRequest = useCallback(
+    (value: DiffRequest | null) => setDiffSelection(value && activeRepo ? { request: value, repoPath: activeRepo } : null),
+    [activeRepo],
+  );
   const [activeConflictPath, setActiveConflictPath] = useState<string | null>(null);
   const [showRecoveryCenter, setShowRecoveryCenter] = useState(false);
   const [commitHistoryStack, setCommitHistoryStack] = useState<string[]>([]);
@@ -70,7 +76,7 @@ export const useMainViewInspector = ({
       setSelectedCommit(null);
       onAutoOpenConflictResolverConsumed?.();
     });
-  }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit]);
+  }, [autoOpenConflictResolverPath, onAutoOpenConflictResolverConsumed, setSelectedCommit, setActiveDiffRequest]);
 
   useLayoutEffect(() => {
     setActiveDiffRequest(null);
@@ -80,7 +86,7 @@ export const useMainViewInspector = ({
     setWorkingDirectoryFile(null);
     setIsCommitInspectorOpen(false);
     setShowRecoveryCenter(false);
-  }, [activeRepo]);
+  }, [activeRepo, setActiveDiffRequest]);
 
   // A file path is only meaningful in the repository from which it was
   // selected. Deriving the exposed value keeps a stale selection from ever
@@ -99,6 +105,7 @@ export const useMainViewInspector = ({
     setActiveConflictPath(null);
     setShowRecoveryCenter(false);
     setWorkingTreeSelection(null);
+    setWorkingDirectoryFile(null);
     setIsCommitInspectorOpen(true);
     if (preserveNextNavigationHistoryRef.current) {
       preserveNextNavigationHistoryRef.current = false;
@@ -106,7 +113,7 @@ export const useMainViewInspector = ({
       setCommitHistoryStack([]);
     }
     setSelectedCommit(request.hash);
-  }, [commitNavigationRequest, onOpenRepoWorkspace, setSelectedCommit]);
+  }, [commitNavigationRequest, onOpenRepoWorkspace, setSelectedCommit, setActiveDiffRequest]);
 
   const handleToggleRecoveryCenter = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'recovery center' }, () => {
@@ -115,20 +122,23 @@ export const useMainViewInspector = ({
       setWorkingDirectoryFile(null);
       setShowRecoveryCenter((prev) => !prev);
     });
-  }, []);
+  }, [setActiveDiffRequest]);
 
-  const handleOpenDiff = useCallback((diffRequest: DiffRequest) => {
-    requestWorkingDirectoryNavigation({ kind: 'view', label: `diff for "${diffRequest.path}"` }, () => {
-      setActiveConflictPath(null);
-      setWorkingDirectoryFile(null);
-      setActiveDiffRequest((previous) => {
-        if (previous && previous.source === diffRequest.source && previous.path === diffRequest.path && previous.commitHash === diffRequest.commitHash) {
-          return previous;
-        }
-        return diffRequest;
-      });
-    });
-  }, []);
+  const handleOpenDiff = useCallback(
+    (diffRequest: DiffRequest) => {
+      if (!activeRepo) return;
+      requestWorkingDirectoryNavigation(
+        { kind: 'file', path: diffRequest.path, identity: fileViewerIdentity(fileViewerRequestFromDiff(activeRepo, diffRequest)), view: 'diff' },
+        () => {
+          setActiveConflictPath(null);
+          setWorkingDirectoryFile(null);
+          setWorkingTreeSelection(diffRequest.source === 'commit' ? null : { path: diffRequest.path, source: diffRequest.source });
+          setActiveDiffRequest(diffRequest);
+        },
+      );
+    },
+    [activeRepo, setActiveDiffRequest],
+  );
 
   const handleOpenConflictResolver = useCallback(
     (filePath: string) => {
@@ -142,7 +152,7 @@ export const useMainViewInspector = ({
         setSelectedCommit(null);
       });
     },
-    [setSelectedCommit],
+    [setSelectedCommit, setActiveDiffRequest],
   );
 
   const handleSelectCommitDirect = useCallback(
@@ -188,13 +198,19 @@ export const useMainViewInspector = ({
 
   const handleSelectWorkingTreeFile = useCallback(
     (path: string, source: 'staged' | 'unstaged') => {
-      setCommitHistoryStack([]);
-      setActiveConflictPath(null);
-      setIsCommitInspectorOpen(false);
-      setSelectedCommit(null);
-      setWorkingTreeSelection({ path, source });
+      if (!activeRepo) return;
+      requestWorkingDirectoryNavigation(
+        { kind: 'file', path, identity: fileViewerIdentity(fileViewerRequestFromDiff(activeRepo, { path, source })), view: 'diff' },
+        () => {
+          setCommitHistoryStack([]);
+          setActiveConflictPath(null);
+          setIsCommitInspectorOpen(false);
+          setSelectedCommit(null);
+          setWorkingTreeSelection({ path, source });
+        },
+      );
     },
-    [setSelectedCommit],
+    [activeRepo, setSelectedCommit],
   );
 
   const handleOpenWorkingDirectoryFile = useCallback(
@@ -210,10 +226,10 @@ export const useMainViewInspector = ({
         setWorkingDirectoryFile({ path, repoPath: activeRepo });
       };
       const guard = workingDirectoryNavigationGuardRef.current;
-      if (guard) guard({ kind: 'file', path }, proceed);
+      if (guard) guard({ kind: 'file', path, identity: fileViewerIdentity(fileViewerRequestFromWorkingFile(activeRepo, path)), view: 'text' }, proceed);
       else proceed();
     },
-    [activeRepo, setSelectedCommit],
+    [activeRepo, setSelectedCommit, setActiveDiffRequest],
   );
 
   const handleWorkingDirectoryEntryInvalidated = useCallback((entryPath: string) => {
@@ -262,13 +278,15 @@ export const useMainViewInspector = ({
   }, [setSelectedCommit]);
 
   const closeInspector = useCallback(() => {
-    setActiveDiffRequest(null);
-    setWorkingDirectoryFile(null);
-    setCommitHistoryStack([]);
-    setWorkingTreeSelection(null);
-    setActiveConflictPath(null);
-    setIsCommitInspectorOpen(false);
-  }, []);
+    requestWorkingDirectoryNavigation({ kind: 'view', label: 'graph' }, () => {
+      setActiveDiffRequest(null);
+      setWorkingDirectoryFile(null);
+      setCommitHistoryStack([]);
+      setWorkingTreeSelection(null);
+      setActiveConflictPath(null);
+      setIsCommitInspectorOpen(false);
+    });
+  }, [setActiveDiffRequest]);
 
   const handleStageCommitOpen = useCallback(() => {
     requestWorkingDirectoryNavigation({ kind: 'view', label: 'staging and commit' }, () => {
@@ -279,7 +297,7 @@ export const useMainViewInspector = ({
       setWorkingDirectoryFile(null);
       handleSelectCommitDirect(null);
     });
-  }, [handleSelectCommitDirect, onOpenRepoWorkspace]);
+  }, [handleSelectCommitDirect, onOpenRepoWorkspace, setActiveDiffRequest]);
 
   return {
     activeDiffRequest,

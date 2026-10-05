@@ -39,7 +39,11 @@ export const useHunkPatchActions = ({ repoPath, request, onRepoChanged, onApplie
     generationRef.current += 1;
     operationRef.current = null;
     setIsHunkOperationRunning(false);
-  }, [repoPath]);
+    return () => {
+      generationRef.current += 1;
+      operationRef.current = null;
+    };
+  }, [repoPath, request.path, request.source]);
 
   const applyHunk = useCallback(
     async (hunk: ParsedHunk, fileHeader: string[], op: HunkPatchOperation) => {

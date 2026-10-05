@@ -12,6 +12,7 @@ type Props = {
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
   showWhitespace?: boolean;
+  readOnly?: boolean;
   onSelectionChange?: (selection: { from: number; to: number }) => void;
 };
 
@@ -120,11 +121,14 @@ const languageDefinitionForPath = (path: string): LanguageDefinition | null => L
 
 export const getLanguageLabelForPath = (path: string): string | null => languageDefinitionForPath(path)?.label || null;
 
-export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave, showWhitespace = false, onSelectionChange }) => {
+export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onChange, onSave, showWhitespace = false, readOnly = false, onSelectionChange }) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartmentRef = useRef(new Compartment());
   const whitespaceCompartmentRef = useRef(new Compartment());
+  const readOnlyCompartmentRef = useRef(new Compartment());
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -144,19 +148,20 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
           editorTheme,
           syntaxHighlighting(editorHighlightStyle),
           languageCompartmentRef.current.of([]),
+          readOnlyCompartmentRef.current.of([EditorState.readOnly.of(readOnlyRef.current), EditorView.editable.of(!readOnlyRef.current)]),
           whitespaceCompartmentRef.current.of(initialShowWhitespaceRef.current ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
           keymap.of([
             indentWithTab,
             {
               key: 'Mod-s',
               run: () => {
-                void onSaveRef.current();
+                if (!readOnlyRef.current) void onSaveRef.current();
                 return true;
               },
             },
           ]),
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) onChangeRef.current(update.state.doc.toString());
+            if (update.docChanged && !readOnlyRef.current) onChangeRef.current(update.state.doc.toString());
             if (update.selectionSet) {
               const selection = update.state.selection.main;
               onSelectionChangeRef.current?.({ from: selection.from, to: selection.to });
@@ -205,6 +210,10 @@ export const WorkingDirectoryCodeEditor: React.FC<Props> = ({ path, value, onCha
       effects: whitespaceCompartmentRef.current.reconfigure(showWhitespace ? [highlightWhitespace(), highlightTrailingWhitespace()] : []),
     });
   }, [showWhitespace]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: readOnlyCompartmentRef.current.reconfigure([EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]) });
+  }, [readOnly]);
 
   return <div ref={hostRef} className="working-file-viewer__code-editor" aria-label={`Code editor for ${path}`} />;
 };

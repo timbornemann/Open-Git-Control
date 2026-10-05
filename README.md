@@ -265,6 +265,10 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
   - sandboxed HTML/HTM preview
   - file History and Blame tabs
   - safe information view for binary or oversized files, with system-open actions
+- Working Directory, Staging and commit diffs share one viewer with Text, Diff, Preview, CSV Table, History and Blame. Working Directory starts in Text; changed files and commits start in Diff.
+- **Save working file** writes the working-tree file. **Save staging** edits only the selected Git index entry, preserving partial staging, other staged files and the working file. Commit versions are read-only, including tools and CSV cells.
+- Previews, relative assets and hashes use the selected source. Missing assets are explained rather than loaded from another version.
+- Unsaved drafts survive Text/Table/Preview changes. Switching to Diff, another file/source/repository or closing asks to save, discard or cancel. External changes and busy index locks refuse overwrites while keeping the draft.
 
 ### Diff Viewer and File Inspector
 

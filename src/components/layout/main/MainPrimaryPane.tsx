@@ -11,7 +11,7 @@ import type { FileTimelineCommitDto } from '@/types/gitDtos';
 import type { WorkingTreeState } from '@/hooks/useWorkingTreeSnapshot';
 import { PRIMARY_PANE_MIN_WIDTH } from '@/components/layout/hooks/useMainViewPaneResizer';
 import { getMainPrimaryRoute, getMainPrimaryTitle, hasMainPrimaryHeader } from './mainPrimaryRoute';
-import { WorkingDirectoryFileViewer } from '@/components/working-directory/WorkingDirectoryFileViewer';
+import { fileViewerRequestFromDiff, fileViewerRequestFromWorkingFile } from '@/components/file-viewer/fileViewerRequest';
 import { RepositoryRunConsole } from '@/components/repository-run/RepositoryRunConsole';
 import { LocalRepositoriesView } from '@/components/local-repositories/LocalRepositoriesView';
 import { RepositoryRunConfigView } from '@/components/repository-run/RepositoryRunConfigView';
@@ -19,7 +19,7 @@ import { RemoteConfigurationView } from '@/components/hosting/RemoteConfiguratio
 import { useCommitMessageEditor } from '@/components/commit-graph/useCommitMessageEditor';
 
 const CommitGraph = viewModules.repo.View;
-const DiffViewer = viewModules.diff.View;
+const FileViewer = viewModules.file.View;
 const FileTimelineView = viewModules.timeline.View;
 const ProjectPlannerView = viewModules.planner.View;
 const HostingWorkspaceView = viewModules.hosting.View;
@@ -74,6 +74,20 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const handleWorkingDirectoryCloseRequestChange = React.useCallback((request: (() => void) | null) => {
     setWorkingDirectoryCloseRequest(() => request);
   }, []);
+  const fileViewerRequest = React.useMemo(
+    () =>
+      repository.activeRepo &&
+      (activeDiffRequest
+        ? fileViewerRequestFromDiff(repository.activeRepo, activeDiffRequest)
+        : workingDirectoryFilePath
+          ? fileViewerRequestFromWorkingFile(repository.activeRepo, workingDirectoryFilePath)
+          : null),
+    [repository.activeRepo, activeDiffRequest, workingDirectoryFilePath],
+  );
+  const closeFileViewer = () => {
+    if (workingDirectoryCloseRequest) workingDirectoryCloseRequest();
+    else closeInspector();
+  };
 
   const route = getMainPrimaryRoute({
     activeConflictPath,
@@ -137,16 +151,12 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             <button className="icon-btn pane-header-nav-btn" onClick={() => setShowRecoveryCenter(false)}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
-          ) : workingDirectoryFilePath ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={() => workingDirectoryCloseRequest?.() ?? closeInspector()}>
+          ) : fileViewerRequest ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={closeFileViewer}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : activeConflictPath ? (
             <button className="icon-btn pane-header-nav-btn" onClick={() => setActiveConflictPath(null)}>
-              {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
-            </button>
-          ) : activeDiffRequest ? (
-            <button className="icon-btn pane-header-nav-btn" onClick={closeInspector}>
               {t('generated.components.layout.main.mainprimarypane.back_to_graph_07687079')}
             </button>
           ) : null}
@@ -185,15 +195,6 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
           </React.Suspense>
         ) : isRunConsoleView && workflow.repositoryRun ? (
           <RepositoryRunConsole run={workflow.repositoryRun} onStop={() => void workflow.onStopRepositoryRun()} onBack={workflow.onCloseRunConsole} />
-        ) : workingDirectoryFilePath && repository.activeRepo ? (
-          <WorkingDirectoryFileViewer
-            repoPath={repository.activeRepo}
-            path={workingDirectoryFilePath}
-            onClose={closeInspector}
-            onRepoChanged={repository.triggerRefresh}
-            onCloseRequestChange={handleWorkingDirectoryCloseRequestChange}
-            onNavigationGuardChange={onWorkingDirectoryNavigationGuardChange}
-          />
         ) : activeConflictPath ? (
           <StagingArea
             repoPath={repository.activeRepo}
@@ -210,12 +211,12 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
             workingTreeStats={workingTree.stats}
             onRefreshWorkingTree={workingTree.refresh}
           />
-        ) : activeDiffRequest || !showRecoveryCenter ? (
+        ) : fileViewerRequest || !showRecoveryCenter ? (
           <React.Suspense fallback={lazyPaneFallback}>
             <div
-              aria-hidden={activeDiffRequest ? true : undefined}
+              aria-hidden={fileViewerRequest ? true : undefined}
               style={{
-                display: activeDiffRequest ? 'none' : 'block',
+                display: fileViewerRequest ? 'none' : 'block',
                 height: '100%',
                 overflow: 'auto',
                 overflowAnchor: 'none',
@@ -244,12 +245,14 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
                 onRefreshWorkingTree={workingTree.refresh}
               />
             </div>
-            {activeDiffRequest && (
-              <DiffViewer
-                repoPath={repository.activeRepo}
-                request={activeDiffRequest}
+            {fileViewerRequest && (
+              <FileViewer
+                request={fileViewerRequest}
                 onClose={closeInspector}
                 onRepoChanged={repository.triggerRefresh}
+                refreshTrigger={repository.refreshTrigger}
+                onCloseRequestChange={handleWorkingDirectoryCloseRequestChange}
+                onNavigationGuardChange={onWorkingDirectoryNavigationGuardChange}
                 onNavigateToCommit={(hash) => {
                   repository.onNavigateToCommit(hash);
                   closeInspector();

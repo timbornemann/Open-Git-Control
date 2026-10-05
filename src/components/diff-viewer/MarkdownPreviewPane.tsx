@@ -27,7 +27,7 @@ export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({ markdo
         </div>
       )}
       {!markdownPreview.loading && markdownPreview.error && <div className="diff-empty-state error">{markdownPreview.error}</div>}
-      {!markdownPreview.loading && !markdownPreview.error && markdownPreview.html && (
+      {!markdownPreview.loading && markdownPreview.html && (
         <article className="markdown-preview-content" onClick={onPreviewClick} dangerouslySetInnerHTML={{ __html: markdownPreview.html }} />
       )}
       {!markdownPreview.loading && !markdownPreview.error && !markdownPreview.html && (

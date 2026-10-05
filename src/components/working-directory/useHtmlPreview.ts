@@ -1,18 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gitClient } from '@/services/gitClient';
+import type { RepositoryFileContextDto } from '@/shared/ipc/repositoryFiles';
 import { buildSandboxedHtmlPreviewDocument, collectHtmlPreviewAssets, type HtmlPreviewAssetContent, type HtmlPreviewAssetKind } from '@/utils/htmlPreview';
 
 export type HtmlPreviewState = { loading: boolean; error: string | null; document: string };
 
 const EMPTY_HTML_PREVIEW: HtmlPreviewState = { loading: false, error: null, document: '' };
 
-export const useHtmlPreview = ({ repoPath, path, html, isActive }: { repoPath: string; path: string; html: string; isActive: boolean }) => {
+export const useHtmlPreview = ({
+  repoPath,
+  path,
+  html,
+  isActive,
+  source = 'unstaged',
+  commitHash,
+}: { html: string; isActive: boolean } & RepositoryFileContextDto) => {
   const [htmlPreview, setHtmlPreview] = useState<HtmlPreviewState>(EMPTY_HTML_PREVIEW);
   const requestGenerationRef = useRef(0);
 
   useLayoutEffect(() => {
     setHtmlPreview(EMPTY_HTML_PREVIEW);
-  }, [path, repoPath]);
+  }, [path, repoPath, source, commitHash]);
 
   useEffect(() => {
     const requestGeneration = requestGenerationRef.current + 1;
@@ -30,21 +38,28 @@ export const useHtmlPreview = ({ repoPath, path, html, isActive }: { repoPath: s
 
       try {
         const assets = collectHtmlPreviewAssets(html, path);
+        const missing: string[] = [];
         await Promise.all(
           assets.map(async (asset) => {
             if (asset.kind === 'image') {
-              const result = await gitClient.getRepoFileDataUrl({ source: 'unstaged', path: asset.path, repoPath });
+              const result = await gitClient.getRepoFileDataUrl({ source, commitHash, path: asset.path, repoPath });
               if (result.success) assetContent.images[asset.path] = result.data.dataUrl;
+              else missing.push(asset.path);
               return;
             }
 
-            const result = await gitClient.getMarkdownPreviewFile({ source: 'unstaged', path: asset.path, repoPath });
+            const result = await gitClient.getMarkdownPreviewFile({ source, commitHash, path: asset.path, repoPath });
             if (result.success) assetContent[`${asset.kind}s` as `${HtmlPreviewAssetKind}s`][asset.path] = result.data.text;
+            else missing.push(asset.path);
           }),
         );
 
         if (isCurrentRequest()) {
-          setHtmlPreview({ loading: false, error: null, document: buildSandboxedHtmlPreviewDocument(html, path, assetContent) });
+          setHtmlPreview({
+            loading: false,
+            error: missing.length ? `Assets unavailable in this version: ${missing.join(', ')}` : null,
+            document: buildSandboxedHtmlPreviewDocument(html, path, assetContent),
+          });
         }
       } catch (previewError: unknown) {
         if (isCurrentRequest()) {
@@ -57,7 +72,7 @@ export const useHtmlPreview = ({ repoPath, path, html, isActive }: { repoPath: s
     return () => {
       if (requestGenerationRef.current === requestGeneration) requestGenerationRef.current += 1;
     };
-  }, [html, isActive, path, repoPath]);
+  }, [html, isActive, path, repoPath, source, commitHash]);
 
   return htmlPreview;
 };

@@ -7,6 +7,7 @@ import '@/styles/working-directory-csv-editor.css';
 type Props = {
   value: string;
   onChange: (value: string) => void;
+  readOnly?: boolean;
 };
 
 const MAX_VISIBLE_ROWS = 500;
@@ -32,7 +33,7 @@ const parseForTable = (value: string, delimiter?: CsvDelimiter): { document: Csv
   }
 };
 
-export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
+export const CsvTableEditor: React.FC<Props> = ({ value, onChange, readOnly = false }) => {
   const { tr } = useI18n();
   const [delimiterOverride, setDelimiterOverride] = useState<CsvDelimiter | undefined>();
   const parsed = useMemo(() => parseForTable(value, delimiterOverride), [delimiterOverride, value]);
@@ -55,7 +56,9 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
   const columnsTruncated = visibleColumnCount < columnCount;
   const delimiterLabel = document.delimiter === '\t' ? tr('Tabulator', 'tab') : document.delimiter;
 
-  const updateRows = (rows: string[][]) => onChange(serializeCsvDocument({ ...document, rows }));
+  const updateRows = (rows: string[][]) => {
+    if (!readOnly) onChange(serializeCsvDocument({ ...document, rows }));
+  };
   const updateCell = (rowIndex: number, columnIndex: number, cellValue: string) => {
     const rows = document.rows.map((row) => row.slice());
     while (rows[rowIndex].length <= columnIndex) rows[rowIndex].push('');
@@ -90,17 +93,17 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
           <option value={'\t'}>{tr('Tabulator', 'Tab')}</option>
         </select>
         <code className="working-csv-editor__delimiter-preview">{delimiterLabel}</code>
-        <button type="button" onClick={addRow}>
+        <button type="button" onClick={addRow} disabled={readOnly}>
           <Rows size={14} />
           <Plus size={11} />
           {tr('Zeile', 'Row')}
         </button>
-        <button type="button" onClick={addColumn}>
+        <button type="button" onClick={addColumn} disabled={readOnly}>
           <Columns size={14} />
           <Plus size={11} />
           {tr('Spalte', 'Column')}
         </button>
-        <button type="button" onClick={removeLastColumn} disabled={columnCount <= 1}>
+        <button type="button" onClick={removeLastColumn} disabled={readOnly || columnCount <= 1}>
           <Columns size={14} />
           <Minus size={11} />
           {tr('Letzte Spalte', 'Last column')}
@@ -115,7 +118,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
         </div>
       )}
       <div className="working-csv-editor__scroller">
-        <table aria-label={tr('Bearbeitbare CSV-Tabelle', 'Editable CSV table')}>
+        <table aria-label={readOnly ? tr('Schreibgeschützte CSV-Tabelle', 'Read-only CSV table') : tr('Bearbeitbare CSV-Tabelle', 'Editable CSV table')}>
           <thead>
             <tr>
               <th aria-label={tr('Zeilennummer', 'Row number')}>#</th>
@@ -132,6 +135,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
                 {Array.from({ length: visibleColumnCount }, (_, columnIndex) => (
                   <td key={columnIndex}>
                     <input
+                      readOnly={readOnly}
                       value={row[columnIndex] ?? ''}
                       aria-label={`${tr('Zeile', 'Row')} ${rowIndex + 1}, ${tr('Spalte', 'column')} ${columnLabel(columnIndex)}`}
                       onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)}
@@ -144,6 +148,7 @@ export const CsvTableEditor: React.FC<Props> = ({ value, onChange }) => {
                     className="working-csv-editor__delete-row"
                     aria-label={`${tr('Zeile löschen', 'Delete row')} ${rowIndex + 1}`}
                     onClick={() => removeRow(rowIndex)}
+                    disabled={readOnly}
                   >
                     <Trash2 size={13} />
                   </button>

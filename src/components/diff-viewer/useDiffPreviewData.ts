@@ -1,4 +1,5 @@
 import { useResourceState } from '@/data/resourceHooks';
+import { freshRead } from '@/data/clientCache';
 import type { DiffPreviewDto } from '@/types/gitDtos';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
@@ -53,13 +54,15 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
       setError(null);
 
       try {
-        const result = await gitClient.getDiffPreview(
-          buildDiffPreviewArgs(request),
-          {
-            maxBytes: MAX_RENDER_CHARS,
-            maxLines: MAX_RENDER_LINES,
-          },
-          repoPath,
+        const result = await freshRead(() =>
+          gitClient.getDiffPreview(
+            buildDiffPreviewArgs(request),
+            {
+              maxBytes: MAX_RENDER_CHARS,
+              maxLines: MAX_RENDER_LINES,
+            },
+            repoPath,
+          ),
         );
         if (!isCurrentRequest()) return;
 

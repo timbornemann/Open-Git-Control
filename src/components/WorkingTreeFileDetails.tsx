@@ -1,11 +1,10 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '@/types/git';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { DiffRequest, DiffSource } from '@/types/diff';
 import { useI18n } from '@/i18n';
-import { gitClient } from '@/services/gitClient';
+import { useFileHistory } from './file-viewer/useFileHistory';
+import { useFileBlame } from './file-viewer/useFileBlame';
 import { BlamePanel } from './file-details/BlamePanel';
 import { FileHistoryPanel } from './file-details/FileHistoryPanel';
-import { BLAME_LOOKAHEAD_COUNT, splitBlamePage } from './file-details/blamePagination';
 
 type DetailsTab = 'history' | 'blame' | 'patch';
 
@@ -19,15 +18,9 @@ interface WorkingTreeFileDetailsProps {
 
 export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ repoPath, path, source, onSelectCommit, onOpenDiff }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('history');
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyEntries, setHistoryEntries] = useState<GitFileHistoryEntryDto[]>([]);
-
-  const [blameLoading, setBlameLoading] = useState(false);
-  const [blameError, setBlameError] = useState<string | null>(null);
-  const [blameLines, setBlameLines] = useState<GitFileBlameLineDto[]>([]);
-  const [blameHasMore, setBlameHasMore] = useState(false);
-  const requestGenerationRef = useRef(0);
+  const context = useMemo(() => ({ repoPath, path, source }), [repoPath, path, source]);
+  const history = useFileHistory(context, activeTab === 'history');
+  const blame = useFileBlame(context, activeTab === 'blame');
 
   const { t, locale } = useI18n();
 
@@ -40,98 +33,8 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
   );
 
   useLayoutEffect(() => {
-    requestGenerationRef.current += 1;
     setActiveTab('history');
-    setHistoryLoading(false);
-    setHistoryError(null);
-    setHistoryEntries([]);
-    setBlameError(null);
-    setBlameLoading(false);
-    setBlameLines([]);
-    setBlameHasMore(false);
   }, [path, repoPath, source]);
-
-  useEffect(() => {
-    if (activeTab !== 'history' || !path || !gitClient.isAvailable()) return;
-    const generation = requestGenerationRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation;
-
-    const fetchHistory = async () => {
-      setHistoryLoading(true);
-      setHistoryError(null);
-      try {
-        const result = await gitClient.getFileHistory(path, undefined, 80, repoPath);
-        if (!isCurrent()) return;
-        if (result.success) {
-          setHistoryEntries(result.data || []);
-        } else {
-          setHistoryEntries([]);
-          setHistoryError(result.error || t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
-        }
-      } catch (fetchError) {
-        if (!isCurrent()) return;
-        console.error(fetchError);
-        setHistoryEntries([]);
-        setHistoryError(t('generated.components.commitdetails.could_not_load_file_history_4fb3f0d4'));
-      } finally {
-        if (isCurrent()) setHistoryLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [activeTab, path, repoPath, t]);
-
-  useEffect(() => {
-    if (activeTab !== 'blame' || !path || !gitClient.isAvailable()) return;
-    const generation = requestGenerationRef.current;
-    const isCurrent = () => requestGenerationRef.current === generation;
-
-    const fetchBlame = async () => {
-      setBlameLoading(true);
-      setBlameError(null);
-      try {
-        const result = await gitClient.getFileBlameRange(path, undefined, 1, BLAME_LOOKAHEAD_COUNT, repoPath, source);
-        if (!isCurrent()) return;
-        if (result.success) {
-          const page = splitBlamePage(result.data || []);
-          setBlameLines(page.lines);
-          setBlameHasMore(page.hasMore);
-        } else {
-          setBlameLines([]);
-          setBlameError(result.error || t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
-        }
-      } catch (fetchError) {
-        if (!isCurrent()) return;
-        console.error(fetchError);
-        setBlameLines([]);
-        setBlameError(t('generated.components.commitdetails.could_not_load_blame_data_b29c2d37'));
-      } finally {
-        if (isCurrent()) setBlameLoading(false);
-      }
-    };
-
-    fetchBlame();
-  }, [activeTab, path, repoPath, source, t]);
-
-  const loadMoreBlame = async () => {
-    if (blameLoading || !blameHasMore || !gitClient.isAvailable()) return;
-    const generation = requestGenerationRef.current;
-    const pathAtStart = path;
-    setBlameLoading(true);
-    try {
-      const result = await gitClient.getFileBlameRange(pathAtStart, undefined, blameLines.length + 1, BLAME_LOOKAHEAD_COUNT, repoPath, source);
-      if (requestGenerationRef.current !== generation) return;
-      if (!result.success) {
-        setBlameError(result.error);
-        return;
-      }
-      const page = splitBlamePage(result.data);
-      setBlameLines((current) => [...current, ...page.lines]);
-      setBlameHasMore(page.hasMore);
-    } finally {
-      if (requestGenerationRef.current === generation) setBlameLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (activeTab !== 'patch' || !path) return;
@@ -198,16 +101,16 @@ export const WorkingTreeFileDetails: React.FC<WorkingTreeFileDetailsProps> = ({ 
       </div>
 
       {activeTab === 'history' && (
-        <FileHistoryPanel entries={historyEntries} loading={historyLoading} error={historyError} formatDate={formatDate} onSelectCommit={onSelectCommit} />
+        <FileHistoryPanel entries={history.entries} loading={history.loading} error={history.error} formatDate={formatDate} onSelectCommit={onSelectCommit} />
       )}
 
       {activeTab === 'blame' && (
         <BlamePanel
-          lines={blameLines}
-          loading={blameLoading}
-          error={blameError}
-          hasMore={blameHasMore}
-          onLoadMore={loadMoreBlame}
+          lines={blame.lines}
+          loading={blame.loading}
+          error={blame.error}
+          hasMore={blame.hasMore}
+          onLoadMore={blame.loadMore}
           onSelectCommit={onSelectCommit}
         />
       )}

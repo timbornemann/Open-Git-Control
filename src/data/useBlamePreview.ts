@@ -8,7 +8,7 @@ import { useCachedResult, useResourceState } from './resourceHooks';
 type BlamePreview = { lines: GitFileBlameLineDto[]; hasMore: boolean };
 const empty: BlamePreview = { lines: [], hasMore: false };
 
-export function useBlamePreview(repoPath: string | null, path: string | null, commit?: string, mode?: 'unstaged') {
+export function useBlamePreview(repoPath: string | null, path: string | null, commit?: string, mode?: 'unstaged' | 'staged') {
   const args: unknown[] = [path, commit, 1, BLAME_LOOKAHEAD_COUNT, repoPath];
   if (mode) args.push(mode);
   const first = useCachedResult<IpcResult<GitFileBlameLineDto[]>>(resourceKey('git', 'getFileBlameRange', args));

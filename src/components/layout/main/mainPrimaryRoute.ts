@@ -72,9 +72,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
     case 'conflict':
       return t('generated.components.layout.main.mainprimarypane.conflict_resolver_1f790ac5');
     case 'diff':
-      return t('generated.components.layout.main.mainprimarypane.diff_viewer_979e21a6');
     case 'file':
-      return 'File viewer';
+      return tr('Datei-Viewer', 'File viewer');
     default:
       return '';
   }

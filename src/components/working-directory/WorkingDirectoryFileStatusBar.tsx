@@ -61,9 +61,11 @@ export const WorkingDirectoryFileStatusBar: React.FC<Props> = ({ text, encoding,
       </span>
       <span>{ENCODING_LABELS[encoding]}</span>
       <span>{lineEnding === '\r\n' ? 'CRLF' : 'LF'}</span>
-      <span title={tr('Letzte Änderung auf dem Datenträger', 'Last modification on disk')}>
-        {tr('Geändert', 'Modified')}: {formatDate(modifiedAt)}
-      </span>
+      {modifiedAt && (
+        <span title={tr('Letzte Änderung auf dem Datenträger', 'Last modification on disk')}>
+          {tr('Geändert', 'Modified')}: {formatDate(modifiedAt)}
+        </span>
+      )}
     </div>
   );
 };

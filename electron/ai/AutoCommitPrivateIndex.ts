@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { toLiteralPathspec } from '../git/RepositoryPathSafety';
+import { acquireRealIndexLock as acquireIndexLock } from '../git/PrivateIndex';
 
 type IndexRun = (index: string, args: string[]) => Promise<string>;
 type PathspecWriter = (name: string, paths: string[]) => string;
@@ -15,14 +15,10 @@ export async function fingerprintIndex(run: IndexRun, index: string): Promise<st
 }
 
 export function acquireRealIndexLock(indexLockPath: string): void {
-  fs.mkdirSync(path.dirname(indexLockPath), { recursive: true });
-  let descriptor: number | undefined;
   try {
-    descriptor = fs.openSync(indexLockPath, 'wx', 0o600);
+    acquireIndexLock(indexLockPath);
   } catch (error) {
     throw new Error(`Git index is busy. AI Auto-Commit did not modify it: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    if (descriptor !== undefined) fs.closeSync(descriptor);
   }
 }
 

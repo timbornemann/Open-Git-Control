@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe('useMarkdownPreview repository binding', () => {
-  it('binds markdown and staged fallback assets to the captured repository', async () => {
+  it('binds staged assets to the captured repository and explains missing assets without a working-file fallback', async () => {
     const getMarkdown = vi.spyOn(gitClient, 'getMarkdownPreviewFile').mockResolvedValue({
       success: true,
       data: { text: '![logo](./logo.png)' },
@@ -44,12 +44,13 @@ describe('useMarkdownPreview repository binding', () => {
     };
     const root = createRoot(document.getElementById('root')!);
     await act(async () => root.render(createElement(Harness)));
-    await vi.waitFor(() => expect(getAsset).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(getAsset).toHaveBeenCalledTimes(1));
     expect(state?.markdownPreview.loading).toBe(false);
 
     expect(getMarkdown).toHaveBeenCalledWith(expect.objectContaining({ repoPath: 'C:/repo-a' }));
     expect(getAsset).toHaveBeenNthCalledWith(1, expect.objectContaining({ source: 'staged', repoPath: 'C:/repo-a' }));
-    expect(getAsset).toHaveBeenNthCalledWith(2, expect.objectContaining({ source: 'unstaged', repoPath: 'C:/repo-a' }));
+    expect(state?.markdownPreview.error).toContain('docs/logo.png');
+    expect(state?.markdownPreview.html).not.toContain('src="./logo.png"');
     act(() => root.unmount());
   });
 

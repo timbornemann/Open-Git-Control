@@ -1,4 +1,5 @@
-export type WorkingDirectoryNavigationTarget = { kind: 'file'; path: string } | { kind: 'view'; label: string } | { kind: 'repository'; path: string };
+export type WorkingDirectoryNavigationTarget =
+  { kind: 'file'; path: string; identity?: string; view?: 'text' | 'diff' } | { kind: 'view'; label: string } | { kind: 'repository'; path: string };
 
 export type WorkingDirectoryNavigationGuard = (target: WorkingDirectoryNavigationTarget, proceed: () => void, cancel?: () => void) => void;
 

@@ -10,6 +10,8 @@ const workingTree = new Set([
   'listWorkingDirectory',
   'getWorkingDirectoryFileInfo',
   'getWorkingDirectoryPreview',
+  'getRepositoryFilePreview',
+  'getRepositoryFileInfo',
   'readRepoFile',
   'getMarkdownPreviewFile',
   'getRepoFileDataUrl',
@@ -50,7 +52,7 @@ export function gitMutationAffects(method: string, args: unknown[], key: readonl
   const operation = String(key[3]);
   const cachedCommand = operation === 'command' ? String(key[4]) : '';
   if (['add', 'stagePaths', 'applyPatch'].includes(command)) return workingTree.has(operation) || treeCommands.has(cachedCommand);
-  if (/WorkingDirectory|RepoFile|IgnoreRule/.test(command) || ['clean', 'rm', 'restore'].includes(command)) {
+  if (/WorkingDirectory|RepoFile|RepositoryFile|IgnoreRule/.test(command) || ['clean', 'rm', 'restore'].includes(command)) {
     return workingTree.has(operation) || treeCommands.has(cachedCommand);
   }
   if (command === 'branch' || command === 'tag') return history.has(operation) || historyCommands.has(cachedCommand) || cachedCommand === 'status';
@@ -83,6 +85,10 @@ export function githubMutationAffects(method: string, args: unknown[], key: read
 
 export function isImmutableGitRead(method: string, args: unknown[]): boolean {
   const sha = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{40,64}$/.test(value);
+  if (['getRepositoryFilePreview', 'getRepositoryFileInfo', 'getMarkdownPreviewFile', 'getRepoFileDataUrl'].includes(method)) {
+    const request = args[0] as { source?: string; commitHash?: string } | undefined;
+    return request?.source === 'commit' && sha(request.commitHash);
+  }
   if (['getFileHistory', 'getFileBlame', 'getFileBlameRange', 'getDiffPreview'].includes(method)) return sha(args[1]);
   const commandIndex = method === 'runGitCommandForRepo' ? 1 : 0;
   return ['show', 'commitDetails'].includes(String(args[commandIndex])) && args.slice(commandIndex + 1).some(sha);

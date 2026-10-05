@@ -1,0 +1,53 @@
+.file-viewer-header {
+  flex-wrap: wrap;
+}
+.file-viewer-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+.file-viewer-source {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.file-viewer-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-panel);
+}
+.file-viewer-tabs .working-file-viewer__button {
+  flex-shrink: 0;
+}
+.file-viewer-diff {
+  flex: 1;
+  min-height: 0;
+}
+.file-viewer-diff .diff-viewer-toolbar {
+  flex-wrap: wrap;
+}
+.file-viewer-diff .diff-toolbar-actions {
+  flex-wrap: wrap;
+}
+.file-viewer-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+.file-viewer-notice {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  overflow-wrap: anywhere;
+}
+.file-viewer-notice--error {
+  color: var(--status-error);
+}

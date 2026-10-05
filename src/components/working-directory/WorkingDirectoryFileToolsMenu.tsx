@@ -6,6 +6,7 @@ export type WorkingDirectoryToolItem = {
   label: string;
   description?: string;
   active?: boolean;
+  disabled?: boolean;
   action: () => void | Promise<void>;
 };
 
@@ -39,7 +40,7 @@ export const WorkingDirectoryFileToolsMenu: React.FC<Props> = ({ groups, activeG
             </span>
           </button>
           {selectedGroup.items.map((item) => (
-            <button key={item.id} type="button" role="menuitem" onClick={() => void item.action()}>
+            <button key={item.id} type="button" role="menuitem" disabled={item.disabled} onClick={() => void item.action()}>
               {item.active ? <Check size={14} /> : item.id === 'whitespace' ? <Eye size={14} /> : <Sparkles size={14} />}
               <span>
                 <strong>{item.label}</strong>

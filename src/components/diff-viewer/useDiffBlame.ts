@@ -1,82 +1,17 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
-import type { GitFileBlameLineDto } from '@/types/git';
-import { gitClient } from '@/services/gitClient';
+import { useFileBlame } from '@/components/file-viewer/useFileBlame';
 
-type UseDiffBlameParams = {
-  repoPath: string | null;
-  request: DiffRequest;
-  refreshTrigger?: number;
-};
-
-export const useDiffBlame = ({ repoPath, request, refreshTrigger }: UseDiffBlameParams) => {
+type Params = { repoPath: string | null; request: DiffRequest; refreshTrigger?: number };
+export function useDiffBlame({ repoPath, request, refreshTrigger = 0 }: Params) {
   const [showBlame, setShowBlame] = useState(false);
-  const [blameData, setBlameData] = useState<GitFileBlameLineDto[]>([]);
-  const [isBlameLoading, setIsBlameLoading] = useState(false);
-  const requestGenerationRef = useRef(0);
-
+  const context = useMemo(
+    () => ({ repoPath: repoPath || '', path: request.path, source: request.source, commitHash: request.commitHash }),
+    [repoPath, request.path, request.source, request.commitHash],
+  );
+  const blame = useFileBlame(context, showBlame && Boolean(repoPath), refreshTrigger, true);
   useLayoutEffect(() => {
     setShowBlame(false);
-    setBlameData([]);
-    setIsBlameLoading(false);
-  }, [repoPath, request]);
-
-  useEffect(() => {
-    const requestGeneration = requestGenerationRef.current + 1;
-    requestGenerationRef.current = requestGeneration;
-    const isCurrentRequest = () => requestGenerationRef.current === requestGeneration;
-
-    if (!showBlame || !repoPath || !gitClient.isAvailable()) {
-      setIsBlameLoading(false);
-      return;
-    }
-
-    const fetchBlame = async () => {
-      setIsBlameLoading(true);
-      setBlameData([]);
-      try {
-        const commitHashForBlame = request.source !== 'staged' && request.source !== 'unstaged' ? request.commitHash : undefined;
-
-        const workingTreeSource = request.source === 'staged' || request.source === 'unstaged' ? request.source : undefined;
-        const result = await gitClient.getFileBlame(request.path, commitHashForBlame, repoPath, workingTreeSource);
-        if (!isCurrentRequest()) return;
-        if (result.success) {
-          setBlameData(result.data);
-        } else {
-          setBlameData([]);
-          console.error('Failed to fetch blame data:', result.error);
-        }
-      } catch (err) {
-        if (!isCurrentRequest()) return;
-        setBlameData([]);
-        console.error('Error fetching blame data:', err);
-      } finally {
-        if (isCurrentRequest()) {
-          setIsBlameLoading(false);
-        }
-      }
-    };
-
-    void fetchBlame();
-    return () => {
-      if (requestGenerationRef.current === requestGeneration) {
-        requestGenerationRef.current += 1;
-      }
-    };
-  }, [showBlame, repoPath, request, refreshTrigger]);
-
-  const blameMap = useMemo(() => {
-    const map = new Map<number, GitFileBlameLineDto>();
-    for (const item of blameData) {
-      map.set(item.lineNumber, item);
-    }
-    return map;
-  }, [blameData]);
-
-  return {
-    showBlame,
-    setShowBlame,
-    blameMap,
-    isBlameLoading,
-  };
-};
+  }, [repoPath, request.path, request.source, request.commitHash]);
+  return { showBlame, setShowBlame, blameMap: blame.loading || blame.error ? new Map() : blame.map, isBlameLoading: blame.loading, error: blame.error };
+}

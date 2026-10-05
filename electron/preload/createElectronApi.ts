@@ -23,6 +23,7 @@ import type {
 import type { FeedbackReportInputDto } from '../../src/types/feedbackDtos';
 import { createRepositoryRunApi } from './createRepositoryRunApi';
 import { createHostingApi } from './createHostingApi';
+import { createRepositoryFileApi } from './createRepositoryFileApi';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -215,6 +216,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       repoPath
         ? invokeGitOperationForRepo(repoPath, 'show', IpcChannel.GitReadRepoFile, filePath, repoPath)
         : invokeGitOperation('show', IpcChannel.GitReadRepoFile, filePath),
+    ...createRepositoryFileApi(invokeGitOperationForRepo),
     getMarkdownPreviewFile: (params: { source: 'unstaged' | 'staged' | 'commit'; path: string; commitHash?: string; repoPath?: string }) =>
       params.repoPath
         ? invokeGitOperationForRepo(params.repoPath, 'show', IpcChannel.GitMarkdownPreviewFile, params)
@@ -392,6 +394,9 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       createWorkingDirectoryFolder: flatApi.createWorkingDirectoryFolder,
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
+      getRepositoryFilePreview: flatApi.getRepositoryFilePreview,
+      getRepositoryFileInfo: flatApi.getRepositoryFileInfo,
+      saveRepositoryFile: flatApi.saveRepositoryFile,
       searchWorkingDirectory: flatApi.searchWorkingDirectory,
       replaceWorkingDirectory: flatApi.replaceWorkingDirectory,
       applyWorkingDirectoryMoves: flatApi.applyWorkingDirectoryMoves,

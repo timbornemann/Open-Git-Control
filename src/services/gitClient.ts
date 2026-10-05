@@ -7,6 +7,7 @@ import { getElectronApi, requireElectronGitApi } from './electronApi';
 import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
 import { workingTreeReads } from './workingTreeReads';
 import { commitMessageEdits } from './commitMessageEdits';
+import { repositoryFileClient } from './repositoryFileClient';
 
 export type GitCommandArgs = [GitCommandName, ...string[]];
 
@@ -314,6 +315,7 @@ export const gitClient = cachedClient('git', {
   async getWorkingDirectoryFileInfo(filePath: string, repoPath: string) {
     return requireElectronGitApi().getWorkingDirectoryFileInfo(filePath, repoPath);
   },
+  ...repositoryFileClient,
   async getWorkingDirectoryPreview(filePath: string, repoPath: string, allowLargeImage?: boolean) {
     return allowLargeImage
       ? requireElectronGitApi().getWorkingDirectoryPreview(filePath, repoPath, true)

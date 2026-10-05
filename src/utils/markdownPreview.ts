@@ -123,7 +123,7 @@ export const collectMarkdownPreviewImageSources = (html: string): string[] => {
   return [...sources];
 };
 
-export const applyMarkdownPreviewImageDataUrls = (html: string, dataUrlsBySource: Record<string, string>): string => {
+export const applyMarkdownPreviewImageDataUrls = (html: string, dataUrlsBySource: Record<string, string>, strictLocalAssets = false): string => {
   if (typeof DOMParser === 'undefined') return html;
 
   const document = new DOMParser().parseFromString(html, 'text/html');
@@ -133,7 +133,12 @@ export const applyMarkdownPreviewImageDataUrls = (html: string, dataUrlsBySource
     if (dataUrl) {
       image.setAttribute('src', dataUrl);
       image.setAttribute('loading', 'lazy');
+    } else if (strictLocalAssets && !isExternalMarkdownUrl(source)) {
+      image.removeAttribute('src');
+      image.setAttribute('title', `Asset unavailable in this version: ${source}`);
+      image.setAttribute('alt', image.getAttribute('alt') || source);
     }
+    if (strictLocalAssets) image.removeAttribute('srcset');
   }
   return document.body.innerHTML;
 };

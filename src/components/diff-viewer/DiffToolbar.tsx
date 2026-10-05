@@ -18,6 +18,7 @@ type DiffToolbarProps = {
   activeHunkIndex: number;
   scrollToHunk: (index: number) => void;
   onClose: () => void;
+  embedded?: boolean;
 };
 
 export const DiffToolbar: React.FC<DiffToolbarProps> = ({
@@ -34,17 +35,20 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
   activeHunkIndex,
   scrollToHunk,
   onClose,
+  embedded = false,
 }) => {
   const { t, tr } = useI18n();
 
   return (
     <div className="diff-viewer-toolbar">
-      <div className="diff-title-wrap">
-        <div className="diff-title">{request.title || request.path}</div>
-        <div className="diff-subtitle">
-          {readableSourceLabel(request, t, tr)} | {request.path}
+      {!embedded && (
+        <div className="diff-title-wrap">
+          <div className="diff-title">{request.title || request.path}</div>
+          <div className="diff-subtitle">
+            {readableSourceLabel(request, t, tr)} | {request.path}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="diff-toolbar-actions">
         <div className="diff-toggle-group">
@@ -64,14 +68,16 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
           >
             <Columns size={14} /> {t('generated.components.diff_viewer.difftoolbar.side_by_side_8652a093')}
           </button>
-          <button
-            className={`diff-toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
-            onClick={() => setViewMode('preview')}
-            title={t('generated.components.diff_viewer.difftoolbar.markdown_preview_d5873ea0')}
-            disabled={!isMarkdownFile}
-          >
-            <FileText size={14} /> {t('generated.components.diff_viewer.difftoolbar.preview_8e7612b9')}
-          </button>
+          {!embedded && (
+            <button
+              className={`diff-toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
+              onClick={() => setViewMode('preview')}
+              title={t('generated.components.diff_viewer.difftoolbar.markdown_preview_d5873ea0')}
+              disabled={!isMarkdownFile}
+            >
+              <FileText size={14} /> {t('generated.components.diff_viewer.difftoolbar.preview_8e7612b9')}
+            </button>
+          )}
         </div>
 
         <button
@@ -99,9 +105,11 @@ export const DiffToolbar: React.FC<DiffToolbarProps> = ({
           </div>
         )}
 
-        <button className="diff-close-btn" onClick={onClose} title={t('generated.components.diff_viewer.difftoolbar.close_diff_c77691ca')}>
-          <X size={14} />
-        </button>
+        {!embedded && (
+          <button className="diff-close-btn" onClick={onClose} title={t('generated.components.diff_viewer.difftoolbar.close_diff_c77691ca')}>
+            <X size={14} />
+          </button>
+        )}
       </div>
     </div>
   );

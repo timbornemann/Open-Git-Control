@@ -242,6 +242,19 @@ describe('createElectronApi', () => {
     expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetWorkingDirectoryPreview, 'assets/large.png', 'C:/captured-repo', true);
   });
 
+  it('passes the full selected source and save version through both file-viewer API surfaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const context = { repoPath: 'C:/captured-repo', path: 'notes.txt', source: 'staged' as const };
+    await api.git.getRepositoryFilePreview(context);
+    await api.getRepositoryFileInfo(context);
+    const save = { ...context, expectedVersion: 'snapshot', content: 'draft', encoding: 'utf8' as const };
+    await api.git.saveRepositoryFile(save);
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetRepositoryFilePreview, context);
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitGetRepositoryFileInfo, context);
+    expect(invoke).toHaveBeenCalledWith(IpcChannel.GitSaveRepositoryFile, save);
+  });
+
   it('pins working-directory file creation to the repository captured by the caller', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

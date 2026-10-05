@@ -25,6 +25,8 @@ export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = 
     listWorkingDirectory: read(30_000, 0),
     getWorkingDirectoryFileInfo: read(30_000, 1),
     getWorkingDirectoryPreview: read(30_000, 1),
+    getRepositoryFilePreview: { staleTime: 30_000, repoProperty: true },
+    getRepositoryFileInfo: { staleTime: 30_000, repoProperty: true },
     getDiffPreview: read(30_000, 2),
     getFileBlameRange: read(30_000, 4),
     getFileHistory: read(30_000, 3),
@@ -73,7 +75,7 @@ export function isMutation(domain: ResourceDomain, name: string) {
   if (domain === 'github') return /^(create|fork|merge|rerun|cancelWorkflow|uploadReleaseAsset)/.test(name);
   if (domain === 'runs') return ['saveConfig', 'start', 'stop'].includes(name);
   if (domain === 'app') return ['setSettings', 'setStoredRepos', 'setGeminiApiKey', 'clearGeminiApiKey', 'setOpenAiApiKey', 'clearOpenAiApiKey'].includes(name);
-  return /^(createCommit|stagePaths|startInteractiveRebase|applyPatch|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
+  return /^(createCommit|stagePaths|startInteractiveRebase|applyPatch|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|saveRepositoryFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
     name,
   );
 }

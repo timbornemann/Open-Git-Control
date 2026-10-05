@@ -40,9 +40,13 @@ const blameLine = (lineNumber: number) =>
   }) as any;
 
 beforeEach(() => {
+  vi.spyOn(gitClient, 'isAvailable').mockReturnValue(true);
   document.body.innerHTML = '<div id="root"></div>';
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({ success: true, data: { kind: 'text', text: 'hello\n' } } as any);
+  vi.spyOn(gitClient, 'getRepositoryFilePreview').mockResolvedValue({
+    success: true,
+    data: { version: 'original', editable: true, kind: 'text', text: 'hello\n' },
+  } as any);
 });
 
 afterEach(() => {
@@ -57,11 +61,11 @@ afterEach(() => {
 
 describe('WorkingDirectoryFileViewer history and blame', () => {
   it('saves an encoding-only conversion through the byte-aware writer', async () => {
-    vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({
+    vi.spyOn(gitClient, 'getRepositoryFilePreview').mockResolvedValue({
       success: true,
-      data: { kind: 'text', text: 'hello\n', bytes: 6, encoding: 'utf8', modifiedAt: '2026-07-27T08:00:00.000Z' },
+      data: { version: 'original', editable: true, kind: 'text', text: 'hello\n', bytes: 6, encoding: 'utf8', modifiedAt: '2026-07-27T08:00:00.000Z' },
     } as any);
-    const writeRepoFile = vi.spyOn(gitClient, 'writeRepoFile').mockResolvedValue({ success: true });
+    const writeRepoFile = vi.spyOn(gitClient, 'saveRepositoryFile').mockResolvedValue({ success: true, data: { version: 'saved', bytes: 6 } });
     const root = createRoot(document.getElementById('root')!);
     await act(async () => {
       root.render(
@@ -95,16 +99,23 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
       await Promise.resolve();
     });
 
-    expect(writeRepoFile).toHaveBeenCalledWith('notes.txt', 'hello\n', 'C:/repo', 'utf8-bom');
+    expect(writeRepoFile).toHaveBeenCalledWith({
+      path: 'notes.txt',
+      content: 'hello\n',
+      repoPath: 'C:/repo',
+      source: 'unstaged',
+      encoding: 'utf8-bom',
+      expectedVersion: 'original',
+    });
     act(() => root.unmount());
   });
 
   it('edits and saves CSV content through the table view', async () => {
-    vi.spyOn(gitClient, 'getWorkingDirectoryPreview').mockResolvedValue({
+    vi.spyOn(gitClient, 'getRepositoryFilePreview').mockResolvedValue({
       success: true,
-      data: { kind: 'text', text: 'name,age\r\nAda,36\r\n' },
+      data: { version: 'original', editable: true, kind: 'text', text: 'name,age\r\nAda,36\r\n', encoding: 'utf8' },
     } as any);
-    const writeRepoFile = vi.spyOn(gitClient, 'writeRepoFile').mockResolvedValue({ success: true });
+    const writeRepoFile = vi.spyOn(gitClient, 'saveRepositoryFile').mockResolvedValue({ success: true, data: { version: 'saved', bytes: 6 } });
     const root = createRoot(document.getElementById('root')!);
     await act(async () => {
       root.render(
@@ -142,20 +153,27 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
       await Promise.resolve();
     });
 
-    expect(writeRepoFile).toHaveBeenCalledWith('data/people.csv', 'name,age\r\nAda,37\r\n', 'C:/repo', 'utf8');
+    expect(writeRepoFile).toHaveBeenCalledWith({
+      path: 'data/people.csv',
+      content: 'name,age\r\nAda,37\r\n',
+      repoPath: 'C:/repo',
+      source: 'unstaged',
+      encoding: 'utf8',
+      expectedVersion: 'original',
+    });
     act(() => root.unmount());
   });
 
   it('loads an oversized image when explicitly requested', async () => {
     const getPreview = vi
-      .spyOn(gitClient, 'getWorkingDirectoryPreview')
+      .spyOn(gitClient, 'getRepositoryFilePreview')
       .mockResolvedValueOnce({
         success: true,
-        data: { kind: 'binary', bytes: 3 * 1024 * 1024, mimeType: 'image/png', reason: 'tooLarge', canLoadImage: true },
+        data: { version: 'original', editable: true, kind: 'binary', bytes: 3 * 1024 * 1024, mimeType: 'image/png', reason: 'tooLarge', canLoadImage: true },
       } as any)
       .mockResolvedValueOnce({
         success: true,
-        data: { kind: 'image', dataUrl: 'data:image/png;base64,AA==', mimeType: 'image/png', bytes: 3 * 1024 * 1024 },
+        data: { version: 'original', editable: true, kind: 'image', dataUrl: 'data:image/png;base64,AA==', mimeType: 'image/png', bytes: 3 * 1024 * 1024 },
       } as any);
     const root = createRoot(document.getElementById('root')!);
     await act(async () => {
@@ -185,7 +203,9 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
       await Promise.resolve();
     });
 
-    await vi.waitFor(() => expect(getPreview).toHaveBeenLastCalledWith('assets/large.png', 'C:/repo', true));
+    await vi.waitFor(() =>
+      expect(getPreview).toHaveBeenLastCalledWith({ source: 'unstaged', path: 'assets/large.png', repoPath: 'C:/repo', allowLargeImage: true }),
+    );
     await vi.waitFor(() => expect(document.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA=='));
     act(() => root.unmount());
   });
@@ -250,7 +270,7 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
   });
 
   it('cancels guarded navigation when save-and-open fails', async () => {
-    vi.spyOn(gitClient, 'writeRepoFile').mockRejectedValue(new Error('File is locked.'));
+    vi.spyOn(gitClient, 'saveRepositoryFile').mockRejectedValue(new Error('File is locked.'));
     const onNavigationGuardChange = vi.fn();
     const root = createRoot(document.getElementById('root')!);
     await act(async () => {
@@ -286,7 +306,7 @@ describe('WorkingDirectoryFileViewer history and blame', () => {
   });
 
   it('keeps the pending guard alive while save-and-open marks the editor clean', async () => {
-    vi.spyOn(gitClient, 'writeRepoFile').mockResolvedValue({ success: true });
+    vi.spyOn(gitClient, 'saveRepositoryFile').mockResolvedValue({ success: true, data: { version: 'saved', bytes: 6 } });
     const root = createRoot(document.getElementById('root')!);
     await act(async () => {
       root.render(

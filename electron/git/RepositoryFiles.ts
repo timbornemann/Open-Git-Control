@@ -32,7 +32,7 @@ const IMAGE_MIME_TYPES = new Map<string, string>([
   ['webp', 'image/webp'],
 ]);
 
-const writeRepositoryFileAtomically = (targetPath: string, contents: Buffer, mode: number): void => {
+const writeRepositoryFileAtomically = (targetPath: string, contents: Buffer, mode: number, beforePublish?: () => void): void => {
   const temporaryPath = path.join(path.dirname(targetPath), `.${path.basename(targetPath)}.ogc-write-${process.pid}-${randomUUID()}.tmp`);
   let descriptor: number | null = null;
   try {
@@ -41,6 +41,7 @@ const writeRepositoryFileAtomically = (targetPath: string, contents: Buffer, mod
     fs.fsyncSync(descriptor);
     fs.closeSync(descriptor);
     descriptor = null;
+    beforePublish?.();
     fs.renameSync(temporaryPath, targetPath);
   } finally {
     if (descriptor !== null) {
@@ -126,7 +127,13 @@ export class RepositoryFiles {
     return this.writeRepoFileAtPath(this.getRepoPath(), relativePath, content);
   }
 
-  async writeRepoFileAtPath(repoPath: string, relativePath: string, content: string, targetEncoding?: RepositoryTextEncoding): Promise<void> {
+  async writeRepoFileAtPath(
+    repoPath: string,
+    relativePath: string,
+    content: string,
+    targetEncoding?: RepositoryTextEncoding,
+    beforePublish?: () => void,
+  ): Promise<void> {
     const textValue = typeof content === 'string' ? content : String(content ?? '');
 
     // Most callers (conflict resolution, Markdown edits) overwrite a file that
@@ -145,7 +152,7 @@ export class RepositoryFiles {
       if (!fs.existsSync(parentDirectory) || !fs.statSync(parentDirectory).isDirectory()) {
         throw new Error('Target folder does not exist.');
       }
-      writeRepositoryFileAtomically(createPath, encodeRepositoryFile(textValue, targetEncoding ?? 'utf8'), 0o644);
+      writeRepositoryFileAtomically(createPath, encodeRepositoryFile(textValue, targetEncoding ?? 'utf8'), 0o644, beforePublish);
       return;
     }
 
@@ -164,7 +171,7 @@ export class RepositoryFiles {
     }
     const encoding = targetEncoding ?? detectedEncoding;
 
-    writeRepositoryFileAtomically(resolvedPath, encodeRepositoryFile(textValue, encoding), stat.mode & 0o777);
+    writeRepositoryFileAtomically(resolvedPath, encodeRepositoryFile(textValue, encoding), stat.mode & 0o777, beforePublish);
   }
 
   async deleteRepoFileAtPath(repoPath: string, relativePath: string): Promise<void> {

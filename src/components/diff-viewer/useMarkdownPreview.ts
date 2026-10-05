@@ -80,36 +80,29 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t, markdownTex
         const initialHtml = renderMarkdownToSanitizedHtml(sourceText);
         const imageSources = collectMarkdownPreviewImageSources(initialHtml);
         const dataUrlsBySource: Record<string, string> = {};
+        const missing: string[] = [];
 
         await Promise.all(
           imageSources.map(async (imageSource) => {
             const assetPath = resolveMarkdownPreviewAssetPath(request.path, imageSource);
             if (!assetPath || !gitClient.isAvailable()) return;
 
-            let assetResult = await gitClient.getRepoFileDataUrl({
+            const assetResult = await gitClient.getRepoFileDataUrl({
               source: request.source,
               path: assetPath,
               commitHash: request.commitHash,
               repoPath: repoAtStart,
             });
 
-            if (!assetResult.success && request.source === 'staged') {
-              assetResult = await gitClient.getRepoFileDataUrl({
-                source: 'unstaged',
-                path: assetPath,
-                repoPath: repoAtStart,
-              });
-            }
-
             if (assetResult.success) {
               dataUrlsBySource[imageSource] = assetResult.data.dataUrl;
-            }
+            } else missing.push(assetPath);
           }),
         );
 
-        const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource);
+        const html = applyMarkdownPreviewImageDataUrls(initialHtml, dataUrlsBySource, true);
         if (isCurrentRequest()) {
-          setMarkdownPreview({ loading: false, error: null, html });
+          setMarkdownPreview({ loading: false, error: missing.length ? `Assets unavailable in this version: ${missing.join(', ')}` : null, html });
         }
       } catch (previewError: unknown) {
         if (isCurrentRequest()) {
