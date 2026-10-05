@@ -1,4 +1,6 @@
 import React from 'react';
+import { FolderOpen } from 'lucide-react';
+import { IconButton } from '@/components/ui/IconButton';
 import { useRepositoryContext, useUIContext } from '@/contexts/AppStateContext';
 import { BranchPanel } from '@/components/sidebar/BranchPanel';
 import { TagPanel } from '@/components/sidebar/TagPanel';
@@ -17,11 +19,20 @@ export const RepoSidebarContainer: React.FC = React.memo(() => {
   return (
     <div className="repo-cockpit">
       <div className="repo-cockpit-header">
-        <strong>{repository.activeRepo.split(/[\\/]/).pop()}</strong>
-        <small className="repo-cockpit-path">{repository.activeRepo}</small>
-        <button className="staging-tool-btn" onClick={() => void gitClient.openRepositoryPath({ action: 'open', repoPath: repository.activeRepo! })}>
-          {tr('Projektordner öffnen', 'Open project folder')}
-        </button>
+        <span className="repo-cockpit-kicker">{tr('Repository-Arbeitsbereich', 'Repository workspace')}</span>
+        <strong className="repo-cockpit-title">{repository.activeRepo.split(/[\\/]/).pop()}</strong>
+        <div className="repo-cockpit-path-row">
+          <small className="repo-cockpit-path" title={repository.activeRepo}>
+            {repository.activeRepo}
+          </small>
+          <IconButton
+            className="repo-cockpit-path-open"
+            size="xs"
+            aria-label={tr('Projektordner öffnen', 'Open project folder')}
+            icon={<FolderOpen size={14} />}
+            onClick={() => void gitClient.openRepositoryPath({ action: 'open', repoPath: repository.activeRepo! })}
+          />
+        </div>
       </div>
       <HostingSidebar local />
       <RepositoryLicensePanel repoPath={repository.activeRepo} />
