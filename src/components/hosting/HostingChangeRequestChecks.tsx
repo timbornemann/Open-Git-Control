@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 import { useState } from 'react';
 import type { HostingChangeRequest, HostingStatus } from '@/types/hostingDtos';
 import { hostingClient } from '@/services/hostingClient';
@@ -11,19 +12,19 @@ export function HostingChangeRequestChecks({ change }: { change: HostingChangeRe
   const [status, setStatus] = useState<HostingStatus | null>(null);
   return (
     <div>
-      <button
+      <Button
         disabled={task.busy}
         onClick={() => void task.run(() => hostingClient.request('status', { repository: change.source, ref: change.headSha }), setStatus)}
       >
         {tr('CI am PR/MR-Stand prüfen', 'Check CI at the change request revision')}
-      </button>
+      </Button>
       {status && (
         <>
           <p>CI: {status.state}</p>
           {status.checks.map((check) => (
             <p key={check.id}>
               {check.name}: {check.status}{' '}
-              {check.htmlUrl && <button onClick={() => void appClient.openExternalUrl(check.htmlUrl!)}>{tr('Öffnen', 'Open')}</button>}
+              {check.htmlUrl && <Button onClick={() => void appClient.openExternalUrl(check.htmlUrl!)}>{tr('Öffnen', 'Open')}</Button>}
             </p>
           ))}
         </>

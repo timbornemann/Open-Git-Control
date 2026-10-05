@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/i18n';
 import type { HostingReleaseTarget } from '@/types/hostingDtos';
 
@@ -31,16 +32,16 @@ export function HostingReleaseInspection({
       </p>
       {inspection.pushBlockedReason && <p>{inspection.pushBlockedReason}</p>}
       <div className="hosting-actions">
-        <button disabled={busy || !inspection.canReleaseRemote} onClick={onPublish}>
+        <Button variant="primary" disabled={busy || !inspection.canReleaseRemote} onClick={onPublish}>
           {native ? tr('Remote-Stand veröffentlichen', 'Publish remote revision') : tr('Tag auf Remote-Stand erstellen', 'Create tag on remote revision')}
-        </button>
-        <button type="button" disabled={busy} onClick={onSuggest}>
+        </Button>
+        <Button type="button" disabled={busy} onClick={onSuggest}>
           {tr('Nächsten Versionstag vorschlagen', 'Suggest next version tag')}
-        </button>
+        </Button>
         {inspection.localSha && (!inspection.remoteSha || inspection.ahead > 0) && (
-          <button disabled={busy} onClick={onTransfer}>
+          <Button disabled={busy} onClick={onTransfer}>
             {tr('Lokalen Stand zuerst pushen', 'Push local revision first')}
-          </button>
+          </Button>
         )}
       </div>
     </div>

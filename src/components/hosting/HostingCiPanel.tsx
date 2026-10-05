@@ -1,7 +1,11 @@
+import { Button } from '@/components/ui/Button';
+import { TextField } from '@/components/ui/TextField';
+import { FileText, RefreshCw, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
 import { useI18n } from '@/i18n';
+import { formatDateTime } from '@/utils/dateTime';
 import type {
   HostedRepository,
   HostingArtifact,
@@ -14,13 +18,14 @@ import type {
 } from '@/types/hostingDtos';
 import { hostedRepositoryKey, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
+import { HostingStateBadge } from './HostingStateBadge';
 
 // eslint-disable-next-line no-control-regex -- strip terminal ANSI escapes before rendering text logs.
 const cleanLog = (text: string) => text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
 const isRunning = (run: HostingRun) =>
   !run.conclusion && !['completed', 'success', 'failed', 'error', 'cancelled', 'stopped'].includes(run.status.toLowerCase());
 export function HostingCiPanel({ repository, capabilities }: { repository: HostedRepository; capabilities: HostingCapabilities }) {
-  const { tr } = useI18n();
+  const { tr, locale } = useI18n();
   const revision = useHostingState((s) => s.revision);
   const [branch, setBranch] = useState(repository.defaultBranch);
   const task = useHostingTask(`${hostedRepositoryKey(repository)}/${branch}`);
@@ -97,11 +102,11 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
   };
   return (
     <div className="hosting-ci">
-      <div className="hosting-actions">
-        <input aria-label="Ref" value={branch} onChange={(e) => setBranch(e.target.value)} />
-        <button disabled={task.busy} onClick={refreshCi}>
+      <div className="hosting-panel-toolbar">
+        <TextField aria-label="Ref" value={branch} onChange={(e) => setBranch(e.target.value)} />
+        <Button icon={<RefreshCw size={14} />} disabled={task.busy} onClick={refreshCi}>
           {tr('Aktualisieren', 'Refresh')}
-        </button>
+        </Button>
       </div>
       {!capabilities.runs && (
         <>
@@ -112,25 +117,38 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
             )}
           </p>
           {status?.checks.map((check) => (
-            <p key={check.id}>
-              {check.name}: {check.status}{' '}
-              {check.htmlUrl && <button onClick={() => void appClient.openExternalUrl(check.htmlUrl!)}>{tr('Build öffnen', 'Open build')}</button>}
-            </p>
+            <div className="hosting-file-row" key={check.id}>
+              <strong>{check.name}</strong> <HostingStateBadge state={check.status} />
+              {check.htmlUrl && <Button onClick={() => void appClient.openExternalUrl(check.htmlUrl!)}>{tr('Build öffnen', 'Open build')}</Button>}
+            </div>
           ))}
         </>
       )}
       {page.items.map((item) => (
-        <button className="hosting-run" key={item.id} aria-pressed={run?.id === item.id} onClick={() => setRun(item)}>
-          <strong>
-            {item.name} #{item.number ?? item.id}
-          </strong>
-          <small>
-            {item.branch} · {item.conclusion ?? item.status} · {item.createdAt}
-          </small>
-        </button>
+        <Button className="hosting-run" key={item.id} aria-pressed={run?.id === item.id} onClick={() => setRun(item)}>
+          <span className="hosting-run__identity">
+            <strong>
+              {item.name} #{item.number ?? item.id}
+            </strong>
+            <small>
+              {item.branch}
+              {item.createdAt ? ` · ${formatDateTime(item.createdAt, locale, { dateStyle: 'short', timeStyle: 'short' })}` : ''}
+            </small>
+          </span>
+          <HostingStateBadge state={item.conclusion ?? item.status} />
+        </Button>
       ))}
+      {capabilities.runs && !page.items.length && !task.busy && !task.error && (
+        <div className="hosting-empty">
+          <Workflow size={30} aria-hidden="true" />
+          <h3>{tr('Keine Läufe für diesen Ref', 'No runs for this ref')}</h3>
+          <p>
+            {tr('Wähle einen anderen Branch oder starte einen neuen Lauf, sofern unterstützt.', 'Choose another branch or start a new run where supported.')}
+          </p>
+        </div>
+      )}
       {page.nextCursor && (
-        <button
+        <Button
           disabled={task.busy}
           onClick={() =>
             void task.run(
@@ -140,16 +158,19 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
           }
         >
           {tr('Weitere laden', 'Load more')}
-        </button>
+        </Button>
       )}
       {run && (
         <article className="hosting-card">
-          <h3>{run.name}</h3>
+          <div className="hosting-item-heading">
+            <h3>{run.name}</h3>
+            <HostingStateBadge state={run.conclusion ?? run.status} />
+          </div>
           <code>{run.headSha}</code>
           <div className="hosting-actions">
-            <button onClick={() => void appClient.openExternalUrl(run.htmlUrl)}>{tr('Im Browser öffnen', 'Open in browser')}</button>
+            <Button onClick={() => void appClient.openExternalUrl(run.htmlUrl)}>{tr('Im Browser öffnen', 'Open in browser')}</Button>
             {capabilities.cancelRun && isRunning(run) && (
-              <button
+              <Button
                 disabled={task.busy}
                 onClick={() =>
                   void task.run(async () => {
@@ -159,10 +180,10 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
                 }
               >
                 {tr('Abbrechen', 'Cancel')}
-              </button>
+              </Button>
             )}
             {capabilities.retryRun && !isRunning(run) && (
-              <button
+              <Button
                 disabled={task.busy}
                 onClick={() =>
                   void task.run(async () => {
@@ -172,25 +193,28 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
                 }
               >
                 {tr('Wiederholen', 'Retry')}
-              </button>
+              </Button>
             )}
           </div>
           {jobs.items.map((job) => (
             <div className="hosting-job" key={job.id}>
-              <strong>{job.name}</strong> · {job.conclusion ?? job.status}
+              <div className="hosting-item-heading">
+                <strong>{job.name}</strong>
+                <HostingStateBadge state={job.conclusion ?? job.status} />
+              </div>
               {job.steps.map((step) => (
                 <small key={step.id}>
                   {step.name}: {step.conclusion ?? step.status}
                 </small>
               ))}
               {capabilities.logs && (
-                <button disabled={detailTask.busy} onClick={() => loadLog(job.id)}>
+                <Button icon={<FileText size={13} />} size="xs" disabled={detailTask.busy} onClick={() => loadLog(job.id)}>
                   Logs
-                </button>
+                </Button>
               )}
-              {job.htmlUrl && <button onClick={() => void appClient.openExternalUrl(job.htmlUrl)}>{tr('Öffnen', 'Open')}</button>}
+              {job.htmlUrl && <Button onClick={() => void appClient.openExternalUrl(job.htmlUrl)}>{tr('Öffnen', 'Open')}</Button>}
               {job.status === 'manual' && capabilities.dispatch && (
-                <button
+                <Button
                   disabled={task.busy}
                   onClick={() =>
                     void task.run(
@@ -203,12 +227,12 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
                   }
                 >
                   {tr('Manuellen Job starten', 'Start manual job')}
-                </button>
+                </Button>
               )}
             </div>
           ))}
           {jobs.nextCursor && (
-            <button
+            <Button
               disabled={detailTask.busy}
               onClick={() =>
                 void detailTask.run(
@@ -218,12 +242,12 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
               }
             >
               {tr('Weitere Jobs laden', 'Load more jobs')}
-            </button>
+            </Button>
           )}
           {capabilities.runLogs && (
-            <button disabled={detailTask.busy} onClick={() => loadLog()}>
+            <Button disabled={detailTask.busy} onClick={() => loadLog()}>
               {tr('Lauf-Logs laden', 'Load run logs')}
-            </button>
+            </Button>
           )}
           {!capabilities.logs && (
             <p>{tr('Diese Server-API bietet keine Logs an. Logs im Browser öffnen.', 'This server API does not provide logs. Open logs in the browser.')}</p>
@@ -235,20 +259,22 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
                 <p>{tr('Log gekürzt. Weitere Teile nachladen oder im Browser öffnen.', 'Log truncated. Load more or open it in the browser.')}</p>
               )}
               {log.nextCursor && (
-                <button disabled={detailTask.busy} onClick={() => loadLog(logJob, log.nextCursor!)}>
+                <Button disabled={detailTask.busy} onClick={() => loadLog(logJob, log.nextCursor!)}>
                   {tr('Weitere Logs laden', 'Load more logs')}
-                </button>
+                </Button>
               )}
             </>
           )}
           <h4>{tr('Artefakte', 'Artifacts')}</h4>
           {artifacts.items.map((artifact) => (
-            <p key={artifact.id}>
-              {artifact.name}
-              {artifact.size !== undefined ? ` · ${artifact.size} B` : ''}
-              {artifact.expiresAt ? ` · ${artifact.expiresAt}` : ''}{' '}
+            <div className="hosting-file-row" key={artifact.id}>
+              <span>
+                {artifact.name}
+                {artifact.size !== undefined ? ` · ${artifact.size} B` : ''}
+                {artifact.expiresAt ? ` · ${artifact.expiresAt}` : ''}
+              </span>
               {artifact.downloadable ? (
-                <button
+                <Button
                   disabled={detailTask.busy}
                   onClick={() =>
                     void detailTask.run(
@@ -260,20 +286,20 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
                   }
                 >
                   {tr('Herunterladen', 'Download')}
-                </button>
+                </Button>
               ) : artifact.htmlUrl ? (
-                <button onClick={() => void appClient.openExternalUrl(artifact.htmlUrl!)}>{tr('Im Browser öffnen', 'Open in browser')}</button>
+                <Button onClick={() => void appClient.openExternalUrl(artifact.htmlUrl!)}>{tr('Im Browser öffnen', 'Open in browser')}</Button>
               ) : null}
-            </p>
+            </div>
           ))}
           {!capabilities.artifacts && (
             <p>
               {tr('Artefakte sind über diese API nicht verfügbar.', 'Artifacts are unavailable through this API.')}{' '}
-              <button onClick={() => void appClient.openExternalUrl(run.htmlUrl)}>{tr('Im Browser öffnen', 'Open in browser')}</button>
+              <Button onClick={() => void appClient.openExternalUrl(run.htmlUrl)}>{tr('Im Browser öffnen', 'Open in browser')}</Button>
             </p>
           )}
           {artifacts.nextCursor && (
-            <button
+            <Button
               disabled={detailTask.busy}
               onClick={() =>
                 void detailTask.run(
@@ -283,7 +309,7 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
               }
             >
               {tr('Weitere Artefakte laden', 'Load more artifacts')}
-            </button>
+            </Button>
           )}
         </article>
       )}
@@ -305,21 +331,37 @@ export function HostingCiPanel({ repository, capabilities }: { repository: Hoste
           >
             <label>
               {tr('Workflow-Datei / ID / Pipeline-Selector (optional)', 'Workflow file / ID / pipeline selector (optional)')}
-              <input value={workflow} onChange={(e) => setWorkflow(e.target.value)} placeholder="ci.yml" />
+              <TextField value={workflow} onChange={(e) => setWorkflow(e.target.value)} placeholder="ci.yml" />
             </label>
             <label>
               Ref
-              <input required value={branch} onChange={(e) => setBranch(e.target.value)} />
+              <TextField required value={branch} onChange={(e) => setBranch(e.target.value)} />
             </label>
             <label>
               Inputs (JSON)
-              <textarea value={inputs} onChange={(e) => setInputs(e.target.value)} />
+              <TextField as="textarea" value={inputs} onChange={(e) => setInputs(e.target.value)} />
             </label>
-            <button disabled={task.busy}>{tr('Neuen Lauf starten', 'Start a new run')}</button>
+            <Button type="submit" variant="primary" disabled={task.busy}>
+              {tr('Neuen Lauf starten', 'Start a new run')}
+            </Button>
           </form>
         </details>
       )}
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <p className="hosting-notice" role="status">
+          {message}
+        </p>
+      )}
+      {task.busy && (
+        <p className="hosting-notice" role="status">
+          {tr('Läufe werden geladen …', 'Loading runs …')}
+        </p>
+      )}
+      {detailTask.busy && (
+        <p className="hosting-notice" role="status">
+          {tr('Laufdetails werden geladen …', 'Loading run details …')}
+        </p>
+      )}
       {[task.error, detailTask.error].filter(Boolean).map((error) => (
         <p className="hosting-error" role="alert" key={error}>
           {error}

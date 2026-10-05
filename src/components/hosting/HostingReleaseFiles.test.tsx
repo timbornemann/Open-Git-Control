@@ -30,7 +30,8 @@ function deferred<T>() {
 describe('repository downloads and native release attachments', () => {
   let host: HTMLDivElement;
   let root: Root;
-  const button = (label: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === label);
+  const button = (label: string) =>
+    [...host.querySelectorAll<HTMLButtonElement>('button')].find((element) => (element.getAttribute('aria-label') ?? element.textContent?.trim()) === label);
   const click = async (element: Element | undefined) => {
     expect(element).toBeTruthy();
     await act(async () => (element as HTMLElement).click());

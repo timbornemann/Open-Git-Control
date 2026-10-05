@@ -4,7 +4,7 @@ Open-Git-Control separates native Git transport from hosting APIs. The Hosting a
 
 ## Connect an account
 
-Open **Hosting → Accounts & servers**, choose a provider, and enter the server URL, including any port or installation base path. Add a descriptive name to distinguish accounts on the same server. An API URL override supports installations with a separate API address. Authenticate with a token, or configure your own OAuth application for browser login.
+Open **Hosting → Accounts & servers → Add connection**. In the account dialog, choose a provider and enter the server URL, including any port or installation base path. Add a descriptive name to distinguish accounts on the same server. Expand **API address and browser sign-in** to override the API URL or configure your own OAuth application. Authenticate with a token or the configured browser login. Existing accounts can be edited from their connection rows.
 
 Credentials are stored with Electron's OS encryption. If secure storage is unavailable, credentials remain in memory for this app session. Tokens and OAuth client secrets are never returned to the renderer after authentication. Account logout invalidates pending operations, refreshes, caches and Git credential sessions for that account.
 
@@ -19,6 +19,12 @@ Credentials are stored with Electron's OS encryption. If secure storage is unava
 Grant only the features you intend to use. Repository reading, writing, change requests, CI and releases can require separate scopes. Bitbucket Cloud catalog discovery requires workspace access in addition to account and repository reading (`read:workspace:bitbucket`, `read:user:bitbucket`, `read:repository:bitbucket` for API tokens; `account` and `repository` for OAuth). OAuth client secrets are supplied locally by the user; the application distributes no shared secret.
 
 For HTTPS transfers, a temporary Git credential helper asks a Main-process broker for credentials bound to the selected account and endpoint. Credentials are neither written into remote URLs nor passed as Git command arguments. SSH URLs and existing system credentials remain usable. Configure SSH aliases by manually binding the actual remote URL to a repository web URL in **Remote configuration**.
+
+## Browse repositories
+
+The **Repositories** catalog uses compact rows with provider/account identity, visibility, branch and matching local clones. Search and filter by provider or account, pin repositories, and load additional catalog pages. **New repository** and **Open repository by URL** open account-specific dialogs.
+
+Opening a repository shows its own full-width detail page with **Overview**, provider-specific **Pull Requests / Merge Requests**, **CI** and **Releases / Tags** sections. The catalog is replaced while viewing details. **All repositories** returns to the same search, filters, pins and scroll position. The overview shows the server, account, clone URLs and local clones; PRs/MRs, CI and publication continue to use the explicitly selected repository and account.
 
 ## Repositories with several endpoints
 

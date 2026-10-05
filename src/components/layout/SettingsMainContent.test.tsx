@@ -7,13 +7,15 @@ import { DEFAULT_SETTINGS } from '@/app/state/defaultSettings';
 import type { SettingsTabId } from '@/app/state/contracts';
 import { I18nProvider } from '@/i18n';
 import { SettingsMainContent } from './SettingsMainContent';
+import { hostingClient } from '@/services/hostingClient';
+import { useHostingState } from '@/components/hosting/hostingState';
 
 describe('SettingsMainContent AI and MCP organization', () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  const render = (activeTab: SettingsTabId) => {
-    act(() => {
+  const render = async (activeTab: SettingsTabId) => {
+    await act(async () => {
       root.render(
         createElement(I18nProvider, {
           language: 'en',
@@ -32,6 +34,8 @@ describe('SettingsMainContent AI and MCP organization', () => {
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    useHostingState.getState().setConnections([]);
+    vi.spyOn(hostingClient, 'request').mockResolvedValue([]);
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
@@ -40,14 +44,16 @@ describe('SettingsMainContent AI and MCP organization', () => {
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
+    vi.restoreAllMocks();
   });
 
-  it('shows AI configuration with MCP settings instead of integrations', () => {
-    render('integrations');
-    expect(host.textContent).toContain('GitHub');
+  it('shows AI configuration with MCP settings instead of integrations', async () => {
+    await render('integrations');
+    expect(host.textContent).toContain('Connected accounts');
+    expect(host.textContent).toContain('Add connection');
     expect(host.textContent).not.toContain('Enable AI auto-commit');
 
-    render('api');
+    await render('api');
     expect(host.textContent).toContain('Enable AI auto-commit');
     expect(host.textContent).toContain('Local API');
   });

@@ -9,7 +9,7 @@ export const providerLabels: Record<HostingProvider, string> = {
   'bitbucket-cloud': 'Bitbucket Cloud',
   'bitbucket-data-center': 'Bitbucket Data Center',
 };
-export type HostingSection = 'repositories' | 'connections' | 'changes' | 'ci' | 'releases' | 'remotes';
+export type HostingSection = 'repositories' | 'connections' | 'overview' | 'changes' | 'ci' | 'releases' | 'remotes';
 interface HostingState {
   connections: HostingConnection[];
   selected: HostedRepository | null;
@@ -37,8 +37,8 @@ export const useHostingState = create<HostingState>((set) => ({
             selected: state.selected && connections.some((c) => c.id === state.selected?.ref.connectionId && c.authenticated) ? state.selected : null,
           },
     ),
-  select: (selected) => set({ selected }),
-  navigate: (section) => set({ section }),
+  select: (selected) => set({ selected, section: selected ? 'overview' : 'repositories' }),
+  navigate: (section) => set({ section, ...(['repositories', 'connections', 'remotes'].includes(section) ? { selected: null } : {}) }),
   setConnectionFilter: (connectionFilter) => set({ connectionFilter, selected: null }),
   refresh: () => {
     void queryClient.invalidateQueries({ queryKey: ['hosting'], refetchType: 'none' });

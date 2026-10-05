@@ -1,3 +1,7 @@
+import { Button } from '@/components/ui/Button';
+import { TextField } from '@/components/ui/TextField';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { GitPullRequest, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
@@ -7,6 +11,8 @@ import type { HostedRepository, HostedRepositoryRef, HostingCapabilities, Hostin
 import { hostedRepositoryKey, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
 import { HostingChangeRequestChecks } from './HostingChangeRequestChecks';
+import { HostingRepositoryPicker } from './HostingRepositoryPicker';
+import { HostingStateBadge } from './HostingStateBadge';
 
 export function HostingChangeRequests({
   repository,
@@ -57,35 +63,43 @@ export function HostingChangeRequests({
   if (!capabilities.changeRequests) return <p>{tr('Dieser Server unterstützt keine PR/MR-API.', 'This server does not support a change request API.')}</p>;
   return (
     <div className="hosting-changes">
-      <div className="hosting-actions">
-        <select aria-label="State" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
-          <option value="open">{tr('Offen', 'Open')}</option>
-          <option value="closed">{tr('Geschlossen', 'Closed')}</option>
-          <option value="all">{tr('Alle', 'All')}</option>
-        </select>
-        <button disabled={task.busy} onClick={() => void task.run(reload, setPage)}>
+      <div className="hosting-panel-toolbar">
+        <SegmentedControl
+          ariaLabel={tr('Status filtern', 'Filter state')}
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'open', label: tr('Offen', 'Open') },
+            { value: 'closed', label: tr('Geschlossen', 'Closed') },
+            { value: 'all', label: tr('Alle', 'All') },
+          ]}
+        />
+        <Button icon={<RefreshCw size={14} />} disabled={task.busy} onClick={() => void task.run(reload, setPage)}>
           {tr('Aktualisieren', 'Refresh')}
-        </button>
+        </Button>
       </div>
       {page.items.map((change) => (
         <article className="hosting-card" key={change.id}>
-          <h3>
-            #{change.number} {change.title}
-          </h3>
-          <small>
-            {change.author} · {change.state}
+          <div className="hosting-item-heading">
+            <h3>
+              #{change.number} {change.title}
+            </h3>
+            <HostingStateBadge state={change.state} />
+          </div>
+          <div className="hosting-item-meta">
+            {change.author}
             {change.draft ? ' · Draft' : ''}
-          </small>
+          </div>
           <p>
             {change.source.fullPath}:{change.sourceBranch} → {change.target.fullPath}:{change.targetBranch}
           </p>
           <code>{change.headSha}</code>
           <HostingChangeRequestChecks key={change.headSha} change={change} />
           <div className="hosting-actions">
-            <button onClick={() => void appClient.openExternalUrl(change.htmlUrl)}>{tr('Öffnen', 'Open')}</button>
-            <button onClick={() => void navigator.clipboard.writeText(change.htmlUrl)}>{tr('Link kopieren', 'Copy link')}</button>
+            <Button onClick={() => void appClient.openExternalUrl(change.htmlUrl)}>{tr('Öffnen', 'Open')}</Button>
+            <Button onClick={() => void navigator.clipboard.writeText(change.htmlUrl)}>{tr('Link kopieren', 'Copy link')}</Button>
             {repoPath && (
-              <button
+              <Button
                 disabled={task.busy}
                 onClick={() =>
                   void task.run(
@@ -96,18 +110,18 @@ export function HostingChangeRequests({
                 }
               >
                 Checkout
-              </button>
+              </Button>
             )}
             {change.state === 'open' && !change.draft && (
-              <button disabled={task.busy} onClick={() => inspectMergeOptions(change)}>
+              <Button disabled={task.busy} onClick={() => inspectMergeOptions(change)}>
                 Merge
-              </button>
+              </Button>
             )}
           </div>
         </article>
       ))}
       {page.nextCursor && (
-        <button
+        <Button
           disabled={task.busy}
           onClick={() =>
             void task.run(
@@ -117,9 +131,14 @@ export function HostingChangeRequests({
           }
         >
           {tr('Weitere laden', 'Load more')}
-        </button>
+        </Button>
       )}
-      {!task.busy && !page.items.length && !task.error && <p>{tr('Keine Einträge für diesen Filter.', 'No entries for this filter.')}</p>}
+      {!task.busy && !page.items.length && !task.error && (
+        <div className="hosting-empty">
+          <GitPullRequest size={30} aria-hidden="true" />
+          <h3>{tr('Keine Einträge für diesen Filter.', 'No entries for this filter.')}</h3>
+        </div>
+      )}
       {mergeCandidate && (
         <div className="hosting-card">
           <p>
@@ -133,7 +152,8 @@ export function HostingChangeRequests({
           </select>
           {!mergeMethods.length && <p>{tr('Für diesen Zielbranch ist keine Merge-Aktion erlaubt.', 'No merge action is permitted for this target branch.')}</p>}
           <div className="hosting-actions">
-            <button
+            <Button
+              variant="primary"
               disabled={task.busy || !mergeMethods.length}
               onClick={() =>
                 void task.run(
@@ -158,8 +178,8 @@ export function HostingChangeRequests({
               }
             >
               {tr('Merge bestätigen', 'Confirm merge')}
-            </button>
-            <button onClick={() => setMergeCandidate(null)}>{tr('Abbrechen', 'Cancel')}</button>
+            </Button>
+            <Button onClick={() => setMergeCandidate(null)}>{tr('Abbrechen', 'Cancel')}</Button>
           </div>
         </div>
       )}
@@ -185,60 +205,61 @@ export function HostingChangeRequests({
             );
           }}
         >
-          <label>
-            {tr('Quellrepository', 'Source repository')}
-            <span>{source.fullPath}</span>
-            <button
-              type="button"
-              disabled={task.busy}
-              onClick={() => {
-                const url = window.prompt(tr('Web-URL des Quellrepositorys', 'Source repository web URL'), repository.htmlUrl);
-                if (url) void task.run(() => resolveRef(url), setSource);
-              }}
+          <div className="hosting-form-grid">
+            <HostingRepositoryPicker
+              label={tr('Quellrepository', 'Source repository')}
+              selected={source}
+              defaultUrl={repository.htmlUrl}
+              busy={task.busy}
+              onResolve={(url) => void task.run(() => resolveRef(url), setSource)}
+            />
+            <HostingRepositoryPicker
+              label={tr('Zielrepository', 'Target repository')}
+              selected={target}
+              defaultUrl={repository.htmlUrl}
+              busy={task.busy}
+              onResolve={(url) => void task.run(() => resolveRef(url), setTarget)}
             >
-              {tr('Auswählen', 'Select')}
-            </button>
-          </label>
-          <label>
-            {tr('Zielrepository', 'Target repository')}
-            <span>{target.fullPath}</span>
-            <button
-              type="button"
-              disabled={task.busy}
-              onClick={() => {
-                const url = window.prompt(tr('Web-URL des Zielrepositorys', 'Target repository web URL'));
-                if (url) void task.run(() => resolveRef(url), setTarget);
-              }}
-            >
-              {tr('Auswählen', 'Select')}
-            </button>
-            {repository.parent && (
-              <button type="button" onClick={() => setTarget(repository.parent!)}>
-                {tr('Übergeordnetes Repository', 'Parent repository')}
-              </button>
-            )}
-          </label>
-          <label>
-            {tr('Quellbranch', 'Source branch')}
-            <input required value={sourceBranch} onChange={(e) => setSourceBranch(e.target.value)} />
-          </label>
-          <label>
-            {tr('Zielbranch', 'Target branch')}
-            <input required value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} />
-          </label>
+              {repository.parent && (
+                <Button type="button" onClick={() => setTarget(repository.parent!)}>
+                  {tr('Übergeordnetes Repository', 'Parent repository')}
+                </Button>
+              )}
+            </HostingRepositoryPicker>
+          </div>
+          <div className="hosting-form-grid">
+            <label>
+              {tr('Quellbranch', 'Source branch')}
+              <TextField required value={sourceBranch} onChange={(e) => setSourceBranch(e.target.value)} />
+            </label>
+            <label>
+              {tr('Zielbranch', 'Target branch')}
+              <TextField required value={targetBranch} onChange={(e) => setTargetBranch(e.target.value)} />
+            </label>
+          </div>
           <label>
             {tr('Titel', 'Title')}
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} />
+            <TextField required value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label>
             {tr('Beschreibung', 'Description')}
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} />
+            <TextField as="textarea" value={body} onChange={(e) => setBody(e.target.value)} />
           </label>
-          <button disabled={task.busy}>{tr('Erstellen', 'Create')}</button>
+          <Button type="submit" variant="primary" disabled={task.busy}>
+            {tr('Erstellen', 'Create')}
+          </Button>
         </form>
       </details>
-      {message && <p role="status">{message}</p>}
-      {task.busy && <p role="status">{tr('Laden …', 'Loading …')}</p>}
+      {message && (
+        <p className="hosting-notice" role="status">
+          {message}
+        </p>
+      )}
+      {task.busy && (
+        <p className="hosting-notice" role="status">
+          {tr('Laden …', 'Loading …')}
+        </p>
+      )}
       {task.error && (
         <p className="hosting-error" role="alert">
           {task.error}

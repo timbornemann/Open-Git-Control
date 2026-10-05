@@ -7,29 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { hostingClient } from '@/services/hostingClient';
 import { useI18n } from '@/i18n';
-import type { HostingCapabilities, HostingProvider } from '@/types/hostingDtos';
 import { useHostingState, type HostingSection } from './hostingState';
 import { useRepositoryHosting } from './useRepositoryHosting';
 import { HostingSidebarTarget } from './HostingSidebarTarget';
+import { hostingRepositoryLabels } from './hostingLabels';
 import './hosting.css';
 import './hosting-sidebar.css';
 import { useHostingConnections } from './useHostingConnections';
-
-const ciLabels: Record<HostingProvider, string> = {
-  github: 'GitHub Actions',
-  forgejo: 'Forgejo Actions',
-  gitlab: 'GitLab CI/CD',
-  'bitbucket-cloud': 'Bitbucket Pipelines',
-  'bitbucket-data-center': 'CI / build status',
-};
-function repositoryLabels(provider: HostingProvider | undefined, capabilities: HostingCapabilities | undefined, tr: (de: string, en: string) => string) {
-  const releases = capabilities?.releases ?? (provider === 'bitbucket-cloud' ? 'downloads' : provider === 'bitbucket-data-center' ? 'tags' : 'native');
-  return {
-    changes: capabilities?.changeRequestLabel ?? (provider === 'gitlab' ? 'Merge Requests' : 'Pull Requests'),
-    ci: capabilities?.ciLabel ?? (provider === 'bitbucket-data-center' ? tr('CI / Buildstatus', ciLabels[provider]) : provider ? ciLabels[provider] : 'CI'),
-    releases: releases === 'downloads' ? tr('Tags & Downloads', 'Tags & downloads') : releases === 'tags' ? tr('Tags & Notes', 'Tags & notes') : 'Releases',
-  };
-}
 
 export function HostingSidebar({ local = false }: { local?: boolean }) {
   useHostingConnections();
@@ -71,7 +55,7 @@ export function HostingSidebar({ local = false }: { local?: boolean }) {
       ) === index,
   );
   const connection = state.connections.find((candidate) => candidate.id === target.repository?.ref.connectionId);
-  const labels = repositoryLabels(connection?.provider, target.repository?.capabilities, tr);
+  const labels = hostingRepositoryLabels(connection?.provider, target.repository?.capabilities, tr);
   const link = (section: HostingSection, label: string, icon: ReactNode, onClick = () => open(section)) => (
     <Button
       variant="ghost"

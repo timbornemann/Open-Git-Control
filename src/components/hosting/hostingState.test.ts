@@ -36,6 +36,19 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe('hosting navigation and pins', () => {
+  it('opens the overview when a repository is selected and clears details on global navigation', () => {
+    const state = useHostingState.getState();
+    state.setConnections([connection('github')]);
+    state.select(repo('github'));
+    expect(useHostingState.getState()).toMatchObject({ selected: repo('github'), section: 'overview' });
+    state.navigate('ci');
+    expect(useHostingState.getState().selected).toEqual(repo('github'));
+    state.navigate('connections');
+    expect(useHostingState.getState()).toMatchObject({ selected: null, section: 'connections' });
+    state.select(repo('github'));
+    state.navigate('repositories');
+    expect(useHostingState.getState()).toMatchObject({ selected: null, section: 'repositories' });
+  });
   it('keeps identical repository ids isolated and removes a signed-out selection', () => {
     const state = useHostingState.getState();
     state.setConnections([connection('github'), connection('forgejo', 'forgejo')]);

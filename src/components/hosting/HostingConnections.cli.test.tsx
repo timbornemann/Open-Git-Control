@@ -35,7 +35,7 @@ describe('GitHub CLI account preview', () => {
   let host: HTMLDivElement;
   let root: Root;
   let accounts: HostingConnection[];
-  const button = (label: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === label);
+  const button = (label: string) => [...document.body.querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === label);
   const click = async (element: Element | undefined) => {
     expect(element).toBeTruthy();
     await act(async () => (element as HTMLElement).click());
@@ -69,17 +69,18 @@ describe('GitHub CLI account preview', () => {
     act(() => root.unmount());
     host.remove();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('shows only host and identity, and adopts the account only after explicit confirmation', async () => {
     await render();
     await openCli();
-    expect(host.textContent).toContain('Use this GitHub CLI account:');
-    expect(host.textContent).toContain(identity.username);
-    expect(host.textContent).toContain(identity.host);
+    expect(document.body.textContent).toContain('Use this GitHub CLI account:');
+    expect(document.body.textContent).toContain(identity.username);
+    expect(document.body.textContent).toContain(identity.host);
     expect(mocks.request).toHaveBeenCalledWith('inspectCliLogin', { connectionId: account.id });
     expect(mocks.request.mock.calls.some(([operation]) => operation === 'loginWithCli')).toBe(false);
-    expect([...host.querySelectorAll<HTMLInputElement>('input[type="password"]')].every((input) => input.value === '')).toBe(true);
+    expect([...document.body.querySelectorAll<HTMLInputElement>('input[type="password"]')].every((input) => input.value === '')).toBe(true);
     expect(mocks.request.mock.calls.map(([operation]) => operation)).toEqual(['connections', 'saveConnection', 'inspectCliLogin', 'connections']);
     await click(button('Connect this account'));
     expect(mocks.request).toHaveBeenCalledWith('loginWithCli', { connectionId: account.id, expectedUsername: identity.username });
@@ -88,12 +89,49 @@ describe('GitHub CLI account preview', () => {
     expect(useHostingState.getState().connections[0]).toMatchObject({ username: identity.username, authenticated: true });
   });
 
+  it('opens a new account dialog only when requested and cancels without saving a connection', async () => {
+    await render();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await click(button('Add connection'));
+    expect(document.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Add connection');
+    expect(document.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe('');
+    await click(button('Cancel'));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocks.request.mock.calls.map(([operation]) => operation)).toEqual(['connections']);
+  });
+
+  it('closes a successful Device Flow dialog and retains the newly verified account', async () => {
+    vi.useFakeTimers();
+    accounts = [{ ...account, oauth: { clientId: 'desktop-client', redirectUri: 'http://127.0.0.1:42873/oauth/callback' } }];
+    const normal = mocks.request.getMockImplementation()!;
+    mocks.request.mockImplementation(async (operation, input) => {
+      if (operation === 'startDeviceLogin')
+        return { deviceCode: 'temporary-device-code', userCode: 'ABCD-1234', verificationUri: account.baseUrl + '/login/device', interval: 5, expiresIn: 600 };
+      if (operation === 'pollDeviceLogin') {
+        accounts = [{ ...accounts[0], username: identity.username, authenticated: true, hasCredentials: true }];
+        return { status: 'success' };
+      }
+      return normal(operation, input);
+    });
+    await render();
+    await click(button('Edit'));
+    await click(button('Sign in in browser'));
+    expect(document.body.textContent).toContain('ABCD-1234');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(mocks.request).toHaveBeenCalledWith('pollDeviceLogin', { connectionId: account.id, deviceCode: 'temporary-device-code' });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(useHostingState.getState().connections[0]).toMatchObject({ username: identity.username, authenticated: true });
+    expect(mocks.request.mock.calls.some(([operation]) => operation === 'cancelAuth')).toBe(false);
+  });
+
   it('cancels a displayed preview and invalidates its main-process authorization', async () => {
     await render();
     await openCli();
-    await click(button('Cancel / new account'));
+    await click(button('Cancel'));
     expect(mocks.request).toHaveBeenCalledWith('cancelAuth', { connectionId: account.id });
-    expect(host.textContent).not.toContain('Use this GitHub CLI account:');
+    expect(document.body.textContent).not.toContain('Use this GitHub CLI account:');
     expect(button('Connect this account')).toBeUndefined();
     expect(mocks.request.mock.calls.some(([operation]) => operation === 'loginWithCli')).toBe(false);
   });
@@ -104,12 +142,12 @@ describe('GitHub CLI account preview', () => {
     mocks.request.mockImplementation((operation, input) => (operation === 'inspectCliLogin' ? pending.promise : normal(operation, input)));
     await render();
     await openCli();
-    expect(host.textContent).toContain('Preparing connection');
-    await click(button('Cancel / new account'));
+    expect(document.body.textContent).toContain('Preparing connection');
+    await click(button('Cancel'));
     await act(async () => pending.resolve(identity));
     expect(button('Connect this account')).toBeUndefined();
-    expect(host.textContent).not.toContain('Use this GitHub CLI account:');
-    expect(host.textContent).not.toContain('Preparing connection');
+    expect(document.body.textContent).not.toContain('Use this GitHub CLI account:');
+    expect(document.body.textContent).not.toContain('Preparing connection');
     expect(mocks.request.mock.calls.some(([operation]) => operation === 'loginWithCli')).toBe(false);
   });
 
@@ -121,7 +159,7 @@ describe('GitHub CLI account preview', () => {
     await openCli();
     await click(button('Connect this account'));
     const connectionsReads = mocks.request.mock.calls.filter(([operation]) => operation === 'connections').length;
-    await click(button('Cancel / new account'));
+    await click(button('Cancel'));
     await act(async () => adoption.resolve({ ...account, username: identity.username, authenticated: true, hasCredentials: true }));
     expect(mocks.request.mock.calls.filter(([operation]) => operation === 'connections')).toHaveLength(connectionsReads);
     expect(useHostingState.getState().connections[0].authenticated).toBe(false);

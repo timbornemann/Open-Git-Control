@@ -38,7 +38,7 @@ describe('SettingsGithubSection', () => {
       authenticated: false,
       hasCredentials: false,
     };
-    const request = vi.spyOn(hostingClient, 'request').mockResolvedValueOnce([]).mockResolvedValueOnce(connection).mockResolvedValue([]);
+    const request = vi.spyOn(hostingClient, 'request').mockResolvedValueOnce([]).mockResolvedValueOnce(connection).mockResolvedValue([connection]);
     const container = document.getElementById('root');
     if (!container) throw new Error('Missing test root.');
     root = createRoot(container);
@@ -57,14 +57,20 @@ describe('SettingsGithubSection', () => {
       );
     });
 
-    expect(container.textContent).toContain('Accounts & servers');
-    const provider = container.querySelector<HTMLSelectElement>('select');
+    expect(container.textContent).toContain('Connected accounts');
+    expect(container.querySelector('form')).toBeNull();
+    const addConnection = Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Add connection');
+    if (!addConnection) throw new Error('Missing add connection action.');
+    act(() => addConnection.click());
+    const dialog = document.querySelector('[role="dialog"]');
+    if (!dialog) throw new Error('Missing connection editor dialog.');
+    const provider = dialog.querySelector<HTMLSelectElement>('select');
     if (!provider) throw new Error('Missing provider selector.');
     act(() => {
       provider.value = 'github';
       provider.dispatchEvent(new window.Event('change', { bubbles: true }));
     });
-    const hostInput = container.querySelector<HTMLInputElement>('input[placeholder="https://github.com"]');
+    const hostInput = dialog.querySelector<HTMLInputElement>('input[placeholder="https://github.com"]');
     if (!hostInput) throw new Error('Missing GitHub host input.');
 
     const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -81,13 +87,15 @@ describe('SettingsGithubSection', () => {
     });
 
     expect(request).not.toHaveBeenCalledWith('saveConnection', expect.anything());
-    const form = container.querySelector('form');
+    const form = dialog.querySelector('form');
     if (!form) throw new Error('Missing hosting connection form.');
     await act(async () => {
       form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(request).toHaveBeenCalledWith('saveConnection', expect.objectContaining({ provider: 'github', baseUrl: 'https://github.enterprise.local' }));
     expect(onUpdateSettings).not.toHaveBeenCalled();
-    expect(hostInput.value).toBe('https://github.enterprise.local');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.textContent).toContain('https://github.enterprise.local');
+    expect(useHostingState.getState().connections).toEqual([connection]);
   });
 });

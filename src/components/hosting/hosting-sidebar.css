@@ -2,15 +2,28 @@
   min-width: 0;
   color: var(--text-primary);
 }
+.repo-card.hosting-sidebar {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.hosting-sidebar .repo-card-header {
+  padding: 9px 16px;
+  background: var(--bg-dark);
+}
 .hosting-sidebar__content {
   display: grid;
-  gap: 10px;
+  gap: 0;
+}
+.hosting-sidebar .hosting-sidebar__content {
+  padding: 0;
 }
 .hosting-sidebar__target {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 6px 0 8px;
+  padding: 12px 16px;
 }
 .hosting-sidebar__provider {
   display: flex;
@@ -27,9 +40,7 @@
 .hosting-sidebar__remote {
   margin-left: auto;
   max-width: 45%;
-  padding: 1px 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  padding: 1px 0 1px 6px;
   color: var(--text-secondary);
   font: 0.65rem var(--font-mono);
   overflow: hidden;
@@ -78,14 +89,19 @@
   appearance: none;
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 26px 6px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  background: var(--bg-dark);
+  padding: 6px 26px 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-subtle);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-primary);
   font: inherit;
   font-size: 0.73rem;
   cursor: pointer;
+}
+.hosting-sidebar__select select:focus-visible {
+  outline: 1px solid var(--accent-primary);
+  outline-offset: 1px;
 }
 .hosting-sidebar__select > svg {
   position: absolute;
@@ -96,15 +112,15 @@
 }
 .hosting-sidebar__navigation {
   display: grid;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 .hosting-sidebar__management {
-  padding-top: 10px;
+  padding: 10px 0 6px;
   border-top: 1px solid var(--line-subtle);
 }
 .hosting-sidebar__group-label {
-  margin: 0 8px 5px;
+  margin: 0 16px 5px;
   color: var(--text-secondary);
   font-size: 0.62rem;
   font-weight: 600;
@@ -115,8 +131,11 @@
   justify-content: flex-start;
   gap: 8px;
   width: 100%;
-  min-height: 30px;
-  padding: 6px 8px;
+  min-height: 34px;
+  padding: 6px 16px 6px 14px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0;
   font-size: 0.75rem;
   font-weight: 500;
   text-align: left;
@@ -140,13 +159,17 @@
 .hosting-sidebar .hosting-sidebar__link[aria-current='page'] {
   background: var(--accent-primary-soft);
   color: var(--text-accent);
-  border-color: var(--accent-primary-border);
+  border-left-color: var(--accent-primary);
 }
 .hosting-sidebar__hint,
 .hosting-sidebar__error {
   margin: 0;
   font-size: 0.73rem;
   line-height: 1.5;
+}
+.hosting-sidebar__content > .hosting-sidebar__hint,
+.hosting-sidebar__content > .hosting-sidebar__error {
+  padding: 8px 16px;
 }
 .hosting-sidebar__hint {
   color: var(--text-secondary);

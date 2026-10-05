@@ -1,204 +1,392 @@
+@import './hosting-pages.css';
+@import './hosting-forms.css';
+
+.pane-content:has(.hosting-workspace) {
+  min-height: 0;
+  overflow: hidden;
+}
 .hosting-workspace {
-  padding: 20px;
-  overflow: auto;
+  container: hosting / inline-size;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--bg-darker);
   color: var(--text-primary);
   font-size: 0.82rem;
   line-height: 1.5;
 }
-.hosting-heading {
+.hosting-workspace__inner {
+  width: 100%;
+  min-height: 100%;
+  padding-bottom: 24px;
+}
+.hosting-page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
-}
-.hosting-heading h1,
-.hosting-heading h2 {
-  margin: 0 0 6px;
-}
-.hosting-heading h1 {
-  font-size: 1.25rem;
-}
-.hosting-heading h2 {
-  font-size: 1rem;
-}
-.hosting-heading p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-.hosting-workspace button,
-.hosting-transfers button,
-.hosting-connections button {
-  padding: 7px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
   background: var(--bg-dark);
-  font-family: inherit;
-  font-size: 0.76rem;
-  font-weight: 600;
-  line-height: 1.4;
-  cursor: pointer;
 }
-.hosting-workspace button:hover,
-.hosting-transfers button:hover,
-.hosting-connections button:hover {
-  background: var(--bg-hover);
-}
-.hosting-workspace button:disabled,
-.hosting-transfers button:disabled,
-.hosting-connections button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.hosting-workspace button[aria-pressed='true'],
-.hosting-transfers button[aria-pressed='true'] {
-  border-color: var(--accent-primary);
-  background: var(--accent-primary-soft);
-  color: var(--text-accent);
-}
-.hosting-tabs,
-.hosting-actions,
-.hosting-filters {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin: 12px 0;
-}
-.hosting-filters input {
-  flex: 1;
-  min-width: 180px;
-}
-.hosting-content {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.5fr);
-  gap: 20px;
-}
-.hosting-content:not(:has(.hosting-detail)) {
-  grid-template-columns: 1fr;
-}
-.hosting-card {
-  border: 1px solid var(--border-color);
-  background: var(--bg-panel);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  overflow-wrap: anywhere;
-}
-.hosting-card.selected {
-  border-color: var(--accent-primary);
-}
-.hosting-card h3 {
-  margin: 0 0 8px;
-  font-size: 0.92rem;
-}
-.hosting-card small,
-.hosting-checkbox small,
-.hosting-job small,
-.hosting-run small {
-  display: block;
-  color: var(--text-secondary);
-  margin: 4px 0;
-}
-.hosting-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
-}
-.hosting-repository-title {
-  font-weight: 600;
-  font-size: 1rem;
-  text-align: left;
-}
-.hosting-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 12px 0;
-}
-.hosting-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 0.85rem;
-}
-.hosting-form input,
-.hosting-form select,
-.hosting-form textarea,
-.hosting-filters input,
-.hosting-filters select,
-.hosting-actions input,
-.hosting-actions select,
-.hosting-ci > input {
-  padding: 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  background: var(--bg-darker);
-  color: var(--text-primary);
-  max-width: 100%;
-  box-sizing: border-box;
-}
-.hosting-form textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-.hosting-form .hosting-checkbox {
-  flex-direction: row;
-  align-items: center;
-}
-.hosting-checkbox input {
-  flex: none;
-}
-.hosting-transfers {
-  padding: 16px;
-}
-.hosting-error {
-  color: var(--status-danger);
-  white-space: pre-wrap;
-  border-left: 3px solid currentColor;
-  padding-left: 10px;
-}
-.hosting-empty {
-  padding: 30px;
-  text-align: center;
-}
-.hosting-run {
-  display: block;
-  width: 100%;
-  text-align: left;
-  margin: 8px 0;
-}
-.hosting-job {
-  padding: 10px;
-  margin: 8px 0;
-  border-left: 2px solid var(--border-color);
-}
-.hosting-log {
-  max-height: 440px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--bg-darker);
-  padding: 12px;
-  font-family: monospace;
-  font-size: 12px;
-}
-.hosting-notes {
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-}
-.hosting-detail {
+.hosting-page-header > div:first-child {
   min-width: 0;
 }
-@media (max-width: 1050px) {
-  .hosting-content {
-    grid-template-columns: 1fr;
+.hosting-eyebrow {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.hosting-page-header h1 {
+  margin: 3px 0;
+  font-size: 1.1rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.hosting-page-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+.hosting-header-actions,
+.hosting-actions,
+.hosting-repo-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.hosting-header-actions {
+  justify-content: flex-end;
+}
+.hosting-actions {
+  margin: 12px 0;
+}
+.hosting-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.hosting-navigation .ui-segmented-control {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.hosting-navigation .ui-segmented-control__item,
+.hosting-detail__tabs .ui-segmented-control__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-transform: none;
+}
+.hosting-navigation .ui-segmented-control__item {
+  flex: none;
+  white-space: nowrap;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+}
+.hosting-navigation .ui-segmented-control__item.is-active {
+  border-bottom-color: var(--accent-primary);
+  background: transparent;
+  color: var(--text-accent);
+}
+.hosting-catalog-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.hosting-search {
+  flex: 1;
+  min-width: min(220px, 100%);
+  display: flex;
+  position: relative;
+  align-items: center;
+  color: var(--text-secondary);
+}
+.hosting-search > svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+}
+.hosting-search .ui-field {
+  min-height: 40px;
+  padding-left: 33px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.hosting-search .ui-field:focus {
+  box-shadow: inset 0 -1px var(--accent-primary);
+}
+.hosting-search:focus-within {
+  color: var(--text-accent);
+}
+.hosting-catalog-toolbar > select {
+  max-width: 220px;
+  flex: 0 1 auto;
+  min-height: 40px;
+  border: 0;
+  border-left: 1px solid var(--line-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+.hosting-results {
+  padding: 9px 20px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+}
+.hosting-catalog {
+  margin: 0;
+  border-top: 1px solid var(--border-color);
+}
+.hosting-repo-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(140px, 0.9fr) auto;
+  grid-template-areas:
+    'heading meta actions'
+    'description branch actions'
+    'paths paths paths';
+  align-items: center;
+  column-gap: 18px;
+  row-gap: 3px;
+  min-height: 76px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 2px solid transparent;
+  transition:
+    background-color 120ms ease,
+    border-left-color 120ms ease;
+}
+.hosting-repo-card:hover,
+.hosting-repo-card:focus-within {
+  background: var(--bg-hover);
+  border-left-color: var(--accent-primary);
+}
+.hosting-repo-card__heading {
+  grid-area: heading;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.hosting-signet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  flex: none;
+  color: var(--text-accent);
+}
+.hosting-repository-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--text-primary);
+}
+.hosting-repository-title .ui-button__label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.hosting-repo-card__namespace {
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.hosting-repo-card__namespace::after {
+  content: '/';
+  margin-left: 7px;
+}
+.hosting-repository-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.88rem;
+}
+.hosting-repo-card__heading .ui-icon-button[aria-pressed='true'] {
+  color: var(--text-accent);
+}
+.hosting-repo-card__description {
+  grid-area: description;
+  min-width: 0;
+  margin: 0 0 0 36px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+.hosting-repo-card__meta {
+  grid-area: meta;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.hosting-repo-card__account {
+  flex-basis: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+}
+.hosting-repo-card__branch {
+  grid-area: branch;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  overflow-wrap: anywhere;
+}
+.hosting-repo-card__branch > span {
+  font-family: inherit;
+}
+.hosting-repo-card__actions {
+  grid-area: actions;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.hosting-local-clones {
+  grid-area: paths;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin-left: 36px;
+}
+.hosting-local-clone {
+  justify-content: flex-start;
+  text-align: left;
+  max-width: 100%;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+}
+.hosting-catalog + .hosting-actions {
+  padding: 0 20px;
+}
+.hosting-empty {
+  padding: 40px 24px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+.hosting-empty > svg {
+  margin-bottom: 10px;
+  color: var(--text-accent);
+}
+.hosting-empty h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+.hosting-empty p {
+  margin: 0 0 16px;
+}
+.hosting-error,
+.hosting-notice {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent-primary-border);
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.hosting-error {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
+  white-space: pre-wrap;
+}
+.hosting-workspace__inner > .hosting-error,
+.hosting-workspace__inner > .hosting-notice,
+.hosting-detail > .hosting-error,
+.hosting-detail > .hosting-notice {
+  margin: 12px 20px;
+}
+@container hosting (max-width: 900px) {
+  .hosting-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
   }
-  .hosting-detail {
-    border-top: 1px solid var(--border-color);
-    padding-top: 20px;
+  .hosting-header-actions {
+    justify-content: flex-start;
+  }
+  .hosting-repo-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'heading actions'
+      'description description'
+      'meta meta'
+      'branch branch'
+      'paths paths';
+    row-gap: 6px;
+  }
+  .hosting-repo-card__meta,
+  .hosting-repo-card__branch {
+    margin-left: 36px;
+  }
+  .hosting-repo-card__account {
+    flex-basis: auto;
+  }
+}
+@container hosting (max-width: 560px) {
+  .hosting-page-header,
+  .hosting-navigation,
+  .hosting-catalog-toolbar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .hosting-page-header h1 {
+    font-size: 1rem;
+  }
+  .hosting-repo-card {
+    padding-left: 14px;
+    padding-right: 16px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'heading' 'description' 'meta' 'branch' 'paths' 'actions';
+  }
+  .hosting-repo-card__actions {
+    justify-content: flex-start;
+    margin-left: 36px;
+  }
+  .hosting-catalog-toolbar > select {
+    flex: 1;
+    max-width: 100%;
+  }
+  .hosting-search {
+    flex-basis: 100%;
   }
 }

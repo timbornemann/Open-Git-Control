@@ -89,8 +89,10 @@ describe('multi-provider hosting acceptance', () => {
   let preferences: RemotePreferences;
   let override: ((operation: string, input: Record<string, unknown>) => Promise<unknown> | undefined) | undefined;
   const page = <T,>(items: T[]) => ({ items, nextCursor: null });
-  const buttons = (label: string, container: ParentNode = host) =>
-    [...container.querySelectorAll<HTMLButtonElement>('button')].filter((button) => button.textContent?.trim() === label);
+  const buttons = (label: string, container: ParentNode = document.body) =>
+    [...container.querySelectorAll<HTMLButtonElement>('button')].filter(
+      (button) => (button.getAttribute('aria-label') ?? button.textContent?.trim()) === label,
+    );
   const click = async (element: Element | undefined | null) => {
     expect(element).toBeTruthy();
     await act(async () => (element as HTMLElement).click());
@@ -233,12 +235,14 @@ describe('multi-provider hosting acceptance', () => {
   it('shows private Forgejo and GitHub together even with identical repository IDs and namespaces, and filters/pins independently', async () => {
     await render();
     expect(rows()).toHaveLength(2);
-    expect(row('forgejo').textContent).toContain('Private Forgejo · Private');
-    expect(row('github').textContent).toContain('GitHub Backup · Public');
+    expect(row('forgejo').textContent).toContain('Private Forgejo');
+    expect(row('forgejo').textContent).toContain('Private');
+    expect(row('github').textContent).toContain('GitHub Backup');
+    expect(row('github').textContent).toContain('Public');
     expect(buttons(`Open local clone · ${mirror}`)).toHaveLength(2);
-    await click(buttons('☆', row('forgejo'))[0]);
-    expect(buttons('★', row('forgejo'))[0].getAttribute('aria-pressed')).toBe('true');
-    expect(buttons('☆', row('github'))[0].getAttribute('aria-pressed')).toBe('false');
+    await click(row('forgejo').querySelector('button[aria-label="Pin repository"]'));
+    expect(row('forgejo').querySelector('button[aria-label="Unpin repository"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(row('github').querySelector('button[aria-label="Pin repository"]')!.getAttribute('aria-pressed')).toBe('false');
     await change(host.querySelector<HTMLSelectElement>('select[aria-label="Filter provider"]')!, 'forgejo');
     expect(rows()).toHaveLength(1);
     expect(row('forgejo')).toBeTruthy();
@@ -257,6 +261,55 @@ describe('multi-provider hosting acceptance', () => {
     await act(async () => old.resolve(page([repos[0]])));
     expect(rows()).toHaveLength(1);
     expect(row('forgejo')).toBeUndefined();
+  });
+
+  it('opens a full detail subpage and returns to the same filtered catalog and scroll position', async () => {
+    await render();
+    await change(host.querySelector<HTMLInputElement>('input[aria-label="Search repositories"]')!, 'project');
+    await change(host.querySelector<HTMLSelectElement>('select[aria-label="Filter provider"]')!, 'forgejo');
+    await click(row('forgejo').querySelector('button[aria-label="Pin repository"]'));
+    const scroller = host.querySelector<HTMLElement>('.hosting-workspace')!;
+    scroller.scrollTop = 145;
+    await act(async () => scroller.dispatchEvent(new Event('scroll', { bubbles: true })));
+    await click(row('forgejo').querySelector('.hosting-repository-title'));
+    expect(host.querySelector('.hosting-catalog')).toBeNull();
+    expect(host.querySelector('.hosting-detail h1')?.textContent).toBe(repos[0].fullName);
+    expect(host.querySelector('button[aria-pressed="true"]')?.textContent).toBe('Overview');
+    expect(scroller.scrollTop).toBe(0);
+    expect(mocks.request.mock.calls.some(([operation]) => ['changeRequests', 'runs', 'releases'].includes(operation))).toBe(false);
+    await click(buttons('All repositories')[0]);
+    expect(host.querySelector('.hosting-detail')).toBeNull();
+    expect(rows()).toHaveLength(1);
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Search repositories"]')?.value).toBe('project');
+    expect(host.querySelector<HTMLSelectElement>('select[aria-label="Filter provider"]')?.value).toBe('forgejo');
+    expect(row('forgejo').querySelector('button[aria-label="Unpin repository"]')).toBeTruthy();
+    expect(scroller.scrollTop).toBe(145);
+  });
+
+  it('does not revive repository details when capabilities arrive after returning to the catalog', async () => {
+    const pending = deferred<unknown>();
+    override = (operation, input) => (operation === 'capabilities' && input.repository ? pending.promise : undefined);
+    await render();
+    await click(row('github').querySelector('.hosting-repository-title'));
+    await click(buttons('All repositories')[0]);
+    await act(async () => pending.resolve(capabilities));
+    expect(rows()).toHaveLength(2);
+    expect(host.querySelector('.hosting-detail')).toBeNull();
+    expect(useHostingState.getState().selected).toBeNull();
+  });
+
+  it('keeps catalog action forms in dialogs and cancels them without creating or resolving a repository', async () => {
+    await render();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await click(buttons('New repository')[0]);
+    expect(document.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('New repository');
+    expect(buttons('Create repository')[0].disabled).toBe(true);
+    await click(buttons('Close')[0]);
+    await click(buttons('Open repository by URL')[0]);
+    await click(buttons('Close')[0]);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(mocks.request.mock.calls.some(([operation]) => ['createRepository', 'clone', 'fork'].includes(operation))).toBe(false);
+    expect(useHostingState.getState().selected).toBeNull();
   });
 
   it('validates saved credentials at startup and then loads both catalogs', async () => {
@@ -279,6 +332,8 @@ describe('multi-provider hosting acceptance', () => {
     await render();
     await click(row('github').querySelector('.hosting-repository-title'));
     expect(host.querySelector('.hosting-detail')?.textContent).toContain('GitHub Backup');
+    expect(host.querySelector('.hosting-catalog')).toBeNull();
+    await click(buttons('Pull requests')[0]);
     await click(buttons('Checkout')[0]);
     expect(mocks.request).toHaveBeenCalledWith('checkoutChangeRequest', { repoPath: mirror, repository: repos[1].ref, id: '31', expectedHeadSha: head });
     await click(buttons('Check CI at the change request revision')[0]);
@@ -317,9 +372,11 @@ describe('multi-provider hosting acceptance', () => {
       'uploadAsset',
       expect.objectContaining({ repository: repos[1].ref, releaseId: 'github-release', repoPath: mirror, filePath: 'C:/Exports/source.zip' }),
     );
+    await click(buttons('All repositories')[0]);
     await click(row('forgejo').querySelector('.hosting-repository-title'));
     expect(host.querySelector('.hosting-detail')?.textContent).toContain('Private Forgejo');
     expect(host.querySelector('.hosting-detail')?.textContent).not.toContain('github log text');
+    await click(buttons('Releases')[0]);
     expect(mocks.request).toHaveBeenCalledWith('releases', { repository: repos[0].ref });
   });
 
@@ -332,7 +389,9 @@ describe('multi-provider hosting acceptance', () => {
     await click(buttons('GitHub Actions')[0]);
     await click(host.querySelector('.hosting-run'));
     await click(buttons('Logs')[0]);
+    await click(buttons('All repositories')[0]);
     await click(row('forgejo').querySelector('.hosting-repository-title'));
+    await click(buttons('Forgejo Actions')[0]);
     expect(host.querySelector('.hosting-ci')?.textContent).toContain('forgejo workflow');
     await act(async () => oldLog.resolve({ text: 'late private GitHub log', truncated: false, nextCursor: null }));
     expect(host.textContent).not.toContain('late private GitHub log');
@@ -359,20 +418,22 @@ describe('multi-provider hosting acceptance', () => {
     };
     await render();
     expect(rows().some((item) => item.textContent?.includes(external.fullName))).toBe(false);
+    await change(host.querySelector<HTMLSelectElement>('select[aria-label="Filter server and account"]')!, accounts[0].id);
+    await click(buttons('Open repository by URL')[0]);
     const openButton = buttons('Open repository')[0];
     expect(openButton.disabled).toBe(true);
-    await change(host.querySelector<HTMLSelectElement>('select[aria-label="Filter server and account"]')!, accounts[0].id);
-    const openForm = buttons('Open repository')[0].closest('form')!;
+    const openForm = openButton.closest('form')!;
     await change(openForm.querySelector('input')!, external.htmlUrl);
     await act(async () => openForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     expect(mocks.request).toHaveBeenCalledWith('resolveRepository', { connectionId: accounts[0].id, url: external.htmlUrl });
     expect(useHostingState.getState().selected?.ref).toEqual(external.ref);
-    expect(host.querySelector('.hosting-detail h2')?.textContent).toBe(external.fullName);
+    expect(host.querySelector('.hosting-detail h1')?.textContent).toBe(external.fullName);
     expect(host.querySelector('.hosting-detail')?.textContent).toContain('Private Forgejo');
     expect(mocks.request).toHaveBeenCalledWith('capabilities', { connectionId: accounts[0].id, repository: external.ref });
     await click(buttons('Clone this repository')[0]);
     expect(mocks.request).toHaveBeenCalledWith('clone', { repository: external.ref, targetDir: 'C:/Clones', targetName: 'tools', useSsh: false });
     expect(mocks.addRepo).toHaveBeenCalledWith('C:/Clones/tools');
+    await click(buttons('Fork')[0]);
     const forkForm = buttons('Create fork')[0].closest('form')!;
     const forkInputs = forkForm.querySelectorAll('input');
     await change(forkInputs[0], 'my-group');
@@ -408,6 +469,7 @@ describe('multi-provider hosting acceptance', () => {
     };
     await render();
     await click(row('github').querySelector('.hosting-repository-title'));
+    await click(buttons('Pull requests')[0]);
     await click(buttons('Merge')[0]);
     expect(mocks.request).toHaveBeenCalledWith('capabilities', {
       connectionId: repos[1].ref.connectionId,

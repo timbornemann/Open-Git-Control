@@ -3,7 +3,7 @@ import { HostingConnections } from '@/components/hosting/HostingConnections';
 import '@/components/hosting/hosting.css';
 
 export const SettingsGithubSection = ({ variant }: SettingsSectionProps) => (
-  <section className={variant === 'sidebar' ? 'ssc-section' : 'settings-card'}>
+  <section className={`${variant === 'sidebar' ? 'ssc-section' : 'settings-card'} hosting-settings`}>
     <HostingConnections />
   </section>
 );

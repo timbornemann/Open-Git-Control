@@ -1,3 +1,6 @@
+import { Button } from '@/components/ui/Button';
+import { ExternalLink, Tag } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useState } from 'react';
 import { appClient } from '@/services/appClient';
 import { useI18n } from '@/i18n';
@@ -19,14 +22,20 @@ export function HostingReleaseList({ repository, releases, showAssets }: { repos
   const { tr } = useI18n();
   return releases.map((release) => (
     <article className="hosting-card" key={release.id}>
-      <h3>{release.name || release.tagName}</h3>
-      <small>
-        {release.tagName}
-        {release.draft ? ' · Draft' : ''}
-        {release.prerelease ? ' · Prerelease' : ''}
-      </small>
+      <div className="hosting-item-heading">
+        <h3>{release.name || release.tagName}</h3>
+        <div className="hosting-item-meta">
+          <StatusBadge icon={<Tag size={12} />}>{release.tagName}</StatusBadge>
+          {release.draft && <StatusBadge tone="warning">Draft</StatusBadge>}
+          {release.prerelease && <StatusBadge tone="info">Prerelease</StatusBadge>}
+        </div>
+      </div>
       {release.body && <pre className="hosting-notes">{release.body}</pre>}
-      <button onClick={() => void appClient.openExternalUrl(release.htmlUrl)}>{tr('Öffnen', 'Open')}</button>
+      <div className="hosting-actions">
+        <Button variant="ghost" icon={<ExternalLink size={13} />} onClick={() => void appClient.openExternalUrl(release.htmlUrl)}>
+          {tr('Öffnen', 'Open')}
+        </Button>
+      </div>
       {showAssets && <ReleaseAttachments repository={repository} releaseId={release.id} />}
     </article>
   ));

@@ -1,3 +1,7 @@
+import { Button } from '@/components/ui/Button';
+import { Check, Sparkles, Tag, X } from 'lucide-react';
+import { IconButton } from '@/components/ui/IconButton';
+import { TextField } from '@/components/ui/TextField';
 import { useCallback, useEffect, useState } from 'react';
 import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
@@ -157,7 +161,7 @@ export function HostingReleases({
   return (
     <div className="hosting-releases">
       {capabilities.releases !== 'native' && (
-        <p>
+        <p className="hosting-help">
           {capabilities.releases === 'downloads'
             ? tr(
                 'Bitbucket verwaltet Tags und Downloads getrennt. Notes werden lokal erstellt und können als Datei veröffentlicht werden.',
@@ -172,7 +176,7 @@ export function HostingReleases({
       {capabilities.releases === 'downloads' && <HostingReleaseFiles repository={repository.ref} />}
       <HostingReleaseList repository={repository.ref} releases={page.items} showAssets={capabilities.releaseAssets && capabilities.releases === 'native'} />
       {page.nextCursor && (
-        <button
+        <Button
           disabled={task.busy}
           onClick={() =>
             void task.run(
@@ -182,7 +186,7 @@ export function HostingReleases({
           }
         >
           {tr('Weitere laden', 'Load more')}
-        </button>
+        </Button>
       )}
       <form
         className="hosting-form hosting-card"
@@ -196,36 +200,40 @@ export function HostingReleases({
           {tr('Veröffentlichungsziel', 'Publication target')}: {repository.fullName} ·{' '}
           {remoteName || tr('Kein lokaler Remote zugeordnet', 'No local remote bound')}
         </p>
-        <label>
-          Tag
-          <input
-            required
-            value={tagName}
-            onChange={(e) => {
-              setTagName(e.target.value);
-              setInspection(null);
-            }}
-          />
-        </label>
-        <label>
-          {tr('Name', 'Name')}
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          {tr('Zielbranch, Tag oder Commit', 'Target branch, tag or commit')}
-          <input
-            required
-            value={target}
-            onChange={(e) => {
-              setTarget(e.target.value);
-              setInspection(null);
-            }}
-          />
-        </label>
-        <label>
-          {tr('Notes ab Tag / Ref (optional)', 'Notes since tag / ref (optional)')}
-          <input value={fromRef} onChange={(e) => setFromRef(e.target.value)} />
-        </label>
+        <div className="hosting-form-grid">
+          <label>
+            Tag
+            <TextField
+              required
+              value={tagName}
+              onChange={(e) => {
+                setTagName(e.target.value);
+                setInspection(null);
+              }}
+            />
+          </label>
+          <label>
+            {tr('Name', 'Name')}
+            <TextField value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+        </div>
+        <div className="hosting-form-grid">
+          <label>
+            {tr('Zielbranch, Tag oder Commit', 'Target branch, tag or commit')}
+            <TextField
+              required
+              value={target}
+              onChange={(e) => {
+                setTarget(e.target.value);
+                setInspection(null);
+              }}
+            />
+          </label>
+          <label>
+            {tr('Notes ab Tag / Ref (optional)', 'Notes since tag / ref (optional)')}
+            <TextField value={fromRef} onChange={(e) => setFromRef(e.target.value)} />
+          </label>
+        </div>
         <HostingNotesOptions options={notesOptions} onChange={setNotesOptions} />
         <div className="hosting-actions">
           <select aria-label={tr('Sprache', 'Language')} value={language} onChange={(e) => setLanguage(e.target.value as 'de' | 'en')}>
@@ -237,19 +245,19 @@ export function HostingReleases({
             <option>minor</option>
             <option>major</option>
           </select>
-          <button type="button" disabled={task.busy || !repoPath} onClick={generateNotes}>
+          <Button icon={<Sparkles size={14} />} type="button" disabled={task.busy || !repoPath} onClick={generateNotes}>
             {tr('KI-Release-Notes erzeugen', 'Generate AI release notes')}
-          </button>
+          </Button>
         </div>
         <label>
           {tr('Release-Notes', 'Release notes')}
-          <textarea rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
+          <TextField as="textarea" rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
         </label>
         <div className="hosting-actions">
-          <button type="button" onClick={() => void navigator.clipboard.writeText(body)}>
+          <Button type="button" onClick={() => void navigator.clipboard.writeText(body)}>
             {tr('Notes kopieren', 'Copy notes')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => {
               const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
@@ -262,7 +270,7 @@ export function HostingReleases({
             }}
           >
             {tr('Notes als Datei speichern', 'Save notes as file')}
-          </button>
+          </Button>
         </div>
         {capabilities.draftRelease && (
           <label className="hosting-checkbox">
@@ -277,7 +285,9 @@ export function HostingReleases({
           </label>
         )}
         {capabilities.releases !== 'tags' && (
-          <button disabled={task.busy || !repoPath || !remoteName}>{tr('Gewählten Endpunkt prüfen', 'Inspect selected endpoint')}</button>
+          <Button icon={<Tag size={14} />} type="submit" variant="primary" disabled={task.busy || !repoPath || !remoteName}>
+            {tr('Gewählten Endpunkt prüfen', 'Inspect selected endpoint')}
+          </Button>
         )}
         {!repoPath && (
           <p>
@@ -323,7 +333,7 @@ export function HostingReleases({
       {created && capabilities.releaseAssets && (
         <div className="hosting-card">
           <h3>{capabilities.releases === 'downloads' ? 'Downloads' : tr('Release-Dateien', 'Release assets')}</h3>
-          <button
+          <Button
             disabled={task.busy}
             onClick={() =>
               void task.run(
@@ -335,19 +345,36 @@ export function HostingReleases({
             }
           >
             {tr('Dateien auswählen', 'Select files')}
-          </button>
+          </Button>
           {files.map((file) => (
-            <p key={file}>
-              {file} {uploaded.includes(file) ? '✓' : <button onClick={() => setFiles(files.filter((value) => value !== file))}>×</button>}
-            </p>
+            <div className="hosting-file-row" key={file}>
+              <span>{file}</span>
+              {uploaded.includes(file) ? (
+                <Check size={14} aria-label={tr('Hochgeladen', 'Uploaded')} />
+              ) : (
+                <IconButton
+                  icon={<X size={14} />}
+                  aria-label={tr('Datei entfernen', 'Remove file')}
+                  onClick={() => setFiles(files.filter((value) => value !== file))}
+                />
+              )}
+            </div>
           ))}
-          <button disabled={task.busy || files.every((file) => uploaded.includes(file))} onClick={upload}>
+          <Button disabled={task.busy || files.every((file) => uploaded.includes(file))} onClick={upload}>
             {tr('Ausstehende Dateien hochladen', 'Upload pending files')}
-          </button>
+          </Button>
         </div>
       )}
-      {message && <p role="status">{message}</p>}
-      {task.busy && <p role="status">{tr('Operation läuft …', 'Operation running …')}</p>}
+      {message && (
+        <p className="hosting-notice" role="status">
+          {message}
+        </p>
+      )}
+      {task.busy && (
+        <p className="hosting-notice" role="status">
+          {tr('Operation läuft …', 'Operation running …')}
+        </p>
+      )}
       {task.error && (
         <p className="hosting-error" role="alert">
           {task.error}

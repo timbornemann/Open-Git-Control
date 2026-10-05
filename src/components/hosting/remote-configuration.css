@@ -1,6 +1,7 @@
 .remote-configuration {
   max-width: none;
   box-sizing: border-box;
+  padding: 20px;
 }
 .remote-configuration__heading {
   display: flex;

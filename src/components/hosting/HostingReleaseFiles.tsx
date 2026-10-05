@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/Button';
+import { ExternalLink, File } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { appClient } from '@/services/appClient';
 import { hostingClient } from '@/services/hostingClient';
@@ -21,13 +23,18 @@ export function HostingReleaseFiles({ repository, releaseId }: { repository: Hos
     <section className="hosting-card">
       <h3>{releaseId ? tr('Dateianhänge', 'Attachments') : tr('Repository-Downloads', 'Repository downloads')}</h3>
       {page.items.map((asset) => (
-        <button key={asset.id} onClick={() => void appClient.openExternalUrl(asset.htmlUrl)}>
-          {asset.name}
-        </button>
+        <div className="hosting-file-row" key={asset.id}>
+          <span>
+            <File size={13} aria-hidden="true" /> {asset.name}
+          </span>
+          <Button aria-label={asset.name} icon={<ExternalLink size={13} />} variant="ghost" onClick={() => void appClient.openExternalUrl(asset.htmlUrl)}>
+            {tr('Öffnen', 'Open')}
+          </Button>
+        </div>
       ))}
       {!page.items.length && !task.busy && !task.error && <p>{tr('Keine Dateien vorhanden.', 'No files available.')}</p>}
       {page.nextCursor && (
-        <button
+        <Button
           disabled={task.busy}
           onClick={() =>
             void run(
@@ -37,7 +44,7 @@ export function HostingReleaseFiles({ repository, releaseId }: { repository: Hos
           }
         >
           {tr('Weitere Dateien laden', 'Load more files')}
-        </button>
+        </Button>
       )}
       {task.busy && <p role="status">{tr('Dateien werden geladen …', 'Loading files …')}</p>}
       {task.error && <p role="alert">{task.error}</p>}

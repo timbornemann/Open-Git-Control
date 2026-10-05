@@ -1,0 +1,214 @@
+.hosting-dialog {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.hosting-dialog .dialog-modal {
+  width: min(600px, 100%);
+}
+.hosting-dialog .dialog-header h3 {
+  margin: 0;
+}
+.hosting-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-width: 0;
+  margin: 12px 0;
+}
+.hosting-dialog .hosting-form {
+  margin: 0;
+}
+.hosting-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.hosting-form .ui-field {
+  box-sizing: border-box;
+}
+.hosting-form input:not([type='checkbox']):not([type='radio']):not(.ui-field),
+.hosting-form textarea:not(.ui-field) {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+}
+.hosting-form textarea:not(.ui-field) {
+  resize: vertical;
+  min-height: 80px;
+}
+.hosting-form .ui-button[type='submit'] {
+  align-self: flex-start;
+}
+.hosting-workspace select,
+.hosting-dialog select,
+.hosting-transfers select {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 28px 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.hosting-workspace select:focus-visible,
+.hosting-dialog select:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: 1px;
+}
+.hosting-workspace select:disabled,
+.hosting-dialog select:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+.hosting-form .hosting-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+.hosting-checkbox input {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  accent-color: var(--accent-primary);
+}
+.hosting-checkbox small {
+  color: var(--text-secondary);
+}
+.hosting-workspace details > summary,
+.hosting-dialog details > summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.79rem;
+  font-weight: 600;
+}
+.hosting-workspace details[open] > summary,
+.hosting-dialog details[open] > summary {
+  margin-bottom: 12px;
+}
+.hosting-form > details {
+  padding: 10px 0;
+  border-block: 1px solid var(--line-subtle);
+}
+.hosting-form > details .hosting-checkbox {
+  margin: 8px 0;
+}
+.hosting-form--nested {
+  margin-bottom: 0;
+}
+.hosting-form p {
+  margin: 0;
+}
+.hosting-help {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.hosting-releases .hosting-form {
+  margin-top: 20px;
+}
+.hosting-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.hosting-form-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.hosting-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hosting-inline-field .ui-field {
+  flex: 1;
+}
+.hosting-source-ref {
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  color: var(--text-accent);
+  overflow-wrap: anywhere;
+}
+.hosting-panel-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.hosting-panel-toolbar > .ui-field {
+  flex: 1;
+  max-width: 280px;
+}
+.hosting-panel-toolbar .ui-segmented-control {
+  width: fit-content;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.hosting-panel-toolbar .ui-segmented-control__item {
+  flex: none;
+  white-space: nowrap;
+  border: 0;
+  border-bottom: 2px solid transparent;
+}
+.hosting-panel-toolbar .ui-segmented-control__item.is-active {
+  border-bottom-color: var(--accent-primary);
+  background: transparent;
+  color: var(--text-accent);
+}
+.hosting-panel-toolbar .ui-button:last-child {
+  margin-left: auto;
+}
+.hosting-transfers {
+  padding: 16px;
+}
+.hosting-workspace button:not(.ui-button):not(.ui-icon-button):not(.ui-segmented-control__item),
+.hosting-transfers button:not(.ui-button):not(.ui-icon-button):not(.ui-segmented-control__item) {
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 5px 10px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.hosting-workspace button:not(.ui-button):not(.ui-icon-button):not(.ui-segmented-control__item):hover:not(:disabled),
+.hosting-transfers button:not(.ui-button):not(.ui-icon-button):not(.ui-segmented-control__item):hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.hosting-workspace button:not(.ui-button):not(.ui-icon-button):not(.ui-segmented-control__item):disabled,
+.hosting-transfers button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+@container hosting (max-width: 560px) {
+  .hosting-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .hosting-dialog .hosting-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
