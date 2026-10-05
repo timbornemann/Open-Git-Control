@@ -7,6 +7,9 @@ import { GitRepositoryProbe } from './GitRepositoryProbe';
 import { GitSpawnOperations } from './GitSpawnOperations';
 import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
+import * as fs from 'fs';
+import * as path from 'path';
+import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks, toLiteralPathspec } from './RepositoryPathSafety';
 import {
   defaultExecFileAsyncRunner,
   type DiffPreviewResult,
@@ -266,9 +269,32 @@ export class GitRunner {
     const maxBytes = Math.max(64 * 1024, Math.min(limits.maxBytes || 2 * 1024 * 1024, 8 * 1024 * 1024));
     const maxLines = Math.max(100, Math.min(limits.maxLines || 5000, 20_000));
 
-    return this.schedule(repoPath, 'interactive', args[0] || 'diff', (signal) =>
-      this.spawnOperations.getDiffPreview(repoPath, args, maxBytes, maxLines, signal),
-    );
+    return this.schedule(repoPath, 'interactive', args[0] || 'diff', async (signal) => {
+      const preview = await this.spawnOperations.getDiffPreview(repoPath, args, maxBytes, maxLines, signal);
+      if (preview.text || args.length !== 3 || args[0] !== 'diff' || args[1] !== '--') return preview;
+
+      // An ordinary working-tree diff omits untracked files. Preview those
+      // against the empty file without creating or changing the Git index.
+      const requestedPath = args[2].startsWith(':(literal)') ? args[2].slice(10) : args[2];
+      const filePath = path.posix.normalize(normalizeRepositoryRelativePath(requestedPath, 'Diff path'));
+      const untrackedPaths = await this.processExecutor.run(repoPath, ['ls-files', '--others', '--exclude-standard', '-z', '--', toLiteralPathspec(filePath)], {
+        cwd: repoPath,
+        maxBuffer: 64 * 1024,
+        env: process.env,
+        signal,
+      });
+      if (!untrackedPaths.split('\0').includes(filePath)) return preview;
+      const resolvedPath = resolveExistingRepositoryPathWithoutSymlinks(repoPath, filePath, 'Diff path');
+      if (!fs.statSync(resolvedPath).isFile()) return preview;
+      signal.throwIfAborted();
+      return this.spawnOperations.getDiffPreview(
+        repoPath,
+        ['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', '/dev/null', filePath],
+        maxBytes,
+        maxLines,
+        signal,
+      );
+    });
   }
 
   async streamLines(

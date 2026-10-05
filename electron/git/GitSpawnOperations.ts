@@ -143,7 +143,9 @@ export class GitSpawnOperations {
           reject(createAbortError('Git diff preview was aborted.'));
           return;
         }
-        if (code !== 0 && !truncated && closeSignal == null) {
+        // --no-index uses exit code 1 for a successful diff with changes.
+        const hasNoIndexChanges = code === 1 && args[0] === 'diff' && args.includes('--no-index');
+        if (code !== 0 && !hasNoIndexChanges && !truncated && closeSignal == null) {
           reject(new Error(redactGitSensitiveText((stderr || `git ${args.join(' ')} exited with code ${code}`).trim())));
           return;
         }

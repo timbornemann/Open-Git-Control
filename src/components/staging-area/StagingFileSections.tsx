@@ -41,13 +41,13 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
   const FileRow = ({ entry, section }: { entry: FileEntry; section: FileSection }) => {
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
-    const inspectSource = section === 'staged' ? 'staged' : section === 'unstaged' ? 'unstaged' : null;
+    const inspectSource = section === 'staged' ? 'staged' : 'unstaged';
     return (
       <div
         className="staging-file-row"
         onClick={() => {
-          if (inspectSource) onSelectFileInspect?.(entry.path, inspectSource);
-          if (section !== 'untracked') fileOps.showDiff(entry.path, section === 'staged');
+          onSelectFileInspect?.(entry.path, inspectSource);
+          fileOps.showDiff(entry.path, section === 'staged');
         }}
         onContextMenu={(event) => fileOps.openFileContextMenu(event, entry, section)}
       >

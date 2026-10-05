@@ -92,7 +92,9 @@ export const useDiffPreviewData = ({ repoPath, request, refreshTrigger, t }: Use
 
   const isBinaryDiff = useMemo(() => {
     if (!diffText) return false;
-    return diffText.includes('Binary files') || diffText.includes('GIT binary patch');
+    // Git emits these markers as complete, unprefixed lines. Matching source
+    // lines too would hide text files that merely mention binary diffs.
+    return /^(?:Binary files .+ differ|GIT binary patch)\r?$/m.test(diffText);
   }, [diffText]);
 
   const isTooLarge = useMemo(() => {

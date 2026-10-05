@@ -17,6 +17,24 @@ describe('GitSpawnOperations stream limits', () => {
     spawnMock.mockReset();
   });
 
+  it.each([
+    [['diff', '--no-index', '--', '/dev/null', 'new.txt'], 1, true],
+    [['diff', '--no-index', '--', '/dev/null', 'missing.txt'], 128, false],
+    [['diff', '--', 'new.txt'], 1, false],
+  ] as const)('accepts only the successful no-index diff exit status for %j', async (args, code, success) => {
+    const process = new FakeGitProcess();
+    spawnMock.mockReturnValue(process);
+    const operation = new GitSpawnOperations().getDiffPreview('/repo', [...args], 65536, 100, new AbortController().signal);
+    process.stdout.emit('data', Buffer.from('diff content'));
+    process.emit('close', code, null);
+
+    if (success) {
+      await expect(operation).resolves.toMatchObject({ text: 'diff content', truncated: false });
+    } else {
+      await expect(operation).rejects.toThrow(`exited with code ${code}`);
+    }
+  });
+
   it('rejects an unterminated stream line before retaining it without bound', async () => {
     const process = new FakeGitProcess();
     spawnMock.mockReturnValue(process);
