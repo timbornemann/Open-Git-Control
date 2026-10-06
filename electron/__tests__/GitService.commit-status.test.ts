@@ -5,7 +5,8 @@ import * as path from 'path';
 import { execFileSync } from 'child_process';
 import { GitService } from '../GitService';
 
-describe('GitService stale index.lock recovery', () => {
+// Lock recovery deliberately retries real Git processes with backoff; allow CI startup and I/O latency.
+describe('GitService stale index.lock recovery', { timeout: 30_000 }, () => {
   it('does not delete an index lock whose ownership cannot be verified', async () => {
     const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-index-lock-'));
     try {
@@ -25,8 +26,9 @@ describe('GitService stale index.lock recovery', () => {
 
       await expect(service.addFile('CHANGE.txt')).rejects.toThrow(/index\.lock/i);
       expect(fs.existsSync(lockPath)).toBe(true);
+      expect(fs.readFileSync(lockPath, 'utf8')).toBe('stale lock');
     } finally {
-      fs.rmSync(repoDir, { recursive: true, force: true });
+      fs.rmSync(repoDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     }
   });
 });

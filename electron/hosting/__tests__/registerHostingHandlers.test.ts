@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { execFileSync } from 'child_process';
 import type { IpcMainInvokeEvent } from 'electron';
 import type { HostingAdapter } from '../HostingAdapter';
 import { HostingService } from '../HostingService';
@@ -39,10 +40,25 @@ afterEach(async () => {
   await fs.promises.rm(state.directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-async function fixture(usePathAlias = false) {
+async function fixture(usePathAlias = false, useShortPath = false) {
+  if (useShortPath) {
+    // A directory junction alone does not exercise Windows 8.3 path expansion.
+    // Ask Windows for the actual short name, as used by hosted runners' TEMP.
+    state.targetDirectory = execFileSync(
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); (New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:OGC_TEST_DIRECTORY).ShortPath',
+      ],
+      { env: { ...process.env, OGC_TEST_DIRECTORY: state.directory }, encoding: 'utf8', windowsHide: true },
+    ).trim();
+  }
   if (usePathAlias) {
-    const parent = path.join(state.directory, 'clone-parent');
-    const alias = path.join(state.directory, 'clone-parent-alias');
+    const parent = path.join(state.targetDirectory, 'clone-parent');
+    const alias = path.join(state.targetDirectory, 'clone-parent-alias');
     fs.mkdirSync(parent);
     fs.symlinkSync(parent, alias, process.platform === 'win32' ? 'junction' : 'dir');
     state.targetDirectory = alias;
@@ -94,20 +110,33 @@ async function fixture(usePathAlias = false) {
 }
 
 describe('hosting clone authorization and account continuity', { timeout: 30_000 }, () => {
-  it.each([false, true])('clones a verified source and persists the selected origin account for later transfers (path alias: %s)', async (usePathAlias) => {
-    const f = await fixture(usePathAlias);
-    const result = await f.request();
-    expect(result.success, result.error).toBe(true);
-    expect(result.data?.path).toBe(fs.realpathSync(path.join(state.targetDirectory, 'selected-clone')));
-    expect(new RemotePreferencesStore().read(result.data!.path)).toMatchObject({
-      hostingRemote: 'origin',
-      hostingRepository: f.ref,
-      bindings: [{ remoteName: 'origin', url: 'https://github.com/acme/project.git', repository: f.ref }],
-    });
-    const options = f.cloneSpy.mock.calls[0][3]!;
-    expect(options.envOverrides?.GIT_CONFIG_VALUE_1).toContain('credential-helper.cjs');
-    expect(JSON.stringify(options.envOverrides)).not.toContain('private-clone-secret');
-  });
+  const pathVariants = [
+    { alias: false, short: false },
+    { alias: true, short: false },
+    ...(process.platform === 'win32'
+      ? [
+          { alias: false, short: true },
+          { alias: true, short: true },
+        ]
+      : []),
+  ];
+  it.each(pathVariants)(
+    'clones a verified source and persists the selected origin account for later transfers (path alias: $alias, Windows short path: $short)',
+    async ({ alias, short }) => {
+      const f = await fixture(alias, short);
+      const result = await f.request();
+      expect(result.success, result.error).toBe(true);
+      expect(result.data?.path).toBe(fs.realpathSync.native(path.join(state.targetDirectory, 'selected-clone')));
+      expect(new RemotePreferencesStore().read(result.data!.path)).toMatchObject({
+        hostingRemote: 'origin',
+        hostingRepository: f.ref,
+        bindings: [{ remoteName: 'origin', url: 'https://github.com/acme/project.git', repository: f.ref }],
+      });
+      const options = f.cloneSpy.mock.calls[0][3]!;
+      expect(options.envOverrides?.GIT_CONFIG_VALUE_1).toContain('credential-helper.cjs');
+      expect(JSON.stringify(options.envOverrides)).not.toContain('private-clone-secret');
+    },
+  );
 
   it('rejects a renderer-supplied destination without a folder grant before cloning', async () => {
     const f = await fixture();
