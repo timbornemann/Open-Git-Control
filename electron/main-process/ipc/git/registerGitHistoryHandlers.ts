@@ -45,10 +45,15 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
         const offset = Math.max(0, Math.floor(Number(params.offset) || 0));
         const scope = params.scope === 'head' ? 'head' : 'all';
         const repoPath = requireActiveRepositoryPath(params.repoPath, gitService.getRepoPath(), IpcChannel.GitCommitLogPage);
+        // A visible graph must survive concurrent detail reads. Only preloads
+        // yield to foreground work; request cancellation still stops both kinds.
+        const readKind = !params.readRequest || params.readRequest.priority === 'visible' ? 'interactive' : 'background';
+        request.signal.throwIfAborted();
 
         try {
-          await gitService.runCommandAtPath(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+          await gitService.runCommandAtPathWithSignal(repoPath, ['rev-parse', '--verify', '--quiet', 'HEAD'], request.signal, readKind);
         } catch (error: unknown) {
+          request.signal.throwIfAborted();
           const message = error instanceof Error ? error.message : String(error);
           if (isRepoUnavailableError(message)) {
             throw error;
@@ -67,13 +72,14 @@ export function registerGitHistoryHandlers({ gitService, commitStatsService, wor
           };
         }
 
-        const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset, repoPath, ...(params.readRequest ? [request.signal] : []));
+        const raw = await gitService.history.getLog(limit + 1, scope === 'all', offset, repoPath, request.signal, readKind);
         request.signal.throwIfAborted();
         // eslint-disable-next-line no-control-regex -- Git log records are NUL/unit-separator delimited.
         const hashes = [...raw.matchAll(/(?:^|\x00)([0-9a-f]{7,64})\x1f/gi)].map((match) => match[1]);
         const hasMore = hashes.length > limit;
         const visibleHashes = hashes.slice(0, limit);
         const stats = await commitStatsService.getCachedStats(visibleHashes, repoPath);
+        request.signal.throwIfAborted();
         return {
           success: true,
           data: {

@@ -5,7 +5,7 @@ import { CloneService, type CloneRepositoryResult } from './git/CloneService';
 import { CommitService, type CommitMessageInput } from './git/CommitService';
 import { isMissingOriginGitError } from './git/GitErrorFormatter';
 import { GitRunner, defaultExecFileAsyncRunner, type DiffPreviewResult, type ExecFileAsyncRunner } from './git/GitRunner';
-import { HistoryService, type CommitStats, type FileTimelineCommit } from './git/HistoryService';
+import { HistoryService, type CommitStats, type FileTimelineCommit, type HistoryReadKind } from './git/HistoryService';
 import { CherryPickService } from './git/CherryPickService';
 import { MergeConflictService } from './git/MergeConflictService';
 import { RebaseService } from './git/RebaseService';
@@ -42,7 +42,7 @@ export class GitService {
     this.commitService = new CommitService((repoPath, args, envOverrides) => this.gitRunner.run(repoPath, args, { envOverrides }));
     this.historyService = new HistoryService(
       (args) => this.runCommand(args),
-      (repoPath, args, signal) => this.runCommandAtPathWithSignal(repoPath, args, signal),
+      (repoPath, args, signal, kind) => this.runCommandAtPathWithSignal(repoPath, args, signal, kind),
       (repoPath, args, input) => this.gitRunner.runWithInput(repoPath, args, input, { commandName: 'blame' }),
       (repoPath, revisionSpec, maxBytes) => this.readGitFileBufferAtPath(repoPath, revisionSpec, maxBytes),
     );
@@ -200,14 +200,14 @@ export class GitService {
     });
   }
 
-  async runCommandAtPathWithSignal(repoPath: string, args: string[], signal: AbortSignal): Promise<string> {
+  async runCommandAtPathWithSignal(repoPath: string, args: string[], signal: AbortSignal, kind: HistoryReadKind = 'background'): Promise<string> {
     const normalizedPath = (repoPath || '').trim();
     if (!normalizedPath) {
       throw new Error('Repository path is required.');
     }
     return this.gitRunner.run(normalizedPath, args, {
       signal,
-      requestedKind: 'background',
+      requestedKind: kind,
     });
   }
 

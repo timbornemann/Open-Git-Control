@@ -40,14 +40,19 @@ describe('registerGitHistoryHandlers through registerGitHandlers', () => {
   it('returns an empty commit page only when HEAD is genuinely unborn', async () => {
     const gitService = {
       getRepoPath: vi.fn(() => 'C:/repo'),
-      runCommandAtPath: vi.fn().mockRejectedValue(Object.assign(new Error('Command failed'), { name: 'ExpectedNonFatalGitError' })),
+      runCommandAtPathWithSignal: vi.fn().mockRejectedValue(Object.assign(new Error('Command failed'), { name: 'ExpectedNonFatalGitError' })),
       history: { getLog: vi.fn() },
     };
     register(gitService);
 
     const result = await handlers.get(IpcChannel.GitCommitLogPage)!({}, {});
 
-    expect(gitService.runCommandAtPath).toHaveBeenCalledWith('C:/repo', ['rev-parse', '--verify', '--quiet', 'HEAD']);
+    expect(gitService.runCommandAtPathWithSignal).toHaveBeenCalledWith(
+      'C:/repo',
+      ['rev-parse', '--verify', '--quiet', 'HEAD'],
+      expect.any(AbortSignal),
+      'interactive',
+    );
     expect(result).toEqual({ success: true, data: { raw: '', hasMore: false, stats: {}, repoPath: 'C:/repo' } });
     expect(gitService.history.getLog).not.toHaveBeenCalled();
   });
@@ -55,7 +60,7 @@ describe('registerGitHistoryHandlers through registerGitHandlers', () => {
   it('propagates a corrupt HEAD instead of presenting an empty history', async () => {
     const gitService = {
       getRepoPath: vi.fn(() => 'C:/repo'),
-      runCommandAtPath: vi.fn().mockRejectedValue(new Error('fatal: bad object HEAD')),
+      runCommandAtPathWithSignal: vi.fn().mockRejectedValue(new Error('fatal: bad object HEAD')),
       history: { getLog: vi.fn() },
     };
     register(gitService);
