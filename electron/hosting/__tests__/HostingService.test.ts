@@ -59,6 +59,83 @@ afterEach(() => {
 const add = (baseUrl = 'https://forge.example.test') => service.saveConnection({ provider: 'forgejo', label: 'Test forge', baseUrl });
 
 describe('independent hosting accounts', () => {
+  it('reads the saved private catalog and resolves its local URL without waiting for startup authentication', async () => {
+    const first = add();
+    await service.request('login', { connectionId: first.id, token: 'saved-account' });
+    const saved: HostedRepository = {
+      ref: { connectionId: first.id, repositoryId: '12', fullPath: 'team/project' },
+      name: 'project',
+      fullName: 'team/project',
+      description: 'Saved private description',
+      private: true,
+      cloneUrl: `${first.baseUrl}/team/project.git`,
+      htmlUrl: `${first.baseUrl}/team/project`,
+      defaultBranch: 'main',
+      fork: false,
+    };
+    service.catalogStore.write(service.connection(first.id), [saved]);
+    let finish!: (value: { id: string; username: string }) => void;
+    const authenticate = vi.fn(
+      () =>
+        new Promise<{ id: string; username: string }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const restarted = new HostingService(
+      () =>
+        ({
+          authenticate,
+          resolveCachedRepository: (url: string, items: HostedRepository[]) => items.find((repo) => repo.cloneUrl === url) ?? null,
+          repositories: async () => ({ items: [saved], nextCursor: null }),
+        }) as unknown as HostingAdapter,
+      { migrate: false },
+    );
+    expect(await restarted.request('cachedRepositories', { connectionId: first.id })).toMatchObject({ items: [saved], stale: true });
+    expect(await restarted.request('resolveRepository', { connectionId: first.id, url: saved.cloneUrl, cachedOnly: true })).toEqual(saved);
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(restarted.connection(first.id).authenticated).toBe(false);
+    const refreshing = restarted.request('repositories', { connectionId: first.id });
+    await vi.waitFor(() => expect(authenticate).toHaveBeenCalledOnce());
+    expect(await restarted.request('cachedRepositories', { connectionId: first.id })).toMatchObject({ items: [saved] });
+    finish({ id: 'saved-account', username: 'saved-account' });
+    await refreshing;
+    await restarted.request('logout', { connectionId: first.id });
+    expect(await restarted.request('cachedRepositories', { connectionId: first.id })).toMatchObject({ items: [] });
+  });
+
+  it('persists a first paginated page immediately and replaces obsolete cached entries only after the final page', async () => {
+    const first = add();
+    await service.request('login', { connectionId: first.id, token: 'saved-account' });
+    const repository = (id: string): HostedRepository => ({
+      ref: { connectionId: first.id, repositoryId: id, fullPath: `team/${id}` },
+      name: id,
+      fullName: `team/${id}`,
+      description: `${id} description`,
+      private: true,
+      cloneUrl: `${first.baseUrl}/team/${id}.git`,
+      htmlUrl: `${first.baseUrl}/team/${id}`,
+      defaultBranch: 'main',
+      fork: false,
+    });
+    const obsolete = repository('obsolete');
+    const current = repository('current');
+    const later = repository('later');
+    service.catalogStore.write(service.connection(first.id), [obsolete]);
+    const restarted = new HostingService(
+      () =>
+        ({
+          authenticate: async () => ({ id: 'saved-account', username: 'saved-account' }),
+          repositories: async (input: { cursor?: string }) => ({ items: [input.cursor ? later : current], nextCursor: input.cursor ? null : 'page-2' }),
+        }) as unknown as HostingAdapter,
+      { migrate: false },
+    );
+    await restarted.request('repositories', { connectionId: first.id });
+    const preview = new HostingService(() => ({}) as HostingAdapter, { migrate: false });
+    expect((await preview.request('cachedRepositories', { connectionId: first.id })).items).toEqual([obsolete, current]);
+    await restarted.request('repositories', { connectionId: first.id, cursor: 'page-2' });
+    expect((await restarted.request('cachedRepositories', { connectionId: first.id })).items).toEqual([current, later]);
+  });
+
   it('retains another instance when signing out and rejects stale credential getters', async () => {
     const first = add();
     const second = add('https://other.example.test');

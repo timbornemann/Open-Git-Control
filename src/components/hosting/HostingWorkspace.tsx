@@ -60,7 +60,7 @@ export function HostingWorkspace() {
                 </p>
               </div>
               <div className="hosting-header-actions">
-                <Button icon={<RefreshCw size={14} />} onClick={state.refresh} disabled={catalog.task.busy}>
+                <Button icon={<RefreshCw size={14} />} onClick={state.refresh} disabled={catalog.task.busy || catalog.refreshing}>
                   {tr('Aktualisieren', 'Refresh')}
                 </Button>
                 {!accounts && (

@@ -7,12 +7,13 @@ import { useI18n } from '@/i18n';
 import { hostedRepositoryKey, providerLabels, useHostingState } from './hostingState';
 import type { useHostingCatalog } from './useHostingCatalog';
 import { localRepositoryKey } from './useLocalHostingRepositories';
+import { HostingActiveRepositoryMark, HostingRepositoryIcon, hostingLocalRepositoryIdentity, isActiveHostingClone } from './HostingRepositoryIdentity';
 import type { HostingProvider } from '@/types/hostingDtos';
 
 export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHostingCatalog> }) {
   const { tr } = useI18n();
   const state = useHostingState();
-  const { repositories, connections, clones, task, pins, togglePin, activateLocal, clone, loadMore } = catalog;
+  const { activeRepo, repositories, connections, clones, task, pins, togglePin, activateLocal, clone, loadMore } = catalog;
   return (
     <>
       <div className="hosting-filters hosting-catalog-toolbar">
@@ -52,19 +53,22 @@ export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHost
       </div>
       <div className="hosting-results" role="status">
         {repositories.length} {tr('Repositories', 'repositories')}
-        {task.busy && ` · ${tr('Wird aktualisiert …', 'Updating …')}`}
+        {catalog.refreshing && ` · ${tr('Wird aktualisiert …', 'Updating …')}`}
       </div>
       <div className="hosting-catalog">
         {repositories.map((repo) => {
           const connection = connections.find((c) => c.id === repo.ref.connectionId);
           const paths = clones[localRepositoryKey(repo.ref)] ?? [];
+          const local = hostingLocalRepositoryIdentity(paths, activeRepo);
           const pinned = pins.includes(hostedRepositoryKey(repo));
           return (
-            <article className="hosting-repo-card" key={hostedRepositoryKey(repo)}>
+            <article
+              className={`hosting-repo-card${local.isActive ? ' is-active' : ''}`}
+              aria-current={local.isActive ? 'true' : undefined}
+              key={hostedRepositoryKey(repo)}
+            >
               <div className="hosting-repo-card__heading">
-                <span className="hosting-signet" aria-hidden="true">
-                  <FolderGit2 size={20} />
-                </span>
+                <HostingRepositoryIcon path={local.path} name={repo.name} />
                 <Button
                   variant="ghost"
                   className="hosting-repository-title"
@@ -74,6 +78,7 @@ export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHost
                 >
                   <span className="hosting-repo-card__namespace">{repo.fullName.substring(0, repo.fullName.lastIndexOf('/'))}</span>
                   <strong>{repo.name}</strong>
+                  {local.isActive && <HostingActiveRepositoryMark />}
                 </Button>
                 <IconButton
                   icon={<Star size={15} fill={pinned ? 'currentColor' : 'none'} />}
@@ -102,14 +107,18 @@ export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHost
                   {paths.map((path) => (
                     <Button
                       variant="ghost"
-                      className="hosting-local-clone"
+                      className={`hosting-local-clone${isActiveHostingClone(path, activeRepo) ? ' is-active' : ''}`}
+                      aria-label={`${tr('Lokalen Klon öffnen', 'Open local clone')} · ${path}`}
+                      aria-current={isActiveHostingClone(path, activeRepo) ? 'true' : undefined}
                       key={path}
                       disabled={task.busy}
-                      icon={<FolderGit2 size={13} />}
+                      icon={<HostingRepositoryIcon path={path} name={repo.name} size={18} />}
                       title={path}
                       onClick={() => activateLocal(path)}
                     >
-                      {tr('Lokalen Klon öffnen', 'Open local clone')} · {path}
+                      <span className="hosting-local-clone__path">
+                        {tr('Lokalen Klon öffnen', 'Open local clone')} · {path}
+                      </span>
                     </Button>
                   ))}
                 </div>
@@ -129,7 +138,7 @@ export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHost
           );
         })}
       </div>
-      {!repositories.length && !task.busy && (
+      {!repositories.length && !catalog.refreshing && !task.busy && (
         <div className="hosting-empty">
           <FolderGit2 size={30} aria-hidden="true" />
           <h3>{tr('Keine passenden Repositories', 'No matching repositories')}</h3>
@@ -141,7 +150,7 @@ export function HostingCatalog({ catalog }: { catalog: ReturnType<typeof useHost
         {Object.entries(catalog.pages)
           .filter(([, page]) => page.nextCursor)
           .map(([id, page]) => (
-            <Button key={id} disabled={task.busy} onClick={() => loadMore(id, page.nextCursor!)}>
+            <Button key={id} disabled={task.busy || catalog.refreshing} onClick={() => loadMore(id, page.nextCursor!)}>
               {tr('Weitere laden', 'Load more')} · {connections.find((c) => c.id === id)?.label}
             </Button>
           ))}

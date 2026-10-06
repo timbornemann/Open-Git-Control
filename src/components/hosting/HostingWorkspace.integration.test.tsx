@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
   refreshGit: vi.fn(),
   git: { activeRepo: 'C:/Code/mirrored' as string | null, openRepos: ['C:/Code/mirrored'], currentBranch: 'main' },
 }));
-vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: mocks.request }, transferClient: { request: mocks.transfer } }));
+vi.mock('@/services/hostingClient', () => ({
+  hostingClient: { request: mocks.request, cachedRepositories: () => undefined },
+  transferClient: { request: mocks.transfer },
+}));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (selector: (value: unknown) => unknown) =>
     selector({ ...mocks.git, onSwitchRepo: mocks.switchRepo, onAddRepo: mocks.addRepo, triggerRefresh: mocks.refreshGit }),
@@ -166,6 +169,7 @@ describe('multi-provider hosting acceptance', () => {
       const provider = accounts.find((account) => account.id === repo.ref.connectionId)!.provider;
       if (operation === 'connections') return accounts;
       if (operation === 'repositories') return page([repo]);
+      if (operation === 'cachedRepositories') return { ...page([]), stale: true };
       if (operation === 'repository') return repo;
       if (operation === 'capabilities') return { ...capabilities, ciLabel: provider === 'github' ? 'GitHub Actions' : 'Forgejo Actions' };
       if (operation === 'resolveRepository')

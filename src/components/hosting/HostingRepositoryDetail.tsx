@@ -17,6 +17,7 @@ import { HostingCiPanel } from './HostingCiPanel';
 import { HostingReleases } from './HostingReleases';
 import { HostingRepositoryOverview } from './HostingRepositoryOverview';
 import { HostingForkDialog } from './HostingForkDialog';
+import { HostingActiveRepositoryMark, HostingRepositoryIcon, hostingLocalRepositoryIdentity } from './HostingRepositoryIdentity';
 
 export function HostingRepositoryDetail({
   repository,
@@ -49,6 +50,7 @@ export function HostingRepositoryDetail({
       e.repository?.fullPath === repository.ref.fullPath,
   );
   const localPath = endpoint ? activeRepo : null;
+  const localIdentity = hostingLocalRepositoryIdentity(localPath ? [localPath, ...localPaths] : localPaths, activeRepo);
   const connection = state.connections.find((c) => c.id === repository.ref.connectionId);
   const labels = hostingRepositoryLabels(connection?.provider, capabilities, tr);
   const section = ['changes', 'ci', 'releases'].includes(state.section) ? state.section : 'overview';
@@ -61,12 +63,11 @@ export function HostingRepositoryDetail({
       </div>
       <header className="hosting-page-header hosting-detail__header">
         <div className="hosting-detail__identity">
-          <span className="hosting-signet" aria-hidden="true">
-            <FolderGit2 size={24} />
-          </span>
+          <HostingRepositoryIcon path={localIdentity.path} name={repository.name} size={32} />
           <div>
             <div className="hosting-detail__account">
               <StatusBadge tone="accent">{connection ? providerLabels[connection.provider] : 'Hosting'}</StatusBadge>
+              {localIdentity.isActive && <HostingActiveRepositoryMark />}
               <span>{connection?.label}</span>
               {connection && (
                 <span className="hosting-detail__server" title={connection.baseUrl}>

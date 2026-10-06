@@ -1,6 +1,14 @@
 import { inflateRawSync } from 'node:zlib';
 import type { HostingOperations } from '../../../src/shared/ipc/contracts/hosting';
-import type { HostedRepositoryRef, HostingCapabilities, HostingConnection, HostingLog, HostingPage, HostingFeature } from '../../../src/types/hostingDtos';
+import type {
+  HostedRepository,
+  HostedRepositoryRef,
+  HostingCapabilities,
+  HostingConnection,
+  HostingLog,
+  HostingPage,
+  HostingFeature,
+} from '../../../src/types/hostingDtos';
 import type { CredentialGetter, HostingAdapter } from '../HostingAdapter';
 import { HostingHttpError, HostingHttpTransport } from './HostingHttpTransport';
 
@@ -187,6 +195,14 @@ export abstract class BaseHostingAdapter implements HostingAdapter {
       if (error instanceof HostingHttpError && error.status === 404) return null;
       throw error;
     }
+  }
+  resolveCachedRepository(url: string, repositories: HostedRepository[]): HostedRepository | null {
+    const path = this.remotePath(url);
+    if (!path) return null;
+    const normalize = (value: string) => (['github', 'bitbucket-data-center'].includes(this.connection.provider) ? value.toLowerCase() : value);
+    return (
+      repositories.find((repository) => repository.ref.connectionId === this.connection.id && normalize(repository.ref.fullPath) === normalize(path)) ?? null
+    );
   }
   protected async json(path: string, method = 'GET', body?: unknown): Promise<Row> {
     return object((await this.http.json(path, { method, body })).data);

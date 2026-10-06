@@ -14,6 +14,7 @@ export interface HostingAdapter {
   authenticate(): Promise<{ id: string; username: string; serverVersion?: string }>;
   capabilities(repository?: HostedRepositoryRef, targetBranch?: string): Promise<HostingCapabilities>;
   resolveRepository(url: string): Promise<HostedRepository | null>;
+  resolveCachedRepository(url: string, repositories: HostedRepository[]): HostedRepository | null;
   repositories(input: Input<'repositories'>): Promise<Output<'repositories'>>;
   repository(input: Input<'repository'>): Promise<Output<'repository'>>;
   createRepository(input: Input<'createRepository'>): Promise<Output<'createRepository'>>;

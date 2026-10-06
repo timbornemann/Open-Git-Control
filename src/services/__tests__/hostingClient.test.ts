@@ -16,6 +16,30 @@ afterEach(() => {
 });
 const repository = (connectionId: string) => ({ connectionId, repositoryId: '7', fullPath: 'group/sub/repo' });
 describe('hosting client identity and lifecycle', () => {
+  it('keeps disk previews separate from online pages and removes both on logout', async () => {
+    const connectionId = 'cached-startup';
+    const input = { connectionId };
+    hostingRequest.mockImplementation(async (operation) => ({
+      success: true,
+      data: operation === 'logout' ? true : { items: [{ description: operation === 'cachedRepositories' ? 'Disk' : 'Online' }], nextCursor: null },
+    }));
+    expect(hostingClient.cachedRepositories(connectionId)).toBeUndefined();
+    await hostingClient.request('cachedRepositories', input);
+    expect(hostingClient.cachedRepositories(connectionId)).toMatchObject({ items: [{ description: 'Disk' }] });
+    await hostingClient.request('repositories', input);
+    expect(hostingClient.cachedRepositories(connectionId)).toMatchObject({ items: [{ description: 'Online' }] });
+    await hostingClient.request('logout', input);
+    expect(hostingClient.cachedRepositories(connectionId)).toBeUndefined();
+  });
+
+  it('does not cache a local URL miss before a catalog refresh has persisted the repository', async () => {
+    hostingRequest.mockResolvedValueOnce({ success: true, data: null }).mockResolvedValueOnce({ success: true, data: { ref: repository('cache-miss') } });
+    const input = { connectionId: 'cache-miss', url: 'https://forge.example/group/sub/repo.git', cachedOnly: true };
+    expect(await hostingClient.request('resolveRepository', input)).toBeNull();
+    expect(await hostingClient.request('resolveRepository', input)).toMatchObject({ ref: repository('cache-miss') });
+    expect(hostingRequest).toHaveBeenCalledTimes(2);
+  });
+
   it('separates identical repository ids on different accounts and namespaces', async () => {
     hostingRequest.mockImplementation(async (_operation, input) => ({ success: true, data: input.repository }));
     const first = await hostingClient.request('repository', { repository: repository('one') });

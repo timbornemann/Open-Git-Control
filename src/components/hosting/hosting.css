@@ -181,6 +181,18 @@
   background: var(--bg-hover);
   border-left-color: var(--accent-primary);
 }
+.hosting-repo-card.is-active {
+  border-left-color: var(--accent-primary);
+}
+.hosting-repository-active {
+  flex: none;
+  color: var(--text-accent);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
 .hosting-repo-card__heading {
   grid-area: heading;
   display: flex;
@@ -292,6 +304,12 @@
   padding: 4px 0;
   border: 0;
   border-radius: 0;
+}
+.hosting-local-clone .ui-button__label {
+  flex: 1;
+}
+.hosting-local-clone.is-active {
+  color: var(--text-accent);
 }
 .hosting-catalog + .hosting-actions {
   padding: 0 20px;

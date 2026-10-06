@@ -1,4 +1,4 @@
-import { Copy, FolderGit2, GitBranch, Globe, Lock } from 'lucide-react';
+import { Copy, GitBranch, Globe, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Panel } from '@/components/ui/Panel';
@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TextField } from '@/components/ui/TextField';
 import { useI18n } from '@/i18n';
 import type { HostedRepository, HostingConnection } from '@/types/hostingDtos';
+import { HostingActiveRepositoryMark, HostingRepositoryIcon, isActiveHostingClone } from './HostingRepositoryIdentity';
 
 export function HostingRepositoryOverview({
   repository,
@@ -68,9 +69,17 @@ export function HostingRepositoryOverview({
         </p>
         <div className="hosting-local-paths">
           {localPaths.map((path) => (
-            <Button variant="ghost" key={path} icon={<FolderGit2 size={15} />} title={path} disabled={busy} onClick={() => onActivateLocal?.(path)}>
+            <Button
+              variant="ghost"
+              key={path}
+              icon={<HostingRepositoryIcon path={path} name={repository.name} size={20} />}
+              title={path}
+              aria-current={isActiveHostingClone(path, activeRepo) ? 'true' : undefined}
+              disabled={busy}
+              onClick={() => onActivateLocal?.(path)}
+            >
               <span>{path}</span>
-              {path === activeRepo && <StatusBadge tone="success">{tr('Aktiv', 'Active')}</StatusBadge>}
+              {isActiveHostingClone(path, activeRepo) && <HostingActiveRepositoryMark />}
             </Button>
           ))}
         </div>

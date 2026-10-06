@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { hostingClient } from '@/services/hostingClient';
 import { appClient } from '@/services/appClient';
 import { useGitStore, useUIStore } from '@/contexts/AppStateContext';
-import type { HostedRepository, HostingPage, HostingProvider } from '@/types/hostingDtos';
+import type { HostedRepository, HostingProvider } from '@/types/hostingDtos';
 import { hostedRepositoryKey, useHostingState } from './hostingState';
 import { migrateHostingPins, readHostingPins, writeHostingPins } from './hostingPinStore';
 import { useLocalHostingRepositories } from './useLocalHostingRepositories';
 import { useHostingTask } from './useHostingTask';
+import { useHostingCatalogPages } from './useHostingCatalogPages';
 
 export function useHostingCatalog() {
   const { connections, connectionFilter, revision, setConnections } = useHostingState();
@@ -15,14 +16,12 @@ export function useHostingCatalog() {
   const onSwitchRepo = useGitStore((s) => s.onSwitchRepo);
   const onOpenRepo = useGitStore((s) => s.onAddRepo);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
-  const clones = useLocalHostingRepositories(openRepos, connections, revision);
   const task = useHostingTask(`${connectionFilter}/${revision}/${activeRepo ?? ''}`);
-  const { run, setError } = task;
-  const [pages, setPages] = useState<Record<string, HostingPage<HostedRepository>>>({});
+  const { setError } = task;
+  const { pages, refreshing, error: catalogError, loadMore } = useHostingCatalogPages(connections, connectionFilter, revision);
   const [providerFilter, setProviderFilter] = useState<HostingProvider | ''>('');
   const [search, setSearch] = useState('');
   const [pins, setPins] = useState(readHostingPins);
-  const lifecycle = useRef({ generation: 0 }).current;
   useEffect(() => {
     let active = true;
     void hostingClient
@@ -38,34 +37,13 @@ export function useHostingCatalog() {
     };
   }, [revision, setConnections, setError]);
   useEffect(() => {
-    const current = ++lifecycle.generation;
-    const selected = connections.filter((c) => (c.authenticated || c.hasCredentials) && (!connectionFilter || c.id === connectionFilter));
-    if (!selected.length) {
-      setPages({});
-      return;
-    }
-    void run(async () => {
-      const results = await Promise.allSettled(selected.map((c) => hostingClient.request('repositories', { connectionId: c.id })));
-      if (current !== lifecycle.generation) return;
-      const next: Record<string, HostingPage<HostedRepository>> = {};
-      const errors: string[] = [];
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') next[selected[index].id] = result.value;
-        else errors.push(`${selected[index].label}: ${String(result.reason)}`);
-      });
-      setPages(next);
-      setPins(
-        migrateHostingPins(
-          connections,
-          Object.values(next).flatMap((page) => page.items),
-        ),
-      );
-      if (errors.length) setError(errors.join('\n'));
-    });
-    return () => {
-      lifecycle.generation++;
-    };
-  }, [connections, connectionFilter, revision, lifecycle, run, setError]);
+    setPins(
+      migrateHostingPins(
+        connections,
+        Object.values(pages).flatMap((page) => page.items),
+      ),
+    );
+  }, [connections, pages]);
   const repositories = Object.values(pages)
     .flatMap((page) => page.items)
     .filter((repo) => {
@@ -77,6 +55,8 @@ export function useHostingCatalog() {
       );
     })
     .sort((a, b) => Number(pins.includes(hostedRepositoryKey(b))) - Number(pins.includes(hostedRepositoryKey(a))) || a.fullName.localeCompare(b.fullName));
+  const localCatalog = Object.values(pages).flatMap((page) => page.items);
+  const clones = useLocalHostingRepositories(openRepos, connections, revision, localCatalog);
   const togglePin = (repo: HostedRepository) => {
     const key = hostedRepositoryKey(repo);
     const next = pins.includes(key) ? pins.filter((p) => p !== key) : [...pins, key];
@@ -106,17 +86,14 @@ export function useHostingCatalog() {
             .catch((error: Error) => setError(error.message));
       },
     );
-  const loadMore = (connectionId: string, cursor: string) =>
-    void task.run(
-      () => hostingClient.request('repositories', { connectionId, cursor }),
-      (next) => setPages((current) => ({ ...current, [connectionId]: { ...next, items: [...(current[connectionId]?.items ?? []), ...next.items] } })),
-    );
   return {
+    activeRepo,
     repositories,
     pages,
     connections,
     clones,
-    task,
+    refreshing,
+    task: { ...task, error: task.error ?? catalogError },
     pins,
     togglePin,
     activateLocal,

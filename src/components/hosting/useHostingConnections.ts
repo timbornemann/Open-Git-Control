@@ -16,9 +16,16 @@ export function useHostingConnections() {
       const restore = connections.filter((c) => c.hasCredentials && !c.authenticated && !attemptedRestorations.has(c.id));
       restore.forEach((c) => attemptedRestorations.add(c.id));
       if (!restore.length) return;
-      await Promise.allSettled(restore.map((c) => hostingClient.request('capabilities', { connectionId: c.id })));
-      const validated = await hostingClient.request('connections', undefined);
-      if (active) setConnections(validated);
+      await Promise.allSettled(
+        restore.map(async (c) => {
+          try {
+            await hostingClient.request('capabilities', { connectionId: c.id });
+          } finally {
+            const validated = await hostingClient.request('connections', undefined);
+            if (active) setConnections(validated);
+          }
+        }),
+      );
     })().catch(() => {
       /* Account-specific failures are displayed by the connection and catalog views. */
     });

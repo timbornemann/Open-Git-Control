@@ -6,6 +6,7 @@ import { queryClient } from '@/data/queryClient';
 const reads = new Set<HostingOperation>([
   'capabilities',
   'repositories',
+  'cachedRepositories',
   'repository',
   'resolveRepository',
   'branches',
@@ -49,6 +50,13 @@ export class HostingRequestError extends Error {
 }
 
 export const hostingClient = {
+  cachedRepositories(connectionId: string): HostingOperations['repositories']['output'] | undefined {
+    const generation = sessions.get(connectionId) ?? 0;
+    return (
+      queryClient.getQueryData(['hosting', connectionId, generation, 'repositories', { connectionId }]) ??
+      queryClient.getQueryData(['hosting', connectionId, generation, 'cachedRepositories', { connectionId }])
+    );
+  },
   async request<K extends HostingOperation>(operation: K, input: HostingOperations[K]['input']): Promise<HostingOperations[K]['output']> {
     const context = input as { id?: string; connectionId?: string; repository?: { connectionId: string } } | undefined;
     const connectionId = context?.connectionId ?? context?.repository?.connectionId ?? context?.id ?? 'application';
@@ -65,6 +73,9 @@ export const hostingClient = {
       if (!result.success) throw new HostingRequestError(result.error, (result as { status?: number }).status, (result as { code?: string }).code);
       return result.data;
     };
+    // A cache-only URL lookup can be a miss just before the online catalog is
+    // persisted. Never retain that miss as a fresh network resource.
+    if (operation === 'resolveRepository' && (input as HostingOperations['resolveRepository']['input']).cachedOnly) return request();
     if (reads.has(operation)) return queryClient.fetchQuery({ queryKey: ['hosting', connectionId, generation, operation, input], queryFn: request });
     const result = await request();
     if (operation === 'pollDeviceLogin' && (result as { status?: string }).status === 'success') {

@@ -102,12 +102,15 @@ export class BitbucketDataCenterAdapter extends BaseHostingAdapter {
       throw new HostingHttpError(0, 'invalid_response', 'Bitbucket returned an invalid next-page position.');
     return { items: rows(data.values).map(map), nextCursor: next };
   }
-  async resolveRepository(url: string) {
-    let path = this.remotePath(url);
+  protected remotePath(url: string): string | null {
+    let path = super.remotePath(url);
     if (path?.startsWith('scm/')) path = path.slice(4);
     const browser = path?.match(/^projects\/([^/]+)\/repos\/([^/]+)(?:\/.*)?$/i);
     if (browser) path = `${browser[1]}/${browser[2]}`;
-    return this.resolvePath(path && path.split('/').length === 2 ? path : null);
+    return path && path.split('/').length === 2 ? path : null;
+  }
+  async resolveRepository(url: string) {
+    return this.resolvePath(this.remotePath(url));
   }
   async repositories(input: Input<'repositories'>) {
     return this.page('repos', (row) => this.mapRepository(row), input.cursor, { name: input.search });

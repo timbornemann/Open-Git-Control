@@ -39,8 +39,9 @@ export interface HostingOperations {
   logout: { input: { connectionId: string }; output: true };
   capabilities: { input: { connectionId: string; repository?: HostedRepositoryRef; targetBranch?: string }; output: HostingCapabilities };
   repositories: { input: { connectionId: string; cursor?: string; search?: string }; output: HostingPage<HostedRepository> };
+  cachedRepositories: { input: { connectionId: string }; output: HostingPage<HostedRepository> };
   repository: { input: { repository: HostedRepositoryRef }; output: HostedRepository };
-  resolveRepository: { input: { connectionId: string; url: string }; output: HostedRepository | null };
+  resolveRepository: { input: { connectionId: string; url: string; cachedOnly?: boolean }; output: HostedRepository | null };
   createRepository: { input: HostingRepositoryCreation; output: HostedRepository };
   clone: { input: { repository: HostedRepositoryRef; targetDir: string; targetName?: string; useSsh?: boolean }; output: { path: string } };
   checkoutChangeRequest: { input: { repoPath: string; repository: HostedRepositoryRef; id: string; expectedHeadSha: string }; output: true };

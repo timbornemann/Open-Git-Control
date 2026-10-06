@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'crypto';
 import type { HostingOperation, HostingOperations } from '../../src/shared/ipc/contracts/hosting';
-import type { HostedRepository, HostedRepositoryRef, HostingConnection, HostingConnectionInput, HostingPage } from '../../src/types/hostingDtos';
+import type { HostedRepositoryRef, HostingConnection, HostingConnectionInput } from '../../src/types/hostingDtos';
 import type { HostingAdapter, HostingAdapterFactory } from './HostingAdapter';
 import { createHostingAdapter } from './providers';
 import { HostingStore } from './HostingStore';
 import { HostingCredentialStore } from './HostingCredentialStore';
 import { HostingCatalogStore } from './HostingCatalogStore';
+import { HostingRepositoryCatalog } from './HostingRepositoryCatalog';
 import { HostingAuth } from './HostingAuth';
 import { HostingCredentialBridge, type GitCredentialRequest } from './HostingCredentialBridge';
 import { HOSTING_PROVIDERS, normalizeConnectionUrls, hasControlCharacters } from './hostingUrls';
@@ -60,7 +61,7 @@ export class HostingService {
   private readonly connections = new Map<string, HostingConnection>();
   private readonly adapters = new Map<string, { generation: number; adapter: HostingAdapter }>();
   private readonly restorations = new Map<string, Promise<HostingConnection>>();
-  private readonly catalogScans = new Map<string, { generation: number; cursor: string | null; items: HostedRepository[] }>();
+  private readonly catalog: HostingRepositoryCatalog;
   private readonly store: HostingStore<HostingConnection>;
   readonly credentialStore: HostingCredentialStore;
   readonly catalogStore: HostingCatalogStore;
@@ -74,6 +75,11 @@ export class HostingService {
     this.store = dependencies.store || new HostingStore(isConnection);
     this.credentialStore = dependencies.credentials || new HostingCredentialStore();
     this.catalogStore = dependencies.catalogs || new HostingCatalogStore();
+    this.catalog = new HostingRepositoryCatalog(this.catalogStore, {
+      connection: (id) => this.connection(id),
+      generation: (id) => this.generation(id),
+      authenticatedAdapter: (id) => this.authenticatedAdapter(id),
+    });
     this.auth = new HostingAuth({
       credentials: this.credentialStore,
       getConnection: (id) => this.connection(id),
@@ -405,36 +411,6 @@ export class HostingService {
     return this.credentialBridge.createGitCredentialEnvironment({ ...request, signal });
   }
 
-  private async repositories(params: HostingOperations['repositories']['input']): Promise<HostingPage<HostedRepository>> {
-    const id = params.connectionId;
-    try {
-      const adapter = await this.authenticatedAdapter(id);
-      const generation = this.generation(id);
-      const page = await adapter.repositories(params);
-      if (generation !== this.generation(id)) throw new Error('The hosting account changed while loading repositories.');
-      if (!params.search) {
-        const previous = this.catalogScans.get(id);
-        const scan = !params.cursor ? { generation, cursor: null as string | null, items: [] as HostedRepository[] } : previous;
-        if (scan && scan.generation === generation && (!params.cursor || scan.cursor === params.cursor)) {
-          scan.items.push(...page.items);
-          scan.cursor = page.nextCursor;
-          this.catalogScans.set(id, scan);
-          if (!page.nextCursor) {
-            this.catalogStore.write(this.connection(id), [...new Map(scan.items.map((repo) => [repo.ref.repositoryId, repo])).values()]);
-            this.catalogScans.delete(id);
-          }
-        }
-      }
-      return page;
-    } catch (error) {
-      const connection = this.connection(id);
-      const cached = connection.hasCredentials ? this.catalogStore.read(connection) : null;
-      if (!cached || params.cursor) throw error;
-      const search = (params.search || '').toLowerCase();
-      return { items: cached.filter((repo) => `${repo.fullName} ${repo.description || ''}`.toLowerCase().includes(search)), nextCursor: null, stale: true };
-    }
-  }
-
   async request<K extends HostingOperation>(operation: K, input: HostingOperations[K]['input']): Promise<HostingOperations[K]['output']> {
     const result = await this.execute(operation, input);
     return result as HostingOperations[K]['output'];
@@ -479,7 +455,10 @@ export class HostingService {
       const adapter = this.connection(id).hasCredentials ? await this.authenticatedAdapter(id) : this.adapter(id);
       return adapter.capabilities(params.repository as HostedRepositoryRef | undefined, params.targetBranch as string | undefined);
     }
-    if (operation === 'repositories') return this.repositories(input as HostingOperations['repositories']['input']);
+    if (operation === 'cachedRepositories') return this.catalog.cached(id);
+    if (operation === 'repositories') return this.catalog.repositories(input as HostingOperations['repositories']['input']);
+    if (operation === 'resolveRepository' && params.cachedOnly === true)
+      return this.adapter(id).resolveCachedRepository(String(params.url || ''), this.catalog.cached(id).items);
     const adapter = await this.authenticatedAdapter(id);
     if (operation === 'resolveRepository') return adapter.resolveRepository(String(params.url || ''));
     if (!ADAPTER_OPERATIONS.has(operation)) throw new Error('Unknown hosting operation.');
