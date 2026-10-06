@@ -21,6 +21,13 @@ describe('local repository primary route', () => {
     expect(getMainPrimaryRoute({ ...base, activeTab: 'settings', showRunConfig: true })).toBe('settings');
     expect(hasMainPrimaryHeader('runConfig')).toBe(true);
   });
+  it('opens the full release creator as a repository subpage ahead of other detail panes', () => {
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'repo', showReleaseCreator: true, showRemoteConfig: true, showRunConfig: true, showTimeline: true })).toBe(
+      'releaseCreator',
+    );
+    expect(hasMainPrimaryHeader('releaseCreator')).toBe(true);
+    expect(getMainPrimaryRoute({ ...base, activeTab: 'hosting', showReleaseCreator: true })).toBe('hosting');
+  });
   it('shows remote configuration before repository detail panes and keeps non-repository navigation independent', () => {
     expect(
       getMainPrimaryRoute({ ...base, activeTab: 'repo', showRemoteConfig: true, showRunConfig: true, showTimeline: true, activeConflictPath: 'file' }),

@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import type { GitHubCreateReleaseParamsDto, GitHubReleaseContextDto, ReleaseSubmissionPhase } from '@/types/githubDtos';
+import React, { useMemo } from 'react';
+import type { ReleaseDraft, ReleaseContext, ReleaseSubmissionPhase, ReleaseNotesOptions } from '@/types/releaseNotes';
 import { useI18n } from '@/i18n';
-import type { ReleaseNotesOptions } from '@/types/releaseNotes';
-import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
+import { validateReleaseInput } from '@/utils/releaseValidation';
+import type { HostingCapabilities } from '@/types/hostingDtos';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 import { detectReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import { ReleaseCreatorAlerts } from './ReleaseCreatorAlerts';
@@ -13,9 +13,12 @@ import { ReleaseVersionStep } from './ReleaseVersionStep';
 import '@/styles/release-creator.css';
 
 type Props = {
-  ownerRepo: { owner: string; repo: string } | null;
-  releaseForm: GitHubCreateReleaseParamsDto;
-  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
+  repositoryLabel: string | null;
+  capabilities: HostingCapabilities | null;
+  versionBump: ReleaseVersionBump;
+  setVersionBump: (value: ReleaseVersionBump) => void;
+  releaseForm: ReleaseDraft;
+  setReleaseForm: (updater: (prev: ReleaseDraft) => ReleaseDraft) => void;
   releaseSubmitting: boolean;
   releasePhase?: ReleaseSubmissionPhase;
   onCreateRelease: () => Promise<void>;
@@ -23,7 +26,7 @@ type Props = {
   onAddPendingAssets: () => Promise<void>;
   onRemovePendingAsset: (filePath: string) => void;
   contextLoading: boolean;
-  context: GitHubReleaseContextDto | null;
+  context: ReleaseContext | null;
   onRefreshContext: () => Promise<void>;
   onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   notesGenerating: boolean;
@@ -31,10 +34,32 @@ type Props = {
   setNotesLanguage: (value: 'de' | 'en') => void;
   notesOptions: ReleaseNotesOptions;
   setNotesOptions: (updater: (prev: ReleaseNotesOptions) => ReleaseNotesOptions) => void;
+  published?: boolean;
+  uploadedAssets?: string[];
+};
+
+const availability = (props: {
+  hasRepository: boolean;
+  hasCapabilities: boolean;
+  published: boolean;
+  submitting: boolean;
+  generating: boolean;
+  loading: boolean;
+  matchesTarget: boolean;
+  hasTag: boolean;
+  commits: number;
+  tagExists: boolean;
+  valid: boolean;
+}) => {
+  const ready = props.hasRepository && !props.published && !props.submitting && !props.generating && !props.loading && props.matchesTarget;
+  return { canGenerateNotes: ready && props.hasTag && props.commits > 0, canCreateRelease: ready && props.hasCapabilities && !props.tagExists && props.valid };
 };
 
 export const ReleaseCreator: React.FC<Props> = ({
-  ownerRepo,
+  repositoryLabel,
+  capabilities,
+  versionBump,
+  setVersionBump,
   releaseForm,
   setReleaseForm,
   releaseSubmitting,
@@ -52,9 +77,10 @@ export const ReleaseCreator: React.FC<Props> = ({
   setNotesLanguage,
   notesOptions,
   setNotesOptions,
+  published = false,
+  uploadedAssets,
 }) => {
-  const { t } = useI18n();
-  const [versionBump, setVersionBump] = useState<ReleaseVersionBump>('patch');
+  const { t, tr } = useI18n();
 
   const normalizedTag = (releaseForm.tagName || '').trim().toLowerCase();
   const trimmedTagName = (releaseForm.tagName || '').trim();
@@ -70,7 +96,7 @@ export const ReleaseCreator: React.FC<Props> = ({
 
   const validation = useMemo(
     () =>
-      validateGithubReleaseInput({
+      validateReleaseInput({
         tagName: releaseForm.tagName || '',
         releaseName: releaseForm.releaseName || '',
       }),
@@ -98,13 +124,21 @@ export const ReleaseCreator: React.FC<Props> = ({
   const bodyLineCount = (releaseForm.body || '').split(/\r?\n/g).length;
   const bodyCharCount = (releaseForm.body || '').length;
   const targetForContext = trimmedTarget || context?.commitsTarget || t('generated.components.releasecreator.unknown_e814b0a7');
-  const repositoryLabel = ownerRepo ? `${ownerRepo.owner}/${ownerRepo.repo}` : t('generated.components.releasecreator.no_github_repository_mapping_65df7317');
   const contextMatchesTarget = Boolean(context) && (!trimmedTarget || context?.commitsTarget === trimmedTarget);
 
-  const canGenerateNotes =
-    Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && !contextLoading && contextMatchesTarget && Boolean(trimmedTagName) && commitsCount > 0;
-  const canCreateRelease =
-    Boolean(ownerRepo) && !releaseSubmitting && !notesGenerating && !contextLoading && contextMatchesTarget && !tagAlreadyExists && validation.valid;
+  const { canGenerateNotes, canCreateRelease } = availability({
+    hasRepository: Boolean(repositoryLabel),
+    hasCapabilities: Boolean(capabilities),
+    published,
+    submitting: releaseSubmitting,
+    generating: notesGenerating,
+    loading: contextLoading,
+    matchesTarget: contextMatchesTarget,
+    hasTag: Boolean(trimmedTagName),
+    commits: commitsCount,
+    tagExists: tagAlreadyExists,
+    valid: validation.valid,
+  });
 
   const applySuggestedTag = (nextTag: string) => {
     setReleaseForm((prev) => {
@@ -126,8 +160,8 @@ export const ReleaseCreator: React.FC<Props> = ({
   };
 
   const createHint = useMemo(() => {
-    if (!ownerRepo) {
-      return t('generated.components.releasecreator.please_connect_a_repository_to_github_first_35d47eae');
+    if (!repositoryLabel) {
+      return tr('Wähle ein Hosting-Ziel für dieses Repository.', 'Choose a hosting target for this repository.');
     }
     if (tagAlreadyExists) {
       return t('generated.components.releasecreator.this_tag_already_exists_please_use_a_new_tag_a371149d');
@@ -135,28 +169,23 @@ export const ReleaseCreator: React.FC<Props> = ({
     if (!validation.valid && validationMessage) {
       return validationMessage;
     }
-    return t('generated.components.releasecreator.the_release_will_be_created_on_github_with_the_current_i_3608f5d0');
-  }, [ownerRepo, t, tagAlreadyExists, validation.valid, validationMessage]);
+    return tr('Die Veröffentlichung verwendet ausschließlich das ausgewählte Hosting-Ziel.', 'Publication uses only the selected hosting target.');
+  }, [repositoryLabel, tr, t, tagAlreadyExists, validation.valid, validationMessage]);
 
   return (
     <div className="release-creator release-creator--clean">
       <div className="release-layout-clean">
         <main className="release-main-clean">
-          <ReleaseCreatorHeader
-            repositoryLabel={repositoryLabel}
-            lastReleaseTag={context?.lastReleaseTag}
-            targetForContext={targetForContext}
-            commitsCount={commitsCount}
-          />
+          <ReleaseCreatorHeader lastReleaseTag={context?.lastReleaseTag} targetForContext={targetForContext} commitsCount={commitsCount} />
 
-          <ReleaseCreatorAlerts hasOwnerRepo={Boolean(ownerRepo)} fallbackUsed={Boolean(context?.fallbackUsed)} />
+          <ReleaseCreatorAlerts hasRepository={Boolean(repositoryLabel)} fallbackUsed={Boolean(context?.fallbackUsed)} />
 
           <section className="release-form-shell">
             <ReleaseVersionStep
               releaseForm={releaseForm}
               setReleaseForm={setReleaseForm}
-              hasOwnerRepo={Boolean(ownerRepo)}
-              releaseSubmitting={releaseSubmitting || notesGenerating}
+              hasRepository={Boolean(repositoryLabel)}
+              releaseSubmitting={releaseSubmitting || notesGenerating || published}
               versionBump={versionBump}
               suggestedTag={suggestedTag}
               tagAlreadyExists={tagAlreadyExists}
@@ -168,7 +197,10 @@ export const ReleaseCreator: React.FC<Props> = ({
             <ReleaseNotesWorkbench
               releaseForm={releaseForm}
               setReleaseForm={setReleaseForm}
-              hasOwnerRepo={Boolean(ownerRepo)}
+              hasRepository={Boolean(repositoryLabel)}
+              capabilities={capabilities}
+              published={published}
+              uploadedAssets={uploadedAssets}
               releaseSubmitting={releaseSubmitting}
               releasePhase={releasePhase}
               notesGenerating={notesGenerating}
@@ -195,7 +227,7 @@ export const ReleaseCreator: React.FC<Props> = ({
           commits={commits}
           commitsCount={commitsCount}
           contextLoading={contextLoading}
-          ownerRepo={ownerRepo}
+          hasRepository={Boolean(repositoryLabel)}
           releaseSubmitting={releaseSubmitting || notesGenerating}
           onRefreshContext={onRefreshContext}
         />

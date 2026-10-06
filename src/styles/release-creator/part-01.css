@@ -13,27 +13,18 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
 }
 
 .release-main-clean {
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border-right: 1px solid var(--border-color);
   background: var(--bg-darker);
   display: flex;
   flex-direction: column;
-}
-
-.release-head-clean {
-  padding: 10px 12px 9px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-dark);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .release-eyebrow {
@@ -44,33 +35,8 @@
   color: var(--text-secondary);
 }
 
-.release-title-clean {
-  margin-top: 2px;
-  font-size: 0.98rem;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.release-subtitle-clean {
-  margin-top: 4px;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: var(--text-secondary);
-}
-
-.release-repo-chip {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-  white-space: nowrap;
-  max-width: min(100%, 360px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-top: 2px;
-}
-
 .release-info-bar {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-bottom: 1px solid var(--border-color);
@@ -78,10 +44,13 @@
 }
 
 .release-info-item {
-  padding: 8px 10px;
+  min-width: 0;
+  padding: 6px 10px;
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  overflow-wrap: anywhere;
 }
 
 .release-info-item + .release-info-item {
@@ -102,6 +71,9 @@
 }
 
 .release-alert {
+  flex-shrink: 0;
+  max-height: 25%;
+  overflow: auto;
   margin: 8px 10px 0;
   padding: 7px 8px;
   font-size: 0.73rem;
@@ -154,16 +126,26 @@
 }
 
 .release-form-shell {
-  display: flex;
-  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, auto) minmax(180px, 1fr);
+  overflow: hidden;
   border-top: 1px solid var(--line-subtle);
 }
 
 .release-step-clean {
+  min-width: 0;
+  min-height: 0;
   padding: 11px 12px;
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+
+.release-step-clean--version {
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .release-step-clean + .release-step-clean {
@@ -186,35 +168,64 @@
 
 .release-step-clean--notes-workbench {
   gap: 10px;
+  overflow: hidden;
 }
 
 .release-notes-workbench {
-  min-height: 540px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--line-subtle);
   background: var(--bg-panel);
   display: grid;
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .release-notes-side {
+  min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--line-subtle);
   display: flex;
   flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.release-notes-side > * {
+  flex-shrink: 0;
+}
+
+.release-step-clean--version:focus-visible,
+.release-notes-side:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: -1px;
 }
 
 .release-notes-editor-pane {
+  min-width: 0;
   min-height: 0;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: var(--bg-darker);
+  overflow: hidden;
 }
 
 .release-field-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px 12px;
+}
+
+.release-tag-field {
+  min-width: 0;
+  display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 8px;
 }
 
@@ -281,6 +292,7 @@
 }
 
 .release-field {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -332,8 +344,11 @@
 
 .release-textarea--editor {
   flex: 1;
-  min-height: 460px;
-  height: 100%;
+  min-height: 0;
+  height: 0;
+  resize: none;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .release-ai-panel {
@@ -376,7 +391,7 @@
 }
 
 .release-ai-generate-btn {
-  height: 40px;
+  min-height: 40px;
   width: 100%;
   border: 1px solid var(--accent-primary-border);
   background: color-mix(in srgb, var(--accent-primary-soft) 70%, var(--bg-dark));

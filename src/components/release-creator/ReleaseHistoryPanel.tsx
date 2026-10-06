@@ -1,20 +1,18 @@
 import React from 'react';
 import { Clock3, GitBranch, RefreshCw } from 'lucide-react';
-import type { GitHubReleaseContextDto } from '@/types/githubDtos';
+import type { ReleaseCommitDto } from '@/types/releaseNotes';
 import { useI18n } from '@/i18n';
 
-type ReleaseCommit = GitHubReleaseContextDto['commitsSinceLastRelease'][number];
-
 type Props = {
-  commits: ReleaseCommit[];
+  commits: ReleaseCommitDto[];
   commitsCount: number;
   contextLoading: boolean;
-  ownerRepo: { owner: string; repo: string } | null;
+  hasRepository: boolean;
   releaseSubmitting: boolean;
   onRefreshContext: () => Promise<void>;
 };
 
-export const ReleaseHistoryPanel: React.FC<Props> = ({ commits, commitsCount, contextLoading, ownerRepo, releaseSubmitting, onRefreshContext }) => {
+export const ReleaseHistoryPanel: React.FC<Props> = ({ commits, commitsCount, contextLoading, hasRepository, releaseSubmitting, onRefreshContext }) => {
   const { t } = useI18n();
 
   return (
@@ -27,7 +25,7 @@ export const ReleaseHistoryPanel: React.FC<Props> = ({ commits, commitsCount, co
         <button
           className="staging-tool-btn"
           onClick={() => void onRefreshContext()}
-          disabled={!ownerRepo || contextLoading || releaseSubmitting}
+          disabled={!hasRepository || contextLoading || releaseSubmitting}
           title={t('generated.components.releasecreator.refresh_data_a356c350')}
         >
           <RefreshCw size={12} className={contextLoading ? 'spin' : ''} />

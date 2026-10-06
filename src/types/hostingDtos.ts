@@ -246,6 +246,7 @@ export interface HostingCreateRelease {
 }
 export interface HostingReleaseTarget {
   inspectionId: string;
+  targetBranch?: string | null;
   localSha: string | null;
   remoteSha: string | null;
   ahead: number;

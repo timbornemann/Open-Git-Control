@@ -12,6 +12,7 @@ import type {
 } from '@/app/state/contracts';
 import type { GitMergeMode } from '@/types/git';
 import type { RepositoryRunActionId } from '@/types/repositoryRun';
+import type { HostedRepositoryRef } from '@/types/hostingDtos';
 
 export type { CommitNavigationRequest } from '@/app/state/contracts';
 
@@ -23,6 +24,10 @@ export type BaseUIContextValue = SidebarCoreState & {
   isRemoteConfigOpen: boolean;
   onOpenRemoteConfig: () => void;
   onCloseRemoteConfig: () => void;
+  isReleaseCreatorOpen: boolean;
+  releaseCreatorTarget: HostedRepositoryRef | null;
+  onOpenReleaseCreator: (target?: HostedRepositoryRef) => void;
+  onCloseReleaseCreator: () => void;
 };
 
 export type SettingsContextValue = SettingsStateContract;

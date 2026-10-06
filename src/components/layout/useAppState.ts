@@ -14,11 +14,16 @@ import { useGitJobEvents } from '@/app/state/useGitJobEvents';
 import { useRepoScopedNavigationState } from '@/app/state/useRepoScopedNavigationState';
 import { useSettingsState } from '@/app/state/useSettingsState';
 import { useRepositoryRun } from '@/app/state/useRepositoryRun';
+import type { HostedRepositoryRef } from '@/types/hostingDtos';
+import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
 
 export const useAppState = () => {
   const [plannerRefreshSignal, setPlannerRefreshSignal] = useState(0);
   const [isRunConfigOpen, setRunConfigOpen] = useState(false);
   const [isRemoteConfigOpen, setRemoteConfigOpen] = useState(false);
+  const [isReleaseCreatorOpen, setReleaseCreatorOpen] = useState(false);
+  const [releaseCreatorTarget, setReleaseCreatorTarget] = useState<HostedRepositoryRef | null>(null);
+  const [releaseReturnTab, setReleaseReturnTab] = useState<'repo' | 'hosting'>('repo');
 
   const {
     toast: gitActionToast,
@@ -67,6 +72,8 @@ export const useAppState = () => {
     resetRepoScopedUi();
     setRunConfigOpen(false);
     setRemoteConfigOpen(false);
+    setReleaseCreatorOpen(false);
+    setReleaseCreatorTarget(null);
   }, [resetRepoScopedUi]);
 
   const { jobs, clearJobs } = useGitJobEvents();
@@ -170,17 +177,35 @@ export const useAppState = () => {
     setActiveTab: workspace.setActiveTab,
     isRunConfigOpen,
     onOpenRunConfig: () => {
+      setReleaseCreatorOpen(false);
       setRemoteConfigOpen(false);
       setRunConfigOpen(true);
     },
     onCloseRunConfig: () => setRunConfigOpen(false),
     isRemoteConfigOpen,
     onOpenRemoteConfig: () => {
+      setReleaseCreatorOpen(false);
       setRunConfigOpen(false);
       setRemoteConfigOpen(true);
       workspace.setActiveTab('repo');
     },
     onCloseRemoteConfig: () => setRemoteConfigOpen(false),
+    isReleaseCreatorOpen,
+    releaseCreatorTarget,
+    onOpenReleaseCreator: (target?: HostedRepositoryRef) => {
+      requestWorkingDirectoryNavigation({ kind: 'view', label: 'release' }, () => {
+        setRunConfigOpen(false);
+        setRemoteConfigOpen(false);
+        setReleaseCreatorTarget(target ?? null);
+        setReleaseReturnTab(target ? 'hosting' : 'repo');
+        workspace.setActiveTab('repo');
+        setReleaseCreatorOpen(true);
+      });
+    },
+    onCloseReleaseCreator: () => {
+      setReleaseCreatorOpen(false);
+      workspace.setActiveTab(releaseReturnTab);
+    },
     openRepos: workspace.openRepos,
     isRestoringRepos: workspace.isRestoringRepos,
     repoMeta: workspace.repoMeta,

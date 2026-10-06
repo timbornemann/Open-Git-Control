@@ -16,6 +16,24 @@ afterEach(() => {
 });
 const repository = (connectionId: string) => ({ connectionId, repositoryId: '7', fullPath: 'group/sub/repo' });
 describe('hosting client identity and lifecycle', () => {
+  it('exposes independent account generations and does not cache or invalidate reads for release inspections and history', async () => {
+    const selected = repository('creator-generation');
+    hostingRequest.mockResolvedValue({ success: true, data: true });
+    const before = hostingClient.sessionVersion(selected.connectionId);
+    const other = hostingClient.sessionVersion('unrelated-creator');
+    expect(hostingClient.sessionVersion('unused-creator')).toBe(0);
+    expect(hostingClient.sessionVersion()).toBeGreaterThanOrEqual(0);
+    await hostingClient.request('repository', { repository: selected });
+    const input = { repository: selected, repoPath: 'C:/repo', remoteName: 'origin', target: 'main' };
+    await hostingClient.request('releaseContext', input);
+    await hostingClient.request('releaseContext', input);
+    await hostingClient.request('inspectRelease', { ...input, tagName: 'v1.0.0', name: 'Release', body: 'Notes' });
+    await hostingClient.request('repository', { repository: selected });
+    expect(hostingRequest).toHaveBeenCalledTimes(4);
+    await hostingClient.request('logout', { connectionId: selected.connectionId });
+    expect(hostingClient.sessionVersion(selected.connectionId)).toBe(before + 1);
+    expect(hostingClient.sessionVersion('unrelated-creator')).toBe(other);
+  });
   it('keeps disk previews separate from online pages and removes both on logout', async () => {
     const connectionId = 'cached-startup';
     const input = { connectionId };

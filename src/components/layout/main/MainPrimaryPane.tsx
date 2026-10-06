@@ -24,6 +24,7 @@ const FileTimelineView = viewModules.timeline.View;
 const ProjectPlannerView = viewModules.planner.View;
 const HostingWorkspaceView = viewModules.hosting.View;
 const SettingsMainContent = viewModules.settings.View;
+const RepositoryReleaseCreator = viewModules.release.View;
 
 type MainPrimaryPaneProps = {
   primaryPaneBasis: string;
@@ -99,6 +100,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     showRunConsole: workflow.isRunConsoleOpen && workflow.repositoryRun?.repoPath === repository.activeRepo,
     showRunConfig: ui.isRunConfigOpen,
     showRemoteConfig: ui.isRemoteConfigOpen,
+    showReleaseCreator: ui.isReleaseCreatorOpen,
   });
   const isSettingsView = route === 'settings';
   const isPlannerView = route === 'planner';
@@ -108,6 +110,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
   const isRunConsoleView = route === 'runConsole';
   const isRunConfigView = route === 'runConfig';
   const isRemoteConfigView = route === 'remoteConfig';
+  const isReleaseCreatorView = route === 'releaseCreator';
   const primaryPaneTitle = getMainPrimaryTitle(route, t, tr);
   const shouldShowPrimaryPaneHeader = hasMainPrimaryHeader(route);
   const lazyPaneFallback = (
@@ -130,7 +133,14 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
     <div
       className="pane"
       style={
-        isSettingsView || isPlannerView || isHostingView || isLocalReposView || isRunConfigView || isRemoteConfigView || !showInspectorPane
+        isSettingsView ||
+        isPlannerView ||
+        isHostingView ||
+        isLocalReposView ||
+        isRunConfigView ||
+        isRemoteConfigView ||
+        isReleaseCreatorView ||
+        !showInspectorPane
           ? { minWidth: 0 }
           : { flex: `0 0 ${primaryPaneBasis}`, minWidth: `${PRIMARY_PANE_MIN_WIDTH}px` }
       }
@@ -139,7 +149,11 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       {shouldShowPrimaryPaneHeader && (
         <div className={`pane-header pane-header-main${activeConflictPath ? ' pane-header-main--conflict' : ''}`}>
           <span className="pane-header-main-title">{primaryPaneTitle}</span>
-          {isSettingsView ? null : isRunConfigView || isRemoteConfigView ? (
+          {isSettingsView ? null : isReleaseCreatorView ? (
+            <button className="icon-btn pane-header-nav-btn" onClick={ui.onCloseReleaseCreator}>
+              {tr('Zurück', 'Back')}
+            </button>
+          ) : isRunConfigView || isRemoteConfigView ? (
             <button className="icon-btn pane-header-nav-btn" onClick={isRemoteConfigView ? ui.onCloseRemoteConfig : ui.onCloseRunConfig}>
               {tr('Zurück zum Repository', 'Back to repository')}
             </button>
@@ -164,7 +178,9 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
       )}
 
       <div className="pane-content" style={{ padding: 0 }}>
-        {isRemoteConfigView ? (
+        {isReleaseCreatorView ? (
+          <RepositoryReleaseCreator repoPath={repository.activeRepo} requestedTarget={ui.releaseCreatorTarget} />
+        ) : isRemoteConfigView ? (
           <RemoteConfigurationView key={repository.activeRepo ?? ''} repoPath={repository.activeRepo} />
         ) : isRunConfigView ? (
           <RepositoryRunConfigView key={repository.activeRepo ?? ''} />

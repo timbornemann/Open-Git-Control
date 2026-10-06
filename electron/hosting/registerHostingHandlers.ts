@@ -17,6 +17,7 @@ import { emitJobEvent } from '../main-process/ipc/jobEvents';
 import { redactGitSensitiveText } from '../git/GitErrorFormatter';
 import { hostingService, type HostingService } from './HostingService';
 import { HostingReleaseSafety } from './HostingReleaseSafety';
+import { getHostingReleaseContext } from './HostingReleaseContext';
 import type { GitCredentialEnvironment } from './HostingCredentialBridge';
 import { hasControlCharacters } from './hostingUrls';
 
@@ -247,6 +248,8 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
       else if (operation === 'checkoutChangeRequest')
         data = await checkoutChangeRequest(event, input as HostingOperations['checkoutChangeRequest']['input'], gitService, service);
       else if (operation === 'releaseNotesCommits') data = await releaseNotesCommits(input as HostingOperations['releaseNotesCommits']['input'], gitService);
+      else if (operation === 'releaseContext')
+        data = await getHostingReleaseContext(input as HostingOperations['releaseContext']['input'], gitService, service);
       else if (operation === 'uploadAsset') {
         const params = input as HostingOperations['uploadAsset']['input'];
         releaseSafety.authorizeUpload(event.sender.id, params);

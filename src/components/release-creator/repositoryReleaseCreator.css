@@ -1,0 +1,74 @@
+.pane-content:has(.repository-release-page) {
+  min-height: 0;
+  overflow: hidden;
+}
+.repository-release-page {
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-darker);
+}
+.repository-release-page__creator {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.release-target-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-dark);
+}
+.release-target-toolbar__identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+.release-target-label {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.release-target-name {
+  min-width: 0;
+}
+.release-target-toolbar .release-select {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.release-page-message {
+  flex-shrink: 0;
+  max-height: 25%;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.release-page-message--error {
+  color: var(--danger);
+}
+.release-notes-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}

@@ -8,13 +8,17 @@ import { requireActiveRepositoryPath } from '../main-process/activeRepositoryAut
 import { beginCommitProtection } from '../main-process/RepositoryCommitProtection';
 import { repoJobRegistry } from '../main-process/repoJobRegistry';
 import { hasControlCharacters } from './hostingUrls';
+import { releaseEndpointResolver, releaseCredentialUrls } from './HostingReleaseEndpoint';
+import { readReleaseRevision } from './HostingReleaseRevision';
 
 type ReadGit = (args: string[], network?: boolean) => Promise<string>;
 type State = {
   fetchUrl: string;
+  bindingStamp: string;
   pushUrls: string[];
   target: string;
   branch: string | null;
+  currentBranch: string;
   head: string;
   localSha: string | null;
   remoteSha: string | null;
@@ -26,7 +30,13 @@ type State = {
 };
 type Inspection = { id: string; key: string; generation: number; repoGeneration: number; expiresAt: number; state: State };
 const key = (input: HostingCreateRelease) => JSON.stringify([input.repoPath, input.repository, input.remoteName, input.tagName, input.target]);
-const shaPattern = /^(?:[a-f\d]{40}|[a-f\d]{64})$/i;
+const pushRestriction = (branch: string | null, localSha: string | null, matchingEndpoint: boolean, currentBranch: string, behind: number) => {
+  if (!branch || !localSha) return 'Only an existing local branch can be pushed from the release creator.';
+  if (!matchingEndpoint) return 'No push endpoint matches this hosted repository.';
+  if (!currentBranch) return 'Check out a local branch before publishing a release branch.';
+  if (behind > 0) return 'Synchronize the local and remote histories before pushing.';
+  return null;
+};
 const parseRefs = (value: string) =>
   new Map(
     value
@@ -79,62 +89,41 @@ export class HostingReleaseSafety {
     const configuredFetchUrl = (await git(['remote', 'get-url', input.remoteName])).trim();
     const pushUrls = (await git(['remote', 'get-url', '--push', '--all', input.remoteName])).trim().split(/\r?\n/).filter(Boolean);
     const adapter = await this.deps.hostingService.authenticatedAdapter(input.repository.connectionId);
+    const resolver = releaseEndpointResolver(input.repoPath, input.remoteName, input.repository, adapter);
     let fetchUrl = '';
     for (const url of [configuredFetchUrl, ...pushUrls]) {
-      const endpoint = await adapter.resolveRepository(url);
-      if (
-        endpoint?.ref.connectionId === input.repository.connectionId &&
-        endpoint.ref.repositoryId === input.repository.repositoryId &&
-        endpoint.ref.fullPath === input.repository.fullPath
-      ) {
+      if (await resolver.matches(url)) {
         fetchUrl = url;
         break;
       }
     }
     if (!fetchUrl) throw new Error('The selected remote has no endpoint for this hosted repository.');
-    const target = input.target.replace(/^refs\/heads\//, '').replace(/^refs\/tags\//, '');
-    if (!shaPattern.test(input.target)) await git(['check-ref-format', `refs/heads/${target}`]);
-    const head = (await git(['rev-parse', '--verify', 'HEAD'])).trim();
-    const refs = parseRefs(await git(['ls-remote', '--', fetchUrl, `refs/heads/${target}`, `refs/tags/${target}`, `refs/tags/${target}^{}`], true));
-    const localBranch = (await git(['rev-parse', '--verify', `refs/heads/${target}^{commit}`]).catch(() => '')).trim() || null;
-    const branchName =
-      input.target.startsWith('refs/tags/') || shaPattern.test(input.target)
-        ? null
-        : input.target.startsWith('refs/heads/') || localBranch || refs.has(`refs/heads/${target}`)
-          ? target
-          : null;
-    const localSha = branchName
-      ? localBranch
-      : (await git(['rev-parse', '--verify', '--end-of-options', `${input.target}^{commit}`]).catch(() => '')).trim() || null;
-    let remoteSha = branchName ? refs.get(`refs/heads/${target}`) || null : refs.get(`refs/tags/${target}^{}`) || refs.get(`refs/tags/${target}`) || null;
-    if (shaPattern.test(input.target)) {
-      try {
-        await git(['fetch', '--no-tags', '--no-write-fetch-head', '--', fetchUrl, input.target], true);
-        remoteSha = input.target;
-      } catch {
-        remoteSha = null;
-      }
-    }
-    if (!branchName && localSha && remoteSha && localSha !== remoteSha) throw new Error('Local and remote release targets point to different commits.');
-    let ahead = localSha && !remoteSha ? 1 : 0;
+    const { target, head, currentBranch, branch: branchName, localSha, remoteSha } = await readReleaseRevision(input.target, fetchUrl, git);
+    let ahead = localSha && !remoteSha ? Number((await git(['rev-list', '--count', localSha])).trim()) : 0;
     let behind = 0;
     if (localSha && remoteSha && localSha !== remoteSha) {
       await git(['fetch', '--no-tags', '--no-write-fetch-head', '--', fetchUrl, remoteSha], true);
       [ahead, behind] = (await git(['rev-list', '--left-right', '--count', `${localSha}...${remoteSha}`])).trim().split(/\s+/).map(Number);
     }
+    if (![ahead, behind].every((count) => Number.isSafeInteger(count) && count >= 0)) throw new Error('The release commit comparison failed.');
+    const matchingPushUrls = await Promise.all(pushUrls.map(resolver.matches));
+    resolver.assertCurrent();
+    const pushBlockedReason = pushRestriction(branchName, localSha, matchingPushUrls.some(Boolean), currentBranch, behind);
     return {
       fetchUrl,
+      bindingStamp: resolver.stamp,
       pushUrls,
       target,
       branch: branchName,
+      currentBranch,
       head,
       localSha,
       remoteSha,
       ahead,
       behind,
-      canPush: false,
+      canPush: ahead > 0 && !pushBlockedReason,
       canReleaseRemote: Boolean(remoteSha),
-      pushBlockedReason: 'Push the selected endpoints through transfer review, then inspect the release again.',
+      pushBlockedReason,
     };
   }
 
@@ -154,10 +143,11 @@ export class HostingReleaseSafety {
           const read: ReadGit = async (args, network = false) => {
             this.assertCurrent(input, generation, repoGeneration);
             let credential;
-            if (network && args.some((arg) => arg.startsWith('https://')))
+            const urls = network ? releaseCredentialUrls(repoPath, input.remoteName, args) : [];
+            if (urls.length)
               credential = await hostingService.createGitCredentialEnvironment({
                 connectionId: input.repository.connectionId,
-                urls: args.filter((arg) => arg.startsWith('https://')),
+                urls,
                 signal: lifecycle,
               });
             try {
@@ -178,6 +168,7 @@ export class HostingReleaseSafety {
       this.inspections.set(event.sender.id, { id, key: key(input), generation, repoGeneration, state, expiresAt: Date.now() + 5 * 60_000 });
       return {
         inspectionId: id,
+        targetBranch: state.branch,
         localSha: state.localSha,
         remoteSha: state.remoteSha,
         ahead: state.ahead,
@@ -212,10 +203,11 @@ export class HostingReleaseSafety {
           const read: ReadGit = async (command, network = false) => {
             this.assertCurrent(input, inspection.generation, inspection.repoGeneration);
             let credential;
-            if (network && command.some((arg) => arg.startsWith('https://')))
+            const urls = network ? releaseCredentialUrls(input.repoPath, input.remoteName, command) : [];
+            if (urls.length)
               credential = await hostingService.createGitCredentialEnvironment({
                 connectionId: input.repository.connectionId,
-                urls: command.filter((arg) => arg.startsWith('https://')),
+                urls,
                 signal: lifecycle,
               });
             try {
@@ -238,6 +230,8 @@ export class HostingReleaseSafety {
           const after = await this.state(input, read);
           if (
             after.head !== current.head ||
+            after.bindingStamp !== current.bindingStamp ||
+            after.currentBranch !== current.currentBranch ||
             after.fetchUrl !== current.fetchUrl ||
             JSON.stringify(after.pushUrls) !== JSON.stringify(current.pushUrls) ||
             after.remoteSha !== sha

@@ -24,6 +24,7 @@ import type {
   HostingStatus,
 } from '../../../types/hostingDtos';
 import type { IpcResult } from '../../../types/ipc';
+import type { ReleaseContext } from '../../../types/releaseNotes';
 
 export interface HostingOperations {
   connections: { input: undefined; output: HostingConnection[] };
@@ -65,6 +66,10 @@ export interface HostingOperations {
   releaseNotesCommits: {
     input: { repoPath: string; fromRef?: string; toRef: string };
     output: { sha: string; message: string; author?: string; date?: string }[];
+  };
+  releaseContext: {
+    input: { repository: HostedRepositoryRef; repoPath: string; remoteName: string; target: string; fromRef?: string };
+    output: ReleaseContext;
   };
   inspectRelease: { input: HostingCreateRelease; output: HostingReleaseTarget };
   createRelease: { input: HostingCreateRelease; output: HostingRelease };

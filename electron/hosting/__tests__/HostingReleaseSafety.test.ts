@@ -3,6 +3,7 @@ import { cleanReleaseRepositories, releaseRepository } from '../../github/__test
 import { HostingReleaseSafety } from '../HostingReleaseSafety';
 import type { HostingService } from '../HostingService';
 import type { HostingCreateRelease } from '../../../src/types/hostingDtos';
+import { RemotePreferencesStore } from '../../git/RemotePreferencesStore';
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -10,6 +11,7 @@ afterEach(async () => {
 });
 
 async function fixture() {
+  const preferences = vi.spyOn(RemotePreferencesStore.prototype, 'read').mockReturnValue({});
   const git = await releaseRepository();
   let generation = 1;
   const repository = { connectionId: 'github-account', repositoryId: 'project-id', fullPath: 'acme/project' };
@@ -41,15 +43,66 @@ async function fixture() {
     body: 'Notes',
     target: 'main',
   };
-  return { ...git, safety, input, publish: createRelease, changeAccount: () => generation++ };
+  return { ...git, safety, input, preferences, publish: createRelease, changeAccount: () => generation++ };
 }
 
 describe('provider-neutral release target safety', { timeout: 30_000 }, () => {
+  it('uses a selected remote tag even when a backup has a conflicting local tag', async () => {
+    const f = await fixture();
+    await f.run(['tag', 'v0.9.0', f.initial], f.remote);
+    const backup = await f.commit('backup-only change');
+    await f.run(['tag', 'v0.9.0', backup]);
+    const input = { ...f.input, target: 'refs/tags/v0.9.0' };
+    const inspected = await f.safety.inspect(f.event, input);
+    expect(inspected).toMatchObject({ localSha: f.initial, remoteSha: f.initial, targetBranch: null });
+    await f.safety.create(f.event, { ...input, inspectionId: inspected.inspectionId, mode: 'remote' });
+    expect(f.publish).toHaveBeenCalledWith(expect.objectContaining({ target: f.initial }));
+    expect(await f.run(['rev-parse', 'refs/tags/v0.9.0'])).toBe(backup);
+  });
+
+  it('rejects a changed account binding after inspection even when the remote URL and SHA stay unchanged', async () => {
+    const f = await fixture();
+    const inspected = await f.safety.inspect(f.event, f.input);
+    f.preferences.mockReturnValue({
+      bindings: [{ remoteName: 'origin', url: 'https://github.com/acme/project.git', repository: f.input.repository, credentialMode: 'system' }],
+    });
+    await expect(f.safety.create(f.event, { ...f.input, inspectionId: inspected.inspectionId, mode: 'remote' })).rejects.toThrow('state changed');
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+  it('inspects another existing local branch for a push without checking it out', async () => {
+    const f = await fixture();
+    await f.run(['checkout', '-b', 'release']);
+    const releaseOid = await f.commit('release change');
+    await f.run(['checkout', 'main']);
+    const inspection = await f.safety.inspect(f.event, { ...f.input, target: 'release' });
+    expect(inspection).toMatchObject({ localSha: releaseOid, remoteSha: null, targetBranch: 'release', canPush: true, canReleaseRemote: false });
+    expect(await f.run(['symbolic-ref', '--short', 'HEAD'])).toBe('main');
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+
+  it('supports a published explicit commit expression without treating it as a push branch', async () => {
+    const f = await fixture();
+    await f.commit('unpublished');
+    const input = { ...f.input, target: 'HEAD~1' };
+    const inspection = await f.safety.inspect(f.event, input);
+    expect(inspection).toMatchObject({ localSha: f.initial, remoteSha: f.initial, targetBranch: null, canPush: false, canReleaseRemote: true });
+    await f.safety.create(f.event, { ...input, inspectionId: inspection.inspectionId, mode: 'remote' });
+    expect(f.publish).toHaveBeenCalledWith(expect.objectContaining({ target: f.initial }));
+  });
+
+  it('rejects a checkout change between inspection and publication even when HEAD stays at the same commit', async () => {
+    const f = await fixture();
+    const inspection = await f.safety.inspect(f.event, f.input);
+    await f.run(['checkout', '-b', 'another']);
+    await expect(f.safety.create(f.event, { ...f.input, inspectionId: inspection.inspectionId, mode: 'remote' })).rejects.toThrow('state changed');
+    expect(f.publish).not.toHaveBeenCalled();
+  });
+
   it('publishes only the inspected remote SHA without changing Git refs', async () => {
     const f = await fixture();
     const local = await f.commit('unpublished change');
     const inspection = await f.safety.inspect(f.event, f.input);
-    expect(inspection).toMatchObject({ localSha: local, remoteSha: f.initial, canPush: false, canReleaseRemote: true, ahead: 1 });
+    expect(inspection).toMatchObject({ localSha: local, remoteSha: f.initial, canPush: true, canReleaseRemote: true, ahead: 1 });
     await f.safety.create(f.event, { ...f.input, inspectionId: inspection.inspectionId, mode: 'remote' });
     expect(f.publish).toHaveBeenCalledWith(expect.objectContaining({ target: f.initial }));
     expect(await f.run(['rev-parse', 'main'], f.remote)).toBe(f.initial);

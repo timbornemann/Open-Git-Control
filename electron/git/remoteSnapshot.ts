@@ -1,7 +1,23 @@
-import type { GitRemoteSnapshotDto, RemotePreferences } from '../../src/types/remoteTransfers';
+import type { GitRemoteSnapshotDto, GitPushPlanDto, RemotePreferences, RemoteTransferOperations } from '../../src/types/remoteTransfers';
 import { displayUrl, lines, digest, type Runner } from './remoteTransferModels';
-import { gitConfigurationEnvironment } from './remoteTransferValidation';
+import { gitConfigurationEnvironment, refName } from './remoteTransferValidation';
 import { lfsConfigurationStamp } from './GitLfsTransfers';
+
+export async function readPushSource(repoPath: string, git: Runner, currentBranch: string, input: RemoteTransferOperations['planPush']['input']) {
+  const sourceBranch = input.sourceBranch === undefined ? currentBranch : refName(input.sourceBranch);
+  if (!sourceBranch) throw new Error('Select a local branch before pushing.');
+  await git.run(repoPath, ['check-ref-format', `refs/heads/${sourceBranch}`]);
+  const destinationRef = `refs/heads/${refName(input.destinationBranch ?? sourceBranch)}`;
+  await git.run(repoPath, ['check-ref-format', destinationRef]);
+  const sourceOid = (await git.run(repoPath, ['rev-parse', '--verify', `refs/heads/${sourceBranch}^{commit}`])).trim();
+  return { sourceBranch, destinationRef, sourceOid };
+}
+
+export async function assertPushSourceUnchanged(repoPath: string, git: Runner, plan: GitPushPlanDto) {
+  if (!plan.sourceBranch) return;
+  if ((await git.run(repoPath, ['rev-parse', '--verify', `refs/heads/${plan.sourceBranch}^{commit}`])).trim() !== plan.sourceOid)
+    throw new Error('The release source branch changed. Create a new push plan.');
+}
 
 export async function probePushUrlIsolation(repoPath: string, git: Runner): Promise<boolean | undefined> {
   // The probe needs an existing named remote; all overrides are process-local.

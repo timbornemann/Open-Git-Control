@@ -206,6 +206,7 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
     if (tab !== 'repo') {
       state.onCloseRunConfig();
       state.onCloseRemoteConfig();
+      if (state.isReleaseCreatorOpen) state.onCloseReleaseCreator();
     }
     state.setActiveTab(tab);
   },
@@ -215,6 +216,10 @@ const createUiSlice = ({ state, resetLayout, uiState }: Pick<CreateAppStateSlice
   isRemoteConfigOpen: state.isRemoteConfigOpen,
   onOpenRemoteConfig: state.onOpenRemoteConfig,
   onCloseRemoteConfig: state.onCloseRemoteConfig,
+  isReleaseCreatorOpen: state.isReleaseCreatorOpen,
+  releaseCreatorTarget: state.releaseCreatorTarget,
+  onOpenReleaseCreator: state.onOpenReleaseCreator,
+  onCloseReleaseCreator: state.onCloseReleaseCreator,
   onResetLayout: resetLayout,
   isRepoPanelCollapsed: state.isRepoPanelCollapsed,
   onToggleRepoPanelCollapsed: state.toggleRepoPanelCollapsed,

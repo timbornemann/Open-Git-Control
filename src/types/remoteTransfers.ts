@@ -66,6 +66,7 @@ export interface GitPushPlanDto {
   sourceOid: string;
   branch: string;
   tagNames: string[];
+  sourceBranch?: string;
   force: boolean;
   targets: GitPushTargetDto[];
 }
@@ -95,6 +96,7 @@ export interface RemoteTransferOperations {
     input: {
       repoPath: string;
       remoteNames: string[];
+      sourceBranch?: string;
       destinationBranch?: string;
       targetBranches?: Record<string, string>;
       targetUrls?: Record<string, string[]>;

@@ -347,7 +347,8 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 ### Release Creator
 
-- Dedicated release view from the topbar.
+- Shared full-width release creator from the repository topbar, action menu and command palette, or **Create release** in Hosting. The local sidebar stays visible; the creator includes its own commit history.
+- Session-only drafts are separated by local repository and complete hosting identity. Opening or leaving the creator does not publish anything.
 - Reads release context from the explicitly selected endpoint:
   - repository URL
   - existing tags
@@ -645,12 +646,12 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 ### Release flow
 
-1. Choose the repository's hosting endpoint in Remote configuration, then open Release from the topbar or the Hosting repository view.
-2. Enter a target branch, tag or commit and inspect the selected endpoint.
-3. If the local revision is missing remotely, use the reviewed Push workflow first, then inspect the endpoint again.
-4. Choose or suggest a version tag; adjust the release name and Markdown notes, optionally generating AI notes.
-5. Publish the inspected remote revision. Draft, prerelease and asset options appear only where supported.
-6. For Bitbucket Cloud, manage tags and Downloads separately; for Data Center, use tags and copy/export local notes.
+1. Open **Release** in the repository topbar, or **Create release** in Hosting. Hosting first activates a selected local clone; repositories without a clone offer clone/open actions.
+2. The creator uses the configured publication target, or lets you choose among multiple endpoints. Missing accounts or mappings have configuration links.
+3. Start with the current branch and a Patch suggestion. Adjust the version, target branch/tag/commit, optional notes baseline, Markdown notes and AI options; select assets before publishing.
+4. **Create release** checks the endpoint. When commits are missing, choose **Push and create release**, **Create without pushing** (where available), or cancel. The confirmed push publishes the captured release branch only to this endpoint, even when another branch is checked out. It leaves backup targets and upstream settings unchanged and repeats the endpoint check before creating the release.
+5. Draft, prerelease and asset options appear only where supported. Uploaded and pending files remain visible after an upload failure; retry sends only pending files.
+6. For Bitbucket Cloud, use tags and separate Downloads; for Data Center, use tags and copy/save local notes. All providers share the same creator and AI options.
 
 ### Recovery flow
 

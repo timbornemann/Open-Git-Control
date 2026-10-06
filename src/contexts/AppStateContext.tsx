@@ -113,6 +113,12 @@ export const useGitStore = <T,>(selector: (state: RepositoryContextValue) => T):
 export const useWorkflowStore = <T,>(selector: (state: WorkflowContextValue) => T): T =>
   useAppStateSelector((state) => selector(state.workflow), 'useWorkflowStore');
 export const useUIStore = <T,>(selector: (state: UIContextValue) => T): T => useAppStateSelector((state) => selector(state.ui), 'useUIStore');
+/** Read the current selection after an asynchronous repository activation. */
+export const useAppStateReader = () => {
+  const store = useContext(AppStateStoreContext);
+  if (!store) throw new Error('useAppStateReader must be used within AppStateSlicesProvider');
+  return store.getState;
+};
 
 export const useSettingsContext = () => useSettingsStore((state) => state);
 export const useRepositoryContext = () => useGitStore((state) => state);

@@ -46,6 +46,7 @@ export const viewModules = {
   timeline: preloadable(async () => ({ default: (await import('@/components/FileTimelineView')).FileTimelineView })),
   planner: preloadable(async () => ({ default: (await import('@/components/project-planner')).ProjectPlannerView })),
   hosting: preloadable(async () => ({ default: (await import('@/components/hosting/HostingWorkspace')).HostingWorkspace })),
+  release: preloadable(async () => ({ default: (await import('@/components/release-creator/RepositoryReleaseCreator')).RepositoryReleaseCreator })),
   settings: preloadable(async () => ({ default: (await import('@/components/layout/SettingsMainContent')).SettingsMainContent })),
 };
 

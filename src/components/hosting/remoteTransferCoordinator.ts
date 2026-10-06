@@ -196,6 +196,7 @@ export class RemoteTransferCoordinator {
       transferClient.request('planPush', {
         repoPath: intent.repoPath,
         remoteNames: selection.selectedRemoteNames,
+        ...(intent.sourceBranch ? { sourceBranch: intent.sourceBranch } : {}),
         ...(intent.constrainedTargetUrls ? { targetUrls: intent.constrainedTargetUrls } : {}),
         destinationBranch: selection.branch,
         targetBranches: Object.fromEntries(

@@ -50,6 +50,9 @@ export class HostingRequestError extends Error {
 }
 
 export const hostingClient = {
+  sessionVersion(connectionId?: string): number {
+    return sessions.get(connectionId ?? 'application') ?? 0;
+  },
   cachedRepositories(connectionId: string): HostingOperations['repositories']['output'] | undefined {
     const generation = sessions.get(connectionId) ?? 0;
     return (
@@ -81,7 +84,15 @@ export const hostingClient = {
     if (operation === 'pollDeviceLogin' && (result as { status?: string }).status === 'success') {
       sessions.set('application', (sessions.get('application') ?? 0) + 1);
     }
-    if (operation !== 'connections' && operation !== 'logs' && operation !== 'downloadArtifact' && operation !== 'startDeviceLogin') {
+    if (
+      operation !== 'connections' &&
+      operation !== 'logs' &&
+      operation !== 'downloadArtifact' &&
+      operation !== 'startDeviceLogin' &&
+      operation !== 'releaseContext' &&
+      operation !== 'releaseNotesCommits' &&
+      operation !== 'inspectRelease'
+    ) {
       await queryClient.cancelQueries({ queryKey: ['hosting', connectionId] });
       queryClient.removeQueries({ queryKey: ['hosting', connectionId] });
     }

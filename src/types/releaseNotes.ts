@@ -8,6 +8,30 @@ export interface ReleaseCommitDto {
   htmlUrl?: string | null;
 }
 
+/** Editable publication data, independent of the hosting account and provider. */
+export interface ReleaseDraft {
+  tagName: string;
+  releaseName: string;
+  targetCommitish: string;
+  fromRef?: string;
+  body: string;
+  draft: boolean;
+  prerelease: boolean;
+}
+
+export interface ReleaseContext {
+  existingTags: string[];
+  lastReleaseTag: string | null;
+  repositoryHtmlUrl: string;
+  commitsSinceLastRelease: ReleaseCommitDto[];
+  commitsTarget: string;
+  targetOid: string;
+  fallbackUsed: boolean;
+  warning?: string;
+}
+
+export type ReleaseSubmissionPhase = 'idle' | 'checking' | 'awaiting-decision' | 'pushing' | 'creating' | 'uploading';
+
 export type ReleaseNotesGenerationParamsDto = {
   tagName: string;
   releaseName: string;

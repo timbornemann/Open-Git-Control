@@ -183,13 +183,7 @@ export function HostingRepositoryDetail({
           (section === 'ci' ? (
             <HostingCiPanel repository={repository} capabilities={capabilities} />
           ) : section === 'releases' ? (
-            <HostingReleases
-              repository={repository}
-              capabilities={capabilities}
-              repoPath={localPath}
-              remoteName={endpoint?.remoteName ?? ''}
-              endpointUrl={endpoint?.url}
-            />
+            <HostingReleases repository={repository} capabilities={capabilities} repoPath={localPath} localPaths={localPaths} onClone={onClone} />
           ) : (
             <HostingChangeRequests repository={repository} capabilities={capabilities} repoPath={localPath} />
           ))

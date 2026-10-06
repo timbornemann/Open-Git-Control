@@ -45,6 +45,12 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   useEffect(() => () => coordinator.invalidate(), [coordinator]);
   const intent = useRemoteTransferDialogState((state) => state.dialog);
   const closeRequest = useRemoteTransferDialogState((state) => state.close);
+  const cancelledRequest = useRemoteTransferDialogState((state) => state.cancelledRequest);
+  useEffect(() => {
+    if (!cancelledRequest) return;
+    if (useRemoteTransferState.getState().intent?.requestId === cancelledRequest) coordinator.cancel();
+    useRemoteTransferDialogState.getState().cancelRequest(null);
+  }, [cancelledRequest, coordinator]);
   useEffect(() => {
     if (intent) {
       closeRequest();

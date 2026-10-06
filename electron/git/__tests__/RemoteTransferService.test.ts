@@ -59,6 +59,45 @@ function olderGitService(f: ReturnType<typeof fixture>) {
 }
 
 describe('RemoteTransferService with real Git', () => {
+  it('publishes a different release branch only to its selected endpoint without checkout, backup push or upstream changes', async () => {
+    const f = fixture();
+    const selected = f.bare('release-source');
+    const backup = f.bare('release-backup');
+    git(f.repo, 'remote', 'add', 'origin', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', selected);
+    git(f.repo, 'config', '--add', 'remote.origin.pushurl', backup);
+    git(f.repo, 'config', 'branch.main.remote', 'origin');
+    git(f.repo, 'config', 'branch.main.merge', 'refs/heads/main');
+    git(f.repo, 'checkout', '-b', 'release');
+    const releaseOid = f.commit('release version');
+    git(f.repo, 'checkout', 'main');
+    const plan = await f.service.planPush(
+      f.repo,
+      { repoPath: f.repo, remoteNames: ['origin'], sourceBranch: 'release', targetUrls: { origin: [selected] } },
+      f.context,
+    );
+    expect(plan).toMatchObject({ branch: 'main', sourceBranch: 'release', sourceOid: releaseOid, tagNames: [] });
+    expect((await f.service.executePush(f.repo, plan.id, f.context)).state).toBe('success');
+    expect(f.ref(selected, 'refs/heads/release')).toBe(releaseOid);
+    expect(git(f.repo, `--git-dir=${backup}`, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+    expect(git(f.repo, 'symbolic-ref', '--short', 'HEAD')).toBe('main');
+    expect(git(f.repo, 'rev-parse', 'HEAD')).toBe(f.initial);
+    expect(git(f.repo, 'config', '--get', 'branch.main.merge')).toBe('refs/heads/main');
+    expect(f.context.authorizePush).toHaveBeenCalledWith(plan.secretScanArgs);
+  }, 20_000);
+
+  it('rejects a changed explicitly selected source branch before a release push', async () => {
+    const f = fixture();
+    const target = f.bare('changed-release-source');
+    git(f.repo, 'remote', 'add', 'origin', target);
+    git(f.repo, 'branch', 'release');
+    const plan = await f.service.planPush(f.repo, { repoPath: f.repo, remoteNames: ['origin'], sourceBranch: 'release' }, f.context);
+    const later = f.commit('later');
+    git(f.repo, 'update-ref', 'refs/heads/release', later);
+    await expect(f.service.executePush(f.repo, plan.id, f.context)).rejects.toThrow('source branch changed');
+    expect(f.context.authorizePush).not.toHaveBeenCalled();
+  });
+
   it('keeps mixed remote URL lists and branch.pushRemote precedence', async () => {
     const f = fixture();
     git(f.repo, 'remote', 'add', 'forgejo', 'https://forge.example.invalid/team/private.git');

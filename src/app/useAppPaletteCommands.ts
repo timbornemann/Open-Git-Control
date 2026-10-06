@@ -59,6 +59,14 @@ export const useAppPaletteCommands = ({ state, t }: Params): PaletteCommand[] =>
         },
       },
       {
+        id: 'release-create',
+        label: state.settings.language === 'en' ? 'Create release' : 'Release erstellen',
+        keywords: ['release', 'creator', 'version', 'notes', 'veröffentlichen'],
+        action: () => {
+          if (state.activeRepo) state.onOpenReleaseCreator();
+        },
+      },
+      {
         id: 'fetch',
         label: t('generated.app.fetch_refresh_remote_88270faa'),
         keywords: ['fetch', 'remote', 'sync'],

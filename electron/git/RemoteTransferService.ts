@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { readRemoteSnapshot, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
+import { readRemoteSnapshot, readPushSource, assertPushSourceUnchanged, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
 import { referencedLfsObjects, lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import type {
   GitRemoteSnapshotDto,
@@ -236,10 +236,7 @@ export class RemoteTransferService {
     const targetUrls = resolvePushTargetUrls(input.targetUrls, snapshot, input.remoteNames);
     const targetBranches = input.targetBranches ? normalizeTargetBranches(input.targetBranches, input.remoteNames) : {};
     if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
-    if (!snapshot.branch) throw new Error('Select a local branch before pushing.');
-    const destinationRef = `refs/heads/${refName(input.destinationBranch ?? snapshot.branch)}`;
-    await this.git.run(repoPath, ['check-ref-format', destinationRef]);
-    const sourceOid = (await this.git.run(repoPath, ['rev-parse', '--verify', `refs/heads/${snapshot.branch}^{commit}`])).trim();
+    const { sourceBranch, destinationRef, sourceOid } = await readPushSource(repoPath, this.git, snapshot.branch, input);
     const tagNames = [...new Set(input.tagNames ?? [])];
     if (!Array.isArray(input.tagNames ?? []) || tagNames.length > 64) throw new Error('Invalid selected tags.');
     const refs: PublishedRef[] = [{ sourceOid, destinationRef }];
@@ -282,6 +279,7 @@ export class RemoteTransferService {
       repoPath,
       sourceOid,
       branch: snapshot.branch,
+      ...(input.sourceBranch === undefined ? {} : { sourceBranch }),
       tagNames,
       force: input.force === true,
       targets,
@@ -320,6 +318,7 @@ export class RemoteTransferService {
     if (plan.fingerprint !== (await this.fingerprint(repoPath))) throw new Error('Remote configuration or account bindings changed. Create a new push plan.');
     if ((await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD'])) !== plan.dto.branch)
       throw new Error('The current branch changed. Create a new push plan.');
+    await assertPushSourceUnchanged(repoPath, this.git, plan.dto);
     if (this.getCredentialGeneration && Object.entries(plan.credentialGenerations).some(([id, generation]) => this.getCredentialGeneration!(id) !== generation))
       throw new Error('Hosting authentication changed. Review the push with the current account again.');
     for (const ref of plan.refs) await this.git.run(repoPath, ['cat-file', '-e', ref.sourceOid]);

@@ -6,8 +6,6 @@ import { useI18n } from '@/i18n';
 import { RemoteTransferHost } from '@/components/hosting/RemoteTransferHost';
 import { requestRemoteTransfer, type RemoteTransferDialog } from '@/components/hosting/remoteTransferDialogState';
 import { useRemoteTransferState } from '@/components/hosting/remoteTransferState';
-import { useRepositoryHosting } from '@/components/hosting/useRepositoryHosting';
-import { useHostingState } from '@/components/hosting/hostingState';
 
 type MainTopbarProps = {
   canShowInspectorPane: boolean;
@@ -32,6 +30,9 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onCloseRunConfig = useUIStore((state) => state.onCloseRunConfig);
   const onOpenRemoteConfig = useUIStore((state) => state.onOpenRemoteConfig);
   const onCloseRemoteConfig = useUIStore((state) => state.onCloseRemoteConfig);
+  const onOpenReleaseCreator = useUIStore((state) => state.onOpenReleaseCreator);
+  const onCloseReleaseCreator = useUIStore((state) => state.onCloseReleaseCreator);
+  const isReleaseCreatorOpen = useUIStore((state) => state.isReleaseCreatorOpen);
   const activeRepo = useGitStore((state) => state.activeRepo);
   const branches = useGitStore((state) => state.branches);
   const tags = useGitStore((state) => state.tags);
@@ -54,9 +55,6 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
   const onStartRepositoryRun = useWorkflowStore((state) => state.onStartRepositoryRun);
   const onStopRepositoryRun = useWorkflowStore((state) => state.onStopRepositoryRun);
   const onOpenRunConsole = useWorkflowStore((state) => state.onOpenRunConsole);
-  const hostingTarget = useRepositoryHosting(activeRepo);
-  const selectHostedRepository = useHostingState((state) => state.select);
-  const navigateHosting = useHostingState((state) => state.navigate);
   const { t } = useI18n();
   const isPlannerView = activeTab === 'planner';
   const isGithubView = activeTab === 'github' || activeTab === 'hosting';
@@ -140,16 +138,10 @@ export const MainTopbar: React.FC<MainTopbarProps> = ({
                 onStageCommit();
               }}
               onOpenReleaseCreator={() => {
-                onCloseRunConfig();
-                if (!hostingTarget.repository) {
-                  showTransfer('remotes');
-                  return;
-                }
-                selectHostedRepository(hostingTarget.repository);
-                navigateHosting('releases');
-                setActiveTab('hosting');
+                onOpenReleaseCreator();
               }}
               onOpenTimeline={() => {
+                if (isReleaseCreatorOpen) onCloseReleaseCreator();
                 onCloseRunConfig();
                 onCloseRemoteConfig();
                 onOpenTimeline();

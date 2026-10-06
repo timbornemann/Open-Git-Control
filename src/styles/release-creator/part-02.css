@@ -246,11 +246,13 @@
 }
 
 .release-history-panel {
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border-color);
   background: var(--bg-dark);
+  overflow: hidden;
 }
 
 .release-history-toolbar {
@@ -283,6 +285,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .release-history-row {
@@ -351,6 +354,7 @@
 @container release-creator (max-width: 980px) {
   .release-layout-clean {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(100px, 18%);
   }
 
   .release-main-clean {
@@ -359,41 +363,17 @@
   }
 
   .release-history-panel {
-    min-height: 280px;
     border-left: 0;
   }
 }
 
 @container release-creator (max-width: 940px) {
   .release-notes-workbench {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .release-notes-side {
-    border-right: 0;
-    border-bottom: 1px solid var(--line-subtle);
-  }
-
-  .release-textarea--editor {
-    min-height: 300px;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   }
 }
 
 @container release-creator (max-width: 760px) {
-  .release-version-bump {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .release-version-bump-options {
-    width: 100%;
-  }
-
-  .release-field-grid {
-    grid-template-columns: 1fr;
-  }
-
   .release-options-grid {
     grid-template-columns: 1fr;
   }
@@ -420,13 +400,39 @@
     width: 100%;
     justify-content: space-between;
   }
+}
 
-  .release-info-bar {
-    grid-template-columns: 1fr;
+@container release-creator (max-width: 500px) {
+  .release-form-shell {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
   }
 
-  .release-info-item + .release-info-item {
-    border-left: 0;
-    border-top: 1px solid var(--line-subtle);
+  .release-version-bump {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .release-version-bump-options {
+    width: 100%;
+  }
+
+  .release-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .release-notes-workbench {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 0.6fr) minmax(0, 1.4fr);
+  }
+
+  .release-notes-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+}
+
+@container release-creator (min-width: 1500px) {
+  .release-field-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

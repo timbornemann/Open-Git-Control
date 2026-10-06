@@ -449,7 +449,18 @@ export class HostingService {
       this.validateRepository(params.source as HostedRepositoryRef);
       if ((params.source as HostedRepositoryRef).connectionId !== id) throw new Error('Cross-provider change requests are not supported.');
     }
-    if (['inspectRelease', 'downloadArtifact', 'uploadAsset', 'createRelease', 'clone', 'checkoutChangeRequest', 'releaseNotesCommits'].includes(operation))
+    if (
+      [
+        'inspectRelease',
+        'downloadArtifact',
+        'uploadAsset',
+        'createRelease',
+        'clone',
+        'checkoutChangeRequest',
+        'releaseNotesCommits',
+        'releaseContext',
+      ].includes(operation)
+    )
       throw new Error('This operation requires a main-process repository or file authorization context.');
     if (operation === 'capabilities') {
       const adapter = this.connection(id).hasCredentials ? await this.authenticatedAdapter(id) : this.adapter(id);

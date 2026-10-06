@@ -8,6 +8,7 @@ export type MainPrimaryRoute =
   | 'settings'
   | 'runConfig'
   | 'remoteConfig'
+  | 'releaseCreator'
   | 'timeline'
   | 'runConsole'
   | 'hosting'
@@ -27,6 +28,7 @@ type RouteParams = {
   showRunConsole: boolean;
   showRunConfig?: boolean;
   showRemoteConfig?: boolean;
+  showReleaseCreator?: boolean;
 };
 
 type Translate = (key: string, variables?: TranslationVariables) => string;
@@ -41,10 +43,12 @@ export const getMainPrimaryRoute = ({
   showRunConsole,
   showRunConfig,
   showRemoteConfig,
+  showReleaseCreator,
 }: RouteParams): MainPrimaryRoute => {
   if (activeTab === 'localRepos') return 'localRepos';
   if (activeTab === 'planner') return 'planner';
   if (activeTab === 'settings') return 'settings';
+  if (activeTab === 'repo' && showReleaseCreator) return 'releaseCreator';
   if (activeTab === 'repo' && showRemoteConfig) return 'remoteConfig';
   if (activeTab === 'repo' && showRunConfig) return 'runConfig';
   if (activeTab === 'repo' && showTimeline) return 'timeline';
@@ -65,6 +69,8 @@ export const getMainPrimaryTitle = (route: MainPrimaryRoute, t: Translate, tr: (
       return tr('Run-Konfiguration', 'Run configuration');
     case 'remoteConfig':
       return tr('Remote-Konfiguration', 'Remote configuration');
+    case 'releaseCreator':
+      return tr('Release erstellen', 'Create release');
     case 'timeline':
       return t('generated.components.layout.main.mainprimarypane.codebase_timeline_cd023f25');
     case 'recovery':

@@ -20,10 +20,11 @@ afterEach(() => {
 });
 
 const createReleaseCreatorProps = (overrides: Partial<ComponentProps<typeof ReleaseCreator>> = {}): ComponentProps<typeof ReleaseCreator> => ({
-  ownerRepo: { owner: 'octo', repo: 'repo' },
+  repositoryLabel: 'octo/repo',
+  capabilities: { releases: 'native', releaseAssets: true, draftRelease: true, prerelease: true } as ComponentProps<typeof ReleaseCreator>['capabilities'],
+  versionBump: 'patch',
+  setVersionBump: vi.fn(),
   releaseForm: {
-    owner: 'octo',
-    repo: 'repo',
     tagName: 'v1.2.3',
     targetCommitish: 'main',
     releaseName: 'Release v1.2.3',
@@ -38,13 +39,13 @@ const createReleaseCreatorProps = (overrides: Partial<ComponentProps<typeof Rele
   onAddPendingAssets: vi.fn(),
   onRemovePendingAsset: vi.fn(),
   contextLoading: false,
-  contextError: null,
   context: {
     existingTags: ['v1.2.2'],
     lastReleaseTag: 'v1.2.2',
     repositoryHtmlUrl: 'https://github.com/octo/repo',
     commitsSinceLastRelease: [{ hash: 'a'.repeat(40), shortHash: 'aaaaaaa', subject: 'change', author: 'A', date: '2026-01-01' }],
     commitsTarget: 'main',
+    targetOid: 'a'.repeat(40),
     fallbackUsed: false,
   },
   onRefreshContext: vi.fn(),
@@ -138,7 +139,7 @@ describe('ReleaseCreator while AI notes are generating', () => {
           { language: 'en' },
           createElement(ReleaseMiniForm, {
             ownerRepo: { owner: 'octo', repo: 'repo' },
-            releaseForm: createReleaseCreatorProps().releaseForm,
+            releaseForm: { ...createReleaseCreatorProps().releaseForm, owner: 'octo', repo: 'repo' },
             setReleaseForm: vi.fn(),
             releaseSubmitting: false,
             releaseNotesGenerating: false,

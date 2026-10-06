@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   switchRepo: vi.fn(),
   addRepo: vi.fn(),
   setTab: vi.fn(),
+  openCreator: vi.fn(),
   refreshGit: vi.fn(),
   git: { activeRepo: 'C:/Code/mirrored' as string | null, openRepos: ['C:/Code/mirrored'], currentBranch: 'main' },
 }));
@@ -24,6 +25,7 @@ vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (selector: (value: unknown) => unknown) =>
     selector({ ...mocks.git, onSwitchRepo: mocks.switchRepo, onAddRepo: mocks.addRepo, triggerRefresh: mocks.refreshGit }),
   useUIStore: (selector: (value: unknown) => unknown) => selector({ setActiveTab: mocks.setTab }),
+  useAppStateReader: () => () => ({ repository: { ...mocks.git, onSwitchRepo: mocks.switchRepo }, ui: { onOpenReleaseCreator: mocks.openCreator } }),
 }));
 vi.mock('@/i18n', () => ({ useI18n: () => ({ tr: (_de: string, en: string) => en }) }));
 vi.mock('@/services/appClient', () => ({
@@ -133,6 +135,7 @@ describe('multi-provider hosting acceptance', () => {
     mocks.switchRepo.mockReset().mockResolvedValue(true);
     mocks.addRepo.mockReset().mockResolvedValue(true);
     mocks.setTab.mockReset();
+    mocks.openCreator.mockReset();
     mocks.git = { activeRepo: mirror, openRepos: [mirror], currentBranch: 'main' };
     accounts = [connection('forgejo-private', 'forgejo'), connection('github-backup', 'github')];
     repos = accounts.map(repository);
@@ -358,24 +361,10 @@ describe('multi-provider hosting acceptance', () => {
     await act(async () => startForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     expect(mocks.request).toHaveBeenCalledWith('dispatch', { repository: repos[1].ref, workflow: 'ci.yml', ref: 'main', inputs: {} });
     await click(buttons('Releases')[0]);
-    const releaseForm = host.querySelector<HTMLFormElement>('.hosting-releases > form')!;
-    await change(releaseForm.querySelector('input')!, 'v1.0.0');
-    await act(async () => releaseForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-    expect(mocks.request).toHaveBeenCalledWith(
-      'inspectRelease',
-      expect.objectContaining({ repository: repos[1].ref, repoPath: mirror, remoteName: 'backup', mode: 'remote' }),
-    );
-    await click(buttons('Publish remote revision')[0]);
-    expect(mocks.request).toHaveBeenCalledWith(
-      'createRelease',
-      expect.objectContaining({ repository: repos[1].ref, remoteName: 'backup', inspectionId: 'github-inspection', mode: 'remote' }),
-    );
-    await click(buttons('Select files')[0]);
-    await click(buttons('Upload pending files')[0]);
-    expect(mocks.request).toHaveBeenCalledWith(
-      'uploadAsset',
-      expect.objectContaining({ repository: repos[1].ref, releaseId: 'github-release', repoPath: mirror, filePath: 'C:/Exports/source.zip' }),
-    );
+    expect(host.querySelector('.hosting-releases > form')).toBeNull();
+    await click(buttons('Create release')[0]);
+    expect(mocks.openCreator).toHaveBeenCalledWith(repos[1].ref);
+    expect(mocks.request.mock.calls.some(([operation]) => operation === 'createRelease' || operation === 'inspectRelease')).toBe(false);
     await click(buttons('All repositories')[0]);
     await click(row('forgejo').querySelector('.hosting-repository-title'));
     expect(host.querySelector('.hosting-detail')?.textContent).toContain('Private Forgejo');

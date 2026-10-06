@@ -1,12 +1,12 @@
 import { AlertCircle, Check, Tag, XCircle } from 'lucide-react';
-import type { GitHubCreateReleaseParamsDto } from '@/types/githubDtos';
+import type { ReleaseDraft } from '@/types/releaseNotes';
 import { useI18n } from '@/i18n';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 
 type ReleaseVersionStepProps = {
-  releaseForm: GitHubCreateReleaseParamsDto;
-  setReleaseForm: (updater: (prev: GitHubCreateReleaseParamsDto) => GitHubCreateReleaseParamsDto) => void;
-  hasOwnerRepo: boolean;
+  releaseForm: ReleaseDraft;
+  setReleaseForm: (updater: (prev: ReleaseDraft) => ReleaseDraft) => void;
+  hasRepository: boolean;
   releaseSubmitting: boolean;
   versionBump: ReleaseVersionBump;
   suggestedTag: string;
@@ -21,7 +21,7 @@ const VERSION_BUMPS: ReleaseVersionBump[] = ['major', 'minor', 'patch'];
 export const ReleaseVersionStep = ({
   releaseForm,
   setReleaseForm,
-  hasOwnerRepo,
+  hasRepository,
   releaseSubmitting,
   versionBump,
   suggestedTag,
@@ -30,11 +30,15 @@ export const ReleaseVersionStep = ({
   onApplySuggestedTag,
   onSelectVersionBump,
 }: ReleaseVersionStepProps) => {
-  const { t } = useI18n();
-  const isDisabled = !hasOwnerRepo || releaseSubmitting;
+  const { t, tr } = useI18n();
+  const isDisabled = !hasRepository || releaseSubmitting;
 
   return (
-    <section className="release-step-clean">
+    <section
+      className="release-step-clean release-step-clean--version"
+      tabIndex={0}
+      aria-label={t('generated.components.releasecreator.1_version_and_target_99fd2b69')}
+    >
       <header className="release-step-title-row">
         <h2>{t('generated.components.releasecreator.1_version_and_target_99fd2b69')}</h2>
       </header>
@@ -61,27 +65,29 @@ export const ReleaseVersionStep = ({
       </div>
 
       <div className="release-field-grid">
-        <label className="release-field">
-          <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.tag_name_required_f52acebf')}</span>
-          <input
-            type="text"
-            className="release-input"
-            value={releaseForm.tagName || ''}
-            onChange={(event) => setReleaseForm((prev) => ({ ...prev, tagName: event.target.value }))}
+        <div className="release-tag-field">
+          <label className="release-field">
+            <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.tag_name_required_f52acebf')}</span>
+            <input
+              type="text"
+              className="release-input"
+              value={releaseForm.tagName || ''}
+              onChange={(event) => setReleaseForm((prev) => ({ ...prev, tagName: event.target.value }))}
+              disabled={isDisabled}
+              placeholder={t('generated.components.releasecreator.e_g_v1_2_0_65ddb49a')}
+            />
+          </label>
+          <button
+            className="release-tag-btn"
+            onClick={() => onApplySuggestedTag(suggestedTag)}
             disabled={isDisabled}
-            placeholder={t('generated.components.releasecreator.e_g_v1_2_0_65ddb49a')}
-          />
-        </label>
-        <button
-          className="release-tag-btn"
-          onClick={() => onApplySuggestedTag(suggestedTag)}
-          disabled={isDisabled}
-          title={t('generated.components.releasecreator.apply_suggested_tag_4bd41c42')}
-        >
-          <Tag size={14} />
-          {suggestedTag}
-        </button>
-        <label className="release-field release-field--full">
+            title={t('generated.components.releasecreator.apply_suggested_tag_4bd41c42')}
+          >
+            <Tag size={14} />
+            {suggestedTag}
+          </button>
+        </div>
+        <label className="release-field">
           <span className="release-field-label">{t('generated.components.layout.sidebar.githubconnectedcontent.release_name_required_cbead0c8')}</span>
           <input
             type="text"
@@ -92,7 +98,7 @@ export const ReleaseVersionStep = ({
             placeholder={t('generated.components.releasecreator.e_g_release_v1_2_0_cb9d37f6')}
           />
         </label>
-        <label className="release-field release-field--full">
+        <label className="release-field">
           <span className="release-field-label">
             {t('generated.components.layout.sidebar.githubconnectedcontent.target_branch_or_commit_optional_3500df18')}
           </span>
@@ -103,6 +109,16 @@ export const ReleaseVersionStep = ({
             onChange={(event) => setReleaseForm((prev) => ({ ...prev, targetCommitish: event.target.value }))}
             disabled={isDisabled}
             placeholder={t('generated.components.releasecreator.e_g_main_or_sha_5fadcf84')}
+          />
+        </label>
+        <label className="release-field">
+          <span className="release-field-label">{tr('Notes ab Tag / Ref (optional)', 'Notes since tag / ref (optional)')}</span>
+          <input
+            type="text"
+            className="release-input"
+            value={releaseForm.fromRef || ''}
+            onChange={(event) => setReleaseForm((prev) => ({ ...prev, fromRef: event.target.value }))}
+            disabled={isDisabled}
           />
         </label>
       </div>
