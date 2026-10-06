@@ -25,6 +25,7 @@ import { createRepositoryRunApi } from './createRepositoryRunApi';
 import { createHostingApi } from './createHostingApi';
 import { createRepositoryFileApi } from './createRepositoryFileApi';
 import { createRepositoryIconApi } from './createRepositoryIconApi';
+import type { ReleaseNotesGenerationParamsDto } from '../../src/types/releaseNotes';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -330,16 +331,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     cancelAiAutoCommit: () => ipcRenderer.invoke(IpcChannel.GitCancelAiAutoCommit),
     getAiAutoCommitState: () => ipcRenderer.invoke(IpcChannel.GitGetAiAutoCommitState),
     aiGenerateCommitMessage: (params: { notes: string }) => ipcRenderer.invoke(IpcChannel.AiGenerateCommitMessage, params),
-    aiGenerateReleaseNotes: (params: {
-      tagName: string;
-      releaseName: string;
-      lastReleaseTag?: string | null;
-      commits: Array<{ hash: string; shortHash: string; subject: string; author: string; date: string; htmlUrl?: string | null }>;
-      repositoryHtmlUrl?: string | null;
-      language: 'de' | 'en';
-      versionBump: 'major' | 'minor' | 'patch';
-      hints?: string[];
-    }) => ipcRenderer.invoke(IpcChannel.AiGenerateReleaseNotes, params),
+    aiGenerateReleaseNotes: (params: ReleaseNotesGenerationParamsDto) => ipcRenderer.invoke(IpcChannel.AiGenerateReleaseNotes, params),
     getDiagnosticsReport: () => ipcRenderer.invoke(IpcChannel.DiagnosticsReport),
   } satisfies ElectronFlatAPI;
   const electronAPI: ElectronAPI = {

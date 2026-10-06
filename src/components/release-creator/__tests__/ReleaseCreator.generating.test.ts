@@ -50,6 +50,7 @@ const createReleaseCreatorProps = (overrides: Partial<ComponentProps<typeof Rele
   },
   onRefreshContext: vi.fn(),
   onGenerateNotes: vi.fn(),
+  onGenerateOfflineNotes: vi.fn(),
   notesGenerating: false,
   notesLanguage: 'en',
   setNotesLanguage: vi.fn(),

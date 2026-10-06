@@ -65,7 +65,7 @@ export interface HostingOperations {
   releaseAssets: { input: { repository: HostedRepositoryRef; releaseId?: string; cursor?: string }; output: HostingPage<HostingReleaseAsset> };
   releaseNotesCommits: {
     input: { repoPath: string; fromRef?: string; toRef: string };
-    output: { sha: string; message: string; author?: string; date?: string }[];
+    output: { sha: string; message: string; description?: string; author?: string; date?: string }[];
   };
   releaseContext: {
     input: { repository: HostedRepositoryRef; repoPath: string; remoteName: string; target: string; fromRef?: string };

@@ -1,5 +1,5 @@
 import { ReleaseSubmitLabel } from '@/components/release-creator/ReleaseSubmitLabel';
-import { AlertCircle, Check, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, FileText, Sparkles } from 'lucide-react';
 import type { ReleaseDraft, ReleaseSubmissionPhase, ReleaseNotesOptions } from '@/types/releaseNotes';
 import { useI18n } from '@/i18n';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
@@ -17,6 +17,7 @@ type ReleaseNotesWorkbenchProps = {
   releaseSubmitting: boolean;
   releasePhase?: ReleaseSubmissionPhase;
   notesGenerating: boolean;
+  notesGenerationMode?: 'ai' | 'offline' | null;
   notesLanguage: 'de' | 'en';
   setNotesLanguage: (value: 'de' | 'en') => void;
   notesOptions: ReleaseNotesOptions;
@@ -24,6 +25,8 @@ type ReleaseNotesWorkbenchProps = {
   canGenerateNotes: boolean;
   effectiveVersionBump: ReleaseVersionBump;
   onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
+  canGenerateOfflineNotes: boolean;
+  onGenerateOfflineNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   canCreateRelease: boolean;
   createHint: string;
   onCreateRelease: () => Promise<void>;
@@ -44,6 +47,7 @@ export const ReleaseNotesWorkbench = ({
   releaseSubmitting,
   releasePhase,
   notesGenerating,
+  notesGenerationMode,
   notesLanguage,
   setNotesLanguage,
   notesOptions,
@@ -51,6 +55,8 @@ export const ReleaseNotesWorkbench = ({
   canGenerateNotes,
   effectiveVersionBump,
   onGenerateNotes,
+  canGenerateOfflineNotes,
+  onGenerateOfflineNotes,
   canCreateRelease,
   createHint,
   onCreateRelease,
@@ -74,11 +80,11 @@ export const ReleaseNotesWorkbench = ({
           <div className="release-ai-panel">
             <div className="release-ai-headline">
               <div className="release-ai-headline-copy">
-                <strong>{t('generated.components.releasecreator.tune_ai_notes_cd829863')}</strong>
-                <span>{t('generated.components.releasecreator.adjust_behavior_and_generate_8d5ba99c')}</span>
+                <strong>{tr('Release Notes', 'Release notes')}</strong>
+                <span>{tr('Mit Vorlage oder KI erstellen.', 'Generate with a template or AI.')}</span>
               </div>
               <div className="release-language-wrap">
-                <label htmlFor="release-language">{t('generated.components.releasecreator.ai_language_7ebc7cfd')}</label>
+                <label htmlFor="release-language">{tr('Sprache', 'Language')}</label>
                 <select
                   id="release-language"
                   className="release-select"
@@ -90,6 +96,26 @@ export const ReleaseNotesWorkbench = ({
                   <option value="de">{t('generated.components.releasecreator.german_239646b7')}</option>
                 </select>
               </div>
+            </div>
+
+            <div className="release-offline-actions">
+              <button
+                type="button"
+                className="release-offline-generate-btn"
+                onClick={() => void onGenerateOfflineNotes(effectiveVersionBump)}
+                disabled={!canGenerateOfflineNotes}
+              >
+                <FileText size={16} />
+                {notesGenerating && notesGenerationMode === 'offline'
+                  ? tr('Vorlage wird erstellt …', 'Generating template …')
+                  : tr('Notes aus Vorlage erstellen', 'Generate notes from template')}
+              </button>
+              <small>
+                {tr(
+                  'Patch-, Minor- oder Major-Text mit Commit-Liste und Beschreibungen. Lokal, ohne KI.',
+                  'Patch, minor or major text with commit list and descriptions. Local, without AI.',
+                )}
+              </small>
             </div>
 
             <div className="release-ai-options-list">
@@ -116,14 +142,14 @@ export const ReleaseNotesWorkbench = ({
               />
               <AiOptionToggle
                 label={t('generated.components.releasecreator.breaking_changes_section_ccb42c05')}
-                description={t('generated.components.releasecreator.always_handled_as_a_separate_section_5bb3fe16')}
+                description={tr('Eigener Abschnitt, wenn inkompatible Änderungen belegt sind.', 'Separate section when incompatible changes are documented.')}
                 checked={notesOptions.includeBreakingChangesSection}
                 onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeBreakingChangesSection: next }))}
                 disabled={isEditorDisabled}
               />
               <AiOptionToggle
                 label={t('generated.components.releasecreator.append_automatic_commit_list_53700f8a')}
-                description={t('generated.components.releasecreator.generated_locally_without_ai_0d3c1350')}
+                description={tr('Auch an KI-Notes anhängen; bei Vorlagen immer enthalten.', 'Also append to AI notes; always included in templates.')}
                 checked={notesOptions.appendAlgorithmicChangeList}
                 onChange={(next) => setNotesOptions((prev) => ({ ...prev, appendAlgorithmicChangeList: next }))}
                 disabled={isEditorDisabled}
@@ -133,14 +159,14 @@ export const ReleaseNotesWorkbench = ({
                 description={t('generated.components.releasecreator.only_for_the_automatic_commit_list_1677c88d')}
                 checked={notesOptions.includeHashesInAlgorithmicList}
                 onChange={(next) => setNotesOptions((prev) => ({ ...prev, includeHashesInAlgorithmicList: next }))}
-                disabled={isEditorDisabled || !notesOptions.appendAlgorithmicChangeList}
+                disabled={isEditorDisabled}
               />
             </div>
 
             <div className="release-ai-main-actions">
               <button className="release-ai-generate-btn" onClick={() => void onGenerateNotes(effectiveVersionBump)} disabled={!canGenerateNotes}>
                 <Sparkles size={16} />
-                {notesGenerating
+                {notesGenerating && notesGenerationMode !== 'offline'
                   ? t('generated.components.releasecreator.ai_is_generating_release_notes_106c5b32')
                   : t('generated.components.releasecreator.generate_release_notes_with_ai_2905a726')}
               </button>

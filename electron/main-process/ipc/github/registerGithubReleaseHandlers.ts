@@ -8,7 +8,7 @@ import type { GitService } from '../../../GitService';
 import type { GitHubService } from '../../../GitHubService';
 import type { AppSettings } from '../../../settings';
 import { IpcChannel } from '../../../../src/types/ipcContract';
-import { parseReleaseCommits } from '../../parsing';
+import { parseReleaseCommits, RELEASE_COMMIT_FORMAT } from '../../parsing';
 import { assertGithubAuthenticated, toErrorMessage } from './githubHandlerUtils';
 import { requireActiveRepositoryPath } from '../../activeRepositoryAuthorization';
 import { getAuthorizedSelectedFile } from '../../fileAccessGrant';
@@ -304,7 +304,7 @@ export function registerGithubReleaseHandlers({ gitService, githubService, readS
           githubService.getLatestReleaseTag(owner, repo),
         ]);
 
-        const commitFormat = '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad';
+        const commitFormat = RELEASE_COMMIT_FORMAT;
         let fallbackUsed = false;
         let commitsRaw = '';
 

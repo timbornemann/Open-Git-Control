@@ -335,7 +335,8 @@
   align-items: center;
 }
 
-.release-ai-generate-btn {
+.release-ai-generate-btn,
+.release-offline-generate-btn {
   min-height: 40px;
   width: 100%;
   border: 1px solid var(--accent-primary-border);
@@ -353,11 +354,13 @@
     border-color 120ms ease;
 }
 
-.release-ai-generate-btn:hover:not(:disabled) {
+.release-ai-generate-btn:hover:not(:disabled),
+.release-offline-generate-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent-primary-soft) 42%, var(--bg-hover));
 }
 
-.release-ai-generate-btn:disabled {
+.release-ai-generate-btn:disabled,
+.release-offline-generate-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }

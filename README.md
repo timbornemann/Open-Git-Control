@@ -368,6 +368,8 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - draft flag
   - prerelease flag
 - Generate release notes with AI.
+- Use **Generate notes from template** for German/English patch, minor or major text and an automatically grouped commit list, including commit descriptions. Generation requires neither AI nor network access; when hosting context is unavailable, it reads local Git history (up to 400 commits). An explicit notes baseline limits that history; otherwise no previous publication is assumed.
+- Commit descriptions also inform AI generation. Empty Breaking Changes sections and placeholders such as “None” are omitted; actual migration guidance is retained.
 - Tune AI notes:
   - language English/German
   - exclude merge commits

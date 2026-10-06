@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { parseFileBlame, parseFileHistory, parseReleaseCommits, parseStashList, sanitizeRemoteUrl } from '../parsing';
 
 describe('main-process parsing helpers', () => {
+  it('keeps description paragraphs and field separators inside NUL-delimited release commits', () => {
+    const body = 'First paragraph.\n\nBREAKING CHANGE: migrate.\n- Detail with \x1f separator.';
+    const raw = `abc1234\x1fabc1234\x1ffeat!: migrate\x1fTim\x1f2026-10-06\x1f${body}\x00\ndef5678\x1fdef5678\x1ffix: preserve\x1fTim\x1f2026-10-06\x1f\x00`;
+    expect(parseReleaseCommits(raw)).toMatchObject([
+      { subject: 'feat!: migrate', description: body },
+      { subject: 'fix: preserve', description: '' },
+    ]);
+  });
   it('parses release commits from x1f separated rows', () => {
     const raw = 'abc1234\x1fabc1234\x1ffeat: add thing\x1fTim\x1f2026-03-24';
     const parsed = parseReleaseCommits(raw);

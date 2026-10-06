@@ -33,7 +33,10 @@ export type ReleaseCommit = {
   author: string;
   date: string;
   htmlUrl?: string | null;
+  description?: string;
 };
+
+export const RELEASE_COMMIT_FORMAT = '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%b%x00';
 
 export function parseFileHistory(logOutput: string): FileHistoryEntry[] {
   if (!logOutput) return [];
@@ -124,17 +127,18 @@ export function parseReleaseCommits(raw: string): ReleaseCommit[] {
   if (!raw.trim()) return [];
 
   return raw
-    .split('\n')
+    .split(raw.includes('\x00') ? '\x00' : '\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [hash, shortHash, subject, author, date] = line.split('\x1f');
+      const [hash, shortHash, subject, author, date, ...body] = line.split('\x1f');
       return {
         hash: String(hash || '').trim(),
         shortHash: String(shortHash || '').trim(),
         subject: String(subject || '').trim(),
         author: String(author || '').trim(),
         date: String(date || '').trim(),
+        ...(body.length ? { description: body.join('\x1f').trim() } : {}),
       };
     })
     .filter((entry) => Boolean(entry.hash && entry.shortHash && entry.subject));

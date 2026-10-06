@@ -273,13 +273,13 @@ describe('registerGithubHandlers fork flow', () => {
         if (args[0] === 'rev-parse') {
           throw new Error('missing local tag');
         }
-        return 'def456\x1fdef456\x1ffix: fallback release context\x1fTim\x1f2026-06-30';
+        return 'def456\x1fdef456\x1ffix: fallback release context\x1fTim\x1f2026-06-30\x1fKeep multiline\n\ndescriptions.\x00';
       }),
       runCommandAtPath: vi.fn(async (_repoPath: string, args: string[]) => {
         if (args[0] === 'rev-parse') {
           throw new Error('missing local tag');
         }
-        return 'def456\x1fdef456\x1ffix: fallback release context\x1fTim\x1f2026-06-30';
+        return 'def456\x1fdef456\x1ffix: fallback release context\x1fTim\x1f2026-06-30\x1fKeep multiline\n\ndescriptions.\x00';
       }),
       resolveRepositoryPath: vi.fn((repoPath: string) => repoPath),
       getRepoPath: vi.fn(() => '/tmp/repo'),
@@ -309,11 +309,12 @@ describe('registerGithubHandlers fork flow', () => {
     expect(result.success).toBe(true);
     expect(result.data.fallbackUsed).toBe(true);
     expect(result.data.commitsSinceLastRelease[0].shortHash).toBe('def456');
+    expect(result.data.commitsSinceLastRelease[0].description).toBe('Keep multiline\n\ndescriptions.');
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith('/tmp/repo', ['rev-parse', '--verify', '--quiet', 'v1.2.5^{commit}']);
     expect(gitService.runCommandAtPath).toHaveBeenCalledWith('/tmp/repo', [
       'log',
       'master',
-      '--pretty=format:%H%x1f%h%x1f%s%x1f%an%x1f%ad',
+      '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI%x1f%b%x00',
       '--date=short',
       '--max-count=150',
     ]);

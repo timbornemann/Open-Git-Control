@@ -47,7 +47,16 @@ const history = {
   targetOid: 'a'.repeat(40),
   commitsTarget: 'main',
   fallbackUsed: false,
-  commitsSinceLastRelease: [{ hash: 'a'.repeat(40), shortHash: 'aaaaaaa', subject: 'after last release', author: 'Author', date: '2026-10-06' }],
+  commitsSinceLastRelease: [
+    {
+      hash: 'a'.repeat(40),
+      shortHash: 'aaaaaaa',
+      subject: 'after last release',
+      description: 'Preserve existing settings.\n\n- Include migration details.',
+      author: 'Author',
+      date: '2026-10-06',
+    },
+  ],
 };
 function target(id: string, caps = capabilities) {
   const repo = repository(id);
@@ -102,6 +111,84 @@ afterEach(() => {
 });
 
 describe('full repository release creator', () => {
+  it.each(['Patch', 'Minor', 'Major'])('generates the %s template and a full commit list without an AI or network request', async (version) => {
+    await render();
+    await click(version);
+    mocks.request.mockClear();
+    await click('Generate notes from template');
+    const body = host.querySelector<HTMLTextAreaElement>('textarea')!.value;
+    expect(body).toContain(`This ${version.toLowerCase()} release`);
+    expect(body).toContain('  Preserve existing settings.\n\n  - Include migration details.');
+    expect(body.match(/## Commit List/g)).toHaveLength(1);
+    expect(body).not.toContain('Breaking Changes');
+    expect(mocks.generate).not.toHaveBeenCalled();
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it('can prepare editable local notes without hosting metadata, using an explicit local baseline and no AI', async () => {
+    mocks.target = { ...target('offline'), repository: null, capabilities: null, error: 'Network unavailable' };
+    mocks.request.mockImplementation(async (operation) => {
+      if (operation === 'releaseNotesCommits')
+        return [{ sha: 'b'.repeat(40), message: 'fix: offline notes', description: 'Preserve configuration.', author: 'Author', date: '2026-10-06' }];
+      throw new Error('Unexpected network request');
+    });
+    await render();
+    await click('Patch');
+    await act(async () => {
+      const key = releaseDraftKey('C:/repo', repository('offline').ref, 'origin');
+      useReleaseDraftState.getState().update(key, (previous) => ({ ...previous!, form: { ...previous!.form, fromRef: 'v1.0.0' } }));
+    });
+    await click('Generate notes from template');
+    expect(mocks.request).toHaveBeenCalledWith('releaseNotesCommits', { repoPath: 'C:/repo', toRef: 'main', fromRef: 'v1.0.0' });
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('  Preserve configuration.');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(false);
+    expect((host.querySelector('.release-primary-btn') as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it('passes descriptions to AI and omits placeholder breaking sections from the result', async () => {
+    await render();
+    mocks.generate.mockResolvedValue({ success: true, data: { markdown: '# Release\n\n## Breaking Changes\n- None\n\n## Fixed\n- Content.', source: 'ai' } });
+    await click('Generate release notes with AI');
+    expect(mocks.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ commits: [expect.objectContaining({ description: history.commitsSinceLastRelease[0].description })] }),
+    );
+    const body = host.querySelector<HTMLTextAreaElement>('textarea')!.value;
+    expect(body).not.toContain('Breaking Changes');
+    expect(body).not.toContain('None');
+    expect(body).toContain('  Preserve existing settings.');
+  });
+
+  it('does not append a second automatic list to the backend offline fallback', async () => {
+    await render();
+    mocks.generate.mockResolvedValue({
+      success: true,
+      data: { markdown: '# Release\n\n## Commit List (Automatic)\n- after last release', source: 'fallback' },
+    });
+    await click('Generate release notes with AI');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value.match(/## Commit List/g)).toHaveLength(1);
+  });
+
+  it('preserves the draft on local history failure and ignores late local history after a repository switch', async () => {
+    mocks.target = { ...target('offline'), repository: null, capabilities: null, error: 'Network unavailable' };
+    mocks.request.mockRejectedValue(new Error('Notes baseline not found'));
+    await render();
+    await click('Patch');
+    await notes('Keep my draft');
+    await click('Generate notes from template');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('Keep my draft');
+    expect(mocks.toast).toHaveBeenCalledWith('Notes baseline not found', true);
+    const late = deferred<unknown>();
+    mocks.request.mockReturnValue(late.promise);
+    await click('Generate notes from template');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.disabled).toBe(true);
+    await render('C:/other');
+    await act(async () => late.resolve([{ sha: 'a'.repeat(40), message: 'private old changes', description: 'Do not cross repositories.' }]));
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('');
+    const key = releaseDraftKey('C:/repo', repository('offline').ref, 'origin');
+    expect(useReleaseDraftState.getState().sessions[key].form.body).toBe('Keep my draft');
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
   it('retains the original version, AI options, history, notes and asset tools without publishing when opened', async () => {
     await render();
     expect(host.querySelector('.release-creator')).toBeTruthy();

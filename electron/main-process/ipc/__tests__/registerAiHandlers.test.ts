@@ -131,12 +131,18 @@ describe('registerAiHandlers', () => {
       {
         tagName: 'v1.0.1',
         releaseName: 'v1.0.1',
-        commits: [{ hash: 'abc', shortHash: 'abc', subject: 'fix', author: 'A', date: '2026-07-11' }],
+        commits: [{ hash: 'abc', shortHash: 'abc', subject: 'fix', description: 'Preserve settings and migrate keys.', author: 'A', date: '2026-07-11' }],
         language: 'en',
         versionBump: 'patch',
       },
     );
 
     expect(result).toEqual({ success: true, data: generated });
+    expect(aiService.generateReleaseNotes).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ commits: [expect.objectContaining({ description: 'Preserve settings and migrate keys.' })] }),
+      expect.anything(),
+    );
   });
 });

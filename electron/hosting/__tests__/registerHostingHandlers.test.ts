@@ -106,10 +106,25 @@ async function fixture(usePathAlias = false, useShortPath = false) {
       error?: string;
       data?: { path: string };
     }>;
-  return { request, cloneSpy, ref };
+  return { request, cloneSpy, ref, git, event, hosting };
 }
 
 describe('hosting clone authorization and account continuity', { timeout: 30_000 }, () => {
+  it('reads release-note subjects and descriptions entirely locally, without a hosting account or network', async () => {
+    const f = await fixture();
+    const oid = await f.git.commit('feat: offline templates\n\nTwo paragraphs.\n\n- Preserve descriptions.');
+    const provider = vi.spyOn(f.hosting, 'request').mockRejectedValue(new Error('Network unavailable'));
+    const result = await state.handlers.get('hosting:request')!(f.event, 'releaseNotesCommits', {
+      repoPath: f.git.repo,
+      toRef: 'main',
+      fromRef: f.git.initial,
+    });
+    expect(result).toMatchObject({
+      success: true,
+      data: [{ sha: oid, message: 'feat: offline templates', description: 'Two paragraphs.\n\n- Preserve descriptions.' }],
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
   const pathVariants = [
     { alias: false, short: false },
     { alias: true, short: false },

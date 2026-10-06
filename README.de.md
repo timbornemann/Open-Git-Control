@@ -363,6 +363,8 @@ Kann das installierte Git einzelne Push-URLs nicht isolieren, veröffentlicht ei
   - Draft-Flag
   - Prerelease-Flag
 - Release Notes mit KI generieren.
+- Direkt **Notes aus Vorlage erstellen**: deutsche/englische Patch-, Minor- oder Major-Texte mit automatisch gruppierter Commit-Liste, einschließlich Commit-Beschreibungen. Die Erstellung benötigt weder KI noch Netzwerk; wenn der Hosting-Kontext fehlt, wird das lokale Git-Log verwendet (bis zu 400 Commits). Eine explizite Notes-Ausgangsrevision begrenzt die lokale Historie; ohne diese wird keine letzte Veröffentlichung angenommen.
+- Commit-Beschreibungen fließen auch in den KI-Kontext ein. Leere Breaking-Changes-Abschnitte und Platzhalter wie „None“ entfallen; tatsächliche Migrationshinweise bleiben erhalten.
 - KI-Notes anpassen:
   - Sprache Englisch/Deutsch
   - Merge Commits ausschliessen

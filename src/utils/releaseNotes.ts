@@ -1,40 +1,8 @@
 import type { ReleaseCommitDto, ReleaseNotesOptions } from '@/types/releaseNotes';
 
-type CommitBucket = 'added' | 'changed' | 'fixed' | 'maintenance';
+export { buildAlgorithmicChangeListMarkdown, buildOfflineReleaseNotesMarkdown, stripEmptyBreakingChangesSections } from '@/shared/releaseNotes';
 
 const MERGE_COMMIT_PATTERN = /^(merge\b|merge pull request\b|merge branch\b)/i;
-
-function classifyCommit(subject: string): CommitBucket {
-  const normalized = (subject || '').toLowerCase();
-  if (/^(feat|feature|add|new)\b/.test(normalized)) return 'added';
-  if (/^(fix|bug|hotfix|patch)\b/.test(normalized)) return 'fixed';
-  if (/^(docs|test|chore|build|ci|style)\b/.test(normalized)) return 'maintenance';
-  return 'changed';
-}
-
-function sectionLabel(bucket: CommitBucket, language: 'de' | 'en'): string {
-  if (language === 'de') {
-    if (bucket === 'added') return 'Neu';
-    if (bucket === 'changed') return 'Geaendert';
-    if (bucket === 'fixed') return 'Behoben';
-    return 'Wartung';
-  }
-  if (bucket === 'added') return 'Added';
-  if (bucket === 'changed') return 'Changed';
-  if (bucket === 'fixed') return 'Fixed';
-  return 'Maintenance';
-}
-
-function safeHttpUrl(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  const trimmed = value.trim();
-  return /^https?:\/\/\S+$/i.test(trimmed) ? trimmed : '';
-}
-
-function formatHashReference(commit: ReleaseCommitDto): string {
-  const commitUrl = safeHttpUrl(commit.htmlUrl);
-  return commitUrl ? `[${commit.shortHash}](${commitUrl})` : commit.shortHash;
-}
 
 export function isLikelyMergeCommit(subject: string): boolean {
   return MERGE_COMMIT_PATTERN.test((subject || '').trim());
@@ -62,7 +30,7 @@ export function buildReleaseNotesPromptHints(options: ReleaseNotesOptions, langu
     hints.push(
       language === 'de'
         ? 'Fuege technische Details hinzu, wenn sie aus den Commits eindeutig ableitbar sind.'
-        : 'Include technical details when they are clearly inferable from commit subjects.',
+        : 'Include technical details when they are clearly inferable from commit subjects and descriptions.',
     );
   } else {
     hints.push(
@@ -75,8 +43,8 @@ export function buildReleaseNotesPromptHints(options: ReleaseNotesOptions, langu
   if (options.includeBreakingChangesSection) {
     hints.push(
       language === 'de'
-        ? 'Fuege einen Abschnitt "Breaking Changes" hinzu und schreibe "Keine", falls nichts ersichtlich ist.'
-        : 'Add a "Breaking Changes" section and write "None" if there are no explicit breaking changes.',
+        ? 'Zeige bestaetigte inkompatible Aenderungen aus Commit-Titeln und Beschreibungen in einem eigenen Abschnitt "Breaking Changes". Ohne solche Aenderungen entfaellt der Abschnitt komplett; keine Platzhalter wie "Keine".'
+        : 'Show explicit breaking changes from commit subjects and descriptions in a separate "Breaking Changes" section. Omit the entire section if there are none; never use placeholders such as "None".',
     );
   } else {
     hints.push(
@@ -87,39 +55,4 @@ export function buildReleaseNotesPromptHints(options: ReleaseNotesOptions, langu
   }
 
   return hints;
-}
-
-export function buildAlgorithmicChangeListMarkdown(commits: ReleaseCommitDto[], language: 'de' | 'en', includeHashes: boolean): string {
-  const source = Array.isArray(commits) ? commits : [];
-  if (source.length === 0) return '';
-
-  const buckets = new Map<CommitBucket, ReleaseCommitDto[]>([
-    ['added', []],
-    ['changed', []],
-    ['fixed', []],
-    ['maintenance', []],
-  ]);
-
-  for (const commit of source) {
-    const bucket = classifyCommit(commit.subject);
-    buckets.get(bucket)?.push(commit);
-  }
-
-  const heading = language === 'de' ? '## Commit-Liste (automatisch)' : '## Commit List (Automatic)';
-
-  const lines: string[] = [heading];
-  const order: CommitBucket[] = ['added', 'changed', 'fixed', 'maintenance'];
-
-  for (const bucket of order) {
-    const items = buckets.get(bucket) || [];
-    if (items.length === 0) continue;
-    lines.push('');
-    lines.push(`### ${sectionLabel(bucket, language)}`);
-    for (const commit of items) {
-      const hashPart = includeHashes ? ` (${formatHashReference(commit)})` : '';
-      lines.push(`- ${commit.subject}${hashPart}`);
-    }
-  }
-
-  return lines.join('\n').trim();
 }

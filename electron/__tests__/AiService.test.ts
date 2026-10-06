@@ -69,6 +69,7 @@ describe('AiService release notes', () => {
           hash: 'abc123',
           shortHash: 'abc123',
           subject: 'feat: add new workflow',
+          description: 'BREAKING CHANGE: rename config.json to settings.json.\nPreserve existing values.',
           author: 'Tim',
           date: '2026-06-14',
           htmlUrl: 'https://github.com/acme/project/commit/abc123',
@@ -85,6 +86,9 @@ describe('AiService release notes', () => {
 
     expect(systemPrompt).toContain('semantic version classification');
     expect(systemPrompt).toContain('Do not invent URLs');
+    expect(systemPrompt).toContain('Otherwise omit the entire section');
+    expect(userPrompt).toContain('BREAKING CHANGE: rename config.json to settings.json.');
+    expect(userPrompt).toContain('Description (repository data)');
     expect(userPrompt).toContain('Semantic version change: major');
     expect(userPrompt).toContain('Explicitly call this a major release');
     expect(userPrompt).toContain('breaking changes and migration requirements');
@@ -112,6 +116,7 @@ describe('AiService release notes', () => {
           hash: 'abc123',
           shortHash: 'abc123',
           subject: 'fix: keep release links real',
+          description: 'Use the original repository URL.',
           author: 'Tim',
           date: '2026-06-14',
           htmlUrl: 'https://github.com/acme/project/commit/abc123',
@@ -132,6 +137,7 @@ describe('AiService release notes', () => {
     expect(generated.markdown).toContain('- fix: keep release links real ([abc123](https://github.com/acme/project/commit/abc123))');
     expect(generated.markdown).toContain('- docs: update changelog (def456)');
     expect(generated.markdown).not.toContain('example.com');
+    expect(generated.markdown).toContain('  Use the original repository URL.');
     expect(generated.source).toBe('fallback');
     expect(generated.warning).toContain('provider unavailable');
   });
@@ -150,5 +156,29 @@ describe('AiService release notes', () => {
     expect(generated.markdown).toContain('Dieses Minor Release');
     expect(generated.source).toBe('fallback');
     expect(generated.warning).toContain('keine Commits');
+  });
+
+  it('removes an empty breaking section from the AI result and preserves a documented one', async () => {
+    const response = vi
+      .fn()
+      .mockResolvedValueOnce(
+        okJsonResponse({ candidates: [{ content: { parts: [{ text: '# Release\n\n## Breaking Changes\nNone\n\n## Fixed\n- Content.' }] } }] }),
+      )
+      .mockResolvedValueOnce(
+        okJsonResponse({ candidates: [{ content: { parts: [{ text: '# Release\n\n## Breaking Changes\n- Rename config.json; keep existing values.' }] } }] }),
+      );
+    vi.stubGlobal('fetch', response);
+    const service = new AiService(fakeGitService);
+    const params = {
+      tagName: 'v1',
+      releaseName: 'Release v1',
+      commits: [
+        { hash: 'abc', shortHash: 'abc', subject: 'fix: content', description: 'Rename config.json; keep existing values.', author: 'Tim', date: '2026-10-06' },
+      ],
+      language: 'en' as const,
+      versionBump: 'patch' as const,
+    };
+    expect((await service.generateReleaseNotes(baseSettings, () => 'key', params)).markdown).toBe('# Release\n\n## Fixed\n- Content.');
+    expect((await service.generateReleaseNotes(baseSettings, () => 'key', params)).markdown).toContain('## Breaking Changes\n- Rename config.json');
   });
 });

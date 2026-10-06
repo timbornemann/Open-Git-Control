@@ -20,6 +20,7 @@ import { HostingReleaseSafety } from './HostingReleaseSafety';
 import { getHostingReleaseContext } from './HostingReleaseContext';
 import type { GitCredentialEnvironment } from './HostingCredentialBridge';
 import { hasControlCharacters } from './hostingUrls';
+import { parseReleaseCommits, RELEASE_COMMIT_FORMAT } from '../main-process/parsing';
 
 type Dependencies = { gitService: GitService; pushGuard?: SecretScanPushGuard; hostingService?: HostingService };
 const MAX_TRANSFER_BYTES = 512 * 1024 * 1024;
@@ -220,20 +221,14 @@ async function releaseNotesCommits(input: HostingOperations['releaseNotesCommits
   const previous = input.fromRef ? await resolve(input.fromRef) : null;
   const output = await gitService.runCommandAtPath(repoPath, [
     'log',
-    '--max-count=1000',
-    '--format=%H%x1f%s%x1f%an%x1f%aI',
+    '--max-count=401',
+    RELEASE_COMMIT_FORMAT,
     previous ? `${previous}..${target}` : target,
     '--',
   ]);
   requireActiveRepositoryPath(repoPath, gitService.getRepoPath(), 'hosting:releaseNotesCommits');
   if (generation !== repoJobRegistry.getGeneration()) throw new Error('The repository changed while loading release commits.');
-  return output
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => {
-      const [sha, message, author, date] = line.split('\x1f');
-      return { sha, message, author, date };
-    });
+  return parseReleaseCommits(output).map(({ hash, subject, description, author, date }) => ({ sha: hash, message: subject, description, author, date }));
 }
 
 export function registerHostingHandlers({ gitService, pushGuard, hostingService: service = hostingService }: Dependencies): void {

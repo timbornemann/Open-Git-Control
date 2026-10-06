@@ -1,5 +1,6 @@
 import type { FileChangeType } from './gitStatusSnapshot';
 import type { AutoCommitGroupResult, AutoCommitMetrics } from './AutoCommitPlanTypes';
+import type { ReleaseCommitDto } from '../../src/types/releaseNotes';
 
 export type SnapshotFile = {
   path: string;
@@ -75,14 +76,7 @@ export type AiAutoCommitResult = {
   diagnostics: string[];
 };
 
-export type ReleaseCommitInput = {
-  hash: string;
-  shortHash: string;
-  subject: string;
-  author: string;
-  date: string;
-  htmlUrl?: string | null;
-};
+export type ReleaseCommitInput = ReleaseCommitDto;
 
 export type ReleaseVersionBump = 'major' | 'minor' | 'patch';
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ReleaseCommitDto } from '@/types/releaseNotes';
-import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes, isLikelyMergeCommit } from '@/utils/releaseNotes';
+import {
+  buildAlgorithmicChangeListMarkdown,
+  buildOfflineReleaseNotesMarkdown,
+  buildReleaseNotesPromptHints,
+  filterCommitsForReleaseNotes,
+  isLikelyMergeCommit,
+  stripEmptyBreakingChangesSections,
+} from '@/utils/releaseNotes';
 
 type TestOptions = {
   omitMergeCommits: boolean;
@@ -78,6 +85,7 @@ describe('releaseNotes utilities', () => {
       expect(hints[0]).toContain('Gruppiere Aenderungen');
       expect(hints[1]).toContain('technische Details');
       expect(hints[2]).toContain('Breaking Changes');
+      expect(hints[2]).toContain('entfaellt der Abschnitt komplett');
     });
 
     it('builds reduced high-level hints in english when options are disabled', () => {
@@ -95,6 +103,21 @@ describe('releaseNotes utilities', () => {
   });
 
   describe('buildAlgorithmicChangeListMarkdown', () => {
+    it('keeps multiline descriptions attached to their own commit, including lists and migration details', () => {
+      const markdown = buildAlgorithmicChangeListMarkdown(
+        [
+          {
+            ...commit('desc', 'feat!: replace settings'),
+            description: 'New format.\r\n\r\nBREAKING CHANGE: migrate settings.\r\n- Rename old keys.\r\n- Keep values.',
+          },
+          commit('next', 'fix: parser'),
+        ],
+        'en',
+        false,
+      );
+      expect(markdown).toContain('- feat!: replace settings\n\n  New format.\n\n  BREAKING CHANGE: migrate settings.\n  - Rename old keys.\n  - Keep values.');
+      expect(markdown).toContain('### Fixed\n- fix: parser');
+    });
     it('returns empty markdown for empty/non-array inputs', () => {
       expect(buildAlgorithmicChangeListMarkdown([], 'en', true)).toBe('');
       const unsafe = null as unknown as ReleaseCommitDto[];
@@ -151,6 +174,43 @@ describe('releaseNotes utilities', () => {
       expect(markdown).toContain('- patch: improve fallback (e2)');
       expect(markdown).toContain('- style: align switches (e3)');
       expect(markdown).not.toContain('example.com');
+    });
+  });
+
+  describe('offline templates', () => {
+    it.each(['patch', 'minor', 'major'] as const)('uses a %s template in both languages with one complete commit list', (versionBump) => {
+      const commits = [{ ...commit('abc', 'fix: preserve content'), description: 'Keep the original file.' }];
+      const params = { tagName: 'v2.0.0', releaseName: 'Release v2.0.0', commits, versionBump, language: 'en' as const };
+      const english = buildOfflineReleaseNotesMarkdown(params, false);
+      expect(english).toContain(`This ${versionBump} release`);
+      expect(english).toContain('  Keep the original file.');
+      expect(english.match(/## Commit List/g)).toHaveLength(1);
+      expect(english).not.toContain('Breaking Changes');
+      expect(english).not.toContain('(abc)');
+      const german = buildOfflineReleaseNotesMarkdown({ ...params, language: 'de' });
+      expect(german).toContain(versionBump === 'patch' ? 'Patch-Release' : versionBump === 'minor' ? 'Minor-Release' : 'Major-Release');
+      expect(german).toContain('## Commit-Liste (automatisch)');
+    });
+
+    it('does not invent changes or an empty list when the selected range has no commits', () => {
+      const markdown = buildOfflineReleaseNotesMarkdown({ tagName: 'v1', releaseName: 'Release v1', commits: [], language: 'en', versionBump: 'patch' });
+      expect(markdown).toContain('no new commits');
+      expect(markdown).not.toContain('Commit List');
+      expect(markdown).not.toContain('Breaking');
+    });
+  });
+
+  describe('empty breaking sections', () => {
+    it.each(['None', '- **None.**', 'Keine', 'No breaking changes detected.', 'N/A', ''])('omits the placeholder %j and its heading', (placeholder) => {
+      expect(stripEmptyBreakingChangesSections(`# Release\n\n## Breaking Changes\n${placeholder}\n\n## Fixed\n- Preserve content.`)).toBe(
+        '# Release\n\n## Fixed\n- Preserve content.',
+      );
+    });
+
+    it('preserves actual breaking changes, other sections and headings in fenced code', () => {
+      const markdown =
+        '# Release\n\n## Breaking Changes\n- None of the old keys are accepted; migrate the file.\n\n## Fixed\nNone\n\n```md\n## Breaking Changes\nNone\n```';
+      expect(stripEmptyBreakingChangesSections(markdown)).toBe(markdown);
     });
   });
 });

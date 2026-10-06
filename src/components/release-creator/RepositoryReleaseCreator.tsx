@@ -75,7 +75,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           },
     }));
   }, [history.context, session.suggestionApplied, session.versionBump, update]);
-  const notes = useReleaseNotesGeneration(scope, session, history.context, target.endpoint?.repository?.connectionId, update);
+  const notes = useReleaseNotesGeneration(scope, session, history.context, target.endpoint?.repository?.connectionId, update, repoPath);
   const publication = useReleasePublication({
     scope,
     repoPath,
@@ -176,6 +176,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
       <div className="repository-release-page__creator">
         <ReleaseCreator
           repositoryLabel={target.repository?.fullName || null}
+          hasLocalRepository={Boolean(repoPath)}
           capabilities={target.capabilities}
           releaseForm={session.form}
           setReleaseForm={(updater) => update((previous) => ({ ...previous, form: updater(previous.form) }))}
@@ -193,7 +194,9 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           context={history.context}
           onRefreshContext={history.refresh}
           onGenerateNotes={notes.generate}
+          onGenerateOfflineNotes={notes.generateOffline}
           notesGenerating={notes.busy}
+          notesGenerationMode={notes.mode}
           notesLanguage={session.language}
           setNotesLanguage={(value) => update((previous) => ({ ...previous, language: value }))}
           notesOptions={session.options}

@@ -12,7 +12,12 @@ import { githubClient } from '@/legacy/github/githubClient';
 import type { ReleaseNotesOptions } from '@/types/releaseNotes';
 import type { RepoOwnerRef } from '@/types/git';
 import { validateGithubReleaseInput } from '@/utils/githubReleaseValidation';
-import { buildAlgorithmicChangeListMarkdown, buildReleaseNotesPromptHints, filterCommitsForReleaseNotes } from '@/utils/releaseNotes';
+import {
+  buildAlgorithmicChangeListMarkdown,
+  buildReleaseNotesPromptHints,
+  filterCommitsForReleaseNotes,
+  stripEmptyBreakingChangesSections,
+} from '@/utils/releaseNotes';
 import { type ReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import type { AppTabId } from '@/app/state/contracts';
 import { requestWorkingDirectoryNavigation } from '@/components/working-directory/workingDirectoryNavigationGuard';
@@ -673,8 +678,8 @@ export const useReleaseWorkflow = ({
           return;
         }
 
-        let markdown = result.data.markdown || '';
-        if (releaseNotesOptions.appendAlgorithmicChangeList) {
+        let markdown = stripEmptyBreakingChangesSections(result.data.markdown || '');
+        if (result.data.source === 'ai' && releaseNotesOptions.appendAlgorithmicChangeList) {
           const automaticList = buildAlgorithmicChangeListMarkdown(commits, releaseNotesLanguage, releaseNotesOptions.includeHashesInAlgorithmicList);
           if (automaticList) {
             markdown = `${markdown.trim()}\n\n${automaticList}`.trim();

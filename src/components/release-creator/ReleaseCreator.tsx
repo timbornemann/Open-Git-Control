@@ -13,6 +13,7 @@ import '@/styles/release-creator.css';
 
 type Props = {
   repositoryLabel: string | null;
+  hasLocalRepository?: boolean;
   capabilities: HostingCapabilities | null;
   versionBump: ReleaseVersionBump;
   setVersionBump: (value: ReleaseVersionBump) => void;
@@ -28,7 +29,9 @@ type Props = {
   context: ReleaseContext | null;
   onRefreshContext: () => Promise<void>;
   onGenerateNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
+  onGenerateOfflineNotes: (versionBump: ReleaseVersionBump) => Promise<void>;
   notesGenerating: boolean;
+  notesGenerationMode?: 'ai' | 'offline' | null;
   notesLanguage: 'de' | 'en';
   setNotesLanguage: (value: 'de' | 'en') => void;
   notesOptions: ReleaseNotesOptions;
@@ -56,6 +59,7 @@ const availability = (props: {
 
 export const ReleaseCreator: React.FC<Props> = ({
   repositoryLabel,
+  hasLocalRepository = Boolean(repositoryLabel),
   capabilities,
   versionBump,
   setVersionBump,
@@ -71,7 +75,9 @@ export const ReleaseCreator: React.FC<Props> = ({
   context,
   onRefreshContext,
   onGenerateNotes,
+  onGenerateOfflineNotes,
   notesGenerating,
+  notesGenerationMode,
   notesLanguage,
   setNotesLanguage,
   notesOptions,
@@ -181,7 +187,7 @@ export const ReleaseCreator: React.FC<Props> = ({
             <ReleaseVersionStep
               releaseForm={releaseForm}
               setReleaseForm={setReleaseForm}
-              hasRepository={Boolean(repositoryLabel)}
+              hasRepository={hasLocalRepository}
               releaseSubmitting={releaseSubmitting || notesGenerating || published}
               versionBump={versionBump}
               suggestedTag={suggestedTag}
@@ -194,13 +200,14 @@ export const ReleaseCreator: React.FC<Props> = ({
             <ReleaseNotesWorkbench
               releaseForm={releaseForm}
               setReleaseForm={setReleaseForm}
-              hasRepository={Boolean(repositoryLabel)}
+              hasRepository={hasLocalRepository}
               capabilities={capabilities}
               published={published}
               uploadedAssets={uploadedAssets}
               releaseSubmitting={releaseSubmitting}
               releasePhase={releasePhase}
               notesGenerating={notesGenerating}
+              notesGenerationMode={notesGenerationMode}
               notesLanguage={notesLanguage}
               setNotesLanguage={setNotesLanguage}
               notesOptions={notesOptions}
@@ -208,6 +215,8 @@ export const ReleaseCreator: React.FC<Props> = ({
               canGenerateNotes={canGenerateNotes}
               effectiveVersionBump={effectiveVersionBump}
               onGenerateNotes={onGenerateNotes}
+              canGenerateOfflineNotes={hasLocalRepository && !published && !releaseSubmitting && !notesGenerating && Boolean(trimmedTagName)}
+              onGenerateOfflineNotes={onGenerateOfflineNotes}
               canCreateRelease={canCreateRelease}
               createHint={createHint}
               onCreateRelease={onCreateRelease}

@@ -43,13 +43,18 @@ async function fixture() {
 describe('endpoint-specific release context', { timeout: 30_000 }, () => {
   it('uses remote tag OIDs for history and suggestions without rewriting a conflicting local tag or tracking', async () => {
     const f = await fixture();
-    const next = await f.commit('change after selected release');
+    const next = await f.commit('change after selected release\n\nFirst description paragraph.\n\nBREAKING CHANGE: move configuration.\n- Keep user values.');
     await f.run(['tag', 'v1.0.0', next]);
     await f.run(['config', 'branch.main.remote', 'backup']);
     await f.run(['config', 'branch.main.merge', 'refs/heads/elsewhere']);
     const context = await f.context();
     expect(context).toMatchObject({ existingTags: ['v1.0.0'], lastReleaseTag: 'v1.0.0', targetOid: next, fallbackUsed: false });
     expect(context.commitsSinceLastRelease.map((commit) => commit.hash)).toEqual([next]);
+    expect(context.commitsSinceLastRelease[0]).toMatchObject({
+      subject: 'change after selected release',
+      description: 'First description paragraph.\n\nBREAKING CHANGE: move configuration.\n- Keep user values.',
+    });
+    expect(context.warning).toBeUndefined();
     expect(await f.run(['rev-parse', 'refs/tags/v1.0.0'])).toBe(next);
     expect(await f.run(['config', 'branch.main.remote'])).toBe('backup');
     expect(await f.run(['for-each-ref', '--format=%(refname)', 'refs/remotes'])).toBe('');

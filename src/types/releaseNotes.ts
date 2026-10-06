@@ -3,6 +3,8 @@ export interface ReleaseCommitDto {
   hash: string;
   shortHash: string;
   subject: string;
+  /** Commit message body, without the subject line. */
+  description?: string;
   author: string;
   date: string;
   htmlUrl?: string | null;

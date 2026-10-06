@@ -6,6 +6,7 @@ import { requireActiveRepositoryPath } from '../main-process/activeRepositoryAut
 import { repoJobRegistry } from '../main-process/repoJobRegistry';
 import { hasControlCharacters } from './hostingUrls';
 import { releaseEndpointResolver, releaseCredentialUrls } from './HostingReleaseEndpoint';
+import { parseReleaseCommits, RELEASE_COMMIT_FORMAT } from '../main-process/parsing';
 
 const oidPattern = /^(?:[a-f\d]{40}|[a-f\d]{64})$/i;
 const revision = (value: string) => {
@@ -153,14 +154,8 @@ export async function getHostingReleaseContext(
           fallbackUsed = true;
         }
         const limit = previous ? 400 : 150;
-        const raw = await read([
-          'log',
-          `--max-count=${limit + 1}`,
-          '--format=%H%x1f%h%x1f%s%x1f%an%x1f%aI',
-          previous ? `${previous}..${targetOid}` : targetOid,
-          '--',
-        ]);
-        const lines = raw.split(/\r?\n/).filter(Boolean);
+        const raw = await read(['log', `--max-count=${limit + 1}`, RELEASE_COMMIT_FORMAT, previous ? `${previous}..${targetOid}` : targetOid, '--']);
+        const commits = parseReleaseCommits(raw);
         resolver.assertCurrent();
         assertCurrent();
         return {
@@ -170,11 +165,8 @@ export async function getHostingReleaseContext(
           commitsTarget: target,
           targetOid,
           fallbackUsed,
-          warning: lines.length > limit ? `Only the latest ${limit} commits are included in the release context.` : undefined,
-          commitsSinceLastRelease: lines.slice(0, limit).map((line) => {
-            const [hash, shortHash, subject, author, date] = line.split('\x1f');
-            return { hash, shortHash, subject, author, date };
-          }),
+          warning: commits.length > limit ? `Only the latest ${limit} commits are included in the release context.` : undefined,
+          commitsSinceLastRelease: commits.slice(0, limit),
         };
       },
       signal,
