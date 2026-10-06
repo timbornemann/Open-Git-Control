@@ -208,6 +208,7 @@
 
 .local-repositories-view__row.is-active {
   border-left-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 22%, var(--bg-darker));
 }
 
 .local-repositories-view__signet {

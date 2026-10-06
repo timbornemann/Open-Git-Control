@@ -183,6 +183,7 @@
 }
 .hosting-repo-card.is-active {
   border-left-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 22%, var(--bg-darker));
 }
 .hosting-repository-active {
   flex: none;
