@@ -1,6 +1,7 @@
 import React from 'react';
-import { Download, FolderPlus } from 'lucide-react';
+import { ChevronRight, Download, FolderPlus } from 'lucide-react';
 import { useI18n } from '@/i18n';
+import { Button } from '@/components/ui/Button';
 import { RepositoryIcon } from '@/components/repository-icon/RepositoryIcon';
 import { useRepositoryIconMenu } from '@/components/repository-icon/RepositoryIconMenu';
 
@@ -24,35 +25,41 @@ export const LocalReposSidebarContent: React.FC<Props> = ({ activeRepo, count, i
         <span>{tr('Gespeichert', 'Saved')}</span>
         <strong>{count}</strong>
       </div>
-      {activeRepo ? (
-        <button
-          type="button"
-          className="local-repos-sidebar__active"
-          onClick={onOpenRepoTab}
-          title={activeRepo}
-          onContextMenu={(event) => logoMenu.open(event, activeRepo)}
-          onKeyDown={(event) => logoMenu.keyboard(event, activeRepo)}
-        >
-          <RepositoryIcon repoPath={activeRepo} name={activeName || activeRepo} size={26} />
-          <span className="local-repos-sidebar__active-label">
-            <small>{tr('Aktives Repository', 'Active repository')}</small>
-            <strong>{activeName}</strong>
-            <em>{activeRepo}</em>
-          </span>
-        </button>
-      ) : (
-        <p className="local-repos-sidebar__empty">
-          {isRestoringRepos ? tr('Repositories werden wiederhergestellt …', 'Restoring repositories …') : tr('Kein Repository aktiv.', 'No active repository.')}
-        </p>
-      )}
-      <div className="local-repos-sidebar__actions">
-        <button type="button" onClick={onOpenFolder}>
-          <FolderPlus size={15} /> {tr('Repository hinzufügen', 'Add repository')}
-        </button>
-        <button type="button" onClick={onCloneByUrl}>
-          <Download size={15} /> {tr('Per URL klonen', 'Clone from URL')}
-        </button>
-      </div>
+      <section className="local-repos-sidebar__workspace" aria-label={tr('Aktives Repository', 'Active repository')}>
+        <h2 className="local-repos-sidebar__group-label">{tr('Aktives Repository', 'Active repository')}</h2>
+        {activeRepo ? (
+          <Button
+            variant="ghost"
+            className="local-repos-sidebar__active"
+            icon={<RepositoryIcon repoPath={activeRepo} name={activeName || activeRepo} size={26} />}
+            onClick={onOpenRepoTab}
+            title={activeRepo}
+            onContextMenu={(event) => logoMenu.open(event, activeRepo)}
+            onKeyDown={(event) => logoMenu.keyboard(event, activeRepo)}
+          >
+            <span className="local-repos-sidebar__active-label">
+              <strong>{activeName}</strong>
+              <em>{activeRepo}</em>
+            </span>
+            <ChevronRight size={14} aria-hidden="true" />
+          </Button>
+        ) : (
+          <p className="local-repos-sidebar__empty" role="status">
+            {isRestoringRepos
+              ? tr('Repositories werden wiederhergestellt …', 'Restoring repositories …')
+              : tr('Kein Repository aktiv.', 'No active repository.')}
+          </p>
+        )}
+      </section>
+      <nav className="local-repos-sidebar__actions" aria-label={tr('Repository-Aktionen', 'Repository actions')}>
+        <h2 className="local-repos-sidebar__group-label">{tr('Aktionen', 'Actions')}</h2>
+        <Button variant="ghost" icon={<FolderPlus size={15} />} onClick={onOpenFolder}>
+          {tr('Repository hinzufügen', 'Add repository')}
+        </Button>
+        <Button variant="ghost" icon={<Download size={15} />} onClick={onCloneByUrl}>
+          {tr('Per URL klonen', 'Clone from URL')}
+        </Button>
+      </nav>
       {logoMenu.menu}
     </div>
   );
