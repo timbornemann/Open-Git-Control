@@ -4,6 +4,7 @@ import type { CredentialEnvironmentFactory, RemoteTransferContext, Runner, Store
 import { lines } from './remoteTransferModels';
 import { gitConfigurationEnvironment } from './remoteTransferValidation';
 import { pushResult, type PublishedRef } from './remotePushResults';
+import { uploadLfsObjects } from './GitLfsTransfers';
 
 export function assertGroupedCredentialChoices(targets: GitPushTargetDto[], connections: Record<string, string | null>): void {
   for (const name of new Set(targets.filter((target) => target.grouped).map((target) => target.remoteName))) {
@@ -35,6 +36,7 @@ export async function runGroupedRemotePush(
   const scope = await credentials?.({
     connectionId,
     urls: targets.map((target) => target.url).filter((url) => /^https:\/\//i.test(url)),
+    lfsUrls: targets.map((target) => target.lfsEndpoint).filter((url): url is string => Boolean(url)),
     signal: context.signal,
     envOverrides: base,
     expectedGeneration: connectionId ? plan.credentialGenerations[connectionId] : undefined,
@@ -44,6 +46,21 @@ export async function runGroupedRemotePush(
     context.ensureActive();
     const signal = scope?.signal ? AbortSignal.any([...(context.signal ? [context.signal] : []), scope.signal]) : context.signal;
     const envOverrides = scope?.envOverrides ?? base;
+    for (const target of targets) {
+      context.ensureActive();
+      if (target.lfsEndpoint)
+        await uploadLfsObjects(
+          repoPath,
+          target.remoteName,
+          target.lfsEndpoint,
+          plan.dto.lfsObjects ?? [],
+          git,
+          envOverrides,
+          signal,
+          context.onProgress,
+          target.url,
+        );
+    }
     const actualUrls = new Set(lines(await git.run(repoPath, ['remote', 'get-url', '--push', '--all', first.remoteName], { envOverrides, signal })));
     if (actualUrls.size !== targets.length || targets.some((target) => !actualUrls.has(target.url)))
       throw new Error('The grouped push URL list changed after review. Create a new push plan.');

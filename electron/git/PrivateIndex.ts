@@ -28,17 +28,18 @@ export async function withPrivateIndex<T>(
   try {
     tempDir = createPrivateTempDir('ogc-file-index');
     const index = path.join(tempDir, 'index');
-    const original = fs.readFileSync(actualIndex);
-    const fingerprint = createHash('sha256').update(original).digest('hex');
-    const mode = fs.statSync(actualIndex).mode & 0o777;
-    fs.writeFileSync(index, original, { mode: 0o600 });
+    const original = fs.existsSync(actualIndex) ? fs.readFileSync(actualIndex) : null;
+    const fingerprint = original ? createHash('sha256').update(original).digest('hex') : null;
+    const mode = original ? fs.statSync(actualIndex).mode & 0o777 : 0o644;
+    if (original) fs.writeFileSync(index, original, { mode: 0o600 });
+    else await git.run(repoPath, ['read-tree', '--empty'], { envOverrides: { GIT_INDEX_FILE: index } });
     // Split-index links are relative to the real Git directory. Materialize a
     // full private index before moving it out of that directory.
     await git.run(repoPath, ['update-index', '--no-split-index'], { envOverrides: { GIT_INDEX_FILE: index } });
     return await work(index, async (validate) => {
       await validate();
-      if (createHash('sha256').update(fs.readFileSync(actualIndex)).digest('hex') !== fingerprint)
-        throw new Error('The Git index changed outside the lock. Your draft was kept.');
+      const current = fs.existsSync(actualIndex) ? createHash('sha256').update(fs.readFileSync(actualIndex)).digest('hex') : null;
+      if (current !== fingerprint) throw new Error('The Git index changed outside the lock. Your draft was kept.');
       fs.copyFileSync(index, lock);
       fs.chmodSync(lock, mode);
       const descriptor = fs.openSync(lock, 'r+');

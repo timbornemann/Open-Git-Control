@@ -18,6 +18,7 @@ import { registerWorkingDirectoryFileCreationHandler } from './workingDirectoryF
 import { registerWorkingDirectoryToolsHandlers } from './workingDirectoryTools';
 import { registerWorkingDirectoryPreviewHandler } from './workingDirectoryPreview';
 import { registerRepositoryFileViewerHandlers } from './repositoryFileViewer';
+import { registerGitLfsHandlers } from './gitLfsHandlers';
 
 type RegisterGitFileHandlersDeps = {
   gitService: GitService;
@@ -187,6 +188,7 @@ export function registerGitFileHandlers({ gitService, readStoredRepoPaths = () =
   registerWorkingDirectoryToolsHandlers({ gitService, workingDirectoryPath, ensureWriteAllowed });
   registerWorkingDirectoryPreviewHandler(gitService, workingDirectoryPath);
   registerRepositoryFileViewerHandlers(gitService, ensureWriteAllowed);
+  registerGitLfsHandlers(gitService, ensureWriteAllowed);
 
   const mutateWorkingDirectory =
     (operation: 'move' | 'copy') =>

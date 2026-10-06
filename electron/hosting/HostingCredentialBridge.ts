@@ -8,6 +8,7 @@ export type GitCredentialEnvironment = { envOverrides: NodeJS.ProcessEnv; signal
 export type GitCredentialRequest = {
   connectionId: string;
   urls: string[];
+  lfsUrls?: string[];
   signal?: AbortSignal;
   envOverrides?: NodeJS.ProcessEnv;
   expectedGeneration?: number;
@@ -73,6 +74,25 @@ export class HostingCredentialBridge {
     if (!urls.size) throw new Error('An exact HTTPS destination is required for account authentication.');
     request.signal?.throwIfAborted();
     const identity = await this.credentialFor(request.connectionId, [...urls]);
+    const gitUrls = [...urls];
+    const defaultLfsUrls = gitUrls.map((value) => `${value}.git/info/lfs`);
+    for (const value of [...defaultLfsUrls, ...(request.lfsUrls ?? [])]) {
+      let endpoint: URL;
+      try {
+        endpoint = new URL(value);
+      } catch {
+        throw new Error('This LFS endpoint requires system credentials.');
+      }
+      const related = gitUrls.some((gitUrl) => {
+        const git = new URL(gitUrl);
+        return (
+          endpoint.origin === git.origin &&
+          [git.pathname, `${git.pathname}.git`].some((prefix) => endpoint.pathname.replace(/\/+$/, '') === `${prefix}/info/lfs`)
+        );
+      });
+      if (!related) throw new Error('This LFS endpoint requires system credentials. Hosting account credentials are restricted to the selected repository.');
+      urls.add(destination(value));
+    }
     request.signal?.throwIfAborted();
     const key = randomBytes(32).toString('hex');
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-git-auth-'));
@@ -145,7 +165,7 @@ export class HostingCredentialBridge {
       timer = setTimeout(dispose, 10 * 60_000);
       return {
         envOverrides: {
-          ...configEnvironment(request.envOverrides || {}, helper, request.urls),
+          ...configEnvironment(request.envOverrides || {}, helper, [...request.urls, ...defaultLfsUrls, ...(request.lfsUrls ?? [])]),
           GIT_ASKPASS: '',
           GIT_TERMINAL_PROMPT: '0',
           GCM_INTERACTIVE: 'never',

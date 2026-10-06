@@ -34,8 +34,7 @@ describe('StagingContextMenu', () => {
     Object.defineProperty(HTMLDivElement.prototype, 'offsetHeight', { configurable: true, value: height });
   };
 
-  const render = (contextMenu: StagingContextMenuState) => {
-    const fileOps = createFileOps();
+  const render = (contextMenu: StagingContextMenuState, fileOps = createFileOps()) => {
     act(() => {
       root.render(createElement(I18nProvider, { language: 'de', children: createElement(StagingContextMenu, { contextMenu, fileOps }) }));
     });
@@ -51,6 +50,42 @@ describe('StagingContextMenu', () => {
     originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'offsetHeight');
     originalInnerWidth = window.innerWidth;
     originalInnerHeight = window.innerHeight;
+  });
+
+  it('offers separate checked LFS actions and retains keyboard navigation and file opening', () => {
+    const fileOps = createFileOps();
+    const state = { eligible: true, extension: '.psd', configured: false, pointer: false };
+    fileOps.lfs = { available: true, loading: false, stateFor: vi.fn(() => state), track: vi.fn() } as any;
+    fileOps.trackFileTypeWithLfs = vi.fn();
+    const contextMenu: StagingContextMenuState = { x: 10, y: 10, entry: { path: 'design.psd', x: 'A', y: ' ' }, section: 'staged' };
+    render(contextMenu, fileOps);
+    const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('button'));
+    act(() => buttons[0].click());
+    expect(fileOps.lfs.track).toHaveBeenCalledWith(contextMenu.entry, 'staged', 'file');
+    act(() => buttons[1].click());
+    expect(fileOps.trackFileTypeWithLfs).toHaveBeenCalledWith(contextMenu.entry, 'staged');
+    expect(buttons.some((button) => button.textContent?.includes('Datei oeffnen'))).toBe(true);
+    buttons[0].focus();
+    act(() => buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    expect(document.activeElement).toBe(buttons[1]);
+    act(() => buttons[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(fileOps.setContextMenu).toHaveBeenCalledWith(null);
+  });
+
+  it('explains unavailable Git LFS and offers its installation page without allowing conversion', () => {
+    const fileOps = createFileOps();
+    fileOps.lfs = {
+      available: false,
+      loading: false,
+      error: 'Git LFS is not installed',
+      stateFor: () => ({ eligible: true, extension: '.psd' }),
+      track: vi.fn(),
+    } as any;
+    render({ x: 10, y: 10, entry, section: 'untracked' }, fileOps);
+    const buttons = host.querySelectorAll<HTMLButtonElement>('button');
+    expect(buttons[0].disabled).toBe(true);
+    expect(host.textContent).toContain('Git LFS is not installed');
+    expect(host.textContent).toContain('Git LFS installieren');
   });
 
   afterEach(() => {

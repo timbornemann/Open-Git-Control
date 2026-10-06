@@ -48,9 +48,12 @@ describe('destination-bound credential broker', () => {
         body: JSON.stringify({ protocol: 'https', host, path: repoPath }),
       });
     try {
-      expect(operation.envOverrides.GIT_CONFIG_COUNT).toBe('7');
+      expect(operation.envOverrides.GIT_CONFIG_COUNT).toBe('8');
       expect(operation.envOverrides.GIT_CONFIG_KEY_0).toBe('push.followTags');
       expect(await (await credential('forge.example.test', 'project/repo.git')).text()).toBe('username=selected-user\npassword=opaque-secret\n\n');
+      expect((await credential('forge.example.test', 'project/repo.git/info/lfs')).status).toBe(200);
+      expect((await credential('forge.example.test', 'project/other.git/info/lfs')).status).toBe(403);
+      expect((await credential('forge.example.test', 'project/repo.git/info/lfs/objects/batch')).status).toBe(403);
       expect((await credential('forge.example.test', 'project/other.git')).status).toBe(403);
       expect((await credential('attacker.example.test', 'project/repo.git')).status).toBe(403);
       const filled = await fillCredential(operation.envOverrides, 'forge.example.test', 'project/repo.git');
@@ -62,6 +65,14 @@ describe('destination-bound credential broker', () => {
     } finally {
       operation.dispose();
     }
+  });
+
+  it('rejects unrelated LFS servers and repository paths instead of sharing the selected account', async () => {
+    const bridge = new HostingCredentialBridge(async () => ({ username: 'user', password: 'password', isCurrent: () => true }));
+    for (const endpoint of ['https://lfs.other.test/store', 'https://forge.test/other.git/info/lfs', 'https://forge.test/repo.git/info/lfs?token=private'])
+      await expect(bridge.createGitCredentialEnvironment({ connectionId: 'one', urls: ['https://forge.test/repo.git'], lfsUrls: [endpoint] })).rejects.toThrow(
+        /system credentials|exact HTTPS/,
+      );
   });
 
   it('rejects plaintext HTTP and clears helper resources on cancellation', async () => {

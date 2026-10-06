@@ -3,6 +3,18 @@ import { IpcChannel } from '../../../src/types/ipcContract';
 import { createElectronApi } from '../createElectronApi';
 
 describe('createElectronApi', () => {
+  it('exposes repository-bound LFS inspection and checked conversion through both API namespaces', async () => {
+    const invoke = vi.fn().mockResolvedValue({ success: true });
+    const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);
+    const request = { repoPath: 'C:/repo', files: [{ path: 'design.psd', source: 'staged' as const }] };
+    const write = { repoPath: request.repoPath, ...request.files[0], scope: 'file' as const, expectedVersion: 'snapshot' };
+    await api.git.getGitLfsStatus(request);
+    await api.trackWithGitLfs(write);
+    expect(invoke.mock.calls).toEqual([
+      [IpcChannel.GitGetLfsStatus, request],
+      [IpcChannel.GitTrackWithLfs, write],
+    ]);
+  });
   it('uses explicit hosting accounts and exposes no retired GitHub namespace or flat methods', async () => {
     const invoke = vi.fn().mockResolvedValue({ success: true, data: { items: [], nextCursor: null } });
     const api = createElectronApi({ invoke, on: vi.fn(), removeListener: vi.fn() } as any);

@@ -144,6 +144,7 @@ export function registerAiHandlers({
               envOverrides: { GIT_INDEX_FILE: privateIndexPath, GIT_OPTIONAL_LOCKS: '0' },
               stagedBaseTree: baseTree,
             });
+            if (scan.historyScanIncomplete) throw new Error(`Git LFS content could not be fully scanned. ${scan.notes.join(' ')}`);
             if (scan.findings.length > 0) {
               throw new Error('Potential secrets were detected in the AI commit snapshot. Remove them or configure an explicit allowlist before committing.');
             }

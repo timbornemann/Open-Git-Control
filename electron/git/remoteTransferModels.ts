@@ -7,6 +7,7 @@ import { redactGitSensitiveText } from './GitErrorFormatter';
 export type CredentialEnvironmentFactory = (input: {
   connectionId?: string | null;
   urls: string[];
+  lfsUrls?: string[];
   signal?: AbortSignal;
   envOverrides?: NodeJS.ProcessEnv;
   expectedGeneration?: number;
@@ -31,7 +32,7 @@ export type StoredPlan = {
   credentialGenerations: Record<string, number>;
 };
 export type StoredBatch = { dto: GitPushBatchDto; plan: StoredPlan };
-export type Runner = Pick<GitRunner, 'run' | 'runResult' | 'streamOutput'>;
+export type Runner = Pick<GitRunner, 'run' | 'runResult' | 'streamOutput' | 'runWithInput' | 'runBuffer'>;
 
 export function boundCredentialGenerations(connections: Record<string, string | null>, generations: Record<string, number>): Record<string, number> {
   const result: Record<string, number> = {};

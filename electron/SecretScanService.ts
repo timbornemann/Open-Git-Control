@@ -1,4 +1,5 @@
 import type { GitService } from './GitService';
+import { scanLfsSecrets } from './git/GitLfsSecretScanner';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
@@ -391,6 +392,21 @@ export class SecretScanService {
     let findingLimitNoted = false;
     const pushPlan = options.pushArgs ? await this.resolvePushPlan(options.repoPath, options.pushArgs) : null;
     const scannedCommits = new Set<string>();
+    const scannedLfs = new Set<string>();
+    const scanLfs = async (commits: string[] | null, source: SecretScanSource) => {
+      const lfsNotes = await scanLfsSecrets(
+        options.repoPath,
+        this.gitService.runner,
+        commits,
+        scannedLfs,
+        (candidate) => scanCandidate({ ...candidate, source }),
+        options,
+      );
+      if (lfsNotes.length) {
+        notes.push(...lfsNotes);
+        historyScanIncomplete = true;
+      }
+    };
 
     const scanCandidate = (candidate: DiffCandidateLine) => {
       if (options.signal?.aborted) return;
@@ -504,6 +520,7 @@ export class SecretScanService {
           throw aborted;
         }
         const batch = commitsToScan.slice(offset, offset + MAX_COMMITS_PER_DIFF_PROCESS);
+        await scanLfs(batch, source);
         await streamDiff(
           [
             'show',
@@ -645,6 +662,7 @@ export class SecretScanService {
       await scanPushSourceCommits();
       await scanTagCommits();
     }
+    await scanLfs(null, 'staged');
 
     options.onProgress?.(stagedLines + toPushLines + tagLines);
 

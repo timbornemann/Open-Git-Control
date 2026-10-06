@@ -397,6 +397,8 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
       getWorkingDirectoryFileInfo: flatApi.getWorkingDirectoryFileInfo,
       getWorkingDirectoryPreview: flatApi.getWorkingDirectoryPreview,
       getRepositoryFilePreview: flatApi.getRepositoryFilePreview,
+      getGitLfsStatus: flatApi.getGitLfsStatus,
+      trackWithGitLfs: flatApi.trackWithGitLfs,
       getRepositoryFileInfo: flatApi.getRepositoryFileInfo,
       saveRepositoryFile: flatApi.saveRepositoryFile,
       searchWorkingDirectory: flatApi.searchWorkingDirectory,

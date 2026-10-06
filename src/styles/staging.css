@@ -153,6 +153,9 @@
 }
 
 .staging-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -160,6 +163,34 @@
   color: var(--text-primary);
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
+}
+
+.staging-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staging-lfs-recommendation {
+  color: var(--status-warning);
+  display: inline-flex;
+  flex: 0 0 auto;
+  cursor: help;
+}
+
+.staging-context-menu .ctx-menu-item {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.staging-file-row:focus-visible {
+  outline: 1px solid var(--accent-primary-border);
+  outline-offset: -1px;
+}
+
+.staging-lfs-recommendation:focus-visible {
+  outline: 1px solid var(--status-warning);
+  outline-offset: 2px;
 }
 
 .staging-actions {

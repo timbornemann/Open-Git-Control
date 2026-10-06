@@ -49,6 +49,7 @@ export class GitService {
     this.repositoryFiles = new RepositoryFiles(
       () => this.ensureRepoPath(),
       (repoPath, revisionSpec, maxBytes) => this.readGitFileBufferAtPath(repoPath, revisionSpec, maxBytes),
+      this.gitRunner,
     );
     this.cloneService = new CloneService(this.gitRunner);
     this.mergeConflictService = new MergeConflictService(

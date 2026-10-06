@@ -25,6 +25,8 @@ export type GitRunOptions = {
 };
 
 export type GitBufferRunOptions = {
+  /** Internal bounded sampling; an intentional truncation is a successful read. */
+  allowTruncation?: boolean;
   input?: string | Buffer;
   maxBytes: number;
   tooLargeMessage: string;

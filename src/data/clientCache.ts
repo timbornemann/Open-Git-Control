@@ -91,6 +91,11 @@ export function preload<T>(operation: () => Promise<T>, requested: ReadPriority 
 }
 export const currentReadPriority = () => priority;
 
+function localLfsSnapshot(key: readonly unknown[], value: unknown): boolean {
+  if (!['getRepositoryFilePreview', 'getRepositoryFileInfo'].includes(String(key[3]))) return false;
+  return Boolean((value as { data?: { lfs?: unknown } } | undefined)?.data?.lfs);
+}
+
 /** Write guards must inspect live repository state even when an overview is fresh. */
 export function freshRead<T>(operation: () => Promise<T>): Promise<T> {
   const previous = requireFreshRead;
@@ -104,8 +109,8 @@ export function freshRead<T>(operation: () => Promise<T>): Promise<T> {
 
 export function invalidateResources(domain: ResourceDomain, scope?: string, operations?: readonly string[], affects?: (key: readonly unknown[]) => boolean) {
   queueMicrotask(refreshVisibleResources);
-  const predicate = (q: { queryKey: readonly unknown[]; meta?: Record<string, unknown> }) =>
-    !q.meta?.immutable &&
+  const predicate = (q: { queryKey: readonly unknown[]; meta?: Record<string, unknown>; state?: { data?: unknown } }) =>
+    (!q.meta?.immutable || localLfsSnapshot(q.queryKey, q.state?.data)) &&
     q.queryKey[1] === domain &&
     (!scope || q.queryKey[2] === scope) &&
     (!operations || operations.includes(String(q.queryKey[3]))) &&
@@ -171,7 +176,10 @@ export function cachedClient<T extends object>(domain: ResourceDomain, client: T
                   )
                 : original.apply(client, args),
           {
-            staleTime: domain === 'git' && isImmutableGitRead(property, args) ? Infinity : (policy?.staleTime ?? 15_000),
+            staleTime:
+              domain === 'git' && isImmutableGitRead(property, args) && !localLfsSnapshot(key, queryClient.getQueryData(key))
+                ? Infinity
+                : (policy?.staleTime ?? 15_000),
             priority,
             force,
             scheduled: !branchPages,

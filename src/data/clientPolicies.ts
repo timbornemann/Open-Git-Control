@@ -17,6 +17,7 @@ export const readPolicies: Record<ResourceDomain, Record<string, ReadPolicy>> = 
     getReleaseContext: read(300_000),
   },
   git: {
+    getGitLfsStatus: { staleTime: 2000, repoProperty: true },
     getCommitLogPage: { staleTime: 30_000, repoProperty: true },
     getWorkingTreeSnapshot: read(4000, 0),
     getWorkingTreeStats: read(4000, 1),
@@ -75,7 +76,7 @@ export function isMutation(domain: ResourceDomain, name: string) {
   if (domain === 'github') return /^(create|fork|merge|rerun|cancelWorkflow|uploadReleaseAsset)/.test(name);
   if (domain === 'runs') return ['saveConfig', 'start', 'stop'].includes(name);
   if (domain === 'app') return ['setSettings', 'setStoredRepos', 'setGeminiApiKey', 'clearGeminiApiKey', 'setOpenAiApiKey', 'clearOpenAiApiKey'].includes(name);
-  return /^(createCommit|stagePaths|startInteractiveRebase|applyPatch|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|saveRepositoryFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
+  return /^(trackWithGitLfs|createCommit|stagePaths|startInteractiveRebase|applyPatch|gitStashBranch|addIgnoreRule|gitFetch|gitPull|gitPush|writeRepoFile|saveRepositoryFile|deleteRepoFile|createWorking|replaceWorking|applyWorking|moveWorking|copyWorking|deleteWorking|deleteEmpty)/.test(
     name,
   );
 }

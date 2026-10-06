@@ -196,7 +196,7 @@ describe('source-aware file viewer', () => {
     git(f.repo, 'add', '.');
     const context = f.request('commit', 'file.txt', hash);
     expect(await f.service.getPreview(context)).toMatchObject({ kind: 'text', text: 'commit content', editable: false });
-    expect((await f.service.getInfo(context)).hashes.sha256).toBe(createHash('sha256').update('commit content').digest('hex'));
+    expect((await f.service.getInfo(context)).hashes?.sha256).toBe(createHash('sha256').update('commit content').digest('hex'));
     await expect(f.save(context, await f.service.getPreview(context), 'draft')).rejects.toThrow(/read-only/);
   });
   it('explains missing contents, conflict entries, symlinks and submodules without text editing', async () => {

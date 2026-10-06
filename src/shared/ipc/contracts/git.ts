@@ -1,4 +1,5 @@
 import type { ReadRequest } from '../../cache/resource';
+import type { GitLfsApi } from '../gitLfs';
 import type { GitFileBlameLineDto, GitFileHistoryEntryDto } from '../../../types/git';
 import type {
   CommitLogPageDto,
@@ -226,7 +227,7 @@ export type OpenRepositoryPathResultDto = {
   error?: string;
 };
 
-export interface ElectronGitAPI {
+export interface ElectronGitAPI extends GitLfsApi {
   inspectCommitMessageEdit: (request: CommitMessageEditRequest) => Promise<IpcResult<CommitMessageEditInspection>>;
   rewordCommitMessage: (request: RewordCommitMessageRequest) => Promise<IpcResult<CommitMessageEditResult>>;
   getCommitMessageEditBackups: (repoPath: string) => Promise<IpcResult<CommitMessageEditBackup[]>>;

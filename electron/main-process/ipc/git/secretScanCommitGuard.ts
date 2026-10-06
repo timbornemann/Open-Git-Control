@@ -122,6 +122,7 @@ export function registerSecretScanCommitGuard({
       if (stateFingerprintBefore !== stateFingerprintAfter) {
         throw new Error(COMMIT_STATE_CHANGED_ERROR);
       }
+      if (result.historyScanIncomplete) throw new Error(`Git LFS content could not be fully scanned. ${result.notes.join(' ')}`);
 
       if (params.recordRendererScan) {
         const record: CommitScanRecord = {

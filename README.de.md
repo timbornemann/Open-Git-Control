@@ -239,6 +239,7 @@ Die Dateien `latest*.yml` und `.blockmap` in GitHub Releases sind Update-Metadat
 - Geaenderte Dateien suchen.
 - Staged- und unstaged-Dateistatistiken anzeigen.
 - Einzelne Dateien stagen und unstagen.
+- Dateien oder Dateitypen per Kontextmenü mit Git LFS verwalten, mit Größenempfehlungen und sicherer Umstellung im Staging. Siehe [Git LFS im Staging](Docs/GIT_LFS.md).
 - Stage all und unstage all.
 - Alle untracked Dateien stagen.
 - Einzelne Dateien oder alle Aenderungen verwerfen.

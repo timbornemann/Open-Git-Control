@@ -23,15 +23,17 @@ describe('StagingFileSections file previews', () => {
     host.remove();
   });
 
-  const render = () => {
+  const render = (lfs?: ReturnType<typeof useFileOperations>['lfs']) => {
     const actions = {
       isMutating: false,
       showDiff: vi.fn(),
       stageFile: vi.fn(),
       unstageFile: vi.fn(),
       deleteUntracked: vi.fn(),
+      openFileContextMenu: vi.fn(),
       stagedStats: { files: 1, additions: 1, deletions: 0 },
       unstagedStats: { files: 1, additions: 1, deletions: 1 },
+      lfs,
     };
     const inspect = vi.fn();
     act(() => {
@@ -65,6 +67,33 @@ describe('StagingFileSections file previews', () => {
     expect(actions.stageFile).not.toHaveBeenCalled();
     expect(actions.unstageFile).not.toHaveBeenCalled();
     expect(actions.deleteUntracked).not.toHaveBeenCalled();
+  });
+
+  it('opens files and their context actions from the keyboard without staging them', () => {
+    const { actions, inspect } = render();
+    const row = host.querySelector('[title="new/file.txt"]')!.closest('.staging-file-row')!;
+    act(() => row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(inspect).toHaveBeenCalledWith('new/file.txt', 'unstaged');
+    act(() => row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true })));
+    expect(actions.openFileContextMenu).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ path: 'new/file.txt' }), 'untracked');
+    expect(actions.stageFile).not.toHaveBeenCalled();
+  });
+
+  it('shows a focusable recommendation only for an eligible unconfigured file and keeps the viewer available', () => {
+    const lfs = {
+      stateFor: (filePath: string) => (filePath === 'new/file.txt' ? { recommendation: 'asset' } : { configured: true }),
+      recommendationTitle: () => 'Git LFS recommended: large asset file (18 MiB). Convert through the context menu.',
+    } as unknown as ReturnType<typeof useFileOperations>['lfs'];
+    const { actions } = render(lfs);
+    const marker = host.querySelector<HTMLElement>('.staging-lfs-recommendation')!;
+    expect(host.querySelectorAll('.staging-lfs-recommendation')).toHaveLength(1);
+    expect(marker.tabIndex).toBe(0);
+    expect(marker.title).toContain('18 MiB');
+    expect(marker.getAttribute('aria-label')).toContain('context menu');
+    act(() => marker.click());
+    expect(actions.showDiff).toHaveBeenCalledWith('new/file.txt', false);
+    render({ ...lfs, stateFor: () => ({ configured: true, pointer: true }) } as any);
+    expect(host.querySelector('.staging-lfs-recommendation')).toBeNull();
   });
 
   it.each(['stage', 'delete'] as const)('keeps the explicit %s button independent of preview selection', (action) => {

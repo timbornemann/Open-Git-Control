@@ -184,6 +184,11 @@ export function FileViewer({
           {document.error}
         </div>
       )}
+      {document.preview?.lfs && (
+        <div className="file-viewer-notice">
+          Git LFS · {(document.preview.lfs.bytes / 1024 / 1024).toLocaleString(undefined, { maximumFractionDigits: 1 })} MiB
+        </div>
+      )}
       {textFile && document.preview?.readOnlyReason && tab !== 'diff' && <div className="file-viewer-notice">{document.preview.readOnlyReason}</div>}
       <FileViewerContent
         context={context}

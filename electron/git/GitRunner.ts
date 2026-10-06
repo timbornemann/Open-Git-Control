@@ -7,6 +7,10 @@ import { GitRepositoryProbe } from './GitRepositoryProbe';
 import { GitSpawnOperations } from './GitSpawnOperations';
 import type { CommitEditGit } from './CommitEditGit';
 import { runCommitEditProcess } from './CommitEditProcess';
+const commandToken = (value: string | undefined): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 import * as fs from 'fs';
 import * as path from 'path';
 import { normalizeRepositoryRelativePath, resolveExistingRepositoryPathWithoutSymlinks, toLiteralPathspec } from './RepositoryPathSafety';
@@ -213,6 +217,9 @@ export class GitRunner {
       async (activeSignal) => {
         const uninterrupted = new AbortController().signal;
         const git: CommitEditGit = {
+          signal: activeSignal,
+          prefix: (cwd, args, maxBytes) =>
+            this.spawnOperations.runBuffer(cwd, args, { maxBytes, tooLargeMessage: 'Git sample is too large.', allowTruncation: true }, activeSignal),
           run: (cwd, args, options = {}) => {
             const commandSignal = options.ignoreAbort ? undefined : (options.signal ?? activeSignal);
             commandSignal?.throwIfAborted();
@@ -355,12 +362,8 @@ export class GitRunner {
   classifyCommand(args: string[], requestedKind?: GitJobKind): GitJobKind {
     if (requestedKind) return requestedKind;
     const commandArgs = commandArguments(args);
-    const primary = String(commandArgs[0] || '')
-      .trim()
-      .toLowerCase();
-    const secondary = String(commandArgs[1] || '')
-      .trim()
-      .toLowerCase();
+    const primary = commandToken(commandArgs[0]);
+    const secondary = commandToken(commandArgs[1]);
     if (primary === 'branch') {
       const flags = commandArgs.slice(1).map((value) => String(value).toLowerCase());
       if (flags.some((flag) => BRANCH_MUTATION_FLAGS.has(optionName(flag)))) return 'write';
@@ -401,6 +404,7 @@ export class GitRunner {
     // local writes. `pull` remains a normal write because it also changes the
     // index and working tree.
     if (primary === 'ls-remote') return 'network-read';
+    if (primary === 'lfs') return this.classifyLfsCommand(secondary);
     if (primary === 'fetch' || primary === 'push') return 'network';
     if (this.shouldSerializeCommand(commandArgs)) return 'write';
     if (primary === 'status') return 'polling';
@@ -411,6 +415,11 @@ export class GitRunner {
 
   normalizeGitError(error: unknown, args: string[]): Error {
     return this.errorFormatter.normalizeGitError(error, args);
+  }
+
+  private classifyLfsCommand(command: string): GitJobKind {
+    if (['push', 'fetch'].includes(command)) return 'network';
+    return ['version', 'env', 'ls-files', 'status'].includes(command) ? 'interactive' : 'write';
   }
 
   assertRepoPathAvailable(repoPath: string): void {

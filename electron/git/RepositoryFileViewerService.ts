@@ -1,6 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
+import { parseGitLfsPointer } from '../../src/shared/ipc/gitLfs';
+import { cleanLfsContent, localLfsObject } from './GitLfsObjects';
 import type {
   RepositoryFileContextDto,
   RepositoryFilePreviewDto,
@@ -32,6 +35,7 @@ const imageMimeTypes: Record<string, string> = {
 };
 type Reader = Pick<CommitEditGit, 'run'>;
 type Snapshot = {
+  lfs?: { oid: string; bytes: number; available: boolean };
   version: string;
   editable: boolean;
   readOnlyReason?: string;
@@ -93,7 +97,7 @@ export class RepositoryFileViewerService {
   }
 
   private async snapshot(request: RepositoryFileContextDto, reader: Reader = this.runner): Promise<Snapshot> {
-    if (request.source === 'unstaged') return this.workingSnapshot(request);
+    if (request.source === 'unstaged') return this.resolveLfsSnapshot(request, this.workingSnapshot(request), reader);
     const identity = [fs.realpathSync(request.repoPath), request.path, request.source, request.commitHash || ''];
     const records = (
       await reader.run(
@@ -126,7 +130,8 @@ export class RepositoryFileViewerService {
             reader.run(request.repoPath, ['symbolic-ref', '--quiet', 'HEAD']).catch(() => ''),
           ])
         : ['', ''];
-    const version = digest(JSON.stringify([...identity, oid, mode, flags, head.trim(), headRef.trim(), conflicted]));
+    const filter = request.source === 'staged' ? await reader.run(request.repoPath, ['check-attr', '--cached', '-z', 'filter', '--', request.path]) : '';
+    const version = digest(JSON.stringify([...identity, oid, mode, flags, head.trim(), headRef.trim(), conflicted, filter]));
     if (conflicted || mode === '160000')
       return {
         version,
@@ -139,7 +144,7 @@ export class RepositoryFileViewerService {
     const editable = request.source === 'staged' && ['100644', '100755'].includes(mode);
     const bytes = Number((await reader.run(request.repoPath, ['cat-file', '-s', oid])).trim());
     if (!Number.isSafeInteger(bytes) || bytes < 0) throw new Error('Invalid Git blob size.');
-    return {
+    const snapshot: Snapshot = {
       version,
       bytes,
       oid,
@@ -148,11 +153,39 @@ export class RepositoryFileViewerService {
       editable,
       readOnlyReason: request.source === 'commit' ? 'Commit versions are read-only.' : editable ? undefined : 'Symbolic links cannot be edited in the index.',
     };
+    return this.resolveLfsSnapshot(request, snapshot, reader);
+  }
+
+  private async resolveLfsSnapshot(request: RepositoryFileContextDto, snapshot: Snapshot, reader: Reader): Promise<Snapshot> {
+    if (!snapshot.missing && snapshot.bytes <= 1024 && ['100644', '100755', undefined].includes(snapshot.mode)) {
+      const raw = snapshot.buffer?.toString() ?? (await reader.run(request.repoPath, ['cat-file', 'blob', snapshot.oid!]));
+      const pointer = parseGitLfsPointer(`${raw.trimEnd()}\n`);
+      if (pointer) {
+        const diskPath = await localLfsObject(request.repoPath, pointer, reader).catch((error: unknown) => {
+          snapshot.missing = error instanceof Error ? error.message : String(error);
+          return null;
+        });
+        snapshot.bytes = pointer.size;
+        snapshot.buffer = undefined;
+        snapshot.diskPath = diskPath ?? undefined;
+        snapshot.lfs = { oid: pointer.oid, bytes: pointer.size, available: Boolean(diskPath) };
+        if (!diskPath) {
+          snapshot.editable = false;
+          snapshot.missing ??= 'The selected Git LFS object is not available locally. Pull its content from the selected remote.';
+        }
+      }
+    }
+    return snapshot;
   }
 
   private async buffer(request: RepositoryFileContextDto, snapshot: Snapshot, maxBytes = IMAGE_PREVIEW_LIMIT): Promise<Buffer> {
     if (snapshot.bytes > maxBytes) throw new Error('The selected file exceeds the preview size limit.');
     if (snapshot.buffer) return snapshot.buffer;
+    if (snapshot.lfs && snapshot.diskPath) {
+      const buffer = fs.readFileSync(snapshot.diskPath);
+      if (buffer.length !== snapshot.bytes || digest(buffer) !== snapshot.lfs.oid) throw new Error('The selected Git LFS object failed its integrity check.');
+      return buffer;
+    }
     if (snapshot.oid)
       return this.runner.runBuffer(request.repoPath, ['cat-file', 'blob', snapshot.oid], {
         maxBytes,
@@ -165,7 +198,13 @@ export class RepositoryFileViewerService {
   async getPreview(input: RepositoryFilePreviewRequestDto): Promise<RepositoryFilePreviewDto> {
     const request = this.validateContext(input);
     const snapshot = await this.snapshot(request);
-    const common = { version: snapshot.version, editable: snapshot.editable, readOnlyReason: snapshot.readOnlyReason, modifiedAt: snapshot.modifiedAt };
+    const common = {
+      version: snapshot.version,
+      editable: snapshot.editable,
+      readOnlyReason: snapshot.readOnlyReason,
+      modifiedAt: snapshot.modifiedAt,
+      lfs: snapshot.lfs,
+    };
     if (snapshot.missing) return { ...common, kind: 'missing', bytes: 0, reason: snapshot.missing };
     const mimeType = imageMimeTypes[path.extname(request.path).slice(1).toLowerCase()] || null;
     if (snapshot.bytes > FILE_PREVIEW_LIMIT && (!mimeType || !input.allowLargeImage || snapshot.bytes > IMAGE_PREVIEW_LIMIT))
@@ -190,15 +229,41 @@ export class RepositoryFileViewerService {
   async getInfo(input: RepositoryFileContextDto): Promise<RepositoryFileInfoDto> {
     const request = this.validateContext(input);
     const snapshot = await this.snapshot(request);
-    const buffer = await this.buffer(request, snapshot);
+    if (snapshot.missing)
+      return {
+        path: request.path,
+        bytes: snapshot.bytes,
+        version: snapshot.version,
+        editable: false,
+        readOnlyReason: snapshot.missing,
+        lfs: snapshot.lfs,
+        hashes: null,
+      };
+    let hashes: NonNullable<RepositoryFileInfoDto['hashes']>;
+    if (snapshot.lfs && snapshot.diskPath) {
+      const sha256 = createHash('sha256'),
+        sha1 = createHash('sha1'),
+        md5 = createHash('md5');
+      for await (const chunk of fs.createReadStream(snapshot.diskPath)) {
+        sha256.update(chunk);
+        sha1.update(chunk);
+        md5.update(chunk);
+      }
+      hashes = { sha256: sha256.digest('hex'), sha1: sha1.digest('hex'), md5: md5.digest('hex') };
+      if (hashes.sha256 !== snapshot.lfs.oid) throw new Error('The selected Git LFS object failed its integrity check.');
+    } else {
+      const buffer = await this.buffer(request, snapshot);
+      hashes = { sha256: digest(buffer), sha1: createHash('sha1').update(buffer).digest('hex'), md5: createHash('md5').update(buffer).digest('hex') };
+    }
     return {
       path: request.path,
-      bytes: buffer.length,
+      bytes: snapshot.bytes,
       version: snapshot.version,
       editable: snapshot.editable,
       readOnlyReason: snapshot.readOnlyReason,
       modifiedAt: snapshot.modifiedAt,
-      hashes: { sha256: digest(buffer), sha1: createHash('sha1').update(buffer).digest('hex'), md5: createHash('md5').update(buffer).digest('hex') },
+      lfs: snapshot.lfs,
+      hashes,
     };
   }
 
@@ -227,7 +292,10 @@ export class RepositoryFileViewerService {
         saved = await withPrivateIndex(git, request.repoPath, async (index, publish) => {
           const current = await this.snapshot(request, git);
           if (current.version !== input.expectedVersion) throw changedError();
-          const oid = (await git.input(request.repoPath, ['hash-object', '-w', '--stdin', '--no-filters'], contents)).trim();
+          const filter = (await git.run(request.repoPath, ['check-attr', '--cached', '-z', 'filter', '--', request.path])).split('\0')[2];
+          const stored =
+            current.lfs || filter === 'lfs' ? await cleanLfsContent(request.repoPath, request.path, Readable.from([contents]), git.signal) : contents;
+          const oid = (await git.input(request.repoPath, ['hash-object', '-w', '--stdin', '--no-filters'], stored)).trim();
           if (!/^[0-9a-f]{40,64}$/.test(oid)) throw new Error('Git did not create a valid file blob.');
           const envOverrides = { GIT_INDEX_FILE: index };
           await git.input(request.repoPath, ['update-index', '-z', '--index-info'], `${current.mode} ${oid}\t${request.path}\0`, false, envOverrides);

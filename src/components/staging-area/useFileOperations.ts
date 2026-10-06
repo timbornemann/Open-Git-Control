@@ -11,6 +11,8 @@ import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { EMPTY_DIFF_STATS, basename, parseConflictEntries, parseNumstatStats } from './utils';
 import type { ConfirmDialogState, DiffStats, FileSection, GitStatusWithConflicts, InputDialogState, StagingContextMenuState } from './types';
 import { useIgnoreRule } from './useIgnoreRule';
+import { useStagingLfs } from './useStagingLfs';
+import type { TrackWithGitLfsRequest } from '@/shared/ipc/gitLfs';
 
 type Params = {
   repoPath: string | null;
@@ -352,10 +354,11 @@ export const useFileOperations = ({
     [hasCurrentStatusForRepo, isCurrentRepoGeneration, refresh, repoPath, setToast, t],
   );
 
-  const openFileContextMenu = useCallback((event: React.MouseEvent, entry: FileEntry, section: FileSection) => {
+  const openFileContextMenu = useCallback((event: React.MouseEvent | React.KeyboardEvent, entry: FileEntry, section: FileSection) => {
     event.preventDefault();
     event.stopPropagation();
-    setContextMenu({ x: event.clientX, y: event.clientY, entry, section });
+    const rect = event.currentTarget.getBoundingClientRect();
+    setContextMenu({ x: 'clientX' in event ? event.clientX : rect.left, y: 'clientY' in event ? event.clientY : rect.bottom, entry, section });
   }, []);
 
   const openRepositoryPath = useCallback(
@@ -383,6 +386,51 @@ export const useFileOperations = ({
   );
 
   const addIgnoreRule = useIgnoreRule({ repoPath, setToast, tr, t, onRepoChanged, refresh });
+  const trackLfs = useCallback(
+    async (request: TrackWithGitLfsRequest) => {
+      const generation = repoGenerationRef.current;
+      if (mutationInFlightRef.current || !isCurrentRepoGeneration(generation, request.repoPath) || !hasCurrentStatusForRepo(request.repoPath)) return false;
+      mutationInFlightRef.current = true;
+      setMutationStartedAt(Date.now());
+      try {
+        const result = await gitClient.trackWithGitLfs(request);
+        if (!isCurrentRepoGeneration(generation, request.repoPath)) return false;
+        if (!result.success) throw new Error(result.error || tr('Git-LFS-Umstellung fehlgeschlagen.', 'Git LFS conversion failed.'));
+        setToast({ msg: tr(`${basename(request.path)} mit Git LFS gestagt`, `Staged ${basename(request.path)} with Git LFS`), isError: false });
+        onRepoChanged?.();
+        await refresh();
+        return true;
+      } catch (error) {
+        if (isCurrentRepoGeneration(generation, request.repoPath)) setToast({ msg: error instanceof Error ? error.message : String(error), isError: true });
+        return false;
+      } finally {
+        mutationInFlightRef.current = false;
+        setMutationStartedAt(null);
+      }
+    },
+    [hasCurrentStatusForRepo, isCurrentRepoGeneration, onRepoChanged, refresh, setToast, tr],
+  );
+  const lfs = useStagingLfs(repoPath, status, trackLfs);
+  const trackFileTypeWithLfs = (entry: FileEntry, section: FileSection) => {
+    const file = lfs.stateFor(entry.path, section);
+    if (!file?.extension) return;
+    setConfirmDialog({
+      title: tr('Dateityp mit Git LFS verwalten', 'Manage file type with Git LFS'),
+      variant: 'confirm',
+      irreversible: false,
+      consequences: tr('Die zusätzliche Regel wird mit der ausgewählten Datei gestagt.', 'The additional rule is staged with the selected file.'),
+      message: tr(
+        `Die Regel *${file.extension} gilt im gesamten Repository. Jetzt wird nur ${basename(entry.path)} umgestellt und gestagt. Weitere passende Dateien verwenden LFS beim nächsten Stagen.`,
+        `The *${file.extension} rule applies throughout the repository. Only ${basename(entry.path)} is converted and staged now. Other matching files use LFS when next staged.`,
+      ),
+      contextItems: [
+        { label: tr('Repository', 'Repository'), value: repoPath ?? '' },
+        { label: tr('Dateityp', 'File type'), value: `*${file.extension}` },
+      ],
+      confirmLabel: tr('Umstellen und stagen', 'Convert and stage'),
+      onConfirm: () => lfs.track(entry, section, 'extension').then(() => {}),
+    });
+  };
 
   const stageFile = useCallback((f: string) => stagePathsForCurrentRepo([f]), [stagePathsForCurrentRepo]);
   const unstageFile = useCallback(
@@ -576,6 +624,8 @@ export const useFileOperations = ({
     openFileContextMenu,
     openRepositoryPath,
     addIgnoreRule,
+    lfs,
+    trackFileTypeWithLfs,
     stageFile,
     unstageFile,
     stageAll,

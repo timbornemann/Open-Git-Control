@@ -10,6 +10,7 @@ export type RepositoryFileContextDto = {
 
 export type RepositoryFilePreviewRequestDto = RepositoryFileContextDto & { allowLargeImage?: boolean };
 export type RepositoryFileSnapshotDto = {
+  lfs?: { oid: string; bytes: number; available: boolean };
   /** Opaque, source- and repository-bound compare-and-swap token. */
   version: string;
   editable: boolean;
@@ -26,7 +27,7 @@ export type RepositoryFilePreviewDto = RepositoryFileSnapshotDto &
 export type RepositoryFileInfoDto = RepositoryFileSnapshotDto & {
   path: string;
   bytes: number;
-  hashes: { sha256: string; sha1: string; md5: string };
+  hashes: { sha256: string; sha1: string; md5: string } | null;
 };
 export type SaveRepositoryFileRequestDto = RepositoryFileContextDto & {
   expectedVersion: string;

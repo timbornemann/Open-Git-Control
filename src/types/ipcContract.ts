@@ -78,6 +78,8 @@ export const enum IpcChannel {
   GitGetRepositoryFilePreview = 'git:getRepositoryFilePreview',
   GitGetRepositoryFileInfo = 'git:getRepositoryFileInfo',
   GitSaveRepositoryFile = 'git:saveRepositoryFile',
+  GitGetLfsStatus = 'git:lfs:status',
+  GitTrackWithLfs = 'git:lfs:track',
   GitSearchWorkingDirectory = 'git:searchWorkingDirectory',
   GitReplaceWorkingDirectory = 'git:replaceWorkingDirectory',
   GitApplyWorkingDirectoryMoves = 'git:applyWorkingDirectoryMoves',

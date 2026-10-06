@@ -53,6 +53,15 @@ describe('secret scan commit state binding', () => {
     });
   });
 
+  it('does not approve an incomplete LFS scan with no reported findings', async () => {
+    const harness = createHarness(
+      vi.fn().mockResolvedValue({ ...findingsResult, findings: [], historyScanIncomplete: true, notes: ['LFS content is not available locally.'] }),
+    );
+    const result = await harness.guard.scanCommitSecrets(harness.event, { repoPath: 'C:/repo', recordRendererScan: true });
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining('could not be fully scanned') });
+    expect(await harness.guard.approveSecretScanCommit(harness.event, 'C:/repo')).toEqual({ success: false });
+  });
+
   it('rejects an approval if staged index entries changed after the scan', async () => {
     const harness = createHarness(vi.fn().mockResolvedValue(findingsResult));
     await expect(harness.guard.scanCommitSecrets(harness.event, { repoPath: 'C:/repo', recordRendererScan: true })).resolves.toEqual(

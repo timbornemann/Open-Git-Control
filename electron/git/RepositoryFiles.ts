@@ -8,6 +8,10 @@ import {
 } from './RepositoryPathSafety';
 import { decodeRepositoryFile, detectRepositoryFileEncoding, encodeRepositoryFile, type RepositoryTextEncoding } from './RepositoryFileEncoding';
 import { repositoryImageMimeType } from '../../src/shared/repositoryImageTypes';
+import { parseGitLfsPointer } from '../../src/shared/ipc/gitLfs';
+import { localLfsObject } from './GitLfsObjects';
+import { createHash } from 'node:crypto';
+import type { CommitEditGit } from './CommitEditGit';
 
 export type RepositoryFileSource = 'unstaged' | 'staged' | 'commit';
 
@@ -52,7 +56,19 @@ export class RepositoryFiles {
   constructor(
     private readonly getRepoPath: () => string,
     private readonly readGitFileBuffer: (repoPath: string, revisionSpec: string, maxBytes: number) => Promise<Buffer>,
+    private readonly gitReader?: Pick<CommitEditGit, 'run'>,
   ) {}
+
+  private async resolveLfsBuffer(repoPath: string, buffer: Buffer, maxBytes: number): Promise<Buffer> {
+    const pointer = buffer.length <= 1024 ? parseGitLfsPointer(buffer.toString()) : null;
+    if (!pointer || !this.gitReader) return buffer;
+    if (pointer.size > maxBytes) throw new Error('Git LFS content exceeds the preview size limit.');
+    const location = await localLfsObject(repoPath, pointer, this.gitReader);
+    if (!location) throw new Error('The selected Git LFS asset is not available locally.');
+    const contents = fs.readFileSync(location);
+    if (createHash('sha256').update(contents).digest('hex') !== pointer.oid) throw new Error('The selected Git LFS asset failed its integrity check.');
+    return contents;
+  }
 
   async readRepoFile(relativePath: string): Promise<string> {
     return this.readRepoFileAtPath(this.getRepoPath(), relativePath);
@@ -81,11 +97,23 @@ export class RepositoryFiles {
   async readRepositoryFileTextAtSourceAndPath(repoPath: string, source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<string> {
     const normalizedRelativePath = this.normalizeRepoRelativePath(relativePath);
     if (source === 'unstaged') {
-      return decodeRepositoryFile(this.readWorkingTreeFileBuffer(repoPath, normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).text;
+      return decodeRepositoryFile(
+        await this.resolveLfsBuffer(
+          repoPath,
+          this.readWorkingTreeFileBuffer(repoPath, normalizedRelativePath, MAX_MARKDOWN_PREVIEW_FILE_BYTES),
+          MAX_MARKDOWN_PREVIEW_FILE_BYTES,
+        ),
+      ).text;
     }
 
     const revisionSpec = this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash);
-    return decodeRepositoryFile(await this.readGitFileBuffer(repoPath, revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES)).text;
+    return decodeRepositoryFile(
+      await this.resolveLfsBuffer(
+        repoPath,
+        await this.readGitFileBuffer(repoPath, revisionSpec, MAX_MARKDOWN_PREVIEW_FILE_BYTES),
+        MAX_MARKDOWN_PREVIEW_FILE_BYTES,
+      ),
+    ).text;
   }
 
   async readRepositoryImageDataUrlAtSource(source: RepositoryFileSource, relativePath: string, commitHash?: string): Promise<RepositoryFileDataUrl> {
@@ -105,10 +133,11 @@ export class RepositoryFiles {
         ? this.readWorkingTreeFileBuffer(repoPath, normalizedRelativePath, MAX_MARKDOWN_PREVIEW_ASSET_BYTES)
         : await this.readGitFileBuffer(repoPath, this.buildRevisionFileSpec(source, normalizedRelativePath, commitHash), MAX_MARKDOWN_PREVIEW_ASSET_BYTES);
 
+    const content = await this.resolveLfsBuffer(repoPath, buffer, MAX_MARKDOWN_PREVIEW_ASSET_BYTES);
     return {
-      dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
+      dataUrl: `data:${mimeType};base64,${content.toString('base64')}`,
       mimeType,
-      bytes: buffer.length,
+      bytes: content.length,
     };
   }
 

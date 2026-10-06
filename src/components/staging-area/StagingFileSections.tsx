@@ -1,6 +1,7 @@
 import type { FileEntry } from '@/utils/gitParsing';
 import { useI18n } from '@/i18n';
 import { VirtualList } from '@/components/VirtualList';
+import { AlertCircle } from 'lucide-react';
 import type { FileSection } from './types';
 import type { useFileOperations } from './useFileOperations';
 import { basename, formatDiffStats, getStatusInfo } from './utils';
@@ -42,9 +43,22 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
     const statusCode = section === 'staged' ? entry.x : entry.y;
     const info = getStatusInfo(statusCode);
     const inspectSource = section === 'staged' ? 'staged' : 'unstaged';
+    const lfsState = fileOps.lfs?.stateFor(entry.path, section);
     return (
       <div
         className="staging-file-row"
+        tabIndex={0}
+        role="group"
+        aria-label={entry.path}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) fileOps.openFileContextMenu(event, entry, section);
+          else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSelectFileInspect?.(entry.path, inspectSource);
+            fileOps.showDiff(entry.path, section === 'staged');
+          }
+        }}
         onClick={() => {
           onSelectFileInspect?.(entry.path, inspectSource);
           fileOps.showDiff(entry.path, section === 'staged');
@@ -55,7 +69,18 @@ export const StagingFileSections: React.FC<StagingFileSectionsProps> = ({ visibl
           {statusCode}
         </span>
         <span className="staging-path" title={entry.path}>
-          {basename(entry.path)}
+          <span className="staging-file-name">{basename(entry.path)}</span>
+          {lfsState?.recommendation && (
+            <span
+              className="staging-lfs-recommendation"
+              tabIndex={0}
+              role="img"
+              title={fileOps.lfs.recommendationTitle(lfsState)}
+              aria-label={fileOps.lfs.recommendationTitle(lfsState)}
+            >
+              <AlertCircle size={13} aria-hidden="true" />
+            </span>
+          )}
         </span>
         <div className="staging-actions">
           {section === 'staged' && (

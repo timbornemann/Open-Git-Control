@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import { readRemoteSnapshot, probePushUrlIsolation, remoteConfigurationFingerprint } from './remoteSnapshot';
+import { referencedLfsObjects, lfsEndpoint, lfsTransferEnvironment, uploadLfsObjects } from './GitLfsTransfers';
 import type {
   GitRemoteSnapshotDto,
   GitPushBatchDto,
@@ -15,7 +17,6 @@ import { RemotePreferencesStore } from './RemotePreferencesStore';
 import { reconcileRemotePreferences } from './reconcileRemotePreferences';
 import { assertGroupedCredentialChoices, runGroupedRemotePush } from './groupedRemotePush';
 import {
-  gitConfigurationEnvironment,
   isolatedPushEnvironment,
   normalizeRemotePreferences,
   referencedRemotePreferenceNames,
@@ -35,7 +36,6 @@ import {
   boundCredentialGenerations,
   pruneTransfers,
   lines,
-  displayUrl,
   PLAN_LIFETIME,
   type CredentialEnvironmentFactory,
   type RemoteTransferContext,
@@ -65,46 +65,12 @@ export class RemoteTransferService {
 
   private async isolationCapability(repoPath: string): Promise<boolean> {
     if (this.isolationSupported !== undefined) return this.isolationSupported;
-    // `remote get-url` requires a remote defined in repository config, even
-    // when runtime configuration contains a complete synthetic remote.
-    const name = lines(await this.git.run(repoPath, ['remote']))[0];
-    if (!name) return false;
-    const expected = 'https://ogc.invalid/probe-second.git';
-    const envOverrides = gitConfigurationEnvironment([
-      [`remote.${name}.url`, 'https://ogc.invalid/probe.git'],
-      [`remote.${name}.pushurl`, 'https://ogc.invalid/probe-first.git'],
-      [`remote.${name}.pushurl`, ''],
-      [`remote.${name}.pushurl`, expected],
-    ]);
-    const result = await this.git.runResult(repoPath, ['remote', 'get-url', '--push', '--all', name], { envOverrides });
-    this.isolationSupported = result.exitCode === 0 && result.stdout.trim() === expected;
-    return this.isolationSupported;
+    this.isolationSupported = await probePushUrlIsolation(repoPath, this.git);
+    return this.isolationSupported ?? false;
   }
 
   async getRemotes(repoPath: string): Promise<GitRemoteSnapshotDto> {
-    const names = lines(await this.git.run(repoPath, ['remote']));
-    const remotes = [];
-    for (const name of names) {
-      const fetchUrls = lines(await this.git.run(repoPath, ['remote', 'get-url', '--all', name]));
-      const pushUrls = lines(await this.git.run(repoPath, ['remote', 'get-url', '--push', '--all', name]));
-      remotes.push({ name, fetchUrls: fetchUrls.map(displayUrl), pushUrls: pushUrls.map(displayUrl) });
-    }
-    const branch = await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
-    const upstreamRemote = branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.remote`]) : '';
-    const upstreamRef = branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.merge`]) : '';
-    const preferred =
-      (branch ? await this.optional(repoPath, ['config', '--get', `branch.${branch}.pushRemote`]) : '') ||
-      (await this.optional(repoPath, ['config', '--get', 'remote.pushDefault'])) ||
-      upstreamRemote ||
-      (names.includes('origin') ? 'origin' : names.length === 1 ? names[0] : '');
-    return {
-      repoPath,
-      branch,
-      upstream: upstreamRemote && upstreamRef ? { remote: upstreamRemote, branch: upstreamRef.replace(/^refs\/heads\//, '') } : null,
-      defaultPushRemote: preferred || null,
-      remotes,
-      supportsPushUrlIsolation: await this.isolationCapability(repoPath),
-    };
+    return readRemoteSnapshot(repoPath, this.git, await this.isolationCapability(repoPath));
   }
 
   getPreferences(repoPath: string): RemotePreferences {
@@ -175,6 +141,7 @@ export class RemoteTransferService {
     work: (env: NodeJS.ProcessEnv, signal?: AbortSignal) => Promise<T>,
     connectionId?: string | null,
     expectedGeneration?: number,
+    lfsUrls: string[] = [],
   ): Promise<T> {
     remoteUrl(url);
     context.ensureActive();
@@ -184,6 +151,7 @@ export class RemoteTransferService {
       signal: context.signal,
       envOverrides: environment,
       expectedGeneration,
+      lfsUrls,
     });
     try {
       const signal = scope?.signal ? AbortSignal.any([...(context.signal ? [context.signal] : []), scope.signal]) : context.signal;
@@ -207,17 +175,28 @@ export class RemoteTransferService {
 
   async pull(repoPath: string, input: RemoteTransferOperations['pull']['input'], context: RemoteTransferContext): Promise<{ output: string }> {
     const remote = await this.selectedRemote(repoPath, input.remote);
-    await this.checkRef(repoPath, `refs/heads/${refName(input.branch)}`);
+    await this.git.run(repoPath, ['check-ref-format', `refs/heads/${refName(input.branch)}`]);
     const flags: Record<string, string[]> = { default: [], rebase: ['--rebase'], 'no-ff': ['--no-ff'], 'ff-only': ['--ff-only'] };
     if (!Object.hasOwn(flags, input.mode)) throw new Error('Unsupported pull strategy.');
-    const output = await this.withCredentials(repoPath, input.remote, remoteUrl(remote.fetchUrls[0]), context, {}, (envOverrides, signal) =>
-      this.git.streamOutput(
-        repoPath,
-        ['pull', ...flags[input.mode], '--no-recurse-submodules', '--', input.remote, input.branch],
-        context.onProgress ?? (() => {}),
-        signal,
-        { envOverrides },
-      ),
+    const endpoint = await lfsEndpoint(repoPath, input.remote, this.git).catch(() => '');
+    const base = endpoint ? lfsTransferEnvironment({}, input.remote, endpoint, remote.fetchUrls[0]) : {};
+    const output = await this.withCredentials(
+      repoPath,
+      input.remote,
+      remoteUrl(remote.fetchUrls[0]),
+      context,
+      base,
+      (envOverrides, signal) =>
+        this.git.streamOutput(
+          repoPath,
+          ['pull', ...flags[input.mode], '--no-recurse-submodules', '--', input.remote, input.branch],
+          context.onProgress ?? (() => {}),
+          signal,
+          { envOverrides },
+        ),
+      undefined,
+      undefined,
+      endpoint ? [endpoint] : [],
     );
     context.ensureActive();
     return { output: redactGitSensitiveText(output) };
@@ -225,7 +204,7 @@ export class RemoteTransferService {
 
   async setUpstream(repoPath: string, name: string, branch: string, context: RemoteTransferContext): Promise<true> {
     await this.selectedRemote(repoPath, name);
-    await this.checkRef(repoPath, `refs/heads/${refName(branch)}`);
+    await this.git.run(repoPath, ['check-ref-format', `refs/heads/${refName(branch)}`]);
     const localBranch = await this.optional(repoPath, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
     if (!localBranch) throw new Error('Select a local branch before setting its upstream.');
     await this.git.run(repoPath, ['branch', `--set-upstream-to=${name}/${branch}`, '--', localBranch], { signal: context.signal });
@@ -233,13 +212,8 @@ export class RemoteTransferService {
     return true;
   }
 
-  private async checkRef(repoPath: string, ref: string): Promise<void> {
-    await this.git.run(repoPath, ['check-ref-format', ref]);
-  }
-
   private async fingerprint(repoPath: string): Promise<string> {
-    const config = await this.git.run(repoPath, ['config', '--null', '--list']);
-    return digest([config, this.getPreferences(repoPath)]);
+    return remoteConfigurationFingerprint(repoPath, this.git, this.getPreferences(repoPath));
   }
 
   private async advertised(repoPath: string, target: GitPushTargetDto, refs: PublishedRef[], context: RemoteTransferContext): Promise<Map<string, string>> {
@@ -264,21 +238,27 @@ export class RemoteTransferService {
     if (input.force !== undefined && typeof input.force !== 'boolean') throw new Error('Invalid push mode.');
     if (!snapshot.branch) throw new Error('Select a local branch before pushing.');
     const destinationRef = `refs/heads/${refName(input.destinationBranch ?? snapshot.branch)}`;
-    await this.checkRef(repoPath, destinationRef);
+    await this.git.run(repoPath, ['check-ref-format', destinationRef]);
     const sourceOid = (await this.git.run(repoPath, ['rev-parse', '--verify', `refs/heads/${snapshot.branch}^{commit}`])).trim();
     const tagNames = [...new Set(input.tagNames ?? [])];
     if (!Array.isArray(input.tagNames ?? []) || tagNames.length > 64) throw new Error('Invalid selected tags.');
     const refs: PublishedRef[] = [{ sourceOid, destinationRef }];
     for (const name of tagNames) {
       const tagRef = `refs/tags/${refName(name)}`;
-      await this.checkRef(repoPath, tagRef);
+      await this.git.run(repoPath, ['check-ref-format', tagRef]);
       refs.push({ sourceOid: (await this.git.run(repoPath, ['rev-parse', '--verify', tagRef])).trim(), destinationRef: tagRef });
     }
     const id = randomUUID();
+    const lfsObjects = await referencedLfsObjects(
+      repoPath,
+      refs.map((ref) => ref.sourceOid),
+      this.git,
+      { signal: context.signal },
+    );
     const targets: GitPushTargetDto[] = [];
     for (const name of [...new Set(input.remoteNames.map(remoteName))]) {
       const targetDestinationRef = targetBranches[name] ? `refs/heads/${targetBranches[name]}` : destinationRef;
-      await this.checkRef(repoPath, targetDestinationRef);
+      await this.git.run(repoPath, ['check-ref-format', targetDestinationRef]);
       const remote = snapshot.remotes.find((candidate) => candidate.name === name);
       if (!remote) throw new Error('Unknown push remote.');
       const grouped = remote.pushUrls.length > 1 && !snapshot.supportsPushUrlIsolation;
@@ -286,6 +266,8 @@ export class RemoteTransferService {
       for (const value of targetUrls[name]) {
         const url = remoteUrl(value);
         const target: GitPushTargetDto = { id: digest([id, name, url]).slice(0, 32), remoteName: name, url, destinationRef: targetDestinationRef, sourceOid };
+        if (lfsObjects.length)
+          target.lfsEndpoint = await lfsEndpoint(repoPath, name, this.git, isolatedPushEnvironment(name, url, snapshot.supportsPushUrlIsolation), true, url);
         if (grouped) target.grouped = true;
         if (input.force)
           target.leaseOid =
@@ -304,6 +286,7 @@ export class RemoteTransferService {
       force: input.force === true,
       targets,
       secretScanArgs: [marker, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`)],
+      ...(lfsObjects.length ? { lfsObjects } : {}),
     };
     const fingerprint = await this.fingerprint(repoPath);
     if (fingerprint !== initialFingerprint) throw new Error('Remote configuration or account bindings changed while planning. Review the push again.');
@@ -393,12 +376,12 @@ export class RemoteTransferService {
     context: RemoteTransferContext,
     retry: boolean,
   ): Promise<GitPushTargetResultDto> {
-    const base = isolatedPushEnvironment(target.remoteName, target.url, this.isolationSupported === true);
+    const isolated = isolatedPushEnvironment(target.remoteName, target.url, this.isolationSupported === true);
+    const base = target.lfsEndpoint ? lfsTransferEnvironment(isolated, target.remoteName, target.lfsEndpoint, target.url) : isolated;
     let refs = plan.refs.map((ref) => (ref.destinationRef.startsWith('refs/heads/') ? { ...ref, destinationRef: target.destinationRef } : ref));
     if (retry) {
       const actual = await this.advertised(repoPath, target, refs, context);
       refs = refs.filter((ref) => actual.get(ref.destinationRef) !== ref.sourceOid);
-      if (!refs.length) return { ...target, status: 'up-to-date', message: 'All planned refs are already present on this endpoint.' };
       if (
         plan.dto.force &&
         actual.get(target.destinationRef) !== (target.leaseOid ?? undefined) &&
@@ -420,6 +403,20 @@ export class RemoteTransferService {
         const effective = await this.git.run(repoPath, ['remote', 'get-url', '--push', '--all', target.remoteName], { envOverrides, signal });
         if (lines(effective).length !== 1 || effective.trim() !== target.url)
           throw new Error('Git URL rewriting changed the planned push endpoint. Configure distinct named remotes.');
+        if (target.lfsEndpoint)
+          await uploadLfsObjects(
+            repoPath,
+            target.remoteName,
+            target.lfsEndpoint,
+            plan.dto.lfsObjects ?? [],
+            this.git,
+            envOverrides,
+            signal,
+            context.onProgress,
+            target.url,
+          );
+        context.ensureActive();
+        if (!refs.length) return { ...target, status: 'up-to-date', message: 'All planned refs and LFS objects are present on this endpoint.' };
         const args = ['push', '--porcelain', '--no-follow-tags', '--recurse-submodules=no'];
         if (plan.dto.force) args.push(`--force-with-lease=${target.destinationRef}:${target.leaseOid ?? ''}`);
         args.push('--', target.remoteName, ...refs.map((ref) => `${ref.sourceOid}:${ref.destinationRef}`));
@@ -429,6 +426,7 @@ export class RemoteTransferService {
       },
       plan.connections[target.id],
       plan.connections[target.id] ? plan.credentialGenerations[plan.connections[target.id]!] : undefined,
+      target.lfsEndpoint ? [target.lfsEndpoint] : [],
     );
   }
 

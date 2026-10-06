@@ -2,6 +2,7 @@ import type { ResourceKey } from '@/shared/cache/resource';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 
 const workingTree = new Set([
+  'getGitLfsStatus',
   'getRepositoryChangeSummary',
   'getWorkingTreeSnapshot',
   'getWorkingTreeStats',

@@ -12,6 +12,7 @@ export class GitSpawnOperations {
     return new Promise<Buffer>((resolve, reject) => {
       const proc = spawn('git', args, {
         cwd: repoPath,
+        windowsHide: true,
         stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
         env: options.envOverrides ? { ...process.env, ...options.envOverrides } : process.env,
       });
@@ -30,6 +31,7 @@ export class GitSpawnOperations {
       proc.stdout!.on('data', (chunk: Buffer) => {
         capturedBytes += chunk.length;
         if (capturedBytes > options.maxBytes) {
+          if (options.allowTruncation) chunks.push(chunk.subarray(0, Math.max(0, options.maxBytes - (capturedBytes - chunk.length))));
           tooLarge = true;
           proc.kill();
           return;
@@ -43,6 +45,10 @@ export class GitSpawnOperations {
       proc.on('close', (code, closeSignal) => {
         signal.removeEventListener('abort', abort);
         if (tooLarge) {
+          if (options.allowTruncation && !signal.aborted) {
+            resolve(Buffer.concat(chunks));
+            return;
+          }
           reject(new Error(options.tooLargeMessage));
           return;
         }

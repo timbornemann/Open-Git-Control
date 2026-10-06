@@ -239,6 +239,7 @@ The `latest*.yml` and `.blockmap` files in GitHub Releases are update metadata f
 - Search changed files.
 - Show staged and unstaged file statistics.
 - Stage and unstage individual files.
+- Convert selected files or file types to Git LFS through the context menu, with size-based recommendations and safe staging. See [Git LFS in Staging](Docs/GIT_LFS.md).
 - Stage all and unstage all.
 - Stage all untracked files.
 - Discard individual files or all changes.

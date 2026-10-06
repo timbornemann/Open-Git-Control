@@ -45,28 +45,6 @@
       "updatedAt": 1785417589147
     },
     {
-      "id": "5ea8d0cb-c8b7-49d8-89af-77bc7322196b",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Github Seite ausbauen",
-      "description": "aktuell ist der github tab nur eine keine seitenleiste, aber um es schöner und app passender zu machen sollte es auch eine haupt view bekommen und dann ähnlcih aufgebaut sein wie planaing ansicht, damit es auch eine eigene seite wird und man nicht die ganzen assachen aus dem current repo / staging area sieht",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1784027726255,
-      "updatedAt": 1784027726255
-    },
-    {
-      "id": "ef7c41f7-1929-4159-b679-004536603d0e",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Lokale Repositorys ausbauen",
-      "description": "aktuell ist der der lokale repo tab nur eine keine seitenleiste, aber um es schöner und app passender zu machen sollte es auch eine haupt view bekommen und dann ähnlcih aufgebaut sein wie planaing ansicht, damit es auch eine eigene seite wird und man nicht die ganzen assachen aus dem curren repo / staging area sieht",
-      "priority": "medium",
-      "status": "idea",
-      "tags": [],
-      "createdAt": 1784027753686,
-      "updatedAt": 1784027753686
-    },
-    {
       "id": "4febcdfe-caff-4919-ac38-38aaa2c08535",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Einstellungen. show config",
@@ -153,17 +131,6 @@
       "tags": [],
       "createdAt": 1785856977969,
       "updatedAt": 1785856977969
-    },
-    {
-      "id": "438886dc-bc20-4ec9-abc0-337ffed4d9f5",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Git LFS",
-      "description": "Große dateien erkennen und mit git lfs einordne und dann damit pushen, damit das direkt vermieden werdnekann",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1789910060278,
-      "updatedAt": 1789910060278
     }
   ]
 }

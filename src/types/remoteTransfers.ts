@@ -48,6 +48,7 @@ export interface RemotePreferences {
   activeProfileId?: string;
 }
 export interface GitPushTargetDto {
+  lfsEndpoint?: string;
   grouped?: boolean;
   id: string;
   remoteName: string;
@@ -57,6 +58,7 @@ export interface GitPushTargetDto {
   leaseOid?: string | null;
 }
 export interface GitPushPlanDto {
+  lfsObjects?: Array<{ oid: string; size: number }>;
   id: string;
   /** Push operands without the subcommand: plan marker followed by captured OID refspecs. */
   secretScanArgs: string[];
