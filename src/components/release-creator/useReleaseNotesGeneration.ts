@@ -18,6 +18,7 @@ export function useReleaseNotesGeneration(
   const current = useRef({ scope, session, context });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
   useLayoutEffect(() => {
     current.current = { scope, session, context };
   }, [scope, session, context]);
@@ -26,6 +27,7 @@ export function useReleaseNotesGeneration(
     running.current = false;
     setBusy(false);
     setMessage('');
+    setIsError(false);
     return () => {
       lifecycle.generation++;
     };
@@ -44,6 +46,7 @@ export function useReleaseNotesGeneration(
     running.current = true;
     setBusy(true);
     setMessage('');
+    setIsError(false);
     try {
       const commits = filterCommitsForReleaseNotes(context.commitsSinceLastRelease, session.options);
       const result = await aiClient.generateReleaseNotes({
@@ -70,7 +73,10 @@ export function useReleaseNotesGeneration(
               : 'AI unavailable; deterministic release notes were generated.'),
         );
     } catch (reason) {
-      if (valid()) setMessage(reason instanceof Error ? reason.message : String(reason));
+      if (valid()) {
+        setMessage(reason instanceof Error ? reason.message : String(reason));
+        setIsError(true);
+      }
     } finally {
       if (lifecycle.generation === started) {
         running.current = false;
@@ -78,5 +84,5 @@ export function useReleaseNotesGeneration(
       }
     }
   };
-  return { busy, message, generate };
+  return { busy, message, isError, generate };
 }

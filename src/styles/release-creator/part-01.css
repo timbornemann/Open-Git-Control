@@ -70,61 +70,6 @@
   font-weight: 600;
 }
 
-.release-alert {
-  flex-shrink: 0;
-  max-height: 25%;
-  overflow: auto;
-  margin: 8px 10px 0;
-  padding: 7px 8px;
-  font-size: 0.73rem;
-  line-height: 1.4;
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  min-width: 0;
-  border-left: 3px solid var(--border-color);
-}
-
-.release-alert > :not(svg) {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.release-alert strong {
-  display: block;
-  margin-bottom: 2px;
-}
-
-.release-alert p {
-  margin-top: 2px;
-}
-
-.release-alert--warning {
-  color: var(--status-warning);
-  background: var(--status-warning-soft);
-  border-left-color: var(--status-warning);
-}
-
-.release-alert--danger {
-  color: var(--status-danger);
-  background: var(--status-danger-soft);
-  border-left-color: var(--status-danger);
-}
-
-.release-alert--success {
-  color: var(--status-success);
-  background: var(--status-success-soft);
-  border-left-color: var(--status-success);
-}
-
-.release-alert-link {
-  color: inherit;
-  text-decoration: underline;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .release-form-shell {
   flex: 1;
   min-height: 0;

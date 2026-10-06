@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/i18n';
-import { useState } from 'react';
+import { useAppToast } from '@/hooks/useAppToast';
 
 export function ReleaseNotesActions({ body, tagName }: { body: string; tagName: string }) {
   const { tr } = useI18n();
-  const [error, setError] = useState('');
+  const toast = useAppToast();
   return (
     <div className="release-notes-actions">
       <Button
@@ -12,8 +12,7 @@ export function ReleaseNotesActions({ body, tagName }: { body: string; tagName: 
         size="xs"
         disabled={!body}
         onClick={() => {
-          setError('');
-          void navigator.clipboard.writeText(body).catch(() => setError(tr('Notes konnten nicht kopiert werden.', 'Could not copy notes.')));
+          void navigator.clipboard.writeText(body).catch(() => toast(tr('Notes konnten nicht kopiert werden.', 'Could not copy notes.'), true));
         }}
       >
         {tr('Notes kopieren', 'Copy notes')}
@@ -33,7 +32,6 @@ export function ReleaseNotesActions({ body, tagName }: { body: string; tagName: 
       >
         {tr('Notes als Datei speichern', 'Save notes as file')}
       </Button>
-      {error && <span role="alert">{error}</span>}
     </div>
   );
 }

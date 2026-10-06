@@ -11,7 +11,7 @@ const endpointKey = (endpoint: RepositoryEndpoint) =>
   JSON.stringify([endpoint.remoteName, endpoint.repository?.connectionId, endpoint.repository?.repositoryId, endpoint.repository?.fullPath]);
 
 export function useReleaseTarget(repoPath: string | null, requested: HostedRepositoryRef | null) {
-  useHostingConnections();
+  const accounts = useHostingConnections();
   const local = useRepositoryHosting(repoPath);
   const connections = useHostingState((state) => state.connections);
   const [choice, setChoice] = useState<RepositoryEndpoint | null>(null);
@@ -61,6 +61,8 @@ export function useReleaseTarget(repoPath: string | null, requested: HostedRepos
       active = false;
     };
   }, [scope, endpoint?.repository]);
+  const loading = accounts.loading || local.loading || data.scope !== scope || data.loading;
+  const error = data.scope === scope ? data.error || local.error || accounts.error : local.error || accounts.error;
   return {
     choices,
     endpoint,
@@ -68,8 +70,9 @@ export function useReleaseTarget(repoPath: string | null, requested: HostedRepos
     choose: setChoice,
     repository: data.scope === scope ? data.repository : null,
     capabilities: data.scope === scope ? data.capabilities : null,
-    loading: local.loading || data.scope !== scope || data.loading,
-    error: data.scope === scope ? data.error || local.error : local.error,
+    loading,
+    error,
+    missingTarget: Boolean(repoPath) && !loading && !error && !endpoint && (!choices.length || Boolean(requested) || Boolean(choice)),
     scope,
   };
 }

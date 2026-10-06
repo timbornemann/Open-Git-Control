@@ -10,6 +10,7 @@ import { useReleaseTarget } from './useReleaseTarget';
 import { useReleaseContext } from './useReleaseContext';
 import { useReleaseNotesGeneration } from './useReleaseNotesGeneration';
 import { useReleasePublication } from './useReleasePublication';
+import { useReleaseFeedback } from './useReleaseFeedback';
 import { hostingClient } from '@/services/hostingClient';
 import { suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
 import '@/styles/release-creator.css';
@@ -87,6 +88,19 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
     update,
     refresh: history.refresh,
   });
+  useReleaseFeedback({
+    targetLoading: target.loading,
+    missingTarget: target.missingTarget,
+    targetError: target.error,
+    contextLoading: history.loading,
+    contextError: history.error,
+    contextWarning: history.context?.warning,
+    fallbackUsed: Boolean(history.context?.fallbackUsed),
+    notesMessage: notes.message,
+    notesError: notes.isError,
+    publicationError: publication.error,
+    created: session.created,
+  });
   const locked = notes.busy || publication.busy;
   const targetLabel = (index: number) => {
     const endpoint = target.choices[index];
@@ -94,7 +108,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
     return `${endpoint.remoteName} · ${connection ? providerLabels[connection.provider] : 'Hosting'} · ${connection?.baseUrl.replace(/^https?:\/\//, '') || ''} · ${connection?.username || connection?.label || ''} · ${endpoint.repository?.fullPath}`;
   };
   return (
-    <section className="repository-release-page">
+    <section className="repository-release-page" aria-busy={target.loading || history.loading || locked}>
       <div className="release-target-toolbar">
         <div className="release-target-toolbar__identity">
           <span className="release-target-label">{tr('Veröffentlichungsziel', 'Publication target')}:</span>
@@ -103,7 +117,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
               className="release-select"
               aria-label={tr('Hosting-Ziel', 'Hosting target')}
               value={target.endpoint ? target.choices.indexOf(target.endpoint) : ''}
-              disabled={locked}
+              disabled={locked || target.loading}
               onChange={(event) => target.choose(target.choices[Number(event.target.value)])}
             >
               <option value="" disabled>
@@ -117,14 +131,18 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
             </select>
           ) : (
             <span className="release-target-name">
-              {target.endpoint ? targetLabel(target.choices.indexOf(target.endpoint)) : tr('Kein Ziel zugeordnet', 'No target configured')}
+              {target.endpoint
+                ? targetLabel(target.choices.indexOf(target.endpoint))
+                : target.loading
+                  ? tr('Hosting-Ziel wird geladen …', 'Loading hosting target …')
+                  : tr('Kein Ziel zugeordnet', 'No target configured')}
             </span>
           )}
         </div>
         <Button variant="ghost" disabled={locked} onClick={onOpenRemoteConfig}>
           {tr('Remote-Konfiguration', 'Remote configuration')}
         </Button>
-        {!target.repository && (
+        {!target.loading && !target.repository && (
           <Button
             variant="ghost"
             onClick={() => {
@@ -135,53 +153,26 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
             {tr('Konten & Server', 'Accounts & servers')}
           </Button>
         )}
-      </div>
-      {target.loading && (
-        <div className="release-page-message" role="status">
-          {tr('Hosting-Ziel wird geladen …', 'Loading hosting target …')}
-        </div>
-      )}
-      {(target.error || history.error || publication.error) && (
-        <div className="release-page-message release-page-message--error" role="alert">
-          {target.error || history.error || publication.error}
-        </div>
-      )}
-      {notes.message && (
-        <div className="release-page-message" role="status">
-          {notes.message}
-        </div>
-      )}
-      {history.context?.warning && (
-        <div className="release-page-message" role="status">
-          {history.context.warning}
-        </div>
-      )}
-      {publication.busy && (
-        <div className="release-page-message" role="status">
-          <Button onClick={publication.cancel}>{tr('Veröffentlichung abbrechen', 'Cancel publication')}</Button>
-        </div>
-      )}
-      {session.created && (
-        <div className="release-page-message" role="status">
-          <strong>
-            {tr('Erstellt', 'Created')}: {session.created.name}
-          </strong>
-          {session.assets.some((file) => !session.uploaded.includes(file)) && (
-            <Button disabled={locked} onClick={() => void publication.retryAssets()}>
-              {tr('Ausstehende Dateien hochladen', 'Upload pending files')}
+        {publication.busy && <Button onClick={publication.cancel}>{tr('Veröffentlichung abbrechen', 'Cancel publication')}</Button>}
+        {session.created && (
+          <>
+            {session.assets.some((file) => !session.uploaded.includes(file)) && (
+              <Button disabled={locked} onClick={() => void publication.retryAssets()}>
+                {tr('Ausstehende Dateien hochladen', 'Upload pending files')}
+              </Button>
+            )}
+            <Button
+              disabled={locked}
+              onClick={() => {
+                update(() => newReleaseSession(branch, appLanguage));
+                void history.refresh();
+              }}
+            >
+              {tr('Neuen Release vorbereiten', 'Prepare another release')}
             </Button>
-          )}
-          <Button
-            disabled={locked}
-            onClick={() => {
-              update(() => newReleaseSession(branch, appLanguage));
-              void history.refresh();
-            }}
-          >
-            {tr('Neuen Release vorbereiten', 'Prepare another release')}
-          </Button>
-        </div>
-      )}
+          </>
+        )}
+      </div>
       <div className="repository-release-page__creator">
         <ReleaseCreator
           repositoryLabel={target.repository?.fullName || null}
@@ -198,7 +189,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           published={Boolean(session.created)}
           onAddPendingAssets={publication.addAssets}
           onRemovePendingAsset={(file) => update((previous) => ({ ...previous, assets: previous.assets.filter((entry) => entry !== file) }))}
-          contextLoading={target.loading || history.loading || Boolean(history.error)}
+          contextLoading={target.loading || history.loading}
           context={history.context}
           onRefreshContext={history.refresh}
           onGenerateNotes={notes.generate}

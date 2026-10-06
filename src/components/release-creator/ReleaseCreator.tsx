@@ -5,7 +5,6 @@ import { validateReleaseInput } from '@/utils/releaseValidation';
 import type { HostingCapabilities } from '@/types/hostingDtos';
 import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 import { detectReleaseVersionBump, suggestNextReleaseTag } from '@/utils/releaseTagSuggestion';
-import { ReleaseCreatorAlerts } from './ReleaseCreatorAlerts';
 import { ReleaseCreatorHeader } from './ReleaseCreatorHeader';
 import { ReleaseHistoryPanel } from './ReleaseHistoryPanel';
 import { ReleaseNotesWorkbench } from './ReleaseNotesWorkbench';
@@ -177,8 +176,6 @@ export const ReleaseCreator: React.FC<Props> = ({
       <div className="release-layout-clean">
         <main className="release-main-clean">
           <ReleaseCreatorHeader lastReleaseTag={context?.lastReleaseTag} targetForContext={targetForContext} commitsCount={commitsCount} />
-
-          <ReleaseCreatorAlerts hasRepository={Boolean(repositoryLabel)} fallbackUsed={Boolean(context?.fallbackUsed)} />
 
           <section className="release-form-shell">
             <ReleaseVersionStep

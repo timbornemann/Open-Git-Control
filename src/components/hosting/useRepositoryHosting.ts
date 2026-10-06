@@ -6,6 +6,8 @@ import { useHostingState } from './hostingState';
 /** Remote identity is adapter-owned; ambiguous accounts require an explicit selection. */
 export function useRepositoryHosting(repoPath: string | null) {
   const { connections, revision } = useHostingState();
+  const scope = JSON.stringify([repoPath, connections, revision]);
+  const [resolvedScope, setResolvedScope] = useState('');
   const [endpoints, setEndpoints] = useState<RepositoryEndpoint[]>([]);
   const [repository, setRepository] = useState<HostedRepository | null>(null);
   const [remoteName, setRemoteName] = useState('');
@@ -17,7 +19,11 @@ export function useRepositoryHosting(repoPath: string | null) {
     setRemoteName('');
     setEndpoints([]);
     setError(null);
-    if (!repoPath) return;
+    if (!repoPath) {
+      setLoading(false);
+      setResolvedScope(scope);
+      return;
+    }
     setLoading(true);
     void (async () => {
       const [snapshot, prefs] = await Promise.all([transferClient.request('getRemotes', { repoPath }), transferClient.request('getPreferences', { repoPath })]);
@@ -72,12 +78,15 @@ export function useRepositoryHosting(repoPath: string | null) {
         if (active) setError(reason.message);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setResolvedScope(scope);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
     };
-  }, [repoPath, connections, revision]);
+  }, [repoPath, connections, revision, scope]);
   const choose = async (endpoint: RepositoryEndpoint) => {
     if (!repoPath || !endpoint.repository) return;
     const capturedPath = repoPath;
@@ -93,5 +102,13 @@ export function useRepositoryHosting(repoPath: string | null) {
     });
     useHostingState.getState().refresh();
   };
-  return { endpoints, repository, remoteName, loading, error, choose };
+  const resolved = resolvedScope === scope;
+  return {
+    endpoints: resolved ? endpoints : [],
+    repository: resolved ? repository : null,
+    remoteName: resolved ? remoteName : '',
+    loading: Boolean(repoPath) && (!resolved || loading),
+    error: resolved ? error : null,
+    choose,
+  };
 }

@@ -6,9 +6,9 @@ import type { HostedRepositoryRef, RepositoryEndpoint } from '@/types/hostingDto
 import { useReleaseTarget } from '../useReleaseTarget';
 import { useHostingState } from '@/components/hosting/hostingState';
 
-const mocks = vi.hoisted(() => ({ request: vi.fn(), local: null as unknown }));
+const mocks = vi.hoisted(() => ({ request: vi.fn(), local: null as unknown, accounts: { loading: false, error: null as string | null } }));
 vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: mocks.request } }));
-vi.mock('@/components/hosting/useHostingConnections', () => ({ useHostingConnections: () => {} }));
+vi.mock('@/components/hosting/useHostingConnections', () => ({ useHostingConnections: () => mocks.accounts }));
 vi.mock('@/components/hosting/useRepositoryHosting', () => ({ useRepositoryHosting: () => mocks.local }));
 const first: RepositoryEndpoint = {
   remoteName: 'origin',
@@ -30,6 +30,7 @@ const render = async (requested?: HostedRepositoryRef | null) => act(async () =>
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   root = createRoot(document.createElement('div'));
+  mocks.accounts = { loading: false, error: null };
   mocks.local = { endpoints: [first], repository: null, remoteName: '', loading: false, error: null };
   mocks.request
     .mockReset()
@@ -41,6 +42,25 @@ beforeEach(() => {
 afterEach(() => act(() => root.unmount()));
 
 describe('release target selection', () => {
+  it('does not declare a missing target until accounts and endpoint discovery have both completed', async () => {
+    mocks.local = { ...(mocks.local as object), endpoints: [], loading: false };
+    mocks.accounts.loading = true;
+    await render();
+    expect(hook.loading).toBe(true);
+    expect(hook.missingTarget).toBe(false);
+    mocks.accounts.loading = false;
+    mocks.local = { ...(mocks.local as object), loading: true };
+    await render();
+    expect(hook.missingTarget).toBe(false);
+    mocks.local = { ...(mocks.local as object), loading: false };
+    await render();
+    expect(hook.missingTarget).toBe(true);
+    mocks.accounts.error = 'Account access denied';
+    await render();
+    expect(hook.missingTarget).toBe(false);
+    expect(hook.error).toBe('Account access denied');
+  });
+
   it('automatically uses one distinct target and requires a choice for multiple unconfigured targets', async () => {
     mocks.local = {
       ...(mocks.local as object),
@@ -52,12 +72,14 @@ describe('release target selection', () => {
     mocks.local = { ...(mocks.local as object), endpoints: [first, second] };
     await render();
     expect(hook.endpoint).toBeNull();
+    expect(hook.missingTarget).toBe(false);
     await act(async () => hook.choose(second));
     expect(hook.repository?.ref).toEqual(second.repository);
     mocks.local = { ...(mocks.local as object), endpoints: [first] };
     await render();
     expect(hook.endpoint).toBeNull();
     expect(hook.repository).toBeNull();
+    expect(hook.missingTarget).toBe(true);
   });
 
   it('honors the configured local target while an explicit hosting request never falls back to another account or namespace', async () => {

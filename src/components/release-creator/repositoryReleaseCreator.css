@@ -49,24 +49,6 @@
   max-width: 100%;
   width: 100%;
 }
-.release-page-message {
-  flex-shrink: 0;
-  max-height: 25%;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 0.76rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.release-page-message--error {
-  color: var(--danger);
-}
 .release-notes-actions {
   display: flex;
   gap: 4px;

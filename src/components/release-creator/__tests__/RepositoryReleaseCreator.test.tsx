@@ -7,7 +7,16 @@ import type { HostedRepository, HostingCapabilities } from '@/types/hostingDtos'
 import { RepositoryReleaseCreator } from '../RepositoryReleaseCreator';
 import { releaseDraftKey, useReleaseDraftState } from '../releaseDraftState';
 
-const mocks = vi.hoisted(() => ({ request: vi.fn(), generate: vi.fn(), target: null as unknown, config: vi.fn(), tab: vi.fn(), branch: 'main' }));
+const mocks = vi.hoisted(() => ({
+  request: vi.fn(),
+  generate: vi.fn(),
+  target: null as unknown,
+  config: vi.fn(),
+  tab: vi.fn(),
+  toast: vi.fn(),
+  branch: 'main',
+}));
+vi.mock('@/hooks/useAppToast', () => ({ useAppToast: () => mocks.toast }));
 vi.mock('../useReleaseTarget', () => ({ useReleaseTarget: () => mocks.target }));
 vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: mocks.request, sessionVersion: () => 0 } }));
 vi.mock('@/services/aiClient', () => ({ aiClient: { generateReleaseNotes: mocks.generate } }));
@@ -43,7 +52,7 @@ const history = {
 function target(id: string, caps = capabilities) {
   const repo = repository(id);
   const endpoint = { repoPath: 'C:/repo', remoteName: 'origin', url: repo.cloneUrl, repository: repo.ref };
-  return { scope: id, repository: repo, endpoint, choices: [endpoint], capabilities: caps, loading: false, error: '', choose: vi.fn() };
+  return { scope: id, repository: repo, endpoint, choices: [endpoint], capabilities: caps, loading: false, missingTarget: false, error: '', choose: vi.fn() };
 }
 let root: Root;
 let host: HTMLDivElement;
@@ -138,7 +147,7 @@ describe('full repository release creator', () => {
   });
 
   it('keeps the creator reachable with configuration actions when no hosting target is mapped', async () => {
-    mocks.target = { ...target('missing'), endpoint: null, choices: [], repository: null, capabilities: null };
+    mocks.target = { ...target('missing'), endpoint: null, choices: [], repository: null, capabilities: null, missingTarget: true };
     await render();
     expect(host.querySelector('.release-creator')).toBeTruthy();
     expect(host.textContent).toContain('No target configured');
@@ -147,6 +156,28 @@ describe('full repository release creator', () => {
     expect(mocks.config).toHaveBeenCalled();
     expect((host.querySelector('.release-primary-btn') as HTMLButtonElement).disabled).toBe(true);
     expect(mocks.request).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Hosting target missing'), true);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it('routes context errors and AI fallback feedback to the central toast without inline messages or repeats on form edits', async () => {
+    mocks.request.mockRejectedValueOnce(new Error('Release history access denied'));
+    await render();
+    expect(mocks.toast).toHaveBeenCalledWith('Release history access denied', true);
+    expect(host.textContent).not.toContain('Release history access denied');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    mocks.request.mockResolvedValue({ ...history, fallbackUsed: true, warning: 'Only the latest 150 commits are included.' });
+    await click('Refresh');
+    expect(mocks.toast).toHaveBeenCalledWith('Only the latest 150 commits are included.', false);
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('Showing recent commits'), false);
+    const count = mocks.toast.mock.calls.length;
+    await click('Minor');
+    expect(mocks.toast).toHaveBeenCalledTimes(count);
+    mocks.generate.mockResolvedValue({ success: true, data: { markdown: 'fallback notes', source: 'deterministic', warning: 'AI unavailable' } });
+    await click('Generate release notes with AI');
+    expect(mocks.toast).toHaveBeenCalledWith('AI unavailable', false);
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('fallback notes');
+    expect(host.querySelector('.release-page-message')).toBeNull();
   });
 
   it('rejects late history and AI results after selecting another hosting account', async () => {
