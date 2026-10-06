@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare Electron runtime
+        run: npx --no-install install-electron
+
       - name: Verify Git LFS test dependency
         run: git lfs version
 

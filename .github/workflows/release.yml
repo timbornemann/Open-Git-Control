@@ -120,6 +120,9 @@ jobs:
       - name: Prepare package version
         run: node scripts/prepare-release-version.js "${{ needs.prepare.outputs.version }}"
 
+      - name: Prepare Electron runtime
+        run: npx --no-install install-electron
+
       - name: Run release quality gate
         run: npm run test:ci
 

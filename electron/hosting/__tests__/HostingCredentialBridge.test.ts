@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { createRequire } from 'node:module';
 
 const fillCredential = (env: NodeJS.ProcessEnv, host: string, repoPath: string) =>
   new Promise<string>((resolve, reject) => {
@@ -115,7 +116,7 @@ describe('destination-bound credential broker', () => {
   it.runIf(process.platform === 'win32')(
     'runs the Git credential helper with the actual Electron executable',
     async () => {
-      const electronExecutable = path.resolve('node_modules/electron/dist/electron.exe');
+      const electronExecutable = createRequire(path.resolve('package.json'))('electron') as string;
       expect(fs.existsSync(electronExecutable)).toBe(true);
       const execPathDescriptor = Object.getOwnPropertyDescriptor(process, 'execPath')!;
       const bridge = new HostingCredentialBridge(async () => ({ username: 'electron-user', password: 'electron-runtime-secret', isCurrent: () => true }));

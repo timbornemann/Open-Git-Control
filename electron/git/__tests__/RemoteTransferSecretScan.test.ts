@@ -26,10 +26,10 @@ afterEach(() => {
   for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-function fixture(content = 'Clean initial content\n') {
+function fixture(content = 'Clean initial content\n', usePathAlias = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ogc-push-scan-'));
   directories.push(root);
-  const repoPath = path.join(root, 'working');
+  let repoPath = path.join(root, 'working');
   const remotePath = path.join(root, 'origin.git');
   fs.mkdirSync(repoPath);
   fs.mkdirSync(remotePath);
@@ -42,8 +42,18 @@ function fixture(content = 'Clean initial content\n') {
   git(repoPath, 'commit', '-m', 'Initial');
   git(remotePath, 'init', '--bare');
   git(repoPath, 'remote', 'add', 'origin', remotePath);
+  if (usePathAlias) {
+    const alias = path.join(root, 'working-alias');
+    fs.symlinkSync(repoPath, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    repoPath = alias;
+  }
   const gitService = new GitService();
   gitService.setRepoPath(repoPath);
+  // IPC requests use the activated root returned by Main, after Git resolves
+  // macOS /var aliases, Windows short temp paths and directory links.
+  const activeRepoPath = gitService.getRepoPath();
+  if (!activeRepoPath) throw new Error('Fixture repository was not activated.');
+  repoPath = activeRepoPath;
   const repoJobRegistry = new RepoJobRegistry();
   repoJobRegistry.cancelForRepoChange(repoPath);
   const scanner = new SecretScanService(gitService);
@@ -65,45 +75,53 @@ function fixture(content = 'Clean initial content\n') {
   const request = (operation: string, input: object = {}) => handlers.get(IpcChannel.RemoteTransferRequest)!(event, operation, { repoPath, ...input });
   const prepare = async () => {
     const result = await request('planPush', { remoteNames: ['origin'] });
-    expect(result.success).toBe(true);
+    expect(result.success, result.error).toBe(true);
     const plan = result.data as GitPushPlanDto;
     const resultScan = await handlers.get(IpcChannel.GitScanPushSecrets)!(event, { repoPath, pushArgs: plan.secretScanArgs });
-    expect(resultScan.success).toBe(true);
+    expect(resultScan.success, resultScan.error).toBe(true);
     return { plan, resultScan: resultScan.data };
   };
   return { repoPath, remotePath, event, scan, request, prepare };
 }
 
 describe('single remote push with the real secret scan and IPC guard', () => {
-  it('publishes a clean captured commit without setup or a separate approval, including a repeated up-to-date push', async () => {
-    const f = fixture();
-    expect((await f.request('getPreferences')).data).toEqual({});
-    expect((await f.request('getRemotes')).data.remotes).toHaveLength(1);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const { plan, resultScan } = await f.prepare();
-      expect(plan.secretScanArgs[0]).toContain(plan.id);
-      expect(resultScan.historyScanIncomplete).toBeUndefined();
-      expect(resultScan.findings).toEqual([]);
-      expect(resultScan.notes.join('\n')).not.toContain('Could not inspect');
-      const result = await f.request('executePush', { planId: plan.id });
-      expect(result).toMatchObject({ success: true, data: { state: 'success' } });
-      expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(plan.sourceOid);
-    }
-    // A completed clean scan is consumed, rather than scanned a second time during execution.
-    expect(f.scan).toHaveBeenCalledTimes(2);
-    expect((await f.request('getPreferences')).data).toEqual({});
-  }, 30_000);
+  it.each([false, true])(
+    'publishes a clean captured commit without setup or a separate approval, including a repeated up-to-date push (path alias: %s)',
+    async (usePathAlias) => {
+      const f = fixture(undefined, usePathAlias);
+      expect((await f.request('getPreferences')).data).toEqual({});
+      expect((await f.request('getRemotes')).data.remotes).toHaveLength(1);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { plan, resultScan } = await f.prepare();
+        expect(plan.secretScanArgs[0]).toContain(plan.id);
+        expect(resultScan.historyScanIncomplete).toBeUndefined();
+        expect(resultScan.findings).toEqual([]);
+        expect(resultScan.notes.join('\n')).not.toContain('Could not inspect');
+        const result = await f.request('executePush', { planId: plan.id });
+        expect(result).toMatchObject({ success: true, data: { state: 'success' } });
+        expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(plan.sourceOid);
+      }
+      // A completed clean scan is consumed, rather than scanned a second time during execution.
+      expect(f.scan).toHaveBeenCalledTimes(2);
+      expect((await f.request('getPreferences')).data).toEqual({});
+    },
+    30_000,
+  );
 
-  it('still requires approval for detected secrets and binds that approval to the captured push plan', async () => {
-    const f = fixture('AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n');
-    const { plan, resultScan } = await f.prepare();
-    expect(resultScan.historyScanIncomplete).toBeUndefined();
-    expect(resultScan.findings.length).toBeGreaterThan(0);
-    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: false, error: expect.stringContaining('Potential secrets') });
-    expect(git(f.remotePath, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
-    const approval = await handlers.get(IpcChannel.GitApproveSecretScanPush)!(f.event, plan.secretScanArgs, f.repoPath);
-    expect(approval).toEqual({ success: true });
-    expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: true, data: { state: 'success' } });
-    expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(plan.sourceOid);
-  }, 30_000);
+  it.each([false, true])(
+    'still requires approval for detected secrets and binds that approval to the captured push plan (path alias: %s)',
+    async (usePathAlias) => {
+      const f = fixture('AWS_ACCESS_KEY_ID=AKIA1234567890ABCDEF\n', usePathAlias);
+      const { plan, resultScan } = await f.prepare();
+      expect(resultScan.historyScanIncomplete).toBeUndefined();
+      expect(resultScan.findings.length).toBeGreaterThan(0);
+      expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: false, error: expect.stringContaining('Potential secrets') });
+      expect(git(f.remotePath, 'for-each-ref', '--format=%(refname)', 'refs/heads')).toBe('');
+      const approval = await handlers.get(IpcChannel.GitApproveSecretScanPush)!(f.event, plan.secretScanArgs, f.repoPath);
+      expect(approval).toEqual({ success: true });
+      expect(await f.request('executePush', { planId: plan.id })).toMatchObject({ success: true, data: { state: 'success' } });
+      expect(git(f.remotePath, 'rev-parse', 'refs/heads/main')).toBe(plan.sourceOid);
+    },
+    30_000,
+  );
 });

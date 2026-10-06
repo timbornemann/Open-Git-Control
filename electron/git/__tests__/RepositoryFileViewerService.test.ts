@@ -42,11 +42,12 @@ afterEach(() => {
   for (const repo of fixtures.splice(0)) {
     if (path.dirname(path.resolve(repo)) !== path.resolve(os.tmpdir()) || !path.basename(repo).startsWith('ogc-viewer-'))
       throw new Error('Unsafe test cleanup');
-    fs.rmSync(repo, { recursive: true, force: true });
+    fs.rmSync(repo, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
 
-describe('source-aware file viewer', () => {
+// These integration cases launch many real Git processes; allow CI startup and I/O latency.
+describe('source-aware file viewer', { timeout: 30_000 }, () => {
   it('reads an untracked file without adding it and detects changed working files before saving', async () => {
     const f = fixture();
     f.write('file.txt', 'new\n');
