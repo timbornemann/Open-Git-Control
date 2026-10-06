@@ -1,6 +1,6 @@
 # Open-Git-Control
 
-[![CI](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml/badge.svg)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml)
+[![CI (Linux, Windows, macOS)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/timbornemann/Open-Git-Control/actions/workflows/ci.yml?query=branch%3Amaster+event%3Apush)
 [![Latest release](https://img.shields.io/github/v/release/timbornemann/Open-Git-Control?sort=semver)](https://github.com/timbornemann/Open-Git-Control/releases/latest)
 [![License](https://img.shields.io/github/license/timbornemann/Open-Git-Control)](LICENSE)
 
