@@ -14,13 +14,14 @@ const mocks = vi.hoisted(() => ({
   config: vi.fn(),
   tab: vi.fn(),
   toast: vi.fn(),
+  openExternal: vi.fn(),
   branch: 'main',
 }));
 vi.mock('@/hooks/useAppToast', () => ({ useAppToast: () => mocks.toast }));
 vi.mock('../useReleaseTarget', () => ({ useReleaseTarget: () => mocks.target }));
 vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: mocks.request, sessionVersion: () => 0 } }));
 vi.mock('@/services/aiClient', () => ({ aiClient: { generateReleaseNotes: mocks.generate } }));
-vi.mock('@/services/appClient', () => ({ appClient: { selectFiles: async () => [] } }));
+vi.mock('@/services/appClient', () => ({ appClient: { selectFiles: async () => [], isAvailable: () => true, openExternalUrl: mocks.openExternal } }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (select: (state: unknown) => unknown) => select({ currentBranch: mocks.branch, refreshTrigger: 0, triggerRefresh: vi.fn() }),
   useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { language: 'en' } }),
@@ -111,6 +112,50 @@ afterEach(() => {
 });
 
 describe('full repository release creator', () => {
+  it('previews the current draft without publishing or losing text and refreshes after notes generation', async () => {
+    await render();
+    const body = '## Fixed\n\n- **Keep the draft**\n\n[Details](https://forge.example/team/repo/commit/aaaaaaa)\n\n<script>unsafe()</script>';
+    await notes(body);
+    mocks.request.mockClear();
+    await click('Preview');
+    const preview = host.querySelector('.release-notes-preview')!;
+    expect(preview.querySelector('h2')?.textContent).toBe('Fixed');
+    expect(preview.querySelector('strong')?.textContent).toBe('Keep the draft');
+    expect(preview.querySelector('script')).toBeNull();
+    expect(host.querySelector('textarea')).toBeNull();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(mocks.generate).not.toHaveBeenCalled();
+    await act(async () => preview.querySelector<HTMLAnchorElement>('a')!.click());
+    expect(mocks.openExternal).toHaveBeenCalledWith('https://forge.example/team/repo/commit/aaaaaaa');
+    await click('Edit');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe(body);
+
+    await click('Preview');
+    mocks.generate.mockResolvedValue({ success: true, data: { markdown: '## Generated\n\nUpdated notes.', source: 'ai' } });
+    await click('Generate release notes with AI');
+    expect(host.querySelector('.release-notes-preview h2')?.textContent).toBe('Generated');
+    expect(host.querySelector('.release-notes-preview')?.textContent).toContain('Updated notes.');
+    await click('Edit');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('## Generated');
+  });
+
+  it('offers an offline empty preview and keeps preview contents isolated when changing repositories', async () => {
+    mocks.target = { ...target('offline'), repository: null, capabilities: null };
+    await render();
+    await click('Preview');
+    expect(host.querySelector('.release-notes-preview')?.textContent).toContain('No release notes yet.');
+    expect(mocks.request).not.toHaveBeenCalled();
+    await click('Edit');
+    await notes('# Private draft');
+    await click('Preview');
+    expect(host.querySelector('.release-notes-preview h1')?.textContent).toBe('Private draft');
+    await render('C:/other');
+    await click('Preview');
+    expect(host.querySelector('.release-notes-preview')?.textContent).not.toContain('Private draft');
+    await render();
+    expect(host.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('# Private draft');
+  });
+
   it.each(['Patch', 'Minor', 'Major'])('generates the %s template and a full commit list without an AI or network request', async (version) => {
     await render();
     await click(version);

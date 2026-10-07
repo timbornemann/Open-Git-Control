@@ -4,9 +4,10 @@ import type { MarkdownPreviewState } from './useMarkdownPreview';
 type MarkdownPreviewPaneProps = {
   markdownPreview: MarkdownPreviewState;
   onPreviewClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+  emptyMessage?: string;
 };
 
-export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({ markdownPreview, onPreviewClick }) => {
+export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({ markdownPreview, onPreviewClick, emptyMessage }) => {
   const { t } = useI18n();
 
   return (
@@ -31,7 +32,7 @@ export const MarkdownPreviewPane: React.FC<MarkdownPreviewPaneProps> = ({ markdo
         <article className="markdown-preview-content" onClick={onPreviewClick} dangerouslySetInnerHTML={{ __html: markdownPreview.html }} />
       )}
       {!markdownPreview.loading && !markdownPreview.error && !markdownPreview.html && (
-        <div className="diff-empty-state">{t('generated.components.diff_viewer.markdownpreviewpane.markdown_file_is_empty_4443e82a')}</div>
+        <div className="diff-empty-state">{emptyMessage ?? t('generated.components.diff_viewer.markdownpreviewpane.markdown_file_is_empty_4443e82a')}</div>
       )}
     </div>
   );

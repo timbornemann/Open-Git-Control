@@ -6,6 +6,7 @@ import type { ReleaseVersionBump } from '@/utils/releaseTagSuggestion';
 import { AiOptionToggle } from './AiOptionToggle';
 import type { HostingCapabilities } from '@/types/hostingDtos';
 import { ReleaseNotesActions } from './ReleaseNotesActions';
+import { ReleaseNotesEditor } from './ReleaseNotesEditor';
 
 type ReleaseNotesWorkbenchProps = {
   releaseForm: ReleaseDraft;
@@ -259,17 +260,7 @@ export const ReleaseNotesWorkbench = ({
         </aside>
 
         <div className="release-notes-editor-pane">
-          <label className="release-field release-field--full release-field--editor">
-            <span className="release-field-label">{t('generated.components.releasecreator.release_notes_markdown_3ec01efd')}</span>
-            <textarea
-              className="release-textarea release-textarea--editor"
-              value={releaseForm.body || ''}
-              onChange={(event) => setReleaseForm((prev) => ({ ...prev, body: event.target.value }))}
-              rows={20}
-              disabled={isEditorDisabled}
-              placeholder={t('generated.components.releasecreator.added_changed_fixed_4361f5e9')}
-            />
-          </label>
+          <ReleaseNotesEditor body={releaseForm.body || ''} disabled={isEditorDisabled} onChange={(body) => setReleaseForm((prev) => ({ ...prev, body }))} />
 
           <div className="release-notes-meta">
             <span>

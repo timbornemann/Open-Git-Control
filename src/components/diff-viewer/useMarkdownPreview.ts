@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DiffRequest } from '@/types/diff';
-import { appClient } from '@/services/appClient';
 import { gitClient } from '@/services/gitClient';
+import { handleMarkdownPreviewClick } from '@/components/ui/markdownPreviewNavigation';
 import {
   applyMarkdownPreviewImageDataUrls,
   collectMarkdownPreviewImageSources,
-  isExternalMarkdownUrl,
   renderMarkdownToSanitizedHtml,
   resolveMarkdownPreviewAssetPath,
 } from '@/utils/markdownPreview';
@@ -117,27 +116,6 @@ export const useMarkdownPreview = ({ repoPath, request, isActive, t, markdownTex
       if (requestGenerationRef.current === requestGeneration) requestGenerationRef.current += 1;
     };
   }, [isActive, markdownText, repoPath, request, t]);
-
-  const handleMarkdownPreviewClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null;
-    if (!anchor) return;
-
-    const href = anchor.getAttribute('href') || '';
-    if (href.startsWith('#')) {
-      event.preventDefault();
-      const targetId = href.slice(1);
-      if (targetId) {
-        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      return;
-    }
-
-    event.preventDefault();
-    if (isExternalMarkdownUrl(href) && /^https:/i.test(href) && appClient.isAvailable()) {
-      void appClient.openExternalUrl(href);
-    }
-  }, []);
 
   return {
     markdownPreview,
