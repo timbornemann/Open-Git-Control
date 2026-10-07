@@ -14,6 +14,8 @@ export interface RemoteTransferState {
   phase: 'idle' | 'preparing' | 'selection' | 'review' | 'running' | 'result';
   busy: boolean;
   cancelling: boolean;
+  transferStage: 'preparing' | 'scanning' | 'transferring';
+  scanProgressId: string | null;
   intent: RemoteTransferDialog | null;
   snapshot: GitRemoteSnapshotDto | null;
   preferences: RemotePreferences;
@@ -31,6 +33,8 @@ export const initialRemoteTransferState = (): RemoteTransferState => ({
   phase: 'idle',
   busy: false,
   cancelling: false,
+  transferStage: 'preparing',
+  scanProgressId: null,
   intent: null,
   snapshot: null,
   preferences: {},

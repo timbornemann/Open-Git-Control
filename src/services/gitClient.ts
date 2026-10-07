@@ -2,6 +2,7 @@ import { cachedClient } from '@/data/clientCache';
 import type { GitCommandName } from '@/shared/ipc/gitCommands';
 import type { GitCommandResultDto, SecretScanResultDto } from '@/types/gitDtos';
 import type { IpcResult } from '@/types/ipc';
+import type { ScanPushSecretsRequestDto } from '@/types/secretScan';
 import type { ElectronAPI } from '@/shared/ipc/contracts/electronApi';
 import { getElectronApi, requireElectronGitApi } from './electronApi';
 import type { RepoUnavailablePayload } from './repoUnavailableClassifier';
@@ -31,7 +32,6 @@ export type RevertCommitOptions = {
 const sanitizeBranchSuffix = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, '-');
 
 const command = <TCommand extends GitCommandName>(commandName: TCommand, ...args: string[]): [TCommand, ...string[]] => [commandName, ...args];
-
 export const gitClient = cachedClient('git', {
   ...commitMessageEdits,
   isAvailable(): boolean {
@@ -352,7 +352,7 @@ export const gitClient = cachedClient('git', {
     return requireElectronGitApi().deleteWorkingDirectoryEntry(filePath, repoPath);
   },
 
-  async scanPushSecrets(params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }): Promise<IpcResult<SecretScanResultDto>> {
+  async scanPushSecrets(params: ScanPushSecretsRequestDto): Promise<IpcResult<SecretScanResultDto>> {
     return requireElectronGitApi().scanPushSecrets(params);
   },
 

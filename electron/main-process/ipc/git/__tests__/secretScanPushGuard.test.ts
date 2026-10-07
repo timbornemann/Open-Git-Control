@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepoJobRegistry } from '../../../repoJobRegistry';
 import { registerSecretScanPushGuard } from '../secretScanPushGuard';
+import type { SecretScanProgressDto } from '../../../../../src/types/secretScan';
 
 const { handlers } = vi.hoisted(() => ({
   handlers: new Map<string, (...args: any[]) => Promise<any>>(),
@@ -108,6 +109,35 @@ describe('secret scan push state binding', () => {
       success: false,
       error: 'Repository state changed after the secret scan. Run the secret scan again before pushing.',
     });
+  });
+
+  it('binds every progress event to the repository and scan request without exposing scanned contents', async () => {
+    const progress = { phase: 'history', checkedLines: 32000, processedCommits: 96, totalCommits: 205 } as const;
+    const scan = vi.fn(async ({ onScanProgress }: { onScanProgress: (event: SecretScanProgressDto) => void }) => {
+      onScanProgress(progress);
+      onScanProgress({ phase: 'verifying', checkedLines: 32001 });
+      return { ...findingsResult, stats: { ...findingsResult.stats, checkedLines: 32001 } };
+    });
+    const harness = createHarness(scan);
+    const result = await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', pushArgs: [], progressId: 'request-scan-1' });
+    expect(result.success, result.error).toBe(true);
+    const events = harness.event.sender.send.mock.calls.map(([, event]) => event);
+    expect(events.map(({ status }) => status)).toEqual(['start', 'progress', 'progress', 'done']);
+    for (const event of events) expect(event.details).toMatchObject({ repoPath: 'C:/repo', progressId: 'request-scan-1' });
+    expect(events[1].details.secretScan).toEqual(progress);
+    expect(events[2].details.secretScan).toEqual({ phase: 'verifying', checkedLines: 32001 });
+    expect(events[3].details.secretScan).toEqual({ phase: 'complete', checkedLines: 32001 });
+    expect(JSON.stringify(events)).not.toContain('[REDACTED_SECRET]');
+  });
+
+  it('keeps failure progress scoped and never reports an unsuccessful scan as complete', async () => {
+    const harness = createHarness(vi.fn().mockRejectedValue(new Error('Scan failed')));
+    const result = await handlers.get('git:scanPushSecrets')!(harness.event, { repoPath: 'C:/repo', progressId: 'failed-scan' });
+    expect(result.success).toBe(false);
+    const events = harness.event.sender.send.mock.calls.map(([, event]) => event);
+    expect(events.map(({ status }) => status)).toEqual(['start', 'failed']);
+    expect(events.at(-1).details).toMatchObject({ repoPath: 'C:/repo', progressId: 'failed-scan' });
+    expect(events.some((event) => event.details.secretScan?.phase === 'complete')).toBe(false);
   });
 
   it('rejects approval when exact staged index entries changed after the scan', async () => {

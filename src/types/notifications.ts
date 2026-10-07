@@ -4,6 +4,8 @@ export type NotificationMessage = ToastMessage & {
   kind?: 'success' | 'error' | 'info' | 'warning' | 'progress';
   title?: string;
   detail?: string;
+  /** null is an indeterminate phase, never an estimated percentage. */
+  progress?: { value: number | null; label: string };
   actions?: { label: string; onClick: () => void; disabled?: boolean }[];
   /** null keeps the notification until it is completed or dismissed. */
   autoHideMs?: number | null;

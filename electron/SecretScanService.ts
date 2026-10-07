@@ -1,5 +1,7 @@
 import type { GitService } from './GitService';
 import { scanLfsSecrets } from './git/GitLfsSecretScanner';
+import { SecretScanProgress } from './git/SecretScanProgress';
+import type { SecretScanProgressDto } from '../src/types/secretScan';
 
 export type SecretScanStrictness = 'low' | 'medium' | 'high';
 export type SecretScanSource = 'staged' | 'to-push' | 'tag';
@@ -371,6 +373,7 @@ export class SecretScanService {
     allowlistText: string;
     signal?: AbortSignal;
     onProgress?: (checkedLines: number) => void;
+    onScanProgress?: (progress: SecretScanProgressDto) => void;
     includeTags?: boolean;
     revisions?: string[];
     excludeRemote?: string;
@@ -390,6 +393,8 @@ export class SecretScanService {
     let toPushLines = 0;
     let tagLines = 0;
     let findingLimitNoted = false;
+    const progress = new SecretScanProgress(options.onScanProgress);
+    progress.phase('preparing');
     const pushPlan = options.pushArgs ? await this.resolvePushPlan(options.repoPath, options.pushArgs) : null;
     const scannedCommits = new Set<string>();
     const scannedLfs = new Set<string>();
@@ -414,6 +419,7 @@ export class SecretScanService {
       else if (candidate.source === 'tag') tagLines += 1;
       else toPushLines += 1;
       const checkedLines = stagedLines + toPushLines + tagLines;
+      progress.lines(checkedLines);
       if (checkedLines % 250 === 0) options.onProgress?.(checkedLines);
       for (const pattern of SECRET_PATTERNS) {
         if (!patternEnabledForStrictness(pattern, strictness)) continue;
@@ -513,6 +519,7 @@ export class SecretScanService {
         commitsToScan.push(commitHash);
       }
 
+      if (commitsToScan.length) progress.beginCommits(commitsToScan.length, source === 'tag');
       for (let offset = 0; offset < commitsToScan.length; offset += MAX_COMMITS_PER_DIFF_PROCESS) {
         if (options.signal?.aborted) {
           const aborted = new Error('Secret scan was aborted.');
@@ -536,6 +543,8 @@ export class SecretScanService {
           ],
           source,
         );
+        options.signal?.throwIfAborted();
+        progress.completeBatch(batch.length);
       }
     };
 
@@ -562,6 +571,7 @@ export class SecretScanService {
     const scanRequestedRevisions = async (revisions: string[], continueOnFailure = false): Promise<boolean> => {
       let scannedSource = false;
       for (const revision of revisions) {
+        progress.phase('preparing');
         try {
           const commitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
             'rev-list',
@@ -634,6 +644,7 @@ export class SecretScanService {
 
     const scanTagCommits = async () => {
       if (!options.includeTags && !pushPlan?.includeTags) return;
+      progress.phase('preparing');
       try {
         const tagOnlyCommitsRaw = await this.gitService.runCommandAtPath(options.repoPath, [
           'rev-list',
@@ -654,17 +665,22 @@ export class SecretScanService {
     };
 
     if (options.stagedBaseTree && !/^[0-9a-f]{40,64}$/.test(options.stagedBaseTree)) throw new Error('Invalid scan base tree.');
+    progress.phase('staged');
     await streamDiff(
       ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', ...(options.stagedBaseTree ? [options.stagedBaseTree] : [])],
       'staged',
     );
     if (options.includePushHistory !== false) {
+      progress.phase('preparing');
       await scanPushSourceCommits();
       await scanTagCommits();
     }
+    progress.phase('lfs');
     await scanLfs(null, 'staged');
 
     options.onProgress?.(stagedLines + toPushLines + tagLines);
+    options.signal?.throwIfAborted();
+    progress.phase('verifying');
 
     return {
       scanned: true,

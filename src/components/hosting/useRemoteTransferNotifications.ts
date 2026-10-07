@@ -2,10 +2,12 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useWorkflowStore } from '@/contexts/AppStateContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import type { NotificationMessage } from '@/types/notifications';
+import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { useRemoteTransferState, type RemoteTransferState } from './remoteTransferState';
 import type { RemoteTransferCoordinator } from './remoteTransferCoordinator';
+import { secretScanNotification } from './secretScanNotification';
 
-const pushOperations = new Set(['git:executePush', 'git:retryPush', 'git:planPush', 'security:secret-scan']);
+const pushOperations = new Set(['git:executePush', 'git:retryPush', 'git:planPush']);
 const notificationTitle = (current: RemoteTransferState) =>
   `${current.intent?.mode === 'pull' ? 'Pull' : current.intent?.mode === 'fetch' ? 'Fetch' : 'Push'} · ${current.intent?.repoPath.split(/[\\/]/).filter(Boolean).pop() ?? ''}`;
 
@@ -18,13 +20,22 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
   translate.current = tr;
   const entry = useRef<{ id: number; intent: RemoteTransferState['intent']; progress: boolean; startedAt: number } | null>(null);
   const owned = useRef(new Set<number>());
+  const matchesRepository = (repoPath: unknown) =>
+    typeof repoPath === 'string' &&
+    [state.intent?.repoPath, state.snapshot?.repoPath].some((path) => path && normalizeRepoPathKey(path) === normalizeRepoPathKey(repoPath));
   const latest = jobs.find(
     (job) =>
       (state.intent?.mode === 'push' ? pushOperations.has(job.operation) : job.operation === `git:${state.intent?.mode}`) &&
-      job.details?.repoPath === state.intent?.repoPath &&
+      matchesRepository(job.details?.repoPath) &&
       job.timestamp >= (entry.current?.progress && entry.current.intent === state.intent ? entry.current.startedAt : Date.now()),
   );
   const progress = latest?.message?.trim() ?? '';
+  const scanProgress =
+    state.transferStage === 'scanning' && state.scanProgressId
+      ? jobs.find(
+          (job) => job.operation === 'security:secret-scan' && matchesRepository(job.details?.repoPath) && job.details?.progressId === state.scanProgressId,
+        )?.details?.secretScan
+      : undefined;
 
   const notify = useCallback(
     (message: string, isError: boolean) => {
@@ -76,8 +87,10 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
     const message = state.cancelling
       ? translate.current('Übertragung wird abgebrochen …', 'Cancelling transfer …')
       : progress ||
-        (state.intent.mode === 'push' && state.plan && !state.scan
-          ? translate.current('Push wird geprüft …', 'Checking push …')
+        (state.intent.mode === 'push'
+          ? state.transferStage === 'transferring'
+            ? translate.current('Push läuft …', 'Pushing …')
+            : translate.current('Push wird vorbereitet …', 'Preparing push …')
           : translate.current('Übertragung läuft …', 'Transfer running …'));
     const notification: NotificationMessage = {
       title: notificationTitle(state),
@@ -86,6 +99,7 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       kind: 'progress',
       autoHideMs: null,
       dismissible: false,
+      ...(state.transferStage === 'scanning' && !state.cancelling ? secretScanNotification(scanProgress, translate.current) : {}),
       actions: [{ label: translate.current('Abbrechen', 'Cancel'), onClick: () => coordinator.cancel(), disabled: state.cancelling }],
     };
     const previous = entry.current;
@@ -97,7 +111,7 @@ export function useRemoteTransferNotifications(coordinator: RemoteTransferCoordi
       progress: true,
       startedAt: previous?.progress && previous.intent === state.intent ? previous.startedAt : Date.now(),
     };
-  }, [coordinator, notifications, state, progress]);
+  }, [coordinator, notifications, state, progress, scanProgress]);
 
   useLayoutEffect(() => {
     const ids = owned.current;

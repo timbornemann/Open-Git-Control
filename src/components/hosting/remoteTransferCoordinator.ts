@@ -166,6 +166,7 @@ export class RemoteTransferCoordinator {
       return;
     }
     const remote = selection.selectedRemoteNames[0];
+    this.set({ transferStage: 'transferring' });
     if (intent.mode === 'fetch') {
       await this.scoped(() => transferClient.request('fetch', { repoPath: intent.repoPath, remote }));
       await this.verifyTargets();
@@ -189,7 +190,9 @@ export class RemoteTransferCoordinator {
   private async scanPlan() {
     const { intent, plan } = this.state;
     if (!intent || !plan || !this.environment.getContext().scanEnabled) return;
-    const result = await this.scoped(() => gitClient.scanPushSecrets({ repoPath: intent.repoPath, pushArgs: plan.secretScanArgs }));
+    const progressId = crypto.randomUUID();
+    this.set({ transferStage: 'scanning', scanProgressId: progressId });
+    const result = await this.scoped(() => gitClient.scanPushSecrets({ repoPath: intent.repoPath, pushArgs: plan.secretScanArgs, progressId }));
     if (!result.success) throw new Error(result.error);
     this.set({ scan: result.data });
   }
@@ -228,7 +231,7 @@ export class RemoteTransferCoordinator {
   }
   async approve() {
     if (this.state.busy || this.state.scan?.historyScanIncomplete) return;
-    this.set({ phase: 'running', busy: true });
+    this.set({ phase: 'running', busy: true, transferStage: 'preparing', scanProgressId: null });
     await this.run(async () => {
       const { intent, plan, scan } = this.state;
       if (!intent || !plan) return;
@@ -243,7 +246,7 @@ export class RemoteTransferCoordinator {
   async retryScan() {
     if (this.state.busy || !this.state.intent || !this.state.plan) return;
     this.cancelled = false;
-    this.set({ phase: 'preparing', busy: true, scan: null, error: '' });
+    this.set({ phase: 'preparing', busy: true, transferStage: 'preparing', scanProgressId: null, scan: null, error: '' });
     await this.run(async () => {
       await this.verifyTargets();
       if (this.state.retrying) {
@@ -259,6 +262,7 @@ export class RemoteTransferCoordinator {
     const { intent, plan, batch, retrying } = this.state;
     if (!intent || !plan) return;
     const generation = this.generation;
+    this.set({ transferStage: 'transferring' });
     const next =
       retrying && batch
         ? await transferClient.request('retryPush', {
@@ -287,7 +291,7 @@ export class RemoteTransferCoordinator {
   async retryPush() {
     if (this.state.busy || !this.state.batch || !this.state.plan) return;
     this.cancelled = false;
-    this.set({ busy: true, phase: 'preparing', scan: null, retrying: true, error: '' });
+    this.set({ busy: true, phase: 'preparing', transferStage: 'preparing', scanProgressId: null, scan: null, retrying: true, error: '' });
     await this.run(async () => {
       await this.verifyTargets();
       await this.scanPlan();
@@ -298,7 +302,7 @@ export class RemoteTransferCoordinator {
     if (this.state.busy || !this.state.failedPull) return;
     this.cancelled = false;
     const input = this.state.failedPull;
-    this.set({ busy: true, phase: 'running', error: '' });
+    this.set({ busy: true, phase: 'running', transferStage: 'transferring', error: '' });
     await this.run(async () => {
       await this.verifyTargets();
       await this.scoped(() => transferClient.request('pull', input));

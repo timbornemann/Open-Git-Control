@@ -20,6 +20,7 @@ import type {
 } from '../../../types/gitDtos';
 import type { GitCommandName } from '../gitCommands';
 import type { GitJobEventDto } from '../../../types/aiDtos';
+import type { ScanPushSecretsRequestDto } from '../../../types/secretScan';
 import type { IpcResult } from '../../../types/ipc';
 import type { LicenseTemplateId } from '../../licenseTemplates';
 import type {
@@ -266,7 +267,7 @@ export interface ElectronGitAPI extends GitLfsApi {
   gitPush: () => Promise<GitCommandResultDto>;
   scanCommitSecrets: (params: { repoPath: string }) => Promise<IpcResult<SecretScanResultDto>>;
   approveSecretScanCommit: (repoPath: string) => Promise<{ success: boolean }>;
-  scanPushSecrets: (params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }) => Promise<IpcResult<SecretScanResultDto>>;
+  scanPushSecrets: (params: ScanPushSecretsRequestDto) => Promise<IpcResult<SecretScanResultDto>>;
   approveSecretScanPush: (pushArgs: string[] | undefined, repoPath: string) => Promise<{ success: boolean }>;
   cancelSecretScan: (repoPath: string) => Promise<{ success: boolean; cancelled: boolean; error?: string }>;
   gitClone: (cloneUrl: string, targetDir: string, targetName?: string) => Promise<GitCloneResultDto>;

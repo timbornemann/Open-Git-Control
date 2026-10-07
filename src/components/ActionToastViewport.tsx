@@ -65,6 +65,25 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
                 {toast.detail && <span className="toast-detail">{toast.detail}</span>}
               </div>
             </div>
+            {toast.progress && (
+              <div className="toast-progress">
+                <div
+                  className={`toast-progress-track${toast.progress.value === null ? ' indeterminate' : ''}`}
+                  role="progressbar"
+                  aria-label={toast.progress.label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={toast.progress.value === null ? undefined : toast.progress.value}
+                >
+                  <span className="toast-progress-fill" style={toast.progress.value === null ? undefined : { width: `${toast.progress.value}%` }} />
+                </div>
+                {toast.progress.value !== null && (
+                  <span className="toast-progress-value" aria-hidden="true">
+                    {toast.progress.value}%
+                  </span>
+                )}
+              </div>
+            )}
             <div className="toast-actions">
               {toast.isError && (
                 <>

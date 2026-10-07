@@ -78,6 +78,49 @@
   animation: notification-spin 1s linear infinite;
 }
 
+.toast-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 24px;
+}
+
+.toast-progress-track {
+  flex: 1;
+  height: 4px;
+  min-width: 120px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--bg-hover);
+}
+
+.toast-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.15s ease;
+}
+
+.toast-progress-track.indeterminate .toast-progress-fill {
+  width: 30%;
+  animation: notification-progress 1.2s ease-in-out infinite;
+}
+
+.toast-progress-value {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes notification-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
 .action-toast.progress,
 .action-toast.info {
   background: var(--bg-panel);
@@ -185,5 +228,11 @@
   .action-toast,
   .toast-icon-spin {
     animation: none;
+  }
+  .toast-progress-track.indeterminate .toast-progress-fill {
+    animation: none;
+  }
+  .toast-progress-fill {
+    transition: none;
   }
 }

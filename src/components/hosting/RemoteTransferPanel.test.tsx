@@ -153,7 +153,11 @@ describe('remote transfer host and selection UI', () => {
     await render();
     await start('push');
     expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(mocked.scan).toHaveBeenCalledWith({ repoPath: '/repo', pushArgs: ['__ogc_transfer_scan_plan__', `${'a'.repeat(40)}:refs/heads/main`] });
+    expect(mocked.scan).toHaveBeenCalledWith({
+      repoPath: '/repo',
+      pushArgs: ['__ogc_transfer_scan_plan__', `${'a'.repeat(40)}:refs/heads/main`],
+      progressId: expect.any(String),
+    });
     expect(mocked.request.mock.calls.filter(([operation]) => operation === 'executePush')).toHaveLength(1);
     expect(mocked.approve).not.toHaveBeenCalled();
     await start('pull');

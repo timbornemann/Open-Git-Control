@@ -119,7 +119,15 @@ export function registerSecretScanPushGuard({
 
   const scanPushSecrets = async (
     event: any,
-    params: { includeTags?: unknown; repoPath?: unknown; revisions?: unknown; excludeRemote?: unknown; pushArgs?: unknown; recordRendererScan?: boolean } = {},
+    params: {
+      includeTags?: unknown;
+      repoPath?: unknown;
+      revisions?: unknown;
+      excludeRemote?: unknown;
+      pushArgs?: unknown;
+      progressId?: unknown;
+      recordRendererScan?: boolean;
+    } = {},
   ) => {
     activeSecretScanController?.abort();
     if (params.recordRendererScan) {
@@ -138,11 +146,14 @@ export function registerSecretScanPushGuard({
     activeSecretScanController = controller;
     const jobId = createJobId('security-secret-scan');
     const operation = 'security:secret-scan';
+    const progressId = typeof params.progressId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(params.progressId) ? params.progressId : undefined;
+    const progressContext = { repoPath: repoJob.repoPath, progressId };
     emitJobEvent(event.sender, {
       id: jobId,
       operation,
       status: 'start',
       message: 'Secret scan started.',
+      details: { ...progressContext, secretScan: { phase: 'preparing', checkedLines: 0 } },
       timestamp: Date.now(),
     });
 
@@ -159,13 +170,13 @@ export function registerSecretScanPushGuard({
         excludeRemote: typeof params.excludeRemote === 'string' ? params.excludeRemote : undefined,
         pushArgs: Array.isArray(params.pushArgs) ? normalizePushArgs(params.pushArgs) : undefined,
         signal: controller.signal,
-        onProgress: (checkedLines) => {
+        onScanProgress: (progress) => {
           emitJobEvent(event.sender, {
             id: jobId,
             operation,
             status: 'progress',
-            message: `Secret scan checked ${checkedLines} added line(s).`,
-            details: { checkedLines },
+            message: `Secret scan checked ${progress.checkedLines} added line(s).`,
+            details: { ...progressContext, checkedLines: progress.checkedLines, secretScan: progress },
             timestamp: Date.now(),
           });
         },
@@ -198,6 +209,8 @@ export function registerSecretScanPushGuard({
         status: 'done',
         message: findingCount > 0 ? `Secret scan found ${findingCount} hit(s) in ${filesWithFindings} file(s).` : 'Secret scan finished with no hits.',
         details: {
+          ...progressContext,
+          secretScan: { phase: 'complete', checkedLines: result.stats.checkedLines },
           strictness: result.strictness,
           findingCount,
           filesWithFindings,
@@ -224,6 +237,7 @@ export function registerSecretScanPushGuard({
         operation,
         status: cancelled ? 'cancelled' : 'failed',
         message: safeError,
+        details: progressContext,
         timestamp: Date.now(),
       });
       return { success: false as const, error: safeError };
@@ -282,18 +296,22 @@ export function registerSecretScanPushGuard({
     return { success: false, error: 'Potential secrets were detected. Confirm the in-app dialog before pushing.' };
   };
 
-  ipcMain.handle(IpcChannel.GitScanPushSecrets, async (event: any, params: { includeTags?: unknown; repoPath?: unknown; pushArgs?: unknown } = {}) => {
-    if (typeof params.repoPath !== 'string' || !params.repoPath.trim()) {
-      return { success: false, error: 'Repository path is required.' };
-    }
-    const result = await scanPushSecrets(event, {
-      includeTags: params.includeTags,
-      repoPath: params.repoPath,
-      pushArgs: params.pushArgs,
-      recordRendererScan: true,
-    });
-    return result.success ? { success: true, data: result.data } : result;
-  });
+  ipcMain.handle(
+    IpcChannel.GitScanPushSecrets,
+    async (event: any, params: { includeTags?: unknown; repoPath?: unknown; pushArgs?: unknown; progressId?: unknown } = {}) => {
+      if (typeof params.repoPath !== 'string' || !params.repoPath.trim()) {
+        return { success: false, error: 'Repository path is required.' };
+      }
+      const result = await scanPushSecrets(event, {
+        includeTags: params.includeTags,
+        repoPath: params.repoPath,
+        pushArgs: params.pushArgs,
+        progressId: params.progressId,
+        recordRendererScan: true,
+      });
+      return result.success ? { success: true, data: result.data } : result;
+    },
+  );
 
   ipcMain.handle(IpcChannel.GitApproveSecretScanPush, async (event: any, pushArgs: unknown, requestedRepoPath?: unknown) => {
     if (typeof requestedRepoPath !== 'string' || !requestedRepoPath.trim()) {

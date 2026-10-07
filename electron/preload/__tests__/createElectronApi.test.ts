@@ -318,7 +318,7 @@ describe('createElectronApi', () => {
 
     await api.git.scanCommitSecrets({ repoPath: 'C:/captured-repo' });
     await api.git.approveSecretScanCommit('C:/captured-repo');
-    await api.git.scanPushSecrets({ repoPath: 'C:/captured-repo', includeTags: true, pushArgs: ['origin', 'main'] });
+    await api.git.scanPushSecrets({ repoPath: 'C:/captured-repo', includeTags: true, pushArgs: ['origin', 'main'], progressId: 'scan-1' });
     await api.git.approveSecretScanPush(['origin', 'main'], 'C:/captured-repo');
 
     expect(invoke).toHaveBeenNthCalledWith(1, IpcChannel.GitScanCommitSecrets, {
@@ -329,6 +329,7 @@ describe('createElectronApi', () => {
       repoPath: 'C:/captured-repo',
       includeTags: true,
       pushArgs: ['origin', 'main'],
+      progressId: 'scan-1',
     });
     expect(invoke).toHaveBeenNthCalledWith(4, IpcChannel.GitApproveSecretScanPush, ['origin', 'main'], 'C:/captured-repo');
   });

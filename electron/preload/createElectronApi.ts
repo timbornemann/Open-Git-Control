@@ -26,6 +26,7 @@ import { createHostingApi } from './createHostingApi';
 import { createRepositoryFileApi } from './createRepositoryFileApi';
 import { createRepositoryIconApi } from './createRepositoryIconApi';
 import type { ReleaseNotesGenerationParamsDto } from '../../src/types/releaseNotes';
+import type { ScanPushSecretsRequestDto } from '../../src/types/secretScan';
 
 type PreloadIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>;
 
@@ -193,8 +194,7 @@ export const createElectronApi = (ipcRenderer: PreloadIpcRenderer): ElectronAPI 
     gitPush: () => invokeGitCommand('push'),
     scanCommitSecrets: (params: { repoPath: string }) => invokeGitOperationForRepo(params.repoPath, 'commit', IpcChannel.GitScanCommitSecrets, params),
     approveSecretScanCommit: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'commit', IpcChannel.GitApproveSecretScanCommit, repoPath),
-    scanPushSecrets: (params: { repoPath: string; includeTags?: boolean; pushArgs?: string[] }) =>
-      invokeGitOperationForRepo(params.repoPath, 'push', IpcChannel.GitScanPushSecrets, params),
+    scanPushSecrets: (params: ScanPushSecretsRequestDto) => invokeGitOperationForRepo(params.repoPath, 'push', IpcChannel.GitScanPushSecrets, params),
     approveSecretScanPush: (pushArgs: string[] | undefined, repoPath: string) =>
       invokeGitOperationForRepo(repoPath, 'push', IpcChannel.GitApproveSecretScanPush, pushArgs, repoPath),
     cancelSecretScan: (repoPath: string) => invokeGitOperationForRepo(repoPath, 'push', IpcChannel.GitCancelSecretScan, repoPath),

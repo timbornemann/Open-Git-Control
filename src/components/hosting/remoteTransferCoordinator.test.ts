@@ -91,7 +91,7 @@ describe('shared remote transfer coordinator', () => {
     expect(actionCalls('planPush')).toEqual([
       { repoPath: '/repo', remoteNames: ['origin'], destinationBranch: 'main', targetBranches: {}, tagNames: [], force: false },
     ]);
-    expect(mocked.scan).toHaveBeenCalledWith({ repoPath: '/repo', pushArgs: plan.secretScanArgs });
+    expect(mocked.scan).toHaveBeenCalledWith({ repoPath: '/repo', pushArgs: plan.secretScanArgs, progressId: expect.any(String) });
     expect(actionCalls('executePush')).toHaveLength(1);
     expect(actionCalls('setPreferences')).toHaveLength(0);
     expect(useRemoteTransferState.getState()).toMatchObject({ phase: 'idle', busy: false });
