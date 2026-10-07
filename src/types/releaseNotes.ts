@@ -32,7 +32,7 @@ export interface ReleaseContext {
   warning?: string;
 }
 
-export type ReleaseSubmissionPhase = 'idle' | 'checking' | 'awaiting-decision' | 'pushing' | 'creating' | 'uploading';
+export type ReleaseSubmissionPhase = 'idle' | 'checking' | 'awaiting-decision' | 'pushing' | 'creating' | 'uploading' | 'syncing-tag' | 'refreshing';
 
 export type ReleaseNotesGenerationParamsDto = {
   tagName: string;

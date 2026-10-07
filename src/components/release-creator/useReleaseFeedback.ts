@@ -55,8 +55,20 @@ export function useReleaseFeedback(feedback: Feedback) {
       if (message && previous.current.get(kind) !== message) toast(message, isError);
       previous.current.set(kind, message);
     }
-    if (feedback.created && feedback.created.id !== createdId.current)
-      toast(tr(`Release erstellt: ${feedback.created.name}`, `Release created: ${feedback.created.name}`), false);
+    if (feedback.created && feedback.created.id !== createdId.current) {
+      const release = feedback.created;
+      const tag =
+        release.localTag && ['created', 'existing'].includes(release.localTag.status)
+          ? tr(` Lokaler Tag ${release.localTag.name} ist verfügbar.`, ` Local tag ${release.localTag.name} is available.`)
+          : '';
+      toast(
+        tr(
+          `${release.draft ? 'Release-Entwurf gespeichert' : 'Release veröffentlicht'}: ${release.name}.${tag} Ein neuer Entwurf ist bereit.`,
+          `${release.draft ? 'Release draft saved' : 'Release published'}: ${release.name}.${tag} A new draft is ready.`,
+        ),
+        false,
+      );
+    }
     createdId.current = feedback.created?.id;
   }, [feedback, toast, tr]);
 }

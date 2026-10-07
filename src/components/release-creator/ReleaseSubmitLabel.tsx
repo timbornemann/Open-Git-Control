@@ -11,6 +11,8 @@ export function ReleaseSubmitLabel({ submitting, phase, label }: { submitting: b
     pushing: tr('Commits werden gepusht …', 'Pushing commits …'),
     creating: tr('Release wird erstellt …', 'Creating release …'),
     uploading: tr('Dateien werden hochgeladen …', 'Uploading files …'),
+    'syncing-tag': tr('Lokaler Release-Tag wird angelegt …', 'Creating local release tag …'),
+    refreshing: tr('Release-Daten werden aktualisiert …', 'Refreshing release data …'),
   };
   return <span role="status">{labels[phase || 'creating']}</span>;
 }

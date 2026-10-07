@@ -99,7 +99,7 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
     notesMessage: notes.message,
     notesError: notes.isError,
     publicationError: publication.error,
-    created: session.created,
+    created: session.lastCreated || null,
   });
   const locked = notes.busy || publication.busy;
   const targetLabel = (index: number) => {
@@ -156,6 +156,11 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
         {publication.busy && <Button onClick={publication.cancel}>{tr('Veröffentlichung abbrechen', 'Cancel publication')}</Button>}
         {session.created && (
           <>
+            {session.created.localTag && !['created', 'existing'].includes(session.created.localTag.status) && (
+              <Button disabled={locked} onClick={() => void publication.retryTag()}>
+                {tr('Lokalen Tag erneut anlegen', 'Retry local tag')}
+              </Button>
+            )}
             {session.assets.some((file) => !session.uploaded.includes(file)) && (
               <Button disabled={locked} onClick={() => void publication.retryAssets()}>
                 {tr('Ausstehende Dateien hochladen', 'Upload pending files')}
@@ -192,7 +197,9 @@ function ReleaseSessionView({ draftKey, repoPath, target }: { draftKey: string; 
           onRemovePendingAsset={(file) => update((previous) => ({ ...previous, assets: previous.assets.filter((entry) => entry !== file) }))}
           contextLoading={target.loading || history.loading}
           context={history.context}
-          onRefreshContext={history.refresh}
+          onRefreshContext={async () => {
+            await history.refresh();
+          }}
           onGenerateNotes={notes.generate}
           onGenerateOfflineNotes={notes.generateOffline}
           notesGenerating={notes.busy}

@@ -10,6 +10,7 @@ import { repoJobRegistry } from '../main-process/repoJobRegistry';
 import { hasControlCharacters } from './hostingUrls';
 import { releaseEndpointResolver, releaseCredentialUrls } from './HostingReleaseEndpoint';
 import { readReleaseRevision } from './HostingReleaseRevision';
+import { createHostingReleaseLocalTag } from './HostingReleaseLocalTag';
 
 type ReadGit = (args: string[], network?: boolean) => Promise<string>;
 type State = {
@@ -54,7 +55,18 @@ export class HostingReleaseSafety {
   private readonly registeredSenders = new Set<number>();
   private readonly uploadAuthorizations = new Map<
     number,
-    { connectionId: string; repositoryId: string; fullPath: string; releaseId: string; repoPath: string; generation: number; expiresAt: number }
+    {
+      connectionId: string;
+      repositoryId: string;
+      fullPath: string;
+      releaseId: string;
+      repoPath: string;
+      generation: number;
+      expiresAt: number;
+      tagName: string;
+      targetOid: string;
+      endpoint: string;
+    }
   >();
   constructor(private readonly deps: { gitService: GitService; hostingService: HostingService; pushGuard?: SecretScanPushGuard }) {}
 
@@ -247,14 +259,60 @@ export class HostingReleaseSafety {
             repoPath: input.repoPath,
             generation: inspection.generation,
             expiresAt: Date.now() + 30 * 60_000,
+            tagName: input.tagName,
+            targetOid: sha,
+            endpoint: current.fetchUrl,
           });
-          return release;
+          const tagResult = await createHostingReleaseLocalTag(read, input.tagName, sha, current.fetchUrl);
+          return { ...release, localTag: tagResult };
         },
         job.signal,
       );
     } finally {
       job.complete();
       releaseProtection();
+    }
+  }
+
+  async syncTag(
+    event: IpcMainInvokeEvent,
+    input: { repository: { connectionId: string; repositoryId: string; fullPath: string }; releaseId: string; repoPath: string },
+  ) {
+    this.authorizeUpload(event.sender.id, input);
+    const authorization = this.uploadAuthorizations.get(event.sender.id)!;
+    const job = repoJobRegistry.begin(input.repoPath);
+    const signal = AbortSignal.any([job.signal, this.deps.hostingService.getConnectionSignal(input.repository.connectionId)]);
+    try {
+      return await this.deps.gitService.runner.withExclusiveWrite(
+        input.repoPath,
+        'hosting-release-local-tag',
+        async (git) => {
+          const read: ReadGit = async (args, network = false) => {
+            this.authorizeUpload(event.sender.id, input);
+            job.ensureActive();
+            signal.throwIfAborted();
+            const credential = network
+              ? await this.deps.hostingService.createGitCredentialEnvironment({
+                  connectionId: input.repository.connectionId,
+                  urls: [authorization.endpoint],
+                  signal,
+                })
+              : null;
+            try {
+              return await git.run(input.repoPath, args, {
+                signal: AbortSignal.any([credential?.signal || signal, AbortSignal.timeout(60_000)]),
+                envOverrides: credential?.envOverrides || { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
+              });
+            } finally {
+              credential?.dispose();
+            }
+          };
+          return createHostingReleaseLocalTag(read, authorization.tagName, authorization.targetOid, authorization.endpoint);
+        },
+        signal,
+      );
+    } finally {
+      job.complete();
     }
   }
 

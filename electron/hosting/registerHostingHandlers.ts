@@ -239,6 +239,7 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
       let data: unknown;
       if (operation === 'inspectRelease') data = await releaseSafety.inspect(event, input as HostingOperations['inspectRelease']['input']);
       else if (operation === 'createRelease') data = await releaseSafety.create(event, input as HostingOperations['createRelease']['input']);
+      else if (operation === 'syncReleaseTag') data = await releaseSafety.syncTag(event, input as HostingOperations['syncReleaseTag']['input']);
       else if (operation === 'downloadArtifact') data = await downloadArtifact(event, input as HostingOperations['downloadArtifact']['input'], service);
       else if (operation === 'clone') data = await clone(event, input as HostingOperations['clone']['input'], gitService, service);
       else if (operation === 'checkoutChangeRequest')

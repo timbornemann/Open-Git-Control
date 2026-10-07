@@ -455,6 +455,7 @@ export class HostingService {
         'downloadArtifact',
         'uploadAsset',
         'createRelease',
+        'syncReleaseTag',
         'clone',
         'checkoutChangeRequest',
         'releaseNotesCommits',

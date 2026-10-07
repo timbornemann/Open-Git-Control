@@ -243,6 +243,14 @@ export interface HostingRelease {
   htmlUrl: string;
   draft: boolean;
   prerelease: boolean;
+  /** Local follow-up of a release created by this app; never supplied by the provider. */
+  localTag?: HostingLocalReleaseTag;
+}
+export interface HostingLocalReleaseTag {
+  name: string;
+  targetOid: string;
+  status: 'created' | 'existing' | 'conflict' | 'failed';
+  message?: string;
 }
 export interface HostingCreateRelease {
   repository: HostedRepositoryRef;

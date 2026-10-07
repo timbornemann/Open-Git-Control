@@ -653,7 +653,8 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 3. Start with the current branch and a Patch suggestion. Adjust the version, target branch/tag/commit, optional notes baseline, Markdown notes and AI options; select assets before publishing.
 4. **Create release** checks the endpoint. When commits are missing, choose **Push and create release**, **Create without pushing** (where available), or cancel. The confirmed push publishes the captured release branch only to this endpoint, even when another branch is checked out. It leaves backup targets and upstream settings unchanged and repeats the endpoint check before creating the release.
 5. Draft, prerelease and asset options appear only where supported. Uploaded and pending files remain visible after an upload failure; retry sends only pending files.
-6. For Bitbucket Cloud, use tags and separate Downloads; for Data Center, use tags and copy/save local notes. All providers share the same creator and AI options.
+6. Completion creates the local tag at the verified published commit, refreshes the release history, and opens a fresh draft with the next patch version. Notes, selected assets, and publication flags are cleared; note preferences stay available. Existing local tags are preserved. If the local tag cannot be created, retry that step after resolving the lock or conflict without publishing the release again.
+7. For Bitbucket Cloud, use tags and separate Downloads; for Data Center, use tags and copy/save local notes. All providers share the same creator and AI options.
 
 ### Recovery flow
 

@@ -32,10 +32,14 @@ export function useReleaseContext(input: HostingOperations['releaseContext']['in
     setState((previous) => ({ key, context: previous.key === key ? previous.context : null, loading: true, error: '' }));
     try {
       const context = await hostingClient.request('releaseContext', request);
-      if (started === lifecycle.generation) setState({ key, context, loading: false, error: '' });
+      if (started === lifecycle.generation) {
+        setState({ key, context, loading: false, error: '' });
+        return context;
+      }
     } catch (reason) {
       if (started === lifecycle.generation) setState({ key, context: null, loading: false, error: reason instanceof Error ? reason.message : String(reason) });
     }
+    return null;
   }, [key, lifecycle]);
   useEffect(() => {
     void refresh();

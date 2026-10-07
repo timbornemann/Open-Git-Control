@@ -20,6 +20,7 @@ import type {
   HostingRelease,
   HostingReleaseAsset,
   HostingReleaseTarget,
+  HostingLocalReleaseTag,
   HostingRepositoryCreation,
   HostingRun,
   HostingStatus,
@@ -75,6 +76,7 @@ export interface HostingOperations {
   };
   inspectRelease: { input: HostingCreateRelease; output: HostingReleaseTarget };
   createRelease: { input: HostingCreateRelease; output: HostingRelease };
+  syncReleaseTag: { input: { repository: HostedRepositoryRef; repoPath: string; releaseId: string }; output: HostingLocalReleaseTag };
   uploadAsset: {
     input: { repository: HostedRepositoryRef; repoPath: string; releaseId: string; filePath: string; name?: string };
     output: HostingReleaseAsset;

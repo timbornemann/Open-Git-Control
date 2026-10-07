@@ -4,6 +4,8 @@ import { HostingReleaseSafety } from '../HostingReleaseSafety';
 import type { HostingService } from '../HostingService';
 import type { HostingCreateRelease } from '../../../src/types/hostingDtos';
 import { RemotePreferencesStore } from '../../git/RemotePreferencesStore';
+import * as fs from 'fs';
+import * as path from 'path';
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -98,15 +100,66 @@ describe('provider-neutral release target safety', { timeout: 30_000 }, () => {
     expect(f.publish).not.toHaveBeenCalled();
   });
 
-  it('publishes only the inspected remote SHA without changing Git refs', async () => {
+  it('creates the local release tag at the inspected remote SHA without changing branches or pushing', async () => {
     const f = await fixture();
     const local = await f.commit('unpublished change');
     const inspection = await f.safety.inspect(f.event, f.input);
     expect(inspection).toMatchObject({ localSha: local, remoteSha: f.initial, canPush: true, canReleaseRemote: true, ahead: 1 });
-    await f.safety.create(f.event, { ...f.input, inspectionId: inspection.inspectionId, mode: 'remote' });
+    const release = await f.safety.create(f.event, { ...f.input, inspectionId: inspection.inspectionId, mode: 'remote' });
+    expect(release.localTag).toMatchObject({ status: 'created', name: 'v1.0.0', targetOid: f.initial });
+    expect(await f.run(['rev-parse', 'refs/tags/v1.0.0^{commit}'])).toBe(f.initial);
+    expect(await f.run(['rev-parse', 'HEAD'])).toBe(local);
     expect(f.publish).toHaveBeenCalledWith(expect.objectContaining({ target: f.initial }));
     expect(await f.run(['rev-parse', 'main'], f.remote)).toBe(f.initial);
     expect(f.pushGuard.requirePushSecretScanApproval).not.toHaveBeenCalled();
+  });
+
+  it('preserves an annotated tag already pointing at the published commit', async () => {
+    const f = await fixture();
+    await f.run(['tag', '-a', 'v1.0.0', '-m', 'Existing annotated release', f.initial]);
+    const object = await f.run(['rev-parse', 'refs/tags/v1.0.0']);
+    const inspected = await f.safety.inspect(f.event, f.input);
+    const release = await f.safety.create(f.event, { ...f.input, inspectionId: inspected.inspectionId, mode: 'remote' });
+    expect(release.localTag?.status).toBe('existing');
+    expect(await f.run(['rev-parse', 'refs/tags/v1.0.0'])).toBe(object);
+  });
+
+  it('reports a local tag lock as a partial result and retries only the local tag after releasing it', async () => {
+    const f = await fixture();
+    const inspected = await f.safety.inspect(f.event, f.input);
+    const lock = path.resolve(f.repo, await f.run(['rev-parse', '--git-path', 'refs/tags/v1.0.0.lock']));
+    fs.mkdirSync(path.dirname(lock), { recursive: true });
+    fs.writeFileSync(lock, 'external writer', { flag: 'wx' });
+    const release = await f.safety.create(f.event, { ...f.input, inspectionId: inspected.inspectionId, mode: 'remote' });
+    expect(release.localTag).toMatchObject({ status: 'failed', name: 'v1.0.0', targetOid: f.initial });
+    expect(fs.readFileSync(lock, 'utf8')).toBe('external writer');
+    expect(f.publish).toHaveBeenCalledOnce();
+    fs.unlinkSync(lock);
+    const retry = { repoPath: f.repo, repository: f.input.repository, releaseId: release.id };
+    expect(await f.safety.syncTag(f.event, retry)).toMatchObject({ status: 'created', targetOid: f.initial });
+    expect(await f.safety.syncTag(f.event, retry)).toMatchObject({ status: 'existing' });
+    expect(f.publish).toHaveBeenCalledOnce();
+    expect(await f.run(['rev-parse', 'refs/tags/v1.0.0^{commit}'])).toBe(f.initial);
+  });
+
+  it('keeps a concurrent conflicting local tag until it is explicitly resolved and refuses retries from another account', async () => {
+    const f = await fixture();
+    const different = await f.commit('Local change');
+    const inspected = await f.safety.inspect(f.event, f.input);
+    f.publish.mockImplementationOnce(async (input) => {
+      await f.run(['tag', input.tagName, different]);
+      return { id: 'release-id', tagName: input.tagName, name: input.name, htmlUrl: '', draft: false, prerelease: false };
+    });
+    const release = await f.safety.create(f.event, { ...f.input, inspectionId: inspected.inspectionId, mode: 'remote' });
+    expect(release.localTag?.status).toBe('conflict');
+    const retry = { repoPath: f.repo, repository: f.input.repository, releaseId: release.id };
+    expect((await f.safety.syncTag(f.event, retry)).status).toBe('conflict');
+    expect(await f.run(['rev-parse', 'refs/tags/v1.0.0'])).toBe(different);
+    await f.run(['tag', '-d', 'v1.0.0']);
+    expect((await f.safety.syncTag(f.event, retry)).status).toBe('created');
+    f.changeAccount();
+    await expect(f.safety.syncTag(f.event, retry)).rejects.toThrow('release created');
+    expect(f.publish).toHaveBeenCalledOnce();
   });
 
   it('refuses direct push-local publication until the transfer review is used', async () => {

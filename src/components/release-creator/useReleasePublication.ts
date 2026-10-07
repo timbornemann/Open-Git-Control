@@ -9,7 +9,7 @@ import type { ReleaseContext, ReleaseSubmissionPhase } from '@/types/releaseNote
 import { validateReleaseInput } from '@/utils/releaseValidation';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
 import { prepareReleasePublication } from './prepareReleasePublication';
-import type { ReleaseSession } from './releaseDraftState';
+import { completedReleaseSession, type ReleaseSession } from './releaseDraftState';
 
 type Params = {
   scope: string;
@@ -21,7 +21,7 @@ type Params = {
   session: ReleaseSession;
   context: ReleaseContext | null;
   update: (updater: (previous: ReleaseSession) => ReleaseSession) => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<ReleaseContext | null | void>;
 };
 const fingerprint = (session: ReleaseSession) => JSON.stringify([session.form, session.assets]);
 
@@ -78,9 +78,10 @@ export function useReleasePublication(params: Params) {
       setDialog(state);
     });
 
-  const run = async (uploadOnly = false) => {
+  const run = async (kind: 'publish' | 'assets' | 'tag' = 'publish') => {
     const snapshot = current.current;
-    if (busyRef.current || !snapshot.repository || !snapshot.capabilities || (!uploadOnly && !snapshot.context)) return;
+    if (busyRef.current || !snapshot.repository || !snapshot.capabilities || (kind === 'publish' && (!snapshot.context || snapshot.session.created))) return;
+    let published = snapshot.session.created;
     const started = ++lifecycle.generation;
     const formFingerprint = fingerprint(snapshot.session);
     const authVersion = hostingClient.sessionVersion(snapshot.repository.ref.connectionId);
@@ -92,7 +93,7 @@ export function useReleasePublication(params: Params) {
         started !== lifecycle.generation ||
         snapshot.scope !== current.current.scope ||
         fingerprint(current.current.session) !== formFingerprint ||
-        (!uploadOnly && current.current.context?.targetOid !== snapshot.context?.targetOid) ||
+        (!published && current.current.context?.targetOid !== snapshot.context?.targetOid) ||
         normalizeRepoPathKey(readAppState().repository.activeRepo || '') !== normalizeRepoPathKey(snapshot.repoPath) ||
         hostingClient.sessionVersion(snapshot.repository!.ref.connectionId) !== authVersion
       )
@@ -106,7 +107,7 @@ export function useReleasePublication(params: Params) {
     busyRef.current = true;
     setBusy(true);
     setError('');
-    setPhase(uploadOnly ? 'uploading' : 'checking');
+    setPhase(kind === 'tag' ? 'syncing-tag' : kind === 'assets' ? 'uploading' : 'checking');
     const upload = async (release: HostingRelease) => {
       const failures: string[] = [];
       for (const filePath of snapshot.session.assets.filter((file) => !current.current.session.uploaded.includes(file))) {
@@ -122,9 +123,40 @@ export function useReleasePublication(params: Params) {
       }
       if (failures.length) throw new Error(failures.join('\n'));
     };
+    const complete = async (release: HostingRelease) => {
+      if (snapshot.capabilities!.releaseAssets) {
+        setPhase('uploading');
+        await upload(release);
+      }
+      setPhase('refreshing');
+      const context = await snapshot.refresh();
+      assertCurrent();
+      if (release.localTag && !['created', 'existing'].includes(release.localTag.status))
+        throw new Error(
+          tr(
+            `Release ${release.tagName} wurde erstellt. Der lokale Tag fehlt oder steht im Konflikt: ${release.localTag.message || release.localTag.status}`,
+            `Release ${release.tagName} was created. Its local tag is missing or conflicted: ${release.localTag.message || release.localTag.status}`,
+          ),
+        );
+      const branch = readAppState().repository.currentBranch || snapshot.session.form.targetCommitish;
+      snapshot.update((previous) => completedReleaseSession(previous, branch, release, context || snapshot.context));
+    };
     try {
-      if (uploadOnly) {
-        if (snapshot.session.created) await upload(snapshot.session.created);
+      if (kind !== 'publish') {
+        if (!published) return;
+        if (kind === 'tag') {
+          const localTag = await hostingClient.request('syncReleaseTag', {
+            repository: snapshot.repository.ref,
+            repoPath: snapshot.repoPath,
+            releaseId: published.id,
+          });
+          assertCurrent();
+          published = { ...published, localTag };
+          const release = published;
+          snapshot.update((previous) => ({ ...previous, created: release }));
+          refreshRepository();
+        }
+        await complete(published);
         return;
       }
       if (snapshot.session.created) return;
@@ -210,16 +242,32 @@ export function useReleasePublication(params: Params) {
       assertCurrent();
       setPhase('creating');
       const release = await hostingClient.request('createRelease', { ...input, inspectionId: inspection.inspectionId });
+      published = release;
       assertCurrent();
       snapshot.update((previous) => ({ ...previous, created: release, uploaded: [] }));
       refreshRepository();
-      if (snapshot.capabilities.releaseAssets) {
-        setPhase('uploading');
-        await upload(release);
-      }
-      await snapshot.refresh();
+      await complete(release);
     } catch (reason) {
-      if (started === lifecycle.generation && !signal.signal.aborted) setError(reason instanceof Error ? reason.message : String(reason));
+      if (started === lifecycle.generation && !signal.signal.aborted) {
+        const message = reason instanceof Error ? reason.message : String(reason);
+        setError(
+          published
+            ? tr(
+                `Release ${published.tagName} wurde erstellt; Nachbereitung offen: ${message}`,
+                `Release ${published.tagName} was created; follow-up pending: ${message}`,
+              )
+            : message,
+        );
+        if (published) {
+          try {
+            assertCurrent();
+            refreshRepository();
+            await snapshot.refresh();
+          } catch {
+            // A different repository or account must not receive this release's refresh.
+          }
+        }
+      }
     } finally {
       if (started === lifecycle.generation) {
         busyRef.current = false;
@@ -241,7 +289,8 @@ export function useReleasePublication(params: Params) {
     phase,
     error,
     publish: () => run(),
-    retryAssets: () => run(true),
+    retryAssets: () => run('assets'),
+    retryTag: () => run('tag'),
     addAssets,
     cancel: () => {
       controller.current?.abort();

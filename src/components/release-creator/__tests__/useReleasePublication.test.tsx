@@ -152,7 +152,9 @@ describe('shared release publication', () => {
       deferredCreate.resolve(release);
       await first.pending;
     });
-    expect(session.created).toEqual(release);
+    expect(session.created).toBeNull();
+    expect(session.lastCreated).toEqual(release);
+    expect(session.form).toMatchObject({ tagName: 'v1.0.2', releaseName: 'Release v1.0.2', body: '', draft: false, prerelease: false });
     expect(mocks.request).toHaveBeenCalledWith(
       'createRelease',
       expect.objectContaining({ repository: repository.ref, remoteName: 'origin', target: 'release', inspectionId: 'checked', body: 'manual notes' }),
@@ -184,7 +186,8 @@ describe('shared release publication', () => {
       await pending;
     });
     expect(mocks.request.mock.calls.map(([operation]) => operation)).toEqual(['inspectRelease', 'inspectRelease', 'createRelease']);
-    expect(session.created).toEqual(release);
+    expect(session.created).toBeNull();
+    expect(session.lastCreated).toEqual(release);
   });
 
   it('can explicitly publish the existing remote revision with unchanged notes', async () => {
@@ -227,7 +230,10 @@ describe('shared release publication', () => {
     expect(session.uploaded).toEqual(['C:/one.zip']);
     expect(hook.error).toContain('two.zip: Upload interrupted');
     await act(async () => hook.retryAssets());
-    expect(session.uploaded).toEqual(['C:/one.zip', 'C:/two.zip']);
+    expect(session.uploaded).toEqual([]);
+    expect(session.assets).toEqual([]);
+    expect(session.created).toBeNull();
+    expect(session.lastCreated).toEqual(release);
     expect(mocks.request.mock.calls.filter(([operation]) => operation === 'createRelease')).toHaveLength(1);
     expect(mocks.request.mock.calls.filter(([operation]) => operation === 'uploadAsset').map(([, input]) => input.filePath)).toEqual([
       'C:/one.zip',
