@@ -110,6 +110,18 @@ async function fixture(usePathAlias = false, useShortPath = false) {
 }
 
 describe('hosting clone authorization and account continuity', { timeout: 30_000 }, () => {
+  it('reads local workflow choices through IPC without using the hosting network adapter', async () => {
+    const f = await fixture();
+    fs.mkdirSync(path.join(f.git.repo, '.github/workflows'), { recursive: true });
+    fs.writeFileSync(path.join(f.git.repo, '.github/workflows/ci.yml'), 'name: Build on demand\non: workflow_dispatch\n');
+    const provider = vi.spyOn(f.hosting, 'request').mockRejectedValue(new Error('Network unavailable'));
+    expect(await state.handlers.get('hosting:request')!(f.event, 'localWorkflows', { repoPath: f.git.repo, repository: f.ref })).toMatchObject({
+      success: true,
+      data: { provider: 'github', workflows: [{ id: 'ci.yml', name: 'Build on demand', filePath: '.github/workflows/ci.yml' }] },
+    });
+    expect(provider).not.toHaveBeenCalled();
+  });
+
   it('reads release-note subjects and descriptions entirely locally, without a hosting account or network', async () => {
     const f = await fixture();
     const oid = await f.git.commit('feat: offline templates\n\nTwo paragraphs.\n\n- Preserve descriptions.');

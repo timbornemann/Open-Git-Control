@@ -181,7 +181,7 @@ export function HostingRepositoryDetail({
         ) : (
           capabilities &&
           (section === 'ci' ? (
-            <HostingCiPanel repository={repository} capabilities={capabilities} />
+            <HostingCiPanel repository={repository} capabilities={capabilities} repoPath={localIdentity.path} />
           ) : section === 'releases' ? (
             <HostingReleases repository={repository} capabilities={capabilities} repoPath={localPath} localPaths={localPaths} onClone={onClone} />
           ) : (

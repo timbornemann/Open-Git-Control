@@ -4,6 +4,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import type { GitService } from '../GitService';
 import type { HostingOperation, HostingOperations } from '../../src/shared/ipc/contracts/hosting';
+import { getLocalHostingWorkflows } from './HostingLocalWorkflows';
 import { IpcChannel } from '../../src/types/ipcContract';
 import type { HostedRepositoryRef, HostingChangeRequest } from '../../src/types/hostingDtos';
 import type { SecretScanPushGuard } from '../main-process/ipc/git/secretScanPushGuard';
@@ -243,6 +244,8 @@ export function registerHostingHandlers({ gitService, pushGuard, hostingService:
       else if (operation === 'checkoutChangeRequest')
         data = await checkoutChangeRequest(event, input as HostingOperations['checkoutChangeRequest']['input'], gitService, service);
       else if (operation === 'releaseNotesCommits') data = await releaseNotesCommits(input as HostingOperations['releaseNotesCommits']['input'], gitService);
+      else if (operation === 'localWorkflows')
+        data = await getLocalHostingWorkflows(input as HostingOperations['localWorkflows']['input'], gitService, service);
       else if (operation === 'releaseContext')
         data = await getHostingReleaseContext(input as HostingOperations['releaseContext']['input'], gitService, service);
       else if (operation === 'uploadAsset') {

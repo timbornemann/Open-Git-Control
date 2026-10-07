@@ -91,6 +91,7 @@ export const hostingClient = {
       operation !== 'startDeviceLogin' &&
       operation !== 'releaseContext' &&
       operation !== 'releaseNotesCommits' &&
+      operation !== 'localWorkflows' &&
       operation !== 'inspectRelease'
     ) {
       await queryClient.cancelQueries({ queryKey: ['hosting', connectionId] });

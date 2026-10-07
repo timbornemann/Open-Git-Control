@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   setTab: vi.fn(),
   openCreator: vi.fn(),
   refreshGit: vi.fn(),
+  toast: vi.fn(),
   git: { activeRepo: 'C:/Code/mirrored' as string | null, openRepos: ['C:/Code/mirrored'], currentBranch: 'main' },
 }));
 vi.mock('@/services/hostingClient', () => ({
@@ -23,7 +24,7 @@ vi.mock('@/services/hostingClient', () => ({
 }));
 vi.mock('@/contexts/AppStateContext', () => ({
   useGitStore: (selector: (value: unknown) => unknown) =>
-    selector({ ...mocks.git, onSwitchRepo: mocks.switchRepo, onAddRepo: mocks.addRepo, triggerRefresh: mocks.refreshGit }),
+    selector({ ...mocks.git, onSwitchRepo: mocks.switchRepo, onAddRepo: mocks.addRepo, triggerRefresh: mocks.refreshGit, onToast: mocks.toast }),
   useUIStore: (selector: (value: unknown) => unknown) => selector({ setActiveTab: mocks.setTab }),
   useAppStateReader: () => () => ({ repository: { ...mocks.git, onSwitchRepo: mocks.switchRepo }, ui: { onOpenReleaseCreator: mocks.openCreator } }),
 }));
@@ -132,6 +133,7 @@ describe('multi-provider hosting acceptance', () => {
     mocks.request.mockReset();
     mocks.transfer.mockReset();
     mocks.refreshGit.mockReset();
+    mocks.toast.mockReset();
     mocks.switchRepo.mockReset().mockResolvedValue(true);
     mocks.addRepo.mockReset().mockResolvedValue(true);
     mocks.setTab.mockReset();
@@ -214,6 +216,8 @@ describe('multi-provider hosting acceptance', () => {
       if (operation === 'logs') return { text: `${provider} log text`, truncated: false, nextCursor: null };
       if (operation === 'downloadArtifact') return { path: `C:/Exports/${provider}.zip` };
       if (operation === 'dispatch') return true;
+      if (operation === 'localWorkflows')
+        return { provider, workflows: [{ id: 'ci.yml', name: `${provider} CI`, filePath: '.github/workflows/ci.yml' }], files: [], issues: [] };
       if (operation === 'releases' || operation === 'tags') return page([]);
       if (operation === 'inspectRelease')
         return {
@@ -356,8 +360,10 @@ describe('multi-provider hosting acceptance', () => {
     expect(mocks.request).toHaveBeenCalledWith('logs', { repository: repos[1].ref, runId: '7', jobId: '9', cursor: undefined });
     await click(buttons('Download')[0]);
     expect(mocks.request).toHaveBeenCalledWith('downloadArtifact', { repository: repos[1].ref, runId: '7', artifactId: '10' });
+    await click(buttons('Start a new run')[0]);
     const startForm = host.querySelector<HTMLFormElement>('.hosting-ci form')!;
-    await change(startForm.querySelector('input')!, 'ci.yml');
+    await change(startForm.querySelector('select')!, '0');
+    expect(mocks.request).toHaveBeenCalledWith('localWorkflows', { repository: repos[1].ref, repoPath: mirror });
     await act(async () => startForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     expect(mocks.request).toHaveBeenCalledWith('dispatch', { repository: repos[1].ref, workflow: 'ci.yml', ref: 'main', inputs: {} });
     await click(buttons('Releases')[0]);

@@ -1,0 +1,76 @@
+.hosting-ci-start {
+  padding: 12px;
+  border-bottom: 1px solid var(--accent-primary-border);
+  background: var(--bg-dark);
+}
+.hosting-ci-start__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hosting-ci-start__heading > span {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  overflow-wrap: anywhere;
+}
+.hosting-ci-start__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 960px;
+}
+.hosting-ci-start__form label,
+.hosting-ci-start__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.73rem;
+}
+.hosting-ci-start__form small {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+.hosting-ci-workflow__choice {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.hosting-ci-workflow__choice select {
+  text-overflow: ellipsis;
+}
+.hosting-ci-start__inputs {
+  margin-top: 8px;
+}
+.hosting-ci-start__inputs .ui-field {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+.hosting-ci-start__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+@container hosting (max-width: 560px) {
+  .hosting-ci-start__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hosting-ci-start__heading > span {
+    width: 100%;
+    margin-left: 22px;
+  }
+}

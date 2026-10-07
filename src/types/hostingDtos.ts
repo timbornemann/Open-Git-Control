@@ -161,6 +161,18 @@ export interface HostingMergeRequest {
   version?: number;
 }
 
+export interface HostingWorkflowSuggestion {
+  id: string;
+  name: string;
+  filePath: string;
+}
+export interface HostingLocalWorkflows {
+  provider: HostingProvider;
+  workflows: HostingWorkflowSuggestion[];
+  files: string[];
+  issues: { filePath: string; reason: 'invalid' | 'too-large' | 'unreadable' | 'limit' }[];
+}
+
 export interface HostingRun {
   id: string;
   number?: string;

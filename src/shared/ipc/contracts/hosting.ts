@@ -14,6 +14,7 @@ import type {
   HostingForkRequest,
   HostingJob,
   HostingLog,
+  HostingLocalWorkflows,
   HostingMergeRequest,
   HostingPage,
   HostingRelease,
@@ -53,6 +54,7 @@ export interface HostingOperations {
   createChangeRequest: { input: HostingCreateChangeRequest; output: HostingChangeRequest };
   merge: { input: HostingMergeRequest; output: { merged: boolean; message: string; sha?: string } };
   runs: { input: { repository: HostedRepositoryRef; branch?: string; headSha?: string; cursor?: string }; output: HostingPage<HostingRun> };
+  localWorkflows: { input: { repository: HostedRepositoryRef; repoPath: string }; output: HostingLocalWorkflows };
   jobs: { input: { repository: HostedRepositoryRef; runId: string; cursor?: string }; output: HostingPage<HostingJob> };
   status: { input: { repository: HostedRepositoryRef; ref: string }; output: HostingStatus };
   logs: { input: { repository: HostedRepositoryRef; runId: string; jobId?: string; cursor?: string }; output: HostingLog };

@@ -459,6 +459,7 @@ export class HostingService {
         'checkoutChangeRequest',
         'releaseNotesCommits',
         'releaseContext',
+        'localWorkflows',
       ].includes(operation)
     )
       throw new Error('This operation requires a main-process repository or file authorization context.');
