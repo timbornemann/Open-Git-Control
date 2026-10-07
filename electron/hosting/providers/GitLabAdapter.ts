@@ -354,6 +354,7 @@ export class GitLabAdapter extends BaseHostingAdapter {
       tagName: string(row.tag_name),
       name: string(row.name ?? row.tag_name),
       body: string(row.description),
+      publishedAt: string(row.released_at) || undefined,
       htmlUrl: `${this.connection.baseUrl.replace(/\/$/, '')}/${repository.fullPath.split('/').map(encode).join('/')}/-/releases/${encode(string(row.tag_name))}`,
       draft: false,
       prerelease: false,

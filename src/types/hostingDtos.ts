@@ -227,6 +227,7 @@ export interface HostingRelease {
   tagName: string;
   name: string;
   body?: string;
+  publishedAt?: string;
   htmlUrl: string;
   draft: boolean;
   prerelease: boolean;

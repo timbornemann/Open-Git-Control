@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Download, FolderOpen } from 'lucide-react';
+import { Plus, Download, FolderOpen, Loader2, RefreshCw, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { hostingClient } from '@/services/hostingClient';
 import { useAppStateReader, useGitStore } from '@/contexts/AppStateContext';
@@ -10,6 +10,7 @@ import { useHostingTask } from './useHostingTask';
 import { HostingReleaseFiles } from './HostingReleaseFiles';
 import { HostingReleaseList } from './HostingReleaseList';
 import { normalizeRepoPathKey } from '@/utils/repoPath';
+import './hosting-releases.css';
 
 export function HostingReleases({
   repository,
@@ -28,6 +29,7 @@ export function HostingReleases({
   const readAppState = useAppStateReader();
   const activeRepo = useGitStore((state) => state.activeRepo);
   const revision = useHostingState((state) => state.revision);
+  const refresh = useHostingState((state) => state.refresh);
   const task = useHostingTask(hostedRepositoryKey(repository));
   const { run } = task;
   const [page, setPage] = useState<HostingPage<HostingRelease>>({ items: [], nextCursor: null });
@@ -60,51 +62,52 @@ export function HostingReleases({
     );
   return (
     <div className="hosting-releases">
-      <div className="hosting-section-toolbar">
-        <div>
-          <h3>{capabilities.releases === 'native' ? 'Releases' : capabilities.releases === 'downloads' ? 'Tags & Downloads' : 'Tags & Notes'}</h3>
-          <p className="hosting-help">
-            {tr(
-              'Neue Versionen im vollständigen Release-Creator vorbereiten und veröffentlichen.',
-              'Prepare and publish new versions in the full release creator.',
-            )}
-          </p>
+      <header className="hosting-releases-toolbar">
+        <div className="hosting-releases-toolbar__title">
+          <Tag size={17} aria-hidden="true" />
+          <h2>{capabilities.releases === 'native' ? tr('Release-Verlauf', 'Release history') : tr('Tag-Verlauf', 'Tag history')}</h2>
+          {page.items.length > 0 && <span title={tr('Geladene Versionen', 'Loaded versions')}>{page.items.length}</span>}
         </div>
-        {paths.length > 1 && (
-          <select
-            className="release-select"
-            aria-label={tr('Lokaler Klon', 'Local clone')}
-            value={path}
-            onChange={(event) => setSelectedPath(event.target.value)}
-            disabled={task.busy}
-          >
-            <option value="" disabled>
-              {tr('Klon auswählen', 'Choose clone')}
-            </option>
-            {paths.map((localPath) => (
-              <option key={localPath} value={localPath}>
-                {localPath}
+        <div className="hosting-releases-toolbar__actions">
+          {paths.length > 1 && (
+            <select
+              className="ui-field"
+              aria-label={tr('Lokaler Klon', 'Local clone')}
+              value={path}
+              onChange={(event) => setSelectedPath(event.target.value)}
+              disabled={task.busy}
+            >
+              <option value="" disabled>
+                {tr('Klon auswählen', 'Choose clone')}
               </option>
-            ))}
-          </select>
-        )}
-        {paths.length ? (
-          <Button variant="primary" icon={<Plus size={14} />} disabled={task.busy || !path} onClick={openCreator}>
-            {capabilities.releases === 'native' ? tr('Release erstellen', 'Create release') : tr('Tag & Notes erstellen', 'Create tag & notes')}
+              {paths.map((localPath) => (
+                <option key={localPath} value={localPath}>
+                  {localPath}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button icon={<RefreshCw size={14} />} disabled={task.busy} onClick={refresh}>
+            {tr('Aktualisieren', 'Refresh')}
           </Button>
-        ) : (
-          <div className="hosting-actions">
-            {onClone && (
-              <Button icon={<Download size={14} />} onClick={() => onClone(repository)}>
-                {tr('Für die Erstellung klonen', 'Clone to create a release')}
-              </Button>
-            )}
-            <Button icon={<FolderOpen size={14} />} onClick={() => void readAppState().repository.onOpenFolder()}>
-              {tr('Lokales Repository öffnen', 'Open local repository')}
+          {paths.length ? (
+            <Button variant="primary" icon={<Plus size={14} />} disabled={task.busy || !path} onClick={openCreator}>
+              {capabilities.releases === 'native' ? tr('Release erstellen', 'Create release') : tr('Tag & Notes erstellen', 'Create tag & notes')}
             </Button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <>
+              {onClone && (
+                <Button icon={<Download size={14} />} onClick={() => onClone(repository)}>
+                  {tr('Für die Erstellung klonen', 'Clone to create a release')}
+                </Button>
+              )}
+              <Button icon={<FolderOpen size={14} />} onClick={() => void readAppState().repository.onOpenFolder()}>
+                {tr('Lokales Repository öffnen', 'Open local repository')}
+              </Button>
+            </>
+          )}
+        </div>
+      </header>
       {capabilities.releases !== 'native' && (
         <p className="hosting-help">
           {capabilities.releases === 'downloads'
@@ -116,23 +119,35 @@ export function HostingReleases({
         </p>
       )}
       {capabilities.releases === 'downloads' && <HostingReleaseFiles repository={repository.ref} />}
-      <HostingReleaseList repository={repository.ref} releases={page.items} showAssets={capabilities.releaseAssets && capabilities.releases === 'native'} />
+      {page.items.length > 0 && (
+        <HostingReleaseList repository={repository.ref} releases={page.items} showAssets={capabilities.releaseAssets && capabilities.releases === 'native'} />
+      )}
+      {!page.items.length && !task.busy && !task.error && (
+        <div className="hosting-empty hosting-releases-empty">
+          <Tag size={28} aria-hidden="true" />
+          <h3>{capabilities.releases === 'native' ? tr('Noch keine Releases', 'No releases yet') : tr('Noch keine Tags', 'No tags yet')}</h3>
+          <p>{tr('Neue Versionen lassen sich im Release-Creator vorbereiten.', 'Prepare new versions in the release creator.')}</p>
+        </div>
+      )}
       {page.nextCursor && (
-        <Button
-          disabled={task.busy}
-          onClick={() =>
-            void task.run(
-              () => hostingClient.request('releases', { repository: repository.ref, cursor: page.nextCursor! }),
-              (next) => setPage((previous) => ({ ...next, items: [...previous.items, ...next.items] })),
-            )
-          }
-        >
-          {tr('Weitere laden', 'Load more')}
-        </Button>
+        <div className="hosting-releases-pagination">
+          <Button
+            disabled={task.busy}
+            onClick={() =>
+              void task.run(
+                () => hostingClient.request('releases', { repository: repository.ref, cursor: page.nextCursor! }),
+                (next) => setPage((previous) => ({ ...next, items: [...previous.items, ...next.items] })),
+              )
+            }
+          >
+            {tr('Weitere laden', 'Load more')}
+          </Button>
+        </div>
       )}
       {task.busy && (
-        <p className="hosting-notice" role="status">
-          {tr('Laden …', 'Loading …')}
+        <p className="hosting-releases-loading" role="status">
+          <Loader2 size={15} className="spin" aria-hidden="true" />
+          {capabilities.releases === 'native' ? tr('Releases werden geladen …', 'Loading releases …') : tr('Tags werden geladen …', 'Loading tags …')}
         </p>
       )}
       {task.error && (

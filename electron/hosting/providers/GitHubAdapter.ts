@@ -434,6 +434,7 @@ export class GitHubAdapter extends BaseHostingAdapter {
       tagName: string(row.tag_name),
       name: string(row.name ?? row.tag_name),
       body: string(row.body),
+      publishedAt: string(row.published_at) || undefined,
       htmlUrl: string(row.html_url),
       draft: Boolean(row.draft),
       prerelease: Boolean(row.prerelease),

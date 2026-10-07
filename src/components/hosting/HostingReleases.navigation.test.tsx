@@ -6,8 +6,10 @@ import { AppStateSlicesProvider, type AppStateSlicesValue } from '@/contexts/App
 import { I18nProvider } from '@/i18n';
 import { HostingReleases } from './HostingReleases';
 import type { HostedRepository, HostingCapabilities } from '@/types/hostingDtos';
+import { useHostingState } from './hostingState';
 
-vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: async () => ({ items: [], nextCursor: null }) } }));
+const requests = vi.hoisted(() => vi.fn());
+vi.mock('@/services/hostingClient', () => ({ hostingClient: { request: requests } }));
 const repository: HostedRepository = {
   ref: { connectionId: 'selected', repositoryId: '1', fullPath: 'team/repo' },
   name: 'repo',
@@ -61,6 +63,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   allowActivation = true;
   vi.clearAllMocks();
+  requests.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+  useHostingState.setState({ revision: 0 });
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -70,6 +74,44 @@ afterEach(() => {
   host.remove();
 });
 describe('hosting creator navigation', () => {
+  it('loads more release history and refreshes the selected endpoint without starting the creator', async () => {
+    const release = (id: string) => ({
+      id,
+      tagName: `v${id}`,
+      name: `Version ${id}`,
+      body: `## Notes ${id}`,
+      draft: false,
+      prerelease: false,
+      htmlUrl: `${repository.htmlUrl}/releases/${id}`,
+    });
+    requests
+      .mockResolvedValueOnce({ items: [release('2')], nextCursor: 'older' })
+      .mockResolvedValueOnce({ items: [release('1')], nextCursor: null })
+      .mockResolvedValueOnce({ items: [release('3')], nextCursor: null });
+    await render(['C:/selected-clone']);
+    const click = (label: string) => act(async () => [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === label)!.click());
+    await click('Load more');
+    expect(requests).toHaveBeenCalledWith('releases', { repository: repository.ref, cursor: 'older' });
+    expect(host.querySelectorAll('.hosting-release')).toHaveLength(2);
+    await click('Refresh');
+    expect(requests).toHaveBeenLastCalledWith('releases', { repository: repository.ref });
+    expect(host.querySelectorAll('.hosting-release')).toHaveLength(1);
+    expect(host.querySelector('.markdown-preview-content h2')?.textContent).toBe('Notes 3');
+    expect(openCreator).not.toHaveBeenCalled();
+    expect(activate).not.toHaveBeenCalled();
+  });
+
+  it('keeps failed loading distinct from an empty release history', async () => {
+    requests.mockRejectedValueOnce(new Error('Release access denied'));
+    await render(['C:/selected-clone']);
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Release access denied');
+    expect(host.querySelector('.hosting-releases-empty')).toBeNull();
+    requests.mockResolvedValueOnce({ items: [], nextCursor: null });
+    await act(async () => [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Refresh')!.click());
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector('.hosting-releases-empty')?.textContent).toContain('No releases yet');
+  });
+
   it('opens the explicit hosting repository only after its local clone has been activated and React has committed that context', async () => {
     await render(['C:/selected-clone']);
     await create();

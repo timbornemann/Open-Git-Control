@@ -29,6 +29,22 @@ const json = (value: unknown, headers?: Record<string, string>) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('connection-local provider contracts', () => {
+  it.each(['github', 'forgejo', 'gitlab'] as const)('preserves the publication date in %s release history', async (provider) => {
+    const publishedAt = '2026-10-07T09:00:00Z';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        json([
+          { id: 12, tag_name: 'v2.2.2', name: 'Release v2.2.2', published_at: publishedAt, released_at: publishedAt },
+          { id: 13, tag_name: 'v2.2.3', name: 'Draft v2.2.3', published_at: null, released_at: null },
+        ]),
+      ),
+    );
+    const page = await createHostingAdapter(connection(provider), credentials).releases({ repository: ref(provider) });
+    expect(page.items[0].publishedAt).toBe(publishedAt);
+    expect(page.items[1].publishedAt).toBeUndefined();
+  });
+
   it('removes API-supplied HTTP usernames and never forwards passwords or URL tokens to repository DTOs', () => {
     expect(safeCloneUrl('https://alice@bitbucket.org/team/demo.git')).toBe('https://bitbucket.org/team/demo.git');
     expect(safeCloneUrl('git@bitbucket.org:team/demo.git', true)).toBe('git@bitbucket.org:team/demo.git');

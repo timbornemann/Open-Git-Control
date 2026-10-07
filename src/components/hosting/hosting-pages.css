@@ -372,14 +372,6 @@
   font-family: var(--font-mono);
   font-size: 12px;
 }
-.hosting-notes {
-  margin: 12px 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 400;
-}
 .hosting-file-row {
   display: flex;
   align-items: center;
