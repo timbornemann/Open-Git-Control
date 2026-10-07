@@ -9,7 +9,7 @@ import { DangerConfirm } from '@/components/DangerConfirm';
 import { Input } from '@/components/Input';
 import { BranchContextMenu } from './BranchContextMenu';
 import { CloneProgressModal } from './CloneProgressModal';
-import { GitTransferProgressOverlay } from './GitTransferProgressOverlay';
+import { GitTransferProgressNotification } from './GitTransferProgressNotification';
 import type { BranchContextMenuState, ConfirmDialogState, InputDialogState } from './layoutTypes';
 
 type RepoSwitcherOverlayState = {
@@ -182,7 +182,7 @@ export const OverlayManager: React.FC<OverlayManagerProps> = ({ repoSwitcher, to
 
     <DialogOverlays state={dialogs} />
 
-    <GitTransferProgressOverlay open={gitTransfer.open} title={gitTransfer.title} events={gitTransfer.events} />
+    <GitTransferProgressNotification open={gitTransfer.open} title={gitTransfer.title} events={gitTransfer.events} />
 
     <CloneProgressModal
       isCloning={cloneProgress.isCloning}

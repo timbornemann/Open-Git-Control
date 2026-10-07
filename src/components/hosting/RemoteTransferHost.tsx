@@ -1,16 +1,14 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useGitStore, useSettingsStore, useUIStore } from '@/contexts/AppStateContext';
 import { DialogFrame } from '@/components/DialogFrame';
-import { Button } from '@/components/ui/Button';
 import { useI18n } from '@/i18n';
 import { useHostingState } from './hostingState';
 import { useRemoteTransferDialogState } from './remoteTransferDialogState';
 import { useRemoteTransferState } from './remoteTransferState';
 import { RemoteTransferCoordinator, type RemoteTransferContext } from './remoteTransferCoordinator';
 import { RemoteTransferPanel } from './RemoteTransferPanel';
-import { RemoteTransferProgress } from './RemoteTransferProgress';
+import { useRemoteTransferNotifications } from './useRemoteTransferNotifications';
 import './hosting.css';
-import './remoteTransferHost.css';
 
 /** Mounted once regardless of the selected repository subpage. */
 export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguration: (repoPath: string) => void }) {
@@ -19,26 +17,27 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   const branch = useGitStore((state) => state.currentBranch);
   const tags = useGitStore((state) => state.tags);
   const refresh = useGitStore((state) => state.triggerRefresh);
-  const toast = useGitStore((state) => state.onToast);
   const scanEnabled = useSettingsStore((state) => state.settings.secretScanBeforePushEnabled);
   const setActiveTab = useUIStore((state) => state.setActiveTab);
   const connections = useHostingState((state) => state.connections);
   const accounts = JSON.stringify(connections.map(({ id, authenticated, username, userId, apiBaseUrl }) => [id, authenticated, username, userId, apiBaseUrl]));
   const context: RemoteTransferContext = { repoPath, branch, accounts, scanEnabled };
-  const environment = useRef({ context, refresh, toast, tr, onOpenConfiguration });
+  const complete = useRef<(message: string, error: boolean) => void>(() => {});
+  const environment = useRef({ context, refresh, tr, onOpenConfiguration });
   useLayoutEffect(() => {
-    environment.current = { context: { repoPath, branch, accounts, scanEnabled }, refresh, toast, tr, onOpenConfiguration };
-  }, [repoPath, branch, accounts, scanEnabled, refresh, toast, tr, onOpenConfiguration]);
+    environment.current = { context: { repoPath, branch, accounts, scanEnabled }, refresh, tr, onOpenConfiguration };
+  }, [repoPath, branch, accounts, scanEnabled, refresh, tr, onOpenConfiguration]);
   const coordinatorRef = useRef<RemoteTransferCoordinator | null>(null);
   if (!coordinatorRef.current)
     coordinatorRef.current = new RemoteTransferCoordinator({
       getContext: () => environment.current.context,
       refresh: () => environment.current.refresh(),
-      toast: (message, error) => environment.current.toast(message, error),
+      toast: (message, error) => complete.current(message, error),
       tr: (de, en) => environment.current.tr(de, en),
       openConfiguration: (path) => environment.current.onOpenConfiguration(path),
     });
   const coordinator = coordinatorRef.current;
+  complete.current = useRemoteTransferNotifications(coordinator, JSON.stringify([repoPath, branch, accounts]), tr);
   useLayoutEffect(() => {
     coordinator.invalidate();
   }, [coordinator, repoPath, branch, accounts]);
@@ -67,31 +66,6 @@ export function RemoteTransferHost({ onOpenConfiguration }: { onOpenConfiguratio
   const modal = ['selection', 'review'].includes(state.phase) || (state.phase === 'result' && state.resultVisible);
   return (
     <>
-      {state.busy && state.intent && (
-        <aside className="remote-transfer-progress" role="status">
-          <div className="remote-transfer-progress__heading">
-            <span className="clone-spinner" aria-hidden="true" />
-            <div>
-              <strong>{title}</strong>
-              <span className="remote-transfer-progress__subtitle">{tr('Operation läuft …', 'Operation running …')}</span>
-            </div>
-          </div>
-          <p className="remote-transfer-progress__repository" title={state.intent.repoPath}>
-            {state.intent.repoPath}
-          </p>
-          <RemoteTransferProgress repoPath={state.intent.repoPath} />
-          <div className="remote-transfer-progress__actions">
-            <Button onClick={() => coordinator.cancel()}>{tr('Abbrechen', 'Cancel')}</Button>
-          </div>
-        </aside>
-      )}
-      {state.phase === 'result' && !state.resultVisible && (
-        <aside className="remote-transfer-progress" aria-live="polite">
-          <Button onClick={() => coordinator.showResult()}>
-            {state.failedPull ? tr('Pull wiederaufnehmen', 'Resume pull') : tr('Übertragungsergebnis öffnen', 'Open transfer result')}
-          </Button>
-        </aside>
-      )}
       <DialogFrame open={modal} title={title} closeOnBackdrop={false} onClose={() => coordinator.close()} cancelLabel={tr('Schließen', 'Close')}>
         <RemoteTransferPanel
           state={state}

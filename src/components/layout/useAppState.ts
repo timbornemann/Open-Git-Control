@@ -30,6 +30,7 @@ export const useAppState = () => {
     toasts: gitActionToasts,
     setToast: setGitActionToast,
     dismiss: dismissToast,
+    notifications,
   } = useToastQueue({
     autoHideMs: 3000,
     errorAutoHideMs: null,
@@ -240,6 +241,7 @@ export const useAppState = () => {
     gitActionToasts,
     setGitActionToast,
     dismissToast,
+    notifications,
 
     branches: repository.branches,
     currentBranch: repository.currentBranch,

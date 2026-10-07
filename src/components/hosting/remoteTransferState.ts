@@ -13,6 +13,7 @@ export interface RemoteTransferSelection {
 export interface RemoteTransferState {
   phase: 'idle' | 'preparing' | 'selection' | 'review' | 'running' | 'result';
   busy: boolean;
+  cancelling: boolean;
   intent: RemoteTransferDialog | null;
   snapshot: GitRemoteSnapshotDto | null;
   preferences: RemotePreferences;
@@ -29,6 +30,7 @@ export interface RemoteTransferState {
 export const initialRemoteTransferState = (): RemoteTransferState => ({
   phase: 'idle',
   busy: false,
+  cancelling: false,
   intent: null,
   snapshot: null,
   preferences: {},

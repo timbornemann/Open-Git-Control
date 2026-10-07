@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ToastMessage } from '@/types/git';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { NotificationEntry, NotificationMessage } from '@/types/notifications';
 
-type ToastEntry = ToastMessage & { id: number };
 type UseToastQueueOptions = {
   autoHideMs?: number;
   errorAutoHideMs?: number | null;
@@ -14,46 +13,87 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   const autoHideMs = options.autoHideMs ?? 3000;
   const errorAutoHideMs = options.errorAutoHideMs === undefined ? autoHideMs : options.errorAutoHideMs;
 
-  const [toasts, setToasts] = useState<ToastEntry[]>([]);
+  const [toasts, setToasts] = useState<NotificationEntry[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-  const latestToastsRef = useRef<ToastEntry[]>([]);
+  const latestToastsRef = useRef<NotificationEntry[]>([]);
 
-  useEffect(() => {
-    latestToastsRef.current = toasts;
-  }, [toasts]);
-
-  const dismiss = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-    const timer = timersRef.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timersRef.current.delete(id);
-    }
+  const commit = useCallback((entries: NotificationEntry[]) => {
+    latestToastsRef.current = entries;
+    setToasts(entries);
   }, []);
 
+  const clearTimer = useCallback((id: number) => {
+    const timer = timersRef.current.get(id);
+    if (timer !== undefined) clearTimeout(timer);
+    timersRef.current.delete(id);
+  }, []);
+
+  const dismiss = useCallback(
+    (id: number) => {
+      commit(latestToastsRef.current.filter((t) => t.id !== id));
+      clearTimer(id);
+    },
+    [clearTimer, commit],
+  );
+
+  const schedule = useCallback(
+    (id: number, message: NotificationMessage) => {
+      clearTimer(id);
+      const delay = message.autoHideMs !== undefined ? message.autoHideMs : message.isError ? errorAutoHideMs : autoHideMs;
+      if (typeof delay === 'number' && delay > 0)
+        timersRef.current.set(
+          id,
+          setTimeout(() => dismiss(id), delay),
+        );
+    },
+    [autoHideMs, errorAutoHideMs, dismiss, clearTimer],
+  );
+
+  const publish = useCallback(
+    (message: NotificationMessage) => {
+      const id = ++nextId;
+      const entries = [...latestToastsRef.current, { ...message, id }];
+      // Keep active operations visible when ordinary notifications fill the queue.
+      while (entries.length > 5) {
+        const index = entries.findIndex((entry) => entry.kind !== 'progress' && entry.id !== id);
+        if (index < 0) break;
+        clearTimer(entries[index].id);
+        entries.splice(index, 1);
+      }
+      commit(entries);
+      schedule(id, message);
+      return id;
+    },
+    [clearTimer, commit, schedule],
+  );
+
+  const update = useCallback(
+    (id: number, message: NotificationMessage) => {
+      if (!latestToastsRef.current.some((entry) => entry.id === id)) return false;
+      commit(latestToastsRef.current.map((entry) => (entry.id === id ? { ...message, id } : entry)));
+      schedule(id, message);
+      return true;
+    },
+    [commit, schedule],
+  );
+
   const setToast = useCallback(
-    (msg: ToastMessage | null) => {
+    (msg: NotificationMessage | null) => {
       if (!msg) {
-        setToasts([]);
+        commit([]);
         timersRef.current.forEach((t) => clearTimeout(t));
         timersRef.current.clear();
         return;
       }
 
       const lastToast = latestToastsRef.current[latestToastsRef.current.length - 1];
-      if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError) {
+      if (lastToast && lastToast.msg === msg.msg && lastToast.isError === msg.isError && lastToast.kind === msg.kind) {
         return;
       }
 
-      const id = ++nextId;
-      setToasts((prev) => [...prev.slice(-4), { ...msg, id }]);
-      const hideAfterMs = msg.isError ? errorAutoHideMs : autoHideMs;
-      if (typeof hideAfterMs === 'number' && hideAfterMs > 0) {
-        const timer = setTimeout(() => dismiss(id), hideAfterMs);
-        timersRef.current.set(id, timer);
-      }
+      publish(msg);
     },
-    [autoHideMs, dismiss, errorAutoHideMs],
+    [commit, publish],
   );
 
   useEffect(() => {
@@ -71,5 +111,6 @@ export const useToastQueue = (config: number | UseToastQueueOptions = 3000) => {
   // Backward-compat: expose last toast as `toast`
   const toast = toasts.length > 0 ? toasts[toasts.length - 1] : null;
 
-  return { toast, toasts, setToast, pushSuccess, pushError, clearToast, dismiss };
+  const notifications = useMemo(() => ({ publish, update, dismiss }), [publish, update, dismiss]);
+  return { toast, toasts, setToast, pushSuccess, pushError, clearToast, dismiss, notifications };
 };

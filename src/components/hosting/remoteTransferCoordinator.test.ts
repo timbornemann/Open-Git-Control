@@ -95,7 +95,7 @@ describe('shared remote transfer coordinator', () => {
     expect(actionCalls('executePush')).toHaveLength(1);
     expect(actionCalls('setPreferences')).toHaveLength(0);
     expect(useRemoteTransferState.getState()).toMatchObject({ phase: 'idle', busy: false });
-    expect(toast).toHaveBeenCalledWith('Push completed: success.', false);
+    expect(toast).toHaveBeenCalledWith('Push completed.', false);
   });
   it('fetches branches and then typed remote tags from the same sole remote', async () => {
     await coordinator.start({ repoPath: '/repo', mode: 'fetch' });
@@ -298,6 +298,8 @@ describe('shared remote transfer coordinator', () => {
     await running;
     expect(actionCalls('cancel')).toEqual([{ repoPath: '/repo' }]);
     expect(useRemoteTransferState.getState()).toMatchObject({ phase: 'result', batch: { state: 'cancelled', targets: [{ status: 'success' }] } });
+    expect(toast).toHaveBeenCalledWith('Push cancelled.', false);
+    expect(useRemoteTransferState.getState().resultVisible).toBe(false);
   });
   it('opens configuration without performing any transfer', async () => {
     await coordinator.start({ repoPath: '/repo', mode: 'remotes' });
@@ -342,5 +344,26 @@ describe('shared remote transfer coordinator', () => {
     expect(useRemoteTransferState.getState().resultVisible).toBe(true);
     await coordinator.retryPush();
     expect(actionCalls('retryPush')).toHaveLength(1);
+  });
+  it.each(['push', 'fetch', 'pull'] as const)('reports cancelled %s preparation/transfers as information without reopening recovery', async (mode) => {
+    const operation = mode === 'push' ? 'planPush' : mode;
+    const original = mocked.request.getMockImplementation()!;
+    let reject!: (error: Error) => void;
+    mocked.request.mockImplementation((name, input) =>
+      name === operation
+        ? new Promise((_resolve, fail) => {
+            reject = fail;
+          })
+        : original(name, input),
+    );
+    const running = coordinator.start({ repoPath: '/repo', mode });
+    for (let index = 0; index < 40 && !reject; index++) await Promise.resolve();
+    coordinator.cancel();
+    coordinator.cancel();
+    reject(new Error('Git operation was aborted.'));
+    await running;
+    expect(toast).toHaveBeenCalledExactlyOnceWith('Transfer cancelled.', false);
+    expect(actionCalls('cancel')).toHaveLength(1);
+    expect(useRemoteTransferState.getState()).toMatchObject({ busy: false, cancelling: false, failedPull: null, phase: 'idle', error: 'Transfer cancelled.' });
   });
 });

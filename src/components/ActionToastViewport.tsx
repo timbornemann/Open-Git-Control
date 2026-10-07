@@ -1,12 +1,11 @@
 import React, { useCallback } from 'react';
 import { useI18n } from '@/i18n';
 import { useOptionalFeedbackReport } from '@/contexts/FeedbackReportContext';
+import { AlertCircle, Check, Info, Loader2, X } from 'lucide-react';
+import type { NotificationEntry } from '@/types/notifications';
+import '@/styles/action-toast.css';
 
-export type ActionToastItem = {
-  id: number;
-  msg: string;
-  isError: boolean;
-};
+export type ActionToastItem = NotificationEntry;
 
 type ActionToastViewportProps = {
   toasts: ActionToastItem[];
@@ -53,45 +52,58 @@ export const ActionToastViewport: React.FC<ActionToastViewportProps> = ({ toasts
 
   return (
     <div className="toast-container" aria-live="polite" aria-atomic="false">
-      {toasts.map((toast) => (
-        <div key={toast.id} className={`action-toast ${toast.isError ? 'error' : 'success'}`} role={toast.isError ? 'alert' : 'status'}>
-          <div className="toast-main">
-            <span className="toast-icon">{toast.isError ? 'x' : 'ok'}</span>
-            <span className="toast-msg">{toast.msg}</span>
-          </div>
-          <div className="toast-actions">
-            {toast.isError && (
-              <>
+      {toasts.map((toast) => {
+        const kind = toast.kind ?? (toast.isError ? 'error' : 'success');
+        const Icon = kind === 'progress' ? Loader2 : kind === 'info' ? Info : kind === 'warning' ? AlertCircle : toast.isError ? X : Check;
+        return (
+          <div key={toast.id} className={`action-toast ${kind}`} role={toast.isError ? 'alert' : 'status'}>
+            <div className="toast-main">
+              <Icon size={16} className={`toast-icon${kind === 'progress' ? ' toast-icon-spin' : ''}`} aria-hidden="true" />
+              <div className="toast-msg">
+                {toast.title && <strong className="toast-title">{toast.title}</strong>}
+                <span>{toast.msg}</span>
+                {toast.detail && <span className="toast-detail">{toast.detail}</span>}
+              </div>
+            </div>
+            <div className="toast-actions">
+              {toast.isError && (
+                <>
+                  <button
+                    type="button"
+                    className="toast-action-btn"
+                    onClick={() => handleCopy(toast.msg)}
+                    title={t('generated.components.actiontoastviewport.copy_error_message_6863792c')}
+                  >
+                    {t('generated.components.actiontoastviewport.copy_5c2a9afe')}
+                  </button>
+                  {feedback && (
+                    <button type="button" className="toast-action-btn toast-action-btn-report" onClick={() => feedback.handleToastAction(toast)}>
+                      {feedback.getToastStatus(toast.id).state === 'reported'
+                        ? feedbackLabel('reported', t, feedback.getToastStatus(toast.id).issueNumber)
+                        : feedbackLabel('idle', t)}
+                    </button>
+                  )}
+                </>
+              )}
+              {toast.actions?.map((action) => (
+                <button key={action.label} type="button" className="toast-action-btn" disabled={action.disabled} onClick={action.onClick}>
+                  {action.label}
+                </button>
+              ))}
+              {onDismiss && toast.dismissible !== false && (
                 <button
                   type="button"
-                  className="toast-action-btn"
-                  onClick={() => handleCopy(toast.msg)}
-                  title={t('generated.components.actiontoastviewport.copy_error_message_6863792c')}
+                  className="toast-action-btn toast-action-btn-close"
+                  onClick={() => onDismiss(toast.id)}
+                  title={t('generated.components.actiontoastviewport.close_message_73bd3641')}
                 >
-                  {t('generated.components.actiontoastviewport.copy_5c2a9afe')}
+                  {t('generated.components.actiontoastviewport.close_181764fa')}
                 </button>
-                {feedback && (
-                  <button type="button" className="toast-action-btn toast-action-btn-report" onClick={() => feedback.handleToastAction(toast)}>
-                    {feedback.getToastStatus(toast.id).state === 'reported'
-                      ? feedbackLabel('reported', t, feedback.getToastStatus(toast.id).issueNumber)
-                      : feedbackLabel('idle', t)}
-                  </button>
-                )}
-              </>
-            )}
-            {onDismiss && (
-              <button
-                type="button"
-                className="toast-action-btn toast-action-btn-close"
-                onClick={() => onDismiss(toast.id)}
-                title={t('generated.components.actiontoastviewport.close_message_73bd3641')}
-              >
-                {t('generated.components.actiontoastviewport.close_181764fa')}
-              </button>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

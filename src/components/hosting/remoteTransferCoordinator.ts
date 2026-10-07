@@ -51,9 +51,13 @@ export class RemoteTransferCoordinator {
       await operation();
     } catch (reason) {
       if (generation !== this.generation || this.context !== contextKey(this.environment.getContext())) return;
-      const error = reason instanceof Error ? reason.message : String(reason);
-      this.set({ phase: 'result', busy: false, error });
-      this.environment.toast(error, true);
+      const error = this.cancelled
+        ? this.environment.tr('Übertragung abgebrochen.', 'Transfer cancelled.')
+        : reason instanceof Error
+          ? reason.message
+          : String(reason);
+      this.set({ phase: this.cancelled && !this.state.batch ? 'idle' : 'result', busy: false, cancelling: false, resultVisible: false, error });
+      this.environment.toast(error, !this.cancelled);
     }
   }
   async start(intent: RemoteTransferDialog) {
@@ -175,7 +179,7 @@ export class RemoteTransferCoordinator {
       await this.scoped(() => transferClient.request('pull', input));
     } catch (error) {
       if (generation === this.generation && this.context === contextKey(this.environment.getContext())) {
-        this.set({ failedPull: input });
+        if (!this.cancelled) this.set({ failedPull: input });
         this.environment.refresh();
       }
       throw error;
@@ -265,9 +269,20 @@ export class RemoteTransferCoordinator {
         : await transferClient.request('executePush', { repoPath: intent.repoPath, planId: plan.id });
     // A cancelled push can still return successful endpoints; keep its full result visible.
     if (generation !== this.generation || this.context !== contextKey(this.environment.getContext())) return;
-    this.set({ batch: next, busy: false, phase: next.state === 'success' ? 'idle' : 'result' });
+    this.set({ batch: next, busy: false, cancelling: false, resultVisible: false, phase: next.state === 'success' ? 'idle' : 'result' });
     this.environment.refresh();
-    this.environment.toast(this.environment.tr(`Push abgeschlossen: ${next.state}.`, `Push completed: ${next.state}.`), next.state !== 'success');
+    const message =
+      next.state === 'success'
+        ? this.environment.tr('Push abgeschlossen.', 'Push completed.')
+        : next.state === 'cancelled'
+          ? this.environment.tr('Push abgebrochen.', 'Push cancelled.')
+          : next.state === 'partial'
+            ? this.environment.tr(
+                'Push teilweise abgeschlossen. Einige Ziele wurden nicht übertragen.',
+                'Push partially completed. Some targets were not published.',
+              )
+            : this.environment.tr('Push fehlgeschlagen.', 'Push failed.');
+    this.environment.toast(message, next.state === 'failed' || next.state === 'partial');
   }
   async retryPush() {
     if (this.state.busy || !this.state.batch || !this.state.plan) return;
@@ -291,18 +306,23 @@ export class RemoteTransferCoordinator {
     });
   }
   private finish(message: string) {
-    this.set({ phase: 'idle', busy: false });
+    this.set({ phase: 'idle', busy: false, cancelling: false, failedPull: null, error: '' });
     this.environment.refresh();
     this.environment.toast(message, false);
   }
   cancel() {
+    if (!this.state.busy) {
+      this.close();
+      return;
+    }
+    if (this.state.cancelling) return;
     const repoPath = this.state.intent?.repoPath;
     this.cancelled = true;
+    this.set({ cancelling: true });
     if (repoPath) {
       void transferClient.request('cancel', { repoPath }).catch(() => {});
       void gitClient.cancelSecretScan(repoPath);
     }
-    if (!this.state.busy) this.close();
   }
   invalidate() {
     this.cancel();
@@ -319,6 +339,6 @@ export class RemoteTransferCoordinator {
     this.set(initialRemoteTransferState());
   }
   showResult() {
-    if (this.state.phase === 'result') this.set({ resultVisible: true });
+    if (!this.state.busy && (this.state.batch || this.state.failedPull || this.state.error)) this.set({ phase: 'result', resultVisible: true });
   }
 }
