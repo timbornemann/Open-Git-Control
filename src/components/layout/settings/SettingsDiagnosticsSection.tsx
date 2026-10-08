@@ -1,9 +1,12 @@
+import { Button } from '@/components/ui/Button';
 import React from 'react';
 import { appClient } from '@/services/appClient';
 import { useI18n } from '@/i18n';
 import { useAppToast } from '@/hooks/useAppToast';
+import { ClipboardCopy } from 'lucide-react';
+import { SettingsSection, type SettingsLayoutVariant } from './SettingsSectionPrimitives';
 
-export const SettingsDiagnosticsSection: React.FC = () => {
+export const SettingsDiagnosticsSection: React.FC<{ variant?: SettingsLayoutVariant }> = ({ variant = 'sidebar' }) => {
   const { t } = useI18n();
   const showToast = useAppToast();
   const [isCopying, setIsCopying] = React.useState(false);
@@ -43,15 +46,14 @@ export const SettingsDiagnosticsSection: React.FC = () => {
   }, [showToast, t]);
 
   return (
-    <div className="ssc-section">
-      <div className="ssc-section-title">{t('generated.components.layout.sidebar.settingssidebarcontent.diagnostics_b0b2e360')}</div>
-      <div className="ssc-row">
-        <button className="staging-tool-btn" onClick={copyDiagnosticsReport} disabled={isCopying}>
+    <SettingsSection group="diagnostics" variant={variant}>
+      <div className="settings-inline-actions">
+        <Button icon={<ClipboardCopy size={13} />} onClick={copyDiagnosticsReport} disabled={isCopying}>
           {isCopying
             ? t('generated.components.layout.sidebar.settingssidebarcontent.copying_097f00a2')
             : t('generated.components.layout.sidebar.settingssidebarcontent.copy_diagnostics_report_428a213f')}
-        </button>
+        </Button>
       </div>
-    </div>
+    </SettingsSection>
   );
 };

@@ -1,7 +1,8 @@
+import { Button } from '@/components/ui/Button';
 import { Bug, HelpCircle, Lightbulb } from 'lucide-react';
 import { useFeedbackReport } from '@/contexts/FeedbackReportContext';
 import { useI18n } from '@/i18n';
-import { actionRowClass, hintClass, type SettingsSectionProps } from './SettingsSectionPrimitives';
+import { actionRowClass, hintClass, SettingsSection, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 export const SettingsFeedbackSection = ({ variant }: SettingsSectionProps) => {
   const { tr } = useI18n();
@@ -15,15 +16,15 @@ export const SettingsFeedbackSection = ({ variant }: SettingsSectionProps) => {
         )}
       </p>
       <div className={`${actionRowClass(variant)} feedback-settings-actions`}>
-        <button className="staging-tool-btn" onClick={() => feedback.openManualReport('bug')}>
-          <Bug size={13} /> {tr('Fehler melden', 'Report bug')}
-        </button>
-        <button className="staging-tool-btn" onClick={() => feedback.openManualReport('feature')}>
-          <Lightbulb size={13} /> {tr('Idee vorschlagen', 'Suggest idea')}
-        </button>
-        <button className="staging-tool-btn" onClick={() => feedback.openManualReport('question')}>
-          <HelpCircle size={13} /> {tr('Frage stellen', 'Ask question')}
-        </button>
+        <Button icon={<Bug size={13} />} onClick={() => feedback.openManualReport('bug')}>
+          {tr('Fehler melden', 'Report bug')}
+        </Button>
+        <Button icon={<Lightbulb size={13} />} onClick={() => feedback.openManualReport('feature')}>
+          {tr('Idee vorschlagen', 'Suggest idea')}
+        </Button>
+        <Button icon={<HelpCircle size={13} />} onClick={() => feedback.openManualReport('question')}>
+          {tr('Frage stellen', 'Ask question')}
+        </Button>
       </div>
       <p className={hintClass(variant)}>
         {feedback.capability?.directSubmissionAvailable
@@ -36,15 +37,9 @@ export const SettingsFeedbackSection = ({ variant }: SettingsSectionProps) => {
     </>
   );
 
-  return variant === 'sidebar' ? (
-    <div className="ssc-section">
-      <div className="ssc-section-title">{tr('Feedback & Fehlerberichte', 'Feedback & issue reports')}</div>
+  return (
+    <SettingsSection group="feedback" variant={variant}>
       {content}
-    </div>
-  ) : (
-    <section className="settings-card settings-card-full">
-      <h3>{tr('Feedback & Fehlerberichte', 'Feedback & issue reports')}</h3>
-      {content}
-    </section>
+    </SettingsSection>
   );
 };

@@ -9,7 +9,7 @@ import { providerLabels, useHostingState } from './hostingState';
 import { useHostingTask } from './useHostingTask';
 import { HostingConnectionEditor } from './HostingConnectionEditor';
 
-export function HostingConnections() {
+export function HostingConnections({ headingId }: { headingId?: string } = {}) {
   const { tr } = useI18n();
   const { connections, setConnections, refresh } = useHostingState();
   const [editor, setEditor] = useState<{ connection: HostingConnection | null } | null>(null);
@@ -27,7 +27,9 @@ export function HostingConnections() {
     <section className="hosting-connections">
       <div className="hosting-section-heading">
         <div>
-          <h2>{tr('Verbundene Konten', 'Connected accounts')}</h2>
+          <h2 id={headingId} tabIndex={headingId ? -1 : undefined}>
+            {tr('Verbundene Konten', 'Connected accounts')}
+          </h2>
           <p className="hosting-help">
             {tr('Jedes Konto behält seine eigenen Repositories und Zugangsdaten.', 'Each account keeps its own repositories and credentials.')}
           </p>

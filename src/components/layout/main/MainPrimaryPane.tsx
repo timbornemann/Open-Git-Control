@@ -212,6 +212,7 @@ export const MainPrimaryPane: React.FC<MainPrimaryPaneProps> = ({
               jobs={workflow.jobs}
               onClearJobs={workflow.onClearJobs}
               activeTab={settingsState.settingsTab}
+              onSelectTab={settingsState.onSelectSettingsTab}
               onResetLayout={ui.onResetLayout}
             />
           </React.Suspense>

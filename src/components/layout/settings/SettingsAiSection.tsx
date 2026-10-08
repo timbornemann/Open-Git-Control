@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
@@ -5,19 +6,29 @@ import { appClient } from '@/services/appClient';
 import { formatCommitMessageStyleExample, getCommitMessageLanguageOptions, getCommitMessageStyleOptions } from '@/utils/commitMessagePreferences';
 import type { SettingsAiUpdaterState } from '../hooks/useSettingsAiUpdater';
 import type { SettingsUpdateResult } from '@/app/state/contracts';
-import { actionRowClass, fieldClass, hintClass, inputClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
+import {
+  actionRowClass,
+  hintClass,
+  inputClass,
+  SettingsDisclosure,
+  SettingsField,
+  SettingsSection,
+  SettingsSwitch,
+  type SettingsLayoutVariant,
+  type SettingsSectionProps,
+} from './SettingsSectionPrimitives';
 
 type BaseUrlInputProps = {
   label: string;
   value: string;
   placeholder: string;
   className?: string;
-  fieldClassName?: string;
+  variant: SettingsLayoutVariant;
   onCommit: (value: string) => Promise<SettingsUpdateResult | void>;
   validate: (value: string) => string | null;
 };
 
-const BaseUrlInput = ({ label, value, placeholder, className, fieldClassName, onCommit, validate }: BaseUrlInputProps) => {
+const BaseUrlInput = ({ label, value, placeholder, className, variant, onCommit, validate }: BaseUrlInputProps) => {
   const [draft, setDraft] = useState(value);
   const [validationError, setValidationError] = useState<string | null>(null);
   const inFlightValueRef = useRef<string | null>(null);
@@ -66,8 +77,7 @@ const BaseUrlInput = ({ label, value, placeholder, className, fieldClassName, on
 
   return (
     <>
-      <label className={fieldClassName}>
-        {label}
+      <SettingsField variant={variant} label={label}>
         <input
           className={className}
           type="text"
@@ -81,7 +91,7 @@ const BaseUrlInput = ({ label, value, placeholder, className, fieldClassName, on
           placeholder={placeholder}
           aria-invalid={Boolean(validationError)}
         />
-      </label>
+      </SettingsField>
       {validationError && <p style={{ color: 'var(--status-danger)', margin: 0, fontSize: '0.78rem' }}>{validationError}</p>}
     </>
   );
@@ -104,16 +114,9 @@ const validateBaseUrl = (value: string, requireHttps: boolean): string | null =>
 export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: SettingsSectionProps & { ai: SettingsAiUpdaterState }) => {
   const { t, tr } = useI18n();
   const modelListId = variant === 'sidebar' ? 'ai-model-list-sc' : 'ai-model-list-settings';
-  const content = (
+  const connection = (
     <>
-      <SettingsSwitch
-        variant={variant}
-        checked={settings.aiAutoCommitEnabled}
-        label={t('generated.components.layout.settingsmaincontent.enable_ai_auto_commit_0468df6a')}
-        onChange={(checked) => void onUpdateSettings({ aiAutoCommitEnabled: checked })}
-      />
-      <label className={fieldClass(variant)}>
-        {t('generated.components.layout.settingsmaincontent.provider_e52086d7')}
+      <SettingsField variant={variant} label={t('generated.components.layout.settingsmaincontent.provider_e52086d7')}>
         <select
           className={inputClass(variant)}
           value={settings.aiProvider}
@@ -123,7 +126,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
           <option value="gemini">Google Gemini</option>
           <option value="openai">OpenAI</option>
         </select>
-      </label>
+      </SettingsField>
 
       {settings.aiProvider === 'ollama' && (
         <BaseUrlInput
@@ -131,7 +134,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
           value={settings.ollamaBaseUrl || 'http://127.0.0.1:11434'}
           placeholder="http://127.0.0.1:11434"
           className={inputClass(variant)}
-          fieldClassName={fieldClass(variant)}
+          variant={variant}
           onCommit={(ollamaBaseUrl) => onUpdateSettings({ ollamaBaseUrl })}
           validate={(value) => validateBaseUrl(value, false)}
         />
@@ -139,8 +142,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
 
       {settings.aiProvider === 'gemini' && (
         <>
-          <label className={fieldClass(variant)}>
-            Gemini API Key
+          <SettingsField variant={variant} label="Gemini API Key">
             <input
               className={inputClass(variant)}
               type="password"
@@ -150,9 +152,9 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                 settings.hasGeminiApiKey ? t('generated.components.layout.settingsmaincontent.already_saved_enter_again_to_replace_fe7e9790') : 'AIza...'
               }
             />
-          </label>
+          </SettingsField>
           <div className={actionRowClass(variant)}>
-            <button
+            <Button
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
@@ -174,8 +176,8 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               }}
             >
               {t('generated.components.layout.settingsmaincontent.save_api_key_5cb25ffc')}
-            </button>
-            <button
+            </Button>
+            <Button
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
@@ -192,7 +194,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               {variant === 'sidebar'
                 ? t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')
                 : t('generated.components.layout.settingsmaincontent.remove_api_key_fe7c209e')}
-            </button>
+            </Button>
           </div>
           <p className={hintClass(variant)}>
             {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}:{' '}
@@ -210,12 +212,11 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
             value={settings.openAiBaseUrl || 'https://api.openai.com/v1'}
             placeholder="https://api.openai.com/v1"
             className={inputClass(variant)}
-            fieldClassName={fieldClass(variant)}
+            variant={variant}
             onCommit={(openAiBaseUrl) => onUpdateSettings({ openAiBaseUrl })}
             validate={(value) => validateBaseUrl(value, true)}
           />
-          <label className={fieldClass(variant)}>
-            OpenAI API Key
+          <SettingsField variant={variant} label="OpenAI API Key">
             <input
               className={inputClass(variant)}
               type="password"
@@ -225,9 +226,9 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
                 settings.hasOpenAiApiKey ? t('generated.components.layout.settingsmaincontent.already_saved_enter_again_to_replace_fe7e9790') : 'sk-...'
               }
             />
-          </label>
+          </SettingsField>
           <div className={actionRowClass(variant)}>
-            <button
+            <Button
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
@@ -249,8 +250,8 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               }}
             >
               {t('generated.components.layout.settingsmaincontent.save_api_key_5cb25ffc')}
-            </button>
-            <button
+            </Button>
+            <Button
               className="staging-tool-btn"
               onClick={async () => {
                 if (!appClient.isAvailable()) return;
@@ -267,7 +268,7 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
               {variant === 'sidebar'
                 ? t('generated.components.layout.sidebar.settingssidebarcontent.remove_d54fc957')
                 : t('generated.components.layout.settingsmaincontent.remove_api_key_fe7c209e')}
-            </button>
+            </Button>
           </div>
           <p className={hintClass(variant)}>
             {t('generated.components.layout.apimcpsettingspanel.status_b853ab43')}:{' '}
@@ -279,23 +280,22 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
       )}
 
       <div className={actionRowClass(variant)}>
-        <button className="staging-tool-btn" onClick={ai.testConnection} disabled={ai.isTestingAi}>
+        <Button onClick={ai.testConnection} disabled={ai.isTestingAi}>
           {ai.isTestingAi
             ? t('generated.components.layout.settingsmaincontent.testing_cead0ff0')
             : t('generated.components.layout.settingsmaincontent.test_connection_c981b874')}
-        </button>
-        <button className="staging-tool-btn" onClick={ai.loadModels} disabled={ai.isLoadingModels}>
+        </Button>
+        <Button onClick={ai.loadModels} disabled={ai.isLoadingModels}>
           {ai.isLoadingModels
             ? variant === 'sidebar'
               ? t('generated.components.layout.sidebar.settingssidebarcontent.loading_7f8a8587')
               : t('generated.components.layout.settingsmaincontent.loading_models_5bd9bbf8')
             : t('generated.components.layout.settingsmaincontent.load_models_a363b3f8')}
-        </button>
+        </Button>
       </div>
-      <label className={fieldClass(variant)}>
-        {t('generated.components.layout.settingsmaincontent.model_83e8c02e')}
+      <SettingsField variant={variant} label={t('generated.components.layout.settingsmaincontent.model_83e8c02e')}>
         {variant === 'main' && ai.modelOptions.length > 0 ? (
-          <select value={ai.selectedModel || ''} onChange={(event) => void ai.setSelectedModel(event.target.value)}>
+          <select className={inputClass(variant)} value={ai.selectedModel || ''} onChange={(event) => void ai.setSelectedModel(event.target.value)}>
             {!ai.selectedModel && (
               <option value="" disabled>
                 {t('generated.components.layout.settingsmaincontent.select_a_model_315c6c35')}
@@ -334,10 +334,13 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
             </datalist>
           </>
         )}
-      </label>
+      </SettingsField>
+    </>
+  );
 
-      <label className={fieldClass(variant)}>
-        {t('generated.components.layout.settingsmaincontent.commit_message_style_7c33ede9')}
+  const output = (
+    <>
+      <SettingsField variant={variant} label={t('generated.components.layout.settingsmaincontent.commit_message_style_7c33ede9')}>
         <select
           className={inputClass(variant)}
           value={settings.aiCommitMessageStyle}
@@ -349,10 +352,9 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
             </option>
           ))}
         </select>
-      </label>
+      </SettingsField>
 
-      <label className={fieldClass(variant)}>
-        {tr('KI-Ausgabesprache', 'AI output language')}
+      <SettingsField variant={variant} label={tr('KI-Ausgabesprache', 'AI output language')}>
         <select
           className={inputClass(variant)}
           value={settings.aiCommitMessageLanguage}
@@ -364,28 +366,38 @@ export const SettingsAiSection = ({ settings, onUpdateSettings, variant, ai }: S
             </option>
           ))}
         </select>
-      </label>
+      </SettingsField>
 
-      <div className={variant === 'sidebar' ? 'ssc-example-block' : 'settings-example-block'}>
-        <span>
-          {variant === 'sidebar'
+      <SettingsDisclosure
+        title={
+          variant === 'sidebar'
             ? t('generated.components.layout.sidebar.settingssidebarcontent.example_54306967')
-            : t('generated.components.layout.settingsmaincontent.example_for_this_style_de3f82d9')}
-        </span>
-        <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, t)}</pre>
-      </div>
+            : t('generated.components.layout.settingsmaincontent.example_for_this_style_de3f82d9')
+        }
+      >
+        <div className="settings-example-block">
+          <pre>{formatCommitMessageStyleExample(settings.aiCommitMessageStyle, settings.aiCommitMessageLanguage, t)}</pre>
+        </div>
+      </SettingsDisclosure>
     </>
   );
 
-  return variant === 'sidebar' ? (
-    <div className="ssc-section">
-      <div className="ssc-section-title">{t('generated.components.layout.settingsmaincontent.ai_294e8d00')}</div>
-      {content}
+  return (
+    <div className={variant === 'sidebar' ? 'ssc-root' : 'settings-grid'}>
+      <SettingsSection group="ai-provider" variant={variant}>
+        {connection}
+      </SettingsSection>
+      <SettingsSection group="ai-output" variant={variant}>
+        {output}
+      </SettingsSection>
+      <SettingsSection group="ai-automation" variant={variant}>
+        <SettingsSwitch
+          variant={variant}
+          checked={settings.aiAutoCommitEnabled}
+          label={t('generated.components.layout.settingsmaincontent.enable_ai_auto_commit_0468df6a')}
+          onChange={(checked) => void onUpdateSettings({ aiAutoCommitEnabled: checked })}
+        />
+      </SettingsSection>
     </div>
-  ) : (
-    <section className="settings-card">
-      <h3>{t('generated.components.layout.settingsmaincontent.ai_294e8d00')}</h3>
-      {content}
-    </section>
   );
 };

@@ -122,17 +122,6 @@
       "updatedAt": 1785856977969
     },
     {
-      "id": "3261f05f-793c-4373-8254-3a4bffcb3f6d",
-      "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
-      "title": "Secret scann allow list",
-      "description": "Secret scann allow list: Jedes repo bekommt seien eigene allowlist, nicht zentral in den einstellungen sondern im lokalen .Open-Git-Control order eine secret scann alow list, damit diese mit versioniert werdne kann und unter teams geteilt werden kann",
-      "priority": "medium",
-      "status": "planned",
-      "tags": [],
-      "createdAt": 1791460457077,
-      "updatedAt": 1791462196831
-    },
-    {
       "id": "e1735baf-002f-43a2-b357-8d49e35bb2d6",
       "projectId": "cb105c0a-6524-485d-8378-4d4e354634d4",
       "title": "Fresh Install: Check for git",

@@ -10,7 +10,10 @@ export const SidebarContentRouter: React.FC = React.memo(() => {
   const activeTab = useUIStore((state) => state.activeTab);
 
   return (
-    <div className="pane-content" style={{ padding: activeTab === 'localRepos' || activeTab === 'github' || activeTab === 'hosting' ? 0 : '8px' }}>
+    <div
+      className="pane-content"
+      style={{ padding: activeTab === 'localRepos' || activeTab === 'github' || activeTab === 'hosting' || activeTab === 'settings' ? 0 : '8px' }}
+    >
       {activeTab === 'localRepos' && <LocalReposSidebarContainer />}
       {activeTab === 'repo' && <RepoSidebarContainer />}
       {activeTab === 'planner' && <ProjectPlannerSidebarContent />}

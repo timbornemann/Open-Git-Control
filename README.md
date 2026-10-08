@@ -544,6 +544,10 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 
 ### Settings, Updates, and Job Center
 
+- Settings use five categories with a shared, compact layout: **General**, **Accounts & servers**, **AI & API**, **Security**, and **App & diagnostics**.
+- **Search settings** finds groups across all categories and opens the matching section. Clearing a search preserves pending field drafts.
+- Only the settings content scrolls; the heading and search remain visible. Narrow windows also provide a category selector.
+- API references, request examples, and update release notes expand on demand.
 - General settings:
   - theme
   - language
@@ -565,9 +569,9 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - Mono Light Red
   - Mono Dark Green
   - Mono Light Green
-- Integrations settings:
+- Accounts & servers:
   - hosting accounts, server/API URLs, tokens and per-connection OAuth configuration
-- AI & MCP settings:
+- AI & API settings:
   - AI provider
   - AI model
   - AI message style/language
@@ -585,7 +589,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - secret scan before push
   - strictness
   - repository allowlists are configured on the repository's **Secret-scan allowlist** subpage
-- System settings:
+- App & diagnostics:
   - installed app version
   - updater status
   - available version
@@ -593,6 +597,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
   - background update toggle
   - one-click update
   - release notes
+  - copyable, redacted diagnostics report
   - job center
 - Run settings:
   - per-repository `.Open-Git-Control/run.json` configuration
@@ -676,7 +681,7 @@ If the installed Git cannot isolate individual push URLs, a normal push publishe
 ### Agent planning workflow
 
 1. Start Open-Git-Control.
-2. Open Settings -> AI & MCP and copy the MCP URL plus token.
+2. Open Settings -> AI & API, expand **URLs and access**, and copy the MCP URL plus token.
 3. Configure an external agent with the MCP URL or REST endpoints.
 4. Ask the agent for `get_next_todos` or `GET /api/agent/next`.
 5. Let the agent create or move planning items.
@@ -930,14 +935,14 @@ Expected release assets:
 ### Planning API is not on port `2990`
 
 - Another local process may already use the port.
-- Check Settings -> AI & MCP for the actual port.
+- Check Settings -> AI & API for the actual port.
 - Set `OPEN_GIT_CONTROL_API_PORT=<PORT>` before starting the app if you want a different preferred port.
 
 ### AI features do not respond
 
 - For Ollama, verify the Ollama server URL and model name.
 - For Gemini, store a valid API key and select a supported model.
-- Use "Test connection" and "Load models" in Settings -> Integrations.
+- Use "Test connection" and "Load models" in Settings -> AI & API.
 
 ## Contributing and Support
 

@@ -1,14 +1,14 @@
+import { Button } from '@/components/ui/Button';
 import { RotateCcw } from 'lucide-react';
 import type { AppSettingsDto } from '@/types/appDtos';
 import { useI18n } from '@/i18n';
 import { THEME_OPTIONS } from '../settingsShared';
-import { fieldClass, inputClass, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
+import { inputClass, SettingsField, SettingsSection, SettingsSwitch, type SettingsSectionProps } from './SettingsSectionPrimitives';
 
 const ThemeField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
-  const { t } = useI18n();
+  const { tr } = useI18n();
   return (
-    <label className={fieldClass(variant)}>
-      {t('generated.components.layout.settingsmaincontent.theme_60c4ba00')}
+    <SettingsField variant={variant} label={tr('Farbschema', 'Theme')}>
       <select
         className={inputClass(variant)}
         value={settings.theme}
@@ -20,15 +20,14 @@ const ThemeField = ({ settings, onUpdateSettings, variant }: SettingsSectionProp
           </option>
         ))}
       </select>
-    </label>
+    </SettingsField>
   );
 };
 
 const LanguageField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
   const { t } = useI18n();
   return (
-    <label className={fieldClass(variant)}>
-      {t('generated.components.layout.settingsmaincontent.language_738d5882')}
+    <SettingsField variant={variant} label={t('generated.components.layout.settingsmaincontent.language_738d5882')}>
       <select
         className={inputClass(variant)}
         value={settings.language}
@@ -37,15 +36,14 @@ const LanguageField = ({ settings, onUpdateSettings, variant }: SettingsSectionP
         <option value="de">Deutsch</option>
         <option value="en">English</option>
       </select>
-    </label>
+    </SettingsField>
   );
 };
 
 const AutoFetchField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
   const { t } = useI18n();
   return (
-    <label className={fieldClass(variant)}>
-      {t('generated.components.layout.settingsmaincontent.auto_fetch_interval_seconds_af13e47c')}
+    <SettingsField variant={variant} label={t('generated.components.layout.settingsmaincontent.auto_fetch_interval_seconds_af13e47c')}>
       <input
         className={inputClass(variant)}
         type="number"
@@ -57,59 +55,66 @@ const AutoFetchField = ({ settings, onUpdateSettings, variant }: SettingsSection
           void onUpdateSettings({ autoFetchIntervalMs: seconds * 1000 });
         }}
       />
-    </label>
+    </SettingsField>
   );
 };
 
 const DefaultBranchField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
-  const { t } = useI18n();
+  const { tr } = useI18n();
   return (
-    <label className={fieldClass(variant)}>
-      {t('generated.components.layout.settingsmaincontent.default_branch_889997a3')}
+    <SettingsField variant={variant} label={tr('Standardbranch', 'Default branch')}>
       <input
         className={inputClass(variant)}
         type="text"
         value={settings.defaultBranch}
         onChange={(event) => void onUpdateSettings({ defaultBranch: event.target.value })}
       />
-    </label>
+    </SettingsField>
   );
 };
 
 const CommitTemplateField = ({ settings, onUpdateSettings, variant }: SettingsSectionProps) => {
-  const { t } = useI18n();
+  const { tr } = useI18n();
   return (
-    <label className={fieldClass(variant, true)}>
-      {t('generated.components.layout.settingsmaincontent.commit_template_c4f13929')}
+    <SettingsField variant={variant} label={tr('Commit-Vorlage', 'Commit template')} multiline>
       <textarea
         className={inputClass(variant)}
-        rows={variant === 'sidebar' ? 3 : 5}
+        rows={3}
         value={settings.commitTemplate}
         onChange={(event) => void onUpdateSettings({ commitTemplate: event.target.value })}
         style={variant === 'sidebar' ? { resize: 'vertical' } : undefined}
       />
-    </label>
+    </SettingsField>
   );
 };
 
 export const SettingsGeneralSection = ({ settings, onUpdateSettings, variant, onResetLayout }: SettingsSectionProps & { onResetLayout?: () => void }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const secondaryHistoryLabel =
     variant === 'sidebar'
       ? t('generated.components.layout.sidebar.settingssidebarcontent.show_secondary_history_d3e9e815')
-      : t('generated.components.layout.settingsmaincontent.show_secondary_history_all_branches_e9193581');
+      : tr('Verlauf aller Branches anzeigen', 'Show history for all branches');
   const signoffLabel =
     variant === 'sidebar'
       ? t('generated.components.layout.sidebar.settingssidebarcontent.commit_signoff_by_default_e423bed1')
-      : t('generated.components.layout.settingsmaincontent.enable_commit_signoff_by_default_fc09a7fe');
+      : tr('Commits standardmäßig mit Sign-off versehen', 'Enable commit sign-off by default');
 
-  if (variant === 'sidebar') {
-    return (
-      <div className="ssc-section">
-        <div className="ssc-section-title">{t('generated.components.layout.sidebar.containers.settingssidebarnav.general_c71a04d3')}</div>
+  return (
+    <div className={variant === 'sidebar' ? 'ssc-root' : 'settings-grid'}>
+      <SettingsSection group="appearance" variant={variant}>
         <ThemeField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
         <LanguageField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-        <AutoFetchField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
+        {onResetLayout && (
+          <div className="settings-action-field">
+            <span>{tr('Fensteraufteilung', 'Window layout')}</span>
+            <Button className="settings-reset-layout-btn" icon={<RotateCcw size={14} />} onClick={onResetLayout}>
+              {tr('Layout zurücksetzen', 'Reset layout')}
+            </Button>
+          </div>
+        )}
+      </SettingsSection>
+
+      <SettingsSection group="workflow" variant={variant}>
         <DefaultBranchField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
         <SettingsSwitch
           variant={variant}
@@ -124,60 +129,11 @@ export const SettingsGeneralSection = ({ settings, onUpdateSettings, variant, on
           onChange={(checked) => void onUpdateSettings({ commitSignoffByDefault: checked })}
         />
         <CommitTemplateField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-      </div>
-    );
-  }
+      </SettingsSection>
 
-  return (
-    <div className="settings-general-page">
-      <section className="settings-general-section">
-        <div className="settings-general-heading">
-          <h3>{t('generated.components.layout.settingsmaincontent.appearance_e9b2d451')}</h3>
-        </div>
-        <div className="settings-general-controls">
-          <ThemeField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-          <LanguageField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-          {onResetLayout && (
-            <div className="settings-general-actions settings-field--full">
-              <button className="staging-tool-btn settings-reset-layout-btn" onClick={onResetLayout}>
-                <RotateCcw size={14} />
-                <span>{t('generated.components.layout.settingsmaincontent.reset_layout_3308dbf7')}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="settings-general-section">
-        <div className="settings-general-heading">
-          <h3>{t('generated.components.layout.settingsmaincontent.workflow_3d911688')}</h3>
-        </div>
-        <div className="settings-general-controls">
-          <DefaultBranchField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-          <SettingsSwitch
-            variant={variant}
-            checked={settings.showSecondaryHistory}
-            label={secondaryHistoryLabel}
-            onChange={(checked) => void onUpdateSettings({ showSecondaryHistory: checked })}
-          />
-          <SettingsSwitch
-            variant={variant}
-            checked={settings.commitSignoffByDefault}
-            label={signoffLabel}
-            onChange={(checked) => void onUpdateSettings({ commitSignoffByDefault: checked })}
-          />
-          <CommitTemplateField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-        </div>
-      </section>
-
-      <section className="settings-general-section">
-        <div className="settings-general-heading">
-          <h3>{t('generated.components.layout.settingsmaincontent.synchronization_6635b4ca')}</h3>
-        </div>
-        <div className="settings-general-controls settings-general-controls--single">
-          <AutoFetchField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
-        </div>
-      </section>
+      <SettingsSection group="synchronization" variant={variant}>
+        <AutoFetchField settings={settings} onUpdateSettings={onUpdateSettings} variant={variant} />
+      </SettingsSection>
     </div>
   );
 };

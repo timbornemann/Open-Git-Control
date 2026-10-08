@@ -4,6 +4,8 @@ import type { PlanningApiInfoDto, PlanningApiTokenLifetimeDto } from '@/types/ap
 import { useI18n } from '@/i18n';
 import { useAppToast } from '@/hooks/useAppToast';
 import { appClient } from '@/services/appClient';
+import { Button } from '@/components/ui/Button';
+import { SettingsDisclosure, SettingsSection } from './settings/SettingsSectionPrimitives';
 
 type EndpointInfo = {
   method: string;
@@ -41,10 +43,16 @@ const CopyButton: React.FC<CopyButtonProps> = ({ value, label }) => {
   };
 
   return (
-    <button className="settings-copy-btn" type="button" onClick={() => void copyValue()} title={t('generated.components.actiontoastviewport.copy_5c2a9afe')}>
-      <Copy size={13} />
+    <Button
+      className="settings-copy-btn"
+      variant="ghost"
+      size="xs"
+      icon={<Copy size={13} />}
+      onClick={() => void copyValue()}
+      title={t('generated.components.actiontoastviewport.copy_5c2a9afe')}
+    >
       {label || t('generated.components.actiontoastviewport.copy_5c2a9afe')}
-    </button>
+    </Button>
   );
 };
 
@@ -84,7 +92,7 @@ const buildAgentConfig = (mcpUrl: string, authHeaderName: string, authToken: str
   );
 
 export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSettings }) => {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const showToast = useAppToast();
   const [apiInfo, setApiInfo] = useState<PlanningApiInfoDto | null>(null);
   const [tokenLifetime, setTokenLifetime] = useState<PlanningApiTokenLifetimeDto>('month');
@@ -230,36 +238,41 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
     <div className="settings-grid">
       {aiSettings}
 
-      <section className="settings-card">
-        <div className="settings-card-header-row">
-          <h3>{t('generated.components.layout.apimcpsettingspanel.local_api_940afb5b')}</h3>
-          <button className="staging-tool-btn" type="button" onClick={() => void loadApiInfo()}>
-            <RefreshCw size={13} />
+      <SettingsSection
+        group="local-api"
+        actions={
+          <Button variant="ghost" icon={<RefreshCw size={13} />} onClick={() => void loadApiInfo()}>
             {t('generated.components.layout.apimcpsettingspanel.refresh_4825b0d7')}
-          </button>
-        </div>
+          </Button>
+        }
+      >
         <p>{t('generated.components.layout.apimcpsettingspanel.these_values_belong_to_the_current_app_process_if_port_2_891cfc37')}</p>
         <div className="settings-api-status-grid">
           <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.status_b853ab43')} value={apiInfo?.status || 'starting'} />
           <CopyValueRow label="IP" value={apiHost} />
           <CopyValueRow label="Port" value={apiPort} />
           <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.base_url_929883ce')} value={baseUrl} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.api_docs_3610985f')} value={docsUrl} />
-          <CopyValueRow label="OpenAPI" value={openApiUrl} />
-          <CopyValueRow label="MCP" value={mcpUrl} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_header_2861ebc8')} value={authHeaderName} />
-          <CopyValueRow
-            label={t('generated.components.layout.apimcpsettingspanel.api_token_2d54a561')}
-            value={authToken || t('generated.components.layout.apimcpsettingspanel.not_available_yet_f74be795')}
-          />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_source_65f47a01')} value={authTokenSourceLabel} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_valid_cecc6640')} value={authTokenExpiryLabel} />
         </div>
+        <SettingsDisclosure title={tr('URLs und Zugriff', 'URLs and access')}>
+          <div className="settings-api-status-grid">
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.api_docs_3610985f')} value={docsUrl} />
+            <CopyValueRow label="OpenAPI" value={openApiUrl} />
+            <CopyValueRow label="MCP" value={mcpUrl} />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_header_2861ebc8')} value={authHeaderName} />
+            <CopyValueRow
+              label={t('generated.components.layout.apimcpsettingspanel.api_token_2d54a561')}
+              value={authToken || t('generated.components.layout.apimcpsettingspanel.not_available_yet_f74be795')}
+            />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_source_65f47a01')} value={authTokenSourceLabel} />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.token_valid_cecc6640')} value={authTokenExpiryLabel} />
+          </div>
+        </SettingsDisclosure>
         <div className="settings-api-token-manager">
           <div className="settings-api-token-controls">
             <label htmlFor="planning-api-token-lifetime">{t('generated.components.layout.apimcpsettingspanel.validity_e481f83d')}</label>
             <select
               id="planning-api-token-lifetime"
+              className="ui-field ui-field--sm"
               value={tokenLifetime}
               onChange={(event) => setTokenLifetime(event.target.value as PlanningApiTokenLifetimeDto)}
               disabled={tokenManagerDisabled}
@@ -269,16 +282,14 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
               <option value="year">{t('generated.components.layout.apimcpsettingspanel.1_year_032918f1')}</option>
               <option value="forever">{t('generated.components.layout.apimcpsettingspanel.forever_dab8b802')}</option>
             </select>
-            <button className="staging-tool-btn" type="button" onClick={() => void runTokenAction('generate')} disabled={tokenManagerDisabled}>
-              <KeyRound size={13} />
+            <Button icon={<KeyRound size={13} />} onClick={() => void runTokenAction('generate')} disabled={tokenManagerDisabled}>
               {isTokenActionRunning
                 ? t('generated.components.layout.apimcpsettingspanel.saving_cf3ffe37')
                 : t('generated.components.layout.apimcpsettingspanel.generate_token_8fa2cce1')}
-            </button>
-            <button className="staging-tool-btn" type="button" onClick={() => void runTokenAction('clear')} disabled={clearTokenDisabled}>
-              <Trash2 size={13} />
+            </Button>
+            <Button icon={<Trash2 size={13} />} onClick={() => void runTokenAction('clear')} disabled={clearTokenDisabled}>
               {t('generated.components.layout.apimcpsettingspanel.delete_saved_token_0f0d2306')}
-            </button>
+            </Button>
           </div>
           {!apiInfo?.authTokenStorageAvailable && (
             <p className="settings-danger">
@@ -289,10 +300,9 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
             <p>{t('generated.components.layout.apimcpsettingspanel.open_git_control_api_token_is_set_and_overrides_saved_ap_c28b0658')}</p>
           )}
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-card">
-        <h3>{t('generated.components.layout.apimcpsettingspanel.connect_an_ai_agent_be1931f0')}</h3>
+      <SettingsSection group="api-agent">
         <p>{t('generated.components.layout.apimcpsettingspanel.if_your_agent_supports_http_mcp_or_json_rpc_over_http_us_7564fb62')}</p>
         <div className="settings-api-command-block">
           <div className="settings-card-header-row">
@@ -301,23 +311,24 @@ export const ApiMcpSettingsPanel: React.FC<ApiMcpSettingsPanelProps> = ({ aiSett
           </div>
           <pre>{mcpConfig}</pre>
         </div>
-        <div className="settings-api-command-grid">
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.list_tools_ed53da16')} value={listToolsCurl} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.call_tool_e25d577f')} value={callToolCurl} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.next_todos_24b89c6d')} value={nextTodosCurl} />
-          <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.create_todo_a64f0415')} value={createTodoCurl} />
-        </div>
-      </section>
+        <SettingsDisclosure title={tr('Aufrufbeispiele mit curl', 'curl request examples')}>
+          <div className="settings-api-command-grid">
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.list_tools_ed53da16')} value={listToolsCurl} />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.call_tool_e25d577f')} value={callToolCurl} />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.next_todos_24b89c6d')} value={nextTodosCurl} />
+            <CopyValueRow label={t('generated.components.layout.apimcpsettingspanel.create_todo_a64f0415')} value={createTodoCurl} />
+          </div>
+        </SettingsDisclosure>
+      </SettingsSection>
 
-      <section className="settings-card">
-        <h3>{t('generated.components.layout.apimcpsettingspanel.planning_endpoints_8f68ac5f')}</h3>
-        <EndpointTable endpoints={planningEndpoints} />
-      </section>
-
-      <section className="settings-card">
-        <h3>{t('generated.components.layout.apimcpsettingspanel.mcp_endpoints_2f04d803')}</h3>
-        <EndpointTable endpoints={mcpEndpoints} />
-      </section>
+      <SettingsSection group="api-reference">
+        <SettingsDisclosure title={t('generated.components.layout.apimcpsettingspanel.planning_endpoints_8f68ac5f')}>
+          <EndpointTable endpoints={planningEndpoints} />
+        </SettingsDisclosure>
+        <SettingsDisclosure title={t('generated.components.layout.apimcpsettingspanel.mcp_endpoints_2f04d803')}>
+          <EndpointTable endpoints={mcpEndpoints} />
+        </SettingsDisclosure>
+      </SettingsSection>
     </div>
   );
 };
